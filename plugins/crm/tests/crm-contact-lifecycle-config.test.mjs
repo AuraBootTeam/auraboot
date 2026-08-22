@@ -22,6 +22,9 @@ const listPage = readJson('config/pages/crm_contact_common_list.json');
 const detailPage = readJson('config/pages/crm_contact_common_detail.json');
 const activityList = readJson('config/pages/crm_activity_common_list.json');
 const activityDetail = readJson('config/pages/crm_activity_common_detail.json');
+const activityCommands = new Map(
+  readJson('config/commands/crm_activity_common.json').map((command) => [command.code, command]),
+);
 const savedViews = readJson('config/saved-views.json');
 
 const findBlock = (page, id) => page.blocks.find((block) => block.id === id);
@@ -90,7 +93,9 @@ test('follow-up list distinguishes plans from records and detail exposes governe
 
   const toolbar = findBlock(activityDetail, 'crm_activity_detail_toolbar');
   const actions = new Map(toolbar.buttons.map((button) => [button.code, button]));
-  assert.equal(actions.get('delete').action.command, 'crm:delete_activity');
+  assert.equal(actions.get('delete').action.command, undefined);
+  assert.equal(actions.get('delete').action.type, 'command');
+  assert.equal(activityCommands.get('crm:delete_activity').type, 'delete');
   assert.equal(actions.get('delete').permissionCode, 'crm.activity.manage');
   assert.ok(actions.get('delete').confirm['zh-CN']);
   for (const code of ['start_task', 'complete_task', 'cancel_task']) {

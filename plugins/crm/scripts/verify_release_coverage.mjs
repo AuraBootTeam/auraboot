@@ -967,12 +967,27 @@ function walkConfig(candidate, visitor, currentPath = 'root', currentBlockId = n
   }
 }
 
-function resolveUiActionTarget(item) {
+function resolveUiActionTarget(item, modelCode, commandByModel) {
   const action = item?.action;
   if (action && typeof action === 'object') {
+    let target = action.command ?? action.to ?? action.name ?? null;
+    if (action.type === 'command' && target === null && modelCode && commandByModel) {
+      const conventionTypes = {
+        create: ['create'],
+        edit: ['update'],
+        delete: ['delete'],
+        save: ['create', 'update'],
+        submit: ['create', 'update'],
+      };
+      const allowedTypes = conventionTypes[item.code] ?? [];
+      const candidates = (commandByModel.get(modelCode) ?? []).filter((command) =>
+        allowedTypes.includes(command.type),
+      );
+      if (candidates.length === 1) target = candidates[0].code;
+    }
     return {
       targetType: action.type ?? 'unknown',
-      target: action.command ?? action.to ?? action.name ?? null,
+      target,
     };
   }
   if (item?.onClick?.action === 'command.execute') {
@@ -990,7 +1005,7 @@ function resolveUiActionTarget(item) {
   };
 }
 
-function collectPageStructure(page, source) {
+function collectPageStructure(page, source, commandByModel = null) {
   const blocks = [];
   const fields = [];
   const uiActions = [];
@@ -1028,7 +1043,7 @@ function collectPageStructure(page, source) {
           blockId: blockId ?? candidate.id ?? 'page',
           path: `${candidatePath}.${key}[${index}]`,
           permissionCode: item.permissionCode ?? item.permission ?? null,
-          ...resolveUiActionTarget(item),
+          ...resolveUiActionTarget(item, page.modelCode, commandByModel),
         });
       });
     }
@@ -1157,7 +1172,7 @@ function buildProductGroups({
   const uiActionRows = [];
   for (const entry of pageEntries) {
     const page = entry.value;
-    const structure = collectPageStructure(page, entry.source);
+    const structure = collectPageStructure(page, entry.source, commandByModel);
     structure.blocks.forEach((block, index) => {
       const blockKey = `${page.pageKey}:${block.id}`;
       const evidence = uniq([

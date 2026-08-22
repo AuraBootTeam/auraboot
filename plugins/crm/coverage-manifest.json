@@ -35851,7 +35851,7 @@
         },
         {
           "id": "ui-action:crm_account_common_list:crm_account_table:delete:10",
-          "action": "button delete on crm_account_common_list -> command:n/a",
+          "action": "button delete on crm_account_common_list -> command:crm:delete_account",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36268,7 +36268,7 @@
         },
         {
           "id": "ui-action:crm_activity_common_list:crm_act_table:delete:15",
-          "action": "button delete on crm_activity_common_list -> command:n/a",
+          "action": "button delete on crm_activity_common_list -> command:crm:delete_activity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36531,7 +36531,7 @@
         },
         {
           "id": "ui-action:crm_approval_case_common_list:crm_apc_table:delete:7",
-          "action": "button delete on crm_approval_case_common_list -> command:n/a",
+          "action": "button delete on crm_approval_case_common_list -> command:crm:delete_approval_case",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36622,7 +36622,7 @@
         },
         {
           "id": "ui-action:crm_assignment_rule_list:crm_asgn_table:delete:3",
-          "action": "button delete on crm_assignment_rule_list -> command:n/a",
+          "action": "button delete on crm_assignment_rule_list -> command:crm:delete_assignment_rule",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36635,7 +36635,7 @@
         },
         {
           "id": "ui-action:crm_attribution_form:buttons:submit:0",
-          "action": "button submit on crm_attribution_form -> command:n/a",
+          "action": "button submit on crm_attribution_form -> command:crm:create_attribution",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36986,7 +36986,7 @@
         },
         {
           "id": "ui-action:crm_campaign_list:crm_cpn_table:delete:9",
-          "action": "button delete on crm_campaign_list -> command:n/a",
+          "action": "button delete on crm_campaign_list -> command:crm:delete_campaign",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -37246,7 +37246,7 @@
         },
         {
           "id": "ui-action:crm_clarification_common_list:crm_cl_table:delete:12",
-          "action": "button delete on crm_clarification_common_list -> command:n/a",
+          "action": "button delete on crm_clarification_common_list -> command:crm:delete_clarification",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -37493,7 +37493,7 @@
         },
         {
           "id": "ui-action:crm_complaint_list:crm_cmp_table:delete:8",
-          "action": "button delete on crm_complaint_list -> command:n/a",
+          "action": "button delete on crm_complaint_list -> command:crm:delete_complaint",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -37506,7 +37506,7 @@
         },
         {
           "id": "ui-action:crm_consent_form:buttons:submit:0",
-          "action": "button submit on crm_consent_form -> command:n/a",
+          "action": "button submit on crm_consent_form -> command:crm:create_consent",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -37800,7 +37800,7 @@
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:7",
-          "action": "button delete on crm_contact_common_list -> command:n/a",
+          "action": "button delete on crm_contact_common_list -> command:crm:delete_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -37942,7 +37942,7 @@
         },
         {
           "id": "ui-action:crm_customer_capacity_list:table:delete:3",
-          "action": "button delete on crm_customer_capacity_list -> command:n/a",
+          "action": "button delete on crm_customer_capacity_list -> command:crm:delete_customer_capacity",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -38668,7 +38668,7 @@
         },
         {
           "id": "ui-action:crm_customer_pool_recycle_rule_list:crm_cprr_table:delete:4",
-          "action": "button delete on crm_customer_pool_recycle_rule_list -> command:n/a",
+          "action": "button delete on crm_customer_pool_recycle_rule_list -> command:crm:delete_customer_pool_recycle_rule",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -39314,7 +39314,7 @@
         },
         {
           "id": "ui-action:crm_customer_request_common_list:crm_cr_table:delete:9",
-          "action": "button delete on crm_customer_request_common_list -> command:n/a",
+          "action": "button delete on crm_customer_request_common_list -> command:crm:delete_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -39574,7 +39574,7 @@
         },
         {
           "id": "ui-action:crm_email_log_list:crm_el_table:delete:10",
-          "action": "button delete on crm_email_log_list -> command:n/a",
+          "action": "button delete on crm_email_log_list -> command:crm:delete_email_log",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -39756,7 +39756,7 @@
         },
         {
           "id": "ui-action:crm_email_template_list:crm_et_table:delete:7",
-          "action": "button delete on crm_email_template_list -> command:n/a",
+          "action": "button delete on crm_email_template_list -> command:crm:delete_email_template",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -39922,7 +39922,7 @@
         },
         {
           "id": "ui-action:crm_forecast_submission_list:table:edit:1",
-          "action": "row-action edit on crm_forecast_submission_list -> command:n/a",
+          "action": "row-action edit on crm_forecast_submission_list -> command:crm:update_forecast",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40026,7 +40026,7 @@
         },
         {
           "id": "ui-action:crm_journey_form:buttons:submit:0",
-          "action": "button submit on crm_journey_form -> command:n/a",
+          "action": "button submit on crm_journey_form -> command:crm:create_journey",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40143,7 +40143,7 @@
         },
         {
           "id": "ui-action:crm_lead_capacity_list:table:delete:3",
-          "action": "button delete on crm_lead_capacity_list -> command:n/a",
+          "action": "button delete on crm_lead_capacity_list -> command:crm:delete_lead_capacity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40539,7 +40539,7 @@
         },
         {
           "id": "ui-action:crm_lead_common_list:crm_lead_table:delete:15",
-          "action": "button delete on crm_lead_common_list -> command:n/a",
+          "action": "button delete on crm_lead_common_list -> command:crm:delete_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41201,7 +41201,7 @@
         },
         {
           "id": "ui-action:crm_lead_pool_recycle_rule_list:crm_lprr_table:delete:4",
-          "action": "button delete on crm_lead_pool_recycle_rule_list -> command:n/a",
+          "action": "button delete on crm_lead_pool_recycle_rule_list -> command:crm:delete_lead_pool_recycle_rule",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41292,7 +41292,7 @@
         },
         {
           "id": "ui-action:crm_lead_score_rule_list:crm_lsr_table:delete:3",
-          "action": "button delete on crm_lead_score_rule_list -> command:n/a",
+          "action": "button delete on crm_lead_score_rule_list -> command:crm:delete_score_rule",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41591,7 +41591,7 @@
         },
         {
           "id": "ui-action:crm_omni_session_form:buttons:submit:0",
-          "action": "button submit on crm_omni_session_form -> command:n/a",
+          "action": "button submit on crm_omni_session_form -> command:crm:create_session",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -42249,7 +42249,7 @@
         },
         {
           "id": "ui-action:crm_opportunity_common_list:crm_opp_table:delete:15",
-          "action": "button delete on crm_opportunity_common_list -> command:n/a",
+          "action": "button delete on crm_opportunity_common_list -> command:crm:delete_opportunity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -42627,7 +42627,7 @@
         },
         {
           "id": "ui-action:crm_quote_summary_common_detail:crm_qs_detail_toolbar:delete:3",
-          "action": "button delete on crm_quote_summary_common_detail -> command:n/a",
+          "action": "button delete on crm_quote_summary_common_detail -> command:crm:delete_quote_summary",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -42783,7 +42783,7 @@
         },
         {
           "id": "ui-action:crm_quote_summary_common_list:crm_qs_table:delete:9",
-          "action": "button delete on crm_quote_summary_common_list -> command:n/a",
+          "action": "button delete on crm_quote_summary_common_list -> command:crm:delete_quote_summary",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43043,7 +43043,7 @@
         },
         {
           "id": "ui-action:crm_review_common_list:crm_rv_table:delete:11",
-          "action": "button delete on crm_review_common_list -> command:n/a",
+          "action": "button delete on crm_review_common_list -> command:crm:delete_review",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43342,7 +43342,7 @@
         },
         {
           "id": "ui-action:crm_risk_common_list:crm_rk_table:delete:13",
-          "action": "button delete on crm_risk_common_list -> command:n/a",
+          "action": "button delete on crm_risk_common_list -> command:crm:delete_risk",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43524,7 +43524,7 @@
         },
         {
           "id": "ui-action:crm_segment_form:buttons:submit:0",
-          "action": "button submit on crm_segment_form -> command:n/a",
+          "action": "button submit on crm_segment_form -> command:crm:create_segment",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43589,7 +43589,7 @@
         },
         {
           "id": "ui-action:crm_sla_policy_detail:toolbar:delete:1",
-          "action": "button delete on crm_sla_policy_detail -> command:n/a",
+          "action": "button delete on crm_sla_policy_detail -> command:crm:delete_sla_policy",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43654,7 +43654,7 @@
         },
         {
           "id": "ui-action:crm_sla_policy_list:crm_sla_policy_table:delete:2",
-          "action": "button delete on crm_sla_policy_list -> command:n/a",
+          "action": "button delete on crm_sla_policy_list -> command:crm:delete_sla_policy",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -43667,7 +43667,7 @@
         },
         {
           "id": "ui-action:crm_subscription_form:buttons:submit:0",
-          "action": "button submit on crm_subscription_form -> command:n/a",
+          "action": "button submit on crm_subscription_form -> command:crm:create_subscription",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",

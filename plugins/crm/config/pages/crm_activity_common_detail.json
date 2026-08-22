@@ -202,8 +202,7 @@
             "en-US": "Delete this follow-up plan or record? Related comments will no longer be visible."
           },
           "action": {
-            "type": "command",
-            "command": "crm:delete_activity"
+            "type": "command"
           }
         }
       ]

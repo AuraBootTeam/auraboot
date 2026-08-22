@@ -29,7 +29,7 @@
       "blockType": "toolbar",
       "buttons": [
         { "code": "edit", "permissionCode": "crm.account.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_account_relation_common_form" } },
-        { "code": "delete", "danger": true, "permissionCode": "crm.account.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "确认删除此客户关系？", "en-US": "Delete this account relationship?" }, "action": { "type": "command", "command": "crm:delete_account_relation" } }
+        { "code": "delete", "danger": true, "permissionCode": "crm.account.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "确认删除此客户关系？", "en-US": "Delete this account relationship?" }, "action": { "type": "command" } }
       ]
     }
   ]
