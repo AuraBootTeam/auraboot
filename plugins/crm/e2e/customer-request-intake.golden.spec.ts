@@ -175,7 +175,6 @@ test('operator inspects the immutable source-evidence summary without raw payloa
       await sidebarToggle.click();
     }
     await expect(sidebarToggle).toHaveAttribute('aria-expanded', 'false');
-    await page.waitForTimeout(400); // allow the 300ms mobile drawer transition to finish
     await expect(sourceTab).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('form-field-crm_cr_source_message_ref')).toBeVisible();
     await shot(page, testInfo, 'customer-request-intake-source-evidence-mobile.png');
