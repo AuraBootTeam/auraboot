@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_detail",
   "name:zh-CN": "线索池详情",
   "name:en": "Lead Pool Detail",
-  "modelCode": "crm_lead_pool",
+  "modelCode": "crm_lead_pool_common",
   "kind": "detail",
   "schemaVersion": 4,
   "layout": { "type": "stack" },
@@ -11,11 +11,12 @@
       { "field": "crm_lp_code", "readOnly": true }, { "field": "crm_lp_name", "readOnly": true }, { "field": "crm_lp_status", "readOnly": true },
       { "field": "crm_lp_member_user_ids", "span": 2, "readOnly": true }, { "field": "crm_lp_admin_user_ids", "readOnly": true },
       { "field": "crm_lp_daily_pick_limit", "readOnly": true }, { "field": "crm_lp_new_cooldown_days", "readOnly": true }, { "field": "crm_lp_previous_owner_cooldown_days", "readOnly": true },
-      { "field": "crm_lp_auto_recycle", "readOnly": true }, { "field": "crm_lp_recycle_after_days", "readOnly": true }, { "field": "crm_lp_recycle_basis", "readOnly": true },
+      { "field": "crm_lp_auto_recycle", "readOnly": true }, { "field": "crm_lp_recycle_match_mode", "readOnly": true }, { "field": "crm_lp_recycle_after_days", "readOnly": true }, { "field": "crm_lp_recycle_basis", "readOnly": true },
       { "field": "crm_lp_description", "span": 3, "readOnly": true }
     ] },
     { "id": "actions", "blockType": "toolbar", "buttons": [
-      { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_pool_form" } }
+      { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_pool_form" } },
+      { "code": "manage_recycle_rules", "permissionCode": "crm.lead_pool.manage", "label": { "zh-CN": "维护回收条件", "en": "Manage Recycle Conditions" }, "action": { "type": "navigate", "to": "crm_lead_pool_recycle_rule_list" } }
     ] }
   ]
 }

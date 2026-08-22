@@ -11,7 +11,7 @@ class LeadPoolRecycleSchedulerTest {
     void skipsOnlyTheExactMissingCrmModelCondition() {
         assertTrue(LeadPoolRecycleScheduler.isCrmModelAbsent(
                 new IllegalStateException("wrapper",
-                        new RuntimeException("Model not found: crm_lead_pool"))));
+                        new RuntimeException("Model not found: crm_lead_pool_common"))));
         assertFalse(LeadPoolRecycleScheduler.isCrmModelAbsent(
                 new RuntimeException("Model not found: crm_lead_common")));
         assertFalse(LeadPoolRecycleScheduler.isCrmModelAbsent(

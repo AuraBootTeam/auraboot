@@ -17,6 +17,8 @@ export interface FiltersBlockRendererProps {
 export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
   const { t } = useI18n();
   const fields = block.fields || [];
+  const density = (block as any).density || 'default';
+  const compact = density === 'compact';
 
   const executeFilterHandler = async (handler: unknown) => {
     if (!handler) return;
@@ -50,29 +52,48 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
   };
 
   return (
-    <div className="filters-block border-border bg-subtle border-b px-6 py-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {fields.map((field) => (
-          <div key={field.field} data-authoring-node-id={(field as any).id || field.field}>
-            <FieldRenderer field={field} runtime={runtime} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex justify-end space-x-2">
-        <button
-          onClick={handleReset}
-          data-testid="filter-btn-reset"
-          className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2"
+    <div
+      className={
+        compact
+          ? 'filters-block rounded-control border-border bg-panel border px-4 py-1.5'
+          : 'filters-block border-border bg-subtle border-b px-6 py-4'
+      }
+      data-density={density}
+    >
+      <div className={compact ? 'flex flex-col gap-3 lg:flex-row lg:items-end' : undefined}>
+        <div
+          className={
+            compact
+              ? 'grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4'
+              : 'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+          }
         >
-          {t('action.reset') !== 'action.reset' ? t('action.reset') : 'Reset'}
-        </button>
-        <button
-          onClick={handleSearch}
-          data-testid="filter-btn-search"
-          className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white"
+          {fields.map((field) => (
+            <div key={field.field} data-authoring-node-id={(field as any).id || field.field}>
+              <FieldRenderer field={field} runtime={runtime} />
+            </div>
+          ))}
+        </div>
+        <div
+          className={
+            compact ? 'flex shrink-0 justify-end gap-2' : 'mt-4 flex justify-end space-x-2'
+          }
         >
-          {t('action.search') !== 'action.search' ? t('action.search') : 'Search'}
-        </button>
+          <button
+            onClick={handleReset}
+            data-testid="filter-btn-reset"
+            className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2"
+          >
+            {t('action.reset') !== 'action.reset' ? t('action.reset') : 'Reset'}
+          </button>
+          <button
+            onClick={handleSearch}
+            data-testid="filter-btn-search"
+            className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-white"
+          >
+            {t('action.search') !== 'action.search' ? t('action.search') : 'Search'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 {
-  "pageKey": "crm_lead_pool_item_detail", "name:zh-CN": "池内线索详情", "name:en": "Pooled Lead Detail", "modelCode": "crm_lead_pool_item", "kind": "detail", "schemaVersion": 4,
+  "pageKey": "crm_lead_pool_item_detail", "name:zh-CN": "池内线索详情", "name:en": "Pooled Lead Detail", "modelCode": "crm_lead_pool_item_common", "kind": "detail", "schemaVersion": 4,
   "layout": { "type": "stack" },
   "blocks": [
     { "id": "lead_snapshot", "blockType": "form-section", "title": { "zh-CN": "线索快照", "en": "Lead Snapshot" }, "columns": 3, "fields": [

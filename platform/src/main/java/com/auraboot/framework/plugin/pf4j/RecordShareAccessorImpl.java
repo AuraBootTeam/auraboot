@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.RecordShare;
@@ -15,6 +16,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Tenant-safe host implementation of the plugin record-share bridge. */
 @Service
@@ -30,7 +32,10 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
             String resourceCode,
             String recordPid,
             Collection<String> userPids) {
-        replaceSharesForUsers(tenantId, resourceCode, recordPid, userPids, "read");
+        withTenantContext(tenantId, () -> {
+            replaceSharesForUsers(tenantId, resourceCode, recordPid, userPids, "read");
+            return null;
+        });
     }
 
     @Override
@@ -39,7 +44,10 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
             String resourceCode,
             String recordPid,
             Collection<String> userPids) {
-        replaceSharesForUsers(tenantId, resourceCode, recordPid, userPids, "read,update");
+        withTenantContext(tenantId, () -> {
+            replaceSharesForUsers(tenantId, resourceCode, recordPid, userPids, "read,update");
+            return null;
+        });
     }
 
     private void replaceSharesForUsers(
@@ -81,6 +89,25 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
             recordShareService.shareRecordByPid(
                     tenantId, resourceCode.trim(), recordPid.trim(),
                     "member", memberIdsByPid.get(memberPid), memberPid, permissionMask, null);
+        }
+    }
+
+    private <T> T withTenantContext(long tenantId, Supplier<T> work) {
+        if (MetaContext.exists()) {
+            if (!java.util.Objects.equals(MetaContext.getCurrentTenantId(), tenantId)) {
+                throw new BusinessException(ResponseCode.FORBIDDEN, "Record-share tenant does not match current context");
+            }
+            return work.get();
+        }
+
+        Long priorEnvironment = MetaContext.getCurrentEnvironmentId();
+        MetaContext.setContext(tenantId, 0L, null, "system");
+        MetaContext.setMemberId(null);
+        MetaContext.setEnvironmentId(priorEnvironment);
+        try {
+            return work.get();
+        } finally {
+            MetaContext.clear();
         }
     }
 }

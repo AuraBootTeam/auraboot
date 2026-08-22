@@ -4,7 +4,7 @@
     "displayName:zh-CN": "新建线索库容",
     "displayName:en": "Create Lead Capacity",
     "type": "create",
-    "modelCode": "crm_lead_capacity",
+    "modelCode": "crm_lead_capacity_common",
     "inputFields": ["crm_lcap_user_id", "crm_lcap_capacity", "crm_lcap_status", "crm_lcap_remark"],
     "autoSetFields": { "crm_lcap_user_key": { "strategy": "copy_field", "sourceField": "crm_lcap_user_id" } },
     "permissions": ["crm.lead_pool.manage"],
@@ -15,7 +15,7 @@
     "displayName:zh-CN": "编辑线索库容",
     "displayName:en": "Update Lead Capacity",
     "type": "update",
-    "modelCode": "crm_lead_capacity",
+    "modelCode": "crm_lead_capacity_common",
     "inputFields": ["crm_lcap_capacity", "crm_lcap_status", "crm_lcap_remark"],
     "permissions": ["crm.lead_pool.manage"],
     "cmd_risk_level": "L1"
@@ -25,7 +25,7 @@
     "displayName:zh-CN": "删除线索库容",
     "displayName:en": "Delete Lead Capacity",
     "type": "delete",
-    "modelCode": "crm_lead_capacity",
+    "modelCode": "crm_lead_capacity_common",
     "permissions": ["crm.lead_pool.manage"],
     "cmd_risk_level": "L4"
   },
@@ -34,7 +34,7 @@
     "displayName:zh-CN": "线索库容列表",
     "displayName:en": "List Lead Capacities",
     "type": "query",
-    "modelCode": "crm_lead_capacity",
+    "modelCode": "crm_lead_capacity_common",
     "permissions": ["crm.lead_pool.read"],
     "cmd_risk_level": "L0"
   }

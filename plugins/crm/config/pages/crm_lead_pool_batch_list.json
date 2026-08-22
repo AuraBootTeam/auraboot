@@ -1,0 +1,63 @@
+{
+  "pageKey": "crm_lead_pool_batch_list",
+  "name:zh-CN": "线索池批量处理",
+  "name:en": "Lead Pool Batch Operations",
+  "modelCode": "crm_lead_pool_item_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "batch_guidance",
+      "blockType": "description",
+      "content": {
+        "zh-CN": "<h3>批量领取与分配</h3><p>仅选择待领取线索。系统会逐条校验成员资格、冷却、每日上限、人员库容和并发状态，并明确报告每条结果。</p>",
+        "en": "<h3>Batch claim and assignment</h3><p>Select only available leads. Membership, cooldown, daily quota, capacity, and concurrency are validated per record with explicit results.</p>"
+      }
+    },
+    {
+      "id": "pool_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        { "key": "available", "label": { "zh-CN": "待领取", "en": "Available" }, "filter": { "field": "crm_lpi_status", "value": "available", "operator": "EQ" } },
+        { "key": "claimed", "label": { "zh-CN": "已领取", "en": "Claimed" }, "filter": { "field": "crm_lpi_status", "value": "claimed", "operator": "EQ" } },
+        { "key": "assigned", "label": { "zh-CN": "已分配", "en": "Assigned" }, "filter": { "field": "crm_lpi_status", "value": "assigned", "operator": "EQ" } }
+      ]
+    },
+    {
+      "id": "pool_queue",
+      "blockType": "table",
+      "table": {
+        "selection": { "mode": "multiple", "bind": "{{state.selectedIds}}" },
+        "bulkCapabilities": { "edit": false, "delete": false, "export": { "permissionCode": "crm.lead_pool.read" } },
+        "bulkActions": [
+          { "code": "batch_claim", "permissionCode": "crm.lead_pool.pick", "label": { "zh-CN": "批量领取", "en": "Claim Selected" }, "confirm": { "zh-CN": "容量、每日上限与冷却规则将逐条校验。确认领取？", "en": "Capacity, daily limit and cooldown rules will be enforced. Continue?" }, "action": { "type": "bulk_state_transition", "command": "crm:claim_pool_lead" } },
+          { "code": "batch_assign", "permissionCode": "crm.lead_pool.assign", "label": { "zh-CN": "批量分配", "en": "Assign Selected" }, "action": { "type": "bulk_field_command", "command": "crm:assign_pool_lead", "input": { "field": "crm_lpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "props": { "multiple": false } } } }
+        ]
+      },
+      "columns": [
+        { "field": "crm_lpi_pool_id", "width": 180 },
+        { "field": "crm_lpi_company", "width": 220, "sortable": true },
+        { "field": "crm_lpi_contact_name", "width": 130 },
+        { "field": "crm_lpi_source", "width": 120, "renderType": "tag", "dictCode": "crm_lead_source" },
+        { "field": "crm_lpi_score", "width": 90, "align": "right", "sortable": true },
+        { "field": "crm_lpi_previous_owner", "width": 140 },
+        { "field": "crm_lpi_entered_at", "width": 170, "sortable": true },
+        { "field": "crm_lpi_claim_release_at", "width": 170 },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            { "code": "view_pool_evidence", "label": { "zh-CN": "池内详情", "en": "Pool Detail" }, "action": { "type": "navigate", "to": "crm_lead_pool_item_detail" } },
+            { "code": "open_lead", "label": { "zh-CN": "查看线索", "en": "View Lead" }, "action": { "type": "navigate", "to": "/p/crm_lead_common/view/${row.crm_lpi_lead_id}" } },
+            { "code": "claim", "permissionCode": "crm.lead_pool.pick", "label": { "zh-CN": "领取", "en": "Claim" }, "visibleWhen": "row.crm_lpi_status == 'available'", "action": { "type": "command", "command": "crm:claim_pool_lead" } },
+            { "code": "assign", "permissionCode": "crm.lead_pool.assign", "label": { "zh-CN": "分配", "en": "Assign" }, "visibleWhen": "row.crm_lpi_status == 'available'", "action": { "type": "command", "command": "crm:assign_pool_lead", "operationType": "update", "inputFieldsTitle": { "zh-CN": "分配线索", "en": "Assign Lead" }, "inputFields": [ { "field": "crm_lpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "props": { "multiple": false } } ] } }
+          ]
+        }
+      ],
+      "searchFields": ["crm_lpi_company", "crm_lpi_contact_name", "crm_lpi_lead_code"],
+      "defaultSort": { "field": "crm_lpi_entered_at", "order": "desc" }
+    }
+  ]
+}

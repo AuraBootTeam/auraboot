@@ -91,6 +91,19 @@ public interface DataAccessor {
     Map<String, Object> create(String modelCode, Map<String, Object> data);
 
     /**
+     * Insert a record idempotently.
+     *
+     * <p>The default preserves source compatibility for plugin test doubles. Runtime accessors
+     * should override this method and return {@link Optional#empty()} when a unique constraint
+     * rejects a duplicate logical operation.
+     *
+     * @since 2.8.0
+     */
+    default Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
+        return Optional.of(create(modelCode, data));
+    }
+
+    /**
      * Update an existing record.
      *
      * @param modelCode the model code
@@ -115,11 +128,24 @@ public interface DataAccessor {
                                   String fieldCode,
                                   Object expectedValue,
                                   Object nextValue) {
+        Map<String, Object> nextValues = new java.util.HashMap<>();
+        nextValues.put(fieldCode, nextValue);
+        return compareAndSet(modelCode, recordId, fieldCode, expectedValue, nextValues);
+    }
+
+    /**
+     * Atomically apply several stored control-field values when one compare field still matches.
+     */
+    default boolean compareAndSet(String modelCode,
+                                  String recordId,
+                                  String fieldCode,
+                                  Object expectedValue,
+                                  Map<String, Object> nextValues) {
         Map<String, Object> current = getById(modelCode, recordId);
         if (current == null || !Objects.equals(current.get(fieldCode), expectedValue)) {
             return false;
         }
-        return update(modelCode, recordId, Map.of(fieldCode, nextValue)) != null;
+        return update(modelCode, recordId, nextValues) != null;
     }
 
     /**

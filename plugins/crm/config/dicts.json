@@ -4149,7 +4149,23 @@
       { "value": "available", "label": "Available", "label:zh-CN": "待领取", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
       { "value": "claiming", "label": "Claiming", "label:zh-CN": "领取中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
-      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } }
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "recycling", "label": "Recycling", "label:zh-CN": "回收处理中", "sortNo": 50, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "recycling_retry", "label": "Recovering Recycle", "label:zh-CN": "回收恢复中", "sortNo": 60, "status": "enabled", "extension": { "color": "amber" } }
+    ]
+  },
+  {
+    "code": "crm_lead_pool_operational_state",
+    "name": "Lead Pool Operational State",
+    "name:zh-CN": "线索池运营状态",
+    "dictType": "static",
+    "items": [
+      { "value": "ready", "label": "Ready", "label:zh-CN": "现在可领", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "cooldown", "label": "Cooling Down", "label:zh-CN": "冷却中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "recycling", "label": "Recycling", "label:zh-CN": "回收处理中", "sortNo": 50, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "recycling_retry", "label": "Recovering Recycle", "label:zh-CN": "回收恢复中", "sortNo": 60, "status": "enabled", "extension": { "color": "amber" } }
     ]
   },
   {
@@ -4160,6 +4176,51 @@
     "items": [
       { "value": "owned", "label": "Owned", "label:zh-CN": "已归属", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
       { "value": "in_pool", "label": "In Pool", "label:zh-CN": "在线索池", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_lead_recycle_match_mode",
+    "name": "Lead Recycle Match Mode",
+    "name:zh-CN": "线索回收条件关系",
+    "dictType": "static",
+    "items": [
+      { "value": "all", "label": "All Conditions (AND)", "label:zh-CN": "全部满足（AND）", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "any", "label": "Any Condition (OR)", "label:zh-CN": "任一满足（OR）", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } }
+    ]
+  },
+  {
+    "code": "crm_lead_recycle_time_source",
+    "name": "Lead Recycle Time Source",
+    "name:zh-CN": "线索回收时间条件",
+    "dictType": "static",
+    "items": [
+      { "value": "pool_entered_or_claimed", "label": "Pool Entry or Claim Time", "label:zh-CN": "入池或领取时间", "sortNo": 10, "status": "enabled" },
+      { "value": "pool_entered_at", "label": "Pool Entry Time", "label:zh-CN": "入池时间", "sortNo": 20, "status": "enabled" },
+      { "value": "claimed_at", "label": "Claim Time", "label:zh-CN": "领取时间", "sortNo": 30, "status": "enabled" },
+      { "value": "last_activity_at", "label": "Last Activity Time", "label:zh-CN": "最近跟进时间", "sortNo": 40, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "crm_lead_recycle_time_operator",
+    "name": "Lead Recycle Time Operator",
+    "name:zh-CN": "线索回收时间运算",
+    "dictType": "static",
+    "items": [
+      { "value": "older_than_days", "label": "Older Than Relative Days", "label:zh-CN": "早于相对天数", "sortNo": 10, "status": "enabled" },
+      { "value": "newer_than_days", "label": "Newer Than Relative Days", "label:zh-CN": "晚于相对天数", "sortNo": 20, "status": "enabled" },
+      { "value": "fixed_between", "label": "Within Fixed Interval", "label:zh-CN": "位于固定区间", "sortNo": 30, "status": "enabled" },
+      { "value": "fixed_before", "label": "Before Fixed Time", "label:zh-CN": "早于固定时间", "sortNo": 40, "status": "enabled" },
+      { "value": "fixed_after", "label": "After Fixed Time", "label:zh-CN": "晚于固定时间", "sortNo": 50, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "crm_lead_recycle_rule_status",
+    "name": "Lead Recycle Rule Status",
+    "name:zh-CN": "线索回收规则状态",
+    "dictType": "static",
+    "items": [
+      { "value": "active", "label": "Active", "label:zh-CN": "生效", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
     ]
   },
   {

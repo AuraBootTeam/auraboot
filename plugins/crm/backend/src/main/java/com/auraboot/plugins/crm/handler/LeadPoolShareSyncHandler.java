@@ -32,33 +32,33 @@ public class LeadPoolShareSyncHandler implements CommandHandlerExtension {
             throw new IllegalStateException("Lead-pool ACL synchronisation bridge unavailable");
         }
         String poolId = required(context.recordId(), "Lead pool id is required after persistence");
-        Map<String, Object> pool = db.getById("crm_lead_pool", poolId);
+        Map<String, Object> pool = db.getById("crm_lead_pool_common", poolId);
         if (pool == null) throw new IllegalArgumentException("Lead pool not found: " + poolId);
 
         Set<String> poolUsers = poolUsers(pool);
-        shares.replaceReadSharesForUsers(context.tenantId(), "crm_lead_pool", poolId, poolUsers);
+        shares.replaceReadSharesForUsers(context.tenantId(), "crm_lead_pool_common", poolId, poolUsers);
 
-        List<Map<String, Object>> items = db.query("crm_lead_pool_item", Map.of("crm_lpi_pool_id", poolId));
+        List<Map<String, Object>> items = db.query("crm_lead_pool_item_common", Map.of("crm_lpi_pool_id", poolId));
         if (items != null) {
             for (Map<String, Object> item : items) {
                 String itemId = required(item.get("pid"), "Pool item pid is required");
                 String status = String.valueOf(item.get("crm_lpi_status"));
                 if ("available".equals(status) || "claiming".equals(status)) {
                     shares.replaceReadUpdateSharesForUsers(
-                            context.tenantId(), "crm_lead_pool_item", itemId, poolUsers);
+                            context.tenantId(), "crm_lead_pool_item_common", itemId, poolUsers);
                 } else {
                     Object owner = item.get("crm_lpi_claimed_by");
-                    shares.replaceReadUpdateSharesForUsers(context.tenantId(), "crm_lead_pool_item", itemId,
+                    shares.replaceReadUpdateSharesForUsers(context.tenantId(), "crm_lead_pool_item_common", itemId,
                             owner == null ? Set.of() : Set.of(String.valueOf(owner)));
                 }
             }
         }
 
         List<Map<String, Object>> history = db.query(
-                "crm_lead_owner_history", Map.of("crm_loh_pool_id", poolId));
+                "crm_lead_owner_history_common", Map.of("crm_loh_pool_id", poolId));
         if (history != null) {
             for (Map<String, Object> row : history) {
-                shares.replaceReadSharesForUsers(context.tenantId(), "crm_lead_owner_history",
+                shares.replaceReadSharesForUsers(context.tenantId(), "crm_lead_owner_history_common",
                         required(row.get("pid"), "Ownership-history pid is required"), poolUsers);
             }
         }
