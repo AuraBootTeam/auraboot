@@ -125,6 +125,46 @@ describe('TenantMemberAccountImportDialog', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('discards one-time credentials when the dialog closes', async () => {
+    const fetchMock = vi.mocked(global.fetch);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(previewData))
+      .mockResolvedValueOnce(jsonResponse(importData));
+
+    function Harness() {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Reopen
+          </button>
+          <TenantMemberAccountImportDialog
+            open={open}
+            onClose={() => setOpen(false)}
+            onImported={vi.fn()}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    uploadWorkbook();
+    fireEvent.click(screen.getByTestId('member-import-preview'));
+    await screen.findByTestId('member-import-preview-result');
+    fireEvent.click(screen.getByTestId('member-import-confirm'));
+    await screen.findByTestId('member-import-result');
+    expect(screen.getByText('jjzz@1234')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' }).at(-1)!);
+    expect(screen.queryByTestId('member-import-dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(screen.getByTestId('member-import-dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('member-import-result')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('member-import-download-credentials')).not.toBeInTheDocument();
+    expect(screen.queryByText('jjzz@1234')).not.toBeInTheDocument();
+  });
+
   it('rejects a non-xlsx template response instead of downloading an error page', async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,

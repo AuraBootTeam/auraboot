@@ -1450,6 +1450,7 @@ function ListPageContentInner(props: PageContentProps) {
   const canImport = canUseImport(importConfig, hasPermission);
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
+  const canManageMemberAccounts = isTenantMemberPage && hasPermission('org.role.update');
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
   // Quick filters live only in the toolbar. They apply to default view mode and
@@ -4748,7 +4749,9 @@ function ListPageContentInner(props: PageContentProps) {
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
-            onImportMembers={() => setMemberImportDialogOpen(true)}
+            onImportMembers={
+              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
+            }
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
               skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
@@ -4769,7 +4772,7 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
-          {isTenantMemberPage && (
+          {canManageMemberAccounts && (
             <TenantMemberAccountImportDialog
               open={memberImportDialogOpen}
               token={token}

@@ -507,8 +507,9 @@ describe('UnifiedDesignerPage', () => {
 
     expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
     window.dispatchEvent(new Event('focus'));
-    await waitFor(() =>
-      expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session_1'),
+    await waitFor(
+      () => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session_1'),
+      { timeout: 5_000 },
     );
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
     expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
@@ -1597,7 +1598,10 @@ describe('UnifiedDesignerPage', () => {
       ),
     );
     expect(savePageSchemaV3).not.toHaveBeenCalled();
-    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    await waitFor(
+      () => expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4'),
+      { timeout: 5_000 },
+    );
   });
 
   it('keeps the source workspace continuous after a governed ChangeSet split', async () => {

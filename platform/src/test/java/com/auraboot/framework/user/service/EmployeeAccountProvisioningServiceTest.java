@@ -210,6 +210,73 @@ class EmployeeAccountProvisioningServiceTest {
     }
 
     @Test
+    void preview_duplicateEmployeeCodesInWorkbookAreRejected() {
+        when(dynamicDataService.list(eq("org_employee"), any()))
+                .thenReturn(PaginationResult.empty(1, 2));
+        when(dynamicDataService.list(eq("org_department"), any()))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("pid", "dept-1", "org_dept_code", "SALES")), 1L, 1, 2));
+        EmployeeAccountRow first = row("王佳霞", null);
+        first.setUserName("wang-1");
+        first.setEmployeeCode("EMP001");
+        first.setDepartmentCode("SALES");
+        EmployeeAccountRow second = row("王佳霞", null);
+        second.setUserName("wang-2");
+        second.setEmployeeCode("EMP001");
+        second.setDepartmentCode("SALES");
+
+        var preview = service.preview(List.of(first, second), 7L);
+
+        assertThat(preview.getErrorCount()).isEqualTo(1);
+        assertThat(preview.getRows().get(1).getErrors())
+                .contains("Duplicate employee code in workbook: EMP001");
+    }
+
+    @Test
+    void preview_positionOutsideDepartmentIsRejected() {
+        when(dynamicDataService.list(eq("org_employee"), any()))
+                .thenReturn(PaginationResult.empty(1, 2));
+        when(dynamicDataService.list(eq("org_department"), any()))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("pid", "dept-support", "org_dept_code", "SUPPORT")),
+                        1L, 1, 2));
+        when(dynamicDataService.list(eq("org_position"), any()))
+                .thenReturn(PaginationResult.of(List.of(Map.of(
+                        "pid", "pos-sales",
+                        "org_pos_code", "SALES_REP",
+                        "org_pos_dept_id", "dept-sales")), 1L, 1, 2));
+        EmployeeAccountRow employee = row("王佳霞", null);
+        employee.setEmployeeCode("EMP001");
+        employee.setDepartmentCode("SUPPORT");
+        employee.setPositionCode("SALES_REP");
+
+        var preview = service.preview(List.of(employee), 7L);
+
+        assertThat(preview.getErrorCount()).isEqualTo(1);
+        assertThat(preview.getRows().get(0).getErrors())
+                .contains("Position SALES_REP does not belong to department SUPPORT");
+    }
+
+    @Test
+    void preview_employeeAlreadyLinkedToMemberIsRejected() {
+        when(dynamicDataService.list(eq("org_employee"), any()))
+                .thenReturn(PaginationResult.of(List.of(Map.of(
+                        "pid", "employee-existing",
+                        "org_emp_code", "EMP002",
+                        "org_emp_dept_id", "dept-1",
+                        "org_emp_position_id", "pos-1",
+                        "org_emp_member_id", "member-existing")), 1L, 1, 2));
+        EmployeeAccountRow employee = row("已有人员", null);
+        employee.setEmployeeCode("EMP002");
+
+        var preview = service.preview(List.of(employee), 7L);
+
+        assertThat(preview.getErrorCount()).isEqualTo(1);
+        assertThat(preview.getRows().get(0).getErrors())
+                .contains("Employee is already linked to a tenant member: EMP002");
+    }
+
+    @Test
     void provision_createsEmployeeByUniqueDepartmentAndPositionCodes() {
         when(dynamicDataService.list(eq("org_employee"), any()))
                 .thenReturn(PaginationResult.empty(1, 2));
