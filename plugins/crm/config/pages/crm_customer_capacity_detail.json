@@ -1,0 +1,10 @@
+{
+  "pageKey": "crm_customer_capacity_detail", "name:zh-CN": "客户库容详情", "name:en": "Customer Capacity Detail", "modelCode": "crm_customer_capacity_common", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "capacity_detail", "blockType": "form-section", "title": { "zh-CN": "用户库容", "en": "User Capacity" }, "columns": 2, "fields": [
+      { "field": "crm_ccap_user_id", "readOnly": true }, { "field": "crm_ccap_capacity", "readOnly": true }, { "field": "crm_ccap_status", "readOnly": true }, { "field": "crm_ccap_remark", "readOnly": true }
+    ] },
+    { "id": "actions", "blockType": "toolbar", "buttons": [ { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_capacity_form" } } ] }
+  ]
+}

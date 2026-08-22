@@ -154,9 +154,20 @@ export function resolvePromptUploadAccept(promptUpload: unknown): string {
   return '.xlsx,.xls,.csv';
 }
 
-export function resolvePromptUploadFeedbackMode(
+/**
+ * Reuse a File already collected by FormDialog under the promptUpload payload
+ * key. This enables one-step import dialogs while keeping the legacy OS picker
+ * fallback for buttons that do not declare an inline file field.
+ */
+export function resolvePromptUploadFile(
   promptUpload: unknown,
-): PromptUploadFeedbackMode {
+  payload: Record<string, unknown> | null | undefined,
+): File | null {
+  const candidate = payload?.[resolvePromptUploadKey(promptUpload)];
+  return typeof File !== 'undefined' && candidate instanceof File ? candidate : null;
+}
+
+export function resolvePromptUploadFeedbackMode(promptUpload: unknown): PromptUploadFeedbackMode {
   if (promptUpload && typeof promptUpload === 'object' && !Array.isArray(promptUpload)) {
     const mode = (promptUpload as Record<string, unknown>).feedbackMode;
     if (mode === 'panel') {

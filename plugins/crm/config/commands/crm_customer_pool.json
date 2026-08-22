@@ -1,0 +1,216 @@
+[
+  {
+    "code": "crm:create_customer_pool",
+    "displayName:zh-CN": "新建客户公海",
+    "displayName:en": "Create Customer Pool",
+    "type": "create",
+    "modelCode": "crm_customer_pool_common",
+    "inputFields": ["crm_cp_name", "crm_cp_member_user_ids", "crm_cp_admin_user_ids", "crm_cp_daily_pick_limit", "crm_cp_new_cooldown_days", "crm_cp_previous_owner_cooldown_days", "crm_cp_auto_recycle", "crm_cp_recycle_match_mode", "crm_cp_recycle_after_days", "crm_cp_recycle_basis", "crm_cp_description"],
+    "autoSetFields": {
+      "crm_cp_code": { "strategy": "auto_generate", "pattern": "CP-{yyyyMMdd}-{seq}" },
+      "crm_cp_status": { "strategy": "fixed_value", "value": "enabled" }
+    },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:update_customer_pool",
+    "displayName:zh-CN": "编辑客户公海策略",
+    "displayName:en": "Update Customer Pool Policy",
+    "type": "update",
+    "modelCode": "crm_customer_pool_common",
+    "inputFields": ["crm_cp_name", "crm_cp_member_user_ids", "crm_cp_admin_user_ids", "crm_cp_daily_pick_limit", "crm_cp_new_cooldown_days", "crm_cp_previous_owner_cooldown_days", "crm_cp_auto_recycle", "crm_cp_recycle_match_mode", "crm_cp_recycle_after_days", "crm_cp_recycle_basis", "crm_cp_description"],
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:toggle_customer_pool",
+    "displayName:zh-CN": "启用/停用客户公海",
+    "displayName:en": "Enable or Disable Customer Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:toggle_customer_pool",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_customer_pool",
+    "displayName:zh-CN": "删除客户公海",
+    "displayName:en": "Delete Customer Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:delete_customer_pool",
+    "handlerParams": { "dslPersistence": false },
+    "extension": { "confirmMessage:zh-CN": "仅空客户公海可删除，确认继续？", "confirmMessage:en": "Only an empty customer pool can be deleted. Continue?" },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_customer_pools",
+    "displayName:zh-CN": "客户公海列表",
+    "displayName:en": "List Customer Pools",
+    "type": "query",
+    "modelCode": "crm_customer_pool_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_customer_pool",
+    "displayName:zh-CN": "查看客户公海",
+    "displayName:en": "View Customer Pool",
+    "type": "query",
+    "modelCode": "crm_customer_pool_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:move_customer_to_pool",
+    "displayName:zh-CN": "移入客户公海",
+    "displayName:en": "Move Customer to Pool",
+    "type": "custom",
+    "modelCode": "crm_account_common",
+    "handler": "crm:move_customer_to_pool",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_acc_last_pool_id"],
+    "permissions": ["crm.customer_pool.move"],
+    "agent_hint": "Move an owned customer into an enabled public pool. Payload poolId or crm_acc_last_pool_id is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:claim_pool_customer",
+    "displayName:zh-CN": "领取客户",
+    "displayName:en": "Claim Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:claim_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.pick"],
+    "agent_hint": "Claim one available pool item. Capacity, daily limit and cooldown policies are enforced atomically.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:assign_pool_customer",
+    "displayName:zh-CN": "分配客户",
+    "displayName:en": "Assign Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:assign_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_cpi_claimed_by"],
+    "permissions": ["crm.customer_pool.assign"],
+    "agent_hint": "Pool administrators assign one available pool item to a user. Payload assigneeId or crm_cpi_claimed_by is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:update_pool_customer",
+    "displayName:zh-CN": "编辑公海客户",
+    "displayName:en": "Update Pooled Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:update_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_acc_name", "crm_acc_industry", "crm_acc_website", "crm_acc_phone", "crm_acc_address", "crm_acc_rating", "crm_acc_status", "crm_acc_remark", "crm_cpi_account_name", "crm_cpi_industry", "crm_cpi_phone", "crm_cpi_rating"],
+    "permissions": ["crm.customer_pool.manage"],
+    "agent_hint": "Update the underlying customer from a public-pool item and keep the shared pool snapshot consistent.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_pool_customer",
+    "displayName:zh-CN": "永久删除公海客户",
+    "displayName:en": "Permanently Delete Pooled Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:delete_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "extension": {
+      "confirmMessage:zh-CN": "客户及其公海记录将被永久删除；存在联系人或商机引用时会阻止删除。确认继续？",
+      "confirmMessage:en": "The customer and its pool records will be permanently deleted. Related contacts or opportunities block deletion. Continue?"
+    },
+    "permissions": ["crm.customer_pool.manage"],
+    "agent_hint": "Permanently delete the customer behind a pool item after checking contact and opportunity references.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_customer_pool_items",
+    "displayName:zh-CN": "客户公海条目列表",
+    "displayName:en": "List Customer Pool Items",
+    "type": "query",
+    "modelCode": "crm_customer_pool_item_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:download_customer_pool_import_template",
+    "displayName:zh-CN": "下载客户公海导入模板",
+    "displayName:en": "Download Customer Pool Import Template",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:download_customer_pool_import_template",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Download the governed .xlsx template for customer-pool ADD or UPDATE imports.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:precheck_customer_pool_import",
+    "displayName:zh-CN": "预检客户公海导入",
+    "displayName:en": "Pre-check Customer Pool Import",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:precheck_customer_pool_import",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "客户公海导入预检", "en": "Customer Pool Import Pre-check" },
+        "completedMessage": { "zh-CN": "预检完成，未写入客户数据", "en": "Pre-check completed without customer writes" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "validRows", "label": { "zh-CN": "可导入", "en": "Valid rows" }, "tone": "success" },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Validate an actor-owned .xlsx file against pool membership, import mode and account rules without mutation.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:import_customer_pool_customers",
+    "displayName:zh-CN": "导入客户到公海",
+    "displayName:en": "Import Customers to Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:import_customer_pool_customers",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "客户公海批量导入", "en": "Customer Pool Bulk Import" },
+        "completedMessage": { "zh-CN": "客户公海导入完成", "en": "Customer pool import completed" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "importedRows", "label": { "zh-CN": "已导入", "en": "Imported rows" }, "tone": "success" },
+          { "field": "createdRows", "label": { "zh-CN": "新增", "en": "Created rows" }, "tone": "success" },
+          { "field": "updatedRows", "label": { "zh-CN": "更新", "en": "Updated rows" } },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Import valid ADD or UPDATE rows through the customer-pool ownership state machine. skipErrors must be explicitly true for partial success.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:run_customer_pool_recycle",
+    "displayName:zh-CN": "立即执行自动回收",
+    "displayName:en": "Run Customer Pool Recycle Now",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:run_customer_pool_recycle",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.recycle"],
+    "cmd_risk_level": "L2"
+  }
+]

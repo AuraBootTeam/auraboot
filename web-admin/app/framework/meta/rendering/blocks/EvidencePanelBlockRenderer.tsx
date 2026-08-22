@@ -5,6 +5,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import {
   readDataSourceRecord,
   readPath,
+  formatTemporalValue,
   resolveRuntimeValue,
   useDataSourceSubscription,
   useRuntimeStateSubscription,
@@ -66,6 +67,8 @@ function formatValue(
   const mapped = mappedValue(value, valueMap, locale, t);
   if (mapped !== null) return mapped;
   if (value === undefined || value === null || value === '') return '-';
+  const temporal = formatTemporalValue(value, format, locale);
+  if (temporal !== null) return temporal;
   if (format === 'percent' && typeof value === 'number') {
     // Accepts both scales: a 0-1 ratio and an already-scaled 0-100 number. Without this, a
     // `format: "percent"` in a plain section was silently ignored (only the semantic-item path
@@ -154,7 +157,7 @@ function renderArrayValue(
       {values.map((entry, index) => (
         <span
           key={`${String(entry)}-${index}`}
-          className="rounded-pill border border-border bg-panel px-2 py-1 text-xs text-text-2"
+          className="rounded-pill border-border bg-panel text-text-2 border px-2 py-1 text-xs"
         >
           {formatSemanticValue(entry, { ...item, format: undefined, unit: undefined }, locale, t)}
         </span>
@@ -314,15 +317,15 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
   }
 
   return (
-    <section className="rounded-card border border-border bg-panel" data-testid="evidence-panel">
-      <div className="border-b border-border px-5 py-4">
+    <section className="rounded-card border-border bg-panel border" data-testid="evidence-panel">
+      <div className="border-border border-b px-5 py-4">
         <h3 className="text-text text-base font-semibold">{title}</h3>
         {description && <p className="text-text-2 mt-1 text-sm">{description}</p>}
       </div>
       <div className="space-y-4 p-5">
         {note && note !== '-' && (
           <div
-            className="rounded-card border border-status-blue bg-status-blue-bg px-4 py-3 text-sm leading-6 text-status-blue"
+            className="rounded-card border-status-blue bg-status-blue-bg text-status-blue border px-4 py-3 text-sm leading-6"
             data-testid="evidence-panel-note"
           >
             {note}
@@ -383,7 +386,7 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
             return (
               <div
                 key={key}
-                className="rounded-card border border-border bg-subtle p-3"
+                className="rounded-card border-border bg-subtle border p-3"
                 data-testid={`evidence-panel-section-${key}`}
               >
                 <div className="text-text-2 text-xs font-medium">{label}</div>

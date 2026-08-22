@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -75,6 +77,30 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                     .pageNum(1)
                     .pageSize(10000)
                     .conditions(conditions)
+                    .build();
+            PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
+            return result.getRecords() != null ? result.getRecords() : List.<Map<String, Object>>of();
+        });
+    }
+
+    @Override
+    public List<Map<String, Object>> queryIn(long tenantId, String modelCode,
+                                              String fieldName, Collection<?> values) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be null or blank");
+        }
+        LinkedHashSet<Object> distinct = new LinkedHashSet<>();
+        if (values != null) values.stream().filter(java.util.Objects::nonNull).forEach(distinct::add);
+        if (distinct.isEmpty()) return List.of();
+        return withTenant(tenantId, () -> {
+            DynamicQueryRequest request = DynamicQueryRequest.builder()
+                    .pageNum(1)
+                    .pageSize(10000)
+                    .conditions(List.of(QueryCondition.builder()
+                            .fieldName(fieldName)
+                            .operator(QueryCondition.Operator.IN)
+                            .values(List.copyOf(distinct))
+                            .build()))
                     .build();
             PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
             return result.getRecords() != null ? result.getRecords() : List.<Map<String, Object>>of();

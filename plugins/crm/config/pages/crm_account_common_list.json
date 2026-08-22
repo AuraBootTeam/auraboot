@@ -75,6 +75,32 @@
     {
       "id": "crm_account_table",
       "blockType": "table",
+      "table": {
+        "selection": { "mode": "multiple", "bind": "{{state.selectedIds}}" },
+        "bulkCapabilities": {
+          "edit": { "permissionCode": "crm.account.manage" },
+          "delete": { "permissionCode": "crm.account.manage" },
+          "export": { "permissionCode": "crm.account.read" }
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_move_to_customer_pool",
+            "permissionCode": "crm.customer_pool.move",
+            "label": { "zh-CN": "批量移入客户公海", "en-US": "Move Selected to Public Pool" },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:move_customer_to_pool",
+              "input": {
+                "field": "crm_acc_last_pool_id",
+                "label": { "zh-CN": "目标客户公海", "en-US": "Target Customer Pool" },
+                "type": "reference",
+                "required": true
+              }
+            }
+          }
+        ]
+      },
+      "selection": { "type": "checkbox" },
       "onRowClick": "navigate",
       "columns": [
         {
@@ -113,6 +139,12 @@
           }
         },
         {
+          "field": "crm_acc_pool_state",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "crm_customer_pool_state"
+        },
+        {
           "field": "actions",
           "isActionColumn": true,
           "buttons": [
@@ -132,6 +164,13 @@
                 "type": "navigate",
                 "to": "crm_account_common_form"
               }
+            },
+            {
+              "code": "move_to_customer_pool",
+              "permissionCode": "crm.customer_pool.move",
+              "label": { "zh-CN": "移入客户公海", "en": "Move to Public Pool" },
+              "visibleWhen": "row.crm_acc_pool_state != 'in_pool' && row.crm_acc_status == 'active'",
+              "action": { "type": "command", "command": "crm:move_customer_to_pool" }
             },
             {
               "code": "delete",
@@ -155,6 +194,11 @@
       "defaultSort": {
         "field": "created_at",
         "order": "desc"
+      },
+      "searchPlaceholder": { "zh-CN": "搜索客户名称、编号或行业", "en": "Search customer name, code, or industry" },
+      "empty": {
+        "title": { "zh-CN": "暂无符合条件的客户", "en": "No matching customers" },
+        "description": { "zh-CN": "调整筛选，或新建客户后再移入公海。", "en": "Adjust filters or create a customer before moving it to a public pool." }
       },
       "rowActions": [
         {

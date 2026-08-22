@@ -1,0 +1,15 @@
+{
+  "pageKey": "crm_customer_capacity_list", "name:zh-CN": "客户库容", "name:en": "Customer Capacity", "modelCode": "crm_customer_capacity_common", "kind": "list", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    { "id": "toolbar", "blockType": "toolbar", "buttons": [ { "code": "create", "primary": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.create", "action": { "type": "navigate", "to": "crm_customer_capacity_form" } } ] },
+    { "id": "table", "blockType": "table", "empty": { "title": { "zh-CN": "尚未配置客户库容", "en": "No customer capacity is configured" }, "description": { "zh-CN": "新建销售用户库容；未配置的用户默认不限制持有客户数。", "en": "Create a sales-user capacity; users without a configuration remain unlimited." } }, "columns": [
+      { "field": "crm_ccap_user_id", "width": 220 }, { "field": "crm_ccap_capacity", "width": 140, "align": "right", "sortable": true }, { "field": "crm_ccap_status", "width": 120, "renderType": "tag", "dictCode": "crm_customer_capacity_status" }, { "field": "crm_ccap_remark", "width": 260 },
+      { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [
+        { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_capacity_detail" } },
+        { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_capacity_form" } },
+        { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": "delete.confirm", "action": { "type": "command" } }
+      ] }
+    ] }
+  ]
+}

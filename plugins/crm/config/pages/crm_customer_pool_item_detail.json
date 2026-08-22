@@ -1,0 +1,118 @@
+{
+  "pageKey": "crm_customer_pool_item_detail",
+  "name:zh-CN": "池内客户详情",
+  "name:en": "Pooled Customer Detail",
+  "modelCode": "crm_customer_pool_item_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "pooled_customer_mobile_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "customer_info",
+          "label": { "zh-CN": "客户信息", "en": "Customer Info" },
+          "blocks": [
+            {
+              "id": "customer_snapshot",
+              "blockType": "form-section",
+              "title": { "zh-CN": "客户快照", "en": "Customer Snapshot" },
+              "columns": 3,
+              "fields": [
+                { "field": "crm_cpi_pool_id", "readOnly": true },
+                { "field": "crm_cpi_status", "readOnly": true },
+                { "field": "crm_cpi_account_code", "readOnly": true },
+                { "field": "crm_cpi_account_name", "readOnly": true },
+                { "field": "crm_cpi_rating", "readOnly": true },
+                { "field": "crm_cpi_phone", "readOnly": true },
+                { "field": "crm_cpi_industry", "readOnly": true },
+                { "field": "crm_cpi_health_score", "readOnly": true },
+                { "field": "crm_cpi_previous_owner", "readOnly": true }
+              ]
+            },
+            {
+              "id": "pool_evidence",
+              "blockType": "form-section",
+              "title": { "zh-CN": "入池与领取证据", "en": "Pool and Claim Evidence" },
+              "columns": 3,
+              "fields": [
+                { "field": "crm_cpi_entered_at", "readOnly": true },
+                { "field": "crm_cpi_entered_by", "readOnly": true },
+                { "field": "crm_cpi_claim_release_at", "readOnly": true },
+                { "field": "crm_cpi_claimed_at", "readOnly": true },
+                { "field": "crm_cpi_claimed_by", "readOnly": true },
+                { "field": "crm_cpi_reason", "readOnly": true }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "activity_history",
+          "label": { "zh-CN": "跟进记录", "en": "Activity History" },
+          "blocks": [
+            {
+              "id": "pool_customer_activity_timeline",
+              "blockType": "activity-timeline",
+              "title": { "zh-CN": "客户、联系人与商机跟进", "en": "Account, Contact and Opportunity Activities" },
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_pool_customer_timeline",
+                    "poolItemId": "${recordPid}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "columns": [
+                  { "field": "crm_act_type", "width": 100, "renderType": "tag" },
+                  { "field": "crm_act_subject", "width": 220 },
+                  { "field": "crm_act_content", "width": 280 },
+                  { "field": "crm_act_date", "width": 160, "format": "YYYY-MM-DD HH:mm" },
+                  { "field": "owner_name", "width": 120 },
+                  { "field": "crm_ar_object_type", "width": 110, "renderType": "tag" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "ownership_history",
+          "label": { "zh-CN": "归属记录", "en": "Ownership History" },
+          "blocks": [
+            {
+              "id": "pool_customer_owner_history",
+              "blockType": "sub-table",
+              "title": { "zh-CN": "客户归属变更记录", "en": "Customer Ownership Changes" },
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_pool_customer_owner_history",
+                    "poolItemId": "${recordPid}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "columns": [
+                  { "field": "crm_coh_occurred_at", "label": { "zh-CN": "操作时间", "en": "Occurred At" }, "width": 170, "format": "YYYY-MM-DD HH:mm" },
+                  { "field": "crm_coh_event", "label": { "zh-CN": "归属事件", "en": "Ownership Event" }, "width": 130, "renderType": "tag", "dictCode": "crm_customer_owner_event" },
+                  { "field": "previous_owner_name", "label": { "zh-CN": "原负责人", "en": "Previous Owner" }, "width": 130 },
+                  { "field": "next_owner_name", "label": { "zh-CN": "新负责人", "en": "New Owner" }, "width": 130 },
+                  { "field": "actor_name", "label": { "zh-CN": "操作人", "en": "Actor" }, "width": 130 },
+                  { "field": "crm_coh_reason", "label": { "zh-CN": "原因", "en": "Reason" }, "width": 240 }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -11,7 +11,7 @@
   "author": "AuraBoot Team",
   "homepage": "https://auraboot.io/plugins/crm",
   "minPlatformVersion": "1.0.0",
-  "dependencies": [],
+  "dependencies": ["com.auraboot.org-management"],
   "backend": {
     "jarPath": "backend/build/libs/crm-plugin-1.2.0.jar",
     "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
@@ -84,6 +84,42 @@
     {
       "type": "page",
       "code": "crm_lead_pool_item_list"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_pool_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_pool_recycle_rule_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_capacity_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_pool_item_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_owner_history_common"
+    },
+    {
+      "type": "command",
+      "code": "crm:move_customer_to_pool"
+    },
+    {
+      "type": "command",
+      "code": "crm:claim_pool_customer"
+    },
+    {
+      "type": "command",
+      "code": "crm:assign_pool_customer"
+    },
+    {
+      "type": "page",
+      "code": "crm_customer_pool_item_list"
     },
     {
       "type": "model",

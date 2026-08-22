@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "b27fd2660",
+    "commit": "b20b93c03",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2189,6 +2189,19 @@
           "verdict": "pass"
         },
         {
+          "id": "crm:assign_pool_customer",
+          "action": "crm:assign_pool_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:assign_pool_lead",
           "action": "crm:assign_pool_lead",
           "surface": "ui",
@@ -2274,6 +2287,19 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:claim_pool_customer",
+          "action": "crm:claim_pool_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:claim_pool_lead",
@@ -2384,6 +2410,7 @@
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-cpq.spec.ts",
@@ -2436,6 +2463,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-approval-case-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
@@ -2555,6 +2583,7 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
@@ -2571,6 +2600,44 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:create_customer_capacity",
+          "action": "crm:create_customer_capacity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_customer_pool",
+          "action": "crm:create_customer_pool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_customer_pool_recycle_rule",
+          "action": "crm:create_customer_pool_recycle_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:create_customer_request",
@@ -2956,6 +3023,40 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:delete_customer_capacity",
+          "action": "crm:delete_customer_capacity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_customer_pool",
+          "action": "crm:delete_customer_pool",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:delete_customer_pool_recycle_rule",
+          "action": "crm:delete_customer_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
           "id": "crm:delete_customer_request",
           "action": "crm:delete_customer_request",
           "surface": "ui",
@@ -3052,6 +3153,19 @@
             "tests/crm-cordys-productization-config.test.mjs",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_pool_customer",
+          "action": "crm:delete_pool_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -3196,6 +3310,32 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:detail_customer_pool",
+          "action": "crm:detail_customer_pool",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_customer_pool_recycle_rule",
+          "action": "crm:detail_customer_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "crm:detail_customer_request",
           "action": "crm:detail_customer_request",
           "surface": "ui",
@@ -3323,6 +3463,18 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:download_customer_pool_import_template",
+          "action": "crm:download_customer_pool_import_template",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
           "id": "crm:enroll_journey",
           "action": "crm:enroll_journey",
           "surface": "ui",
@@ -3381,6 +3533,19 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:import_customer_pool_customers",
+          "action": "crm:import_customer_pool_customers",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:investigate_complaint",
@@ -3499,6 +3664,52 @@
         {
           "id": "crm:list_contacts",
           "action": "crm:list_contacts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_customer_capacities",
+          "action": "crm:list_customer_capacities",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_customer_pool_items",
+          "action": "crm:list_customer_pool_items",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_customer_pool_recycle_rules",
+          "action": "crm:list_customer_pool_recycle_rules",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_customer_pools",
+          "action": "crm:list_customer_pools",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -3817,6 +4028,19 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:move_customer_to_pool",
+          "action": "crm:move_customer_to_pool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:move_lead_to_pool",
           "action": "crm:move_lead_to_pool",
           "surface": "ui",
@@ -3848,6 +4072,19 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:precheck_customer_pool_import",
+          "action": "crm:precheck_customer_pool_import",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:prepare_qdp_draft",
@@ -4059,6 +4296,18 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:run_customer_pool_recycle",
+          "action": "crm:run_customer_pool_recycle",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
           "id": "crm:run_journey_scheduler",
           "action": "crm:run_journey_scheduler",
           "surface": "ui",
@@ -4191,6 +4440,18 @@
           "verdict": "partial"
         },
         {
+          "id": "crm:toggle_customer_pool",
+          "action": "crm:toggle_customer_pool",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
           "id": "crm:toggle_lead_pool",
           "action": "crm:toggle_lead_pool",
           "surface": "contract",
@@ -4311,6 +4572,44 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:update_customer_capacity",
+          "action": "crm:update_customer_capacity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_customer_pool",
+          "action": "crm:update_customer_pool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_customer_pool_recycle_rule",
+          "action": "crm:update_customer_pool_recycle_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:update_customer_request",
           "action": "crm:update_customer_request",
           "surface": "ui",
@@ -4423,6 +4722,19 @@
           "verdict": "partial"
         },
         {
+          "id": "crm:update_pool_customer",
+          "action": "crm:update_pool_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-customer-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:update_quote_summary",
           "action": "crm:update_quote_summary",
           "surface": "ui",
@@ -4515,6 +4827,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -4893,6 +5206,175 @@
           "note": "kind=detail model=crm_account_common"
         },
         {
+          "id": "page:crm_customer_capacity_detail",
+          "action": "crm_customer_capacity_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_capacity_common"
+        },
+        {
+          "id": "page:crm_customer_capacity_form",
+          "action": "crm_customer_capacity_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_customer_capacity_common"
+        },
+        {
+          "id": "page:crm_customer_capacity_list",
+          "action": "crm_customer_capacity_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_capacity_common"
+        },
+        {
+          "id": "page:crm_customer_owner_history_detail",
+          "action": "crm_customer_owner_history_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_owner_history_common"
+        },
+        {
+          "id": "page:crm_customer_owner_history_list",
+          "action": "crm_customer_owner_history_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_owner_history_common"
+        },
+        {
+          "id": "page:crm_customer_pool_batch_list",
+          "action": "crm_customer_pool_batch_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_pool_item_common"
+        },
+        {
+          "id": "page:crm_customer_pool_detail",
+          "action": "crm_customer_pool_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_pool_common"
+        },
+        {
+          "id": "page:crm_customer_pool_form",
+          "action": "crm_customer_pool_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_customer_pool_common"
+        },
+        {
+          "id": "page:crm_customer_pool_item_detail",
+          "action": "crm_customer_pool_item_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_pool_item_common"
+        },
+        {
+          "id": "page:crm_customer_pool_item_list",
+          "action": "crm_customer_pool_item_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_customer_pool_item_common"
+        },
+        {
+          "id": "page:crm_customer_pool_list",
+          "action": "crm_customer_pool_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_pool_common"
+        },
+        {
+          "id": "page:crm_customer_pool_recycle_rule_detail",
+          "action": "crm_customer_pool_recycle_rule_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_pool_recycle_rule_common"
+        },
+        {
+          "id": "page:crm_customer_pool_recycle_rule_form",
+          "action": "crm_customer_pool_recycle_rule_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_customer_pool_recycle_rule_common"
+        },
+        {
+          "id": "page:crm_customer_pool_recycle_rule_list",
+          "action": "crm_customer_pool_recycle_rule_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_pool_recycle_rule_common"
+        },
+        {
+          "id": "page:crm_customer_pool_strategy",
+          "action": "crm_customer_pool_strategy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_customer_pool_common"
+        },
+        {
           "id": "page:crm_customer_request_common_detail",
           "action": "crm_customer_request_common_detail",
           "surface": "ui",
@@ -5114,7 +5596,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_lead_capacity"
+          "note": "kind=detail model=crm_lead_capacity_common"
         },
         {
           "id": "page:crm_lead_capacity_form",
@@ -5125,7 +5607,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=form model=crm_lead_capacity"
+          "note": "kind=form model=crm_lead_capacity_common"
         },
         {
           "id": "page:crm_lead_capacity_list",
@@ -5136,7 +5618,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_lead_capacity"
+          "note": "kind=list model=crm_lead_capacity_common"
         },
         {
           "id": "page:crm_lead_common_detail",
@@ -5216,7 +5698,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_lead_owner_history"
+          "note": "kind=detail model=crm_lead_owner_history_common"
         },
         {
           "id": "page:crm_lead_owner_history_list",
@@ -5224,12 +5706,10 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=list model=crm_lead_owner_history"
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_lead_owner_history_common"
         },
         {
           "id": "page:crm_lead_pool_batch_list",
@@ -5240,7 +5720,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_lead_pool_item"
+          "note": "kind=list model=crm_lead_pool_item_common"
         },
         {
           "id": "page:crm_lead_pool_detail",
@@ -5251,7 +5731,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_lead_pool"
+          "note": "kind=detail model=crm_lead_pool_common"
         },
         {
           "id": "page:crm_lead_pool_form",
@@ -5262,7 +5742,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=form model=crm_lead_pool"
+          "note": "kind=form model=crm_lead_pool_common"
         },
         {
           "id": "page:crm_lead_pool_item_detail",
@@ -5273,7 +5753,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_lead_pool_item"
+          "note": "kind=detail model=crm_lead_pool_item_common"
         },
         {
           "id": "page:crm_lead_pool_item_list",
@@ -5286,7 +5766,7 @@
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
-          "note": "kind=detail model=crm_lead_pool_item"
+          "note": "kind=detail model=crm_lead_pool_item_common"
         },
         {
           "id": "page:crm_lead_pool_list",
@@ -5297,7 +5777,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_lead_pool"
+          "note": "kind=list model=crm_lead_pool_common"
         },
         {
           "id": "page:crm_lead_pool_recycle_rule_detail",
@@ -5308,7 +5788,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_lead_pool_recycle_rule"
+          "note": "kind=detail model=crm_lead_pool_recycle_rule_common"
         },
         {
           "id": "page:crm_lead_pool_recycle_rule_form",
@@ -5319,7 +5799,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=form model=crm_lead_pool_recycle_rule"
+          "note": "kind=form model=crm_lead_pool_recycle_rule_common"
         },
         {
           "id": "page:crm_lead_pool_recycle_rule_list",
@@ -5330,7 +5810,7 @@
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_lead_pool_recycle_rule"
+          "note": "kind=list model=crm_lead_pool_recycle_rule_common"
         },
         {
           "id": "page:crm_lead_score_rule_detail",
@@ -9496,6 +9976,7 @@
             "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
             "web-admin/tests/e2e/crm/crm-email-features.spec.ts",
@@ -10635,10 +11116,10 @@
     }
   ],
   "stats": {
-    "commands": 477,
-    "untested": 320,
-    "pages": 280,
-    "pagesUntested": 187,
+    "commands": 502,
+    "untested": 324,
+    "pages": 295,
+    "pagesUntested": 201,
     "platformPages": 99,
     "platformPagesUntested": 41
   }

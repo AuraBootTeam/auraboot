@@ -18,6 +18,7 @@ interface SidebarSubmenuProps {
   name: string;
   icon?: any;
   depth?: number;
+  onNavigate?: () => void;
 }
 
 export function resolveMenuLabel(
@@ -37,7 +38,13 @@ function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {
   return false;
 }
 
-export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: SidebarSubmenuProps) {
+export default function SidebarSubmenu({
+  submenu,
+  name,
+  icon,
+  depth = 0,
+  onNavigate,
+}: SidebarSubmenuProps) {
   const location = useLocation();
   const { t } = useI18n();
   // Default expanded so child nav links are always visible & clickable.
@@ -87,9 +94,7 @@ export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: Sideb
           expand/collapse to instant removes the race window without
           changing the visible end-states. */}
       <div
-        className={`overflow-hidden ${
-          isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
-        }`}
+        className={`overflow-hidden ${isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'}`}
       >
         <div className={`${paddingLeft} space-y-1`}>
           {submenu.map((item, index) => {
@@ -101,6 +106,7 @@ export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: Sideb
                   name={resolveMenuLabel(t, item)}
                   icon={item.icon}
                   depth={depth + 1}
+                  onNavigate={onNavigate}
                 />
               );
             }
@@ -111,6 +117,7 @@ export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: Sideb
               <Link
                 key={item.id || index}
                 to={item.path}
+                onClick={onNavigate}
                 className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
                     ? 'bg-blue-100 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'

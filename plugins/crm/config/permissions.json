@@ -788,5 +788,99 @@
     "module": "crm",
     "resourceCode": "crm_lead_owner_history_common",
     "action": "read"
+  },
+  {
+    "code": "crm.customer_pool.read",
+    "name:zh-CN": "查看客户公海",
+    "name:en": "View Customer Public Pools",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.pick",
+    "name:zh-CN": "领取公海客户",
+    "name:en": "Claim Pooled Customers",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.move",
+    "name:zh-CN": "移入客户公海",
+    "name:en": "Move Customers to Public Pool",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.assign",
+    "name:zh-CN": "分配公海客户",
+    "name:en": "Assign Pooled Customers",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.manage",
+    "name:zh-CN": "管理客户公海策略",
+    "name:en": "Manage Customer Pool Policy",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.recycle",
+    "name:zh-CN": "执行客户自动回收",
+    "name:en": "Run Customer Pool Recycle",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.customer_pool.import",
+    "name:zh-CN": "导入客户到公海",
+    "name:en": "Import Customers to Public Pool",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_customer_pool_common.read",
+    "name:zh-CN": "查看客户公海池模型",
+    "name:en": "Read Customer Pool Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_pool_common",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_customer_pool_recycle_rule_common.read",
+    "name:zh-CN": "查看客户公海回收规则模型",
+    "name:en": "Read Customer Pool Recycle Rule Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_pool_recycle_rule_common",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_customer_capacity_common.read",
+    "name:zh-CN": "查看客户库容模型",
+    "name:en": "Read Customer Capacity Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_capacity_common",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_customer_pool_item_common.read",
+    "name:zh-CN": "查看公海客户模型",
+    "name:en": "Read Pooled Customer Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_pool_item_common",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_customer_owner_history_common.read",
+    "name:zh-CN": "查看客户归属历史",
+    "name:en": "Read Customer Ownership History",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_owner_history_common",
+    "action": "read"
   }
 ]

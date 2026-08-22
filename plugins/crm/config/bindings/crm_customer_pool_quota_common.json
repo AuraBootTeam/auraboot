@@ -1,0 +1,8 @@
+[
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_key", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_pool_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_user_id", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_local_date", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_pick_count", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_quota_common", "fieldCode": "crm_cpq_limit_snapshot", "sequence": 6, "required": true, "visible": true, "editable": false }
+]

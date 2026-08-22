@@ -24,9 +24,9 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
   return (
     <div className="tabs-block">
       {/* Tab headers */}
-      <div className="border-border border-b">
+      <div className="border-border min-w-0 border-b">
         <nav
-          className="-mb-px flex space-x-8"
+          className="-mb-px flex min-h-11 max-w-full gap-6 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]"
           role="tablist"
           aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
         >
@@ -38,7 +38,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
                 role="tab"
                 aria-selected={activeTab === index}
                 onClick={() => setActiveTab(index)}
-                className={`border-b-2 px-1 py-2 text-sm font-medium ${
+                className={`min-h-11 shrink-0 touch-manipulation whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium ${
                   activeTab === index
                     ? 'border-accent text-accent'
                     : 'text-text-2 hover:border-border-strong hover:text-text-2 border-transparent'

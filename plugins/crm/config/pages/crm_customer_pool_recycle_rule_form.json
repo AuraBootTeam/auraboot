@@ -1,0 +1,46 @@
+{
+  "pageKey": "crm_customer_pool_recycle_rule_form",
+  "name:zh-CN": "回收条件编辑",
+  "name:en": "Recycle Condition Editor",
+  "modelCode": "crm_customer_pool_recycle_rule_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "identity",
+      "blockType": "form-section",
+      "title": { "zh-CN": "条件归属", "en": "Condition Identity" },
+      "description": { "zh-CN": "一条记录代表一个时间条件；同一客户公海的生效条件由池策略中的 AND/OR 关系组合。", "en": "Each record is one time condition. Active conditions for the same pool are composed by the pool's AND/OR match mode." },
+      "fields": [
+        { "field": "crm_cprr_code", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "例如 CP-STALE-30D", "en": "e.g. CP-STALE-30D" }, "helpText": { "zh-CN": "使用稳定且唯一的业务编号，便于审计和排查。", "en": "Use a stable unique business code for audit and troubleshooting." } },
+        { "field": "crm_cprr_name", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "例如 30 天未跟进自动回收", "en": "e.g. Recycle after 30 days without activity" }, "helpText": { "zh-CN": "名称应直接说明触发条件和业务结果。", "en": "Name the condition by its trigger and business outcome." } },
+        { "field": "crm_cprr_pool_id", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "选择应用该条件的客户公海", "en": "Select the customer pool for this condition" }, "helpText": { "zh-CN": "同一公海的生效条件按池策略中的 AND/OR 关系组合。", "en": "Active conditions in the same pool are composed by its AND/OR policy." } },
+        { "field": "crm_cprr_status", "colSpan": 6, "required": true, "defaultValue": "active" },
+        { "field": "crm_cprr_sort_order", "colSpan": 6, "required": true, "defaultValue": 100, "placeholder": { "zh-CN": "例如 100", "en": "e.g. 100" }, "helpText": { "zh-CN": "数字越小越先评估；相同结果不依赖顺序。", "en": "Lower values evaluate first; equivalent outcomes must not depend on order." } }
+      ]
+    },
+    {
+      "id": "time_condition",
+      "blockType": "form-section",
+      "title": { "zh-CN": "时间条件", "en": "Time Condition" },
+      "description": { "zh-CN": "相对天数运算填写“相对天数”；固定区间填写开始/结束时间；固定早于使用结束时间，固定晚于使用开始时间。", "en": "Relative operators use Relative Days. Fixed intervals use both endpoints; Fixed Before uses the end and Fixed After uses the start." },
+      "fields": [
+        { "field": "crm_cprr_time_source", "colSpan": 6, "required": true },
+        { "field": "crm_cprr_operator", "colSpan": 6, "required": true },
+        { "field": "crm_cprr_days", "colSpan": 4, "required": true, "visibleWhen": "record.crm_cprr_operator === 'older_than_days' || record.crm_cprr_operator === 'newer_than_days'", "placeholder": { "zh-CN": "例如 30", "en": "e.g. 30" } },
+        { "field": "crm_cprr_start_at", "colSpan": 4, "required": true, "visibleWhen": "record.crm_cprr_operator === 'fixed_between' || record.crm_cprr_operator === 'fixed_after'" },
+        { "field": "crm_cprr_end_at", "colSpan": 4, "required": true, "visibleWhen": "record.crm_cprr_operator === 'fixed_between' || record.crm_cprr_operator === 'fixed_before'" },
+        { "field": "crm_cprr_description", "colSpan": 12, "placeholder": { "zh-CN": "说明适用客群、例外和运营约定", "en": "Describe segments, exceptions, and operating conventions" }, "helpText": { "zh-CN": "说明不参与机器判断；实际回收只以结构化条件为准。", "en": "Descriptions are not evaluated; recycle uses only structured condition fields." } }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        { "code": "submit", "primary": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.save", "action": { "type": "command" } },
+        { "code": "cancel", "label": "$i18n:common.button.cancel" }
+      ]
+    }
+  ]
+}

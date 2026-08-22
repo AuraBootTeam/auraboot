@@ -52,6 +52,7 @@
         "pollIntervalMs",
         "reload",
         "reloadIntervalMs",
+        "reloadOnError",
         "resultFeedback",
         "targetRecordId",
         "targetRecordPid",

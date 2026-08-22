@@ -67,7 +67,10 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         String leadPid = nonBlank(str(lead.get("pid")), leadId);
         String leadCode = nonBlank(str(lead.get("crm_lead_code")), leadPid);
         String company = required(lead.get("crm_lead_company"), "crm_lead_company is required before conversion");
-        String owner = str(lead.get("crm_lead_assigned_to"));
+        String owner = nonBlank(str(lead.get("crm_lead_assigned_to")), context.currentUserPid());
+        if (isBlank(owner)) {
+            throw new IllegalStateException("Lead conversion requires an assigned owner or authenticated actor");
+        }
 
         Map<String, Object> account = findOrCreateAccount(db, lead, leadCode, company, owner);
         String accountId = resolveId(account);
@@ -122,6 +125,7 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         data.put("crm_acc_phone", lead.get("crm_lead_contact_phone"));
         data.put("crm_acc_owner", owner);
         data.put("crm_acc_status", "active");
+        data.put("crm_acc_pool_state", "owned");
         data.put("crm_acc_remark", "Created by crm:convert_lead from " + leadCode);
         return db.create("crm_account_common", data);
     }

@@ -243,7 +243,7 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.deepEqual(
     dictionaries.find((dictionary) => dictionary.code === 'crm_lead_pool_operational_state')
       ?.items.map((item) => item.value),
-    ['ready', 'cooldown', 'claimed', 'assigned', 'recycling', 'recycling_retry'],
+    ['ready', 'cooldown', 'quota_blocked', 'capacity_blocked', 'claimed', 'assigned', 'recycling', 'recycling_retry'],
   );
   const poolActions = operations.blocks.find((block) => block.id === 'crm_lead_pool_actions').actions;
   assert.deepEqual(poolActions.map((action) => action.code), ['claim', 'assign']);

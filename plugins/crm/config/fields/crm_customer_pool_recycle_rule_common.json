@@ -1,0 +1,13 @@
+[
+  { "code": "crm_cprr_code", "displayName:zh-CN": "规则编号", "displayName:en": "Rule Code", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_cprr_name", "displayName:zh-CN": "规则名称", "displayName:en": "Rule Name", "dataType": "string", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_cprr_pool_id", "displayName:zh-CN": "客户公海", "displayName:en": "Customer Pool", "dataType": "reference", "referenceModelCode": "crm_customer_pool_common", "refTarget": { "targetModel": "crm_customer_pool_common", "valueField": "pid", "displayField": "crm_cp_name" }, "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_cprr_time_source", "displayName:zh-CN": "时间条件", "displayName:en": "Time Source", "dataType": "enum", "dictCode": "crm_customer_recycle_time_source", "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_cprr_operator", "displayName:zh-CN": "时间运算", "displayName:en": "Time Operator", "dataType": "enum", "dictCode": "crm_customer_recycle_time_operator", "constraints": { "required": true } },
+  { "code": "crm_cprr_days", "displayName:zh-CN": "相对天数", "displayName:en": "Relative Days", "dataType": "integer", "constraints": { "min": 0 }, "extension": { "helpText:zh-CN": "“早于/晚于相对天数”时填写；0 表示今天", "helpText:en": "Used by relative-day operators; 0 means today" } },
+  { "code": "crm_cprr_start_at", "displayName:zh-CN": "固定开始时间", "displayName:en": "Fixed Start Time", "dataType": "datetime", "extension": { "helpText:zh-CN": "固定区间时填写（含边界）", "helpText:en": "Inclusive start for a fixed interval" } },
+  { "code": "crm_cprr_end_at", "displayName:zh-CN": "固定结束时间", "displayName:en": "Fixed End Time", "dataType": "datetime", "extension": { "helpText:zh-CN": "固定区间时填写（含边界）", "helpText:en": "Inclusive end for a fixed interval" } },
+  { "code": "crm_cprr_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "crm_customer_recycle_rule_status", "defaultValue": "active", "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_cprr_sort_order", "displayName:zh-CN": "执行顺序", "displayName:en": "Evaluation Order", "dataType": "integer", "defaultValue": 100, "constraints": { "required": true, "min": 0 }, "feature": { "sortable": true } },
+  { "code": "crm_cprr_description", "displayName:zh-CN": "规则说明", "displayName:en": "Rule Description", "dataType": "text" }
+]

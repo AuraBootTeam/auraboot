@@ -129,6 +129,35 @@ describe('AsyncTaskProgressModal', () => {
     expect(screen.getByText(/处理行数/).textContent).toContain('154');
     expect(screen.queryByText(/总行数: 0/)).toBeNull();
   });
+  it('completed import with declarative metrics still exposes row-level failures', () => {
+    render(
+      <AsyncTaskProgressModal
+        task={{
+          status: 'completed',
+          locale: 'zh-CN',
+          resultData: {
+            totalRows: 2,
+            importedRows: 1,
+            skippedRows: 1,
+            failedRows: 1,
+            failures: [{ row: 3, reason: 'Customer name is required' }],
+          },
+          presentation: {
+            title: { 'zh-CN': '客户公海批量导入' },
+            metrics: [
+              { field: 'importedRows', label: { 'zh-CN': '已导入' }, tone: 'success' },
+              { field: 'failedRows', label: { 'zh-CN': '失败' }, tone: 'danger' },
+            ],
+          },
+        }}
+        onClose={() => {}}
+        onBackground={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/Customer name is required/)).toBeTruthy();
+    expect(screen.getByTestId('copy-failures')).toBeTruthy();
+  });
   it('cancelled: is terminal and exposes cancellation state', () => {
     render(
       <AsyncTaskProgressModal
