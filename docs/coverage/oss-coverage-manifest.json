@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "5b0703bc0",
+    "commit": "c7ef0fa57",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2397,6 +2397,7 @@
           "evidence": [
             "backend/src/test/java/com/auraboot/plugins/crm/handler/ConvertLeadHandlerTest.java",
             "tests/crm-activity-timeline-config.test.mjs",
+            "tests/crm-customer-request-intake-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
@@ -2671,6 +2672,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-customer-request-intake-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts",
             "web-admin/tests/e2e/pcba/pcba-main-flow-permissions.spec.ts",
             "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts"
@@ -3629,6 +3631,20 @@
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:intake_customer_request",
+          "action": "crm:intake_customer_request",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-request-intake-config.test.mjs",
+            "tests/crm-release-coverage.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
         },
         {
           "id": "crm:investigate_complaint",
@@ -4740,12 +4756,14 @@
         {
           "id": "crm:update_customer_request",
           "action": "crm:update_customer_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-customer-request-intake-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:update_email_log",
@@ -11311,8 +11329,8 @@
     }
   ],
   "stats": {
-    "commands": 510,
-    "untested": 321,
+    "commands": 511,
+    "untested": 320,
     "pages": 298,
     "pagesUntested": 200,
     "platformPages": 99,

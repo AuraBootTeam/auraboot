@@ -44,6 +44,22 @@
     "cmd_risk_level": "L1"
   },
   {
+    "code": "crm:intake_customer_request",
+    "displayName:zh-CN": "接入外部客户需求",
+    "displayName:en": "Intake External Customer Request",
+    "description": "Create the sole CRM Customer Request from a canonical external or batch source envelope, preserving an immutable source snapshot, field-level evidence and transaction-scoped idempotency.",
+    "type": "custom",
+    "modelCode": "crm_customer_request_common",
+    "handler": "crm:intake_customer_request",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_request.manage"],
+    "concurrencyKey": "crm:intake:${payload.crm_cr_source_channel}:${payload.crm_cr_source_system}:${payload.crm_cr_source_message_ref}",
+    "lockTimeoutMs": 8000,
+    "idempotent": true,
+    "agent_hint": "Use one stable clientRequestId per connector delivery. The source channel/system/message reference form the business identity. Every supplied Customer Request fact requires a field evidence locator. Exact replays return the existing request; changed content for the same source identity fails closed.",
+    "cmd_risk_level": "L2"
+  },
+  {
     "code": "crm:update_customer_request",
     "displayName:zh-CN": "编辑客户需求",
     "displayName:en": "Update Customer Request",
@@ -59,7 +75,6 @@
       "crm_cr_priority",
       "crm_cr_expected_date",
       "crm_cr_owner",
-      "crm_cr_source_channel",
       "crm_cr_summary",
       "crm_cr_submitted_at",
       "crm_cr_due_at"

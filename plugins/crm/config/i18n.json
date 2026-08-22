@@ -5096,6 +5096,83 @@
     "refType": "field"
   },
   {
+    "key": "model.crm_customer_request_common.crm_cr_source_business_key.label",
+    "zh-CN": "来源业务键指纹",
+    "en-US": "Source Business Key Fingerprint",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_source_system.label",
+    "zh-CN": "来源系统",
+    "en-US": "Source System",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_source_message_ref.label",
+    "zh-CN": "来源消息引用",
+    "en-US": "Source Message Reference",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_source_received_at.label",
+    "zh-CN": "来源接收时间",
+    "en-US": "Source Received At",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_source_content_hash.label",
+    "zh-CN": "来源内容指纹",
+    "en-US": "Source Content Fingerprint",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_intake_snapshot.label",
+    "zh-CN": "原始接入快照",
+    "en-US": "Original Intake Snapshot",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_source_provenance.label",
+    "zh-CN": "来源血缘",
+    "en-US": "Source Provenance",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_field_evidence.label",
+    "zh-CN": "字段证据引用",
+    "en-US": "Field Evidence References",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_field_evidence_count.label",
+    "zh-CN": "证据化字段数",
+    "en-US": "Evidence-backed Fields",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_intake_client_request_id.label",
+    "zh-CN": "接入请求标识",
+    "en-US": "Intake Request Identity",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_customer_request_common.crm_cr_ingested_at.label",
+    "zh-CN": "接入时间",
+    "en-US": "Ingested At",
+    "source": "import",
+    "refType": "field"
+  },
+  {
     "key": "model.crm_customer_request_common.crm_mw_opp_name.label",
     "zh-CN": "商机名称",
     "en-US": "Opportunity Name",

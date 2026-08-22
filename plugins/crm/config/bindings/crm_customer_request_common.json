@@ -192,8 +192,100 @@
   },
   {
     "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_business_key",
+    "sequence": 19,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_system",
+    "sequence": 20,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "searchable": true }
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_message_ref",
+    "sequence": 21,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "searchable": true }
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_received_at",
+    "sequence": 22,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "sortable": true }
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_content_hash",
+    "sequence": 23,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_intake_snapshot",
+    "sequence": 24,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_source_provenance",
+    "sequence": 25,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_field_evidence",
+    "sequence": 26,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_field_evidence_count",
+    "sequence": 27,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_intake_client_request_id",
+    "sequence": 28,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_customer_request_common",
+    "fieldCode": "crm_cr_ingested_at",
+    "sequence": 29,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "sortable": true }
+  },
+  {
+    "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_opp_name",
-    "sequence": 30,
+    "sequence": 40,
     "required": false,
     "visible": false,
     "editable": false,
@@ -204,7 +296,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_opp_stage",
-    "sequence": 31,
+    "sequence": 41,
     "required": false,
     "visible": false,
     "editable": false,
@@ -216,7 +308,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_opp_expected_amount",
-    "sequence": 32,
+    "sequence": 42,
     "required": false,
     "visible": false,
     "editable": false,
@@ -227,7 +319,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_opp_expected_close_date",
-    "sequence": 33,
+    "sequence": 43,
     "required": false,
     "visible": false,
     "editable": false,
@@ -238,7 +330,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_quote_count",
-    "sequence": 34,
+    "sequence": 44,
     "required": false,
     "visible": false,
     "editable": false,
@@ -249,7 +341,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_quote_amount",
-    "sequence": 35,
+    "sequence": 45,
     "required": false,
     "visible": false,
     "editable": false,
@@ -260,7 +352,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_latest_quote_valid_until",
-    "sequence": 36,
+    "sequence": 46,
     "required": false,
     "visible": false,
     "editable": false,
@@ -271,7 +363,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_pending_approval_count",
-    "sequence": 37,
+    "sequence": 47,
     "required": false,
     "visible": false,
     "editable": false,
@@ -282,7 +374,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_open_task_count",
-    "sequence": 38,
+    "sequence": 48,
     "required": false,
     "visible": false,
     "editable": false,
@@ -293,7 +385,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_overdue_task_count",
-    "sequence": 39,
+    "sequence": 49,
     "required": false,
     "visible": false,
     "editable": false,
@@ -304,7 +396,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_risk_reason",
-    "sequence": 40,
+    "sequence": 50,
     "required": false,
     "visible": false,
     "editable": false,
@@ -315,7 +407,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_mw_age_days",
-    "sequence": 41,
+    "sequence": 51,
     "required": false,
     "visible": false,
     "editable": false,
@@ -326,7 +418,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_cr_submitted_at",
-    "sequence": 42,
+    "sequence": 52,
     "required": false,
     "visible": true,
     "editable": true,
@@ -335,7 +427,7 @@
   {
     "modelCode": "crm_customer_request_common",
     "fieldCode": "crm_cr_due_at",
-    "sequence": 43,
+    "sequence": 53,
     "required": false,
     "visible": true,
     "editable": true,

@@ -36,6 +36,7 @@ const RG3_COMMANDS = [
   'crm:convert_lead',
   'crm:create_activity',
 ];
+const AMOS_P0_B01_COMMANDS = ['crm:intake_customer_request'];
 
 // Runtime-generated ledgers can expose list/detail investigation surfaces while
 // intentionally denying manual forms. Their service commands are scheduler or
@@ -61,6 +62,22 @@ const EVIDENCE = {
     'web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts',
   accountCollaboration: 'web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts',
   accountRelationship: 'web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts',
+  amosB01Stack: 'plugins/crm/scripts/it/customer_request_intake_true_stack.py',
+  amosB01Browser: 'plugins/crm/e2e/customer-request-intake.golden.spec.ts',
+};
+
+const AMOS_P0_B01_COVERAGE = {
+  blocks: ['crm_customer_request_common_detail:crm_cr_source_evidence'],
+  fields: [
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_channel',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_system',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_message_ref',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_received_at',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_ingested_at',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_field_evidence_count',
+    'crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_content_hash',
+  ],
+  uiActions: ['crm_customer_request_common_detail:crm_cr_tabs:source_evidence'],
 };
 
 const FOLLOWUP_COMMENT_COVERAGE = {
@@ -823,6 +840,9 @@ const dashboardCoverageSets = Object.fromEntries(
 const forecastVarianceCoverageSets = Object.fromEntries(
   Object.entries(FORECAST_VARIANCE_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
+const amosB01CoverageSets = Object.fromEntries(
+  Object.entries(AMOS_P0_B01_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
+);
 
 function json(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'config', relativePath), 'utf8'));
@@ -903,6 +923,9 @@ function evidenceForCommand(code, rg1Commands) {
     );
   }
   if (RG3_COMMANDS.includes(code)) files.push(EVIDENCE.rg3Journey);
+  if (AMOS_P0_B01_COMMANDS.includes(code)) {
+    files.push(EVIDENCE.amosB01Stack, EVIDENCE.amosB01Browser);
+  }
   if (releaseBCoverageSets.commands.has(code)) files.push(EVIDENCE.releaseB);
   if (customerPoolCoverageSets.commands.has(code)) files.push(EVIDENCE.customerPool);
   if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
@@ -1179,6 +1202,7 @@ function buildProductGroups({
         ...(coreWorkbenchCoverageSets.blocks.has(blockKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.blocks.has(blockKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.blocks.has(blockKey) ? [EVIDENCE.forecastVariance] : []),
+        ...(amosB01CoverageSets.blocks.has(blockKey) ? [EVIDENCE.amosB01Browser] : []),
         ...(customerPoolCoverageSets.blocks.has(blockKey) ? [EVIDENCE.customerPool] : []),
         ...(followupCommentCoverageSets.blocks.has(blockKey)
           ? [EVIDENCE.followupComments]
@@ -1217,6 +1241,7 @@ function buildProductGroups({
         ...(coreWorkbenchCoverageSets.fields.has(fieldKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.fields.has(fieldKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.fields.has(fieldKey) ? [EVIDENCE.forecastVariance] : []),
+        ...(amosB01CoverageSets.fields.has(fieldKey) ? [EVIDENCE.amosB01Browser] : []),
         ...(customerPoolCoverageSets.fields.has(fieldKey) ? [EVIDENCE.customerPool] : []),
         ...(contactFollowupLifecycleCoverageSets.fields.has(fieldKey)
           ? [EVIDENCE.contactFollowupLifecycle]
@@ -1248,6 +1273,9 @@ function buildProductGroups({
       const forecastVarianceAction = forecastVarianceCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
+      const amosB01Action = amosB01CoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
       const customerPoolAction = customerPoolCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
@@ -1269,6 +1297,7 @@ function buildProductGroups({
         ...(releaseAction?.evidence ?? []),
         ...(releaseBAction ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceAction ? [EVIDENCE.forecastVariance] : []),
+        ...(amosB01Action ? [EVIDENCE.amosB01Browser] : []),
         ...(customerPoolAction ? [EVIDENCE.customerPool] : []),
         ...(contactFollowupLifecycleAction ? [EVIDENCE.contactFollowupLifecycle] : []),
         ...(leadConversionActivityCarryAction ? [EVIDENCE.leadConversionActivityCarry] : []),
@@ -1649,6 +1678,7 @@ export function buildReleaseManifest() {
     ...CORE_WORKBENCH_COVERAGE.commands,
     ...RG2_COMMANDS,
     ...RG3_COMMANDS,
+    ...AMOS_P0_B01_COMMANDS,
     ...RELEASE_B_COVERAGE.commands,
     ...CUSTOMER_POOL_COVERAGE.commands,
     ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.commands,
@@ -1663,6 +1693,7 @@ export function buildReleaseManifest() {
     if (rg1Commands.has(code) || coreWorkbenchCoverageSets.commands.has(code)) goals.push('RG-1');
     if (RG2_COMMANDS.includes(code)) goals.push('RG-2');
     if (RG3_COMMANDS.includes(code)) goals.push('RG-3');
+    if (AMOS_P0_B01_COMMANDS.includes(code)) goals.push('AMOS-P0-B01');
     if (releaseBCoverageSets.commands.has(code)) goals.push('RELEASE-B');
     if (customerPoolCoverageSets.commands.has(code)) goals.push('CORDYS-CUSTOMER-POOL');
     if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
@@ -1940,6 +1971,11 @@ export function buildReleaseManifest() {
         note: 'Selected forecast submissions are compared with live owner facts and drilled down to exact opportunity drivers.',
       },
       {
+        id: 'AMOS-P0-B01',
+        verdict: 'pass',
+        note: 'The governed external Customer Request intake command and its read-only source-evidence summary have true-stack and browser evidence; actual Email/Portal connectors and Excel UX remain outside this slice.',
+      },
+      {
         id: 'CORDYS-CUSTOMER-POOL',
         verdict: 'pass',
         note: 'Three real-stack journeys cover member operations, manager batch work, administrator governance, recycle policy, ownership evidence, import/mobile behavior and negative boundaries without development-data migration.',
@@ -2033,6 +2069,18 @@ export function buildReleaseManifest() {
         expectedActions: 8,
         minimumScreenshots: 2,
         expectedCoverage: FORECAST_VARIANCE_COVERAGE,
+      },
+      {
+        id: 'AMOS-P0-B01-STACK',
+        filePrefix: 'customer-request-intake-true-stack-',
+        minimumChecks: 9,
+      },
+      {
+        id: 'AMOS-P0-B01-BROWSER',
+        filePrefix: 'customer-request-intake-browser-',
+        minimumScenarios: 2,
+        minimumScreenshots: 2,
+        expectedCoverage: AMOS_P0_B01_COVERAGE,
       },
       {
         id: 'CRM-CUSTOMER-POOL',

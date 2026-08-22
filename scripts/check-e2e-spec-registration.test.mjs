@@ -33,6 +33,94 @@ test('a fully registered directory is silent', () => {
   assert.deepEqual(auditRegistrations({ root, config }).findings, []);
 });
 
+test('purpose-built projects register their union without widening either suite', () => {
+  const { root, config } = makeRepo({ specs: ['a', 'b'], registered: ['a'] });
+  const secondConfig = 'web-admin/playwright.special.config.ts';
+  fs.writeFileSync(
+    path.join(root, secondConfig),
+    "const specialSpecNames = ['b'];\n",
+  );
+  config.registries[0] = {
+    dir: SPEC_DIR,
+    projects: [
+      {
+        configFile: CONFIG_FILE,
+        arrayName: 'demoSpecNames',
+        project: 'demo',
+      },
+      {
+        configFile: secondConfig,
+        arrayName: 'specialSpecNames',
+        project: 'special',
+      },
+    ],
+  };
+
+  const result = auditRegistrations({ root, config });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.summary[0].registered, 2);
+});
+
+test('duplicate names across project registries are counted once', () => {
+  const { root, config } = makeRepo({ specs: ['a'], registered: ['a'] });
+  const secondConfig = 'web-admin/playwright.duplicate.config.ts';
+  fs.writeFileSync(
+    path.join(root, secondConfig),
+    "const duplicateSpecNames = ['a'];\n",
+  );
+  config.registries[0] = {
+    dir: SPEC_DIR,
+    projects: [
+      { configFile: CONFIG_FILE, arrayName: 'demoSpecNames', project: 'demo' },
+      { configFile: secondConfig, arrayName: 'duplicateSpecNames', project: 'duplicate' },
+    ],
+  };
+
+  const result = auditRegistrations({ root, config });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.summary[0].registered, 1);
+});
+
+test('an orphan outside the multi-project union remains red', () => {
+  const { root, config } = makeRepo({ specs: ['a', 'b', 'orphan'], registered: ['a'] });
+  const secondConfig = 'web-admin/playwright.special.config.ts';
+  fs.writeFileSync(
+    path.join(root, secondConfig),
+    "const specialSpecNames = ['b'];\n",
+  );
+  config.registries[0] = {
+    dir: SPEC_DIR,
+    projects: [
+      { configFile: CONFIG_FILE, arrayName: 'demoSpecNames', project: 'demo' },
+      { configFile: secondConfig, arrayName: 'specialSpecNames', project: 'special' },
+    ],
+  };
+
+  const result = auditRegistrations({ root, config });
+  assert.deepEqual(kinds(result), ['orphan']);
+  assert.match(result.findings[0].message, /orphan\.spec\.ts/);
+});
+
+test('registries never collect spec names from another governed directory', () => {
+  const { root, config } = makeRepo({ specs: ['a'], registered: ['a'] });
+  const otherDir = 'plugins/other/e2e';
+  const otherConfig = 'plugins/other/playwright.config.ts';
+  fs.mkdirSync(path.join(root, otherDir), { recursive: true });
+  fs.writeFileSync(path.join(root, otherDir, 'b.spec.ts'), '// other spec\n');
+  fs.mkdirSync(path.join(root, path.dirname(otherConfig)), { recursive: true });
+  fs.writeFileSync(path.join(root, otherConfig), "const otherSpecNames = ['b'];\n");
+  config.registries.push({
+    dir: otherDir,
+    configFile: otherConfig,
+    arrayName: 'otherSpecNames',
+    project: 'other',
+  });
+
+  const result = auditRegistrations({ root, config });
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual(result.summary.map((row) => row.registered), [1, 1]);
+});
+
 test('a spec nobody registered is an error, not a warning', () => {
   const { root, config } = makeRepo({ specs: ['a', 'b'], registered: ['a'] });
   const r = auditRegistrations({ root, config });
