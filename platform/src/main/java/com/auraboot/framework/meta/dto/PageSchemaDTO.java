@@ -193,6 +193,10 @@ public class PageSchemaDTO extends AbstractResponse {
     @JsonProperty("commands")
     private Map<String, String> commands;
 
+    /** Runtime release identity. Present on runtime reads and stable for one immutable snapshot. */
+    @JsonProperty("runtime")
+    private PageSchemaRuntimeDTO runtime;
+
     // 状态字段已在父类 AbstractResponse 中定义，无需重复声明
 
     /**

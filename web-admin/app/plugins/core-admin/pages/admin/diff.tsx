@@ -38,8 +38,8 @@ interface DryRunResult {
 
 interface PromotionResponse {
   pid: string;
-  sourceEnvId: number;
-  targetEnvId: number;
+  sourceEnvId: string;
+  targetEnvId: string;
   status: string;
   dryRunResult: DryRunResult | null;
   dryRunAt: string | null;

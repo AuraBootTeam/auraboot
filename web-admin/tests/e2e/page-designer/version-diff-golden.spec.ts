@@ -38,11 +38,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import { uniqueId } from '../helpers';
-
-const ADMIN_STORAGE_STATE =
-  process.env.PW_ADMIN_STORAGE_STATE ||
-  (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
 // ab_announcement is a published platform meta-model present in every OSS stack;
 // it satisfies the detail-page contract for the root detail block.
@@ -138,12 +136,7 @@ function detailDoc(pageKey: string, sectionId: string, sectionTitle: string, tit
   };
 }
 
-async function seedDraftPage(
-  browser: import('@playwright/test').Browser,
-  uid: string,
-): Promise<{ pid: string; pageKey: string }> {
-  const ctx = await browser.newContext({ storageState: ADMIN_STORAGE_STATE });
-  const page = await ctx.newPage();
+async function seedDraftPage(page: Page, uid: string): Promise<{ pid: string; pageKey: string }> {
   const pageKey = `pd_diff_${uid}`.replace(/-/g, '_');
   const resp = await page.request.post('/api/pages', {
     data: {
@@ -164,7 +157,6 @@ async function seedDraftPage(
   expect(body.code, 'seed page API code').toBe('0');
   const pid = String(body.data?.pid ?? '');
   expect(pid, 'seeded pid').toBeTruthy();
-  await ctx.close();
   return { pid, pageKey };
 }
 
@@ -183,15 +175,20 @@ async function createSnapshot(page: Page, pid: string): Promise<void> {
   }).toPass({ timeout: 30_000 });
 }
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe.serial('Unified Designer version-diff golden', () => {
   // Real save/reopen round-trips plus two snapshots + a compare; 15s default is tight.
   test.describe.configure({ timeout: 120_000 });
 
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  });
+
   test('happy: compare two snapshots surfaces the backend diff (summary + rows)', async ({
     page,
-    browser,
   }, testInfo) => {
-    const { pid, pageKey } = await seedDraftPage(browser, uniqueId('pddiff'));
+    const { pid, pageKey } = await seedDraftPage(page, uniqueId('pddiff'));
 
     await openDesigner(page, pid);
 
@@ -226,7 +223,9 @@ test.describe.serial('Unified Designer version-diff golden', () => {
         'utf-8',
       ),
     });
-    await expect(page.getByTestId(`outline-item-${CHANGED_SECTION}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`outline-item-${CHANGED_SECTION}`)).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
@@ -257,6 +256,7 @@ test.describe.serial('Unified Designer version-diff golden', () => {
 
     // --- Enter Compare mode, pick the two snapshots, run Compare ---
     await page.getByTestId('version-compare-toggle').click();
+    await expect(page.getByTestId('version-compare-bar')).toBeVisible();
     // Compare cannot run until exactly two versions are selected.
     await expect(page.getByTestId('version-compare-run')).toBeDisabled();
     await page.getByTestId(`version-compare-select-${v1HistoryId}`).check();
@@ -277,7 +277,10 @@ test.describe.serial('Unified Designer version-diff golden', () => {
     const modifiedFields =
       payload.summary?.modifiedFields ??
       payload.differences.filter((d) => String(d.type).toUpperCase() === 'MODIFIED').length;
-    expect(modifiedFields, 'at least one modified field (coarse blocks/title diff)').toBeGreaterThanOrEqual(1);
+    expect(
+      modifiedFields,
+      'at least one modified field (coarse blocks/title diff)',
+    ).toBeGreaterThanOrEqual(1);
     expect(
       payload.summary?.totalDifferences ?? payload.differences.length,
       'non-empty diff between two distinct snapshots',
@@ -285,6 +288,7 @@ test.describe.serial('Unified Designer version-diff golden', () => {
 
     // Summary strip renders.
     await expect(page.getByTestId('version-diff-summary')).toBeVisible();
+    await expect(page.getByTestId('version-diff-list')).toBeVisible();
 
     // At least one of the coarse rows the backend returns (blocks/title/rowVersion)
     // is rendered. We assert on whichever the server actually emitted so the test
@@ -297,8 +301,11 @@ test.describe.serial('Unified Designer version-diff golden', () => {
       rowFieldPaths.includes('blocks') || rowFieldPaths.includes('title'),
       `expected a blocks/title MODIFIED row, got: ${rowFieldPaths.join(', ')}`,
     ).toBeTruthy();
-    const firstField = rowFieldPaths.find((f) => f === 'blocks' || f === 'title') ?? rowFieldPaths[0];
-    await expect(page.getByTestId(`version-diff-row-${firstField}`)).toBeVisible({ timeout: 10_000 });
+    const firstField =
+      rowFieldPaths.find((f) => f === 'blocks' || f === 'title') ?? rowFieldPaths[0];
+    await expect(page.getByTestId(`version-diff-row-${firstField}`)).toBeVisible({
+      timeout: 10_000,
+    });
 
     await testInfo.attach('diff-view', {
       body: await page.screenshot(),
@@ -313,9 +320,8 @@ test.describe.serial('Unified Designer version-diff golden', () => {
 
   test('sad: comparing two identical snapshots shows the no-differences state', async ({
     page,
-    browser,
   }, testInfo) => {
-    const { pid } = await seedDraftPage(browser, uniqueId('pddiffsame'));
+    const { pid } = await seedDraftPage(page, uniqueId('pddiffsame'));
 
     await openDesigner(page, pid);
 

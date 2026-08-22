@@ -93,6 +93,9 @@ export interface ListTableProps {
   getRowStyle?: (record: Record<string, any>) => React.CSSProperties | undefined;
   previewRecordId?: string | null;
   t: (key: string) => string;
+  /** Localized business empty-state copy resolved by the page renderer. */
+  emptyTitle?: string;
+  emptyDescription?: string;
   onInlineSave?: (field: string, value: any, record: Record<string, any>) => Promise<void>;
   dictDataCache?: Map<string, DictItem[]>;
   enableSelection?: boolean;
@@ -144,6 +147,8 @@ export const ListTable = React.memo(function ListTable({
   getRowStyle,
   previewRecordId,
   t,
+  emptyTitle,
+  emptyDescription,
   onInlineSave,
   dictDataCache,
   enableSelection = true,
@@ -498,7 +503,7 @@ export const ListTable = React.memo(function ListTable({
         <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
           <table
             className="divide-border min-w-full table-fixed divide-y"
-            style={{ minWidth: `${renderedTableWidth}px` }}
+            style={{ width: `${renderedTableWidth}px`, minWidth: `${renderedTableWidth}px` }}
           >
             <colgroup>
               {enableSelection && <col style={{ width: `${SELECTION_COLUMN_WIDTH}px` }} />}
@@ -625,7 +630,17 @@ export const ListTable = React.memo(function ListTable({
                           />
                         </svg>
                       </span>
-                      <span>{t('table.noData') || 'No data'}</span>
+                      <span className="text-text-1 font-medium" data-testid="empty-state-title">
+                        {emptyTitle || t('table.noData') || 'No data'}
+                      </span>
+                      {emptyDescription ? (
+                        <span
+                          className="text-text-3 max-w-2xl text-sm leading-6"
+                          data-testid="empty-state-description"
+                        >
+                          {emptyDescription}
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

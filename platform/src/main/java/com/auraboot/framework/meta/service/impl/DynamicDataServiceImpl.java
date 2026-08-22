@@ -93,6 +93,7 @@ import java.util.stream.Collectors;
 public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDataService {
     private static final String DEFAULT_LIST_SORT_COLUMN = "updated_at";
     private static final String DEFAULT_LIST_SORT_DIRECTION = "DESC";
+    private static final Set<String> AUDIT_USER_DISPLAY_FIELDS = Set.of("created_by", "updated_by");
 
     private final MetaModelService metadataService;
     private final QueryBuilderService queryBuilderService;
@@ -364,8 +365,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         if (!commandPermitInForce) {
-            // Apply field-level permission filtering — remove hidden fields from results
-            records = applyFieldPermissionFilter(modelCode, records);
+            // Resolve requested audit actors while the canonical created_by / updated_by IDs are
+            // still available, then let field permissions remove those raw internal IDs. The
+            // public controller exposes only the safe `<field>_display` projection.
+            records = enrichAuditUsersBeforeFieldPermissionFilter(
+                    modelCode, records, request.getAuditUserDisplayFields());
         }
 
         // Command handlers consume canonical stored values (ids/codes), not presentation-only
@@ -428,6 +432,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             throw new MetaServiceException("Field permission evaluation failed for model: " + modelCode, e);
         }
         return records;
+    }
+
+    private List<Map<String, Object>> enrichAuditUsersBeforeFieldPermissionFilter(
+            String modelCode,
+            List<Map<String, Object>> records,
+            List<String> auditUserDisplayFields) {
+        enrichAuditUserDisplayFields(records, auditUserDisplayFields);
+        return applyFieldPermissionFilter(modelCode, records);
     }
 
     /**
@@ -513,7 +525,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return memberId != null ? memberId : resolveCurrentTenantMemberId();
     }
 
-    private List<Map<String, Object>> enrichListRecords(String modelCode, List<Map<String, Object>> records) {
+    private List<Map<String, Object>> enrichListRecords(
+            String modelCode,
+            List<Map<String, Object>> records) {
         if (records == null || records.isEmpty()) {
             return records;
         }
@@ -566,6 +580,59 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
         return records;
+    }
+
+    /**
+     * Resolve the visible audit actor columns with one tenant-scoped user query.
+     * No query runs when the page does not request an audit field, and unresolved
+     * users stay blank rather than falling back to an internal numeric ID.
+     */
+    private void enrichAuditUserDisplayFields(
+            List<Map<String, Object>> records,
+            List<String> requestedFields) {
+        if (records == null || records.isEmpty() || requestedFields == null || requestedFields.isEmpty()) {
+            return;
+        }
+
+        List<String> fields = requestedFields.stream()
+                .filter(AUDIT_USER_DISPLAY_FIELDS::contains)
+                .distinct()
+                .toList();
+        if (fields.isEmpty()) {
+            return;
+        }
+
+        Set<Long> userIds = new LinkedHashSet<>();
+        for (Map<String, Object> record : records) {
+            for (String field : fields) {
+                Long userId = asLong(record.get(field));
+                if (userId != null) {
+                    userIds.add(userId);
+                }
+            }
+        }
+        if (userIds.isEmpty()) {
+            return;
+        }
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Map<Long, String> displayNames = new HashMap<>();
+        for (Map<String, Object> user : userMapper.findDisplayNamesByIdsInTenant(tenantId, userIds)) {
+            Long userId = asLong(user.get("id"));
+            Object displayName = user.get("display_name");
+            if (userId != null && displayName != null && !String.valueOf(displayName).isBlank()) {
+                displayNames.put(userId, String.valueOf(displayName));
+            }
+        }
+
+        for (Map<String, Object> record : records) {
+            for (String field : fields) {
+                String displayName = displayNames.get(asLong(record.get(field)));
+                if (displayName != null) {
+                    record.put(field + "_display", displayName);
+                }
+            }
+        }
     }
 
     private Long asLong(Object value) {
@@ -1124,7 +1191,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             nqRequest.setOrderConditions(orderArray);
         }
 
-        return namedQueryService.executeQuery(queryCode, nqRequest);
+        PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryCode, nqRequest);
+        enrichAuditUserDisplayFields(result.getRecords(), request.getAuditUserDisplayFields());
+        return result;
     }
 
     @Override

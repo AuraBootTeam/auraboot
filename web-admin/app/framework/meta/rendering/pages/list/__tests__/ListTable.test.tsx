@@ -57,7 +57,7 @@ describe('ListTable selection column layout', () => {
 
     const table = container.querySelector('table');
     expect(table).toHaveClass('table-fixed');
-    expect(table).toHaveStyle({ minWidth: '290px' });
+    expect(table).toHaveStyle({ width: '290px', minWidth: '290px' });
 
     const cols = container.querySelectorAll('col');
     expect(cols).toHaveLength(2);
@@ -258,7 +258,10 @@ describe('ListTable selection column layout', () => {
       });
 
       await waitFor(() => {
-        expect(container.querySelector('table')).toHaveStyle({ minWidth: '1000px' });
+        expect(container.querySelector('table')).toHaveStyle({
+          width: '1000px',
+          minWidth: '1000px',
+        });
       });
 
       const cols = container.querySelectorAll('col');
@@ -307,6 +310,20 @@ describe('ListTable selection column layout', () => {
         delete (HTMLElement.prototype as any).clientWidth;
       }
     }
+  });
+
+  it('renders the page business empty state instead of the generic fallback', async () => {
+    renderListTable({
+      data: [],
+      emptyTitle: '暂无生产退料申请',
+      emptyDescription: '点击“新建退料申请”，从一张已确认的生产发料单开始。',
+    });
+
+    expect(await screen.findByTestId('empty-state-title')).toHaveTextContent('暂无生产退料申请');
+    expect(screen.getByTestId('empty-state-description')).toHaveTextContent(
+      '点击“新建退料申请”，从一张已确认的生产发料单开始。',
+    );
+    expect(screen.queryByText('table.noData')).not.toBeInTheDocument();
   });
 });
 

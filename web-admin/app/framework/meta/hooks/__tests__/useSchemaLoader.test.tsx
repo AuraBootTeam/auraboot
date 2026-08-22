@@ -128,6 +128,61 @@ describe('useSchemaLoader', () => {
     expect(second.result.current.schema?.title).toBe('Fresh schema');
   });
 
+  it('revalidates the active release pointer before using production cache', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        message: '',
+        data: {
+          pid: 'release_cache_page',
+          pageKey: 'release_cache_list',
+          kind: 'list',
+          title: 'Release one',
+          blocks: [],
+          runtime: {
+            source: 'AUTHORING_RELEASE',
+            releasePid: 'release-1',
+            channelVersion: 1,
+            sourceVersion: 2,
+            snapshotChecksum: 'checksum-1',
+            cacheKey: 'authoring-release:release-1:1:checksum-1',
+          },
+        },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '0',
+        message: '',
+        data: {
+          pid: 'release_cache_page',
+          pageKey: 'release_cache_list',
+          kind: 'list',
+          title: 'Release two',
+          blocks: [],
+          runtime: {
+            source: 'AUTHORING_RELEASE',
+            releasePid: 'release-2',
+            channelVersion: 2,
+            sourceVersion: 2,
+            snapshotChecksum: 'checksum-2',
+            cacheKey: 'authoring-release:release-2:2:checksum-2',
+          },
+        },
+      } as any);
+
+    const first = renderHook(() => useSchemaLoader({ pageKey: 'release_cache_list' }));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+
+    const second = renderHook(() => useSchemaLoader({ pageKey: 'release_cache_list' }));
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+
+    expect(mockFetchResult).toHaveBeenCalledTimes(2);
+    expect(second.result.current.schema?.title).toBe('Release two');
+    expect(second.result.current.schema?.runtime?.releasePid).toBe('release-2');
+    vi.unstubAllEnvs();
+  });
+
   it('aborts in-flight schema requests when the hook unmounts', async () => {
     let capturedSignal: AbortSignal | undefined;
     mockFetchResult.mockImplementation((_, options: any) => {

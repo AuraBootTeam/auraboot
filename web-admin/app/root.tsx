@@ -192,8 +192,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     fetchSpaces(),
   ]);
 
-  // Stale token guard: token exists but user resolution failed (e.g. DB reset)
-  // → clear session and redirect to login
+  // Authoritative auth rejection: fetchUserInfo returns null only for a 401.
+  // Transport, timeout and 5xx failures throw instead, preserving the valid session for retry.
   if (!user && !isPublicRoute(pathname)) {
     if (token) {
       const session = await getSessionFromRequest(request);

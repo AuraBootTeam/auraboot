@@ -20,7 +20,7 @@ public class SavedViewUpdateRequest {
     private String description;
 
     /**
-     * Scope: PERSONAL, TEAM, GLOBAL
+     * Scope: PERSONAL, TEAM, ROLE, GLOBAL
      */
     private String scope;
 
@@ -33,6 +33,11 @@ public class SavedViewUpdateRequest {
      * Team ID (required when scope is TEAM)
      */
     private String teamId;
+
+    /**
+     * Role PID (required when scope is ROLE)
+     */
+    private String roleId;
 
     /**
      * View configuration

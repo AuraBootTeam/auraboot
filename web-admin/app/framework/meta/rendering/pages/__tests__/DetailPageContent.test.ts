@@ -7,6 +7,7 @@ import {
   extractBlockDataRows,
   getByDataPath,
   injectDetailRecordValueIntoCustomBlock,
+  loadDetailRecordRefreshSnapshot,
   mergeDetailDisplayFields,
   readDetailRecordField,
   resolveDetailReturnTarget,
@@ -21,8 +22,54 @@ import {
   resolveVisibleDetailTabsFromBlocks,
   resolveVisibleTopLevelDetailBlocks,
   shouldRenderDefaultDetailEditAction,
+  canRenderDetailToolbarButton,
   unwrapDetailRecord,
 } from '../DetailPageContent';
+
+describe('loadDetailRecordRefreshSnapshot', () => {
+  it('does not settle until the post-command record and display enrichment are both fresh', async () => {
+    let resolveFetch!: (value: any) => void;
+    let resolveEnrichment!: (value: Record<string, unknown>) => void;
+    const fetchRecord = () =>
+      new Promise<any>((resolve) => {
+        resolveFetch = resolve;
+      });
+    const enrichRecord = () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        resolveEnrichment = resolve;
+      });
+
+    let settled = false;
+    const pending = loadDetailRecordRefreshSnapshot(
+      fetchRecord,
+      undefined,
+      'inv_shipment',
+      'shipment-1',
+      undefined,
+      enrichRecord as any,
+    ).then((value) => {
+      settled = true;
+      return value;
+    });
+
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    resolveFetch({ code: 0, data: { pid: 'shipment-1', row_version: 6 } });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    resolveEnrichment({ pid: 'shipment-1', row_version: 6, carrier_display: '顺丰速运' });
+
+    await expect(pending).resolves.toEqual({
+      rawData: { pid: 'shipment-1', row_version: 6 },
+      recordData: {
+        pid: 'shipment-1',
+        row_version: 6,
+        carrier_display: '顺丰速运',
+      },
+    });
+  });
+});
 
 describe('resolveDetailReturnTarget', () => {
   it('returns to an internal workbench while carrying its route context', () => {
@@ -120,6 +167,30 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 
   it('hides the default edit action when extension.showEdit is false', () => {
     expect(shouldRenderDefaultDetailEditAction({ extension: { showEdit: false } })).toBe(false);
+  });
+});
+
+describe('canRenderDetailToolbarButton', () => {
+  it('keeps buttons without a permission code visible', () => {
+    expect(canRenderDetailToolbarButton({}, () => false)).toBe(true);
+  });
+
+  it('hides a permission-bound button when the current user lacks the permission', () => {
+    expect(
+      canRenderDetailToolbarButton(
+        { permissionCode: 'model.supplier_management_supplier.update' },
+        () => false,
+      ),
+    ).toBe(false);
+  });
+
+  it('shows a permission-bound button when the current user has the permission', () => {
+    expect(
+      canRenderDetailToolbarButton(
+        { permissionCode: 'model.supplier_management_supplier.update' },
+        (code) => code === 'model.supplier_management_supplier.update',
+      ),
+    ).toBe(true);
   });
 });
 

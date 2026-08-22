@@ -15,6 +15,7 @@ import { ResultHelper } from '~/utils/type';
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { ViewFilterConfig, SortConfig } from '~/framework/smart/types/savedView';
+import { resolveAuditUserDisplayFields } from '../list/auditUserDisplayFields';
 
 interface DynamicEntity {
   [key: string]: any;
@@ -116,6 +117,10 @@ export function useListData({
     }
     return null;
   }, [schema]);
+  const auditUserDisplayFields = useMemo(() => {
+    const tableBlock = schema?.blocks?.find((block) => block.blockType === 'table');
+    return resolveAuditUserDisplayFields(tableBlock);
+  }, [schema]);
 
   // Build filters JSON array
   const buildFiltersParam = useCallback(
@@ -198,6 +203,9 @@ export function useListData({
         } else {
           queryParams.pageNum = requestedPageNum;
           queryParams.pageSize = requestedPageSize;
+          if (auditUserDisplayFields) {
+            queryParams.auditUserDisplayFields = auditUserDisplayFields;
+          }
         }
 
         // Parent-scope filters always win over user/tab filters of the same field.
@@ -290,6 +298,7 @@ export function useListData({
       fixedFilters,
       buildFiltersParam,
       namedQueryCode,
+      auditUserDisplayFields,
     ],
   );
 

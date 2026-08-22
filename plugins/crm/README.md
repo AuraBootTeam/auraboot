@@ -27,7 +27,7 @@ crm_adoption_jars="${PWD}/.aura-stack/crm-adoption-plugin-jars"
 ./platform/gradlew -p platform \
   :platform-plugin-api:publishToMavenLocal \
   --no-daemon
-gradle -p plugins/crm/backend clean test jar --no-daemon
+./platform/gradlew --project-dir plugins/crm/backend clean test jar --no-daemon
 mkdir -p "${crm_adoption_jars}"
 install -m 0644 \
   plugins/crm/backend/build/libs/crm-plugin-1.2.0.jar \
@@ -151,7 +151,7 @@ Build the hybrid JAR and use the runtime guard so the local artifact, PF4J
 registry, imported metadata and page schema are checked together:
 
 ```bash
-gradle -p plugins/crm/backend clean test jar
+./platform/gradlew --project-dir plugins/crm/backend clean test jar --no-daemon
 
 node scripts/dev/plugin-runtime-import-guard.mjs \
   --plugin plugins/crm \
@@ -196,7 +196,7 @@ the backend log. Do not replace the failure with a manual database update.
 
 ```bash
 ./platform/gradlew -p platform :platform-plugin-api:publishToMavenLocal --no-daemon
-gradle -p plugins/crm/backend test jar
+./platform/gradlew --project-dir plugins/crm/backend test jar --no-daemon
 node --test plugins/crm/tests/*.test.mjs
 node scripts/check-dsl-actions.mjs plugins/crm
 node plugins/crm/scripts/verify_release_coverage.mjs

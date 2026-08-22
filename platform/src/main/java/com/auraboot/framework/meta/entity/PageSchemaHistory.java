@@ -75,6 +75,12 @@ public class PageSchemaHistory {
     @TableField("op_at")
     private Instant opAt;
 
+    /**
+     * Human-readable reason supplied when the snapshot or version action was created.
+     */
+    @TableField("description")
+    private String description;
+
     @TableField("created_at")
     private Instant createdAt;
 }

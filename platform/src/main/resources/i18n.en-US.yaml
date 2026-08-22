@@ -1056,6 +1056,23 @@ common:
   modified_this_week: Modified This Week
   preset_views: Preset Views
   view_saved: Saved to current view
+  saved_view_overlay_rebased_title: Personal view adapted to the new page
+  saved_view_overlay_rebased_description: Field and action identities remain compatible; your settings were replayed automatically.
+  saved_view_overlay_stale_title: Personal view safely degraded
+  saved_view_overlay_stale_description_prefix: "The page structure changed; "
+  saved_view_overlay_stale_description_suffix: " invalid personal settings were ignored. The business page remains usable."
+  saved_view_overlay_affected_some: Some
+  saved_view_overlay_mandatory_restored: Required items were restored automatically.
+  saved_view_overlay_repairing: Repairing…
+  saved_view_overlay_repair: Remove invalid settings
+  saved_view_overlay_read_only: This view is read-only. Ask a view administrator to repair it.
+  saved_view_overlay_pending_draft: Save or discard the current local view changes first.
+  saved_view_overlay_repair_success: Invalid settings removed. The personal view now matches the current page.
+  saved_view_overlay_repair_failed: Failed to repair the personal view
+  saved_view_mandatory: Required
+  saved_view_mandatory_field_reason: Required fields cannot be hidden in a personal view
+  saved_view_mandatory_action_reason: Required actions cannot be hidden in a personal view
+  saved_view_mandatory_column: Required Column
   saved_view_save_preset_to_personal: Save preset as my view
   saved_view_preset_saved_to_personal: Saved as personal view
   saved_view_preset_save_failed: Failed to save preset

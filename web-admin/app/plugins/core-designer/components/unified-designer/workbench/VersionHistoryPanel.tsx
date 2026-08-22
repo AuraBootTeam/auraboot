@@ -78,10 +78,13 @@ function formatTime(time: string | undefined): string {
  * lower-cased token, defensively tolerating any casing so a future serialization
  * change cannot silently drop the badge.
  */
-function diffKind(type: FieldDifference['type']): 'added' | 'removed' | 'modified' {
+export function normalizeDifferenceType(
+  type: FieldDifference['type'],
+): 'added' | 'removed' | 'modified' | 'moved' {
   const t = String(type ?? '').toLowerCase();
   if (t === 'added') return 'added';
   if (t === 'removed') return 'removed';
+  if (t === 'moved') return 'moved';
   return 'modified';
 }
 
@@ -106,7 +109,7 @@ const VALUE_TRUNCATE = 120;
 /** A single diff row: field path + type badge + source→target values. */
 function DiffRow({ diff, locale }: { diff: FieldDifference; locale: string }) {
   const [expanded, setExpanded] = useState(false);
-  const kind = diffKind(diff.type);
+  const kind = normalizeDifferenceType(diff.type);
   const emptyLabel = resolveDesignerText(DESIGNER_I18N.unified.versionDiffEmptyValue, locale);
   const sourceText = formatDiffValue(diff.sourceValue, emptyLabel);
   const targetText = formatDiffValue(diff.targetValue, emptyLabel);
@@ -115,16 +118,20 @@ function DiffRow({ diff, locale }: { diff: FieldDifference; locale: string }) {
 
   const badge = {
     added: {
-      cls: 'bg-emerald-50 text-emerald-700',
+      cls: 'bg-status-green-bg text-status-green',
       label: resolveDesignerText(DESIGNER_I18N.unified.versionDiffAdded, locale),
     },
     removed: {
-      cls: 'bg-red-50 text-red-700',
+      cls: 'bg-status-red-bg text-status-red',
       label: resolveDesignerText(DESIGNER_I18N.unified.versionDiffRemoved, locale),
     },
     modified: {
-      cls: 'bg-blue-50 text-blue-700',
+      cls: 'bg-status-amber-bg text-status-amber',
       label: resolveDesignerText(DESIGNER_I18N.unified.versionDiffModified, locale),
+    },
+    moved: {
+      cls: 'bg-status-blue-bg text-status-blue',
+      label: resolveDesignerText(DESIGNER_I18N.unified.versionDiffMoved, locale),
     },
   }[kind];
 
@@ -202,10 +209,9 @@ function DiffRow({ diff, locale }: { diff: FieldDifference; locale: string }) {
  *   - POST   /api/pages/{pid}/rollback/{historyId}             → rollback
  *   - GET    /api/pages/{pid}/versions/{from}/compare/{to}     → diff
  *
- * The compare endpoint is coarse-grained (top-level key diff: `blocks` is
- * compared as one JSON blob, not drilled into per-block). The diff viewer renders
- * the backend's `differences` verbatim — it does not re-derive a finer block-level
- * diff client-side (that is a separate backend item).
+ * The compare endpoint returns stable-id block diffs, including semantic MOVE
+ * entries for reordering. The diff viewer renders the backend's `differences`
+ * verbatim and never re-derives policy-sensitive diff semantics client-side.
  */
 export function VersionHistoryPanel({ pid, open, onClose, onRolledBack }: VersionHistoryPanelProps) {
   const { locale } = useI18n();
@@ -341,11 +347,17 @@ export function VersionHistoryPanel({ pid, open, onClose, onRolledBack }: Versio
     if (!cmp) return null;
     const summary = cmp.summary;
     const differences = cmp.differences ?? [];
-    const added = summary?.addedFields ?? differences.filter((d) => diffKind(d.type) === 'added').length;
+    const added =
+      summary?.addedFields ?? differences.filter((d) => normalizeDifferenceType(d.type) === 'added').length;
     const removed =
-      summary?.removedFields ?? differences.filter((d) => diffKind(d.type) === 'removed').length;
+      summary?.removedFields ??
+      differences.filter((d) => normalizeDifferenceType(d.type) === 'removed').length;
     const modified =
-      summary?.modifiedFields ?? differences.filter((d) => diffKind(d.type) === 'modified').length;
+      summary?.modifiedFields ??
+      differences.filter((d) => normalizeDifferenceType(d.type) === 'modified').length;
+    const moved =
+      summary?.movedFields ??
+      differences.filter((d) => normalizeDifferenceType(d.type) === 'moved').length;
     const total = summary?.totalDifferences ?? differences.length;
 
     return (
@@ -379,6 +391,7 @@ export function VersionHistoryPanel({ pid, open, onClose, onRolledBack }: Versio
             added,
             removed,
             modified,
+            moved,
           })}
         </div>
 

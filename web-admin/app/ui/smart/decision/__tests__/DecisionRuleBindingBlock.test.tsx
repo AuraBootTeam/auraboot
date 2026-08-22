@@ -707,7 +707,9 @@ describe('DecisionRuleBindingBlock', () => {
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
     expect(api.getModelFields).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('cb-add'));
+    const addConditionButton = screen.getByTestId('cb-add');
+    await waitFor(() => expect(addConditionButton).toBeEnabled());
+    fireEvent.click(addConditionButton);
     fireEvent.change(await screen.findByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });

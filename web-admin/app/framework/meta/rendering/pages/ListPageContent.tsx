@@ -109,6 +109,11 @@ import {
 import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilterChips';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
+import { SavedViewOverlayStatusBanner } from './list/SavedViewOverlayStatusBanner';
+import {
+  resolveAuditUserCellValue,
+  resolveAuditUserDisplayFields,
+} from './list/auditUserDisplayFields';
 import {
   type SelectionState,
   createSelectionModel,
@@ -762,6 +767,7 @@ export function buildListColumnSettingsDefinitions(
     definitions.set(column.field, {
       field: column.field,
       label: resolveLabel(column),
+      ...(column.mandatory === true ? { mandatory: true } : {}),
       dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
       group: 'business',
       defaultVisible: true,
@@ -1174,6 +1180,10 @@ function ListPageContentInner(props: PageContentProps) {
     if (!schema?.blocks) return null;
     return schema.blocks.find((block: any) => block.blockType === 'table') || null;
   }, [schema]);
+  const auditUserDisplayFields = useMemo(
+    () => resolveAuditUserDisplayFields(tableBlock),
+    [tableBlock],
+  );
   const tableBulkActions = useMemo<ButtonConfig[]>(() => {
     const configured =
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
@@ -1331,6 +1341,16 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  const tableEmptyState = useMemo(() => {
+    const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
+    if (!configured || typeof configured !== 'object') return {};
+    return {
+      title: configured.title ? getLocalizedText(configured.title, locale, t) : undefined,
+      description: configured.description
+        ? getLocalizedText(configured.description, locale, t)
+        : undefined,
+    };
+  }, [locale, t, tableBlock]);
   const navigateAwayFromList = useCallback(
     ((toOrDelta: To | number, options?: NavigateOptions) => {
       // List URL state effects (SavedView sorts, filters and pagination) can still be queued
@@ -1497,6 +1517,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
+  const [repairingViewOverlay, setRepairingViewOverlay] = useState(false);
   const savedViewPersistenceMode = getSavedViewPersistenceMode(currentView);
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
   const canCopyCurrentView = canCopySavedView(currentView);
@@ -1612,6 +1633,48 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [t],
   );
+  const overlayMeta = currentView?.viewConfig?.meta;
+  const overlayCanWrite =
+    Boolean(currentView) &&
+    (savedViewPersistenceMode !== 'shared-draft' || canSaveSharedView) &&
+    !isCurrentViewLockedPreset;
+  const canRepairViewOverlay = overlayCanWrite && !hasPendingViewConfig;
+  const repairViewOverlayUnavailableReason = hasPendingViewConfig
+    ? translateCommon(
+        'common.saved_view_overlay_pending_draft',
+        '请先保存或放弃当前视图的本地变更。',
+      )
+    : undefined;
+
+  const handleRepairViewOverlay = useCallback(async () => {
+    if (!currentView?.viewConfig || !canRepairViewOverlay) return;
+
+    setRepairingViewOverlay(true);
+    try {
+      await updateView({ viewConfig: currentView.viewConfig });
+      showSuccessToast(
+        translateCommon(
+          'common.saved_view_overlay_repair_success',
+          '失效设置已清理，个人视图已适配当前页面。',
+        ),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_overlay_repair_failed', '个人视图修复失败'),
+      );
+    } finally {
+      setRepairingViewOverlay(false);
+    }
+  }, [
+    canRepairViewOverlay,
+    currentView,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+  ]);
   useEffect(() => {
     setPendingViewConfig(null);
   }, [currentView?.pid]);
@@ -1975,6 +2038,9 @@ function ListPageContentInner(props: PageContentProps) {
         } else {
           queryParams.pageNum = requestedPageNum;
           queryParams.pageSize = requestedPageSize;
+          if (auditUserDisplayFields) {
+            queryParams.auditUserDisplayFields = auditUserDisplayFields;
+          }
         }
 
         if (isApiDatasource) {
@@ -2094,6 +2160,7 @@ function ListPageContentInner(props: PageContentProps) {
       buildFiltersParam,
       namedQueryCode,
       tableBlock,
+      auditUserDisplayFields,
       activeSorts,
       skipListData,
     ],
@@ -2287,6 +2354,9 @@ function ListPageContentInner(props: PageContentProps) {
           } else {
             queryParams.pageNum = 1;
             queryParams.pageSize = pagination.pageSize;
+            if (auditUserDisplayFields) {
+              queryParams.auditUserDisplayFields = auditUserDisplayFields;
+            }
           }
           if (isApiDatasource) {
             // API datasource: tab filter as individual query param
@@ -2378,6 +2448,7 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       activeSorts,
       tableBlock,
+      auditUserDisplayFields,
       skipListData,
     ],
   );
@@ -2526,26 +2597,31 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
-  const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setLocalActiveSorts((prev) => {
-      const existing = prev.find((s) => s.fieldCode === fieldCode);
-      let next: SortConfig[];
-      if (!existing) {
-        // Add new sort
-        const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
-        next = multiSort ? [...prev, newSort] : [newSort];
-      } else if (existing.direction === 'asc') {
-        // asc → desc
-        next = multiSort
-          ? prev.map((s) => (s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s))
-          : [{ fieldCode, direction: 'desc', priority: 0 }];
-      } else {
-        // desc → clear
-        next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
-      }
-      return next;
-    });
-  }, [setLocalActiveSorts]);
+  const toggleSort = useCallback(
+    (fieldCode: string, multiSort = false) => {
+      setLocalActiveSorts((prev) => {
+        const existing = prev.find((s) => s.fieldCode === fieldCode);
+        let next: SortConfig[];
+        if (!existing) {
+          // Add new sort
+          const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
+          next = multiSort ? [...prev, newSort] : [newSort];
+        } else if (existing.direction === 'asc') {
+          // asc → desc
+          next = multiSort
+            ? prev.map((s) =>
+                s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s,
+              )
+            : [{ fieldCode, direction: 'desc', priority: 0 }];
+        } else {
+          // desc → clear
+          next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
+        }
+        return next;
+      });
+    },
+    [setLocalActiveSorts],
+  );
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -2983,7 +3059,8 @@ function ListPageContentInner(props: PageContentProps) {
   // Render cell content using CellRendererRegistry
   const renderCellContent = useCallback(
     (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
-      const value = getListFieldValueWithAlias(record, column.field);
+      const rawValue = getListFieldValueWithAlias(record, column.field);
+      const value = resolveAuditUserCellValue(record, column.field, rawValue);
       const recordWithAliasedField = Object.prototype.hasOwnProperty.call(record, column.field)
         ? record
         : { ...record, [column.field]: value };
@@ -4605,6 +4682,16 @@ function ListPageContentInner(props: PageContentProps) {
               </button>
             </div>
           )}
+          <SavedViewOverlayStatusBanner
+            status={overlayMeta?.overlayStatus}
+            reasonCodes={overlayMeta?.overlayReasonCodes}
+            stalePaths={overlayMeta?.overlayStalePaths}
+            canRepair={canRepairViewOverlay}
+            repairing={repairingViewOverlay}
+            onRepair={handleRepairViewOverlay}
+            repairUnavailableReason={repairViewOverlayUnavailableReason}
+            t={translateCommon}
+          />
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
@@ -4642,6 +4729,7 @@ function ListPageContentInner(props: PageContentProps) {
             onAction={handleAction}
             onToolbarConfigChange={handleToolbarConfigChange}
             resolveLabel={resolveButtonLabel}
+            t={t}
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}
@@ -4759,13 +4847,15 @@ function ListPageContentInner(props: PageContentProps) {
 
           {/* List Tabs */}
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
-            <ListTabs
-              tabs={listTabsBlock.tabs as any[]}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              locale={locale}
-              t={t}
-            />
+            <div data-aura-block-id={listTabsBlock.id} data-aura-element-id={listTabsBlock.id}>
+              <ListTabs
+                tabs={listTabsBlock.tabs as any[]}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                locale={locale}
+                t={t}
+              />
+            </div>
           )}
 
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
@@ -4775,6 +4865,8 @@ function ListPageContentInner(props: PageContentProps) {
             filterBlock.fields.length > 0 && (
               <div
                 data-testid="search-area"
+                data-aura-block-id={filterBlock.id}
+                data-aura-element-id={filterBlock.id}
                 data-ab-testid={deriveTestId('list', modelCode, 'filters')}
                 className="print-hide border-border bg-subtle border-b px-6 py-4"
                 data-print="hide"
@@ -4795,6 +4887,7 @@ function ListPageContentInner(props: PageContentProps) {
                   {filterBlock.fields.map((field: FieldConfig) => (
                     <div
                       key={field.field}
+                      data-authoring-node-id={(field as any).id || field.field}
                       className="min-w-0"
                       style={{
                         gridColumn: `span ${Math.min(Math.max(field.layout?.colSpan || 4, 1), 12)}`,
@@ -4893,6 +4986,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           key={button.code}
                           data-testid={`filter-btn-${button.code}`}
+                          data-authoring-node-id={(button as any).id || button.code}
                           onClick={() => handleAction(button)}
                           className={`rounded-control px-4 py-2 ${
                             button.primary || button.variant === 'primary'
@@ -4946,7 +5040,11 @@ function ListPageContentInner(props: PageContentProps) {
               </div>
             )
           ) : activeViewType === 'table' ? (
-            <>
+            <div
+              className="relative"
+              data-aura-block-id={tableBlock?.id}
+              data-aura-element-id={tableBlock?.id}
+            >
               {miscBlocksPosition === 'beforeTable' && miscListBlocks.length > 0 && runtime && (
                 <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
                   {miscListBlocks.map((block: any, idx: number) => (
@@ -5159,6 +5257,8 @@ function ListPageContentInner(props: PageContentProps) {
                 getRowStyle={getRowStyle}
                 previewRecordId={previewRecordId}
                 t={t}
+                emptyTitle={tableEmptyState.title}
+                emptyDescription={tableEmptyState.description}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
                 enableSelection={selectionEnabled}
@@ -5213,28 +5313,30 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
-            </>
+            </div>
           ) : (
-            <SmartViewRenderer
-              view={
-                {
-                  ...(activeViewTemplate || currentView || {}),
-                  modelCode,
-                  viewType: activeViewType,
-                  viewConfig: activeViewConfig,
-                } as any
-              }
-              onGanttTaskClick={navigateToRecordView}
-              onOpenViewConfig={() => setViewManageOpen(true)}
-              onSwitchToTableView={() => setActiveViewType('table')}
-              onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
-              onEventClick={navigateToRecordView}
-              onGalleryCardClick={navigateToRecordView}
-              onTreeNodeClick={navigateToRecordView}
-              onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
-              linkageFilters={[]}
-              pageKey={pageKey}
-            />
+            <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>
+              <SmartViewRenderer
+                view={
+                  {
+                    ...(activeViewTemplate || currentView || {}),
+                    modelCode,
+                    viewType: activeViewType,
+                    viewConfig: activeViewConfig,
+                  } as any
+                }
+                onGanttTaskClick={navigateToRecordView}
+                onOpenViewConfig={() => setViewManageOpen(true)}
+                onSwitchToTableView={() => setActiveViewType('table')}
+                onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
+                onEventClick={navigateToRecordView}
+                onGalleryCardClick={navigateToRecordView}
+                onTreeNodeClick={navigateToRecordView}
+                onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
+                linkageFilters={[]}
+                pageKey={pageKey}
+              />
+            </div>
           )}
 
           <ListModals

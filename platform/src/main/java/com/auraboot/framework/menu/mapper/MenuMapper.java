@@ -185,6 +185,38 @@ public interface MenuMapper extends BaseMapper<Menu> {
         """)
     String findPermissionCodeByPageKey(@Param("tenantId") Long tenantId, @Param("pageKey") String pageKey);
 
+    /** Active menu nodes linked to one page plus their active ancestor path, tenant-scoped. */
+    @Select({
+        "WITH RECURSIVE menu_path AS (",
+        "  SELECT id, tenant_id, pid, parent_id, code, name, type, permission_code, visible,",
+        "         order_no, page_key, page_pid, status, deleted_flag",
+        "  FROM ab_menu",
+        "  WHERE tenant_id = #{tenantId}",
+        "    AND (page_pid = #{pagePid}",
+        "      OR (page_pid IS NULL AND page_key = #{pageKey}))",
+        "    AND status = 'active'",
+        "    AND deleted_flag = false",
+        "  UNION",
+        "  SELECT parent.id, parent.tenant_id, parent.pid, parent.parent_id, parent.code,",
+        "         parent.name, parent.type, parent.permission_code, parent.visible,",
+        "         parent.order_no, parent.page_key, parent.page_pid, parent.status,",
+        "         parent.deleted_flag",
+        "  FROM ab_menu parent",
+        "  JOIN menu_path child ON child.parent_id = parent.id",
+        "  WHERE parent.tenant_id = #{tenantId}",
+        "    AND parent.status = 'active'",
+        "    AND parent.deleted_flag = false",
+        ")",
+        "SELECT id, tenant_id, pid, parent_id, code, name, type, permission_code, visible,",
+        "       order_no, page_key, page_pid, status, deleted_flag",
+        "FROM menu_path",
+        "ORDER BY order_no ASC, id ASC"
+    })
+    List<Menu> findActivePathByPage(
+            @Param("tenantId") Long tenantId,
+            @Param("pagePid") String pagePid,
+            @Param("pageKey") String pageKey);
+
     /**
      * Auto-link menus to pages by matching page_key.
      * Updates page_pid for menus that have page_key set but no page_pid.

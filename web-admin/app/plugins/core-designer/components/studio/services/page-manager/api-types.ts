@@ -197,9 +197,9 @@ export interface VersionInfo {
  * `type` is the backend `DifferenceType` enum serialized by name — Jackson
  * writes enums via `name()` (no `@JsonValue` / WRITE_ENUMS_USING_TO_STRING on
  * the platform mapper), so the wire value is UPPERCASE (`ADDED` / `REMOVED` /
- * `MODIFIED`). The diff viewer normalizes case defensively all the same.
+ * `MODIFIED` / `MOVED`). The diff viewer normalizes case defensively all the same.
  */
-export type FieldDifferenceType = 'ADDED' | 'REMOVED' | 'MODIFIED';
+export type FieldDifferenceType = 'ADDED' | 'REMOVED' | 'MODIFIED' | 'MOVED';
 
 export interface FieldDifference {
   fieldPath: string;
@@ -217,6 +217,7 @@ export interface ComparisonSummary {
   addedFields: number;
   removedFields: number;
   modifiedFields: number;
+  movedFields: number;
   hasMajorChanges?: boolean;
   changesByCategory?: Record<string, number>;
 }

@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -82,9 +83,10 @@ class DynamicControllerPublicRecordSanitizerTest {
                 String.class,
                 String.class,
                 String.class,
+                String.class,
                 String.class);
 
-        assertThat(listMethod.getParameterTypes()[9]).isEqualTo(String.class);
+        assertThat(listMethod.getParameterTypes()[10]).isEqualTo(String.class);
     }
 
     @Test
@@ -106,10 +108,38 @@ class DynamicControllerPublicRecordSanitizerTest {
                 .thenReturn(PaginationResult.of(List.of(row(1L, "p1")), 1L, 1, 20));
 
         ApiResponse<PaginationResult<Map<String, Object>>> response = controller.list(
-                "order", 1, 20, null, null, null, null, null, null, null);
+                "order", 1, 20, null, null, null, null, null, null, null, null);
 
         assertPublicRecord(response.getData().getRecords().get(0), "p1");
         assertThat(response.getData().getTotal()).isEqualTo(1L);
+    }
+
+    @Test
+    void listRequestsOnlyWhitelistedAuditDisplaysAndKeepsDisplayNamePublic() {
+        DynamicController controller = controller();
+        when(metaModelService.getModelDefinition("order")).thenReturn(Optional.of(model("order")));
+        Map<String, Object> enriched = row(1L, "p1");
+        enriched.put("created_by_display", "Alice Zhang");
+        when(dynamicDataService.list(eq("order"), any()))
+                .thenReturn(PaginationResult.of(List.of(enriched), 1L, 1, 20));
+
+        ApiResponse<PaginationResult<Map<String, Object>>> response = controller.list(
+                "order", 1, 20, null, null, null, null, null, null,
+                "created_by,created_by", null);
+
+        ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("order"), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getAuditUserDisplayFields()).containsExactly("created_by");
+        assertThat(response.getData().getRecords().getFirst())
+                .containsEntry("created_by_display", "Alice Zhang")
+                .doesNotContainKey("created_by");
+    }
+
+    @Test
+    void auditDisplayProjectionRejectsUnknownFields() {
+        assertThatThrownBy(() -> DynamicController.parseAuditUserDisplayFields("created_by,password_hash"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("password_hash");
     }
 
     @Test
@@ -120,7 +150,7 @@ class DynamicControllerPublicRecordSanitizerTest {
                 .thenReturn(PaginationResult.of(List.of(row(2L, "p2")), 1L, 1, 20));
 
         ApiResponse<PaginationResult<Map<String, Object>>> response = controller.list(
-                "order", 1, 20, null, null, null, null, null, "order_query", null);
+                "order", 1, 20, null, null, null, null, null, "order_query", null, null);
 
         assertPublicRecord(response.getData().getRecords().get(0), "p2");
     }
@@ -147,7 +177,7 @@ class DynamicControllerPublicRecordSanitizerTest {
                 """;
 
         ApiResponse<PaginationResult<Map<String, Object>>> response = controller.list(
-                "child", 1, 20, null, filters, null, null, null, null, null);
+                "child", 1, 20, null, filters, null, null, null, null, null, null);
 
         ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService).list(eq("child"), requestCaptor.capture());
@@ -178,7 +208,7 @@ class DynamicControllerPublicRecordSanitizerTest {
                 """;
 
         controller.list("crm_opportunity_common", 1, 20, null, filters,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService).list(eq("crm_opportunity_common"), requestCaptor.capture());
@@ -209,7 +239,7 @@ class DynamicControllerPublicRecordSanitizerTest {
                 """;
 
         controller.list("crm_account_common", 1, 20, null, filters,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService).list(eq("crm_account_common"), requestCaptor.capture());
@@ -238,7 +268,7 @@ class DynamicControllerPublicRecordSanitizerTest {
                 """;
 
         controller.list("crm_account_common", 1, 20, null, filters,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService).list(eq("crm_account_common"), requestCaptor.capture());

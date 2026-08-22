@@ -213,6 +213,24 @@ Controlled mutation: temporarily make application/channel capability intersectio
 - Therefore a production/sandbox authorization-code → token → userinfo/id-token exchange could not
   be executed. The intentionally invalid Google authorize canary remains initiation-only evidence.
 
+## 2026-08-22 main-conflict resolution rerun
+
+- Merged the current `origin/main` into the PR branch. The only textual conflict was the generated
+  OSS schema snapshot. It was regenerated from the combined 76 Flyway migrations rather than edited
+  by hand; `scripts/db/check-schema-drift.sh --edition oss` passed against a fresh PostgreSQL 17.6
+  database.
+- Fresh verification runtime: `pr1006-oss-auth-20260822-s87`, slot 87, database `auraboot_87`,
+  source root `/Users/ghj/work/auraboot/.worktrees/auraboot-single-business-tenant-party-actor-20260809`.
+- The 20 affected Auth/Party backend test classes executed 162 tests with 162 passed, 0 failed and
+  0 skipped. The batch includes `PartyActorPersistenceIntegrationTest` against the fresh PostgreSQL
+  database.
+- Focused Web verification passed: OAuth state, actor switching and the auto-merged root auth loader
+  suites executed 18/18 tests; `pnpm typecheck` passed.
+- Documentation governance passed with 0 errors and 0 warnings. E2E spec registration passed.
+- The workspace-wide test-system gate still reports unrelated current-main CRM lead-pool command
+  reachability/coverage rows and script-index drift. Those failures are not counted as Party/Auth
+  passes and are tracked in the workspace closeout task.
+
 ## Deliberate partials / residual scope
 
 - Complete data model does not mean complete UI/workflow. Generic Party invitation acceptance, Capability approval workbench, relation/network management, and all legacy business domains becoming Party-aware are deferred.

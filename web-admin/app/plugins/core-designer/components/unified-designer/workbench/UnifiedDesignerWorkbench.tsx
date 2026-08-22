@@ -22,9 +22,13 @@ import {
   removeBlockById,
   updateBlockById,
 } from '../utils/recursiveBlockWalker';
-import { setByPath } from '../utils/dotPath';
+import { getByPath, setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
-import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
+import {
+  parseDocumentSnapshot,
+  serializeDocument,
+  useDesignerDocument,
+} from '../document/useDesignerDocument';
 import { useDesignerSelection } from '../selection/useDesignerSelection';
 import { useDesignerDnd } from '../dnd/useDesignerDnd';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
@@ -35,7 +39,12 @@ import {
   getDeviceFrameStyle,
   getDevicePreviewPreset,
 } from '../preview/devicePreviewPresets';
-import { getPageTemplate, getPageTemplates } from '../templates/pageTemplateRegistry';
+import {
+  getPageTemplate,
+  getPageTemplates,
+  instantiatePageTemplate,
+} from '../templates/pageTemplateRegistry';
+import { CORE_PAGE_TEMPLATES } from '../templates/corePageTemplates';
 import {
   canSwitchToKind,
   getKindPolicy,
@@ -46,7 +55,7 @@ import {
   createModelFieldBlock,
   type ModelFieldTargetBlockType,
 } from '../registry/createBlockTemplate';
-import { collectBlockIds } from '../utils/blockIds';
+import { collectBlockIds, createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
 import { buildDesignerCollisionCandidates, type DragData } from '../dnd/dndShared';
 import {
   canMoveExistingBlockBeforeTarget,
@@ -63,8 +72,38 @@ import { CanvasHost } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
+import {
+  createRoleStructurePermissionEvaluator,
+  roleStructurePreviewRuntimeServices,
+  sanitizeRoleStructurePreviewDocument,
+  summarizeRoleStructureDecisions,
+} from '../preview/roleStructurePreview';
+import {
+  applySyntheticPreviewToDocument,
+  createSyntheticPreviewRuntimeServices,
+} from '../preview/syntheticPreview';
+import {
+  acknowledgeAuthoringIdentitySimulation,
+  endAuthoringIdentitySimulation,
+  loadActiveAuthoringIdentitySimulation,
+  loadAuthoringIdentitySimulation,
+  loadAuthoringRolePreviewTargets,
+  loadAuthoringRoleStructurePreview,
+  loadAuthoringSyntheticPreview,
+  startAuthoringIdentitySimulation,
+} from '~/framework/meta/authoring/authoringService';
+import type {
+  AuthoringSession,
+  CapabilityRegistry,
+  AuthoringIdentitySimulation,
+  AuthoringRolePreviewTarget,
+  AuthoringRoleStructureDecision,
+  AuthoringRoleStructurePreview,
+  AuthoringSyntheticPreview,
+} from '~/framework/meta/authoring/types';
 import { AiDesignDialog } from '../ai/AiDesignDialog';
 import { buildDesignCopilotPrompt, applyDesignBlocks, type ParsedDesign } from '../ai/designCopilot';
+import { GovernedAiPatchProposalDialog } from '../ai/GovernedAiPatchProposalDialog';
 
 // Pointer-based collision for real users, with a closestCenter fallback when the
 // pointer isn't inside any droppable.
@@ -76,11 +115,18 @@ const designerCollisionDetection: CollisionDetection = (args) => {
   );
 };
 
+const SYNTHETIC_PREVIEW_OPTION = '__synthetic_fixture__';
+const AUTHORING_COPY_LINEAGE_PATH = '/extension/authoringCopyLineage';
+
 export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
+  /** Optional authoritative baseline when initialDocument is a recovered local Mine. */
+  initialSavedDocument?: PageSchemaV3;
   modelFieldsByModel?: ModelFieldsByModel;
   returnHref?: string;
-  onSave?: (document: PageSchemaV3) => Promise<void> | void;
+  onSave?: (document: PageSchemaV3) => Promise<PageSchemaV3 | void> | PageSchemaV3 | void;
+  /** Receives every local document transition so a host can persist crash recovery state. */
+  onDocumentChange?: (document: PageSchemaV3, dirty: boolean) => void;
   /**
    * The persisted page id (pid) when the document is page-bound. Required to
    * enable the publish / unpublish action points (a local/new document has none).
@@ -109,25 +155,62 @@ export interface UnifiedDesignerWorkbenchProps {
    * specific surface (e.g. a QR scan-landing page).
    */
   aiCopilot?: boolean | { domainGuidance?: string };
+  governedAiCopilot?: {
+    sessionPid: string;
+    revision: number;
+    capabilities: CapabilityRegistry;
+    onApplied: (session: AuthoringSession) => void;
+  };
+  initialSelectedBlockId?: string;
+  contextualReadOnly?: boolean;
+  contextualEditablePropertyPaths?: Record<string, string[]>;
+  contextualReorderableBlockTypes?: string[];
+  contextualCreatableBlockTypes?: string[];
+  contextualRemovableBlockTypes?: string[];
+  contextualRelocatableBlockTypes?: string[];
+  contextualPageKindSwitchEnabled?: boolean;
+  /** Active governed authoring session; enables target-role structure preview in Preview mode. */
+  roleStructurePreviewSessionPid?: string;
+  /** Security-admin capability for starting a short-lived, audited, read-only role simulation. */
+  identitySimulationAllowed?: boolean;
+  /** Fill a parent shell instead of claiming another viewport-height workspace. */
+  embedded?: boolean;
 }
 
 export function UnifiedDesignerWorkbench({
   initialDocument,
+  initialSavedDocument,
   modelFieldsByModel = {},
   returnHref,
   onSave,
+  onDocumentChange,
   pageId,
   initialPublished = false,
   onPublish,
   onUnpublish,
   onReloadDocument,
   aiCopilot,
+  governedAiCopilot,
+  initialSelectedBlockId,
+  contextualReadOnly = false,
+  contextualEditablePropertyPaths,
+  contextualReorderableBlockTypes,
+  contextualCreatableBlockTypes,
+  contextualRemovableBlockTypes,
+  contextualRelocatableBlockTypes,
+  contextualPageKindSwitchEnabled = false,
+  roleStructurePreviewSessionPid,
+  identitySimulationAllowed = false,
+  embedded = false,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
-  const [savedSnapshot, setSavedSnapshot] = useState(initialSnapshot);
-  const savedSnapshotRef = useRef(initialSnapshot);
-  const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
+  const initialSavedSnapshot = serializeDocument(initialSavedDocument ?? initialDocument);
+  const [savedSnapshot, setSavedSnapshot] = useState(initialSavedSnapshot);
+  const savedSnapshotRef = useRef(initialSavedSnapshot);
+  const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>(
+    initialSnapshot === initialSavedSnapshot ? 'saved' : 'dirty',
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [publishStatus, setPublishStatus] = useState<DesignerPublishStatus>(
@@ -136,6 +219,38 @@ export function UnifiedDesignerWorkbench({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
+  const [rolePreviewTargets, setRolePreviewTargets] = useState<AuthoringRolePreviewTarget[]>([]);
+  const [selectedRolePreviewPid, setSelectedRolePreviewPid] = useState('');
+  const [roleStructurePreview, setRoleStructurePreview] =
+    useState<AuthoringRoleStructurePreview | null>(null);
+  const [rolePreviewLoading, setRolePreviewLoading] = useState(false);
+  const [rolePreviewError, setRolePreviewError] = useState<string | null>(null);
+  const [syntheticPreview, setSyntheticPreview] = useState<AuthoringSyntheticPreview | null>(null);
+  const [syntheticPreviewLoading, setSyntheticPreviewLoading] = useState(false);
+  const [syntheticPreviewError, setSyntheticPreviewError] = useState<string | null>(null);
+  const [identitySimulation, setIdentitySimulation] = useState<AuthoringIdentitySimulation | null>(
+    null,
+  );
+  const [identitySimulationFormOpen, setIdentitySimulationFormOpen] = useState(false);
+  const [identitySimulationDuration, setIdentitySimulationDuration] = useState<5 | 10 | 15>(5);
+  const [identitySimulationReason, setIdentitySimulationReason] = useState('');
+  const [identitySimulationPending, setIdentitySimulationPending] = useState(false);
+  const [identitySimulationEnding, setIdentitySimulationEnding] = useState(false);
+  const [identitySimulationError, setIdentitySimulationError] = useState<string | null>(null);
+  const [identitySimulationRemainingSeconds, setIdentitySimulationRemainingSeconds] = useState(0);
+  const [identitySimulationRecoveryPending, setIdentitySimulationRecoveryPending] = useState(
+    Boolean(roleStructurePreviewSessionPid && identitySimulationAllowed),
+  );
+  const [identitySimulationRecoveryBlocked, setIdentitySimulationRecoveryBlocked] = useState(false);
+  const [identitySimulationRecoveryAttempt, setIdentitySimulationRecoveryAttempt] = useState(0);
+  const identityTerminalRefreshPendingRef = useRef(false);
+  const syntheticPreviewSelected = selectedRolePreviewPid === SYNTHETIC_PREVIEW_OPTION;
+  const selectedTargetRolePid = syntheticPreviewSelected ? '' : selectedRolePreviewPid;
+  const identitySimulationActive = identitySimulation?.status === 'ACTIVE';
+  const identitySimulationRecoveryGuarded =
+    identitySimulationRecoveryPending || identitySimulationRecoveryBlocked;
+  const identitySimulationPid = identitySimulation?.simulationPid;
+  const identitySimulationExpiresAt = identitySimulation?.expiresAt;
   // Primary + additive multi-selection model, extracted to a shared kernel so
   // the report designer (block-tree family) reuses the same modifier-click /
   // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
@@ -152,13 +267,287 @@ export function UnifiedDesignerWorkbench({
   } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const contextualRestricted = contextualEditablePropertyPaths !== undefined;
+  const contextualReorderableTypes = useMemo(
+    () => new Set(contextualReorderableBlockTypes ?? []),
+    [contextualReorderableBlockTypes],
+  );
+  const contextualCreatableTypes = useMemo(
+    () => new Set(contextualCreatableBlockTypes ?? []),
+    [contextualCreatableBlockTypes],
+  );
+  const contextualRemovableTypes = useMemo(
+    () => new Set(contextualRemovableBlockTypes ?? []),
+    [contextualRemovableBlockTypes],
+  );
+  const contextualRelocatableTypes = useMemo(
+    () => new Set(contextualRelocatableBlockTypes ?? []),
+    [contextualRelocatableBlockTypes],
+  );
+  const prepareCreatedBlock = (block: DslBlockV3): DslBlockV3 => {
+    if (!contextualRestricted) return block;
+    let projected = { id: block.id, blockType: block.blockType } as DslBlockV3;
+    for (const pointer of contextualEditablePropertyPaths?.[block.blockType] ?? []) {
+      const path = pointerToDotPath(pointer);
+      const value = getByPath(block as unknown as Record<string, unknown>, path);
+      if (value !== undefined) {
+        projected = setByPath(
+          projected as unknown as Record<string, unknown>,
+          path,
+          value,
+        ) as unknown as DslBlockV3;
+      }
+    }
+    if (block.blocks?.length) {
+      projected = { ...projected, blocks: block.blocks.map(prepareCreatedBlock) };
+    }
+    return projected;
+  };
+
+  React.useEffect(() => {
+    if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
+  }, [initialSelectedBlockId, setSelectedBlockId]);
+
+  React.useEffect(() => {
+    setRolePreviewTargets([]);
+    setSelectedRolePreviewPid('');
+    setRoleStructurePreview(null);
+    setRolePreviewError(null);
+    setSyntheticPreview(null);
+    setSyntheticPreviewError(null);
+    if (!roleStructurePreviewSessionPid || mode !== 'preview') return;
+    let cancelled = false;
+    void loadAuthoringRolePreviewTargets(roleStructurePreviewSessionPid)
+      .then((targets) => {
+        if (!cancelled) setRolePreviewTargets(targets);
+      })
+      .catch((targetError: unknown) => {
+        if (!cancelled) {
+          setRolePreviewError(
+            targetError instanceof Error ? targetError.message : '无法加载可预览角色',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, roleStructurePreviewSessionPid]);
+
+  React.useEffect(() => {
+    setRoleStructurePreview(null);
+    setRolePreviewError(null);
+    if (!roleStructurePreviewSessionPid || !selectedTargetRolePid) {
+      setRolePreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRolePreviewLoading(true);
+    void loadAuthoringRoleStructurePreview(
+      roleStructurePreviewSessionPid,
+      selectedTargetRolePid,
+    )
+      .then((preview) => {
+        if (!cancelled) setRoleStructurePreview(preview);
+      })
+      .catch((previewError: unknown) => {
+        if (!cancelled) {
+          setRolePreviewError(
+            previewError instanceof Error
+              ? previewError.message
+              : '无法生成角色权限结构预览',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRolePreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roleStructurePreviewSessionPid, selectedTargetRolePid]);
+
+  React.useEffect(() => {
+    setSyntheticPreview(null);
+    setSyntheticPreviewError(null);
+    if (!roleStructurePreviewSessionPid || !syntheticPreviewSelected) {
+      setSyntheticPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSyntheticPreviewLoading(true);
+    void loadAuthoringSyntheticPreview(roleStructurePreviewSessionPid)
+      .then((preview) => {
+        if (!cancelled) setSyntheticPreview(preview);
+      })
+      .catch((previewError: unknown) => {
+        if (!cancelled) {
+          setSyntheticPreviewError(
+            previewError instanceof Error ? previewError.message : '无法生成隔离合成数据',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSyntheticPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roleStructurePreviewSessionPid, syntheticPreviewSelected]);
+
+  React.useEffect(() => {
+    setIdentitySimulation(null);
+    setIdentitySimulationFormOpen(false);
+    setIdentitySimulationReason('');
+    setIdentitySimulationError(null);
+    setIdentitySimulationRecoveryBlocked(false);
+    if (!roleStructurePreviewSessionPid || !identitySimulationAllowed) {
+      setIdentitySimulationRecoveryPending(false);
+      return;
+    }
+    let cancelled = false;
+    setIdentitySimulationRecoveryPending(true);
+    void loadActiveAuthoringIdentitySimulation(roleStructurePreviewSessionPid)
+      .then((simulation) => {
+        if (cancelled) return;
+        setIdentitySimulation(simulation);
+        if (simulation) {
+          setMode('preview');
+          setSelectedRolePreviewPid(simulation.targetRole.rolePid);
+        }
+      })
+      .catch((recoveryError: unknown) => {
+        if (cancelled) return;
+        setIdentitySimulationRecoveryBlocked(true);
+        setIdentitySimulationError(
+          recoveryError instanceof Error ? recoveryError.message : '无法恢复审计身份模拟',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIdentitySimulationRecoveryPending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    identitySimulationAllowed,
+    identitySimulationRecoveryAttempt,
+    roleStructurePreviewSessionPid,
+  ]);
+
+  React.useEffect(() => {
+    if (!identitySimulationActive || !identitySimulationPid || !identitySimulationExpiresAt) {
+      setIdentitySimulationRemainingSeconds(0);
+      identityTerminalRefreshPendingRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    const refreshRemaining = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((Date.parse(identitySimulationExpiresAt) - Date.now()) / 1000),
+      );
+      setIdentitySimulationRemainingSeconds(remaining);
+      if (remaining === 0 && !identityTerminalRefreshPendingRef.current) {
+        identityTerminalRefreshPendingRef.current = true;
+        void loadAuthoringIdentitySimulation(identitySimulationPid)
+          .then((refreshed) => {
+            if (!cancelled) setIdentitySimulation(refreshed);
+          })
+          .catch((refreshError: unknown) => {
+            if (!cancelled) {
+              setIdentitySimulationError(
+                refreshError instanceof Error ? refreshError.message : '无法确认身份模拟是否已到期',
+              );
+            }
+          })
+          .finally(() => {
+            identityTerminalRefreshPendingRef.current = false;
+          });
+      }
+    };
+    refreshRemaining();
+    const timer = window.setInterval(refreshRemaining, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [identitySimulationActive, identitySimulationExpiresAt, identitySimulationPid]);
+
+  React.useEffect(() => {
+    if (identitySimulationActive) setMode('preview');
+  }, [identitySimulationActive]);
+
+  React.useEffect(() => {
+    if (identitySimulationActive && identitySimulation && mode === 'preview') {
+      setSelectedRolePreviewPid(identitySimulation.targetRole.rolePid);
+    }
+  }, [identitySimulation, identitySimulationActive, mode]);
+
+  const handleStartIdentitySimulation = async () => {
+    const reason = identitySimulationReason.trim();
+    if (!roleStructurePreviewSessionPid || !selectedTargetRolePid || !reason) return;
+    setIdentitySimulationPending(true);
+    setIdentitySimulationError(null);
+    try {
+      const started = await startAuthoringIdentitySimulation(
+        roleStructurePreviewSessionPid,
+        selectedTargetRolePid,
+        identitySimulationDuration,
+        reason,
+      );
+      setIdentitySimulation(started);
+      setIdentitySimulationFormOpen(false);
+      setIdentitySimulationReason('');
+    } catch (startError: unknown) {
+      setIdentitySimulationError(
+        startError instanceof Error ? startError.message : '无法启动审计身份模拟',
+      );
+    } finally {
+      setIdentitySimulationPending(false);
+    }
+  };
+
+  const handleEndIdentitySimulation = async () => {
+    if (!identitySimulationActive || !identitySimulation) return;
+    setIdentitySimulationEnding(true);
+    setIdentitySimulationError(null);
+    try {
+      setIdentitySimulation(await endAuthoringIdentitySimulation(identitySimulation.simulationPid));
+    } catch (endError: unknown) {
+      setIdentitySimulationError(
+        endError instanceof Error ? endError.message : '无法结束审计身份模拟',
+      );
+    } finally {
+      setIdentitySimulationEnding(false);
+    }
+  };
+
+  const handleDismissIdentitySimulation = async () => {
+    if (!identitySimulation || identitySimulationActive) return;
+    setIdentitySimulationEnding(true);
+    setIdentitySimulationError(null);
+    try {
+      await acknowledgeAuthoringIdentitySimulation(identitySimulation.simulationPid);
+      setIdentitySimulation(null);
+    } catch (acknowledgeError: unknown) {
+      setIdentitySimulationError(
+        acknowledgeError instanceof Error
+          ? acknowledgeError.message
+          : '无法确认审计身份模拟终态',
+      );
+    } finally {
+      setIdentitySimulationEnding(false);
+    }
+  };
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
   const syncSaveStateForSnapshot = (snapshot: string) => {
-    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
+    const dirty = snapshot !== savedSnapshotRef.current;
+    setSaveStatus(dirty ? 'dirty' : 'saved');
     setSaveError(null);
     setValidationErrorCount(0);
+    onDocumentChange?.(parseDocumentSnapshot(snapshot), dirty);
   };
 
   // Shared block-tree document + history kernel. Selection, drag-and-drop, the
@@ -168,6 +557,24 @@ export function UnifiedDesignerWorkbench({
     onChange: syncSaveStateForSnapshot,
   });
   const document = documentKernel.document;
+  const availablePageTemplates = useMemo(
+    () =>
+      [...CORE_PAGE_TEMPLATES, ...getPageTemplates()]
+        .filter((template) => {
+          if (template.kinds) return template.kinds.includes(document.kind);
+          const roots = template.build();
+          return roots.length === 1 && roots[0].blockType === document.kind;
+        })
+        .filter((template) => {
+          if (!contextualRestricted) return true;
+          const roots = template.build();
+          return (
+            roots.length === 1 &&
+            templateDescendantsAreGoverned(roots[0].blocks, contextualCreatableTypes)
+          );
+        }),
+    [contextualCreatableTypes, contextualRestricted, document.kind],
+  );
   const updateDocument = documentKernel.update;
   const handleUndo = documentKernel.undo;
   const handleRedo = documentKernel.redo;
@@ -203,6 +610,7 @@ export function UnifiedDesignerWorkbench({
   // to the target kind's root (e.g. detail → form), keeping all children. The
   // whole switch is one undoable step.
   const handleSwitchKind = (targetKind: PageSchemaV3['kind']) => {
+    if (contextualReadOnly || (contextualRestricted && !contextualPageKindSwitchEnabled)) return;
     if (targetKind === document.kind) return;
     if (!canSwitchToKind(document.blocks, targetKind)) return;
     const rootBlockType = getKindPolicy(targetKind).rootBlockType;
@@ -220,18 +628,36 @@ export function UnifiedDesignerWorkbench({
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
   // fresh tree built by the registered template, then clear the selection.
   const applyTemplate = (templateId: string) => {
-    const template = getPageTemplate(templateId);
+    if (contextualReadOnly) return;
+    const template = availablePageTemplates.find((candidate) => candidate.id === templateId)
+      ?? getPageTemplate(templateId);
     if (!template) return;
+    const built = instantiatePageTemplate(template, document.blocks);
+    const governedBlocks = contextualRestricted
+      ? projectTemplateIntoGovernedRoot(document, built, prepareCreatedBlock)
+      : built;
+    if (!governedBlocks) return;
     updateDocument((current) => ({
       ...current,
-      title: template.title ?? current.title,
-      blocks: template.build(),
+      title: contextualRestricted ? current.title : (template.title ?? current.title),
+      blocks: governedBlocks,
     }));
     setSelectedBlockId(null);
+    setMultiSelectedIds(new Set());
   };
 
   const updateSelectedBlock = (path: string, value: unknown) => {
+    if (contextualReadOnly) return;
     if (!selectedBlockId) return;
+    if (
+      contextualRestricted &&
+      !isDotPathAllowed(
+        path,
+        contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [],
+      )
+    ) {
+      return;
+    }
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, selectedBlockId, (block) => {
@@ -266,6 +692,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveBefore = (movingBlockId: string, targetBlockId: string) => {
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualMoveBefore(movingBlockId, targetBlockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
@@ -273,6 +701,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveToParent = (movingBlockId: string, parentBlockId: string) => {
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualRelocate(movingBlockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockToParent(current.blocks, movingBlockId, parentBlockId),
@@ -283,11 +713,15 @@ export function UnifiedDesignerWorkbench({
   // The single top-level kind container (form/list/detail/dashboard root) defines
   // the page; it cannot be deleted, only its descendants can.
   const canDeleteBlock = (blockId: string) => {
+    if (contextualReadOnly) return false;
     const result = findBlockById(document.blocks, blockId);
-    return Boolean(result) && result!.path.length > 1;
+    return Boolean(result)
+      && result!.path.length > 1
+      && (!contextualRestricted || contextualRemovableTypes.has(result!.block.blockType));
   };
 
   const handleDeleteBlock = (blockId: string) => {
+    if (contextualReadOnly) return;
     if (!canDeleteBlock(blockId)) return;
     updateDocument((current) => ({
       ...current,
@@ -302,11 +736,44 @@ export function UnifiedDesignerWorkbench({
     });
   };
 
+  const canDuplicateBlock = (blockId: string | null) => {
+    if (contextualReadOnly || !blockId) return false;
+    const result = findBlockById(document.blocks, blockId);
+    if (!result || result.path.length <= 1) return false;
+    if (!contextualRestricted) return true;
+    return duplicateSubtreeIsGoverned(
+      result.block,
+      contextualCreatableTypes,
+      contextualEditablePropertyPaths ?? {},
+    );
+  };
+
+  const handleDuplicateBlock = () => {
+    if (!canDuplicateBlock(selectedBlockId) || !selectedBlockId) return;
+    let copiedRootId: string | null = null;
+    updateDocument((current) => {
+      const source = findBlockById(current.blocks, selectedBlockId);
+      if (!source || source.path.length <= 1) return current;
+      const usedIds = collectBlockIds(current.blocks);
+      const copied = prepareCreatedBlock(duplicateBlockSubtree(source.block, usedIds));
+      copiedRootId = copied.id;
+      return {
+        ...current,
+        blocks: insertBlockAfterTarget(current.blocks, source.block.id, copied),
+      };
+    });
+    if (copiedRootId) {
+      setSelectedBlockId(copiedRootId);
+      setMultiSelectedIds(new Set());
+    }
+  };
+
 
   // Batch-delete every deletable block in the multi-selection in a single
   // history step (one updateDocument → one undo). Undeletable blocks (the root
   // kind container) are silently skipped. Selection is cleared afterwards.
   const handleDeleteMultiSelected = () => {
+    if (contextualReadOnly) return;
     const deletableIds = [...multiSelectedIds].filter((id) => canDeleteBlock(id));
     if (deletableIds.length === 0) {
       clearMultiSelection();
@@ -325,6 +792,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlock = (blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
@@ -342,7 +811,9 @@ export function UnifiedDesignerWorkbench({
     const beforeTarget = selectedBlockId ? resolveBlockDropBeforeTarget(selectedBlockId, blockType) : null;
 
     if (selectedBlockId && selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) {
-      const preparedBlock = applyParentPlacementDefaults(nextBlock, selectedBlock);
+      const preparedBlock = prepareCreatedBlock(
+        applyParentPlacementDefaults(nextBlock, selectedBlock),
+      );
       updateDocument((current) => ({
         ...current,
         blocks: updateBlockById(current.blocks, selectedBlockId, (block) => ({
@@ -351,9 +822,9 @@ export function UnifiedDesignerWorkbench({
         })),
       }));
     } else if (selectedBlockId && beforeTarget) {
-      const preparedBlock = beforeTarget.parentBlock
+      const preparedBlock = prepareCreatedBlock(beforeTarget.parentBlock
         ? applyParentPlacementDefaults(nextBlock, beforeTarget.parentBlock)
-        : nextBlock;
+        : nextBlock);
       updateDocument((current) => ({
         ...current,
         blocks: insertBlockBeforeTarget(
@@ -366,7 +837,7 @@ export function UnifiedDesignerWorkbench({
     } else {
       updateDocument((current) => ({
         ...current,
-        blocks: [...current.blocks, nextBlock],
+        blocks: [...current.blocks, prepareCreatedBlock(nextBlock)],
       }));
     }
 
@@ -374,17 +845,22 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlockToParent = (parentBlockId: string, blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const parentBlock = findBlockById(document.blocks, parentBlockId)?.block;
     return parentBlock ? blockRegistry.canContain(parentBlock.blockType, blockType) : false;
   };
 
   const canAddBlockBeforeTarget = (targetBlockId: string, blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     return Boolean(resolveBlockDropBeforeTarget(targetBlockId, blockType));
   };
 
   const canMoveBlockBeforeTarget = (movingBlockId: string, targetBlockId: string) => {
+    if (contextualRestricted && !canContextualMoveBefore(movingBlockId, targetBlockId)) return false;
     return canMoveExistingBlockBeforeTarget({
       blocks: document.blocks,
       kind: document.kind,
@@ -395,6 +871,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canMoveBlockToParent = (movingBlockId: string, parentBlockId: string) => {
+    if (contextualRestricted && !canContextualRelocate(movingBlockId)) return false;
     return canMoveExistingBlockToParent({
       blocks: document.blocks,
       kind: document.kind,
@@ -404,7 +881,31 @@ export function UnifiedDesignerWorkbench({
     });
   };
 
+  const canContextualMoveBefore = (movingBlockId: string, targetBlockId: string): boolean => {
+    const movingResult = findBlockById(document.blocks, movingBlockId);
+    const targetResult = findBlockById(document.blocks, targetBlockId);
+    if (!movingResult || !targetResult) return false;
+    const movingParent = movingResult.path.at(-2)?.id ?? null;
+    const targetParent = targetResult.path.at(-2)?.id ?? null;
+    return movingParent === targetParent
+      ? contextualReorderableTypes.has(movingResult.block.blockType)
+      : contextualRelocatableTypes.has(movingResult.block.blockType);
+  };
+
+  const canContextualRelocate = (movingBlockId: string): boolean => {
+    const block = findBlockById(document.blocks, movingBlockId)?.block;
+    return Boolean(block && contextualRelocatableTypes.has(block.blockType));
+  };
+
+  const canContextualResizeSpan = (blockId: string): boolean => {
+    const block = findBlockById(document.blocks, blockId)?.block;
+    if (!block) return false;
+    return contextualEditablePropertyPaths?.[block.blockType]?.includes('/layout/span') ?? false;
+  };
+
   const canAddBlockToRoot = (blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const policy = getKindPolicy(document.kind);
     if (policy.rootBlockType) {
@@ -423,7 +924,7 @@ export function UnifiedDesignerWorkbench({
 
     updateDocument((current) => ({
       ...current,
-      blocks: [...current.blocks, nextBlock],
+      blocks: [...current.blocks, prepareCreatedBlock(nextBlock)],
     }));
     setSelectedBlockId(nextBlock.id);
   };
@@ -435,7 +936,7 @@ export function UnifiedDesignerWorkbench({
     if (!nextBlock) return;
     const parentBlock = findBlockById(document.blocks, parentBlockId)?.block;
     if (!parentBlock) return;
-    const preparedBlock = applyParentPlacementDefaults(nextBlock, parentBlock);
+    const preparedBlock = prepareCreatedBlock(applyParentPlacementDefaults(nextBlock, parentBlock));
 
     updateDocument((current) => ({
       ...current,
@@ -453,9 +954,9 @@ export function UnifiedDesignerWorkbench({
 
     const nextBlock = createBlockTemplate(blockType, collectBlockIds(document.blocks));
     if (!nextBlock) return;
-    const preparedBlock = resolution.parentBlock
+    const preparedBlock = prepareCreatedBlock(resolution.parentBlock
       ? applyParentPlacementDefaults(nextBlock, resolution.parentBlock)
-      : nextBlock;
+      : nextBlock);
 
     updateDocument((current) => ({
       ...current,
@@ -470,11 +971,19 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddModelFieldToParent = (parentBlockId: string, field: ModelFieldDefinition) => {
-    return Boolean(resolveModelFieldDropTarget(parentBlockId, field));
+    const targetBlockType = resolveModelFieldDropTarget(parentBlockId, field);
+    return Boolean(
+      targetBlockType
+      && (!contextualRestricted || contextualCreatableTypes.has(targetBlockType)),
+    );
   };
 
   const canAddModelFieldBeforeTarget = (targetBlockId: string, field: ModelFieldDefinition) => {
-    return Boolean(resolveModelFieldDropBeforeTarget(targetBlockId, field));
+    const resolution = resolveModelFieldDropBeforeTarget(targetBlockId, field);
+    return Boolean(
+      resolution
+      && (!contextualRestricted || contextualCreatableTypes.has(resolution.targetBlockType)),
+    );
   };
 
   const handleAddModelFieldToParent = (parentBlockId: string, field: ModelFieldDefinition) => {
@@ -486,12 +995,13 @@ export function UnifiedDesignerWorkbench({
       targetBlockType,
       collectBlockIds(document.blocks),
     );
+    const preparedBlock = prepareCreatedBlock(nextBlock);
 
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, parentBlockId, (block) => ({
         ...block,
-        blocks: [...(block.blocks ?? []), nextBlock],
+        blocks: [...(block.blocks ?? []), preparedBlock],
       })),
     }));
     setSelectedBlockId(nextBlock.id);
@@ -506,12 +1016,13 @@ export function UnifiedDesignerWorkbench({
       resolution.targetBlockType,
       collectBlockIds(document.blocks),
     );
+    const preparedBlock = prepareCreatedBlock(nextBlock);
 
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, resolution.parentBlock.id, (block) => ({
         ...block,
-        blocks: insertChildBlockBefore(block.blocks ?? [], targetBlockId, nextBlock),
+        blocks: insertChildBlockBefore(block.blocks ?? [], targetBlockId, preparedBlock),
       })),
     }));
     setSelectedBlockId(nextBlock.id);
@@ -528,7 +1039,13 @@ export function UnifiedDesignerWorkbench({
 
   const isSelectedModelFieldUsed = (field: ModelFieldDefinition) => {
     if (!selectedBlockId) return false;
-    return isModelFieldUsedInParent(selectedBlockId, field);
+    if (isModelFieldUsedInParent(selectedBlockId, field)) return true;
+    const selected = findBlockById(document.blocks, selectedBlockId);
+    if (!selected) return false;
+    return selected.path
+      .slice(0, -1)
+      .reverse()
+      .some(({ block }) => isModelFieldUsedInParent(block.id, field));
   };
 
   const handleAddModelField = (field: ModelFieldDefinition) => {
@@ -630,6 +1147,8 @@ export function UnifiedDesignerWorkbench({
     blockId: string,
     updater: (block: PageSchemaV3['blocks'][number]) => PageSchemaV3['blocks'][number],
   ) => {
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualResizeSpan(blockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, blockId, updater),
@@ -691,6 +1210,7 @@ export function UnifiedDesignerWorkbench({
   });
 
   const handleSave = async () => {
+    if (contextualReadOnly) return;
     const validation = validatePageSchemaV3(document);
     setSaveError(null);
     if (!validation.valid) {
@@ -703,14 +1223,17 @@ export function UnifiedDesignerWorkbench({
     setValidationErrorCount(0);
     setSaveStatus('saving');
     try {
-      await onSave?.(document);
-      const snapshot = serializeDocument(document);
+      const savedDocument = await onSave?.(document);
+      const canonicalDocument = savedDocument ?? document;
+      if (savedDocument) documentKernel.reset(savedDocument);
+      const snapshot = serializeDocument(canonicalDocument);
       savedSnapshotRef.current = snapshot;
       setSavedSnapshot(snapshot);
       setSaveStatus('saved');
+      onDocumentChange?.(canonicalDocument, false);
     } catch (error) {
       setSaveStatus('error');
-      setSaveError(resolveSaveErrorMessage(error));
+      setSaveError(resolveSaveErrorMessage(error, locale));
     }
   };
 
@@ -791,32 +1314,55 @@ export function UnifiedDesignerWorkbench({
   // any parse/shape failure the document is left untouched and an inline error
   // is shown via the existing save-error channel.
   const handleImportFile = (file: File) => {
+    if (contextualReadOnly) return;
     setSaveError(null);
     const reader = new FileReader();
     reader.onload = () => {
       const imported = parseImportedDocument(reader.result);
       if (!imported) {
-        setSaveStatus('error');
+        setSaveStatus('import-error');
         setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
         return;
       }
-      updateDocument(() => imported);
+      const nextDocument = contextualRestricted
+        ? normalizeGovernedImport(
+            document,
+            imported,
+            prepareCreatedBlock,
+            contextualCreatableTypes,
+            contextualRemovableTypes,
+            contextualReorderableTypes,
+            contextualRelocatableTypes,
+            contextualPageKindSwitchEnabled,
+          )
+        : imported;
+      if (!nextDocument) {
+        setSaveStatus('import-error');
+        setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
+        return;
+      }
+      updateDocument(() => nextDocument);
       setSelectedBlockId(null);
+      setMultiSelectedIds(new Set());
     };
     reader.onerror = () => {
-      setSaveStatus('error');
+      setSaveStatus('import-error');
       setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
     };
     reader.readAsText(file);
   };
 
-  const aiCopilotEnabled = !!aiCopilot;
+  const legacyAiCopilotEnabled = !!aiCopilot && !contextualRestricted;
+  const governedAiCopilotEnabled = Boolean(
+    governedAiCopilot && contextualRestricted && !contextualReadOnly,
+  );
+  const aiCopilotEnabled = legacyAiCopilotEnabled || governedAiCopilotEnabled;
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);
   const aiRootBlockType = aiKindPolicy.rootBlockType;
   const aiSystemPrompt = useMemo(() => {
-    if (!aiCopilotEnabled) return '';
+    if (!legacyAiCopilotEnabled) return '';
     const allowed = aiKindPolicy.allowedBlockTypes
       ? [...aiKindPolicy.allowedBlockTypes].filter((type) => type !== aiRootBlockType)
       : blockDefinitions.map((definition) => definition.blockType);
@@ -839,7 +1385,7 @@ export function UnifiedDesignerWorkbench({
       domainGuidance: aiDomainGuidance,
     });
   }, [
-    aiCopilotEnabled,
+    legacyAiCopilotEnabled,
     aiKindPolicy,
     aiRootBlockType,
     blockDefinitions,
@@ -849,15 +1395,52 @@ export function UnifiedDesignerWorkbench({
   ]);
 
   const handleApplyAiDesign = (parsed: ParsedDesign) => {
+    if (contextualReadOnly || contextualRestricted) return;
     updateDocument((current) =>
       applyDesignBlocks(current, parsed, getKindPolicy(current.kind).rootBlockType),
     );
     setSelectedBlockId(null);
   };
 
+  const effectiveRoleStructurePreview = useMemo<AuthoringRoleStructurePreview | null>(() => {
+    if (!identitySimulationActive || !identitySimulation) return roleStructurePreview;
+    return {
+      mode: 'STRUCTURE',
+      pagePid: identitySimulation.pagePid,
+      targetRole: identitySimulation.targetRole,
+      actorIntersectionApplied: true,
+      businessDataIncluded: false,
+      exportAllowed: false,
+      businessActionsAllowed: false,
+      decisions: identitySimulation.decisions,
+    };
+  }, [identitySimulation, identitySimulationActive, roleStructurePreview]);
+  const previewDocument = useMemo(() => {
+    if (effectiveRoleStructurePreview) return sanitizeRoleStructurePreviewDocument(document);
+    if (syntheticPreview) return applySyntheticPreviewToDocument(document, syntheticPreview);
+    return document;
+  }, [document, effectiveRoleStructurePreview, syntheticPreview]);
+  const rolePreviewPermissionEvaluator = useMemo(
+    () =>
+      effectiveRoleStructurePreview
+        ? createRoleStructurePermissionEvaluator(effectiveRoleStructurePreview)
+        : undefined,
+    [effectiveRoleStructurePreview],
+  );
+  const rolePreviewSummary = useMemo(
+    () => summarizeRoleStructureDecisions(effectiveRoleStructurePreview?.decisions ?? []),
+    [effectiveRoleStructurePreview],
+  );
+  const syntheticPreviewRuntimeServices = useMemo(
+    () => (syntheticPreview ? createSyntheticPreviewRuntimeServices(syntheticPreview) : undefined),
+    [syntheticPreview],
+  );
+
   return (
     <div
-      className="flex h-[calc(100vh-64px)] min-h-[656px] flex-col overflow-hidden bg-slate-100 text-slate-900"
+      className={`relative flex flex-col overflow-hidden bg-slate-100 text-slate-900 ${
+        embedded ? 'h-full min-h-[36rem]' : 'h-[calc(100vh-64px)] min-h-[656px]'
+      }`}
       data-testid="unified-designer-workbench"
       data-mode={mode}
     >
@@ -871,23 +1454,89 @@ export function UnifiedDesignerWorkbench({
         canUndo={canUndo}
         canRedo={canRedo}
         returnHref={returnHref}
-        aiCopilotEnabled={aiCopilotEnabled}
+        aiCopilotEnabled={
+          aiCopilotEnabled && !identitySimulationActive && !identitySimulationRecoveryGuarded
+        }
+        aiCopilotGoverned={governedAiCopilotEnabled}
         pageId={pageId}
         publishStatus={publishStatus}
         publishError={publishError}
-        onModeChange={setMode}
-        onSwitchKind={handleSwitchKind}
+        onModeChange={(nextMode) => {
+          if (
+            (identitySimulationActive || identitySimulationRecoveryGuarded) &&
+            nextMode !== 'preview'
+          )
+            return;
+          setMode(nextMode);
+        }}
+        onSwitchKind={
+          identitySimulationActive ||
+          identitySimulationRecoveryGuarded ||
+          (contextualRestricted && !contextualPageKindSwitchEnabled)
+            ? undefined
+            : handleSwitchKind
+        }
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}
         onPublish={onPublish ? handlePublish : undefined}
         onUnpublish={onUnpublish ? handleUnpublish : undefined}
-        onExport={handleExport}
-        onImportFile={handleImportFile}
+        onExport={
+          !contextualReadOnly &&
+          !identitySimulationActive &&
+          !identitySimulationRecoveryGuarded &&
+          effectiveRoleStructurePreview?.exportAllowed !== false &&
+          syntheticPreview?.exportAllowed !== false
+            ? handleExport
+            : undefined
+        }
+        onImportFile={
+          contextualReadOnly || identitySimulationActive || identitySimulationRecoveryGuarded
+            ? undefined
+            : handleImportFile
+        }
         onOpenAiCopilot={() => setAiDialogOpen(true)}
-        onOpenVersions={pageId ? () => setVersionPanelOpen(true) : undefined}
+        onOpenVersions={
+          pageId && !contextualRestricted ? () => setVersionPanelOpen(true) : undefined
+        }
+        readOnly={
+          contextualReadOnly || identitySimulationActive || identitySimulationRecoveryGuarded
+        }
+        contextualRestricted={contextualRestricted}
+        previewOnly={identitySimulationActive || identitySimulationRecoveryGuarded}
       />
-      {pageId ? (
+      {identitySimulationRecoveryGuarded ? (
+        <div
+          className="absolute inset-x-0 bottom-0 top-14 z-50 grid place-items-center bg-slate-50/95 p-6 text-center"
+          data-testid={
+            identitySimulationRecoveryBlocked
+              ? 'identity-simulation-recovery-fail-closed'
+              : 'identity-simulation-recovery-loading'
+          }
+        >
+          <div className="max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-semibold text-slate-900">
+              {identitySimulationRecoveryBlocked ? '无法确认身份模拟状态' : '正在确认身份模拟状态'}
+            </div>
+            <p className="mt-1 text-xs text-slate-600">
+              {identitySimulationRecoveryBlocked
+                ? '为避免越过只读边界，工作台已暂停编辑。请重试恢复。'
+                : '确认完成前，保存、导入、导出与设计操作暂不可用。'}
+            </p>
+            {identitySimulationRecoveryBlocked ? (
+              <button
+                type="button"
+                data-testid="identity-simulation-recovery-retry"
+                onClick={() => setIdentitySimulationRecoveryAttempt((attempt) => attempt + 1)}
+                className="mt-3 rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800"
+              >
+                重试恢复
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {pageId && !contextualRestricted ? (
         <VersionHistoryPanel
           pid={pageId}
           open={versionPanelOpen}
@@ -895,7 +1544,17 @@ export function UnifiedDesignerWorkbench({
           onRolledBack={handleVersionRolledBack}
         />
       ) : null}
-      {aiCopilotEnabled ? (
+      {governedAiCopilotEnabled && governedAiCopilot ? (
+        <GovernedAiPatchProposalDialog
+          open={aiDialogOpen}
+          onClose={() => setAiDialogOpen(false)}
+          sessionPid={governedAiCopilot.sessionPid}
+          revision={governedAiCopilot.revision}
+          document={document}
+          capabilities={governedAiCopilot.capabilities}
+          onApplied={governedAiCopilot.onApplied}
+        />
+      ) : legacyAiCopilotEnabled ? (
         <AiDesignDialog
           open={aiDialogOpen}
           onClose={() => setAiDialogOpen(false)}
@@ -909,21 +1568,403 @@ export function UnifiedDesignerWorkbench({
           className="min-h-0 flex-1 overflow-auto bg-slate-100 p-4 lg:p-6"
           data-testid="unified-runtime-preview"
         >
-          <div className="mx-auto mb-3 flex max-w-7xl items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">预览设备</span>
-            <select
-              data-testid="preview-device-select"
-              value={previewDeviceId}
-              onChange={(event) => setPreviewDeviceId(event.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
-            >
-              {DEVICE_PREVIEW_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
+          <div className="mx-auto mb-3 flex max-w-7xl flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.device, locale)}
+              <select
+                data-testid="preview-device-select"
+                value={previewDeviceId}
+                onChange={(event) => setPreviewDeviceId(event.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+              >
+                {DEVICE_PREVIEW_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {roleStructurePreviewSessionPid ? (
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.perspective, locale)}
+                <select
+                  data-testid="role-preview-target-select"
+                  value={selectedRolePreviewPid}
+                  onChange={(event) => setSelectedRolePreviewPid(event.target.value)}
+                  disabled={identitySimulationActive || identitySimulationPending}
+                  className="min-w-48 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.currentActor, locale)}
+                  </option>
+                  <option value={SYNTHETIC_PREVIEW_OPTION}>
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.option, locale)}
+                  </option>
+                  {rolePreviewTargets.map((target) => (
+                    <option key={target.rolePid} value={target.rolePid}>
+                      {target.roleName} · {target.roleCode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {rolePreviewLoading || syntheticPreviewLoading || identitySimulationPending ? (
+              <span className="text-xs text-blue-700" data-testid="role-preview-loading">
+                {resolveDesignerText(
+                  identitySimulationPending
+                    ? DESIGNER_I18N.unified.identitySimulation.starting
+                    : syntheticPreviewSelected
+                      ? DESIGNER_I18N.unified.syntheticPreview.calculating
+                      : DESIGNER_I18N.unified.rolePreview.calculating,
+                  locale,
+                )}
+              </span>
+            ) : null}
           </div>
+          {rolePreviewError && !selectedRolePreviewPid ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800"
+              data-testid="role-preview-targets-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.targetsFailed, locale, {
+                error: rolePreviewError,
+              })}
+            </div>
+          ) : null}
+          {roleStructurePreview && !identitySimulation ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"
+              data-testid="role-structure-preview-banner"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.title, locale, {
+                      role: roleStructurePreview.targetRole.roleName,
+                    })}
+                  </span>
+                  <span className="ml-2 text-xs text-blue-700">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.intersection, locale)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {identitySimulationAllowed ? (
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-open"
+                      onClick={() => {
+                        setIdentitySimulationFormOpen((current) => !current);
+                        setIdentitySimulationError(null);
+                      }}
+                      className="rounded-md bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+                    >
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.open, locale)}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    data-testid="role-preview-exit"
+                    onClick={() => setSelectedRolePreviewPid('')}
+                    className="rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                  >
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exit, locale)}
+                  </button>
+                </div>
+              </div>
+              {identitySimulationFormOpen ? (
+                <div
+                  className="mt-3 rounded-lg border border-rose-200 bg-white p-3 text-slate-800"
+                  data-testid="identity-simulation-form"
+                >
+                  <div className="font-semibold text-rose-900">
+                    {resolveDesignerText(
+                      DESIGNER_I18N.unified.identitySimulation.confirmTitle,
+                      locale,
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {resolveDesignerText(
+                      DESIGNER_I18N.unified.identitySimulation.confirmDescription,
+                      locale,
+                    )}
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[160px_minmax(240px,1fr)_auto] sm:items-end">
+                    <label className="grid gap-1 text-xs font-medium text-slate-600">
+                      {resolveDesignerText(
+                        DESIGNER_I18N.unified.identitySimulation.duration,
+                        locale,
+                      )}
+                      <select
+                        data-testid="identity-simulation-duration"
+                        value={identitySimulationDuration}
+                        onChange={(event) =>
+                          setIdentitySimulationDuration(Number(event.target.value) as 5 | 10 | 15)
+                        }
+                        className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+                      >
+                        {[5, 10, 15].map((duration) => (
+                          <option key={duration} value={duration}>
+                            {resolveDesignerText(
+                              DESIGNER_I18N.unified.identitySimulation.minutes,
+                              locale,
+                              { count: duration },
+                            )}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-slate-600">
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.reason, locale)}
+                      <textarea
+                        data-testid="identity-simulation-reason"
+                        value={identitySimulationReason}
+                        maxLength={1000}
+                        rows={2}
+                        onChange={(event) => setIdentitySimulationReason(event.target.value)}
+                        placeholder={resolveDesignerText(
+                          DESIGNER_I18N.unified.identitySimulation.reasonPlaceholder,
+                          locale,
+                        )}
+                        className="resize-none rounded-md border border-slate-300 px-2 py-2 text-sm"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-start"
+                      disabled={identitySimulationPending || !identitySimulationReason.trim()}
+                      onClick={() => void handleStartIdentitySimulation()}
+                      className="rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.start, locale)}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.noTargetData, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exportOff, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.actionsOff, locale)}
+                </span>
+                {rolePreviewSummary.map((summary) => (
+                  <span
+                    key={summary.nodeType}
+                    className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200"
+                    data-testid={`role-preview-summary-${summary.nodeType.toLowerCase()}`}
+                  >
+                    {rolePreviewNodeLabel(summary.nodeType, locale)} {summary.allowed}/{summary.total}
+                  </span>
+                ))}
+              </div>
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer font-medium text-blue-800">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.inspect, locale)}
+                </summary>
+                <div className="mt-2 max-h-40 overflow-auto rounded-md bg-white ring-1 ring-blue-100">
+                  {roleStructurePreview.decisions.map((decision) => (
+                    <div
+                      key={`${decision.nodeType}:${decision.nodeId}`}
+                      className="grid grid-cols-[64px_minmax(120px,1fr)_auto] gap-2 border-b border-blue-50 px-3 py-2 last:border-b-0"
+                      data-testid={`role-preview-decision-${decision.nodeId}`}
+                    >
+                      <span className="text-slate-500">
+                        {rolePreviewNodeLabel(decision.nodeType, locale)}
+                      </span>
+                      <span className="truncate" title={decision.permissionCode || undefined}>
+                        {decision.label || decision.nodeId}
+                      </span>
+                      <span
+                        className={decision.visible ? 'text-emerald-700' : 'font-medium text-amber-700'}
+                      >
+                        {decision.visible
+                          ? resolveDesignerText(
+                              decision.writable
+                                ? DESIGNER_I18N.unified.rolePreview.visibleWritable
+                                : DESIGNER_I18N.unified.rolePreview.visibleReadOnly,
+                              locale,
+                            )
+                          : resolveDesignerText(
+                              DESIGNER_I18N.unified.rolePreview.hidden,
+                              locale,
+                            )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          ) : null}
+          {identitySimulation ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm"
+              data-testid="identity-simulation-banner"
+              data-status={identitySimulation.status}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.title, locale, {
+                      role: identitySimulation.targetRole.roleName,
+                    })}
+                  </span>
+                  <span className="ml-2 text-xs font-medium text-rose-700">
+                    {resolveDesignerText(
+                      identitySimulation.status === 'ACTIVE'
+                        ? DESIGNER_I18N.unified.identitySimulation.active
+                        : identitySimulation.status === 'EXPIRED'
+                          ? DESIGNER_I18N.unified.identitySimulation.expired
+                          : DESIGNER_I18N.unified.identitySimulation.ended,
+                      locale,
+                    )}
+                  </span>
+                </div>
+                {identitySimulationActive ? (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="font-mono text-xs font-semibold text-rose-800"
+                      data-testid="identity-simulation-countdown"
+                    >
+                      {String(Math.floor(identitySimulationRemainingSeconds / 60)).padStart(2, '0')}
+                      :{String(identitySimulationRemainingSeconds % 60).padStart(2, '0')}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-end"
+                      disabled={identitySimulationEnding}
+                      onClick={() => void handleEndIdentitySimulation()}
+                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      {resolveDesignerText(
+                        identitySimulationEnding
+                          ? DESIGNER_I18N.unified.identitySimulation.ending
+                          : DESIGNER_I18N.unified.identitySimulation.end,
+                        locale,
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="identity-simulation-dismiss"
+                    disabled={identitySimulationEnding}
+                    onClick={() => void handleDismissIdentitySimulation()}
+                    className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                  >
+                    {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.dismiss, locale)}
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.intersection, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.readOnly, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(
+                    DESIGNER_I18N.unified.identitySimulation.noBusinessRecords,
+                    locale,
+                  )}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exportOff, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.actionsOff, locale)}
+                </span>
+                {identitySimulationActive
+                  ? rolePreviewSummary.map((summary) => (
+                      <span
+                        key={summary.nodeType}
+                        className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200"
+                      >
+                        {rolePreviewNodeLabel(summary.nodeType, locale)} {summary.allowed}/
+                        {summary.total}
+                      </span>
+                    ))
+                  : null}
+              </div>
+            </div>
+          ) : null}
+          {syntheticPreview ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950"
+              data-testid="synthetic-preview-banner"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.title, locale)}
+                  </span>
+                  <span className="ml-2 text-xs text-violet-700">
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.source, locale)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="synthetic-preview-exit"
+                  onClick={() => setSelectedRolePreviewPid('')}
+                  className="rounded-md border border-violet-300 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100"
+                >
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.exit, locale)}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.isolated, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.notPersisted, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.actionsOff, locale)}
+                </span>
+                <span
+                  className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200"
+                  data-testid="synthetic-preview-record-count"
+                >
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.recordCount, locale, {
+                    count: syntheticPreview.records.length,
+                  })}
+                </span>
+              </div>
+            </div>
+          ) : null}
+          {rolePreviewError && selectedTargetRolePid ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="role-preview-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.failed, locale, {
+                error: rolePreviewError,
+              })}
+            </div>
+          ) : null}
+          {syntheticPreviewError && syntheticPreviewSelected ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="synthetic-preview-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.failed, locale, {
+                error: syntheticPreviewError,
+              })}
+            </div>
+          ) : null}
+          {identitySimulationError ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="identity-simulation-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.failed, locale, {
+                error: identitySimulationError,
+              })}
+            </div>
+          ) : null}
           <div
             className={
               getDevicePreviewPreset(previewDeviceId).width == null
@@ -934,13 +1975,69 @@ export function UnifiedDesignerWorkbench({
             data-device={previewDeviceId}
             style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
           >
-            <RecursiveBlockRenderer
-              schema={document}
-              runtimeServices={defaultRuntimeExecutionServices}
-              modelFields={
-                document.modelCode ? modelFieldsByModel[document.modelCode] ?? [] : []
-              }
-            />
+            {(selectedTargetRolePid && (rolePreviewLoading || rolePreviewError)) ||
+            (syntheticPreviewSelected && (syntheticPreviewLoading || syntheticPreviewError)) ||
+            (identitySimulationActive &&
+              identitySimulationRemainingSeconds === 0 &&
+              identitySimulationError) ? (
+              <div
+                className="grid min-h-64 place-items-center bg-white p-6 text-sm text-slate-500"
+                data-testid={
+                  identitySimulationActive && identitySimulationRemainingSeconds === 0
+                    ? 'identity-simulation-fail-closed'
+                    : syntheticPreviewSelected
+                      ? 'synthetic-preview-fail-closed'
+                      : 'role-preview-fail-closed'
+                }
+              >
+                {identitySimulationActive && identitySimulationRemainingSeconds === 0
+                  ? resolveDesignerText(
+                      DESIGNER_I18N.unified.identitySimulation.safeFailure,
+                      locale,
+                    )
+                  : syntheticPreviewSelected
+                    ? resolveDesignerText(
+                        syntheticPreviewLoading
+                          ? DESIGNER_I18N.unified.syntheticPreview.safeLoading
+                          : DESIGNER_I18N.unified.syntheticPreview.safeFailure,
+                        locale,
+                      )
+                    : resolveDesignerText(
+                        rolePreviewLoading
+                          ? DESIGNER_I18N.unified.rolePreview.safeLoading
+                          : DESIGNER_I18N.unified.rolePreview.safeFailure,
+                        locale,
+                      )}
+              </div>
+            ) : (
+              <RecursiveBlockRenderer
+                key={
+                  syntheticPreview
+                    ? `synthetic:${syntheticPreview.fixtureRevision}`
+                    : effectiveRoleStructurePreview
+                      ? identitySimulationActive
+                        ? `identity:${identitySimulation.simulationPid}`
+                        : `role:${effectiveRoleStructurePreview.targetRole.rolePid}`
+                      : 'actor'
+                }
+                schema={previewDocument}
+                runtimeServices={
+                  effectiveRoleStructurePreview
+                    ? roleStructurePreviewRuntimeServices
+                    : syntheticPreviewRuntimeServices ?? defaultRuntimeExecutionServices
+                }
+                permissionEvaluator={rolePreviewPermissionEvaluator}
+                interactionDisabled={Boolean(effectiveRoleStructurePreview || syntheticPreview)}
+                previewInitialFormValues={syntheticPreview?.formValues}
+                modelFields={
+                  effectiveRoleStructurePreview || syntheticPreview
+                    ? []
+                    : document.modelCode
+                      ? modelFieldsByModel[document.modelCode] ?? []
+                      : []
+                }
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -952,7 +2049,7 @@ export function UnifiedDesignerWorkbench({
           onDragEnd={handleDragEnd}
           onDragCancel={clearActiveDrag}
         >
-          {getPageTemplates().length > 0 ? (
+          {!contextualReadOnly && availablePageTemplates.length > 0 ? (
             <div
               className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2"
               data-testid="designer-template-bar"
@@ -967,7 +2064,7 @@ export function UnifiedDesignerWorkbench({
                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
               >
                 <option value="">应用模板…</option>
-                {getPageTemplates().map((template) => (
+                {availablePageTemplates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.label}
                   </option>
@@ -975,7 +2072,7 @@ export function UnifiedDesignerWorkbench({
               </select>
             </div>
           ) : null}
-          {multiSelectedIds.size >= 2 ? (
+          {!contextualReadOnly && multiSelectedIds.size >= 2 ? (
             <div
               className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2"
               data-testid="multi-select-bar"
@@ -1014,6 +2111,7 @@ export function UnifiedDesignerWorkbench({
               blockDefinitions={blockDefinitions}
               selectedModelCode={selectedModelCode}
               modelFields={selectedModelFields}
+              canAddCustomField={!contextualRestricted && canAddBlock('field')}
               canAddBlock={canAddBlock}
               canAddModelField={canAddModelField}
               isModelFieldUsed={isSelectedModelFieldUsed}
@@ -1029,6 +2127,20 @@ export function UnifiedDesignerWorkbench({
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
               rootAccepts={Boolean(rootAccepts)}
+              structuralReadOnly={contextualRestricted}
+              canReorderBlock={
+                contextualRestricted
+                  ? (blockId) => {
+                      const block = findBlockById(document.blocks, blockId)?.block;
+                      return Boolean(
+                        block
+                        && (contextualReorderableTypes.has(block.blockType)
+                          || contextualRelocatableTypes.has(block.blockType)),
+                      );
+                    }
+                  : undefined
+              }
+              canResizeSpan={contextualRestricted ? canContextualResizeSpan : undefined}
               onSelect={handleCanvasSelect}
               onMoveBefore={handleMoveBefore}
               onPatchBlock={patchBlock}
@@ -1042,6 +2154,13 @@ export function UnifiedDesignerWorkbench({
             <InspectorHost
               selectedBlock={selectedBlock}
               modelFields={selectedModelFields}
+              editablePropertyPaths={
+                contextualRestricted
+                  ? (contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [])
+                  : undefined
+              }
+              canDuplicateBlock={canDuplicateBlock(selectedBlockId)}
+              onDuplicateBlock={handleDuplicateBlock}
               onChange={updateSelectedBlock}
             />
           </div>
@@ -1071,6 +2190,14 @@ function DragGhost({ drag }: { drag: DragData }) {
   );
 }
 
+function pointerToDotPath(pointer: string): string {
+  return pointer
+    .replace(/^\//, '')
+    .split('/')
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
+    .join('.');
+}
+
 function localizedLabel(value: ModelFieldDefinition['label']): string {
   if (typeof value === 'string') return value;
   return value['zh-CN'] || value['en-US'] || Object.values(value)[0] || '';
@@ -1080,7 +2207,17 @@ function formatValidationSaveError(errorCount: number): string {
   return `Fix ${errorCount} validation issue${errorCount === 1 ? '' : 's'} before saving.`;
 }
 
-function resolveSaveErrorMessage(error: unknown): string {
+function resolveSaveErrorMessage(error: unknown, locale: string): string {
+  const context = (error as { context?: unknown } | null)?.context;
+  const policyToken =
+    typeof context === 'string'
+      ? context
+      : context && typeof context === 'object' && 'reason' in context
+        ? String((context as { reason?: unknown }).reason ?? '')
+        : '';
+  if (policyToken === 'authoring.policy.protected_semantic_invalid') {
+    return resolveDesignerText(DESIGNER_I18N.unified.protectedSemanticInvalid, locale);
+  }
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
   return 'Failed to save page schema.';
@@ -1124,6 +2261,179 @@ function parseImportedDocument(raw: FileReader['result']): PageSchemaV3 | null {
     return null;
   }
   return parsed as PageSchemaV3;
+}
+
+function projectTemplateIntoGovernedRoot(
+  current: PageSchemaV3,
+  templateBlocks: DslBlockV3[],
+  project: (block: DslBlockV3) => DslBlockV3,
+): DslBlockV3[] | null {
+  if (
+    current.blocks.length !== 1 ||
+    templateBlocks.length !== 1 ||
+    current.blocks[0].blockType !== current.kind ||
+    templateBlocks[0].blockType !== current.kind
+  ) {
+    return null;
+  }
+  const projected = project(templateBlocks[0]);
+  const { authoringTemplateLineage: _rootLineage, ...projectedRootExtension } =
+    projected.extension ?? {};
+  const governedRootExtension = {
+    ...(current.blocks[0].extension ?? {}),
+    ...projectedRootExtension,
+  };
+  const governedRoot: DslBlockV3 = {
+    ...current.blocks[0],
+    ...projected,
+    id: current.blocks[0].id,
+    blockType: current.kind,
+    extension: Object.keys(governedRootExtension).length ? governedRootExtension : undefined,
+    blocks: projected.blocks ?? [],
+  };
+  if (!governedRoot.extension) delete governedRoot.extension;
+  return [governedRoot];
+}
+
+/** Governed imports may replace design content, but never page identity, binding or ownership. */
+function normalizeGovernedImport(
+  current: PageSchemaV3,
+  imported: PageSchemaV3,
+  project: (block: DslBlockV3) => DslBlockV3,
+  creatableTypes: Set<string>,
+  removableTypes: Set<string>,
+  reorderableTypes: Set<string>,
+  relocatableTypes: Set<string>,
+  pageKindSwitchEnabled: boolean,
+): PageSchemaV3 | null {
+  if (
+    imported.kind === 'composite' ||
+    (imported.kind !== current.kind && !pageKindSwitchEnabled) ||
+    current.blocks.length !== 1 ||
+    imported.blocks.length !== 1 ||
+    current.blocks[0].blockType !== current.kind ||
+    imported.blocks[0].blockType !== imported.kind ||
+    !validatePageSchemaV3(imported).valid
+  ) {
+    return null;
+  }
+
+  const stableRootId = current.blocks[0].id;
+  const importedRoot: DslBlockV3 = {
+    ...imported.blocks[0],
+    id: stableRootId,
+    blockType: imported.kind,
+  };
+  const currentBlocks = indexImportBlocks(current.blocks);
+  const importedBlocks = indexImportBlocks([importedRoot]);
+  for (const [id, entry] of importedBlocks) {
+    const existing = currentBlocks.get(id);
+    if (
+      existing &&
+      existing.block.blockType !== entry.block.blockType &&
+      id !== stableRootId
+    ) {
+      return null;
+    }
+    if (!existing && !creatableTypes.has(entry.block.blockType)) return null;
+    if (
+      existing &&
+      existing.parentId !== entry.parentId &&
+      id !== current.blocks[0].id &&
+      !relocatableTypes.has(entry.block.blockType)
+    ) {
+      return null;
+    }
+  }
+  for (const [id, entry] of currentBlocks) {
+    if (!importedBlocks.has(id) && !removableTypes.has(entry.block.blockType)) return null;
+  }
+  if (hasUnauthorizedExistingSiblingReorder(currentBlocks, importedBlocks, reorderableTypes)) {
+    return null;
+  }
+
+  const projectImportedBlock = (block: DslBlockV3): DslBlockV3 => {
+    const projected = project({ ...block, blocks: undefined });
+    const existing = currentBlocks.get(block.id)?.block;
+    const projectedExtension = { ...(projected.extension ?? {}) };
+    if (existing) {
+      delete projectedExtension.authoringTemplateLineage;
+      delete projectedExtension.authoringCopyLineage;
+    }
+    if (existing?.extension?.authoringTemplateLineage) {
+      projectedExtension.authoringTemplateLineage =
+        existing.extension.authoringTemplateLineage;
+    }
+    if (existing?.extension?.authoringCopyLineage) {
+      projectedExtension.authoringCopyLineage =
+        existing.extension.authoringCopyLineage;
+    }
+    const governedExtension = {
+      ...(existing?.extension ?? {}),
+      ...projectedExtension,
+    };
+    const normalizedBlock: DslBlockV3 = {
+      ...(existing ?? {}),
+      ...projected,
+      id: block.id,
+      blockType: block.blockType,
+      extension: Object.keys(governedExtension).length ? governedExtension : undefined,
+      blocks: block.blocks?.map(projectImportedBlock),
+    };
+    if (!normalizedBlock.extension) delete normalizedBlock.extension;
+    return normalizedBlock;
+  };
+  const projectedRoot = projectImportedBlock(importedRoot);
+  const normalized: PageSchemaV3 = {
+    ...imported,
+    id: current.id,
+    pageKey: current.pageKey,
+    modelCode: current.modelCode,
+    title: current.title,
+    layout: current.layout,
+    extension: current.extension,
+    blocks: [{ ...projectedRoot, id: current.blocks[0].id, blockType: imported.kind }],
+  };
+  return validatePageSchemaV3(normalized).valid ? normalized : null;
+}
+
+type ImportBlockEntry = { block: DslBlockV3; parentId: string | null; siblingIndex: number };
+
+function indexImportBlocks(blocks: DslBlockV3[] | undefined): Map<string, ImportBlockEntry> {
+  const indexed = new Map<string, ImportBlockEntry>();
+  const visit = (items: DslBlockV3[] | undefined, parentId: string | null) => {
+    for (const [siblingIndex, block] of (items ?? []).entries()) {
+      indexed.set(block.id, { block, parentId, siblingIndex });
+      visit(block.blocks, block.id);
+    }
+  };
+  visit(blocks, null);
+  return indexed;
+}
+
+function hasUnauthorizedExistingSiblingReorder(
+  current: Map<string, ImportBlockEntry>,
+  imported: Map<string, ImportBlockEntry>,
+  reorderableTypes: Set<string>,
+): boolean {
+  const parentIds = new Set([...current.values()].map((entry) => entry.parentId));
+  for (const parentId of parentIds) {
+    const currentOrder = [...current.entries()]
+      .filter(([id, entry]) => entry.parentId === parentId && imported.get(id)?.parentId === parentId)
+      .sort((left, right) => left[1].siblingIndex - right[1].siblingIndex)
+      .map(([id]) => id);
+    const importedOrder = [...imported.entries()]
+      .filter(([id, entry]) => entry.parentId === parentId && current.get(id)?.parentId === parentId)
+      .sort((left, right) => left[1].siblingIndex - right[1].siblingIndex)
+      .map(([id]) => id);
+    if (
+      currentOrder.join('\0') !== importedOrder.join('\0') &&
+      importedOrder.some((id) => !reorderableTypes.has(imported.get(id)!.block.blockType))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function findModelCodeForSelection(path: PageSchemaV3['blocks']): string | null {
@@ -1183,6 +2493,56 @@ function insertBlockBeforeTarget(
   }));
 }
 
+function insertBlockAfterTarget(
+  blocks: DslBlockV3[],
+  targetBlockId: string,
+  nextBlock: DslBlockV3,
+): DslBlockV3[] {
+  const directIndex = blocks.findIndex((block) => block.id === targetBlockId);
+  if (directIndex >= 0) {
+    const next = [...blocks];
+    next.splice(directIndex + 1, 0, nextBlock);
+    return next;
+  }
+  let changed = false;
+  const next = blocks.map((block) => {
+    if (!block.blocks?.length) return block;
+    const children = insertBlockAfterTarget(block.blocks, targetBlockId, nextBlock);
+    if (children === block.blocks) return block;
+    changed = true;
+    return { ...block, blocks: children };
+  });
+  return changed ? next : blocks;
+}
+
+function duplicateBlockSubtree(source: DslBlockV3, usedIds: Set<string>): DslBlockV3 {
+  const id = createUniqueBlockId(toStableBlockId(source.id, 'copy') || 'block_copy', usedIds);
+  usedIds.add(id);
+  return {
+    ...source,
+    id,
+    extension: {
+      ...(source.extension ?? {}),
+      authoringCopyLineage: { sourceBlockId: source.id },
+    },
+    blocks: source.blocks?.map((child) => duplicateBlockSubtree(child, usedIds)),
+  };
+}
+
+function duplicateSubtreeIsGoverned(
+  block: DslBlockV3,
+  creatableTypes: Set<string>,
+  editablePropertyPaths: Record<string, string[]>,
+): boolean {
+  return (
+    creatableTypes.has(block.blockType)
+    && (editablePropertyPaths[block.blockType] ?? []).includes(AUTHORING_COPY_LINEAGE_PATH)
+    && (block.blocks ?? []).every((child) =>
+      duplicateSubtreeIsGoverned(child, creatableTypes, editablePropertyPaths),
+    )
+  );
+}
+
 function applyParentPlacementDefaults(block: DslBlockV3, parentBlock: DslBlockV3): DslBlockV3 {
   if (
     block.blockType === 'action' &&
@@ -1231,4 +2591,42 @@ function compactObject<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
+}
+
+function templateDescendantsAreGoverned(
+  blocks: DslBlockV3[] | undefined,
+  creatableTypes: Set<string>,
+): boolean {
+  return (blocks ?? []).every(
+    (block) =>
+      creatableTypes.has(block.blockType) &&
+      templateDescendantsAreGoverned(block.blocks, creatableTypes),
+  );
+}
+
+function isDotPathAllowed(dotPath: string, capabilityPointers: string[]): boolean {
+  const pointer = `/${dotPath
+    .split('.')
+    .map((segment) => segment.replace(/~/g, '~0').replace(/\//g, '~1'))
+    .join('/')}`;
+  return capabilityPointers.some(
+    (capabilityPointer) =>
+      pointer === capabilityPointer || pointer.startsWith(`${capabilityPointer}/`),
+  );
+}
+
+function rolePreviewNodeLabel(
+  nodeType: AuthoringRoleStructureDecision['nodeType'],
+  locale: string,
+): string {
+  switch (nodeType) {
+    case 'MENU':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.menu, locale);
+    case 'FIELD':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.field, locale);
+    case 'ACTION':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.action, locale);
+    default:
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.block, locale);
+  }
 }

@@ -5,11 +5,11 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.constants.MetaPermission;
-import com.auraboot.framework.organization.dto.TeamResponse;
-import com.auraboot.framework.organization.service.TeamService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.entity.Team;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.view.dto.AutoSaveViewRequest;
 import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
@@ -24,7 +24,6 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
-import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.auraboot.framework.user.dto.UserSearchDTO;
@@ -87,8 +86,10 @@ public class SavedViewServiceImpl implements SavedViewService {
             "string", "text", "integer", "int", "long", "bigint");
     private static final Set<String> COLLABORATOR_PRINCIPAL_TYPES = Set.of("user");
     private static final Set<String> COLLABORATOR_PERMISSIONS = Set.of("view", "save", "manage");
+    private static final Set<String> VIEW_SCOPES = Set.of("personal", "team", "role", "global");
     private static final int PERSONAL_VIEW_LIMIT = 10;
     private static final int TEAM_VIEW_LIMIT = 20;
+    private static final int ROLE_VIEW_LIMIT = 20;
     private static final int GLOBAL_VIEW_LIMIT = 20;
 
     private final SavedViewMapper savedViewMapper;
@@ -97,8 +98,10 @@ public class SavedViewServiceImpl implements SavedViewService {
     private final UserPermissionService userPermissionService;
     private final CurrentUserTeamResolver currentUserTeamResolver;
     private final TeamMapper teamMapper;
+    private final RoleMapper roleMapper;
     private final AuditTrailService auditTrailService;
     private final UserService userService;
+    private final SavedViewOverlayPolicy savedViewOverlayPolicy;
 
     @Override
     public SavedViewDTO create(SavedViewCreateRequest request) {
@@ -111,8 +114,12 @@ public class SavedViewServiceImpl implements SavedViewService {
         if ("team".equals(request.getScope())) {
             validateCurrentUserInTeam(request.getTeamId());
         }
+        if ("role".equals(request.getScope())) {
+            validateCurrentUserInRole(request.getRoleId());
+        }
         String viewType = StringUtils.hasText(request.getViewType()) ? request.getViewType() : "table";
         ViewConfig viewConfig = request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig();
+        viewConfig = savedViewOverlayPolicy.validateAndStamp(request.getPageKey(), viewConfig);
         validateViewTypeConfig(request.getModelCode(), viewType, viewConfig);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
@@ -126,6 +133,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
 
         String scope = StringUtils.hasText(request.getScope()) ? request.getScope() : "personal";
+        scope = normalizeScope(scope);
         validateCollaboratorAcl(scope, viewConfig);
         validateViewCountLimit(request, scope, currentUserPid);
 
@@ -140,6 +148,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         savedView.setViewType(viewType);
         savedView.setOwnerId(currentUserPid);
         savedView.setTeamId(request.getTeamId());
+        savedView.setRoleId(request.getRoleId());
         savedView.setViewConfig(viewConfig);
         savedView.setAllowFullModel(request.getAllowFullModel() != null ? request.getAllowFullModel() : false);
         savedView.setIsDefault(request.getIsDefault() != null ? request.getIsDefault() : false);
@@ -153,7 +162,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         // If setting as default, clear other defaults first based on scope
         if (Boolean.TRUE.equals(savedView.getIsDefault())) {
             clearDefaultFlagByScope(scope, request.getModelCode(), request.getPageKey(),
-                    currentUserPid, request.getTeamId());
+                    currentUserPid, request.getTeamId(), request.getRoleId());
         }
 
         savedViewMapper.insertSavedView(savedView);
@@ -214,12 +223,31 @@ public class SavedViewServiceImpl implements SavedViewService {
             changedFields.add("description");
         }
         if (request.getScope() != null) {
-            savedView.setScope(request.getScope());
+            String nextScope = normalizeScope(request.getScope());
+            savedView.setScope(nextScope);
+            if (!"team".equals(nextScope)) {
+                savedView.setTeamId(null);
+            }
+            if (!"role".equals(nextScope)) {
+                savedView.setRoleId(null);
+            }
             changedFields.add("scope");
         }
         if (request.getTeamId() != null) {
+            if (!"team".equals(savedView.getScope())) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Team ID is only valid for TEAM scope views");
+            }
             savedView.setTeamId(request.getTeamId());
             changedFields.add("teamId");
+        }
+        if (request.getRoleId() != null) {
+            if (!"role".equals(savedView.getScope())) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Role ID is only valid for ROLE scope views");
+            }
+            savedView.setRoleId(request.getRoleId());
+            changedFields.add("roleId");
         }
         if (request.getViewConfig() != null) {
             ViewConfig nextConfig = hasManageAccess
@@ -229,6 +257,8 @@ public class SavedViewServiceImpl implements SavedViewService {
                 validateCollaboratorAcl(savedView.getScope(), nextConfig);
                 changedFields.add("collaborators");
             }
+            nextConfig = savedViewOverlayPolicy.validateAndStamp(
+                    savedView.getPageKey(), nextConfig);
             savedView.setViewConfig(nextConfig);
             changedFields.add("viewConfig");
         }
@@ -240,7 +270,8 @@ public class SavedViewServiceImpl implements SavedViewService {
             // If setting as default, clear other defaults first based on scope
             if (Boolean.TRUE.equals(request.getIsDefault())) {
                 clearDefaultFlagByScope(savedView.getScope(), savedView.getModelCode(),
-                        savedView.getPageKey(), currentUserPid, savedView.getTeamId());
+                        savedView.getPageKey(), currentUserPid, savedView.getTeamId(),
+                        savedView.getRoleId());
             }
             savedView.setIsDefault(request.getIsDefault());
             changedFields.add("isDefault");
@@ -256,6 +287,13 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
         if (savedView.isTeam()) {
             validateCurrentUserInTeam(savedView.getTeamId());
+        }
+        if ("role".equals(savedView.getScope()) && !StringUtils.hasText(savedView.getRoleId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Role ID is required for ROLE scope views");
+        }
+        if (savedView.isRole()) {
+            validateCurrentUserInRole(savedView.getRoleId());
         }
         if (request.getViewConfig() != null) {
             validateViewTypeConfig(savedView.getModelCode(), savedView.getViewType(), savedView.getViewConfig());
@@ -292,9 +330,10 @@ public class SavedViewServiceImpl implements SavedViewService {
     public List<SavedViewDTO> getAccessibleViews(String modelCode, String pageKey) {
         String currentUserPid = MetaContext.getCurrentUserPid();
         List<String> teamIds = getCurrentUserTeamIds();
+        List<String> roleIds = getCurrentUserRoleIds();
 
         List<SavedView> views = savedViewMapper.findAccessibleViews(
-                modelCode, pageKey, currentUserPid, teamIds);
+                modelCode, pageKey, currentUserPid, teamIds, roleIds);
 
         return views.stream()
                 .map(this::toDTO)
@@ -326,11 +365,20 @@ public class SavedViewServiceImpl implements SavedViewService {
     public SavedViewDTO getDefaultView(String modelCode, String pageKey) {
         String currentUserPid = MetaContext.getCurrentUserPid();
         List<String> teamIds = getCurrentUserTeamIds();
-
-        SavedView defaultView = savedViewMapper.findDefaultView(
-                modelCode, pageKey, currentUserPid, teamIds);
-
-        return defaultView != null ? toDTO(defaultView) : null;
+        List<String> roleIds = getCurrentUserRoleIds();
+        List<SavedView> stack = savedViewMapper.findDefaultOverlayStack(
+                modelCode, pageKey, currentUserPid, teamIds, roleIds);
+        if (stack.isEmpty()) {
+            return null;
+        }
+        SavedViewDTO effective = toDTO(stack.getLast());
+        ViewConfig config = new ViewConfig();
+        for (SavedView layer : stack) {
+            config = mergeOverlayLayer(config, toDTO(layer).getViewConfig());
+        }
+        effective.setViewConfig(config);
+        effective.setDirty(false);
+        return effective;
     }
 
     @Override
@@ -348,7 +396,8 @@ public class SavedViewServiceImpl implements SavedViewService {
 
         // Clear other defaults based on scope
         clearDefaultFlagByScope(savedView.getScope(), savedView.getModelCode(),
-                savedView.getPageKey(), currentUserPid, savedView.getTeamId());
+                savedView.getPageKey(), currentUserPid, savedView.getTeamId(),
+                savedView.getRoleId());
 
         savedView.setIsDefault(true);
         savedView.setUpdatedAt(Instant.now());
@@ -496,6 +545,9 @@ public class SavedViewServiceImpl implements SavedViewService {
     public SavedViewDTO autoSave(AutoSaveViewRequest request) {
         String currentUserPid = MetaContext.getCurrentUserPid();
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (StringUtils.hasText(request.getPageKey())) {
+            validatePageKeyExists(request.getPageKey());
+        }
 
         // Look for existing implicit view for this user/model/page
         SavedView existing = savedViewMapper.findImplicitView(
@@ -506,16 +558,35 @@ public class SavedViewServiceImpl implements SavedViewService {
             ViewConfig merged = existing.getViewConfig() != null ? existing.getViewConfig() : new ViewConfig();
             ViewConfig incoming = request.getViewConfig();
             if (incoming != null) {
-                if (incoming.getColumns() != null) merged.setColumns(incoming.getColumns());
-                if (incoming.getSorts() != null) merged.setSorts(incoming.getSorts());
-                if (incoming.getFilters() != null) merged.setFilters(incoming.getFilters());
-                if (incoming.getGroupBy() != null) merged.setGroupBy(incoming.getGroupBy());
-                if (incoming.getPagination() != null) merged.setPagination(incoming.getPagination());
-                if (incoming.getDensity() != null) merged.setDensity(incoming.getDensity());
-                if (incoming.getRowHeight() != null) merged.setRowHeight(incoming.getRowHeight());
-                if (incoming.getConditionalFormats() != null) merged.setConditionalFormats(incoming.getConditionalFormats());
-                if (incoming.getToolbarActions() != null) merged.setToolbarActions(incoming.getToolbarActions());
+                if (incoming.getColumns() != null) {
+                    merged.setColumns(incoming.getColumns());
+                }
+                if (incoming.getSorts() != null) {
+                    merged.setSorts(incoming.getSorts());
+                }
+                if (incoming.getFilters() != null) {
+                    merged.setFilters(incoming.getFilters());
+                }
+                if (incoming.getGroupBy() != null) {
+                    merged.setGroupBy(incoming.getGroupBy());
+                }
+                if (incoming.getPagination() != null) {
+                    merged.setPagination(incoming.getPagination());
+                }
+                if (incoming.getDensity() != null) {
+                    merged.setDensity(incoming.getDensity());
+                }
+                if (incoming.getRowHeight() != null) {
+                    merged.setRowHeight(incoming.getRowHeight());
+                }
+                if (incoming.getConditionalFormats() != null) {
+                    merged.setConditionalFormats(incoming.getConditionalFormats());
+                }
+                if (incoming.getToolbarActions() != null) {
+                    merged.setToolbarActions(incoming.getToolbarActions());
+                }
             }
+            merged = savedViewOverlayPolicy.validateAndStamp(request.getPageKey(), merged);
             existing.setViewConfig(merged);
             existing.setUpdatedAt(Instant.now());
             existing.setUpdatedBy(currentUserPid);
@@ -533,7 +604,8 @@ public class SavedViewServiceImpl implements SavedViewService {
         savedView.setScope("personal");
         savedView.setViewType("table");
         savedView.setOwnerId(currentUserPid);
-        savedView.setViewConfig(request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig());
+        savedView.setViewConfig(savedViewOverlayPolicy.validateAndStamp(
+                request.getPageKey(), request.getViewConfig()));
         savedView.setAllowFullModel(false);
         savedView.setIsDefault(true);
         savedView.setIsImplicit(true);
@@ -579,7 +651,8 @@ public class SavedViewServiceImpl implements SavedViewService {
         if (page == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "[S-SAVED-VIEW] pageKey '" + pageKey + "' does not exist in ab_page_schema; "
-                            + "define it as config/pages/" + pageKey + ".json in your plugin before creating a SavedView");
+                            + "define it as config/pages/" + pageKey
+                            + ".json in your plugin before creating a SavedView");
         }
     }
 
@@ -590,10 +663,35 @@ public class SavedViewServiceImpl implements SavedViewService {
         if (!StringUtils.hasText(request.getModelCode())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Model code is required");
         }
-        if ("team".equals(request.getScope()) && !StringUtils.hasText(request.getTeamId())) {
+        String scope = normalizeScope(request.getScope());
+        request.setScope(scope);
+        if ("team".equals(scope) && !StringUtils.hasText(request.getTeamId())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Team ID is required for TEAM scope views");
         }
+        if (!"team".equals(scope) && StringUtils.hasText(request.getTeamId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Team ID is only valid for TEAM scope views");
+        }
+        if ("role".equals(scope) && !StringUtils.hasText(request.getRoleId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Role ID is required for ROLE scope views");
+        }
+        if (!"role".equals(scope) && StringUtils.hasText(request.getRoleId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Role ID is only valid for ROLE scope views");
+        }
+    }
+
+    private String normalizeScope(String requestedScope) {
+        String scope = StringUtils.hasText(requestedScope)
+                ? requestedScope.trim().toLowerCase(Locale.ROOT)
+                : "personal";
+        if (!VIEW_SCOPES.contains(scope)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Unsupported saved view scope: " + scope);
+        }
+        return scope;
     }
 
     private void validateViewCountLimit(SavedViewCreateRequest request, String scope, String currentUserPid) {
@@ -604,12 +702,14 @@ public class SavedViewServiceImpl implements SavedViewService {
 
         String ownerId = "personal".equals(scope) ? currentUserPid : null;
         String teamId = "team".equals(scope) ? request.getTeamId() : null;
+        String roleId = "role".equals(scope) ? request.getRoleId() : null;
         int currentCount = savedViewMapper.countActiveNonImplicitViewsForScope(
                 request.getModelCode(),
                 request.getPageKey(),
                 scope,
                 ownerId,
-                teamId);
+                teamId,
+                roleId);
         if (currentCount >= limit) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Saved view limit reached for " + scope + " scope: " + limit);
@@ -620,6 +720,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         return switch (scope) {
             case "personal" -> PERSONAL_VIEW_LIMIT;
             case "team" -> TEAM_VIEW_LIMIT;
+            case "role" -> ROLE_VIEW_LIMIT;
             case "global" -> GLOBAL_VIEW_LIMIT;
             default -> 0;
         };
@@ -903,6 +1004,108 @@ public class SavedViewServiceImpl implements SavedViewService {
         return merged;
     }
 
+    private ViewConfig mergeOverlayLayer(ViewConfig base, ViewConfig patch) {
+        ViewConfig merged = mergeViewConfig(base, patch);
+        merged.setColumns(mergeColumns(base == null ? null : base.getColumns(),
+                patch == null ? null : patch.getColumns()));
+        merged.setToolbarActions(mergeToolbarActions(
+                base == null ? null : base.getToolbarActions(),
+                patch == null ? null : patch.getToolbarActions()));
+        merged.setMeta(mergeOverlayMeta(
+                base == null ? null : base.getMeta(),
+                patch == null ? null : patch.getMeta()));
+        return merged;
+    }
+
+    private ViewConfig.Meta mergeOverlayMeta(ViewConfig.Meta base, ViewConfig.Meta patch) {
+        if (base == null && patch == null) {
+            return null;
+        }
+        ViewConfig.Meta merged = new ViewConfig.Meta();
+        if (patch != null) {
+            BeanUtils.copyProperties(patch, merged);
+        } else {
+            BeanUtils.copyProperties(base, merged);
+        }
+        LinkedHashSet<String> reasons = new LinkedHashSet<>();
+        LinkedHashSet<String> stalePaths = new LinkedHashSet<>();
+        collectOverlayMetadata(base, reasons, stalePaths);
+        collectOverlayMetadata(patch, reasons, stalePaths);
+        merged.setOverlayStatus(mostSevereOverlayStatus(
+                base == null ? null : base.getOverlayStatus(),
+                patch == null ? null : patch.getOverlayStatus()));
+        merged.setOverlayReasonCodes(List.copyOf(reasons));
+        merged.setOverlayStalePaths(stalePaths.stream().limit(100).toList());
+        return merged;
+    }
+
+    private void collectOverlayMetadata(
+            ViewConfig.Meta meta,
+            Set<String> reasons,
+            Set<String> stalePaths) {
+        if (meta == null) return;
+        if (meta.getOverlayReasonCodes() != null) {
+            reasons.addAll(meta.getOverlayReasonCodes());
+        }
+        if (meta.getOverlayStalePaths() != null) {
+            stalePaths.addAll(meta.getOverlayStalePaths());
+        }
+    }
+
+    private String mostSevereOverlayStatus(String first, String second) {
+        String selected = overlayStatusRank(first) >= overlayStatusRank(second) ? first : second;
+        return selected == null ? "CURRENT" : selected;
+    }
+
+    private int overlayStatusRank(String status) {
+        if (status == null) return -1;
+        return switch (status) {
+            case "CURRENT" -> 0;
+            case "REBASED" -> 1;
+            case "UNTRACKED" -> 2;
+            case "STALE" -> 3;
+            default -> 4;
+        };
+    }
+
+    private List<ViewConfig.ColumnConfig> mergeColumns(
+            List<ViewConfig.ColumnConfig> base,
+            List<ViewConfig.ColumnConfig> patch) {
+        if (patch == null) return base;
+        if (base == null) return patch;
+        Map<String, ViewConfig.ColumnConfig> byCode = new java.util.LinkedHashMap<>();
+        base.forEach(column -> {
+            if (column != null && StringUtils.hasText(column.getFieldCode())) {
+                byCode.put(column.getFieldCode(), column);
+            }
+        });
+        patch.forEach(column -> {
+            if (column != null && StringUtils.hasText(column.getFieldCode())) {
+                byCode.put(column.getFieldCode(), column);
+            }
+        });
+        return List.copyOf(byCode.values());
+    }
+
+    private List<ViewConfig.ToolbarActionConfig> mergeToolbarActions(
+            List<ViewConfig.ToolbarActionConfig> base,
+            List<ViewConfig.ToolbarActionConfig> patch) {
+        if (patch == null) return base;
+        if (base == null) return patch;
+        Map<String, ViewConfig.ToolbarActionConfig> byCode = new java.util.LinkedHashMap<>();
+        base.forEach(action -> {
+            if (action != null && StringUtils.hasText(action.getCode())) {
+                byCode.put(action.getCode(), action);
+            }
+        });
+        patch.forEach(action -> {
+            if (action != null && StringUtils.hasText(action.getCode())) {
+                byCode.put(action.getCode(), action);
+            }
+        });
+        return List.copyOf(byCode.values());
+    }
+
     private ViewConfig preserveManagedMetaForSaveAccess(ViewConfig currentConfig, ViewConfig requestedConfig) {
         if (requestedConfig == null) {
             return null;
@@ -1011,6 +1214,11 @@ public class SavedViewServiceImpl implements SavedViewService {
                     || userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE));
         }
 
+        if (savedView.isRole()) {
+            return getCurrentUserRoleIds().contains(savedView.getRoleId())
+                    && hasSharedManagePermission(savedView, "manage");
+        }
+
         if (savedView.isGlobal()) {
             if (currentUserPid != null && currentUserPid.equals(savedView.getCreatedBy())) {
                 return true;
@@ -1047,6 +1255,11 @@ public class SavedViewServiceImpl implements SavedViewService {
             return currentUserId != null
                     && (userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_TEAM_MANAGE)
                     || userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE));
+        }
+
+        if (savedView.isRole()) {
+            return getCurrentUserRoleIds().contains(savedView.getRoleId())
+                    && hasSharedManagePermission(savedView, "save", "manage");
         }
 
         if (savedView.isGlobal()) {
@@ -1095,6 +1308,9 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
         if (StringUtils.hasText(savedView.getTeamId())) {
             metadata.put("teamId", savedView.getTeamId());
+        }
+        if (StringUtils.hasText(savedView.getRoleId())) {
+            metadata.put("roleId", savedView.getRoleId());
         }
         metadata.put("summary", buildSharedAuditSummary(operationType, fields));
 
@@ -1157,6 +1373,9 @@ public class SavedViewServiceImpl implements SavedViewService {
                 return;
             }
         }
+        if (savedView.isRole()) {
+            validateCurrentUserInRole(savedView.getRoleId());
+        }
     }
 
     private void validateWriteAccess(SavedView savedView) {
@@ -1190,6 +1409,15 @@ public class SavedViewServiceImpl implements SavedViewService {
             if (!hasTeamManagePermission) {
                 throw new ValidationException(ResponseCode.FORBIDDEN,
                         "You don't have permission to modify this team view");
+            }
+            return;
+        }
+
+        if (savedView.isRole()) {
+            validateCurrentUserInRole(savedView.getRoleId());
+            if (!hasSharedManagePermission(savedView, "save", "manage")) {
+                throw new ValidationException(ResponseCode.FORBIDDEN,
+                        "You don't have permission to modify this role view");
             }
             return;
         }
@@ -1243,6 +1471,15 @@ public class SavedViewServiceImpl implements SavedViewService {
             return;
         }
 
+        if (savedView.isRole()) {
+            validateCurrentUserInRole(savedView.getRoleId());
+            if (!hasSharedManagePermission(savedView, "manage")) {
+                throw new ValidationException(ResponseCode.FORBIDDEN,
+                        "You don't have permission to manage this role view");
+            }
+            return;
+        }
+
         if (savedView.isGlobal()) {
             if (StringUtils.hasText(currentUserPid) && currentUserPid.equals(savedView.getCreatedBy())) {
                 return;
@@ -1263,6 +1500,7 @@ public class SavedViewServiceImpl implements SavedViewService {
                 || request.getDescription() != null
                 || request.getScope() != null
                 || request.getTeamId() != null
+                || request.getRoleId() != null
                 || request.getAllowFullModel() != null
                 || request.getSortOrder() != null;
     }
@@ -1309,17 +1547,55 @@ public class SavedViewServiceImpl implements SavedViewService {
         return currentUserTeamResolver.resolveCurrentUserTeamIds();
     }
 
+    private List<String> getCurrentUserRoleIds() {
+        Long memberId = MetaContext.getCurrentMemberId();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (memberId == null || tenantId == null) {
+            return List.of();
+        }
+        return roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
+                .map(Role::getPid)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private void validateCurrentUserInRole(String roleId) {
+        if (!StringUtils.hasText(roleId) || !getCurrentUserRoleIds().contains(roleId)) {
+            throw new ValidationException(ResponseCode.FORBIDDEN,
+                    "You are not a member of role: " + roleId);
+        }
+    }
+
+    private boolean hasSharedManagePermission(SavedView savedView, String... permissions) {
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        if (StringUtils.hasText(currentUserPid)
+                && currentUserPid.equals(savedView.getCreatedBy())) {
+            return true;
+        }
+        if (hasCollaboratorPermission(savedView, permissions)) {
+            return true;
+        }
+        Long currentUserId = MetaContext.getCurrentUserId();
+        return currentUserId != null
+                && userPermissionService.hasPermission(currentUserId, MetaPermission.VIEW_MANAGE);
+    }
+
     /**
      * Clear default flag based on view scope.
      * PERSONAL: clears for same user. TEAM: clears for same team. GLOBAL: clears all global defaults.
      */
     private void clearDefaultFlagByScope(String scope, String modelCode, String pageKey,
-                                          String currentUserPid, String teamId) {
+                                          String currentUserPid, String teamId, String roleId) {
         switch (scope) {
             case "personal" -> savedViewMapper.clearPersonalDefaultFlag(modelCode, pageKey, currentUserPid);
             case "team" -> {
                 if (StringUtils.hasText(teamId)) {
                     savedViewMapper.clearTeamDefaultFlag(modelCode, pageKey, teamId);
+                }
+            }
+            case "role" -> {
+                if (StringUtils.hasText(roleId)) {
+                    savedViewMapper.clearRoleDefaultFlag(modelCode, pageKey, roleId);
                 }
             }
             case "global" -> savedViewMapper.clearGlobalDefaultFlag(modelCode, pageKey);
@@ -1360,7 +1636,9 @@ public class SavedViewServiceImpl implements SavedViewService {
                 .viewType(entity.getViewType())
                 .ownerId(entity.getOwnerId())
                 .teamId(entity.getTeamId())
-                .viewConfig(entity.getViewConfig())
+                .roleId(entity.getRoleId())
+                .viewConfig(savedViewOverlayPolicy.replay(
+                        entity.getPageKey(), entity.getViewConfig()))
                 .allowFullModel(entity.getAllowFullModel())
                 .isDefault(entity.getIsDefault())
                 .isImplicit(entity.getIsImplicit())
@@ -1377,6 +1655,10 @@ public class SavedViewServiceImpl implements SavedViewService {
         // Populate teamName for TEAM scope views
         if ("team".equals(entity.getScope()) && StringUtils.hasText(entity.getTeamId())) {
             dto.setTeamName(resolveTeamName(entity.getTeamId()));
+        }
+        if ("role".equals(entity.getScope()) && StringUtils.hasText(entity.getRoleId())) {
+            Role role = roleMapper.findByTenantIdAndPid(entity.getTenantId(), entity.getRoleId());
+            dto.setRoleName(role != null ? role.getName() : null);
         }
 
         return dto;

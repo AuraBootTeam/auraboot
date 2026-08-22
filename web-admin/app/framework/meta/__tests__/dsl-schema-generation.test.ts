@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('should have 41 definitions', () => {
-    expect(Object.keys(defs).length).toBe(41);
+  it('should have 42 definitions', () => {
+    expect(Object.keys(defs).length).toBe(42);
   });
 
   it('should have DslSchema definition', () => {
@@ -112,6 +112,11 @@ describe('DSL Generated Schema', () => {
     expect(editable?.type).toBe('boolean');
   });
 
+  it('personalization mandatory flags should be explicit booleans', () => {
+    expect(defs.ColumnConfig.properties?.mandatory?.type).toBe('boolean');
+    expect(defs.ButtonConfig.properties?.mandatory?.type).toBe('boolean');
+  });
+
   it('ColumnConfig.valueType should be string enum with known values', () => {
     const vt = defs.ColumnConfig.properties?.valueType;
     expect(vt?.type).toBe('string');
@@ -144,6 +149,45 @@ describe('DSL Generated Schema', () => {
         expect.objectContaining({ $ref: '#/definitions/DataSourceConfig' }),
       ]),
     );
+  });
+
+  it('ActionDef should accept localized business groups on command input fields', () => {
+    const group = defs.CommandInputFieldConfig?.properties?.group;
+    expect(group?.anyOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'string' }),
+        expect.objectContaining({ $ref: '#/definitions/LocalizedText' }),
+      ]),
+    );
+    expect(defs.CommandInputFieldConfig?.properties?.dictCode).toEqual(
+      expect.objectContaining({ type: 'string' }),
+    );
+
+    const validateAction = new Ajv({ strict: false }).compile({
+      ...defs.ActionDef,
+      definitions: defs,
+    });
+
+    expect(
+      validateAction({
+        type: 'command',
+        command: 'inventory:record_package',
+        inputFieldsTitle: { 'zh-CN': '记录包装', en: 'Record package' },
+        inputFields: [
+          {
+            field: 'boxNo',
+            label: { 'zh-CN': '箱号', en: 'Box number' },
+            group: { 'zh-CN': '箱号与数量', en: 'Box and quantity' },
+            placeholder: { 'zh-CN': '请扫描或输入箱号', en: 'Scan or enter a box number' },
+            helpText: {
+              'zh-CN': '每个包装箱的唯一业务编号',
+              en: 'Unique business number for the package',
+            },
+            required: true,
+          },
+        ],
+      }),
+    ).toBe(true);
   });
 
   it('SelectionConfig should publish the grouped-radio contract', () => {

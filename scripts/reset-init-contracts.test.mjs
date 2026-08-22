@@ -22,6 +22,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
   assert.match(gate, /bash -n scripts\/dev\/env\.sh/);
+  assert.match(gate, /bash -n scripts\/dev\/xxl-job-true-stack-smoke\.sh/);
   assert.match(gate, /bash -n scripts\/dev\/lib\/process-manager\.sh/);
   assert.match(gate, /bash -n scripts\/dev\/lib\/health\.sh/);
   assert.match(gate, /bash -n scripts\/dev\/run-agent-runtime-full-gate-docker\.sh/);
@@ -44,12 +45,15 @@ test('OSS reset uses fail-closed runtime ownership instead of global process mat
   assert.match(reset, /aura_reset_owner_init/);
   assert.match(reset, /aura_reset_acquire_locks/);
   assert.match(reset, /aura_reset_stop_service "backend"/);
-  assert.match(reset, /aura_reset_stop_service "backend"[^\n]+"bootRun"/);
+  assert.match(reset, /backend_owner_command_token/);
+  assert.match(reset, /bootRun\|"java -jar"/);
   assert.match(reset, /aura_reset_stop_service "web"/);
   assert.match(reset, /aura_reset_stop_service "bff"/);
   assert.match(reset, /aura_reset_register_process "backend"/);
-  assert.match(reset, /aura_reset_register_process "backend"[^\n]+"bootRun"/);
-  assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"backend"[^\n]+"bootRun"/);
+  assert.match(reset, /aura_reset_register_process "backend"[^\n]+"java -jar"/);
+  assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"backend"[^\n]+"java -jar"/);
+  assert.match(reset, /\.\/gradlew --no-daemon :bootJar -x test/);
+  assert.match(reset, /aura_reset_spawn_detached[^\n]+java -jar "\$BOOT_JAR"/);
   assert.match(reset, /aura_reset_register_process "web"/);
   assert.match(reset, /aura_reset_register_process "bff"/);
   assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"web"/);
@@ -84,6 +88,15 @@ test('OSS reset uses fail-closed runtime ownership instead of global process mat
 
   assert.match(hostE2e, /exec bash scripts\/oss-reset-and-init\.sh/);
   assert.doesNotMatch(hostE2e, /FORCE_HOST="\$\{FORCE_HOST:-1\}"/);
+});
+
+test('stable XXL true-stack smoke builds once and runs the executable jar', () => {
+  const smoke = read('scripts/dev/xxl-job-true-stack-smoke.sh');
+
+  assert.match(smoke, /\.\/gradlew --no-daemon :bootJar -x test/);
+  assert.match(smoke, /exec env SPRING_PROFILES_ACTIVE=dev/);
+  assert.match(smoke, /java -jar "\$BOOT_JAR"/);
+  assert.doesNotMatch(smoke, /:bootRun/);
 });
 
 test('OSS reset init contract gate is executable for direct local use', () => {
@@ -253,7 +266,8 @@ test('OSS golden stack stages current-source hybrid jars before import', () => {
 
   assert.match(golden, /stage_requested_hybrid_jars\(\)/);
   assert.match(golden, /:platform-plugin-api:publishToMavenLocal/);
-  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" gradle --no-daemon/);
+  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
+  assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
   assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
@@ -265,6 +279,31 @@ test('OSS golden stack stages current-source hybrid jars before import', () => {
       golden.indexOf('log "5/9 start backend'),
     'hybrid jars must be staged before the PF4J host starts',
   );
+});
+
+test('host-side build scripts never fall back to the system Gradle executable', () => {
+  const scripts = [
+    'scripts/oss-golden-stack.sh',
+    'scripts/p1-verify-in-docker.sh',
+    'scripts/mes-wms-golden-run.sh',
+    'plugins/scripts/build-plugin.sh',
+  ];
+
+  for (const script of scripts) {
+    const source = read(script);
+    assert.doesNotMatch(
+      source,
+      /(?:^|[;&(|]\s*|\s)gradle\s+(?:--no-daemon\s+)?(?:build|clean|jar)/m,
+      `${script} must use a repository Gradle wrapper`,
+    );
+  }
+
+  const mesWms = read('scripts/mes-wms-golden-run.sh');
+  assert.match(mesWms, /--project-dir "\$2" jar --console=plain -q --no-daemon/);
+
+  const buildPlugin = read('plugins/scripts/build-plugin.sh');
+  assert.match(buildPlugin, /publishToMavenLocal --quiet --no-daemon/);
+  assert.match(buildPlugin, /clean build -x test --quiet --no-daemon/);
 });
 
 test('Docker bootstrap entrypoints preserve plugin dependency order', () => {

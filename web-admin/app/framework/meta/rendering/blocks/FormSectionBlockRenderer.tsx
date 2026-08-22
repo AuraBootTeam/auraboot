@@ -47,6 +47,31 @@ function isNegativeDisplayValue(value: unknown): boolean {
   return text.includes('已停用') || text.includes('disabled');
 }
 
+export function resolveSettingsCardDisplayValue(
+  value: unknown,
+  valueMap: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  if (value !== null && value !== undefined && valueMap && typeof valueMap === 'object') {
+    const key = String(value);
+    const mapped = (valueMap as Record<string, unknown>)[key];
+    if (mapped !== undefined) {
+      return getLocalizedText(mapped as any, locale, t);
+    }
+  }
+  return value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+export function resolveSettingsCardFieldDisplayValue(
+  value: unknown,
+  field: Pick<FieldConfig, 'props'> & { valueMap?: unknown },
+  locale: string,
+  t: (key: string) => string,
+): string {
+  return resolveSettingsCardDisplayValue(value, field.valueMap ?? field.props?.valueMap, locale, t);
+}
+
 export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> = ({
   block,
   runtime,
@@ -103,8 +128,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
 
     const renderValue = (field: FieldConfig) => {
       const value = stateManager.getFieldValue(scopeId, field.field);
-      const displayValue =
-        value === null || value === undefined || value === '' ? '—' : String(value);
+      const displayValue = resolveSettingsCardFieldDisplayValue(value, field, locale, t);
       const isLongText = displayValue.includes('\n') || displayValue.length > 56;
       const toneClass = isPositiveDisplayValue(displayValue)
         ? 'border-status-green bg-status-green-bg text-status-green'
@@ -114,15 +138,13 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
 
       if (isLongText) {
         return (
-          <p className="mt-2 text-sm leading-6 whitespace-pre-line text-text-2">
-            {displayValue}
-          </p>
+          <p className="text-text-2 mt-2 text-sm leading-6 whitespace-pre-line">{displayValue}</p>
         );
       }
 
       return (
         <span
-          className={`mt-2 inline-flex w-fit max-w-full items-center rounded-control border px-2.5 py-1 text-sm font-medium ${toneClass}`}
+          className={`rounded-control mt-2 inline-flex w-fit max-w-full items-center border px-2.5 py-1 text-sm font-medium ${toneClass}`}
         >
           {displayValue}
         </span>
@@ -130,14 +152,14 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
     };
 
     return (
-      <section className="mb-4 overflow-hidden rounded-card border border-border bg-panel shadow-card">
-        <div className="flex items-start gap-3 border-b border-border bg-subtle px-5 py-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-accent-weak text-accent">
+      <section className="rounded-card border-border bg-panel shadow-card mb-4 overflow-hidden border">
+        <div className="border-border bg-subtle flex items-start gap-3 border-b px-5 py-4">
+          <div className="rounded-control bg-accent-weak text-accent flex h-9 w-9 shrink-0 items-center justify-center">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-text">{title}</h3>
-            {description ? <p className="mt-1 text-sm text-text-3">{description}</p> : null}
+            <h3 className="text-text text-base font-semibold">{title}</h3>
+            {description ? <p className="text-text-3 mt-1 text-sm">{description}</p> : null}
           </div>
         </div>
         <div className="p-4 sm:p-5" style={cardGridStyle}>
@@ -149,10 +171,11 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
             return (
               <div
                 key={field.field}
-                className="min-w-0 rounded-control border border-border bg-panel px-4 py-3"
+                data-authoring-node-id={(field as any).id || field.field}
+                className="rounded-control border-border bg-panel min-w-0 border px-4 py-3"
                 style={{ gridColumn: `span ${Math.min(12, Math.max(1, colSpan))}` }}
               >
-                <div className="text-xs font-medium text-text-3">{label}</div>
+                <div className="text-text-3 text-xs font-medium">{label}</div>
                 {renderValue(field)}
               </div>
             );
@@ -178,6 +201,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
           return (
             <div
               key={field.field}
+              data-authoring-node-id={(field as any).id || field.field}
               style={{
                 gridColumn: `span ${colSpan}`,
                 gridRow: rowSpan > 1 ? `span ${rowSpan}` : undefined,
