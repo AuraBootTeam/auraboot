@@ -56,11 +56,17 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
     getStateManager: () => ({
       updateState,
       getContext: () => context,
+      getFieldMeta: () => undefined,
+      getFieldValue: (_scopeId: string, field: string) => context.form[field],
+      updateField: (_scopeId: string, field: string, value: unknown) => {
+        context.form[field] = value;
+      },
     }),
     getScopeId: () => 'scope-1',
     getSchema: () => ({ id: 'test_schema', modelCode: 'test_model' }),
     __updateState: updateState,
     __reload: reload,
+    triggerFieldLinkage: vi.fn(),
     ...overrides,
   };
   return stub as unknown as SchemaRuntime;
@@ -87,9 +93,54 @@ describe('FiltersBlockRenderer', () => {
       expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'searchKeyword', ''),
     );
   });
+
+  it('renders the compact workbench filter surface without changing action semantics', () => {
+    const runtime = makeRuntime();
+    const block = {
+      id: 'queue_filters',
+      blockType: 'filters',
+      density: 'compact',
+      fields: [{ id: 'lead_status_filter', field: 'status', label: 'Status' }],
+    } as unknown as BlockConfig;
+
+    const { container } = render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+
+    const filter = container.querySelector('.filters-block');
+    expect(filter).toHaveAttribute('data-density', 'compact');
+    expect(filter).toHaveClass('bg-panel', 'px-4', 'py-1.5');
+    expect(container.querySelector('[data-authoring-node-id="lead_status_filter"]')).not.toBeNull();
+  });
 });
 
 describe('MetricStripBlockRenderer', () => {
+  it('renders compact cards for dense operational workbenches', () => {
+    const runtime = makeRuntime({ data: { summary: { availableCount: 12 } } });
+    const block = {
+      id: 'metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      density: 'compact',
+      metrics: [
+        {
+          key: 'available',
+          label: 'Available',
+          valueField: 'availableCount',
+          subText: 'Still in the pool',
+        },
+      ],
+    } as unknown as BlockConfig;
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-metrics')).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByTestId('metric-strip-item-available')).toHaveClass('h-20', 'p-3');
+    expect(screen.getByTestId('metric-strip-item-available')).toHaveAttribute(
+      'aria-description',
+      'Still in the pool',
+    );
+    expect(screen.queryByTestId('metric-strip-subtext-available')).not.toBeInTheDocument();
+  });
+
   it('renders a stable empty state when no metrics are configured', () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {
@@ -584,6 +635,28 @@ describe('MetricStripBlockRenderer', () => {
       'xl:grid-cols-4',
     );
   });
+
+  it('keeps a configured five-card strip on one row at wide desktop widths', () => {
+    const runtime = makeRuntime({
+      data: { summary: { a: 1, b: 2, c: 3, d: 4, e: 5 } },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'lead_pool_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      columns: 5,
+      metrics: ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, label: key, valueField: key })),
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+      'xl:grid-cols-5',
+    );
+  });
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
@@ -1072,9 +1145,7 @@ describe('StatusBannerBlockRenderer', () => {
 
     render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent(
-      'CN¥1,886,000',
-    );
+    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent('CN¥1,886,000');
   });
 
   it('renders directly from a runtime-state context without a duplicate detail query', () => {
@@ -2546,9 +2617,21 @@ describe('ReviewDrawerBlockRenderer', () => {
                     inputFieldsTitle: '录入人工价',
                     inputFieldsSubmitLabel: '录入并采用',
                     inputFields: [
-                      { field: 'unitPrice', label: '人工单价', type: 'number', required: true },
-                      { field: 'currency', label: '币种', type: 'text', defaultValue: 'CNY' },
-                      { field: 'reason', label: '来源说明', type: 'textarea' },
+                      {
+                        field: 'unitPrice',
+                        group: '价格结果',
+                        label: '人工单价',
+                        type: 'number',
+                        required: true,
+                      },
+                      {
+                        field: 'currency',
+                        group: '价格结果',
+                        label: '币种',
+                        type: 'text',
+                        defaultValue: 'CNY',
+                      },
+                      { field: 'reason', group: '采用依据', label: '来源说明', type: 'textarea' },
                     ],
                   },
                 },
@@ -2578,6 +2661,11 @@ describe('ReviewDrawerBlockRenderer', () => {
       'unitPrice',
       'currency',
       'reason',
+    ]);
+    expect(formDetail.fields.map((field: any) => field.group)).toEqual([
+      '价格结果',
+      '价格结果',
+      '采用依据',
     ]);
     // simulate the user filling + submitting the standard FormDialog
     formDetail.onSubmit({ unitPrice: '8.88', currency: 'CNY', reason: '业务裁决价' });

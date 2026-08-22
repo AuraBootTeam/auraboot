@@ -19,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Pure unit tests for the deterministic conformance post-processing in
  * {@link NlModelingService#buildPluginManifestJson} — closes Prompt-to-App
  * import gaps ④ (dicts channel), ⑤/⑦ (command.type / field.dataType case) and
- * ⑧ (dynamic-menu pageKey) without an LLM or DB.
+ * ⑧ (dynamic-menu pageKey), ⑨ (canonical model permissions), and ⑩ (complete CRUD pages)
+ * without an LLM or DB.
  */
 class NlModelingManifestPostProcessingTest {
 
@@ -87,12 +88,9 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
-    void buildManifest_synthesizesDynamicCrudPermissions_forMenuPermissionRefs() throws Exception {
-        // The system prompt tells the model to gate a child menu on dynamic.<model>.read but to
-        // emit no explicit permissions (they are not platform-auto-created on model publish). The
-        // manifest must synthesize the dynamic CRUD permissions so the menu->permission referential
-        // check in PluginImportService.validateManifest passes at apply() time. (Live-surfaced gap:
-        // "Menu 'NL_EQUIP_INSPECTION_LIST' references missing permission: dynamic.equip_inspection.read".)
+    void buildManifest_synthesizesCanonicalModelCrudPermissions_forMenuPermissionRefs() throws Exception {
+        // Legacy LLM output used dynamic.<model>.read, while DynamicController authorizes model.*.
+        // The manifest builder must canonicalize the reference and synthesize the same CRUD family.
         NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
                 .models(List.of(mutable("code", "equip_inspection", "displayName:zh-CN", "设备点检")))
                 .menus(List.of(mutable("code", "nl_ei_list", "path", "/p/equip_inspection",
@@ -103,12 +101,15 @@ class NlModelingManifestPostProcessingTest {
 
         Set<String> permCodes = new HashSet<>();
         m.get("permissions").forEach(p -> permCodes.add(p.get("code").asText()));
-        assertTrue(permCodes.contains("dynamic.equip_inspection.read"),
-                "the menu-referenced dynamic read permission must be synthesized into the manifest");
+        assertEquals("model.equip_inspection.read",
+                m.get("menus").get(0).get("permissionCode").asText(),
+                "legacy menu permission references must be canonicalized");
+        assertTrue(permCodes.contains("model.equip_inspection.read"),
+                "the menu-referenced model read permission must be synthesized into the manifest");
         assertTrue(permCodes.containsAll(Set.of(
-                        "dynamic.equip_inspection.read", "dynamic.equip_inspection.create",
-                        "dynamic.equip_inspection.update", "dynamic.equip_inspection.delete")),
-                "the full dynamic CRUD permission set must be synthesized for the model");
+                        "model.equip_inspection.read", "model.equip_inspection.create",
+                        "model.equip_inspection.update", "model.equip_inspection.delete")),
+                "the full model CRUD permission set must be synthesized for the model");
     }
 
     @Test
@@ -159,13 +160,14 @@ class NlModelingManifestPostProcessingTest {
 
     @Test
     void buildManifest_preservesExplicitPermissions_andDoesNotDuplicate() throws Exception {
-        // A custom permission the model emitted is preserved; a dynamic permission already present
-        // is not duplicated by the synthesizer.
+        // A custom permission is preserved; an explicit legacy dynamic permission is canonicalized
+        // and not duplicated by the synthesizer.
         NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
                 .models(List.of(mutable("code", "book")))
                 .permissions(List.of(
                         mutable("code", "book.export", "name:zh-CN", "导出图书"),
-                        mutable("code", "dynamic.book.read")))
+                        mutable("code", "dynamic.book.read"),
+                        mutable("code", "model.book.read")))
                 .build();
 
         JsonNode m = mapper.readTree(service.buildPluginManifestJson("x", res));
@@ -173,11 +175,12 @@ class NlModelingManifestPostProcessingTest {
         List<String> codes = new ArrayList<>();
         m.get("permissions").forEach(p -> codes.add(p.get("code").asText()));
         assertTrue(codes.contains("book.export"), "an explicit custom permission must be preserved");
-        assertEquals(1, codes.stream().filter("dynamic.book.read"::equals).count(),
-                "an already-present dynamic permission must not be duplicated");
+        assertFalse(codes.contains("dynamic.book.read"), "legacy dynamic permission must not survive");
+        assertEquals(1, codes.stream().filter("model.book.read"::equals).count(),
+                "the canonicalized model permission must not be duplicated");
         assertTrue(codes.containsAll(Set.of(
-                        "dynamic.book.create", "dynamic.book.update", "dynamic.book.delete")),
-                "missing dynamic CRUD permissions are still synthesized alongside the existing one");
+                        "model.book.create", "model.book.update", "model.book.delete")),
+                "missing model CRUD permissions are still synthesized alongside the existing one");
     }
 
     @Test
@@ -302,7 +305,7 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
-    void buildManifest_synthesizesListFormPages_andMenu() throws Exception {
+    void buildManifest_synthesizesListFormDetailPages_andMenu() throws Exception {
         NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
                 .models(List.of(mutable("code", "equipment")))
                 .fields(List.of(mutable("code", "name", "dataType", "string"),
@@ -312,7 +315,7 @@ class NlModelingManifestPostProcessingTest {
         JsonNode m = mapper.readTree(service.buildPluginManifestJson("equipment_mgmt", res));
 
         JsonNode pages = m.get("pages");
-        assertEquals(2, pages.size(), "a list + form page must be synthesized");
+        assertEquals(3, pages.size(), "a list + form + detail page set must be synthesized");
         JsonNode listPage = pages.get(0);
         assertEquals("equipment_list", listPage.get("pageKey").asText());
         assertEquals("list", listPage.get("kind").asText());
@@ -341,12 +344,20 @@ class NlModelingManifestPostProcessingTest {
         assertEquals("equipment_mgmt:create_equipment",
                 formButtons.get("buttons").get(0).get("commandCode").asText());
 
+        JsonNode detailPage = pages.get(2);
+        assertEquals("equipment_detail", detailPage.get("pageKey").asText());
+        assertEquals("detail", detailPage.get("kind").asText());
+        assertEquals("form-section", detailPage.get("blocks").get(1).get("blockType").asText());
+        assertTrue(detailPage.get("blocks").get(1).get("readOnly").asBoolean());
+        assertEquals(2, detailPage.get("blocks").get(1).get("fields").size());
+
         // menu uses the canonical /p/<model> dynamic-page route (snake_case model code);
         // the frontend resolves it to <model>_list. Kebab-casing would 404.
         JsonNode menus = m.get("menus");
         assertEquals(1, menus.size());
         assertEquals("/p/equipment", menus.get(0).get("path").asText(),
                 "synthesized menu must use the canonical /p/<snake_model> route");
+        assertEquals("model.equipment.read", menus.get(0).get("permissionCode").asText());
     }
 
     @Test

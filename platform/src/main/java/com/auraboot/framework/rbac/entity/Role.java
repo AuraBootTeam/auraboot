@@ -27,6 +27,7 @@ import java.time.Instant;
         private String description;         // 角色描述
 
         private String type;                // 角色类型：SYSTEM, TENANT, CUSTOM
+        private String roleScope;           // 权限主体层级：platform, tenant, party
         private String scopeType;               // 作用域：GLOBAL, TENANT, STORE
         @TableField(value = "scope_content", typeHandler = JsonbStringTypeHandler.class)
         private String scopeContent;               // 作用域值,json

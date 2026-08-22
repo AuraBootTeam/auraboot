@@ -125,9 +125,9 @@
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |
 | `lib/reset-init-common.sh` | 7 | 2026-05-17 | Shared reset/init primitives. This file is sourced by lifecycle scripts; keep |
-| `lib/runtime-process-owner.sh` | 5 | 2026-08-14 | Resolve and validate runtime process ownership for worktree-scoped stacks. |
+| `lib/runtime-process-owner.sh` | 4 | 2026-08-19 | Runtime-scoped process ownership and exact cleanup safeguards. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
-| `lib/test-runtime-process-owner.sh` | 1 | 2026-08-14 | Regression tests for runtime process ownership checks. |
+| `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
 
 ## tooling (66)
 

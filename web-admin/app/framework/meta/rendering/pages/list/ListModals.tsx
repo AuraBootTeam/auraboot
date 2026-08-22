@@ -378,6 +378,7 @@ export function ListModals({
           onFilterByColumn={onFilterByColumn}
           onGroupBy={onGroupBy}
           onClose={onContextMenuClose}
+          t={t}
         />
       )}
 

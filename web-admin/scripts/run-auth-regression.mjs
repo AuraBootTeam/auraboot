@@ -12,11 +12,15 @@ const targetSpecs = [
   'tests/e2e/auth/logout.spec.ts',
   'tests/e2e/auth/employee-account-login-policy.spec.ts',
   'tests/e2e/auth/space-selection.spec.ts',
+  'tests/e2e/auth/social-oauth-callback.spec.ts',
 ];
 
 const runId =
   process.env.PW_E2E_RUN_ID ||
-  `auth-regression-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${process.pid}`;
+  `auth-regression-${new Date()
+    .toISOString()
+    .replace(/[-:.TZ]/g, '')
+    .slice(0, 14)}-${process.pid}`;
 
 const env = { ...process.env };
 env.NO_PROXY = appendNoProxy(env.NO_PROXY);

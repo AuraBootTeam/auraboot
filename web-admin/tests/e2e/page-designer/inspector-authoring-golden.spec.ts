@@ -31,11 +31,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import { uniqueId } from '../helpers';
-
-const ADMIN_STORAGE_STATE =
-  process.env.PW_ADMIN_STORAGE_STATE ||
-  (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
 // ab_announcement is a published platform meta-model present in every OSS stack.
 // The helper blocks under test (bpm-panel / activity-timeline / field-history /
@@ -125,13 +123,19 @@ async function applyJsonField(page: Page, path: string, value: unknown): Promise
   await textarea.fill(JSON.stringify(value, null, 2));
   // Let the draft state commit before the apply handler reads it (UDW pattern).
   await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
   );
   await page.getByTestId(`inspector-json-field-apply-${path}`).click();
   // Let the apply commit to the document before the next interaction so the
   // dirty snapshot reflects this edit (avoids a clean-snapshot save race).
   await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
   );
 }
 
@@ -147,9 +151,12 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
   const uid = uniqueId('pdinsp');
   let pid = '';
 
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: ADMIN_STORAGE_STATE });
+    const ctx = await browser.newContext();
     const page = await ctx.newPage();
+    await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
 
     const resp = await page.request.post('/api/pages', {
       data: {
@@ -224,6 +231,10 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     await ctx.close();
   });
 
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  });
+
   test('A2: bpm-panel inspector — status/assignee/dueAt + actions JSON persist and reload', async ({
     page,
   }) => {
@@ -251,7 +262,9 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     await expect(page.getByTestId('inspector-field-props.status')).toHaveValue('pending');
     await expect(page.getByTestId('inspector-field-props.assignee')).toHaveValue(assignee);
     await expect(page.getByTestId('inspector-field-props.dueAt')).toHaveValue(dueAt);
-    await expect(page.getByTestId('inspector-field-props.actions')).toContainText('page_schema:approve');
+    await expect(page.getByTestId('inspector-field-props.actions')).toContainText(
+      'page_schema:approve',
+    );
 
     const persisted = await readPage(page, pid);
     const block = findBlockById(persisted.blocks, BPM_BLOCK);
@@ -268,9 +281,7 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
       { actor: `User ${uid}`, action: 'submitted', time: '2026-07-01 09:00' },
       { actor: `User ${uid}`, action: 'approved', time: '2026-07-02 14:30' },
     ];
-    const entries = [
-      { field: 'status', from: 'draft', to: 'pending', changedBy: `User ${uid}` },
-    ];
+    const entries = [{ field: 'status', from: 'draft', to: 'pending', changedBy: `User ${uid}` }];
     const timelineEmpty = `No activity ${uid}`;
     const historyEmpty = `No history ${uid}`;
 
@@ -345,7 +356,9 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     });
   });
 
-  test('A5: AI lock toggle → canvas badge appears → persisted props.aiLocked=true', async ({ page }) => {
+  test('A5: AI lock toggle → canvas badge appears → persisted props.aiLocked=true', async ({
+    page,
+  }) => {
     await openDesigner(page, pid);
     await selectBlock(page, BPM_BLOCK);
 
@@ -392,7 +405,10 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     // --- sad path first: invalid JSON shows an error and does not commit ---
     await propsEditor.fill('{ not valid json,,, }');
     await page.evaluate(
-      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
     );
     await page.getByTestId('inspector-json-apply-props').click();
     await expect(page.getByTestId('inspector-json-error-props')).toBeVisible({ timeout: 5_000 });
@@ -406,7 +422,10 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     // --- happy path: valid JSON applies, error clears, save persists ---
     await propsEditor.fill(JSON.stringify(validProps, null, 2));
     await page.evaluate(
-      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
     );
     await page.getByTestId('inspector-json-apply-props').click();
     await expect(page.getByTestId('inspector-json-error-props')).toHaveCount(0);
@@ -456,5 +475,13 @@ test.describe.serial('Unified Designer inspector authoring golden', () => {
     await expect(page.getByTestId('designer-leave-warning')).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+
+    // Explicit confirmation is the only path that may leave; it does not silently save the Mine.
+    await returnLink.click();
+    await page.getByTestId('designer-leave-confirm').click();
+    await expect(page).toHaveURL(new RegExp(`/p/page_schema(?:[?#].*)?$`));
+    await expect(page.getByTestId('unified-designer-workbench')).toHaveCount(0);
+    const afterLeave = await readPage(page, pid);
+    expect(findBlockById(afterLeave.blocks, SECTION_BLOCK)?.title).not.toBe(`Leave warning ${uid}`);
   });
 });

@@ -14,11 +14,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
+import {
+  PromotionDriftDecisionPanel,
+  type PromotionDrift,
+  type PromotionDriftDecision,
+} from '../../components/PromotionDriftDecisionPanel';
 
 // ---------- Types ----------
 
 interface EnvironmentLite {
-  id: number;
+  id: string;
   pid: string;
   code: string;
   name: string;
@@ -54,19 +59,20 @@ interface DryRunResult {
   valid: boolean;
   conflicts: Conflict[];
   missingDependencies: any[];
+  drifts?: PromotionDrift[];
 }
 
 interface PromotionResponse {
   pid: string;
-  sourceEnvId: number;
-  targetEnvId: number;
+  sourceEnvId: string;
+  targetEnvId: string;
   status: 'DRAFT' | 'VALIDATED' | 'APPLIED' | 'REJECTED' | 'FAILED';
   units: PromotionUnitView[];
   dryRunResult: DryRunResult | null;
   dryRunAt: string | null;
   createdAt: string;
   appliedAt: string | null;
-  appliedBy: number | null;
+  appliedBy: string | null;
   appliedReason: string | null;
   failureReason: string | null;
 }
@@ -107,8 +113,8 @@ export default function PromotionManagement() {
   const [showCreate, setShowCreate] = useState(false);
 
   // Create form state
-  const [formSourceEnvId, setFormSourceEnvId] = useState<number | null>(null);
-  const [formTargetEnvId, setFormTargetEnvId] = useState<number | null>(null);
+  const [formSourceEnvId, setFormSourceEnvId] = useState<string | null>(null);
+  const [formTargetEnvId, setFormTargetEnvId] = useState<string | null>(null);
   const [formPagePids, setFormPagePids] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -116,21 +122,12 @@ export default function PromotionManagement() {
   const [applyTarget, setApplyTarget] = useState<PromotionResponse | null>(null);
   const [applyReason, setApplyReason] = useState('');
   const [applySubmitting, setApplySubmitting] = useState(false);
-
-  const envByPid: Record<string, EnvironmentLite> = useMemo(
-    () => Object.fromEntries(environments.map((e) => [e.pid, e])),
-    [environments],
-  );
-  const envById: Record<number, EnvironmentLite & { id: number }> = useMemo(() => {
-    const m: any = {};
-    // We don't have id on the lite; we'll fetch with full env list via /api/admin/environments
-    return m;
-  }, []);
+  const [resolvingDriftUnitPid, setResolvingDriftUnitPid] = useState<string | null>(null);
 
   // Fetch envs (full)
   const fetchEnvs = useCallback(async () => {
     try {
-      const result = await fetchResult<Array<EnvironmentLite & { id?: number }>>(
+      const result = await fetchResult<EnvironmentLite[]>(
         '/api/admin/environments',
         { method: 'get' },
       );
@@ -257,6 +254,38 @@ export default function PromotionManagement() {
   const openApplyDialog = (p: PromotionResponse) => {
     setApplyTarget(p);
     setApplyReason('');
+  };
+
+  const handleResolveDrift = async (
+    promotionPid: string,
+    unitPid: string,
+    input: {
+      expectedFingerprint: string;
+      decision: PromotionDriftDecision;
+      reason: string;
+    },
+  ) => {
+    setResolvingDriftUnitPid(unitPid);
+    setError(null);
+    try {
+      const result = await fetchResult<PromotionResponse>(
+        `/api/admin/promotions/${promotionPid}/drifts/${unitPid}/decision`,
+        {
+          method: 'post',
+          params: input,
+          token: token ?? undefined,
+        },
+      );
+      if (!result.success) {
+        setError('Drift decision failed');
+        return;
+      }
+      await fetchPromotions();
+    } catch (caught: any) {
+      setError(caught?.message ?? 'Drift decision failed');
+    } finally {
+      setResolvingDriftUnitPid(null);
+    }
   };
 
   const handleApply = async () => {
@@ -475,6 +504,21 @@ export default function PromotionManagement() {
                 ))}
               </ul>
 
+              {selected.dryRunResult && (selected.dryRunResult.drifts?.length ?? 0) > 0 && (
+                <div className="mt-4 space-y-3" data-testid="promotion-drift-list">
+                  {selected.dryRunResult.drifts?.map((drift) => (
+                    <PromotionDriftDecisionPanel
+                      key={`${drift.unitPid}:${drift.fingerprint}`}
+                      drift={drift}
+                      submitting={resolvingDriftUnitPid === drift.unitPid}
+                      onResolve={(input) =>
+                        handleResolveDrift(selected.pid, drift.unitPid, input)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+
               {selected.dryRunResult && selected.dryRunResult.conflicts.length > 0 && (
                 <div className="mt-3">
                   <div className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
@@ -519,7 +563,7 @@ export default function PromotionManagement() {
                   <select
                     value={formSourceEnvId ?? ''}
                     onChange={(e) =>
-                      setFormSourceEnvId(e.target.value ? Number(e.target.value) : null)
+                      setFormSourceEnvId(e.target.value || null)
                     }
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     data-testid="promotion-create-source"
@@ -540,7 +584,7 @@ export default function PromotionManagement() {
                   <select
                     value={formTargetEnvId ?? ''}
                     onChange={(e) =>
-                      setFormTargetEnvId(e.target.value ? Number(e.target.value) : null)
+                      setFormTargetEnvId(e.target.value || null)
                     }
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     data-testid="promotion-create-target"
@@ -599,9 +643,15 @@ export default function PromotionManagement() {
           <div
             className="mx-4 w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-800"
             data-testid="promotion-apply-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="promotion-apply-title"
           >
             <div className="p-6">
-              <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <h2
+                id="promotion-apply-title"
+                className="mb-1 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
+              >
                 <ArrowUpCircleIcon className="h-5 w-5 text-green-600" />
                 Apply Promotion
               </h2>
@@ -610,10 +660,14 @@ export default function PromotionManagement() {
                 If the target is locked, four-eyes will be enforced server-side.
               </p>
 
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label
+                htmlFor="promotion-apply-reason"
+                className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
                 Reason {applyTarget.dryRunResult && applyTarget.dryRunResult.conflicts.length > 0 ? '(required for locked)' : '(optional)'}
               </label>
               <textarea
+                id="promotion-apply-reason"
                 value={applyReason}
                 onChange={(e) => setApplyReason(e.target.value)}
                 rows={3}

@@ -52,7 +52,7 @@ export function buildRequest(
   url: string;
   init: RequestInit;
 } {
-  const { method = 'get', params = {}, timeout, apiConfig, signal, keepalive } = options;
+  const { method = 'get', params = {}, timeout, apiConfig, signal, keepalive, headers } = options;
   const paramsAreArray = Array.isArray(params);
 
   // Step 1: Replace PathVariables and separate params
@@ -78,6 +78,7 @@ export function buildRequest(
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...headers,
     },
     credentials: 'include', // Send cookies to BFF server
   };

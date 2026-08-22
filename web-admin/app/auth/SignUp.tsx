@@ -13,13 +13,13 @@ import { createUserSession, getTokenFromRequest } from '~/shared/services/sessio
 import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
+import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 
-const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  if (!PUBLIC_REGISTRATION_ENABLED) {
+  const accessPolicy = await fetchAccessPolicy();
+  if (!isPublicRegistrationOpen(accessPolicy)) {
     return redirect('/login');
   }
   const token = await getTokenFromRequest(request);
@@ -30,7 +30,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  if (!PUBLIC_REGISTRATION_ENABLED) {
+  const accessPolicy = await fetchAccessPolicy();
+  if (!isPublicRegistrationOpen(accessPolicy)) {
     return {
       errors: { email: 'Self-registration is disabled', password: null, displayName: null },
       status: 403,
@@ -102,7 +103,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       request: request,
       token,
       remember: false,
-      redirectTo: '/tenant-selection',
+      // SINGLE is a product access policy over the retained tenant model. The
+      // backend has already admitted this user to the Default Business Tenant,
+      // so do not route through a tenant-selection page that the product does
+      // not expose. MULTI/HYBRID retain the existing onboarding journey.
+      redirectTo: accessPolicy.deploymentMode === 'single' ? '/' : '/tenant-selection',
     });
   }
 };

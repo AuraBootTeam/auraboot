@@ -8,10 +8,20 @@
  * 4. ✅ 权限信息实时从API获取（避免过期）
  */
 
-import { ResultHelper } from '~/utils/type';
+import { ErrorCodes } from '~/shared/services/http-client/types';
+import { ResultHelper, type User, type UserPermissions, type Preferences } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
-import type { User, UserPermissions, Preferences } from '~/utils/type';
+
+export class UserInfoUnavailableError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'UserInfoUnavailableError';
+    this.code = code;
+  }
+}
 
 /**
  * 从后端API获取用户完整信息（包括权限）
@@ -42,7 +52,13 @@ export async function fetchUserInfo(request: Request): Promise<{
     // 后端返回格式: { code: "0", data: { user: {...}, permissions: {...} } }
     if (!ResultHelper.isSuccess(result) || !result.data) {
       console.error('Invalid response from /api/auth/me:', result);
-      return null;
+      if (result.httpStatus === 401 || result.code === ErrorCodes.UNAUTHORIZED) {
+        return null;
+      }
+      throw new UserInfoUnavailableError(
+        result.code,
+        result.message || result.desc || 'Unable to resolve the authenticated user',
+      );
     }
 
     return {
@@ -54,8 +70,14 @@ export async function fetchUserInfo(request: Request): Promise<{
       preferences: result.data.preferences || null,
     };
   } catch (error) {
+    if (error instanceof UserInfoUnavailableError) {
+      throw error;
+    }
     console.error('Error fetching user info:', error);
-    return null;
+    throw new UserInfoUnavailableError(
+      ErrorCodes.NETWORK_ERROR,
+      error instanceof Error ? error.message : 'Unable to resolve the authenticated user',
+    );
   }
 }
 

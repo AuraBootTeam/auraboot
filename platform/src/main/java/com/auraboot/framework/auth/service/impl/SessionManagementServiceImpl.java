@@ -3,12 +3,14 @@ package com.auraboot.framework.auth.service.impl;
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.mapper.UserSessionMapper;
 import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.util.UlidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -28,6 +30,9 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 
     private final UserSessionMapper userSessionMapper;
 
+    @Autowired(required = false)
+    private JwtUtil jwtUtil;
+
     // Throttle map: tokenHash -> lastUpdateTime (avoid DB writes on every request)
     private final ConcurrentHashMap<String, Instant> lastActiveThrottle = new ConcurrentHashMap<>();
     private static final Duration THROTTLE_DURATION = Duration.ofMinutes(5);
@@ -39,6 +44,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         session.setPid(UlidGenerator.generate());
         session.setUserId(userId);
         session.setTokenHash(hashToken(token));
+        populateExecutionContext(session, token);
         session.setIpAddress(ipAddress);
         session.setUserAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent);
         session.setDeviceInfo(parseDeviceInfo(userAgent));
@@ -51,6 +57,23 @@ public class SessionManagementServiceImpl implements SessionManagementService {
             log.debug("Session already exists for token, skipping: {}", e.getMessage());
         }
         return session;
+    }
+
+    private void populateExecutionContext(UserSession session, String token) {
+        if (jwtUtil == null) {
+            session.setContextVersion(1L);
+            session.setSessionStage("onboarding");
+            return;
+        }
+        session.setApplicationId(jwtUtil.extractApplicationId(token));
+        session.setLoginChannelId(jwtUtil.extractLoginChannelId(token));
+        session.setTenantId(jwtUtil.extractTenantId(token));
+        session.setTenantMemberId(jwtUtil.extractMemberId(token));
+        session.setExecutionScope(jwtUtil.extractExecutionScope(token));
+        session.setActorPartyId(jwtUtil.extractActorPartyId(token));
+        session.setPartyMembershipId(jwtUtil.extractPartyMembershipId(token));
+        session.setSessionStage(jwtUtil.extractSessionStage(token));
+        session.setContextVersion(jwtUtil.extractContextVersion(token));
     }
 
     @Override

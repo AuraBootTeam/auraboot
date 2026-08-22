@@ -250,7 +250,21 @@ log "starting AuraBoot Postgres/Redis infra"
 log "starting AuraBoot backend on $BACKEND_URL"
 (
   cd "$PLATFORM_DIR"
-  SPRING_PROFILES_ACTIVE=dev \
+  ./gradlew --no-daemon :bootJar -x test
+)
+BOOT_JAR="$(find "$PLATFORM_DIR/build/libs" -maxdepth 1 -type f -name '*-boot.jar' -print 2>/dev/null \
+  | while IFS= read -r candidate; do
+      printf '%s\t%s\n' "$(stat -f '%m' "$candidate" 2>/dev/null || stat -c '%Y' "$candidate")" "$candidate"
+    done \
+  | sort -rn \
+  | awk -F'\t' 'NR == 1 { print $2; exit }')"
+[ -n "$BOOT_JAR" ] && [ -f "$BOOT_JAR" ] || {
+  log "bootJar build produced no executable artifact"
+  exit 1
+}
+(
+  cd "$PLATFORM_DIR"
+  exec env SPRING_PROFILES_ACTIVE=dev \
   DATABASE_URL="jdbc:postgresql://127.0.0.1:$AURA_PG_PORT/aura_boot?charSet=UTF8" \
   DATABASE_USERNAME=auraboot \
   DATABASE_PASSWORD=auraboot_dev \
@@ -265,7 +279,7 @@ log "starting AuraBoot backend on $BACKEND_URL"
   XXL_JOB_EXECUTOR_ADDRESS="http://host.docker.internal:$XXL_JOB_EXECUTOR_PORT" \
   XXL_JOB_EXECUTOR_PORT="$XXL_JOB_EXECUTOR_PORT" \
   MANAGEMENT_HEALTH_DISKSPACE_ENABLED=false \
-  ./gradlew :bootRun --no-daemon --args="--server.port=$AURA_BE_PORT --auraboot.bootstrap.enabled=false"
+  java -jar "$BOOT_JAR" --server.port="$AURA_BE_PORT" --auraboot.bootstrap.enabled=false
 ) >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 

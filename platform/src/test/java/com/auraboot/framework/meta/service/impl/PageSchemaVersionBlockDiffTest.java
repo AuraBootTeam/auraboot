@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -165,5 +164,26 @@ class PageSchemaVersionBlockDiffTest {
 
         Map<String, DifferenceType> paths = diffByPath(versionService.compareVersions(1L, 2L));
         assertThat(paths).containsEntry("blocks[a].title", DifferenceType.MODIFIED);
+    }
+
+    @Test
+    @DisplayName("reports block reorder as MOVED without add/remove noise")
+    void reportsBlockMove() {
+        PageSchemaHistory v1 = history(1L, List.of(
+                block("a", "field", "A"), block("b", "field", "B")));
+        PageSchemaHistory v2 = history(2L, List.of(
+                block("b", "field", "B"), block("a", "field", "A")));
+        stub(v1, v2);
+
+        PageSchemaVersionComparisonDTO result = versionService.compareVersions(1L, 2L);
+        Map<String, DifferenceType> paths = diffByPath(result);
+
+        assertThat(paths).containsEntry("blocks[a]", DifferenceType.MOVED)
+                .containsEntry("blocks[b]", DifferenceType.MOVED);
+        assertThat(result.getSummary().getMovedFields()).isEqualTo(2);
+        assertThat(result.getDifferences())
+                .filteredOn(diff -> diff.getFieldPath().startsWith("blocks["))
+                .noneMatch(diff -> diff.getType() == DifferenceType.ADDED
+                        || diff.getType() == DifferenceType.REMOVED);
     }
 }

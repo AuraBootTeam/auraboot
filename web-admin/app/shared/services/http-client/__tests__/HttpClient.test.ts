@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchResult, get, post, put, del, patch } from '../HttpClient';
+import {
+  activateAuthoringPreviewGuard,
+  AUTHORING_WRITE_BLOCKED_EVENT,
+  resetAuthoringPreviewGuardForTests,
+  withAuthoringPreviewContext,
+} from '../AuthoringPreviewGuard';
 
 // Mock session module to prevent SSR session resolution errors
 vi.mock('~/shared/services/session', () => ({
@@ -31,12 +37,78 @@ describe('HttpClient integration', () => {
   });
 
   afterEach(() => {
+    resetAuthoringPreviewGuardForTests();
     globalThis.fetch = originalFetch;
     window.sessionStorage.clear();
     window.localStorage.clear();
   });
 
   describe('fetchResult', () => {
+    it('blocks business writes during authoring preview but allows reads and authoring APIs', async () => {
+      mockFetchSuccess({ ok: true });
+      const blockedEvents = vi.fn();
+      window.addEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);
+      const deactivate = activateAuthoringPreviewGuard('session-1');
+
+      const command = await fetchResult('/api/meta/commands/execute/order:update', {
+        method: 'post',
+        params: { payload: { pid: 'record-1' } },
+      });
+      const mutation = await fetchResult('/api/dynamic/order/record-1', {
+        method: 'put',
+        params: { status: 'APPROVED' },
+      });
+
+      expect(command.code).toBe('authoring_preview_write_blocked');
+      expect(mutation.code).toBe('authoring_preview_write_blocked');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(blockedEvents).toHaveBeenCalledTimes(2);
+
+      await fetchResult('/api/dynamic/order/list');
+      await fetchResult('/api/authoring/sessions/session-1/handoffs', {
+        method: 'post',
+        params: { expectedRevision: 1 },
+      });
+      await fetchResult('/api/authoring/sessions/session-1/patches', {
+        method: 'patch',
+        params: { expectedRevision: 1 },
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+
+      deactivate();
+      window.removeEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);
+    });
+
+    it('binds command requests to the active authoring session for the backend guard', () => {
+      const deactivate = activateAuthoringPreviewGuard('session-owned-by-current-actor');
+      const commandOptions = withAuthoringPreviewContext(
+        '/api/meta/commands/execute/announcement:publish',
+        {
+          method: 'post',
+          params: {
+            payload: {},
+          },
+          headers: {
+            'X-Aura-Authoring-Session': 'caller-must-not-override-the-active-session',
+          },
+        },
+      );
+
+      expect(commandOptions.headers).toEqual({
+        'X-Aura-Authoring-Session': 'session-owned-by-current-actor',
+      });
+      expect(commandOptions.params).toEqual({ payload: {} });
+
+      deactivate();
+      const usageOptions = { method: 'post', params: { payload: {} } } as const;
+      expect(
+        withAuthoringPreviewContext(
+          '/api/meta/commands/execute/announcement:publish',
+          usageOptions,
+        ),
+      ).toBe(usageOptions);
+    });
+
     it('should make a GET request by default', async () => {
       mockFetchSuccess({ users: [] });
 
@@ -48,7 +120,7 @@ describe('HttpClient integration', () => {
 
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/users');
-      expect(init.method).toBe('get');
+      expect(init.method).toBe('GET');
     });
 
     it('should make a POST request with body', async () => {
@@ -61,7 +133,7 @@ describe('HttpClient integration', () => {
 
       expect(result.success).toBe(true);
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('post');
+      expect(init.method).toBe('POST');
       expect(init.body).toBe('{"name":"John"}');
     });
 
@@ -134,7 +206,7 @@ describe('HttpClient integration', () => {
 
       expect(result.success).toBe(true);
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('post');
+      expect(init.method).toBe('POST');
       expect(JSON.parse(init.body)).toEqual({ name: 'John' });
     });
   });
@@ -151,7 +223,7 @@ describe('HttpClient integration', () => {
       expect(result.success).toBe(true);
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/1');
-      expect(init.method).toBe('put');
+      expect(init.method).toBe('PUT');
       expect(JSON.parse(init.body)).toEqual({ name: 'Updated' });
     });
 
@@ -163,7 +235,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/dynamic/page_schema/batch');
       expect(url).not.toContain('?0=');
-      expect(init.method).toBe('put');
+      expect(init.method).toBe('PUT');
       expect(JSON.parse(init.body)).toEqual([{ pid: 'pid-1', name: 'Updated' }]);
     });
   });
@@ -177,7 +249,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/123');
       expect(url).toContain('reason=inactive');
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(init.body).toBeUndefined();
     });
 
@@ -187,7 +259,7 @@ describe('HttpClient integration', () => {
       await del('/api/user/{userId}', { userId: 123 });
 
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(init.body).toBeUndefined();
     });
 
@@ -199,7 +271,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/dynamic/page_schema/batch');
       expect(url).not.toContain('?0=');
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(JSON.parse(init.body)).toEqual(['pid-1', 'pid-2']);
     });
   });
@@ -216,7 +288,7 @@ describe('HttpClient integration', () => {
       expect(result.success).toBe(true);
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/1');
-      expect(init.method).toBe('patch');
+      expect(init.method).toBe('PATCH');
       expect(JSON.parse(init.body)).toEqual({ name: 'Patched' });
     });
   });

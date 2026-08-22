@@ -1,6 +1,6 @@
 [
   { "code": "crm_lpq_key", "displayName:zh-CN": "额度唯一键", "displayName:en": "Quota Key", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 240 }, "feature": { "readonly": true } },
-  { "code": "crm_lpq_pool_id", "displayName:zh-CN": "线索池", "displayName:en": "Lead Pool", "dataType": "reference", "referenceModelCode": "crm_lead_pool", "constraints": { "required": true }, "feature": { "readonly": true } },
+  { "code": "crm_lpq_pool_id", "displayName:zh-CN": "线索池", "displayName:en": "Lead Pool", "dataType": "reference", "referenceModelCode": "crm_lead_pool_common", "constraints": { "required": true }, "feature": { "readonly": true } },
   { "code": "crm_lpq_user_id", "displayName:zh-CN": "领取用户", "displayName:en": "Claim User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "constraints": { "required": true }, "feature": { "readonly": true } },
   { "code": "crm_lpq_local_date", "displayName:zh-CN": "领取日期", "displayName:en": "Claim Date", "dataType": "date", "constraints": { "required": true }, "feature": { "readonly": true } },
   { "code": "crm_lpq_pick_count", "displayName:zh-CN": "已领取数量", "displayName:en": "Picked Count", "dataType": "integer", "defaultValue": 0, "constraints": { "required": true }, "feature": { "readonly": true } },

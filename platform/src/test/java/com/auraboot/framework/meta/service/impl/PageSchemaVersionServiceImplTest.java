@@ -119,7 +119,9 @@ class PageSchemaVersionServiceImplTest {
             assertThat(result.getPagePid()).isEqualTo("test-page-pid");
             assertThat(result.getOperation()).isEqualTo("update");
             assertThat(result.getOperatorPid()).isEqualTo("test-user");
-            verify(pageSchemaHistoryMapper).insert(any(PageSchemaHistory.class));
+            assertThat(result.getDescription()).isEqualTo("测试更新");
+            verify(pageSchemaHistoryMapper).insert((PageSchemaHistory) argThat(
+                (PageSchemaHistory history) -> "测试更新".equals(history.getDescription())));
         }
 
         @Test
@@ -174,6 +176,7 @@ class PageSchemaVersionServiceImplTest {
         @DisplayName("成功获取版本历史列表")
         void testGetVersionHistory_Success() {
             // Given
+            testHistory.setDescription("上线前快照");
             List<PageSchemaHistory> histories = Arrays.asList(testHistory);
             when(pageSchemaHistoryMapper.findByPagePid("test-page-pid")).thenReturn(histories);
 
@@ -183,6 +186,7 @@ class PageSchemaVersionServiceImplTest {
             // Then
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getPagePid()).isEqualTo("test-page-pid");
+            assertThat(result.get(0).getDescription()).isEqualTo("上线前快照");
         }
 
         @Test

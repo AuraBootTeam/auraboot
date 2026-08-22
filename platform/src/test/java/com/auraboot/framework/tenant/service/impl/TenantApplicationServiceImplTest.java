@@ -10,6 +10,7 @@ import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dto.TenantRequest;
@@ -66,6 +67,7 @@ class TenantApplicationServiceImplTest {
     @Mock private AutoPermissionAssignmentService autoPermissionAssignmentService;
     @Mock private TenantBootstrapService tenantBootstrapService;
     @Mock private BuiltinPluginImportService builtinPluginImportService;
+    @Mock private SystemModeService systemModeService;
 
     @InjectMocks
     private TenantApplicationServiceImpl service;
@@ -159,6 +161,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("createTenantForUser rejects duplicate name")
     void createDuplicate() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
         when(tenantService.findByName("acme")).thenReturn(tenant(1L, "acme"));
         TenantSelectionRequest req = new TenantSelectionRequest();
         req.setTenantName("acme");
@@ -169,6 +172,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("createTenantForUser bootstraps tenant + assigns admin")
     void createForUserOk() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
         when(tenantService.findByName("acme")).thenReturn(null);
         Tenant created = tenant(99L, "acme");
         when(tenantService.createTenant(any(Tenant.class))).thenReturn(created);
@@ -197,6 +201,7 @@ class TenantApplicationServiceImplTest {
     @Test
     @DisplayName("createTenantForUser maps DuplicateKeyException to validation error")
     void createDuplicateKey() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
         when(tenantService.findByName("acme")).thenReturn(null);
         when(tenantService.createTenant(any(Tenant.class)))
                 .thenThrow(new org.springframework.dao.DuplicateKeyException("dup"));
@@ -209,6 +214,20 @@ class TenantApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("createTenantForUser enforces provisioning policy in the service layer")
+    void createPolicyDeniedInService() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(false);
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("blocked");
+
+        assertThrows(com.auraboot.framework.exception.RootUnCheckedException.class,
+                () -> service.createTenantForUser(req, user(7L, "u@x.com")));
+
+        verify(tenantService, never()).findByName(anyString());
+        verify(tenantService, never()).createTenant(any());
+    }
+
+    @Test
     @DisplayName("joinTenantByInviteCode error when invite not found")
     void joinInviteNotFound() {
         when(tenantInviteService.findByInvitationCode("c")).thenReturn(null);
@@ -217,6 +236,20 @@ class TenantApplicationServiceImplTest {
 
         TenantSelectionResponse resp = service.joinTenantByInviteCode(req, user(7L, "x"));
         assertEquals("error", resp.getStatus());
+        verify(tenantMemberService, never()).addMember(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("joinTenantByInviteCode enforces SINGLE policy in the service layer")
+    void joinPolicyDeniedInService() {
+        when(systemModeService.isSingleTenant()).thenReturn(true);
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setInviteCode("blocked");
+
+        assertThrows(com.auraboot.framework.exception.RootUnCheckedException.class,
+                () -> service.joinTenantByInviteCode(req, user(7L, "u@x.com")));
+
+        verify(tenantInviteService, never()).findByInvitationCode(anyString());
         verify(tenantMemberService, never()).addMember(any(), any(), any());
     }
 

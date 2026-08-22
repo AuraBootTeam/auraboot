@@ -33,6 +33,9 @@ public final class MetaPermission {
      */
     public static final String SYSTEM_MANAGEMENT = "system_management";
 
+    public static final String PARTY_READ = "party.party.read";
+    public static final String PARTY_MANAGE = "party.party.manage";
+
     // ==================== MODEL permissions ====================
 
     /**

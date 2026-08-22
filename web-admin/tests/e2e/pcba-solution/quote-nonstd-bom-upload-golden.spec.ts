@@ -1,4 +1,5 @@
 import type { Locator } from '@playwright/test';
+import path from 'node:path';
 import { test, expect } from '../../fixtures';
 import {
   createNonStandardBomWorkbook,
@@ -10,6 +11,7 @@ import {
   type CreatedRows,
   yunhanMockControlUrl,
 } from './quote-e2e-helpers';
+import { validateQuickCustomerBomWorkbook } from './quote-workbook-assertions';
 
 function parseSnapshot(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object') return value as Record<string, unknown>;
@@ -186,9 +188,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
               .every((row) => row.qo_pe_source_ref === 'yunhan:refresh'),
             capturedUsesUploadBomLane: evidence
               .filter((row) => ['captured', 'usd_review'].includes(String(row.qo_pe_status)))
-              .every(
-                (row) => String(parseSnapshot(row.qo_pe_snapshot).matchedBy) === 'upload_bom',
-              ),
+              .every((row) => String(parseSnapshot(row.qo_pe_snapshot).matchedBy) === 'upload_bom'),
             // The scenario reset clears the managed mock's request log before upload. Combined with
             // per-run unique MPNs, an observed upload-bom request proves this run crossed the real
             // protocol boundary instead of being satisfied by retained recent-cache evidence.
@@ -340,6 +340,34 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await testInfo.attach('nonstd-process-fee-0201-match.png', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
+    });
+
+    await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
+    await expect(reviewDrawer).toBeHidden({ timeout: 10_000 });
+    await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
+    const generateAction = page.getByTestId('workbench-action-generate_quote_excel');
+    await expect(generateAction).toBeVisible({ timeout: 20_000 });
+    const generateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/qo_quote_common:generate_document') &&
+        response.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+    const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
+    await generateAction.click();
+    const generateResponse = await generateResponsePromise;
+    const generateBody = await generateResponse.json().catch(() => ({}));
+    expect(
+      String((generateBody as any).code),
+      `generate_document response: ${JSON.stringify(generateBody).slice(0, 800)}`,
+    ).toBe('0');
+    const download = await downloadPromise;
+    const quoteWorkbookPath = path.join(testInfo.outputDir, 'nonstd-customer-bom-quote.xlsx');
+    await download.saveAs(quoteWorkbookPath);
+    validateQuickCustomerBomWorkbook(quoteWorkbookPath, mpnSuffix);
+    await testInfo.attach('nonstd-customer-bom-quote.xlsx', {
+      path: quoteWorkbookPath,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
     await expect(consoleIssues).toEqual([]);

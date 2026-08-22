@@ -49,6 +49,7 @@ function configuredCardGridClass(columns: number | undefined): string {
   if (columns === 2) return 'grid-cols-1 sm:grid-cols-2';
   if (columns === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
   if (columns === 4) return 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4';
+  if (columns === 5) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
   return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6';
 }
 
@@ -89,9 +90,8 @@ function mappedMetricValue(
     (metric?.valueType === 'currency' || metric?.format === 'currency') &&
     Number.isFinite(numericValue)
   ) {
-    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
-      ? precision
-      : 2;
+    const fractionDigits =
+      Number.isInteger(precision) && precision >= 0 && precision <= 20 ? precision : 2;
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: String(metric?.currencyCode || 'CNY').toUpperCase(),
@@ -133,6 +133,8 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   const record = readDataSourceRecord(runtime, dataSourceId);
   const metrics = Array.isArray((block as any).metrics) ? (block as any).metrics : [];
   const variant = (block as any).variant || 'cards';
+  const density = (block as any).density || 'default';
+  const compactCards = variant === 'cards' && density === 'compact';
   const configuredColumns = Number((block as any).columns);
   const cardColumns =
     Number.isFinite(configuredColumns) && configuredColumns > 0
@@ -254,26 +256,35 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
             });
           }}
           disabled={!clickable}
-          className={`rounded-card border-border bg-panel shadow-card h-28 overflow-hidden border p-4 text-left transition-shadow ${
+          aria-description={compactCards && displaySubText ? displaySubText : undefined}
+          className={`rounded-card border-border bg-panel shadow-card overflow-hidden border text-left transition-shadow ${
+            compactCards ? 'h-20 p-3' : 'h-28 p-4'
+          } ${
             active ? `ring-2 ring-offset-1 ${tk.ring}` : ''
           } ${clickable ? 'hover:shadow-pop cursor-pointer' : 'cursor-default'}`}
         >
           <div className="flex items-center gap-2">
             {showIcon && (
               <span
-                className={`rounded-control inline-flex h-7 w-7 flex-none items-center justify-center ${tk.iconBg} ${tk.icon}`}
+                className={`rounded-control inline-flex flex-none items-center justify-center ${
+                  compactCards ? 'h-6 w-6' : 'h-7 w-7'
+                } ${tk.iconBg} ${tk.icon}`}
                 aria-hidden="true"
               >
-                {resolveIcon(iconName, label, 16)}
+                {resolveIcon(iconName, label, compactCards ? 14 : 16)}
               </span>
             )}
             <div className="text-text-2 min-w-0 flex-1 truncate text-xs font-medium" title={label}>
               {label}
             </div>
           </div>
-          <div className="mt-2 flex min-w-0 items-baseline gap-1.5 overflow-hidden">
+          <div
+            className={`${compactCards ? 'mt-1' : 'mt-2'} flex min-w-0 items-baseline gap-1.5 overflow-hidden`}
+          >
             <span
-              className="text-text min-w-0 truncate text-2xl font-semibold tabular-nums"
+              className={`text-text min-w-0 truncate font-semibold tabular-nums ${
+                compactCards ? 'text-xl leading-6' : 'text-2xl'
+              }`}
               data-testid={`metric-strip-value-${key}`}
               title={displayValue}
             >
@@ -289,9 +300,11 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
               </span>
             )}
           </div>
-          {displaySubText && (
+          {displaySubText && !compactCards && (
             <div
-              className="text-text-3 mt-1 line-clamp-2 text-xs break-words"
+              className={`text-text-3 mt-0.5 text-xs break-words ${
+                compactCards ? 'truncate' : 'line-clamp-2'
+              }`}
               data-testid={`metric-strip-subtext-${key}`}
               title={displaySubText}
             >
@@ -303,7 +316,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
     });
 
   return (
-    <section data-testid={`metric-strip-${block.id || 'block'}`}>
+    <section data-testid={`metric-strip-${block.id || 'block'}`} data-density={density}>
       {title && <h3 className="text-text-2 mb-2 text-sm font-medium">{title}</h3>}
       <div
         className={

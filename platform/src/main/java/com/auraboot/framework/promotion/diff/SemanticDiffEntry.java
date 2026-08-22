@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SemanticDiffEntry {
 
-    public enum Op { ADD, MODIFY, DELETE }
+    public enum Op { ADD, MODIFY, DELETE, MOVE }
 
     /** Dotted path inside the source document. */
     private String path;

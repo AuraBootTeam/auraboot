@@ -770,7 +770,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // STRICT模式下，验证失败抛出异常
         if (mode == ValidationMode.STRICT && !result.getValid()) {
             throw new com.auraboot.framework.meta.exception.ValidationException(
-                "Validation failed: " + String.join(", ", result.getErrors()));
+                "Validation failed: " + String.join(", ", result.getErrors()), result);
         }
 
         return result;

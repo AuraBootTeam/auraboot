@@ -8,6 +8,8 @@ import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
+import { DynamicPageUnavailable } from '~/framework/meta/rendering/pages/DynamicPageUnavailable';
+import { resolveDynamicPageAccessError } from '~/shared/services/dynamic-page-access.server';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const { pageKey } = params;
@@ -17,7 +19,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   try {
     const token = await getTokenFromRequest(request);
-    return { tableName: pageKey, token };
+    const accessError = await resolveDynamicPageAccessError(request, token, pageKey);
+    return { tableName: pageKey, token, accessError };
   } catch (error) {
     console.error('Failed to load form schema:', error);
     if (error instanceof Response) {
@@ -28,6 +31,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicFormNew() {
-  const { tableName, token } = useLoaderData<typeof loader>();
+  const { tableName, token, accessError } = useLoaderData<typeof loader>();
+  if (accessError) {
+    return <DynamicPageUnavailable message={accessError} />;
+  }
   return <DynamicPageRenderer tableName={tableName} pageType="form" token={token} />;
 }

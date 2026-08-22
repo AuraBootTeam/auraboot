@@ -59,6 +59,7 @@ import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
+import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
@@ -120,6 +121,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
+  const accessPolicy = await fetchAccessPolicy();
   const token = await getTokenFromRequest(request);
 
   // Public runtime shells must never load admin user, permissions, or menus.
@@ -157,6 +159,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       icpCompliance,
       branding,
       buildIdentity,
+      accessPolicy,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -189,8 +192,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     fetchSpaces(),
   ]);
 
-  // Stale token guard: token exists but user resolution failed (e.g. DB reset)
-  // → clear session and redirect to login
+  // Authoritative auth rejection: fetchUserInfo returns null only for a 401.
+  // Transport, timeout and 5xx failures throw instead, preserving the valid session for retry.
   if (!user && !isPublicRoute(pathname)) {
     if (token) {
       const session = await getSessionFromRequest(request);
@@ -225,13 +228,15 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     i18n: i18nData,
     locale,
     initialTimezone: initialTimezone ?? undefined,
-    skipTenantPreferences: isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
+    skipTenantPreferences:
+      isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
     edition,
     spaces,
     bootstrapStatus,
     icpCompliance,
     branding,
     buildIdentity,
+    accessPolicy,
   };
 }
 
@@ -344,7 +349,10 @@ export default function App() {
     <RuntimeProfileProvider value={data.runtimeProfile}>
       <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
         <AppDirectionSync locale={data.locale} />
-        <TimezoneProvider initialTimezone={data.initialTimezone} skipTenantPreferences={data.skipTenantPreferences}>
+        <TimezoneProvider
+          initialTimezone={data.initialTimezone}
+          skipTenantPreferences={data.skipTenantPreferences}
+        >
           <ToastProvider>
             <ConfirmDialogProvider>
               {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}

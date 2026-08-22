@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
+import { canSelfProvisionTenant, fetchAccessPolicy } from '~/services/accessPolicy';
 
 interface UserSpace {
   tenantId: number;
@@ -34,19 +35,20 @@ interface UserSpace {
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const token = await getTokenFromRequest(request);
-  if (!token) return { spaces: [] };
+  const accessPolicy = await fetchAccessPolicy();
+  if (!token) return { spaces: [], accessPolicy };
 
   try {
     const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
     const resp = await fetch(`${apiUrl}/api/tenant-selection/my-spaces`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!resp.ok) return { spaces: [] };
+    if (!resp.ok) return { spaces: [], accessPolicy };
     const result = await resp.json();
-    return { spaces: (result.data || []) as UserSpace[] };
+    return { spaces: (result.data || []) as UserSpace[], accessPolicy };
   } catch (err) {
     console.error('[TenantSelection] my-spaces fetch failed', err);
-    return { spaces: [] };
+    return { spaces: [], accessPolicy };
   }
 };
 
@@ -71,6 +73,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const formData = await request.formData();
   const action = formData.get('action');
+  const accessPolicy = await fetchAccessPolicy();
+
+  if ((action === 'create' || action === 'join') && !canSelfProvisionTenant(accessPolicy)) {
+    return {
+      success: false,
+      error: 'Workspace self-service is disabled. Contact a platform administrator.',
+    };
+  }
 
   const requestData: any = { action };
 
@@ -150,11 +160,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function TenantSelection() {
   const [selectedAction, setSelectedAction] = useState<'create' | 'join' | null>(null);
   const actionData = useActionData<typeof action>();
-  const { spaces } = useLoaderData<typeof loader>() ?? { spaces: [] };
+  const { spaces, accessPolicy } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { t } = useI18n();
   const { formData, errors, handleInputChange } = useTenantForm();
   const hasExistingSpaces = spaces && spaces.length > 0;
+  const allowTenantSelfService = canSelfProvisionTenant(accessPolicy);
 
   const inviteCodeRef = useRef<HTMLInputElement>(null);
   // Track which action produced the error so stale errors don't leak across views
@@ -210,8 +221,12 @@ export default function TenantSelection() {
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-400">
                 {hasExistingSpaces
-                  ? 'Select a space to continue, or create a new one'
-                  : 'Create a new organization or join an existing team'}
+                  ? allowTenantSelfService
+                    ? 'Select a space to continue, or create a new one'
+                    : 'Select an authorized space to continue'
+                  : allowTenantSelfService
+                    ? 'Create a new organization or join an existing team'
+                    : 'Your account has no authorized workspace'}
               </p>
             </div>
 
@@ -259,28 +274,42 @@ export default function TenantSelection() {
                   </Form>
                 ))}
 
-                <div className="pt-4 text-center">
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    Or{' '}
-                    <button
-                      onClick={() => handleSwitchAction('create')}
-                      className="text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      create a new organization
-                    </button>
-                    {' / '}
-                    <button
-                      onClick={() => handleSwitchAction('join')}
-                      className="text-green-600 hover:underline dark:text-green-400"
-                    >
-                      join with invite code
-                    </button>
-                  </p>
-                </div>
+                {allowTenantSelfService && (
+                  <div className="pt-4 text-center">
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                      Or{' '}
+                      <button
+                        onClick={() => handleSwitchAction('create')}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        create a new organization
+                      </button>
+                      {' / '}
+                      <button
+                        onClick={() => handleSwitchAction('join')}
+                        className="text-green-600 hover:underline dark:text-green-400"
+                      >
+                        join with invite code
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {!selectedAction && !hasExistingSpaces ? (
+            {!selectedAction && !hasExistingSpaces && !allowTenantSelfService ? (
+              <div
+                data-testid="workspace-access-not-provisioned"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-800 dark:bg-amber-900/20"
+              >
+                <h2 className="mb-3 text-xl font-semibold text-gray-900 dark:text-white">
+                  Workspace access has not been provisioned
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Contact a platform administrator to activate your business workspace access.
+                </p>
+              </div>
+            ) : !selectedAction && !hasExistingSpaces ? (
               <div className="grid gap-8 md:grid-cols-2">
                 {/* 创建新租户选项 */}
                 <div
@@ -353,7 +382,11 @@ export default function TenantSelection() {
                         {t('tenant.select.create.title', undefined, '创建新租户')}
                       </h2>
                       <p className="text-gray-600 dark:text-gray-400">
-                        {t('tenant.select.create.formHint', undefined, '填写以下信息来创建您的组织')}
+                        {t(
+                          'tenant.select.create.formHint',
+                          undefined,
+                          '填写以下信息来创建您的组织',
+                        )}
                       </p>
                     </div>
 
@@ -404,10 +437,18 @@ export default function TenantSelection() {
                         type="text"
                         required
                         className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                        placeholder={t('tenant.select.join.inviteCodePlaceholder', undefined, '输入邀请码')}
+                        placeholder={t(
+                          'tenant.select.join.inviteCodePlaceholder',
+                          undefined,
+                          '输入邀请码',
+                        )}
                       />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t('tenant.select.join.inviteCodeHint', undefined, '请输入租户管理员提供的邀请码')}
+                        {t(
+                          'tenant.select.join.inviteCodeHint',
+                          undefined,
+                          '请输入租户管理员提供的邀请码',
+                        )}
                       </p>
                     </div>
 

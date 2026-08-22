@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_list",
   "name:zh-CN": "线索池设置",
   "name:en": "Lead Pool Settings",
-  "modelCode": "crm_lead_pool",
+  "modelCode": "crm_lead_pool_common",
   "kind": "list",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },

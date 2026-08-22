@@ -344,10 +344,9 @@ export async function rollbackPageToVersion(
  * (GET /api/pages/{pid}/versions/{fromHistoryId}/compare/{toHistoryId}).
  *
  * Returns the backend's {@link PageSchemaVersionComparisonDTO} verbatim — the
- * panel renders the differences exactly as the server computes them. The compare
- * is coarse-grained (top-level key diff: `blocks` is compared as one JSON blob,
- * not drilled into per-block), so the UI surfaces whatever the server returns
- * without re-deriving a finer diff client-side. A non-'0' code (e.g. a 403 from
+ * panel renders stable-id block/property differences and semantic MOVE entries
+ * exactly as the server computes them, without re-deriving policy-sensitive diff
+ * semantics client-side. A non-'0' code (e.g. a 403 from
  * missing page.page.read, or a 404 when a history id is unknown) is surfaced as
  * an error string rather than thrown, matching the other version helpers so the
  * panel can render inline feedback instead of crashing the workbench.

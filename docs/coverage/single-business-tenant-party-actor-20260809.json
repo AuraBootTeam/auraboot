@@ -1,0 +1,234 @@
+{
+  "run": {
+    "id": "single-business-tenant-party-actor-20260809",
+    "target": "SINGLE Business Tenant + Party Actor + federated identity foundation",
+    "runtime": "auraboot-party-actor-long",
+    "fix_rounds": 4
+  },
+  "groups": [
+    {
+      "id": "policy",
+      "title": "SINGLE product policies and admission",
+      "rows": [
+        {
+          "id": "policy.server-source",
+          "action": "Resolve registration, Tenant provisioning and Party creation policies on the server",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.config.service.impl.SystemModeServiceImplTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "SINGLE forces Tenant provisioning disabled and retains legacy registration compatibility without allowing it to weaken explicit policy",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "pure-logic", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.single-admission",
+          "action": "Admit an allowed identity into the server-owned Default Business Tenant",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.UserAdmissionServiceImplTest.xml"],
+          "assertion": "SINGLE creates/reuses the business TenantMember, rejects CLOSED registration and never selects System Tenant",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.tenant-entry",
+          "action": "Block create/join/select product entry in SINGLE while preserving MULTI self-service",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.controller.TenantSelectionControllerPolicyTest.xml", "web-admin/tests/e2e/auth/auth-complete.spec.ts", "web-admin/tests/e2e/auth/space-selection.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Direct API calls are rejected in SINGLE; registration, OTP and password login bypass Tenant selection; MULTI registration/login still enters the existing space-selection journey",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.tenant-service",
+          "action": "Enforce Tenant create and join policy below the controller boundary",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.service.impl.TenantApplicationServiceImplTest.xml"],
+          "assertion": "Service callers cannot create a Tenant when provisioning is disabled or join another Tenant in SINGLE mode",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        }
+      ]
+    },
+    {
+      "id": "schema-iam",
+      "title": "Complete Party and IAM data model",
+      "rows": [
+        {
+          "id": "schema.party-iam",
+          "action": "Migrate Party 12 tables, IAM 5 tables, role scope and session context fields",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml"],
+          "assertion": "Fresh PostgreSQL reaches migration v20260809120000 and model round-trips without schema drift",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "contract", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it"
+        },
+        {
+          "id": "schema.tenant-boundaries",
+          "action": "Keep Party persistence tenant-filtered with composite tenant foreign keys",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Party mapper observes current tenant and schema prevents cross-tenant membership/session references",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it"
+        },
+        {
+          "id": "iam.default-surface",
+          "action": "Resolve and repair the default LoginApplication/Channel/AuthMethod",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.bootstrap.BootstrapRepairServiceTenantBootstrapTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.TenantLoginChannelServiceImplTest.xml"],
+          "assertion": "Schema-snapshot first install receives separate Web/native default password surfaces; tenant toggles control built-in password/OTP methods while canonical registry controls federated IdP methods",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "iam.external-idp",
+          "action": "Manage external IdP instances and orchestrate OAuth/LDAP federation through the canonical registry",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809130000__federated_identity_channel_binding.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Management API, channel binding, canonical external links and runtime orchestration are active while legacy social paths remain compatible; a full visual IdP administration console is a non-goal",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "http"
+        }
+      ]
+    },
+    {
+      "id": "actor",
+      "title": "Party lifecycle, authorization and Actor session",
+      "rows": [
+        {
+          "id": "actor.create-approve",
+          "action": "Create a Party under approval policy and activate it",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyActorServiceImplTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Approval-required creates pending Party/Membership; approval makes the Actor eligible",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "actor.switch",
+          "action": "Switch to an active Party Actor",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyActorServiceImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Replacement session is minted before old revoke; new token is ready/party with cv increment, old token is rejected",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-release", "driver": "http"
+        },
+        {
+          "id": "actor.authorization",
+          "action": "Evaluate active membership, PARTY role, capability and resource ownership",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyAuthorizationServiceImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml"],
+          "assertion": "Only the selected active Actor contributes PARTY roles; capability remains distinct; cross-Party resource access is denied",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "actor.channel-capabilities",
+          "action": "Filter Actor candidates by the current application/channel Party capabilities",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.ActorCandidateResolverImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml"],
+          "assertion": "Only active Parties with an allowed capability are eligible; disabled, half-bound or cross-tenant channels fail closed; global channels remain valid",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-release", "driver": "it"
+        },
+        {
+          "id": "actor.extended-workflows",
+          "action": "Run generic invitation, capability approval, relation and business-network workflows",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Full model exists; general-purpose workflow/UI is intentionally deferred until a concrete domain needs it",
+          "verdict": "partial",
+          "verdict_by": "spec-assert",
+          "surface": "journey", "dependencies": "deployed", "authority": "recorded", "driver": "http"
+        }
+      ]
+    },
+    {
+      "id": "federated-identity",
+      "title": "Federated identity registry, OAuth/OIDC/WeChat/LDAP and native clients",
+      "rows": [
+        {
+          "id": "sso.registry-channel",
+          "action": "Resolve separate Web/mobile login applications, channels and IdP instances in SINGLE mode",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809130000__federated_identity_channel_binding.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Fresh PostgreSQL bootstrap repairs both surfaces; same provider code can be independently enabled per application and SINGLE tenant is server-owned",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "http"
+        },
+        {
+          "id": "sso.transaction",
+          "action": "Create and consume one-time state/nonce/PKCE transactions bound to Web cookies or native secrets",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Redis stores only the binding digest; wrong or missing binding and platform mismatch fail closed, consume the state, and cannot be replayed",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-release", "driver": "http"
+        },
+        {
+          "id": "sso.provider-contracts",
+          "action": "Run OIDC, WeChat Website, Apple Web and LDAP protocol/security contracts",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "OIDC URL/claim hardening, WeChat openid contract, Apple query-code callback and real TCP/JNDI LDAP immutable identity are executable and green",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "controlled-http", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "sso.web-journey",
+          "action": "Render a configured IdP, start OAuth, reject forged state, preserve password login and show authenticated binding UI",
+          "evidence": ["web-admin/tests/e2e/auth/social-oauth-callback.spec.ts", "web-admin/tests/e2e/auth/auth-complete.spec.ts", "web-admin/tests/e2e/personal/social-links.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Real browser reached Google authorize, rejects state mismatch before exchange, consumes state, blocks empty merge confirmation, routes SINGLE to the workspace and MULTI to Tenant selection, while authenticated binding remains executable",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "vision_check": "Inspected semantic DOM and rendered pixels for the login and social-binding pages on the PostgreSQL/Redis runtime",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "browser"
+        },
+        {
+          "id": "sso.external-canary",
+          "action": "Complete an external Google/OIDC and WeChat login with real provider credentials",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Official Google authorize is reachable with an intentionally invalid client, but Google/WeChat/WeCom/OIDC/Microsoft credentials are absent and the known runtime databases contain no OAuth CloudConfig credentials, so no real token exchange was performed",
+          "verdict": "partial", "verdict_by": "spec-assert",
+          "surface": "journey", "dependencies": "external", "authority": "recorded", "driver": "browser"
+        },
+        {
+          "id": "sso.native-physical",
+          "action": "Complete mobile-channel deep-link/state/native-binding login on iOS and Android physical devices",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Native unit tests pass (Android 39/39, iOS 4/4) and the dynamic OAuth UI passes against the real backend on an Android emulator 3/3 and iOS Simulator 3/3; Android has no physical device, while the paired iPhone build is blocked by its signing certificate and four provisioning profiles, so no physical install/login occurred",
+          "verdict": "partial", "verdict_by": "spec-assert",
+          "surface": "deployed-native", "dependencies": "physical-device", "authority": "blocking-release", "driver": "native"
+        }
+      ]
+    },
+    {
+      "id": "web-performance-trust",
+      "title": "Web journey, SQL performance and falsifiability",
+      "rows": [
+        {
+          "id": "web.actor-switch",
+          "action": "Log in to the unique business workspace and switch Business identity from the Header",
+          "evidence": ["web-admin/test-results/results.json", "docs/coverage/evidence/single-business-tenant-party-actor-login.jpg", "docs/coverage/evidence/single-business-tenant-party-actor-selected.jpg", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "No registration/Tenant self-service entry; Actor switch persists and current Actor is visibly selected; console has no errors",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Manually inspected login, /home, user menu, switch result and browser console in isolated runtime",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "browser"
+        },
+        {
+          "id": "performance.tenant-index",
+          "action": "Query Party by fixed tenant and lifecycle at realistic fixture cardinality",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "PostgreSQL uses idx_party_tenant_status; 20k-row transactional fixture is fully rolled back",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "recorded", "driver": "it"
+        },
+        {
+          "id": "trust.party-context-mutation",
+          "action": "Remove tenant/member context before Party revalidation, observe red, restore and rerun",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml"],
+          "assertion": "Controlled mutation fails the crown-jewel test and restored code passes targeted plus final combined suite",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "contract", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        }
+      ]
+    }
+  ]
+}

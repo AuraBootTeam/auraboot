@@ -7,17 +7,18 @@ import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.LoginRateLimiter;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.UserInfoService;
-import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.config.service.SystemModeService;
-import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.saas.constant.PartyCreationPolicy;
+import com.auraboot.framework.saas.constant.SystemMode;
+import com.auraboot.framework.saas.constant.TenantProvisioningPolicy;
+import com.auraboot.framework.saas.constant.UserRegistrationPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,15 +34,9 @@ class AuthControllerSelfServicePasswordTest {
     @Mock
     private UserInfoService userInfoService;
     @Mock
-    private UserService userService;
-    @Mock
     private PasswordManagementService passwordManagementService;
     @Mock
     private LoginRateLimiter loginRateLimiter;
-    @Mock
-    private JwtUtil jwtUtil;
-    @Mock
-    private UserDetailsService userDetailsService;
     @Mock
     private SystemModeService systemModeService;
 
@@ -87,15 +82,33 @@ class AuthControllerSelfServicePasswordTest {
         verify(authService, never()).register(request);
     }
 
+    @Test
+    void accessPolicy_exposesServerOwnedProductEntryPolicies() {
+        AuthController controller = controller(false);
+        ReflectionTestUtils.setField(controller, "systemModeService", systemModeService);
+        when(systemModeService.getMode()).thenReturn(SystemMode.SINGLE);
+        when(systemModeService.getUserRegistrationPolicy()).thenReturn(UserRegistrationPolicy.INVITE_ONLY);
+        when(systemModeService.getTenantProvisioningPolicy()).thenReturn(TenantProvisioningPolicy.DISABLED);
+        when(systemModeService.getPartyCreationPolicy()).thenReturn(PartyCreationPolicy.APPROVAL_REQUIRED);
+        when(systemModeService.isPartyInvitationEnabled()).thenReturn(true);
+        when(systemModeService.isActorSwitchEnabled()).thenReturn(true);
+
+        ApiResponse<?> response = controller.getAccessPolicy();
+
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("deploymentMode", "single");
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("userRegistrationPolicy", "invite_only");
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("tenantProvisioningPolicy", "disabled");
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("partyCreationPolicy", "approval_required");
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("partyInvitationEnabled", true);
+        assertThat(response.getData()).hasFieldOrPropertyWithValue("actorSwitchEnabled", true);
+    }
+
     private AuthController controller(boolean selfServiceEnabled) {
         AuthController controller = new AuthController(
                 authService,
                 userInfoService,
-                userService,
                 passwordManagementService,
-                loginRateLimiter,
-                jwtUtil,
-                userDetailsService);
+                loginRateLimiter);
         ReflectionTestUtils.setField(controller, "passwordSelfServiceEnabled", selfServiceEnabled);
         return controller;
     }

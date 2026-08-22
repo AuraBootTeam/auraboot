@@ -106,6 +106,7 @@ describe('executeFetch', () => {
     expect(result.code).toBe('35000');
     expect(result.success).toBe(false);
     expect(result.context).toEqual({ error: "Field 'wd_req_days' is required" });
+    expect(result.httpStatus).toBe(422);
   });
 
   it('should handle HTTP error with empty statusText', async () => {
@@ -122,13 +123,31 @@ describe('executeFetch', () => {
   });
 
   it('should handle network error', async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const transportError = Object.assign(new Error('connect ECONNREFUSED ::1:5362'), {
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5362,
+    });
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch', { cause: transportError }));
 
     const result = await executeFetch('http://invalid-host/api/test', { method: 'get' });
 
     expect(result.code).toBe(ErrorCodes.NETWORK_ERROR);
     expect(result.success).toBe(false);
     expect(result.desc).toContain('Failed to fetch');
+    expect(result.context).toEqual({
+      transportCause: {
+        name: 'Error',
+        message: 'connect ECONNREFUSED ::1:5362',
+        code: 'ECONNREFUSED',
+        syscall: 'connect',
+        address: '::1',
+        port: 5362,
+      },
+    });
   });
 
   it('should handle timeout error (AbortError)', async () => {
@@ -177,7 +196,7 @@ describe('executeFetch', () => {
     expect(result.success).toBe(false); // code !== '0'
   });
 
-  it('should pass init options to fetch', async () => {
+  it('should pass init options to fetch with an uppercase wire method', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ code: '0', desc: 'OK', data: null }),
@@ -193,6 +212,27 @@ describe('executeFetch', () => {
 
     await executeFetch('http://localhost:3500/api/test', init);
 
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3500/api/test', init);
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3500/api/test', {
+      ...init,
+      method: 'POST',
+    });
+  });
+
+  it('should normalize lowercase PATCH before it reaches the server', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ code: '0', desc: 'OK', data: null }),
+    });
+    globalThis.fetch = mockFetch;
+
+    await executeFetch('http://localhost:3500/api/authoring/sessions/session-1/patches', {
+      method: 'patch',
+      body: '{}',
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:3500/api/authoring/sessions/session-1/patches',
+      { method: 'PATCH', body: '{}' },
+    );
   });
 });

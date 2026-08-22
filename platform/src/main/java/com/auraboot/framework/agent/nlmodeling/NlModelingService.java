@@ -526,13 +526,14 @@ public class NlModelingService {
                 ### Permission Definition
                 ```json
                 {
-                  "code": "dynamic.<model_code>.read",
+                  "code": "model.<model_code>.read",
                   "name:zh-CN": "<Chinese name>",
                   "name:en": "<English name>",
                   "type": "dynamic",
                   "description": "Read access to <model>"
                 }
                 ```
+                - Dynamic-model permissions use model.<model_code>.<action>, matching DynamicController
                 - Permissions are auto-created when models are published, so you typically don't need to generate them
                 - Only generate explicit permissions if custom permission codes are needed for menus
 
@@ -550,7 +551,7 @@ public class NlModelingService {
                 3. Generate bilingual displayNames (zh-CN and en) for ALL resources
                 4. For ENUM fields, use a dictCode like "<model_code>_<field_code>" (the dict will be created separately)
                 5. Generate a parent menu (type=0) to group all child page menus
-                6. The permissions array can be empty — dynamic permissions are auto-created on model publish
+                6. The permissions array can be empty — model.* permissions are auto-created on model publish
                 7. ALWAYS emit the full operable set for EVERY model — these are REQUIRED, never optional:
                    - commands: a create, an update, and a delete command per model (type "create"/"update"/"delete",
                      modelCode set, inputFields listing the model's field codes; delete needs no inputFields).
@@ -775,9 +776,11 @@ public class NlModelingService {
         manifest.put("modelFieldBindings", bindings);
         List<Map<String, Object>> commands =
                 synthesizeCrudCommands(pluginCode, models, fields, res.getCommands());
+        NlModelingPermissionConformance.canonicalizeReferences(commands);
         manifest.put("commands", lowercaseStringKey(commands, "type"));
         List<Map<String, Object>> pages =
                 synthesizePages(pluginCode, models, fields, res.getPages());
+        NlModelingPermissionConformance.canonicalizeReferences(pages);
         conformPageModelContracts(pages, fields, bindings);
         List<Map<String, Object>> i18nResources = mutableI18nResources(res.getI18n());
         conformPageTextToI18n(pages, fields, i18nResources);
@@ -787,8 +790,10 @@ public class NlModelingService {
             PageConfigProvenance.tagGenerated(page);
         }
         manifest.put("pages", pages);
-        manifest.put("menus", deriveDynamicMenuPageKeys(
-                synthesizeMenus(models, res.getMenus())));
+        List<Map<String, Object>> menus = deriveDynamicMenuPageKeys(
+                synthesizeMenus(models, res.getMenus()));
+        NlModelingPermissionConformance.canonicalizeReferences(menus);
+        manifest.put("menus", menus);
         manifest.put("i18nResources", i18nResources);
         manifest.put("permissions", synthesizePermissions(models, res.getPermissions()));
         manifest.put("dicts", res.getDicts() != null ? res.getDicts() : List.of());
@@ -841,21 +846,19 @@ public class NlModelingService {
     }
 
     /**
-     * Synthesizes the standard dynamic CRUD permissions ({@code dynamic.<model>.{read,create,update,
-     * delete}}) for every generated model, preserving any explicit permissions the LLM already emitted
-     * and never duplicating an existing code.
+     * Synthesizes the canonical dynamic-model CRUD permissions
+     * ({@code model.<model>.{read,create,update,delete}}) for every generated model, preserving custom
+     * explicit permissions and never duplicating an existing code. Legacy LLM output using the obsolete
+     * {@code dynamic.<model>.<action>} prefix is normalized to {@code model.*} so menu/command/page
+     * references match {@code DynamicController}'s authorization contract.
      *
-     * <p>The system prompt biases the model to gate a child menu on {@code dynamic.<model>.read} (and a
-     * role/command may reference the sibling actions) while emitting an empty {@code permissions} list,
-     * because {@code dynamic.*} permissions are <em>not</em> auto-created on model publish. Without this,
-     * the menu&rarr;permission referential check in {@code PluginImportService.validateManifest} rejects
-     * the menu ("references missing permission: dynamic.&lt;model&gt;.read") and {@code apply()} fails
-     * before the page gate. Declaring the permissions in the manifest makes them exist at import time —
-     * an idempotent UPSERT under {@code ConflictStrategy.OVERWRITE} — so the references resolve.
+     * <p>Declaring the permissions in the manifest also lets
+     * {@code PluginImportService.validateManifest} resolve menu permission references before model
+     * publication has auto-created the same idempotent permission rows.
      *
      * @param models       generated models (each a map with a {@code code} key); may be null
      * @param permissions  explicit permissions the LLM emitted (preserved as-is); may be null
-     * @return the merged permission list: explicit permissions first, then synthesized dynamic perms
+     * @return the merged permission list: explicit permissions first, then synthesized model perms
      */
     static List<Map<String, Object>> synthesizePermissions(List<Map<String, Object>> models,
                                                            List<Map<String, Object>> permissions) {
@@ -866,10 +869,13 @@ public class NlModelingService {
                 if (p == null) {
                     continue;
                 }
-                result.add(p);
+                NlModelingPermissionConformance.canonicalizeDefinitionCode(p);
                 if (p.get("code") instanceof String code && !code.isBlank()) {
-                    seen.add(code);
+                    if (!seen.add(code)) {
+                        continue;
+                    }
                 }
+                result.add(p);
             }
         }
         if (models == null) {
@@ -884,7 +890,7 @@ public class NlModelingService {
             String label = model.get("displayName:zh-CN") instanceof String zh && !zh.isBlank()
                     ? zh : rawCode;
             for (String action : actions) {
-                String permCode = "dynamic." + modelCode + "." + action;
+                String permCode = "model." + modelCode + "." + action;
                 if (!seen.add(permCode)) {
                     continue;
                 }
@@ -1033,6 +1039,7 @@ public class NlModelingService {
         c.put("type", type);
         c.put("modelCode", modelCode);
         c.put("inputFields", new ArrayList<>(inputFields));
+        c.put("permissions", List.of("model." + modelCode + "." + type));
         return c;
     }
 
@@ -1823,64 +1830,7 @@ public class NlModelingService {
                 }
             }
         }
-        return new ArrayList<>(List.of(
-                listPage(pluginCode, model, fieldCodes),
-                formPage(pluginCode, model, fieldCodes, requiredCodes)));
-    }
-
-    private static Map<String, Object> listPage(String plugin, String model, List<String> fieldCodes) {
-        List<Map<String, Object>> columns = new ArrayList<>();
-        for (String fc : fieldCodes) {
-            columns.add(om("field", fc, "width", 160, "sortable", true));
-        }
-        columns.add(om("field", "actions", "isActionColumn", true, "label", "$i18n:common.actions",
-                "buttons", List.of(
-                        om("code", "edit", "action", "edit", "navigateTo", model + "_form",
-                                "label", "$i18n:common.button.edit"),
-                        om("code", "delete", "action", "delete", "danger", true,
-                                "commandCode", plugin + ":delete_" + model,
-                                "label", "$i18n:common.button.delete"))));
-        Map<String, Object> toolbar = om("id", model + "_toolbar", "blockType", "toolbar",
-                "area", "toolbar", "buttons", List.of(
-                        om("code", "create", "action", "create", "primary", true,
-                                "label", "$i18n:common.button.create")));
-        Map<String, Object> table = om("id", model + "_table", "blockType", "table",
-                "props", om("rowClickAction", "drawer"),
-                "columns", columns,
-                "searchFields", new ArrayList<>(fieldCodes),
-                "area", "main");
-        return om("pageKey", model + "_list",
-                "name:zh-CN", humanize(model) + " List", "name:en", humanize(model) + " List",
-                "kind", "list", "schemaVersion", 4, "modelCode", model,
-                "title", om("zh-CN", humanize(model) + " List", "en", humanize(model) + " List"),
-                "layout", om("type", "stack"),
-                "blocks", List.of(toolbar, table));
-    }
-
-    private static Map<String, Object> formPage(String plugin, String model, List<String> fieldCodes,
-                                                Set<String> requiredCodes) {
-        List<Map<String, Object>> formFields = new ArrayList<>();
-        for (String fc : fieldCodes) {
-            Map<String, Object> ff = om("field", fc, "colSpan", 6);
-            if (requiredCodes != null && requiredCodes.contains(fc)) {
-                ff.put("required", true);
-            }
-            formFields.add(ff);
-        }
-        Map<String, Object> section = om("id", "basic", "blockType", "form-section",
-                "title", om("zh-CN", "Basic Information", "en-US", "Basic Information"),
-                "fields", formFields, "area", "main");
-        Map<String, Object> buttons = om("id", "buttons", "blockType", "form-buttons", "area", "footer",
-                "buttons", List.of(
-                        om("code", "submit", "action", "save", "commandCode", plugin + ":create_" + model,
-                                "primary", true, "label", "$i18n:common.button.submit"),
-                        om("code", "cancel", "action", "cancel", "label", "$i18n:common.button.cancel")));
-        return om("pageKey", model + "_form",
-                "name:zh-CN", humanize(model) + " Form", "name:en", humanize(model) + " Form",
-                "kind", "form", "schemaVersion", 4, "modelCode", model,
-                "title", om("zh-CN", humanize(model) + " Form", "en", humanize(model) + " Form"),
-                "layout", om("type", "stack"),
-                "blocks", List.of(section, buttons));
+        return NlModelingDefaultPages.create(pluginCode, model, fieldCodes, requiredCodes);
     }
 
     /**
@@ -1903,6 +1853,7 @@ public class NlModelingService {
         return new ArrayList<>(List.of(om(
                 "code", "menu_" + model, "name:en", humanize(model), "icon", "table",
                 "type", 1, "visible", true,
+                "permissionCode", "model." + model + ".read",
                 "path", "/p/" + model)));
     }
 
@@ -1982,7 +1933,7 @@ public class NlModelingService {
                 ],
                 "menus": [
                   { "code": "nl_book_mgmt", "parentCode": null, "name:zh-CN": "图书管理", "name:en": "Book Management", "path": null, "component": null, "icon": "IconBook", "type": 0, "permissionCode": null, "orderNo": 100, "visible": true, "extension": { "platforms": ["web"] } },
-                  { "code": "nl_book_list", "parentCode": "nl_book_mgmt", "name:zh-CN": "图书列表", "name:en": "Book List", "path": "/p/book", "component": null, "icon": "IconList", "type": 1, "permissionCode": "dynamic.book.read", "orderNo": 10, "visible": true, "extension": { "platforms": ["web"] } }
+                  { "code": "nl_book_list", "parentCode": "nl_book_mgmt", "name:zh-CN": "图书列表", "name:en": "Book List", "path": "/p/book", "component": null, "icon": "IconList", "type": 1, "permissionCode": "model.book.read", "orderNo": 10, "visible": true, "extension": { "platforms": ["web"] } }
                 ],
                 "i18n": [
                   { "key": "model.book._meta.label", "zh-CN": "图书", "en-US": "Book", "source": "import", "refType": "model" },

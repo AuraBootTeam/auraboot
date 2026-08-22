@@ -105,6 +105,31 @@ describe('validateStructural plugin manifest schema', () => {
     expect(result.errorCount).toBe(0);
   });
 
+  it('accepts preserveInput for runtime-supported auto-set fields', () => {
+    const plugin = pluginWithManifest({
+      pluginId: 'preserve-input-contract',
+      namespace: 'preserve_input_contract',
+      version: '1.0.0',
+    });
+    plugin.resourceFiles.set('commands', [{
+      code: 'crm:create_activity',
+      modelCode: 'crm_activity_common',
+      type: 'create',
+      inputFields: ['crm_act_date'],
+      autoSetFields: {
+        crm_act_date: {
+          strategy: 'current_datetime',
+          preserveInput: true,
+        },
+      },
+    }]);
+
+    const result = validateStructural(plugin);
+
+    expect(result.messages.filter((message) => message.code === 'L1-RESOURCE')).toEqual([]);
+    expect(result.errorCount).toBe(0);
+  });
+
   it('accepts runtime command handler parameters and aggregate concurrency controls', () => {
     const plugin = pluginWithManifest({
       pluginId: 'runtime-command-contract',

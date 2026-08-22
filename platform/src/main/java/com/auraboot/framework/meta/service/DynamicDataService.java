@@ -70,6 +70,12 @@ public interface DynamicDataService {
                           Object expectedValue,
                           Object nextValue);
 
+    boolean compareAndSet(String modelCode,
+                          String recordId,
+                          String fieldCode,
+                          Object expectedValue,
+                          Map<String, Object> nextValues);
+
     /**
      * 删除数据
      * @param modelCode 模型编码

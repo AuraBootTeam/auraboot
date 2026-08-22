@@ -10,12 +10,9 @@ import { coreRoutes } from '../packages/core/route-manifest';
 const webRouteManifest = process.env.AURA_WEB_ROUTE_MANIFEST
   ? await import(/* @vite-ignore */ process.env.AURA_WEB_ROUTE_MANIFEST)
   : null;
-const ENTERPRISE_ROUTES: RouteConfigEntry[] =
-  webRouteManifest?.ENTERPRISE_ROUTES ?? [];
-const PLATFORM_ROUTES: RouteConfigEntry[] =
-  webRouteManifest?.PLATFORM_ROUTES ?? [];
-const PLATFORM_LAYOUT =
-  webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformLayout.tsx';
+const ENTERPRISE_ROUTES: RouteConfigEntry[] = webRouteManifest?.ENTERPRISE_ROUTES ?? [];
+const PLATFORM_ROUTES: RouteConfigEntry[] = webRouteManifest?.PLATFORM_ROUTES ?? [];
+const PLATFORM_LAYOUT = webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformLayout.tsx';
 
 // OSS build: core routes only. A private build-time route manifest contributes
 // enterpriseRoutes() + platformRoutes() + the PlatformLayout wrapper.
@@ -24,6 +21,7 @@ export default [
   // API routes (always)
   route('/api/address-data', './routes/api.address-data.tsx'),
   route('/_action/switch-space', './routes/api.switch-space.tsx'),
+  route('/_action/switch-actor', './routes/api.switch-actor.tsx'),
 
   // Setup wizard (standalone, no layout wrapper, no auth required)
   route('/setup', './routes/setup/SetupWizard.tsx'),
@@ -62,9 +60,7 @@ export default [
   layout('./routes/DefaultLayout.tsx', [
     index('./routes/_index.tsx'),
     ...ENTERPRISE_ROUTES,
-    ...(PLATFORM_ROUTES.length > 0
-      ? [layout(PLATFORM_LAYOUT, PLATFORM_ROUTES)]
-      : []),
+    ...(PLATFORM_ROUTES.length > 0 ? [layout(PLATFORM_LAYOUT, PLATFORM_ROUTES)] : []),
     ...coreRoutes(),
   ]),
 

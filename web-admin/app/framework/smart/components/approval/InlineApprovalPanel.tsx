@@ -15,7 +15,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { get, ErrorCodes } from '~/shared/services/http-client';
 import { ApprovalChainPanel } from '~/plugins/core-bpm/components/ApprovalChainPanel';
 
@@ -92,14 +91,12 @@ export function InlineApprovalPanel({ recordPid, className }: InlineApprovalPane
     };
   }, [recordPid]);
 
-  // While still checking, show a subtle loading indicator
+  // This is an optional, below-content enhancement. A temporary loading row
+  // changes the page scroll extent and can move the user's current context when
+  // the lookup resolves with no process, so keep the layout stable until there
+  // is an approval panel to render.
   if (!checked || loading) {
-    return (
-      <div className="flex items-center justify-center py-4 text-sm text-gray-400">
-        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-        Checking approval status...
-      </div>
-    );
+    return null;
   }
 
   // No approval process associated with this record

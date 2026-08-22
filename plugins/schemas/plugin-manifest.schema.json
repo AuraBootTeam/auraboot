@@ -1126,6 +1126,10 @@
               "pattern": {
                 "type": "string",
                 "description": "Generation pattern"
+              },
+              "preserveInput": {
+                "type": "boolean",
+                "description": "Keep an explicit input value instead of overwriting it with the generated value"
               }
             },
             "additionalProperties": false

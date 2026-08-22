@@ -1,5 +1,5 @@
 {
-  "pageKey": "crm_lead_capacity_list", "name:zh-CN": "线索库容", "name:en": "Lead Capacity", "modelCode": "crm_lead_capacity", "kind": "list", "schemaVersion": 4,
+  "pageKey": "crm_lead_capacity_list", "name:zh-CN": "线索库容", "name:en": "Lead Capacity", "modelCode": "crm_lead_capacity_common", "kind": "list", "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },
   "blocks": [
     { "id": "toolbar", "blockType": "toolbar", "buttons": [ { "code": "create", "primary": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.create", "action": { "type": "navigate", "to": "crm_lead_capacity_form" } } ] },

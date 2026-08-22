@@ -44,6 +44,8 @@ public class Promotion {
     private Date dryRunAt;
 
     private String failureReason;
+    private String parentPromotionPid;
+    private String originDriftDecisionPid;
 
     // Terminal-state audit columns. Service must write these atomically with the status flip.
     private Date appliedAt;

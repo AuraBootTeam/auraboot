@@ -122,7 +122,7 @@
     "displayName:zh-CN": "最近线索池",
     "displayName:en": "Last Lead Pool",
     "dataType": "reference",
-    "referenceModelCode": "crm_lead_pool",
+    "referenceModelCode": "crm_lead_pool_common",
     "feature": { "readonly": true, "searchable": true }
   },
   {

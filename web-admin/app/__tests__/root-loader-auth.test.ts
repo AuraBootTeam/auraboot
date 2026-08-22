@@ -130,6 +130,34 @@ describe('root loader authentication guard', () => {
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
   });
 
+  it('does not destroy an authenticated session when user resolution is temporarily unavailable', async () => {
+    mocks.getTokenFromRequest.mockResolvedValue('still-valid-token');
+    mocks.getUserInfo.mockRejectedValue(new Error('Network error: fetch failed'));
+
+    const { loader } = await import('~/root');
+
+    await expect(
+      loader({ request: new Request('http://localhost/p/inv_fg_pack_rule/edit/record-1') } as any),
+    ).rejects.toThrow('Network error: fetch failed');
+    expect(mocks.destroySession).not.toHaveBeenCalled();
+  });
+
+  it('destroys an authenticated session only after an authoritative auth rejection', async () => {
+    mocks.getTokenFromRequest.mockResolvedValue('invalid-token');
+    mocks.getUserInfo.mockResolvedValue({ user: null, permissions: null, preferences: null });
+    mocks.destroySession.mockResolvedValue('__session=; Max-Age=0');
+
+    const { loader } = await import('~/root');
+    const result = await loader({
+      request: new Request('http://localhost/p/inv_fg_pack_rule/edit/record-1'),
+    } as any);
+
+    expect(result).toMatchObject({
+      url: '/login?redirectTo=%2Fp%2Finv_fg_pack_rule%2Fedit%2Frecord-1',
+    });
+    expect(mocks.destroySession).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps anonymous public routes available without user or menu fetches', async () => {
     mocks.getTokenFromRequest.mockResolvedValue(null);
 

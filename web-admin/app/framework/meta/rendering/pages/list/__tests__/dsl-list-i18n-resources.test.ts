@@ -110,6 +110,23 @@ const REQUIRED_COMMON_KEYS = [
   'saved_view_save_current',
   'saved_view_save_as_personal',
   'saved_view_current_saved',
+  'saved_view_overlay_rebased_title',
+  'saved_view_overlay_rebased_description',
+  'saved_view_overlay_stale_title',
+  'saved_view_overlay_stale_description_prefix',
+  'saved_view_overlay_stale_description_suffix',
+  'saved_view_overlay_affected_some',
+  'saved_view_overlay_mandatory_restored',
+  'saved_view_overlay_repairing',
+  'saved_view_overlay_repair',
+  'saved_view_overlay_read_only',
+  'saved_view_overlay_pending_draft',
+  'saved_view_overlay_repair_success',
+  'saved_view_overlay_repair_failed',
+  'saved_view_mandatory',
+  'saved_view_mandatory_field_reason',
+  'saved_view_mandatory_action_reason',
+  'saved_view_mandatory_column',
   'saved_view_save_filters',
   'saved_view_personal_quota',
   'saved_view_personal_quota_reached',
@@ -215,6 +232,10 @@ const REQUIRED_COMMON_KEYS = [
   'cancel',
 ];
 
+const REQUIRED_BILINGUAL_SAVED_VIEW_KEYS = REQUIRED_COMMON_KEYS.filter(
+  (key) => key.startsWith('saved_view_overlay_') || key.startsWith('saved_view_mandatory'),
+);
+
 const REQUIRED_JSON_EDITOR_KEYS = [
   'common.json_editor.valid',
   'common.json_editor.invalid',
@@ -285,6 +306,15 @@ describe('DSL list page i18n zh-CN yaml resource', () => {
       true,
     );
   });
+
+  it.each(REQUIRED_BILINGUAL_SAVED_VIEW_KEYS)(
+    'en-US yaml defines common.%s without Chinese fallback leakage',
+    (key) => {
+      const value = readFlattenedCommonBlock(EN_US_YAML)[`common.${key}`];
+      expect(value, `common.${key} must be defined for English runtime`).toBeDefined();
+      expect(/[\u4e00-\u9fa5]/.test(value), `common.${key} must not leak Chinese`).toBe(false);
+    },
+  );
 
   it.each(REQUIRED_JSON_EDITOR_KEYS)('%s exists in zh-CN and en-US yaml fallbacks', (key) => {
     expect(readFlattenedCommonBlock(ZH_CN_YAML)[key]).toBeDefined();

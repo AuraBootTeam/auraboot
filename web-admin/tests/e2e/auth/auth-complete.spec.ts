@@ -183,15 +183,26 @@ async function detectSelfRegistrationStatus(
   if (isSelfRegistrationDisabled(body)) {
     return 'disabled';
   }
-  expect(response.ok(), `Unexpected self-registration probe response: ${JSON.stringify(body)}`).toBe(
-    true,
-  );
+  expect(
+    response.ok(),
+    `Unexpected self-registration probe response: ${JSON.stringify(body)}`,
+  ).toBe(true);
   return 'enabled';
 }
 
 async function getLoginChannels(request: APIRequestContext): Promise<string[]> {
   const res = await request.get('/api/auth/login/channels');
   return res.ok() ? ((await res.json())?.data ?? []) : [];
+}
+
+async function getDeploymentMode(
+  request: APIRequestContext,
+): Promise<'single' | 'multi' | 'hybrid'> {
+  const response = await request.get('/api/auth/access-policy');
+  expect(response.ok(), 'Access policy must be available to the public login surface').toBe(true);
+  const mode = (await response.json())?.data?.deploymentMode;
+  expect(mode).toMatch(/^(single|multi|hybrid)$/);
+  return mode;
 }
 
 async function openEmailCodeLogin(page: Page): Promise<void> {
@@ -239,7 +250,10 @@ test.describe('Registration Flow', () => {
   });
 
   test.beforeEach(() => {
-    test.skip(!selfRegistrationEnabled, 'Registration form validation requires self-registration enabled');
+    test.skip(
+      !selfRegistrationEnabled,
+      'Registration form validation requires self-registration enabled',
+    );
   });
 
   test('REG-001: should display signup form with email, displayName, password fields', async ({
@@ -311,8 +325,12 @@ test.describe('Registration Flow — Self-registration enabled', () => {
     test.skip(!selfRegistrationEnabled, 'Self-registration enabled scenario is not active');
   });
 
-  test('REG-005: should register successfully and redirect @smoke', async ({ page }) => {
+  test('REG-005: should register into the deployment-mode-appropriate journey @smoke', async ({
+    page,
+    request,
+  }) => {
     test.setTimeout(30000);
+    const deploymentMode = await getDeploymentMode(request);
 
     await page.goto('/signup');
 
@@ -322,25 +340,24 @@ test.describe('Registration Flow — Self-registration enabled', () => {
 
     await page.locator('button:has-text("创建账号")').click();
 
-    // Should redirect to tenant-selection (new user without tenant)
-    // or /home (if user was previously registered and already has a tenant).
-    await page.waitForURL(
-      (url) => {
-        const path = url.toString();
-        return path.includes('tenant-selection') || path.includes('/home');
-      },
-      { timeout: 20000 },
-    );
-    const currentUrl = page.url();
-    expect(currentUrl.includes('tenant-selection') || currentUrl.includes('/home')).toBe(true);
+    if (deploymentMode === 'single') {
+      await page.waitForURL(
+        (url) => !url.pathname.includes('tenant-selection') && !url.pathname.includes('/login'),
+        { timeout: 20000 },
+      );
+      expect(new URL(page.url()).pathname).not.toContain('tenant-selection');
+    } else {
+      await page.waitForURL(/tenant-selection/, { timeout: 20000 });
+    }
   });
 
   test('REG-006: should reject duplicate email registration', async ({ page }) => {
     const duplicateEmail = `${uniqueId('dup').toLowerCase()}@e2e-test.local`;
     const first = await postRegistrationAttempt(page.request, duplicateEmail, 'Duplicate Seed');
-    expect(first.response.ok(), `Duplicate seed registration failed: ${JSON.stringify(first.body)}`).toBe(
-      true,
-    );
+    expect(
+      first.response.ok(),
+      `Duplicate seed registration failed: ${JSON.stringify(first.body)}`,
+    ).toBe(true);
 
     await page.goto('/signup');
     await page.locator('input#email').fill(duplicateEmail);
@@ -368,7 +385,10 @@ test.describe('Registration Policy — Self-registration disabled', () => {
     const email = `${uniqueId('disabled-reg').toLowerCase()}@e2e-test.local`;
     const { body } = await postRegistrationAttempt(request, email, 'Disabled Registration Probe');
 
-    test.skip(!isSelfRegistrationDisabled(body), 'Self-registration is enabled in this environment');
+    test.skip(
+      !isSelfRegistrationDisabled(body),
+      'Self-registration is enabled in this environment',
+    );
     expect(JSON.stringify(body)).toMatch(/Self-registration is disabled|single-tenant/i);
   });
 
@@ -444,7 +464,9 @@ test.describe('Login — Email/Password', () => {
     await expect(page).toHaveURL(/signup/);
   });
 
-  test('LN-007: should hide forgot password link when passwords are admin-managed', async ({ page }) => {
+  test('LN-007: should hide forgot password link when passwords are admin-managed', async ({
+    page,
+  }) => {
     await page.goto('/login');
     const forgotLink = page.locator('a[href*="forgot-password"]').first();
     await expect(forgotLink).toHaveCount(0);
@@ -549,6 +571,7 @@ test.describe('Login — Email OTP', () => {
       'Email OTP auto-registration requires self-registration enabled',
     );
     test.setTimeout(30000);
+    const deploymentMode = await getDeploymentMode(request);
 
     const newEmail = `otp-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
 
@@ -563,8 +586,15 @@ test.describe('Login — Email OTP', () => {
     await expect(codeInput).toHaveValue(code!, { timeout: 3000 });
     await page.locator('form[action="/login"] button[type="submit"]').click();
 
-    // New user → should go to tenant-selection (no tenant yet), or /home if auto-assigned
-    await page.waitForURL(/tenant-selection|\/home/, { timeout: 20000 });
+    if (deploymentMode === 'single') {
+      await page.waitForURL(
+        (url) => !url.pathname.includes('tenant-selection') && !url.pathname.includes('/login'),
+        { timeout: 20000 },
+      );
+      expect(new URL(page.url()).pathname).not.toContain('tenant-selection');
+    } else {
+      await page.waitForURL(/tenant-selection/, { timeout: 20000 });
+    }
   });
 
   test('OTP-005: should reject new-user email OTP when self-registration is disabled', async ({
@@ -586,7 +616,10 @@ test.describe('Login — Email OTP', () => {
     await sendEmailLoginCode(page, newEmail);
 
     const code = await waitForDevVerifyCode(request, newEmail);
-    expect(code, 'Verification code should be retrievable for disabled-registration probe').toBeTruthy();
+    expect(
+      code,
+      'Verification code should be retrievable for disabled-registration probe',
+    ).toBeTruthy();
 
     await page.locator('#ec-code').fill(code!);
     await page.locator('form[action="/login"] button[type="submit"]').click();
@@ -850,10 +883,7 @@ test.describe('Logout Flow', () => {
     if (/\/logout([?#].*)?$/.test(page.url())) {
       const confirmButton = page.getByRole('button', { name: /确认退出|Log Out/i });
       await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
-      await Promise.all([
-        page.waitForURL(/login/, { timeout: 15000 }),
-        confirmButton.click(),
-      ]);
+      await Promise.all([page.waitForURL(/login/, { timeout: 15000 }), confirmButton.click()]);
     }
 
     // After Form POST, should redirect to /login (increase timeout for batch runs)
@@ -1005,10 +1035,7 @@ test.describe('Tenant Selection', () => {
 // ===========================================================================
 
 test.describe('Invitation Flow', () => {
-  async function generateInviteCode(
-    request: APIRequestContext,
-    expiryDays = '3',
-  ): Promise<string> {
+  async function generateInviteCode(request: APIRequestContext, expiryDays = '3'): Promise<string> {
     const res = await request.post('/api/tenant/invite-code/generate', {
       params: { expiryDays },
     });

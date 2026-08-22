@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.config;
 
 import com.auraboot.framework.application.security.AdminRoleInterceptor;
+import com.auraboot.framework.authoring.workspace.AuthoringBusinessWriteInterceptor;
 import com.auraboot.framework.environment.web.EnvironmentResolverInterceptor;
 import com.auraboot.framework.permission.interceptor.PermissionInterceptor;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
@@ -20,6 +21,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * 
  * <p>Registered Interceptors:
  * <ul>
+ *   <li>{@link EnvironmentResolverInterceptor} - Environment context resolution</li>
+ *   <li>{@link AuthoringBusinessWriteInterceptor} - Contextual-authoring business-write denial</li>
  *   <li>{@link PermissionInterceptor} - Permission-based access control</li>
  * </ul>
  * 
@@ -43,11 +46,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final PermissionInterceptor permissionInterceptor;
     private final AdminRoleInterceptor adminRoleInterceptor;
     private final EnvironmentResolverInterceptor environmentResolverInterceptor;
+    private final AuthoringBusinessWriteInterceptor authoringBusinessWriteInterceptor;
     
     /**
      * Add interceptors to the registry
      * 
-     * <p>Permission Interceptor Configuration:
+     * <p>API Interceptor Configuration:
      * <ul>
      *   <li>Path Pattern: /api/**</li>
      *   <li>Exclude Patterns:
@@ -69,7 +73,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // otherwise a non-admin caller would get a confusing 1/AccessDenied
         // from the permission evaluator instead of the canonical 409 envelope.
         registry.addInterceptor(adminRoleInterceptor)
-            .addPathPatterns("/api/admin/**");
+                .addPathPatterns("/api/admin/**");
         log.info("AdminRoleInterceptor registered for /api/admin/**");
 
         // env-layering: resolve env from ?env / X-Environment header BEFORE PermissionInterceptor.
@@ -81,22 +85,31 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // decisions cross-env -- a latent leak with no test coverage. Reorder closes the gap
         // proactively before the @EnvScoped set grows. (Slice 1 review P1-3, 2026-05-07.)
         registry.addInterceptor(environmentResolverInterceptor)
-            .addPathPatterns("/api/**")
-            .excludePathPatterns(
-                "/api/auth/**",
-                "/api/public/**",
-                "/actuator/**"
-            );
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/**",
+                        "/api/public/**",
+                        "/actuator/**"
+                );
         log.info("EnvironmentResolverInterceptor registered for /api/**");
+
+        registry.addInterceptor(authoringBusinessWriteInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/**",
+                        "/api/public/**",
+                        "/actuator/**"
+                );
+        log.info("AuthoringBusinessWriteInterceptor registered for /api/**");
 
         log.info("Registering PermissionInterceptor");
         registry.addInterceptor(permissionInterceptor)
-            .addPathPatterns("/api/**")
-            .excludePathPatterns(
-                "/api/auth/**",      // Authentication endpoints (login, signup, etc.)
-                "/api/public/**",    // Public endpoints (no authentication required)
-                "/actuator/**"       // Actuator endpoints (health, metrics, etc.)
-            );
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/**",      // Authentication endpoints (login, signup, etc.)
+                        "/api/public/**",    // Public endpoints (no authentication required)
+                        "/actuator/**"       // Actuator endpoints (health, metrics, etc.)
+                );
         log.info("PermissionInterceptor registered successfully");
     }
 

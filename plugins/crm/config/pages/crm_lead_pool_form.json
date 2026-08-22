@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_form",
   "name:zh-CN": "线索池策略",
   "name:en": "Lead Pool Policy",
-  "modelCode": "crm_lead_pool",
+  "modelCode": "crm_lead_pool_common",
   "kind": "form",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
@@ -18,10 +18,11 @@
       { "field": "crm_lp_new_cooldown_days", "colSpan": 4, "required": true },
       { "field": "crm_lp_previous_owner_cooldown_days", "colSpan": 4, "required": true }
     ] },
-    { "id": "recycle_policy", "blockType": "form-section", "title": { "zh-CN": "自动回收规则", "en": "Automatic Recycle Policy" }, "fields": [
-      { "field": "crm_lp_auto_recycle", "colSpan": 4, "required": true },
-      { "field": "crm_lp_recycle_after_days", "colSpan": 4 },
-      { "field": "crm_lp_recycle_basis", "colSpan": 4 }
+    { "id": "recycle_policy", "blockType": "form-section", "title": { "zh-CN": "自动回收规则", "en": "Automatic Recycle Policy" }, "description": { "zh-CN": "开启后优先使用独立回收条件；未配置条件时使用兼容回收天数与口径。", "en": "When enabled, composed recycle conditions take precedence; pools without conditions use the compatible day/basis policy." }, "fields": [
+      { "field": "crm_lp_auto_recycle", "colSpan": 3, "required": true },
+      { "field": "crm_lp_recycle_match_mode", "colSpan": 3, "required": true, "defaultValue": "all", "visibleWhen": "record.crm_lp_auto_recycle === true" },
+      { "field": "crm_lp_recycle_after_days", "colSpan": 4, "visibleWhen": "record.crm_lp_auto_recycle === true" },
+      { "field": "crm_lp_recycle_basis", "colSpan": 2, "visibleWhen": "record.crm_lp_auto_recycle === true" }
     ] },
     { "id": "buttons", "blockType": "form-buttons", "buttons": [
       { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } },

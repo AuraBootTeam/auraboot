@@ -8,7 +8,7 @@
 /**
  * View scope determines visibility and access permissions
  */
-export type ViewScope = 'personal' | 'team' | 'global';
+export type ViewScope = 'personal' | 'team' | 'role' | 'global';
 
 /**
  * Team option available to the current user for SavedView sharing.
@@ -232,6 +232,24 @@ export interface ViewConfigMeta {
   quickFilterOrder?: number;
   /** Per-view collaborator ACL for shared team views */
   collaborators?: ViewCollaboratorAcl[];
+  /** Server-evaluated compatibility of this overlay against the current page baseline. */
+  overlayStatus?: 'CURRENT' | 'REBASED' | 'STALE' | 'UNTRACKED';
+  /** Stable machine-readable reasons for rebasing or fail-safe degradation. */
+  overlayReasonCodes?: string[];
+  /** Invalid overlay paths ignored while replaying against the current baseline. */
+  overlayStalePaths?: string[];
+  /** Public page identity this overlay was last validated against. */
+  basePagePid?: string;
+  /** Immutable authoring release identity, when the page is release-backed. */
+  baseReleasePid?: string;
+  /** Release-channel compare-and-set version captured at validation time. */
+  baseChannelVersion?: number;
+  /** Runtime baseline checksum captured at validation time. */
+  baseSnapshotChecksum?: string;
+  /** Stable field identities present in the validated baseline. */
+  baseFieldCodes?: string[];
+  /** Stable action identities present in the validated baseline. */
+  baseActionCodes?: string[];
 }
 
 export interface ViewCollaboratorAcl {
@@ -597,6 +615,8 @@ export interface SavedView {
   ownerId?: string;
   /** Team ID (for TEAM views) */
   teamId?: string;
+  /** Role PID (for ROLE views) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow access to full model fields */
@@ -625,6 +645,8 @@ export interface SavedView {
   ownerName?: string;
   /** Team display name (populated by service) */
   teamName?: string;
+  /** Role display name (populated by service) */
+  roleName?: string;
 }
 
 /**
@@ -645,6 +667,8 @@ export interface SavedViewCreateRequest {
   viewType?: ViewType;
   /** Team ID (required when scope is TEAM) */
   teamId?: string;
+  /** Role PID (required when scope is ROLE) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow full model field access */
@@ -668,6 +692,8 @@ export interface SavedViewUpdateRequest {
   scope?: ViewScope;
   /** Team ID (required when scope is TEAM) */
   teamId?: string;
+  /** Role PID (required when scope is ROLE) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow full model field access */

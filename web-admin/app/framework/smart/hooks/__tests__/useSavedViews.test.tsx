@@ -121,6 +121,38 @@ describe('useSavedViews', () => {
     expect(result.current.currentView?.viewType).toBe('kanban');
   });
 
+  it('keeps the backend-composed personal default instead of replacing it with the raw list row', async () => {
+    const rawPersonal = makeView({
+      pid: 'personal',
+      name: 'My View',
+      scope: 'personal',
+      isDefault: true,
+      viewConfig: { columns: [{ fieldCode: 'name', width: 160 }] },
+    });
+    const effectivePersonal = makeView({
+      ...rawPersonal,
+      viewConfig: {
+        density: 'compact',
+        columns: [
+          { fieldCode: 'tenant_only', width: 100 },
+          { fieldCode: 'name', width: 160 },
+        ],
+      },
+    });
+    mockService.getAccessibleViews.mockResolvedValue([rawPersonal]);
+    mockService.getDefaultView.mockResolvedValue(effectivePersonal);
+
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal' }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.currentView?.viewConfig.density).toBe('compact');
+    expect(result.current.currentView?.viewConfig.columns).toEqual(
+      effectivePersonal.viewConfig?.columns,
+    );
+  });
+
   it('auto-selects first view when no default view', async () => {
     const v1 = makeView({ pid: 'v1' });
     mockService.getAccessibleViews.mockResolvedValue([v1]);
@@ -386,8 +418,9 @@ describe('useSavedViews', () => {
   it('groupedViews groups by scope', async () => {
     const personal = makeView({ pid: 'p1', scope: 'personal' });
     const team = makeView({ pid: 't1', scope: 'team' });
+    const role = makeView({ pid: 'r1', scope: 'role', roleId: 'role-1' });
     const global = makeView({ pid: 'g1', scope: 'global' });
-    mockService.getAccessibleViews.mockResolvedValue([personal, team, global]);
+    mockService.getAccessibleViews.mockResolvedValue([personal, team, role, global]);
     mockService.getDefaultView.mockResolvedValue(null);
 
     const { result } = renderHook(() => useSavedViews({ modelCode: 'order' }));
@@ -395,6 +428,7 @@ describe('useSavedViews', () => {
 
     expect(result.current.groupedViews.personal).toHaveLength(1);
     expect(result.current.groupedViews.team).toHaveLength(1);
+    expect(result.current.groupedViews.role).toHaveLength(1);
     expect(result.current.groupedViews.global).toHaveLength(1);
   });
 
