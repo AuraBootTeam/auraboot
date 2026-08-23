@@ -257,6 +257,36 @@ class RecordShareControllerAuthzTest {
     }
 
     @Test
+    void batchRemoveAuthorizesEveryShareBeforeDeletingAny() {
+        RecordShare first = share(77L);
+        RecordShare second = share(77L);
+        second.setPid("share-2");
+        when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(first);
+        when(recordShareService.getByPidInTenant(TENANT_ID, "share-2")).thenReturn(second);
+        stubBusinessOwner(CALLER_PID);
+        RecordShareController.RecordShareBatchDeleteRequest request =
+                new RecordShareController.RecordShareBatchDeleteRequest();
+        request.setSharePids(List.of(SHARE_PID, "share-2"));
+
+        controller.removeShares(request);
+
+        verify(recordShareService).removeByPids(TENANT_ID, List.of(SHARE_PID, "share-2"));
+    }
+
+    @Test
+    void batchRemoveFailsClosedWhenAnyShareIsMissing() {
+        when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(share(77L));
+        when(recordShareService.getByPidInTenant(TENANT_ID, "missing-share")).thenReturn(null);
+        RecordShareController.RecordShareBatchDeleteRequest request =
+                new RecordShareController.RecordShareBatchDeleteRequest();
+        request.setSharePids(List.of(SHARE_PID, "missing-share"));
+
+        assertThrows(AccessDeniedException.class, () -> controller.removeShares(request));
+
+        verify(recordShareService, never()).removeByPids(any(), any());
+    }
+
+    @Test
     void updateShareRejectsPastExpiryBeforeServiceMutation() {
         RecordShare share = share(77L);
         when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(share);

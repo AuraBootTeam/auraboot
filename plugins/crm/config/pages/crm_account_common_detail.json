@@ -211,9 +211,7 @@
                   { "field": "crm_acr_relation_type", "width": 130, "renderType": "tag", "dictCode": "crm_account_relation_type" },
                   { "field": "crm_acr_strength", "width": 110, "renderType": "tag", "dictCode": "crm_account_relation_strength" },
                   { "field": "crm_acr_status", "width": 100, "renderType": "tag", "dictCode": "crm_account_relation_status" },
-                  { "field": "crm_acr_effective_from", "width": 120 },
-                  { "field": "crm_acr_effective_to", "width": 120 },
-                  { "field": "crm_acr_owner", "width": 130 }
+                  { "field": "crm_acr_effective_to", "width": 120, "label": { "zh-CN": "有效至", "en-US": "Valid Until" } }
                 ],
                 "actions": [
                   {
@@ -257,9 +255,7 @@
                   { "field": "crm_acr_relation_type", "width": 130, "renderType": "tag", "dictCode": "crm_account_relation_type" },
                   { "field": "crm_acr_strength", "width": 110, "renderType": "tag", "dictCode": "crm_account_relation_strength" },
                   { "field": "crm_acr_status", "width": 100, "renderType": "tag", "dictCode": "crm_account_relation_status" },
-                  { "field": "crm_acr_effective_from", "width": 120 },
-                  { "field": "crm_acr_effective_to", "width": 120 },
-                  { "field": "crm_acr_owner", "width": 130 }
+                  { "field": "crm_acr_effective_to", "width": 120, "label": { "zh-CN": "有效至", "en-US": "Valid Until" } }
                 ],
                 "actions": [
                   {
@@ -517,6 +513,69 @@
                     "renderType": "tag",
                     "dictCode": "crm_quote_summary_result"
                   }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "follow_plans",
+          "label": {
+            "zh-CN": "客户计划",
+            "en-US": "Customer Plans"
+          },
+          "blocks": [
+            {
+              "id": "crm_account_plan_actions",
+              "blockType": "toolbar",
+              "buttons": [
+                {
+                  "code": "create_plan",
+                  "primary": true,
+                  "permissionCode": "crm.activity.manage",
+                  "label": { "zh-CN": "新建客户计划", "en-US": "New Customer Plan" },
+                  "action": {
+                    "type": "navigate",
+                    "to": "crm_activity_common_form",
+                    "command": "crm:create_account_task"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "block_account_follow_plans",
+              "blockType": "sub-table",
+              "title": { "zh-CN": "计划与执行状态", "en-US": "Plans and Execution" },
+              "description": {
+                "zh-CN": "集中查看与当前客户直接关联的计划；跨联系人、商机的互动仍保留在活动时间线。",
+                "en-US": "Plans directly related to this account. Cross-contact and opportunity interactions remain in the activity timeline."
+              },
+              "layout": { "colSpan": 12 },
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "account",
+                    "objectId": "${recordPid}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "maxHeight": 320,
+                "columns": [
+                  { "field": "crm_act_subject", "width": 280 },
+                  { "field": "crm_act_status", "width": 110, "renderType": "tag", "dictCode": "crm_task_status" },
+                  { "field": "crm_act_priority", "width": 105, "renderType": "tag", "dictCode": "crm_task_priority" },
+                  { "field": "crm_act_due_date", "width": 125, "valueType": "date" },
+                  { "field": "owner_name", "width": 140, "label": { "zh-CN": "负责人", "en-US": "Owner" } }
+                ],
+                "actions": [
+                  { "code": "view_task", "permissionCode": "crm.activity.read", "label": { "zh-CN": "查看", "en-US": "View" }, "action": { "type": "navigate", "to": "crm_activity_common_detail" } },
+                  { "code": "start_task", "permissionCode": "crm.activity.manage", "visibleWhen": "row.crm_act_type === 'task' && row.crm_act_status === 'open'", "label": { "zh-CN": "开始", "en-US": "Start" }, "action": { "type": "state_transition", "command": "crm:start_task" } },
+                  { "code": "complete_task", "permissionCode": "crm.activity.manage", "visibleWhen": "row.crm_act_type === 'task' && (row.crm_act_status === 'open' || row.crm_act_status === 'in_progress')", "label": { "zh-CN": "完成", "en-US": "Complete" }, "action": { "type": "state_transition", "command": "crm:complete_task" } },
+                  { "code": "cancel_task", "permissionCode": "crm.activity.manage", "danger": true, "visibleWhen": "row.crm_act_type === 'task' && (row.crm_act_status === 'open' || row.crm_act_status === 'in_progress')", "label": { "zh-CN": "取消", "en-US": "Cancel" }, "confirm": { "zh-CN": "确定取消该客户计划？取消后不可再开始或完成。", "en-US": "Cancel this customer plan? It cannot be started or completed afterwards." }, "action": { "type": "state_transition", "command": "crm:cancel_task" } }
                 ]
               }
             }

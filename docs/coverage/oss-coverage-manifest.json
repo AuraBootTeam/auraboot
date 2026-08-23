@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "c7ef0fa57",
+    "commit": "8ffc13e32",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -4440,6 +4440,18 @@
           "driver": "unit",
           "evidence": [
             "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:save_account_relation",
+          "action": "crm:save_account_relation",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs"
           ],
           "assertion": "covered below the UI only — no browser evidence",
           "verdict": "partial"
@@ -11329,7 +11341,7 @@
     }
   ],
   "stats": {
-    "commands": 511,
+    "commands": 512,
     "untested": 320,
     "pages": 298,
     "pagesUntested": 200,

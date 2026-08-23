@@ -10,6 +10,7 @@ import com.auraboot.framework.rbac.service.UserRoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
@@ -245,6 +246,29 @@ public class RecordShareServiceImpl implements RecordShareService {
         recordShareMapper.deleteByPidInTenant(tenantId, sharePid.trim());
         log.info("Removed share pid={} for resource={} record={}",
                 sharePid, share.getResourceCode(), share.getRecordPid());
+    }
+
+    @Override
+    @Transactional
+    public void removeByPids(Long tenantId, List<String> sharePids) {
+        if (tenantId == null || sharePids == null || sharePids.isEmpty()) {
+            throw new RootUnCheckedException(BadParam, "sharePids are required");
+        }
+        List<String> normalized = sharePids.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (normalized.isEmpty() || normalized.size() != sharePids.size()) {
+            throw new RootUnCheckedException(BadParam, "sharePids must be unique and non-blank");
+        }
+        for (String sharePid : normalized) {
+            int deleted = recordShareMapper.deleteByPidInTenant(tenantId, sharePid);
+            if (deleted != 1) {
+                throw new RootUnCheckedException(BadParam, "Share not found");
+            }
+        }
+        log.info("Removed {} record shares for tenant={}", normalized.size(), tenantId);
     }
 
     @Override

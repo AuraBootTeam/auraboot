@@ -159,6 +159,9 @@ public interface RecordShareService {
     /** Remove a share by its stable public PID, scoped to the tenant. */
     void removeByPid(Long tenantId, String sharePid);
 
+    /** Remove a validated set of shares atomically, scoped to the tenant. */
+    void removeByPids(Long tenantId, List<String> sharePids);
+
     /** Look up a share by its stable public PID, scoped to the tenant. */
     com.auraboot.framework.permission.entity.RecordShare getByPidInTenant(Long tenantId, String sharePid);
 }

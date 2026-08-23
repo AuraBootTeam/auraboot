@@ -65,6 +65,13 @@ const I18N = {
     remove: '移除协作成员',
     removed: '协作成员已移除',
     remove_failed: '移除协作成员失败',
+    select_all: '全选',
+    remove_selected: '移除所选',
+    batch_confirm: '确认移除所选协作成员？',
+    confirm_remove: '确认移除',
+    select_member: '选择协作成员',
+    batch_removed: '所选协作成员已移除',
+    batch_remove_failed: '批量移除协作成员失败',
   },
 };
 
@@ -169,6 +176,40 @@ describe('RecordShareDialog', () => {
       method: 'DELETE',
     });
     expect(showSuccessToast).toHaveBeenCalledWith('协作成员已移除');
+  });
+
+  it('batch-removes selected collaborators only after explicit confirmation', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          data: [
+            { pid: 'share-1', subjectName: '销售一组', permissionMask: 'read' },
+            { pid: 'share-2', subjectName: '销售二组', permissionMask: 'read,update' },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    renderDialog();
+
+    await screen.findByText('销售一组');
+    fireEvent.click(screen.getByTestId('record-share-select-share-1'));
+    fireEvent.click(screen.getByTestId('record-share-select-share-2'));
+    fireEvent.click(screen.getByTestId('record-share-batch-remove'));
+    expect(screen.getByTestId('record-share-batch-confirm')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId('record-share-batch-confirm-ok'));
+
+    await waitFor(() => expect(screen.queryByText('销售一组')).not.toBeInTheDocument());
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/record-share/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sharePids: ['share-1', 'share-2'] }),
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith('所选协作成员已移除');
   });
 
   it('saves the collaborator permission upgrade using only public PIDs', async () => {

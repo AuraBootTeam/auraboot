@@ -1112,6 +1112,12 @@ record_share:
   update_failed: Failed to update collaboration access
   load_failed: Failed to load collaborators
   current_members: Current collaborators
+  select_all: Select all
+  remove_selected: Remove selected
+  batch_confirm: Remove {count} selected collaborators?
+  confirm_remove: Confirm removal
+  batch_removed: Collaborators removed
+  batch_remove_failed: Failed to remove collaborators
   empty_title: No collaborators yet
   empty_description: Choose a member and permission to start collaborating
   unavailable_member: Unavailable member
