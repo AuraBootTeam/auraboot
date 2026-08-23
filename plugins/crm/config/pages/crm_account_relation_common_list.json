@@ -17,6 +17,12 @@
           "permissionCode": "crm.account.manage",
           "label": { "zh-CN": "新增关系", "en-US": "Add Relationship" },
           "action": { "type": "navigate", "to": "crm_account_relation_common_form" }
+        },
+        {
+          "code": "save",
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "保存或合并关系", "en-US": "Save or Merge Relationship" },
+          "action": { "type": "navigate", "to": "crm_account_relation_common_form", "command": "crm:save_account_relation" }
         }
       ]
     },
@@ -35,9 +41,7 @@
         { "field": "crm_acr_relation_type", "width": 130, "renderType": "tag", "dictCode": "crm_account_relation_type" },
         { "field": "crm_acr_strength", "width": 110, "renderType": "tag", "dictCode": "crm_account_relation_strength" },
         { "field": "crm_acr_status", "width": 100, "renderType": "tag", "dictCode": "crm_account_relation_status" },
-        { "field": "crm_acr_effective_from", "width": 120 },
-        { "field": "crm_acr_effective_to", "width": 120 },
-        { "field": "crm_acr_owner", "width": 130 },
+        { "field": "crm_acr_effective_to", "width": 120, "label": { "zh-CN": "有效至", "en-US": "Valid Until" } },
         {
           "field": "actions",
           "isActionColumn": true,
@@ -50,6 +54,7 @@
         }
       ],
       "searchFields": ["crm_acr_source_account_id", "crm_acr_target_account_id", "crm_acr_relation_type"],
+      "searchPlaceholder": { "zh-CN": "搜索客户或关系类型", "en-US": "Search accounts or relationship type" },
       "defaultSort": { "field": "updated_at", "order": "desc" },
       "empty": {
         "title": { "zh-CN": "暂无客户关系", "en": "No account relationships" },

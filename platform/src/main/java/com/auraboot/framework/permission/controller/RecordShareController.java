@@ -20,6 +20,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -205,6 +207,26 @@ public class RecordShareController {
         }
         authorizeExistingShareManagement(share);
         recordShareService.removeByPid(tenantId, sharePid);
+        return ApiResponse.success();
+    }
+
+    /** Remove several collaborators only after every share has passed authorization. */
+    @PostMapping("/batch-delete")
+    @Operation(summary = "Remove record shares by public PID")
+    public ApiResponse<Void> removeShares(@Valid @RequestBody RecordShareBatchDeleteRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<String> sharePids = request.getSharePids().stream()
+                .map(String::trim)
+                .distinct()
+                .toList();
+        List<RecordShare> shares = sharePids.stream()
+                .map(sharePid -> recordShareService.getByPidInTenant(tenantId, sharePid))
+                .toList();
+        if (shares.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new AccessDeniedException("One or more record shares are not accessible");
+        }
+        shares.forEach(this::authorizeExistingShareManagement);
+        recordShareService.removeByPids(tenantId, sharePids);
         return ApiResponse.success();
     }
 
@@ -441,6 +463,13 @@ public class RecordShareController {
 
         /** Optional future expiration time. Null means no expiry. */
         private Instant expiresAt;
+    }
+
+    @Data
+    public static class RecordShareBatchDeleteRequest {
+        @NotEmpty
+        @Size(max = 100)
+        private List<@NotBlank String> sharePids;
     }
 
     public record RecordShareResponse(
