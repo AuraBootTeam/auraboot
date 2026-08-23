@@ -303,6 +303,41 @@ describe('ToolbarBlockRenderer', () => {
     expect(options?.context?.record).toBe(detailRecord);
   });
 
+  it('evaluates visibility against the detail-bound parent record', () => {
+    const evaluateCondition = vi.fn(() => true);
+    const detailRecord = { pid: 'OPP-PARENT-1', crm_opp_stage: 'proposal' };
+    const runtime = makeRuntime({
+      getEvaluator: () => ({
+        evaluateCondition,
+        evaluateTemplate: (template: string) => template,
+      }),
+    });
+
+    render(
+      <ToolbarBlockRenderer
+        block={
+          {
+            type: 'toolbar',
+            record: detailRecord,
+            buttons: [
+              { code: 'add', label: 'Add', visibleWhen: "record.crm_opp_stage == 'proposal'" },
+            ],
+          } as any
+        }
+        runtime={runtime}
+      />,
+    );
+
+    expect(evaluateCondition).toHaveBeenCalledWith(
+      "record.crm_opp_stage == 'proposal'",
+      expect.objectContaining({
+        record: detailRecord,
+        row: detailRecord,
+        form: detailRecord,
+      }),
+    );
+  });
+
   it('disables the button while its action is in flight and ignores re-entrant double-clicks', async () => {
     const runtime = makeRuntime();
     let resolveAction: () => void = () => {};

@@ -37,6 +37,14 @@
           "target": "sub-table-actions",
           "blockId": "block_line_items"
         }
+      },
+      {
+        "id": "line-items.toolbar-actions",
+        "kind": "action",
+        "anchor": {
+          "target": "sub-table-toolbar-actions",
+          "blockId": "block_line_items"
+        }
       }
     ]
   },

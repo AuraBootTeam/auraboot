@@ -232,10 +232,7 @@ function isRecursiveRuntimeRoot(block: Record<string, any>, kind: string): boole
   return block.blockType === kind || block.blockType === 'composite';
 }
 
-function normalizeRecursiveBlocksForLegacyRuntime(
-  kind: string,
-  blocks: unknown,
-): BlockConfig[] {
+function normalizeRecursiveBlocksForLegacyRuntime(kind: string, blocks: unknown): BlockConfig[] {
   if (!Array.isArray(blocks)) return [];
   return blocks.flatMap((block) => {
     if (!block || typeof block !== 'object') return [];
@@ -310,9 +307,7 @@ function normalizeRecursiveBlockForLegacyRuntime(block: Record<string, any>): Re
     return {
       ...block,
       blocks: block.blocks.map((child) =>
-        child && typeof child === 'object'
-          ? normalizeRecursiveBlockForLegacyRuntime(child)
-          : child,
+        child && typeof child === 'object' ? normalizeRecursiveBlockForLegacyRuntime(child) : child,
       ),
     };
   }
@@ -393,7 +388,9 @@ function normalizeBlock(
       dataSources[id] = { ...source, id };
       normalizedTableDataSource = id;
     }
-    const tableColumns = Array.isArray(result.table.columns) ? result.table.columns : result.columns;
+    const tableColumns = Array.isArray(result.table.columns)
+      ? result.table.columns
+      : result.columns;
     const tableRowActions = Array.isArray(result.table.rowActions)
       ? result.table.rowActions.map(normalizeButton)
       : result.table.rowActions;
@@ -415,6 +412,9 @@ function normalizeBlock(
     result.subTable = {
       ...result.subTable,
       columns: normalizeColumns(result.subTable.columns) as ColumnConfig[],
+      toolbarActions: Array.isArray(result.subTable.toolbarActions)
+        ? result.subTable.toolbarActions.map(normalizeButton)
+        : result.subTable.toolbarActions,
       actions: Array.isArray(result.subTable.actions)
         ? result.subTable.actions.map(normalizeButton)
         : result.subTable.actions,

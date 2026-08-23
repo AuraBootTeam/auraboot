@@ -37,6 +37,12 @@ class CrmOpportunityPageContributionContractTest {
                         "kind", "action",
                         "anchor", Map.of(
                                 "target", "sub-table-actions",
+                                "blockId", "block_line_items")),
+                Map.of(
+                        "id", "line-items.toolbar-actions",
+                        "kind", "action",
+                        "anchor", Map.of(
+                                "target", "sub-table-toolbar-actions",
                                 "blockId", "block_line_items")));
         assertThat(fixture.rawJson())
                 .doesNotContain("\"sl_", "\"sl:", "com.auraboot.sales");
@@ -62,7 +68,11 @@ class CrmOpportunityPageContributionContractTest {
                 new PageSchemaContribution(
                         "select-product", "catalog-plugin", "line-items.actions",
                         PageSchemaContributionKind.ACTION, 100,
-                        Map.of("code", "select_product", "label", Map.of("en-US", "Select product")))));
+                        Map.of("code", "select_product", "label", Map.of("en-US", "Select product"))),
+                new PageSchemaContribution(
+                        "add-priced-product", "sales-plugin", "line-items.toolbar-actions",
+                        PageSchemaContributionKind.ACTION, 100,
+                        Map.of("code", "add_priced_product", "label", Map.of("en-US", "Add priced product")))));
 
         Map<String, Object> tabs = findBlock(composed.getBlocks(), "crm_opportunity_tabs");
         List<Map<String, Object>> lineItemBlocks = findTabBlocks(tabs, "line_items");
@@ -73,6 +83,10 @@ class CrmOpportunityPageContributionContractTest {
         List<Map<String, Object>> actions = (List<Map<String, Object>>) (List<?>) subTable.get("actions");
         assertThat(actions).extracting(action -> action.get("code"))
                 .containsExactly("add", "edit", "delete", "select_product");
+        List<Map<String, Object>> toolbarActions =
+                (List<Map<String, Object>>) (List<?>) subTable.get("toolbarActions");
+        assertThat(toolbarActions).extracting(action -> action.get("code"))
+                .containsExactly("add_priced_product");
         assertThat(mapper.writeValueAsString(base.getBlocks())).isEqualTo(originalBlocks);
         assertThat(composed.getPageKey()).isEqualTo("crm_opportunity_common_detail");
     }
