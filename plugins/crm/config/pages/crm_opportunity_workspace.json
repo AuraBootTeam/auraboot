@@ -91,7 +91,8 @@
           "component": "SmartInput",
           "bindState": "searchKeyword",
           "label": { "zh-CN": "搜索商机队列", "en": "Search opportunity queue" },
-          "placeholder": { "zh-CN": "输入商机、客户或编号", "en": "Search opportunity, customer or code" }
+          "placeholder": { "zh-CN": "输入商机、客户或编号", "en": "Search opportunity, customer or code" },
+          "helpText": { "zh-CN": "搜索会保留当前风险或关闭时间筛选。", "en": "Search keeps the current risk or closing-window filter." }
         }
       ]
     },
@@ -158,7 +159,11 @@
           "permissionCode": "crm.opportunity.read",
           "action": { "type": "navigate", "to": "crm_opportunity_common_detail" }
         }
-      ]
+      ],
+      "empty": {
+        "title": { "zh-CN": "当前没有符合条件的在途商机", "en": "No open opportunities match the current criteria" },
+        "description": { "zh-CN": "可清除搜索或风险筛选；有新销售机会时也可从上方新建商机。", "en": "Clear the search or risk filter, or create an opportunity above when a new deal appears." }
+      }
     },
     {
       "id": "crm_opportunity_attention",
@@ -249,8 +254,47 @@
           "label": { "zh-CN": "标记丢单", "en": "Mark Lost" },
           "variant": "danger",
           "visibleWhen": "state.selectedOpportunity != null",
-          "confirm": { "zh-CN": "丢单后将退出在途队列。请先在商机档案补充丢单原因。", "en": "The opportunity will leave the open queue. Record the loss reason first." },
-          "onClick": { "action": "command.execute", "args": { "command": "crm:lose_opportunity", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }
+          "confirm": { "zh-CN": "丢单后将退出在途队列，失败原因会保留用于复盘。确认继续吗？", "en": "The opportunity will leave the open queue and the loss reason will be retained for review. Continue?" },
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:lose_opportunity",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedOpportunity.pid}",
+              "inputFieldsTitle": { "zh-CN": "关闭商机并记录失败原因", "en": "Close Opportunity and Record Loss Reason" },
+              "inputFieldsSubmitLabel": { "zh-CN": "确认丢单", "en": "Confirm Loss" },
+              "inputFields": [
+                {
+                  "field": "crm_opp_lost_reason_code",
+                  "label": { "zh-CN": "失败原因", "en": "Loss Reason" },
+                  "type": "enum",
+                  "dictCode": "crm_opp_lost_reason",
+                  "required": true,
+                  "placeholder": { "zh-CN": "选择最主要的失败原因", "en": "Select the primary loss reason" },
+                  "helpText": { "zh-CN": "该原因会进入丢单分析；选择“输给对手”时请同时填写竞争对手。", "en": "This reason feeds loss analysis; identify the competitor when choosing Lost to Competitor." }
+                },
+                {
+                  "field": "crm_opp_competitor",
+                  "label": { "zh-CN": "竞争对手", "en": "Competitor" },
+                  "type": "text",
+                  "placeholder": { "zh-CN": "例如：华东智造云", "en": "For example: East China Manufacturing Cloud" },
+                  "helpText": { "zh-CN": "仅在输给明确竞争对手时填写，便于后续竞品复盘。", "en": "Complete this only when a known competitor won the deal." }
+                },
+                {
+                  "field": "crm_opp_lost_reason",
+                  "label": { "zh-CN": "补充说明", "en": "Details" },
+                  "type": "text",
+                  "placeholder": { "zh-CN": "记录客户反馈、决策背景或后续重启条件", "en": "Record customer feedback, decision context, or restart conditions" },
+                  "helpText": { "zh-CN": "请写可复盘的客户反馈与决策事实。", "en": "Capture reviewable customer feedback and decision facts." }
+                }
+              ],
+              "reload": ["opportunityStats", "opportunityQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "商机已关闭为丢单，失败原因已保存", "en": "Opportunity closed as lost and the reason was saved" },
+                "errorMessage": { "zh-CN": "关闭失败。请检查商机状态和失败原因后重试", "en": "Close failed. Check the opportunity stage and loss reason, then retry" }
+              }
+            }
+          }
         }
       ]
     },
@@ -268,6 +312,28 @@
         { "key": "quotes", "label": { "zh-CN": "报价摘要", "en": "Quote Summaries" }, "field": "quote_count" }
       ],
       "empty": { "title": { "zh-CN": "选择一条商机，查看风险、活动、报价和下一步", "en": "Select an opportunity to review risks, activity, quotes and next action" } }
+    },
+    {
+      "id": "crm_opportunity_daily_shortcuts",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "open_my_tasks",
+          "permissionCode": "crm.activity.read",
+          "label": { "zh-CN": "我的待办", "en": "My Tasks" },
+          "action": { "type": "navigate", "to": "crm_my_tasks_list" }
+        },
+        {
+          "code": "create_next_step",
+          "permissionCode": "crm.activity.manage",
+          "label": { "zh-CN": "创建下一步任务", "en": "Create Next-step Task" },
+          "visibleWhen": "state.selectedOpportunity != null",
+          "action": {
+            "type": "navigate",
+            "to": "/p/crm_activity_common/new?command=crm:create_opp_task&sourceRecordPid=${state.selectedOpportunity.pid}"
+          }
+        }
+      ]
     }
   ]
 }
