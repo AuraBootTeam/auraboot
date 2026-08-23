@@ -119,6 +119,28 @@
     "cmd_risk_level": "L2"
   },
   {
+    "code": "crm:convert_lead_to_customer",
+    "displayName:zh-CN": "转为客户",
+    "displayName:en": "Convert to Customer",
+    "type": "custom",
+    "handler": "crm:convert_lead_to_customer",
+    "modelCode": "crm_lead_common",
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": ["qualified"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认仅将此线索转为客户和联系人？不会创建商机或客户需求。",
+      "confirmMessage:en": "Convert this lead to an account and contact only? No opportunity or customer request will be created."
+    },
+    "permissions": ["crm.lead.manage"],
+    "agent_hint": "Convert a qualified lead to an account and optional contact without creating an opportunity or customer request.",
+    "cmd_risk_level": "L2"
+  },
+  {
     "code": "crm:lose_lead",
     "displayName:zh-CN": "标记丢失",
     "displayName:en": "Mark Lost",
