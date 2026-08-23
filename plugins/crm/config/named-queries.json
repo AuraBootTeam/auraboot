@@ -124,7 +124,7 @@
     "name:zh-CN": "跟进记录聚合池",
     "name:en": "Follow-up Record Pool",
     "description": "Tenant-wide follow-up record pool with direct and graph anchor summaries; task plans are excluded",
-    "fromSql": "SELECT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_content, a.crm_act_date, a.crm_act_owner, a.crm_act_source, a.crm_act_related_model, a.crm_act_related_id, COALESCE(rel.anchor_count, 0) + CASE WHEN a.crm_act_related_id IS NULL OR a.crm_act_related_id = '' THEN 0 ELSE 1 END AS anchor_count, rel.object_types, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a LEFT JOIN (SELECT crm_ar_activity_id, COUNT(*) AS anchor_count, string_agg(DISTINCT crm_ar_object_type, ',' ORDER BY crm_ar_object_type) AS object_types FROM mt_crm_activity_relation_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_ar_activity_id) rel ON rel.crm_ar_activity_id = a.pid LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND a.crm_act_type IN ('call','email','meeting','note','visit') ORDER BY a.crm_act_date DESC",
+    "fromSql": "SELECT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_content, a.crm_act_date, a.crm_act_owner, a.crm_act_source, a.crm_act_related_model, a.crm_act_related_id, COALESCE(rel.anchor_count, 0) + CASE WHEN a.crm_act_related_id IS NULL OR a.crm_act_related_id = '' THEN 0 ELSE 1 END AS anchor_count, rel.object_types, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a LEFT JOIN (SELECT crm_ar_activity_id, COUNT(*) AS anchor_count, string_agg(DISTINCT crm_ar_object_type, ',' ORDER BY crm_ar_object_type) AS object_types FROM mt_crm_activity_relation_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_ar_activity_id) rel ON rel.crm_ar_activity_id = a.pid LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND a.crm_act_type <> 'task' ORDER BY a.crm_act_date DESC",
     "outputFields": [
       { "code": "pid", "columnExpr": "pid", "dataType": "string" },
       { "code": "crm_act_type", "columnExpr": "crm_act_type", "dataType": "string", "searchable": true },
@@ -135,7 +135,7 @@
       { "code": "crm_act_source", "columnExpr": "crm_act_source", "dataType": "string" },
       { "code": "crm_act_related_model", "columnExpr": "crm_act_related_model", "dataType": "string" },
       { "code": "crm_act_related_id", "columnExpr": "crm_act_related_id", "dataType": "string" },
-      { "code": "anchor_count", "columnExpr": "anchor_count", "dataType": "integer" },
+      { "code": "anchor_count", "columnExpr": "anchor_count", "dataType": "number" },
       { "code": "object_types", "columnExpr": "object_types", "dataType": "string" },
       { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" }
     ]

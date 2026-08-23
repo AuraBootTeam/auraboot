@@ -81,12 +81,14 @@ test('follow record pool-list is tenant-scoped, record-only and preserves anchor
   const pool = queries.find((query) => query.code === 'crm_follow_record_pool_list');
   assert.ok(pool);
   assert.match(pool.fromSql, /a\.tenant_id = #\{params\.tenantId\}/);
-  assert.match(pool.fromSql, /a\.crm_act_type IN \('call','email','meeting','note','visit'\)/);
+  assert.match(pool.fromSql, /a\.crm_act_type <> 'task'/);
   assert.match(pool.fromSql, /COUNT\(\*\) AS anchor_count/);
   assert.match(pool.fromSql, /string_agg\(DISTINCT crm_ar_object_type/);
   assert.doesNotMatch(pool.fromSql, /crm_act_type = 'task'/);
+  assert.doesNotMatch(pool.fromSql, /\bCALL\b/i);
   assert.deepEqual(
     pool.outputFields.map((field) => field.code).filter((code) => ['anchor_count', 'object_types'].includes(code)),
     ['anchor_count', 'object_types'],
   );
+  assert.equal(pool.outputFields.find((field) => field.code === 'anchor_count')?.dataType, 'number');
 });
