@@ -27,9 +27,9 @@
       "model-surfaces": 50,
       "menus": 55,
       "pages": 128,
-      "page-blocks": 413,
-      "page-fields": 1763,
-      "ui-actions": 628,
+      "page-blocks": 414,
+      "page-fields": 1766,
+      "ui-actions": 630,
       "commands": 248,
       "permissions": 114,
       "queries": 55,
@@ -37,7 +37,7 @@
     },
     "productVerdicts": {
       "pass": 735,
-      "untested": 2756
+      "untested": 2762
     },
     "fullProductNonGoals": [
       "data migration"
@@ -11197,6 +11197,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6]"
+        },
+        {
+          "id": "block:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:7",
+          "action": "Render and semantically verify toolbar block crm_opportunity_daily_shortcuts on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7]"
         },
         {
           "id": "block:crm_qdp_release_workbench:crm_qdp_queue_metrics:0",
@@ -30830,7 +30843,46 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[4].summaryFields[3].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_code:15",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_lost_reason_code:15",
+          "action": "Verify field crm_opp_lost_reason_code in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_competitor:16",
+          "action": "Verify field crm_opp_competitor in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_lost_reason:17",
+          "action": "Verify field crm_opp_lost_reason in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_code:18",
           "action": "Verify field crm_opp_code in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30843,7 +30895,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[0].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:account_name:16",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:account_name:19",
           "action": "Verify field account_name in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30856,7 +30908,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[1].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_forecast_category:17",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_forecast_category:20",
           "action": "Verify field crm_opp_forecast_category in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30869,7 +30921,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[2].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:last_activity_at:18",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:last_activity_at:21",
           "action": "Verify field last_activity_at in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30882,7 +30934,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[3].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:open_risks:19",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:open_risks:22",
           "action": "Verify field open_risks in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30895,7 +30947,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[4].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:quote_count:20",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:quote_count:23",
           "action": "Verify field quote_count in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -42638,6 +42690,32 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:open_my_tasks:8",
+          "action": "button open_my_tasks on crm_opportunity_workspace -> navigate:crm_my_tasks_list",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7].buttons[0]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:create_next_step:9",
+          "action": "button create_next_step on crm_opportunity_workspace -> navigate:/p/crm_activity_common/new?command=crm:create_opp_task&sourceRecordPid=${state.selectedOpportunity.pid}",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7].buttons[1]"
         },
         {
           "id": "ui-action:crm_qdp_release_workbench:crm_qdp_queue_filters:filter_all:0",
