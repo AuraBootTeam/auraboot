@@ -5747,9 +5747,16 @@
     "refType": "command"
   },
   {
-    "key": "command.crm:delete_activity.label",
-    "zh-CN": "删除活动",
-    "en-US": "Delete Activity",
+    "key": "command.crm:delete_follow_plan.label",
+    "zh-CN": "删除跟进计划",
+    "en-US": "Delete Follow-up Plan",
+    "source": "import",
+    "refType": "command"
+  },
+  {
+    "key": "command.crm:delete_follow_record.label",
+    "zh-CN": "删除跟进记录",
+    "en-US": "Delete Follow-up Record",
     "source": "import",
     "refType": "command"
   },
