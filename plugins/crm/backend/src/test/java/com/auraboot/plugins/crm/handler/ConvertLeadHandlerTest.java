@@ -192,12 +192,53 @@ class ConvertLeadHandlerTest {
         assertTrue(error.getMessage().contains("already converted"));
     }
 
+    @Test
+    void convertsQualifiedLeadToCustomerWithoutOpportunityOrRequest() throws Exception {
+        FakeDataAccessor db = new FakeDataAccessor();
+        db.seed("crm_lead_common", row(
+                "pid", "lead-customer-only",
+                "crm_lead_code", "LEAD-CUSTOMER-ONLY",
+                "crm_lead_company", "Customer Only Ltd",
+                "crm_lead_contact_name", "Casey Lin",
+                "crm_lead_contact_email", "casey@example.com",
+                "crm_lead_assigned_to", "sales-a",
+                "crm_lead_status", "qualified"
+        ));
+        db.seed("crm_activity_common", row(
+                "pid", "activity-customer-only",
+                "crm_act_related_model", "crm_lead_common",
+                "crm_act_related_id", "lead-customer-only"
+        ));
+
+        Map<?, ?> result = (Map<?, ?>) handler.execute(context(
+                "lead-customer-only", db, ConvertLeadHandler.CUSTOMER_ONLY_COMMAND_TYPE));
+
+        assertEquals("", result.get("opportunityId"));
+        assertEquals("", result.get("customerRequestId"));
+        assertEquals(1, db.store.get("crm_account_common").size());
+        assertEquals(1, db.store.get("crm_contact_common").size());
+        assertFalse(db.store.containsKey("crm_opportunity_common"));
+        assertFalse(db.store.containsKey("crm_customer_request_common"));
+        assertEquals(3, result.get("createdActivityRelationCount"));
+
+        Map<String, Object> lead = db.getById("crm_lead_common", "lead-customer-only");
+        assertEquals("converted", lead.get("crm_lead_status"));
+        assertEquals("PID1", lead.get("crm_lead_converted_account_id"));
+        assertEquals("PID2", lead.get("crm_lead_converted_contact_id"));
+        assertFalse(lead.containsKey("crm_lead_converted_opportunity_id"));
+        assertFalse(lead.containsKey("crm_lead_converted_request_id"));
+    }
+
     private static CommandContext context(String recordId, DataAccessor db) {
+        return context(recordId, db, ConvertLeadHandler.COMMAND_TYPE);
+    }
+
+    private static CommandContext context(String recordId, DataAccessor db, String commandType) {
         return CommandContext.builder()
                 .tenantId(1L)
                 .pluginId("com.auraboot.crm")
                 .namespace("crm")
-                .commandType("crm:convert_lead")
+                .commandType(commandType)
                 .modelCode("crm_lead_common")
                 .recordId(recordId)
                 .settings(Map.of("__dataAccessor", db, "__currentUserPid", "actor-1"))
