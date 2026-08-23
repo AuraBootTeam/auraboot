@@ -25,10 +25,12 @@ public class ContactPrimaryInvariantHandler implements CommandHandlerExtension {
     static final String SET_PRIMARY = "crm:set_primary_contact";
     static final String DISABLE = "crm:disable_contact";
     static final String ENABLE = "crm:enable_contact";
+    static final String DELETE = "crm:delete_contact";
     private static final String MODEL = "crm_contact_common";
+    private static final String OPPORTUNITY_CONTACT_MODEL = "crm_opportunity_contact_common";
     private static final String PRIMARY = "crm_ct_is_primary";
     private static final String PRIMARY_ACCOUNT_KEY = "crm_ct_primary_account_key";
-    private static final Set<String> TYPES = Set.of(CREATE, UPDATE, SET_PRIMARY, DISABLE, ENABLE);
+    private static final Set<String> TYPES = Set.of(CREATE, UPDATE, SET_PRIMARY, DISABLE, ENABLE, DELETE);
 
     @Override
     public String getCommandType() {
@@ -66,6 +68,13 @@ public class ContactPrimaryInvariantHandler implements CommandHandlerExtension {
         if (contact == null) {
             throw new IllegalArgumentException("Contact not found after persistence: " + contactId);
         }
+
+        if (DELETE.equals(context.commandType())) {
+            deleteContact(db, contactId, contact);
+            return Map.of("deletedContactId", contactId);
+        }
+
+        validateAccountAndContactChannels(db, contactId, contact);
 
         String status = string(contact.get("crm_ct_status"));
         boolean active = status.isBlank() || "active".equals(status);
@@ -119,6 +128,58 @@ public class ContactPrimaryInvariantHandler implements CommandHandlerExtension {
                 "primaryContactNormalized", true,
                 "primaryContactId", contactId,
                 "demotedContactCount", demoted);
+    }
+
+    private static void deleteContact(DataAccessor db, String contactId, Map<String, Object> contact) {
+        if (Boolean.TRUE.equals(contact.get(PRIMARY))) {
+            throw new IllegalArgumentException(
+                    "主联系人不能直接删除，请先指定其他主联系人 / "
+                            + "A primary contact cannot be deleted; assign another primary contact first");
+        }
+        List<Map<String, Object>> opportunityLinks = db.query(
+                OPPORTUNITY_CONTACT_MODEL, Map.of("crm_oc_contact_id", contactId));
+        if (opportunityLinks != null && !opportunityLinks.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "联系人仍关联商机，请先移除商机关联 / "
+                            + "The contact is linked to opportunities; remove those associations first");
+        }
+        db.delete(MODEL, contactId);
+    }
+
+    private static void validateAccountAndContactChannels(
+            DataAccessor db, String contactId, Map<String, Object> contact) {
+        String accountId = required(contact.get("crm_ct_account_id"),
+                "联系人必须关联客户 / A contact must belong to an account");
+        String email = normalized(contact.get("crm_ct_email"));
+        String phone = normalized(contact.get("crm_ct_phone"));
+        String mobile = normalized(contact.get("crm_ct_mobile"));
+        if (email.isBlank() && phone.isBlank() && mobile.isBlank()) {
+            return;
+        }
+        List<Map<String, Object>> siblings = db.query(MODEL, Map.of("crm_ct_account_id", accountId));
+        if (siblings == null) {
+            return;
+        }
+        for (Map<String, Object> sibling : siblings) {
+            if (contactId.equals(string(sibling.get("pid")))) {
+                continue;
+            }
+            if (sameNonBlank(email, sibling.get("crm_ct_email"))
+                    || sameNonBlank(phone, sibling.get("crm_ct_phone"))
+                    || sameNonBlank(mobile, sibling.get("crm_ct_mobile"))) {
+                throw new IllegalArgumentException(
+                        "同一客户下已存在相同联系方式 / "
+                                + "A contact with the same contact detail already exists for this account");
+            }
+        }
+    }
+
+    private static boolean sameNonBlank(String expected, Object actual) {
+        return !expected.isBlank() && expected.equals(normalized(actual));
+    }
+
+    private static String normalized(Object value) {
+        return string(value).toLowerCase();
     }
 
     private static Map<String, Object> primaryState(boolean primary, String accountKey) {
