@@ -118,6 +118,21 @@
     "defaultValue": "false"
   },
   {
+    "code": "crm_ct_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "reference",
+    "referenceModelCode": "sys_user",
+    "refTarget": {
+      "targetModel": "sys_user",
+      "valueField": "pid",
+      "displayField": "displayName"
+    },
+    "constraints": {
+      "maxLength": 100
+    }
+  },
+  {
     "code": "crm_ct_primary_account_key",
     "displayName:zh-CN": "主联系人客户唯一键",
     "displayName:en": "Primary Account Key",

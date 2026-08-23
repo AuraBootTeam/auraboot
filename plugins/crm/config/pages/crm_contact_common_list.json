@@ -89,6 +89,10 @@
           "editable": true
         },
         {
+          "field": "crm_ct_owner",
+          "width": 150
+        },
+        {
           "field": "crm_ct_email",
           "width": 200
         },
@@ -199,8 +203,24 @@
       ],
       "searchFields": [
         "crm_ct_name",
-        "crm_ct_email"
+        "crm_ct_email",
+        "crm_ct_phone",
+        "crm_ct_mobile"
       ],
+      "searchPlaceholder": {
+        "zh-CN": "搜索联系人姓名、邮箱或电话",
+        "en-US": "Search contact name, email, or phone"
+      },
+      "empty": {
+        "title": {
+          "zh-CN": "当前视图暂无联系人",
+          "en-US": "No contacts in this view"
+        },
+        "description": {
+          "zh-CN": "可新建联系人，或切换“全部 / 我的 / 本部门”视图并调整搜索条件。",
+          "en-US": "Create a contact, or switch between All, My, and Department views and adjust the search."
+        }
+      },
       "defaultSort": {
         "field": "created_at",
         "order": "desc"
