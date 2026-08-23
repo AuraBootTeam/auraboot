@@ -6907,5 +6907,47 @@
     "en-US": "Recompute Subscription",
     "source": "import",
     "refType": "command"
+  },
+  {
+    "key": "crm.saved_view.all_leads",
+    "zh-CN": "全部线索",
+    "en-US": "All Leads",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.all_leads_description",
+    "zh-CN": "按最近更新时间查看全部可见线索",
+    "en-US": "Review all visible leads by latest update",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.my_leads",
+    "zh-CN": "我的线索",
+    "en-US": "My Leads",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.my_leads_description",
+    "zh-CN": "仅查看当前负责人名下的线索",
+    "en-US": "Show leads assigned to the current owner",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.lead_board",
+    "zh-CN": "线索看板",
+    "en-US": "Lead Board",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.lead_board_description",
+    "zh-CN": "按生命周期状态查看线索漏斗",
+    "en-US": "View the lead funnel grouped by lifecycle status",
+    "source": "import",
+    "refType": "page"
   }
 ]
