@@ -7,6 +7,7 @@ import test from 'node:test';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
 const source = readFileSync(runner, 'utf8');
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
@@ -29,7 +30,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
     'tdengine/tdengine:3.3.4.3',
     'testcontainers/ryuk:0.12.0',
   ]) {
-    assert.match(source, new RegExp(image.replace(/[./:-]/g, '\\$&')));
+    assert.match(source, new RegExp(escapeRegex(image)));
   }
   assert.match(source, /timeout 10m docker pull "\$image" \|\| environment_invalid/);
 });
