@@ -557,6 +557,27 @@ class FileServiceImplTest {
     // ----- file relations -----
 
     @Test
+    void getFileRelations_resolvesPublicPidToInternalRelationKey() {
+        FileEntity file = new FileEntity();
+        file.setId(11L);
+        file.setPid("public-file-pid");
+        FileRelationEntity relation = new FileRelationEntity().setEntityType("crm_account_common");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(file);
+        when(fileRelationMapper.findByFileId("11")).thenReturn(List.of(relation));
+
+        assertThat(fileService.getFileRelations("public-file-pid")).containsExactly(relation);
+        verify(fileRelationMapper).findByFileId("11");
+    }
+
+    @Test
+    void getFileRelations_missingFileDoesNotProbeRelations() {
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+
+        assertThat(fileService.getFileRelations("missing")).isEmpty();
+        verify(fileRelationMapper, never()).findByFileId(anyString());
+    }
+
+    @Test
     void createFileRelation_removesPriorAndInserts() {
         FileRelationRequestDTO req = new FileRelationRequestDTO();
         req.setEntityType("user");
