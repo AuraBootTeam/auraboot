@@ -184,6 +184,15 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public List<FileRelationEntity> getFileRelations(String fileId) {
+        FileEntity file = getFileById(fileId);
+        if (file == null || file.getId() == null) {
+            return List.of();
+        }
+        return fileRelationMapper.findByFileId(String.valueOf(file.getId()));
+    }
+
+    @Override
     public List<FileEntity> getFilesByUserId(Long userId) {
         return fileMapper.selectByCreatedBy(userId);
     }

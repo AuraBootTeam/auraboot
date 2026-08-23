@@ -27,17 +27,17 @@
       "model-surfaces": 50,
       "menus": 55,
       "pages": 128,
-      "page-blocks": 413,
-      "page-fields": 1761,
-      "ui-actions": 624,
-      "commands": 247,
+      "page-blocks": 418,
+      "page-fields": 1769,
+      "ui-actions": 640,
+      "commands": 250,
       "permissions": 114,
-      "queries": 55,
+      "queries": 56,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 735,
-      "untested": 2749
+      "pass": 736,
+      "untested": 2781
     },
     "fullProductNonGoals": [
       "data migration"
@@ -523,14 +523,16 @@
         "id": "crm:complete_task",
         "goals": [
           "RG-1",
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -766,20 +768,6 @@
         "verdict": "pass"
       },
       {
-        "id": "crm:delete_activity",
-        "goals": [
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
-        ],
-        "permissionCodes": [
-          "crm.activity.manage"
-        ],
-        "evidence": [
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
-        ],
-        "permissionsVerified": false,
-        "verdict": "pass"
-      },
-      {
         "id": "crm:delete_customer_capacity",
         "goals": [
           "CORDYS-CUSTOMER-POOL"
@@ -819,6 +807,34 @@
           "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
         ],
         "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:delete_follow_plan",
+        "goals": [
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:delete_follow_record",
+        "goals": [
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
         "verdict": "pass"
       },
       {
@@ -1129,14 +1145,16 @@
         "id": "crm:start_task",
         "goals": [
           "RG-1",
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -3057,8 +3075,8 @@
     {
       "id": "CRM-CONTACT-FOLLOWUP-LIFECYCLE",
       "filePrefix": "crm-contact-followup-lifecycle-",
-      "expectedScenarios": 10,
-      "minimumScreenshots": 6,
+      "expectedScenarios": 14,
+      "minimumScreenshots": 7,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_detail",
@@ -3070,7 +3088,8 @@
           "crm_contact_common_detail:crm_contact_detail_toolbar",
           "crm_activity_common_list:crm_act_tabs",
           "crm_activity_common_list:crm_act_table",
-          "crm_activity_common_detail:section_basic",
+          "crm_activity_common_detail:activity_summary",
+          "crm_activity_common_detail:activity_history",
           "crm_activity_common_detail:crm_activity_detail_toolbar"
         ],
         "fields": [
@@ -3081,10 +3100,10 @@
           "crm_activity_common_list:crm_act_table:crm_act_type",
           "crm_activity_common_list:crm_act_table:crm_act_subject",
           "crm_activity_common_list:crm_act_table:crm_act_date",
-          "crm_activity_common_detail:section_basic:crm_act_type",
-          "crm_activity_common_detail:section_basic:crm_act_subject",
-          "crm_activity_common_detail:section_basic:crm_act_date",
-          "crm_activity_common_detail:section_basic:crm_act_content"
+          "crm_activity_common_detail:activity_summary:crm_act_type",
+          "crm_activity_common_detail:activity_summary:crm_act_subject",
+          "crm_activity_common_detail:activity_summary:crm_act_date",
+          "crm_activity_common_detail:activity_summary:crm_act_content"
         ],
         "uiActions": [
           "crm_contact_common_detail:crm_contact_detail_toolbar:set_primary",
@@ -3093,7 +3112,9 @@
           "crm_activity_common_list:crm_act_tabs:follow_plans",
           "crm_activity_common_list:crm_act_tabs:follow_records",
           "crm_activity_common_detail:crm_activity_detail_toolbar:start_task",
-          "crm_activity_common_detail:crm_activity_detail_toolbar:delete"
+          "crm_activity_common_detail:crm_activity_detail_toolbar:complete_task",
+          "crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan",
+          "crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record"
         ],
         "commands": [
           "crm:create_account",
@@ -3102,7 +3123,10 @@
           "crm:disable_contact",
           "crm:enable_contact",
           "crm:create_activity",
-          "crm:delete_activity"
+          "crm:start_task",
+          "crm:complete_task",
+          "crm:delete_follow_plan",
+          "crm:delete_follow_record"
         ]
       },
       "expectedTechnicalVerdict": "pass",
@@ -6696,7 +6720,33 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0]"
         },
         {
-          "id": "block:crm_account_common_detail:block_activities:10",
+          "id": "block:crm_account_common_detail:crm_account_plan_actions:10",
+          "action": "Render and semantically verify toolbar block crm_account_plan_actions on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0]"
+        },
+        {
+          "id": "block:crm_account_common_detail:block_account_follow_plans:11",
+          "action": "Render and semantically verify sub-table block block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1]"
+        },
+        {
+          "id": "block:crm_account_common_detail:block_activities:12",
           "action": "Render and semantically verify activity-timeline block block_activities on crm_account_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
@@ -6708,10 +6758,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0]"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0]"
         },
         {
-          "id": "block:crm_account_common_detail:crm_account_detail_toolbar:11",
+          "id": "block:crm_account_common_detail:crm_account_detail_toolbar:13",
           "action": "Render and semantically verify toolbar block crm_account_detail_toolbar on crm_account_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
@@ -6840,7 +6890,20 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[0]"
         },
         {
-          "id": "block:crm_account_relation_common_form:relationship_buttons:1",
+          "id": "block:crm_account_relation_common_form:relationship_validity:1",
+          "action": "Render and semantically verify form-section block relationship_validity on crm_account_relation_common_form",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1]"
+        },
+        {
+          "id": "block:crm_account_relation_common_form:relationship_buttons:2",
           "action": "Render and semantically verify form-buttons block relationship_buttons on crm_account_relation_common_form",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
@@ -6852,7 +6915,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[2]"
         },
         {
           "id": "block:crm_account_relation_common_list:relationship_toolbar:0",
@@ -6881,8 +6944,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1]"
         },
         {
-          "id": "block:crm_activity_common_detail:section_basic:0",
-          "action": "Render and semantically verify form-section block section_basic on crm_activity_common_detail",
+          "id": "block:crm_activity_common_detail:activity_summary:0",
+          "action": "Render and semantically verify detail-section block activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -6896,8 +6959,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0]"
         },
         {
-          "id": "block:crm_activity_common_detail:section_related_context:1",
-          "action": "Render and semantically verify form-section block section_related_context on crm_activity_common_detail",
+          "id": "block:crm_activity_common_detail:activity_facts:1",
+          "action": "Render and semantically verify detail-section block activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
           "verdict": "untested",
@@ -6935,7 +6998,22 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[3]"
         },
         {
-          "id": "block:crm_activity_common_detail:activity_followup_comments:4",
+          "id": "block:crm_activity_common_detail:activity_history:4",
+          "action": "Render and semantically verify sub-table block activity_history on crm_activity_common_detail",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+        },
+        {
+          "id": "block:crm_activity_common_detail:activity_followup_comments:5",
           "action": "Render and semantically verify record-comments block activity_followup_comments on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
@@ -6948,10 +7026,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5]"
         },
         {
-          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:5",
+          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:6",
           "action": "Render and semantically verify toolbar block crm_activity_detail_toolbar on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
@@ -6963,7 +7041,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6]"
         },
         {
           "id": "block:crm_activity_common_form:basic:0",
@@ -11199,6 +11277,19 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6]"
         },
         {
+          "id": "block:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:7",
+          "action": "Render and semantically verify toolbar block crm_opportunity_daily_shortcuts on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7]"
+        },
+        {
           "id": "block:crm_qdp_release_workbench:crm_qdp_queue_metrics:0",
           "action": "Render and semantically verify metric-strip block crm_qdp_queue_metrics on crm_qdp_release_workbench",
           "evidence": [],
@@ -12492,8 +12583,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_effective_from:23",
-          "action": "Verify field crm_acr_effective_from in block_outgoing_relationships on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_effective_to:23",
+          "action": "Verify field crm_acr_effective_to in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12505,33 +12596,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_effective_to:24",
-          "action": "Verify field crm_acr_effective_to in block_outgoing_relationships on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[5].field"
-        },
-        {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_owner:25",
-          "action": "Verify field crm_acr_owner in block_outgoing_relationships on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[6].field"
-        },
-        {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_source_account_id:26",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_source_account_id:24",
           "action": "Verify field crm_acr_source_account_id in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12544,7 +12609,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_relation_type:27",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_relation_type:25",
           "action": "Verify field crm_acr_relation_type in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12557,7 +12622,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_strength:28",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_strength:26",
           "action": "Verify field crm_acr_strength in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12570,7 +12635,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_status:29",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_status:27",
           "action": "Verify field crm_acr_status in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12583,8 +12648,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_effective_from:30",
-          "action": "Verify field crm_acr_effective_from in block_incoming_relationships on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_effective_to:28",
+          "action": "Verify field crm_acr_effective_to in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12596,33 +12661,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_effective_to:31",
-          "action": "Verify field crm_acr_effective_to in block_incoming_relationships on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[5].field"
-        },
-        {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_owner:32",
-          "action": "Verify field crm_acr_owner in block_incoming_relationships on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[6].field"
-        },
-        {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_code:33",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_code:29",
           "action": "Verify field crm_opp_code in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12635,7 +12674,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_name:34",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_name:30",
           "action": "Verify field crm_opp_name in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12648,7 +12687,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_stage:35",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_stage:31",
           "action": "Verify field crm_opp_stage in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12661,7 +12700,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_amount:36",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_amount:32",
           "action": "Verify field crm_opp_expected_amount in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12674,7 +12713,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_close_date:37",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_close_date:33",
           "action": "Verify field crm_opp_expected_close_date in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12687,7 +12726,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_owner:38",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_owner:34",
           "action": "Verify field crm_opp_owner in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12700,7 +12739,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_code:39",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_code:35",
           "action": "Verify field crm_cmp_code in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12713,7 +12752,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_type:40",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_type:36",
           "action": "Verify field crm_cmp_type in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12726,7 +12765,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_severity:41",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_severity:37",
           "action": "Verify field crm_cmp_severity in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12739,7 +12778,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_status:42",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_status:38",
           "action": "Verify field crm_cmp_status in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12752,7 +12791,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_date:43",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_date:39",
           "action": "Verify field crm_cmp_date in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12765,7 +12804,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_code:44",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_code:40",
           "action": "Verify field crm_cr_code in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12778,7 +12817,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_title:45",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_title:41",
           "action": "Verify field crm_cr_title in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12791,7 +12830,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_type:46",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_type:42",
           "action": "Verify field crm_cr_type in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12804,7 +12843,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_status:47",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_status:43",
           "action": "Verify field crm_cr_status in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12817,7 +12856,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_route_status:48",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_route_status:44",
           "action": "Verify field crm_cr_route_status in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12830,7 +12869,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_expected_date:49",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_expected_date:45",
           "action": "Verify field crm_cr_expected_date in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12843,7 +12882,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_owner:50",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_owner:46",
           "action": "Verify field crm_cr_owner in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12856,7 +12895,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_code:51",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_code:47",
           "action": "Verify field crm_qs_code in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12869,7 +12908,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_customer_request_id:52",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_customer_request_id:48",
           "action": "Verify field crm_qs_customer_request_id in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12882,7 +12921,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_source_quote_type:53",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_source_quote_type:49",
           "action": "Verify field crm_qs_source_quote_type in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12895,7 +12934,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_status:54",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_status:50",
           "action": "Verify field crm_qs_status in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12908,7 +12947,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_quote_amount:55",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_quote_amount:51",
           "action": "Verify field crm_qs_quote_amount in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12921,7 +12960,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_currency:56",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_currency:52",
           "action": "Verify field crm_qs_currency in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12934,7 +12973,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_valid_until:57",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_valid_until:53",
           "action": "Verify field crm_qs_valid_until in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12947,7 +12986,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_won_lost_result:58",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_won_lost_result:54",
           "action": "Verify field crm_qs_won_lost_result in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12960,7 +12999,72 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[7].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_type:59",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_subject:55",
+          "action": "Verify field crm_act_subject in block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[0].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_status:56",
+          "action": "Verify field crm_act_status in block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[1].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_priority:57",
+          "action": "Verify field crm_act_priority in block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[2].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_due_date:58",
+          "action": "Verify field crm_act_due_date in block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[3].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_account_follow_plans:owner_name:59",
+          "action": "Verify field owner_name in block_account_follow_plans on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[4].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_activities:crm_act_type:60",
           "action": "Verify field crm_act_type in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12970,10 +13074,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].subTable.columns[0].field"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_subject:60",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_subject:61",
           "action": "Verify field crm_act_subject in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12983,10 +13087,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].subTable.columns[1].field"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_date:61",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_date:62",
           "action": "Verify field crm_act_date in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12996,10 +13100,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].subTable.columns[2].field"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_owner:62",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_owner:63",
           "action": "Verify field crm_act_owner in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13009,10 +13113,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].subTable.columns[3].field"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_ar_object_type:63",
+          "id": "field:crm_account_common_detail:block_activities:crm_ar_object_type:64",
           "action": "Verify field crm_ar_object_type in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13022,7 +13126,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].subTable.columns[4].field"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[4].field"
         },
         {
           "id": "field:crm_account_common_form:basic:crm_acc_name:0",
@@ -13464,49 +13568,43 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[0].fields[4].field"
         },
         {
-          "id": "field:crm_account_relation_common_form:relationship_basic:crm_acr_effective_from:5",
-          "action": "Verify field crm_acr_effective_from in relationship_basic on crm_account_relation_common_form",
-          "evidence": [
-            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
-          ],
-          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
-          "verdict": "pass",
-          "verdict_by": "spec-assert",
+          "id": "field:crm_account_relation_common_form:relationship_validity:crm_acr_effective_from:5",
+          "action": "Verify field crm_acr_effective_from in relationship_validity on crm_account_relation_common_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[0].fields[5].field"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1].fields[0].field"
         },
         {
-          "id": "field:crm_account_relation_common_form:relationship_basic:crm_acr_effective_to:6",
-          "action": "Verify field crm_acr_effective_to in relationship_basic on crm_account_relation_common_form",
-          "evidence": [
-            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
-          ],
-          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
-          "verdict": "pass",
-          "verdict_by": "spec-assert",
+          "id": "field:crm_account_relation_common_form:relationship_validity:crm_acr_effective_to:6",
+          "action": "Verify field crm_acr_effective_to in relationship_validity on crm_account_relation_common_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[0].fields[6].field"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1].fields[1].field"
         },
         {
-          "id": "field:crm_account_relation_common_form:relationship_basic:crm_acr_notes:7",
-          "action": "Verify field crm_acr_notes in relationship_basic on crm_account_relation_common_form",
-          "evidence": [
-            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
-          ],
-          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
-          "verdict": "pass",
-          "verdict_by": "spec-assert",
+          "id": "field:crm_account_relation_common_form:relationship_validity:crm_acr_notes:7",
+          "action": "Verify field crm_acr_notes in relationship_validity on crm_account_relation_common_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[0].fields[7].field"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1].fields[2].field"
         },
         {
           "id": "field:crm_account_relation_common_list:relationship_table:crm_acr_source_account_id:0",
@@ -13574,8 +13672,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[4].field"
         },
         {
-          "id": "field:crm_account_relation_common_list:relationship_table:crm_acr_effective_from:5",
-          "action": "Verify field crm_acr_effective_from in relationship_table on crm_account_relation_common_list",
+          "id": "field:crm_account_relation_common_list:relationship_table:crm_acr_effective_to:5",
+          "action": "Verify field crm_acr_effective_to in relationship_table on crm_account_relation_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13587,8 +13685,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[5].field"
         },
         {
-          "id": "field:crm_account_relation_common_list:relationship_table:crm_acr_effective_to:6",
-          "action": "Verify field crm_acr_effective_to in relationship_table on crm_account_relation_common_list",
+          "id": "field:crm_account_relation_common_list:relationship_table:actions:6",
+          "action": "Verify field actions in relationship_table on crm_account_relation_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13600,33 +13698,7 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[6].field"
         },
         {
-          "id": "field:crm_account_relation_common_list:relationship_table:crm_acr_owner:7",
-          "action": "Verify field crm_acr_owner in relationship_table on crm_account_relation_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[7].field"
-        },
-        {
-          "id": "field:crm_account_relation_common_list:relationship_table:actions:8",
-          "action": "Verify field actions in relationship_table on crm_account_relation_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[8].field"
-        },
-        {
-          "id": "field:crm_account_relation_common_list:relationship_table:updated_at:9",
+          "id": "field:crm_account_relation_common_list:relationship_table:updated_at:7",
           "action": "Verify field updated_at in relationship_table on crm_account_relation_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13639,8 +13711,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].defaultSort.field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_type:0",
-          "action": "Verify field crm_act_type in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_type:0",
+          "action": "Verify field crm_act_type in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13654,8 +13726,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[0].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_subject:1",
-          "action": "Verify field crm_act_subject in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_subject:1",
+          "action": "Verify field crm_act_subject in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13669,8 +13741,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[1].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_date:2",
-          "action": "Verify field crm_act_date in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_date:2",
+          "action": "Verify field crm_act_date in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13684,8 +13756,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[2].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_owner:3",
-          "action": "Verify field crm_act_owner in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_owner:3",
+          "action": "Verify field crm_act_owner in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13697,8 +13769,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[3].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_source:4",
-          "action": "Verify field crm_act_source in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_source:4",
+          "action": "Verify field crm_act_source in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13710,8 +13782,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[4].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_parent_id:5",
-          "action": "Verify field crm_act_parent_id in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_parent_id:5",
+          "action": "Verify field crm_act_parent_id in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13723,8 +13795,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[5].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_content:6",
-          "action": "Verify field crm_act_content in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_content:6",
+          "action": "Verify field crm_act_content in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13738,8 +13810,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[6].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_files:7",
-          "action": "Verify field crm_act_files in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_files:7",
+          "action": "Verify field crm_act_files in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13751,8 +13823,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[7].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_related_context:crm_act_related_model:8",
-          "action": "Verify field crm_act_related_model in section_related_context on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_facts:crm_act_related_model:8",
+          "action": "Verify field crm_act_related_model in activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13764,8 +13836,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[1].fields[0].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_related_context:crm_act_related_id:9",
-          "action": "Verify field crm_act_related_id in section_related_context on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_facts:crm_act_related_id:9",
+          "action": "Verify field crm_act_related_id in activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13892,6 +13964,58 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[3].fields[4].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_type:19",
+          "action": "Verify field crm_act_type in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[0].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_subject:20",
+          "action": "Verify field crm_act_subject in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[1].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_date:21",
+          "action": "Verify field crm_act_date in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[2].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_owner:22",
+          "action": "Verify field crm_act_owner in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[3].field"
         },
         {
           "id": "field:crm_activity_common_form:basic:crm_act_type:0",
@@ -25682,7 +25806,33 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[0].tabs[5].filter.field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_last_pool_id:5",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_assigned_to:5",
+          "action": "Verify field crm_lead_assigned_to in crm_lead_table on crm_lead_common_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[0].action.input.field"
+        },
+        {
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_source:6",
+          "action": "Verify field crm_lead_source in crm_lead_table on crm_lead_common_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[1].action.input.field"
+        },
+        {
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_last_pool_id:7",
           "action": "Verify field crm_lead_last_pool_id in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25692,10 +25842,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[3].action.input.field"
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[6].action.input.field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_code:6",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_code:8",
           "action": "Verify field crm_lead_code in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25708,7 +25858,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[0].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_company:7",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_company:9",
           "action": "Verify field crm_lead_company in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25721,7 +25871,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[1].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_contact_name:8",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_contact_name:10",
           "action": "Verify field crm_lead_contact_name in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25734,7 +25884,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[2].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_contact_phone:9",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_contact_phone:11",
           "action": "Verify field crm_lead_contact_phone in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25747,7 +25897,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[3].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_source:10",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_source:12",
           "action": "Verify field crm_lead_source in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25760,7 +25910,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[4].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_score:11",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_score:13",
           "action": "Verify field crm_lead_score in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25773,7 +25923,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[5].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_status:12",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_status:14",
           "action": "Verify field crm_lead_status in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25786,7 +25936,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[6].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_assigned_to:13",
+          "id": "field:crm_lead_common_list:crm_lead_table:crm_lead_assigned_to:15",
           "action": "Verify field crm_lead_assigned_to in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25799,7 +25949,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[7].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:actions:14",
+          "id": "field:crm_lead_common_list:crm_lead_table:actions:16",
           "action": "Verify field actions in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -25812,7 +25962,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].field"
         },
         {
-          "id": "field:crm_lead_common_list:crm_lead_table:created_at:15",
+          "id": "field:crm_lead_common_list:crm_lead_table:created_at:17",
           "action": "Verify field created_at in crm_lead_table on crm_lead_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30804,7 +30954,46 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[4].summaryFields[3].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_code:15",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_lost_reason_code:15",
+          "action": "Verify field crm_opp_lost_reason_code in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_competitor:16",
+          "action": "Verify field crm_opp_competitor in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_stage_actions:crm_opp_lost_reason:17",
+          "action": "Verify field crm_opp_lost_reason in crm_opportunity_stage_actions on crm_opportunity_workspace",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4].onClick.args.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_code:18",
           "action": "Verify field crm_opp_code in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30817,7 +31006,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[0].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:account_name:16",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:account_name:19",
           "action": "Verify field account_name in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30830,7 +31019,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[1].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_forecast_category:17",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:crm_opp_forecast_category:20",
           "action": "Verify field crm_opp_forecast_category in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30843,7 +31032,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[2].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:last_activity_at:18",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:last_activity_at:21",
           "action": "Verify field last_activity_at in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30856,7 +31045,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[3].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:open_risks:19",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:open_risks:22",
           "action": "Verify field open_risks in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30869,7 +31058,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[6].sections[4].field"
         },
         {
-          "id": "field:crm_opportunity_workspace:crm_opportunity_context:quote_count:20",
+          "id": "field:crm_opportunity_workspace:crm_opportunity_context:quote_count:23",
           "action": "Verify field quote_count in crm_opportunity_context on crm_opportunity_workspace",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -35635,7 +35824,20 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_tabs:activities:7",
+          "id": "ui-action:crm_account_common_detail:crm_account_tabs:follow_plans:7",
+          "action": "tab follow_plans on crm_account_common_detail -> view-state:follow_plans",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:crm_account_tabs:activities:8",
           "action": "tab activities on crm_account_common_detail -> view-state:activities",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
@@ -35647,10 +35849,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7]"
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_contacts:add:8",
+          "id": "ui-action:crm_account_common_detail:block_contacts:add:9",
           "action": "action add on crm_account_common_detail -> navigate:crm:create_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35663,7 +35865,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_contacts:edit:9",
+          "id": "ui-action:crm_account_common_detail:block_contacts:edit:10",
           "action": "action edit on crm_account_common_detail -> navigate:crm:update_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35676,7 +35878,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_contacts:delete:10",
+          "id": "ui-action:crm_account_common_detail:block_contacts:delete:11",
           "action": "action delete on crm_account_common_detail -> command:crm:delete_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35689,7 +35891,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.actions[2]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_relationship_actions:add:11",
+          "id": "ui-action:crm_account_common_detail:crm_account_relationship_actions:add:12",
           "action": "button add on crm_account_common_detail -> navigate:crm:create_account_relation",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
@@ -35704,7 +35906,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[0].buttons[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:view:12",
+          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:view:13",
           "action": "action view on crm_account_common_detail -> navigate:crm_account_relation_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
@@ -35719,7 +35921,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:edit:13",
+          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:edit:14",
           "action": "action edit on crm_account_common_detail -> navigate:crm:update_account_relation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35732,7 +35934,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:delete:14",
+          "id": "ui-action:crm_account_common_detail:block_outgoing_relationships:delete:15",
           "action": "action delete on crm_account_common_detail -> command:crm:delete_account_relation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35745,7 +35947,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.actions[2]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_incoming_relationships:view:15",
+          "id": "ui-action:crm_account_common_detail:block_incoming_relationships:view:16",
           "action": "action view on crm_account_common_detail -> navigate:crm_account_relation_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35758,7 +35960,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_customer_requests:add:16",
+          "id": "ui-action:crm_account_common_detail:block_customer_requests:add:17",
           "action": "action add on crm_account_common_detail -> navigate:crm:create_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35771,7 +35973,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:block_customer_requests:view:17",
+          "id": "ui-action:crm_account_common_detail:block_customer_requests:view:18",
           "action": "action view on crm_account_common_detail -> navigate:crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35784,7 +35986,72 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:edit:18",
+          "id": "ui-action:crm_account_common_detail:crm_account_plan_actions:create_plan:19",
+          "action": "button create_plan on crm_account_common_detail -> navigate:crm:create_account_task",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[0].buttons[0]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:block_account_follow_plans:view_task:20",
+          "action": "action view_task on crm_account_common_detail -> navigate:crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.actions[0]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:block_account_follow_plans:start_task:21",
+          "action": "action start_task on crm_account_common_detail -> state_transition:crm:start_task",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.actions[1]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:block_account_follow_plans:complete_task:22",
+          "action": "action complete_task on crm_account_common_detail -> state_transition:crm:complete_task",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.actions[2]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:block_account_follow_plans:cancel_task:23",
+          "action": "action cancel_task on crm_account_common_detail -> state_transition:crm:cancel_task",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.actions[3]"
+        },
+        {
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:edit:24",
           "action": "button edit on crm_account_common_detail -> navigate:crm_account_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35797,7 +36064,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[1].buttons[0]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:log_activity:19",
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:log_activity:25",
           "action": "button log_activity on crm_account_common_detail -> navigate:crm:log_account_activity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35810,7 +36077,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[1].buttons[1]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:create_task:20",
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:create_task:26",
           "action": "button create_task on crm_account_common_detail -> navigate:crm:create_account_task",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35823,7 +36090,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[1].buttons[2]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:view_360:21",
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:view_360:27",
           "action": "button view_360 on crm_account_common_detail -> navigate:/dashboards/view/crm_account_360?recordPid={pid}",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35836,7 +36103,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[1].buttons[3]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:recompute_health:22",
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:recompute_health:28",
           "action": "button recompute_health on crm_account_common_detail -> command:crm:recompute_health",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -35849,7 +36116,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[1].buttons[4]"
         },
         {
-          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:move_to_customer_pool:23",
+          "id": "ui-action:crm_account_common_detail:crm_account_detail_toolbar:move_to_customer_pool:29",
           "action": "button move_to_customer_pool on crm_account_common_detail -> command:crm:move_customer_to_pool",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -36073,7 +36340,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[2].buttons[0]"
         },
         {
           "id": "ui-action:crm_account_relation_common_form:relationship_buttons:cancel:1",
@@ -36086,7 +36353,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[1].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_form.json#root[2].buttons[1]"
         },
         {
           "id": "ui-action:crm_account_relation_common_list:relationship_toolbar:create:0",
@@ -36102,7 +36369,20 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[0].buttons[0]"
         },
         {
-          "id": "ui-action:crm_account_relation_common_list:relationship_table:view:1",
+          "id": "ui-action:crm_account_relation_common_list:relationship_toolbar:save:1",
+          "action": "button save on crm_account_relation_common_list -> navigate:crm:save_account_relation",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[0].buttons[1]"
+        },
+        {
+          "id": "ui-action:crm_account_relation_common_list:relationship_table:view:2",
           "action": "button view on crm_account_relation_common_list -> navigate:crm_account_relation_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -36112,10 +36392,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[8].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[6].buttons[0]"
         },
         {
-          "id": "ui-action:crm_account_relation_common_list:relationship_table:edit:2",
+          "id": "ui-action:crm_account_relation_common_list:relationship_table:edit:3",
           "action": "button edit on crm_account_relation_common_list -> navigate:crm_account_relation_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -36125,10 +36405,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[8].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[6].buttons[1]"
         },
         {
-          "id": "ui-action:crm_account_relation_common_list:relationship_table:delete:3",
+          "id": "ui-action:crm_account_relation_common_list:relationship_table:delete:4",
           "action": "button delete on crm_account_relation_common_list -> command:crm:delete_account_relation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -36138,7 +36418,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[8].buttons[2]"
+          "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].columns[6].buttons[2]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:edit:0",
@@ -36151,7 +36431,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[0]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:start_task:1",
@@ -36166,20 +36446,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[1]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:complete_task:2",
           "action": "button complete_task on crm_activity_common_detail -> state_transition:crm:complete_task",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[2]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[2]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:cancel_task:3",
@@ -36192,11 +36474,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[3]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[3]"
         },
         {
-          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete:4",
-          "action": "button delete on crm_activity_common_detail -> command:crm:delete_activity",
+          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan:4",
+          "action": "button delete_follow_plan on crm_activity_common_detail -> command:crm:delete_follow_plan",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -36207,7 +36489,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[4]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record:5",
+          "action": "button delete_follow_record on crm_activity_common_detail -> command:crm:delete_follow_record",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[5]"
         },
         {
           "id": "ui-action:crm_activity_common_form:buttons:submit:0",
@@ -36435,8 +36732,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[1]"
         },
         {
-          "id": "ui-action:crm_activity_common_list:crm_act_table:delete:15",
-          "action": "button delete on crm_activity_common_list -> command:crm:delete_activity",
+          "id": "ui-action:crm_activity_common_list:crm_act_table:delete_follow_plan:15",
+          "action": "button delete_follow_plan on crm_activity_common_list -> command:crm:delete_follow_plan",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36446,6 +36743,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[2]"
+        },
+        {
+          "id": "ui-action:crm_activity_common_list:crm_act_table:delete_follow_record:16",
+          "action": "button delete_follow_record on crm_activity_common_list -> command:crm:delete_follow_record",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[3]"
         },
         {
           "id": "ui-action:crm_activity_service_desk:crm_activity_service_header_actions:open_task_record:0",
@@ -37902,7 +38212,20 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].rowActions[0]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:view:2",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:bulk_delete_contacts:2",
+          "action": "bulk-action bulk_delete_contacts on crm_contact_common_list -> bulk_record_command:crm:delete_contact",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].table.bulkActions[0]"
+        },
+        {
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:view:3",
           "action": "button view on crm_contact_common_list -> navigate:crm_contact_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37915,7 +38238,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[0]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:3",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:4",
           "action": "button edit on crm_contact_common_list -> navigate:crm_contact_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37928,7 +38251,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[1]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:set_primary:4",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:set_primary:5",
           "action": "button set_primary on crm_contact_common_list -> command:crm:set_primary_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37941,7 +38264,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[2]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:disable:5",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:disable:6",
           "action": "button disable on crm_contact_common_list -> state_transition:crm:disable_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37954,7 +38277,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[3]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:enable:6",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:enable:7",
           "action": "button enable on crm_contact_common_list -> state_transition:crm:enable_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37967,7 +38290,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[4]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:7",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:8",
           "action": "button delete on crm_contact_common_list -> command:crm:delete_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -40630,8 +40953,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[1].buttons[1]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_contact:8",
-          "action": "bulk-action bulk_contact on crm_lead_common_list -> bulk_state_transition:crm:contact_lead",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_transfer_owner:8",
+          "action": "bulk-action bulk_transfer_owner on crm_lead_common_list -> bulk_field_command:crm:update_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40643,8 +40966,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[0]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_qualify:9",
-          "action": "bulk-action bulk_qualify on crm_lead_common_list -> bulk_state_transition:crm:qualify_lead",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_update_source:9",
+          "action": "bulk-action bulk_update_source on crm_lead_common_list -> bulk_field_command:crm:update_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40656,8 +40979,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[1]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_lose:10",
-          "action": "bulk-action bulk_lose on crm_lead_common_list -> bulk_state_transition:crm:lose_lead",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_delete_leads:10",
+          "action": "bulk-action bulk_delete_leads on crm_lead_common_list -> bulk_record_command:crm:delete_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40669,8 +40992,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[2]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_move_to_pool:11",
-          "action": "bulk-action bulk_move_to_pool on crm_lead_common_list -> bulk_field_command:crm:move_lead_to_pool",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_contact:11",
+          "action": "bulk-action bulk_contact on crm_lead_common_list -> bulk_state_transition:crm:contact_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40682,7 +41005,46 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[3]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:view:12",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_qualify:12",
+          "action": "bulk-action bulk_qualify on crm_lead_common_list -> bulk_state_transition:crm:qualify_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[4]"
+        },
+        {
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_lose:13",
+          "action": "bulk-action bulk_lose on crm_lead_common_list -> bulk_state_transition:crm:lose_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[5]"
+        },
+        {
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:bulk_move_to_pool:14",
+          "action": "bulk-action bulk_move_to_pool on crm_lead_common_list -> bulk_field_command:crm:move_lead_to_pool",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].table.bulkActions[6]"
+        },
+        {
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:view:15",
           "action": "button view on crm_lead_common_list -> navigate:crm_lead_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -40695,7 +41057,7 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[0]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:edit:13",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:edit:16",
           "action": "button edit on crm_lead_common_list -> navigate:crm_lead_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -40708,8 +41070,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[1]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:move_to_pool:14",
-          "action": "button move_to_pool on crm_lead_common_list -> command:crm:move_lead_to_pool",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:convert_to_customer:17",
+          "action": "button convert_to_customer on crm_lead_common_list -> command:crm:convert_lead_to_customer",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40721,8 +41083,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[2]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:delete:15",
-          "action": "button delete on crm_lead_common_list -> command:crm:delete_lead",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:move_to_pool:18",
+          "action": "button move_to_pool on crm_lead_common_list -> command:crm:move_lead_to_pool",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -40732,6 +41094,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[3]"
+        },
+        {
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:delete:19",
+          "action": "button delete on crm_lead_common_list -> command:crm:delete_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[4]"
         },
         {
           "id": "ui-action:crm_lead_conversion:crm_lead_conversion_tabs:overview:0",
@@ -42562,6 +42937,32 @@
           "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[5].actions[4]"
         },
         {
+          "id": "ui-action:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:open_my_tasks:8",
+          "action": "button open_my_tasks on crm_opportunity_workspace -> navigate:crm_my_tasks_list",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7].buttons[0]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_workspace:crm_opportunity_daily_shortcuts:create_next_step:9",
+          "action": "button create_next_step on crm_opportunity_workspace -> navigate:/p/crm_activity_common/new?command=crm:create_opp_task&sourceRecordPid=${state.selectedOpportunity.pid}",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_workspace.json#root[7].buttons[1]"
+        },
+        {
           "id": "ui-action:crm_qdp_release_workbench:crm_qdp_queue_filters:filter_all:0",
           "action": "action filter_all on crm_qdp_release_workbench -> unknown:n/a",
           "evidence": [],
@@ -44022,6 +44423,19 @@
           "source": "plugins/crm/config/commands/crm_account_relation_common.json"
         },
         {
+          "id": "command:crm:save_account_relation",
+          "action": "Execute crm:save_account_relation (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_account_relation_common.json"
+        },
+        {
           "id": "command:crm:delete_account_relation",
           "action": "Execute crm:delete_account_relation (delete) through its supported user or runtime path",
           "evidence": [
@@ -44097,7 +44511,8 @@
           "action": "Execute crm:start_task (state_transition) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44113,7 +44528,8 @@
           "action": "Execute crm:complete_task (state_transition) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44140,8 +44556,23 @@
           "source": "plugins/crm/config/commands/crm_activity_common.json"
         },
         {
-          "id": "command:crm:delete_activity",
-          "action": "Execute crm:delete_activity (delete) through its supported user or runtime path",
+          "id": "command:crm:delete_follow_plan",
+          "action": "Execute crm:delete_follow_plan (delete) through its supported user or runtime path",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/commands/crm_activity_common.json"
+        },
+        {
+          "id": "command:crm:delete_follow_record",
+          "action": "Execute crm:delete_follow_record (delete) through its supported user or runtime path",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -44925,7 +45356,7 @@
         },
         {
           "id": "command:crm:delete_contact",
-          "action": "Execute crm:delete_contact (delete) through its supported user or runtime path",
+          "action": "Execute crm:delete_contact (custom) through its supported user or runtime path",
           "evidence": [],
           "assertion": "No complete browser/backend evidence pair is registered for this command.",
           "verdict": "untested",
@@ -46104,6 +46535,19 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
+          "source": "plugins/crm/config/commands/crm_lead_common.json"
+        },
+        {
+          "id": "command:crm:convert_lead_to_customer",
+          "action": "Execute crm:convert_lead_to_customer (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
           "source": "plugins/crm/config/commands/crm_lead_common.json"
         },
         {
@@ -48855,6 +49299,19 @@
           "assertion": "The named query has registered release evidence.",
           "verdict": "pass",
           "verdict_by": "spec-assert",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "http",
+          "source": "plugins/crm/config/named-queries.json"
+        },
+        {
+          "id": "query:crm_follow_record_pool_list",
+          "action": "Execute crm_follow_record_pool_list with tenant isolation and assert non-empty business semantics where fixtures require data",
+          "evidence": [],
+          "assertion": "No real-stack response and consuming-page evidence pair is registered.",
+          "verdict": "untested",
+          "verdict_by": null,
           "surface": "api",
           "dependencies": "real-stack",
           "authority": "blocking-release",

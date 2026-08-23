@@ -53,6 +53,8 @@ test('contacts expose an explicit active/inactive lifecycle instead of overloadi
   );
   assert.equal(commands.get('crm:set_primary_contact').type, 'custom');
   assert.equal(commands.get('crm:set_primary_contact').handler, 'crm:set_primary_contact');
+  assert.equal(commands.get('crm:delete_contact').type, 'custom');
+  assert.equal(commands.get('crm:delete_contact').handler, 'crm:delete_contact');
 });
 
 test('primary-contact and lifecycle actions are available from list and detail with state guards', () => {
@@ -74,8 +76,26 @@ test('primary-contact and lifecycle actions are available from list and detail w
     assert.equal(actions.get('enable').action.command, 'crm:enable_contact');
     assert.match(actions.get('enable').visibleWhen, /inactive/);
   }
+  assert.equal(listActions.get('delete').action.command, 'crm:delete_contact');
   assert.equal(detailActions.get('log_activity').label['zh-CN'], '记录跟进');
   assert.equal(detailActions.get('create_task').label['zh-CN'], '新建计划');
+});
+
+test('contact list exposes governed bulk edit, delete, export and update import', () => {
+  const table = findBlock(listPage, 'crm_contact_table');
+  assert.equal(table.table.selection.mode, 'multiple');
+  assert.equal(table.selection.type, 'checkbox');
+  assert.equal(table.table.bulkCapabilities.edit.permissionCode, 'crm.contact.manage');
+  assert.equal(table.table.bulkCapabilities.export.permissionCode, 'crm.contact.read');
+  assert.equal(table.table.bulkCapabilities.delete, undefined);
+  const deleteAction = table.table.bulkActions.find(
+    (action) => action.code === 'bulk_delete_contacts',
+  );
+  assert.equal(deleteAction.action.type, 'bulk_record_command');
+  assert.equal(deleteAction.action.command, 'crm:delete_contact');
+  assert.equal(deleteAction.action.operationType, undefined);
+  assert.deepEqual(listPage.extension.import.modes, ['insert', 'update']);
+  assert.deepEqual(listPage.extension.import.updateKeys, ['crm_ct_email']);
 });
 
 test('follow-up list distinguishes plans from records and detail exposes governed deletion', () => {
@@ -93,14 +113,34 @@ test('follow-up list distinguishes plans from records and detail exposes governe
 
   const toolbar = findBlock(activityDetail, 'crm_activity_detail_toolbar');
   const actions = new Map(toolbar.buttons.map((button) => [button.code, button]));
-  assert.equal(actions.get('delete').action.command, undefined);
-  assert.equal(actions.get('delete').action.type, 'command');
-  assert.equal(activityCommands.get('crm:delete_activity').type, 'delete');
-  assert.equal(actions.get('delete').permissionCode, 'crm.activity.manage');
-  assert.ok(actions.get('delete').confirm['zh-CN']);
+  const deletePlan = actions.get('delete_follow_plan');
+  const deleteRecord = actions.get('delete_follow_record');
+  assert.equal(deletePlan.action.command, 'crm:delete_follow_plan');
+  assert.equal(deleteRecord.action.command, 'crm:delete_follow_record');
+  assert.match(deletePlan.visibleWhen, /=== 'task'/);
+  assert.match(deleteRecord.visibleWhen, /!== 'task'/);
+  assert.equal(activityCommands.get('crm:delete_follow_plan').type, 'delete');
+  assert.equal(activityCommands.get('crm:delete_follow_record').type, 'delete');
+  assert.equal(deletePlan.permissionCode, 'crm.activity.manage');
+  assert.equal(deleteRecord.permissionCode, 'crm.activity.manage');
+  assert.equal(findBlock(activityDetail, 'activity_history').subTable.parentField, 'crm_act_parent_id');
+  assert.match(deletePlan.confirm['zh-CN'], /无法恢复/);
+  assert.match(deleteRecord.confirm['zh-CN'], /无法恢复/);
   for (const code of ['start_task', 'complete_task', 'cancel_task']) {
     assert.match(actions.get(code).visibleWhen, /crm_act_type/);
     assert.match(actions.get(code).visibleWhen, /crm_act_status/);
+  }
+  assert.equal(activityCommands.get('crm:update_activity').inputFields.includes('crm_act_type'), false);
+  for (const code of ['complete_task', 'cancel_task']) {
+    assert.deepEqual(activityCommands.get(`crm:${code}`).preconditions[0], {
+      field: 'crm_act_type',
+      operator: 'EQ',
+      value: 'task',
+      'message:zh-CN': code === 'complete_task' ? '只有跟进计划可以完成' : '只有跟进计划可以取消',
+      'message:en': code === 'complete_task'
+        ? 'Only follow-up plans can be completed'
+        : 'Only follow-up plans can be cancelled',
+    });
   }
 });
 

@@ -27,6 +27,17 @@
     "cmd_risk_level": "L1"
   },
   {
+    "code": "crm:save_account_relation",
+    "displayName:zh-CN": "保存客户关系",
+    "displayName:en": "Save Account Relationship",
+    "type": "custom",
+    "modelCode": "crm_account_relation_common",
+    "handler": "crm:save_account_relation",
+    "permissions": ["crm.account.manage"],
+    "agent_hint": "Idempotently create or update one directional account relationship by source, target and type.",
+    "cmd_risk_level": "L1"
+  },
+  {
     "code": "crm:delete_account_relation",
     "displayName:zh-CN": "删除客户关系",
     "displayName:en": "Delete Account Relationship",

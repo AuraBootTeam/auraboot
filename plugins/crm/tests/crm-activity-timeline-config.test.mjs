@@ -56,7 +56,39 @@ test('account timeline deduplicates one activity linked through account, contact
   const timeline = queries.find((query) => query.code === 'crm_account_timeline');
   assert.ok(timeline, 'crm_account_timeline must remain registered');
   assert.match(timeline.fromSql, /DISTINCT ON \(a\.pid\)/);
-  assert.match(timeline.fromSql, /WHEN 'account' THEN 0 WHEN 'contact' THEN 1 ELSE 2 END/);
+  assert.match(timeline.fromSql, /WHEN r\.crm_ar_object_type = 'account' THEN 1/);
+  assert.match(timeline.fromSql, /WHEN r\.crm_ar_object_type = 'contact' THEN 2 ELSE 3 END/);
   assert.match(timeline.fromSql, /ORDER BY timeline\.crm_act_date DESC$/);
   assert.doesNotMatch(timeline.fromSql, /^SELECT DISTINCT a\.\*/);
+  assert.match(timeline.fromSql, /crm_act_related_model = 'crm_account_common'/);
+  assert.match(timeline.fromSql, /LEFT JOIN mt_crm_activity_relation_common/);
+});
+
+test('lead, contact and opportunity timeline uses one direct-or-graph deduplication syntax', () => {
+  const queries = readJson('config/named-queries.json');
+  const timeline = queries.find((query) => query.code === 'crm_activities_by_object');
+  assert.ok(timeline);
+  assert.match(timeline.fromSql, /DISTINCT ON \(a\.pid\)/);
+  assert.match(timeline.fromSql, /LEFT JOIN mt_crm_activity_relation_common/);
+  assert.match(timeline.fromSql, /WHEN 'lead' THEN 'crm_lead_common'/);
+  assert.match(timeline.fromSql, /WHEN 'account' THEN 'crm_account_common'/);
+  assert.match(timeline.fromSql, /WHEN 'opportunity' THEN 'crm_opportunity_common'/);
+  assert.match(timeline.fromSql, /r\.crm_ar_object_type = #\{params\.objectType\}/);
+});
+
+test('follow record pool-list is tenant-scoped, record-only and preserves anchor evidence', () => {
+  const queries = readJson('config/named-queries.json');
+  const pool = queries.find((query) => query.code === 'crm_follow_record_pool_list');
+  assert.ok(pool);
+  assert.match(pool.fromSql, /a\.tenant_id = #\{params\.tenantId\}/);
+  assert.match(pool.fromSql, /a\.crm_act_type <> 'task'/);
+  assert.match(pool.fromSql, /COUNT\(\*\) AS anchor_count/);
+  assert.match(pool.fromSql, /string_agg\(DISTINCT crm_ar_object_type/);
+  assert.doesNotMatch(pool.fromSql, /crm_act_type = 'task'/);
+  assert.doesNotMatch(pool.fromSql, /\bCALL\b/i);
+  assert.deepEqual(
+    pool.outputFields.map((field) => field.code).filter((code) => ['anchor_count', 'object_types'].includes(code)),
+    ['anchor_count', 'object_types'],
+  );
+  assert.equal(pool.outputFields.find((field) => field.code === 'anchor_count')?.dataType, 'number');
 });

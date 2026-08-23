@@ -87,6 +87,9 @@ function MemberRecordShareDialog({
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [removingPid, setRemovingPid] = useState<string>();
+  const [selectedSharePids, setSelectedSharePids] = useState<string[]>([]);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [removingBatch, setRemovingBatch] = useState(false);
   const [pickerVersion, setPickerVersion] = useState(0);
 
   const permissionOptions = useMemo(
@@ -140,6 +143,8 @@ function MemberRecordShareDialog({
     setExpiryPreset('never');
     setCustomExpiry('');
     setEditingShare(undefined);
+    setSelectedSharePids([]);
+    setConfirmBatchDelete(false);
     void loadShares();
   }, [loadShares, open]);
 
@@ -248,6 +253,33 @@ function MemberRecordShareDialog({
     },
     [showErrorToast, showSuccessToast, t],
   );
+
+  const removeSelectedShares = useCallback(async () => {
+    if (selectedSharePids.length === 0) return;
+    setRemovingBatch(true);
+    try {
+      const response = await fetch('/api/record-share/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sharePids: selectedSharePids }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !ResultHelper.isSuccess(body)) {
+        throw new Error(body?.message || `HTTP ${response.status}`);
+      }
+      const removed = new Set(selectedSharePids);
+      setShares((current) => current.filter((share) => !removed.has(share.pid)));
+      setSelectedSharePids([]);
+      setConfirmBatchDelete(false);
+      showSuccessToast(t('record_share.batch_removed', undefined, 'Collaborators removed'));
+    } catch {
+      showErrorToast(
+        t('record_share.batch_remove_failed', undefined, 'Failed to remove collaborators'),
+      );
+    } finally {
+      setRemovingBatch(false);
+    }
+  }, [selectedSharePids, showErrorToast, showSuccessToast, t]);
 
   if (!open) return null;
 
@@ -492,6 +524,66 @@ function MemberRecordShareDialog({
                 {shares.length}
               </span>
             </div>
+            {shares.length > 1 ? (
+              <div className="border-border mb-3 flex items-center justify-between gap-2 border-b pb-3">
+                <label className="text-text-2 flex items-center gap-2 text-xs font-medium">
+                  <input
+                    checked={selectedSharePids.length === shares.length}
+                    data-testid="record-share-select-all"
+                    onChange={(event) =>
+                      setSelectedSharePids(
+                        event.target.checked ? shares.map((share) => share.pid) : [],
+                      )
+                    }
+                    type="checkbox"
+                  />
+                  {t('record_share.select_all', undefined, 'Select all')}
+                </label>
+                <button
+                  className="rounded-control text-status-red hover:bg-status-red-bg px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  data-testid="record-share-batch-remove"
+                  disabled={selectedSharePids.length === 0 || removingBatch}
+                  onClick={() => setConfirmBatchDelete(true)}
+                  type="button"
+                >
+                  {t('record_share.remove_selected', undefined, 'Remove selected')} (
+                  {selectedSharePids.length})
+                </button>
+              </div>
+            ) : null}
+            {confirmBatchDelete ? (
+              <div
+                className="border-status-red bg-status-red-bg rounded-card mb-3 border p-3"
+                data-testid="record-share-batch-confirm"
+              >
+                <p className="text-text text-sm font-medium">
+                  {t(
+                    'record_share.batch_confirm',
+                    { count: selectedSharePids.length },
+                    `Remove ${selectedSharePids.length} selected collaborators?`,
+                  )}
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    className="rounded-control border-border border px-3 py-2 text-xs font-medium"
+                    disabled={removingBatch}
+                    onClick={() => setConfirmBatchDelete(false)}
+                    type="button"
+                  >
+                    {t('common.cancel', undefined, 'Cancel')}
+                  </button>
+                  <button
+                    className="rounded-control bg-status-red px-3 py-2 text-xs font-semibold text-white"
+                    data-testid="record-share-batch-confirm-ok"
+                    disabled={removingBatch}
+                    onClick={() => void removeSelectedShares()}
+                    type="button"
+                  >
+                    {t('record_share.confirm_remove', undefined, 'Confirm removal')}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {loading ? (
               <div className="text-text-3 flex items-center justify-center gap-2 py-12 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -527,6 +619,23 @@ function MemberRecordShareDialog({
                       data-testid={`record-share-row-${share.pid}`}
                       key={share.pid}
                     >
+                      <input
+                        aria-label={t(
+                          'record_share.select_member',
+                          undefined,
+                          'Select collaborator',
+                        )}
+                        checked={selectedSharePids.includes(share.pid)}
+                        data-testid={`record-share-select-${share.pid}`}
+                        onChange={(event) =>
+                          setSelectedSharePids((current) =>
+                            event.target.checked
+                              ? [...current, share.pid]
+                              : current.filter((pid) => pid !== share.pid),
+                          )
+                        }
+                        type="checkbox"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="text-text truncate text-sm font-medium">
                           {share.subjectName ||

@@ -15,6 +15,10 @@ const EXPECTED_SCENARIOS = [
   'concurrent-set-primary-single-winner',
   'follow-plan-and-record-tabs',
   'task-actions-state-guarded',
+  'plan-open-to-in-progress-to-done',
+  'terminal-plan-rejects-cancel',
+  'record-rejects-plan-transition',
+  'follow-plan-delete-from-detail',
   'follow-record-delete-from-detail',
 ] as const;
 
@@ -25,7 +29,8 @@ const COVERAGE = {
     'crm_contact_common_detail:crm_contact_detail_toolbar',
     'crm_activity_common_list:crm_act_tabs',
     'crm_activity_common_list:crm_act_table',
-    'crm_activity_common_detail:section_basic',
+    'crm_activity_common_detail:activity_summary',
+    'crm_activity_common_detail:activity_history',
     'crm_activity_common_detail:crm_activity_detail_toolbar',
   ],
   fields: [
@@ -36,10 +41,10 @@ const COVERAGE = {
     'crm_activity_common_list:crm_act_table:crm_act_type',
     'crm_activity_common_list:crm_act_table:crm_act_subject',
     'crm_activity_common_list:crm_act_table:crm_act_date',
-    'crm_activity_common_detail:section_basic:crm_act_type',
-    'crm_activity_common_detail:section_basic:crm_act_subject',
-    'crm_activity_common_detail:section_basic:crm_act_date',
-    'crm_activity_common_detail:section_basic:crm_act_content',
+    'crm_activity_common_detail:activity_summary:crm_act_type',
+    'crm_activity_common_detail:activity_summary:crm_act_subject',
+    'crm_activity_common_detail:activity_summary:crm_act_date',
+    'crm_activity_common_detail:activity_summary:crm_act_content',
   ],
   uiActions: [
     'crm_contact_common_detail:crm_contact_detail_toolbar:set_primary',
@@ -48,7 +53,9 @@ const COVERAGE = {
     'crm_activity_common_list:crm_act_tabs:follow_plans',
     'crm_activity_common_list:crm_act_tabs:follow_records',
     'crm_activity_common_detail:crm_activity_detail_toolbar:start_task',
-    'crm_activity_common_detail:crm_activity_detail_toolbar:delete',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:complete_task',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record',
   ],
   commands: [
     'crm:create_account',
@@ -57,7 +64,10 @@ const COVERAGE = {
     'crm:disable_contact',
     'crm:enable_contact',
     'crm:create_activity',
-    'crm:delete_activity',
+    'crm:start_task',
+    'crm:complete_task',
+    'crm:delete_follow_plan',
+    'crm:delete_follow_record',
   ],
 } as const;
 
@@ -358,6 +368,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await expect(recordTab).toBeVisible();
       await planTab.click();
       await expect(page.getByText(planSubject).first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/跟进履历|Follow-up History/)).toBeVisible();
       await expect(page.getByText(recordSubject)).toHaveCount(0);
       await recordTab.click();
       await expect(page.getByText(recordSubject).first()).toBeVisible({ timeout: 15_000 });
@@ -368,17 +379,57 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
         waitUntil: 'domcontentloaded',
       });
       await expect(page.getByText(planSubject).first()).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByRole('button', { name: /开始任务|Start Task/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /删除|Delete/ })).toBeVisible();
+      const startTask = page.getByRole('button', { name: /开始任务|Start Task/ });
+      await expect(startTask).toBeVisible();
+      await expect(page.getByRole('button', { name: /删除计划|Delete Plan/ })).toBeVisible();
+      await startTask.click();
+      await expect
+        .poll(async () => {
+          const state = await pool.query<{ status: string }>(
+            `SELECT crm_act_ext->>'status' AS status FROM mt_crm_activity_common WHERE pid = $1`,
+            [plan.recordId],
+          );
+          return state.rows[0]?.status;
+        })
+        .toBe('in_progress');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const completeTask = page.getByRole('button', { name: /完成任务|Complete Task/ });
+      await expect(completeTask).toBeVisible();
+      await completeTask.click();
+      await expect
+        .poll(async () => {
+          const state = await pool.query<{ status: string }>(
+            `SELECT crm_act_ext->>'status' AS status FROM mt_crm_activity_common WHERE pid = $1`,
+            [plan.recordId],
+          );
+          return state.rows[0]?.status;
+        })
+        .toBe('done');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('button', { name: /开始任务|Start Task/ })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /完成任务|Complete Task/ })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /取消任务|Cancel Task/ })).toHaveCount(0);
+      screenshots.push(await screenshot(page, testInfo, '06-follow-plan-terminal-state'));
+
+      const terminalCancel = await page.request.post(
+        '/api/meta/commands/execute/crm:cancel_task',
+        { data: { payload: {}, targetRecordPid: plan.recordId } },
+      );
+      expect(terminalCancel.ok()).toBe(false);
 
       await page.goto(`/p/crm_activity_common/view/${record.recordId}`, {
         waitUntil: 'domcontentloaded',
       });
       await expect(page.getByText(recordSubject).first()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByRole('button', { name: /开始任务|Start Task/ })).toHaveCount(0);
-      const deleteButton = page.getByRole('button', { name: /删除|Delete/ });
+      const recordTransition = await page.request.post(
+        '/api/meta/commands/execute/crm:complete_task',
+        { data: { payload: {}, targetRecordPid: record.recordId } },
+      );
+      expect(recordTransition.ok()).toBe(false);
+      const deleteButton = page.getByRole('button', { name: /删除记录|Delete Record/ });
       await expect(deleteButton).toBeVisible();
-      screenshots.push(await screenshot(page, testInfo, '06-follow-record-detail-delete'));
+      screenshots.push(await screenshot(page, testInfo, '07-follow-record-detail-delete'));
       await deleteButton.click();
       const confirmDelete = page.getByRole('button', { name: /确认|Confirm/ }).last();
       await expect(confirmDelete).toBeVisible();
@@ -388,6 +439,25 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
           const deleted = await pool.query<{ record_count: string }>(
             'SELECT count(*)::text AS record_count FROM mt_crm_activity_common WHERE pid = $1',
             [record.recordId],
+          );
+          return deleted.rows[0]?.record_count;
+        })
+        .toBe('0');
+
+      await page.goto(`/p/crm_activity_common/view/${plan.recordId}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      const deletePlan = page.getByRole('button', { name: /删除计划|Delete Plan/ });
+      await expect(deletePlan).toBeVisible();
+      await deletePlan.click();
+      const confirmDeletePlan = page.getByRole('button', { name: /确认|Confirm/ }).last();
+      await expect(confirmDeletePlan).toBeVisible();
+      await confirmDeletePlan.click();
+      await expect
+        .poll(async () => {
+          const deleted = await pool.query<{ record_count: string }>(
+            'SELECT count(*)::text AS record_count FROM mt_crm_activity_common WHERE pid = $1',
+            [plan.recordId],
           );
           return deleted.rows[0]?.record_count;
         })

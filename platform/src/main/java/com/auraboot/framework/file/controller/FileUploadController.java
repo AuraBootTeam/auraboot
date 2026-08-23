@@ -10,6 +10,7 @@ import com.auraboot.framework.file.dto.FileInfoRequestDTO;
 import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
+import com.auraboot.framework.file.entity.FileRelationEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.file.support.FileNameEncodingSupport;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -26,6 +27,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -95,8 +97,11 @@ public class FileUploadController {
      */
     @GetMapping("/{fileId}")
     @RequirePermission(MetaPermission.SYS_FILE_READ)
-    public ApiResponse<FileUploadResponseDTO> getFile(@PathVariable String fileId) {
+    public ApiResponse<FileUploadResponseDTO> getFile(
+            @PathVariable String fileId,
+            @CurrentUserId Long userId) {
         FileEntity fileEntity = fileService.getFileById(fileId);
+        authorizeFileAccess(fileId, fileEntity, userId);
         return ApiResponse.success(toDto(fileEntity));
     }
 
@@ -181,11 +186,14 @@ public class FileUploadController {
      */
     @GetMapping("/download/{fileId}")
     @RequirePermission(MetaPermission.SYS_FILE_READ)
-    public ResponseEntity<Resource> downloadFile(@PathVariable String fileId) {
+    public ResponseEntity<Resource> downloadFile(
+            @PathVariable String fileId,
+            @CurrentUserId Long userId) {
         FileEntity fileEntity = fileService.getFileById(fileId);
         if (fileEntity == null) {
             return ResponseEntity.notFound().build();
         }
+        authorizeFileAccess(fileId, fileEntity, userId);
 
         // Determine the storage key: localPath for LOCAL, cloudKey for cloud providers
         String storageKey = fileEntity.getLocalPath();
@@ -245,6 +253,22 @@ public class FileUploadController {
                 action,
                 entityId,
                 recordPid -> dynamicDataService.getById(entityType, recordPid));
+    }
+
+    private void authorizeFileAccess(String fileId, FileEntity file, Long userId) {
+        if (file == null) {
+            return;
+        }
+        List<FileRelationEntity> relations = fileService.getFileRelations(fileId);
+        if (relations.isEmpty()) {
+            if (userId == null || file.getCreatedBy() == null || !file.getCreatedBy().equals(userId)) {
+                throw new AccessDeniedException("File is not accessible to the current user");
+            }
+            return;
+        }
+        for (FileRelationEntity relation : relations) {
+            authorizeRelationTarget(relation.getEntityType(), relation.getEntityId(), "read");
+        }
     }
 
     private static void requireRelationRequest(FileRelationRequestDTO request) {

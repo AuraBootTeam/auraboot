@@ -26,6 +26,7 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
     private static final Logger log = LoggerFactory.getLogger(ConvertLeadHandler.class);
 
     public static final String COMMAND_TYPE = "crm:convert_lead";
+    public static final String CUSTOMER_ONLY_COMMAND_TYPE = "crm:convert_lead_to_customer";
 
     @Override
     public String getCommandType() {
@@ -34,12 +35,12 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
 
     @Override
     public Set<String> getSupportedCommandTypes() {
-        return Set.of(COMMAND_TYPE);
+        return Set.of(COMMAND_TYPE, CUSTOMER_ONLY_COMMAND_TYPE);
     }
 
     @Override
     public boolean supports(String commandType) {
-        return COMMAND_TYPE.equals(commandType);
+        return COMMAND_TYPE.equals(commandType) || CUSTOMER_ONLY_COMMAND_TYPE.equals(commandType);
     }
 
     @Override
@@ -82,12 +83,18 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         Map<String, Object> contact = findOrCreateContact(db, lead, accountId);
         String contactId = resolveId(contact);
 
-        Map<String, Object> opportunity = createOpportunity(db, lead, leadPid, leadCode, company, accountId, owner);
-        String opportunityId = resolveId(opportunity);
+        boolean customerOnly = CUSTOMER_ONLY_COMMAND_TYPE.equals(context.commandType());
+        String opportunityId = null;
+        String requestId = null;
+        if (!customerOnly) {
+            Map<String, Object> opportunity = createOpportunity(
+                    db, lead, leadPid, leadCode, company, accountId, owner);
+            opportunityId = resolveId(opportunity);
 
-        Map<String, Object> request = createCustomerRequest(
-                db, lead, leadPid, leadCode, company, accountId, contactId, opportunityId, owner);
-        String requestId = resolveId(request);
+            Map<String, Object> request = createCustomerRequest(
+                    db, lead, leadPid, leadCode, company, accountId, contactId, opportunityId, owner);
+            requestId = resolveId(request);
+        }
 
         ActivityCarryResult activityCarry = carryLeadActivities(
                 db, leadPid, accountId, contactId, opportunityId);
@@ -98,8 +105,12 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         if (!isBlank(contactId)) {
             update.put("crm_lead_converted_contact_id", contactId);
         }
-        update.put("crm_lead_converted_opportunity_id", opportunityId);
-        update.put("crm_lead_converted_request_id", requestId);
+        if (!isBlank(opportunityId)) {
+            update.put("crm_lead_converted_opportunity_id", opportunityId);
+        }
+        if (!isBlank(requestId)) {
+            update.put("crm_lead_converted_request_id", requestId);
+        }
         update.put("crm_lead_converted_at", Instant.now().toString());
         db.update("crm_lead_common", leadPid, update);
 
@@ -113,8 +124,8 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
                 "leadId", leadPid,
                 "accountId", accountId,
                 "contactId", contactId == null ? "" : contactId,
-                "opportunityId", opportunityId,
-                "customerRequestId", requestId,
+                "opportunityId", opportunityId == null ? "" : opportunityId,
+                "customerRequestId", requestId == null ? "" : requestId,
                 "carriedActivityCount", activityCarry.activityCount(),
                 "createdActivityRelationCount", activityCarry.createdRelationCount());
     }
@@ -165,8 +176,10 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
             if (!isBlank(contactId)) {
                 created += ensureActivityRelation(db, existingEdges, activityId, "contact", contactId);
             }
-            created += ensureActivityRelation(
-                    db, existingEdges, activityId, "opportunity", opportunityId);
+            if (!isBlank(opportunityId)) {
+                created += ensureActivityRelation(
+                        db, existingEdges, activityId, "opportunity", opportunityId);
+            }
         }
         return new ActivityCarryResult(activityIds.size(), created);
     }

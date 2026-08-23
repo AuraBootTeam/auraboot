@@ -120,7 +120,7 @@ test.describe('CRM Opportunity Kanban @smoke', () => {
   }) => {
     await gotoOpportunityList(page);
     for (const label of STAGE_FILTERS) {
-      await expect(page.getByRole('button', { name: label })).toBeVisible();
+      await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
     }
   });
 

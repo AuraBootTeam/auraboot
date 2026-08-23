@@ -38,6 +38,7 @@ const COVERAGE = {
     'crm_account_common_detail:block_outgoing_relationships',
     'crm_account_common_detail:block_incoming_relationships',
     'crm_account_relation_common_form:relationship_basic',
+    'crm_account_relation_common_form:relationship_validity',
     'crm_account_relation_common_form:relationship_buttons',
     'crm_account_relation_common_detail:relationship_detail',
     'crm_account_relation_common_detail:relationship_detail_toolbar',
@@ -48,9 +49,9 @@ const COVERAGE = {
     'crm_account_relation_common_form:relationship_basic:crm_acr_relation_type',
     'crm_account_relation_common_form:relationship_basic:crm_acr_strength',
     'crm_account_relation_common_form:relationship_basic:crm_acr_status',
-    'crm_account_relation_common_form:relationship_basic:crm_acr_effective_from',
-    'crm_account_relation_common_form:relationship_basic:crm_acr_effective_to',
-    'crm_account_relation_common_form:relationship_basic:crm_acr_notes',
+    'crm_account_relation_common_form:relationship_validity:crm_acr_effective_from',
+    'crm_account_relation_common_form:relationship_validity:crm_acr_effective_to',
+    'crm_account_relation_common_form:relationship_validity:crm_acr_notes',
   ],
   uiActions: [
     'crm_account_common_detail:crm_account_tabs:relationships',
@@ -129,8 +130,8 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
       )
       .toMatch(/\S+/);
     const relationId = String(
-      (await relationshipIdentity(sourceAccount.recordId, targetAccount.recordId, 'partner'))?.pid ??
-        '',
+      (await relationshipIdentity(sourceAccount.recordId, targetAccount.recordId, 'partner'))
+        ?.pid ?? '',
     );
     expect(relationId).toMatch(/\S+/);
 
@@ -160,7 +161,10 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
     await expect(page.getByText(initialNotes, { exact: true })).toBeVisible();
     screenshots.push(await screenshot(page, testInfo, '04-relationship-detail'));
 
-    await page.getByRole('button', { name: /编辑|Edit/i }).first().click();
+    await page
+      .getByRole('button', { name: /编辑|Edit/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(new RegExp(`/p/crm_account_relation_common/edit/${relationId}`));
     await pickSmartSelect(page, 'crm_acr_strength', /重要|Important/i);
     await fillFormField(page, 'crm_acr_notes', editedNotes);
@@ -176,27 +180,39 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
     await expect(page.getByText(/重要|Important/i).first()).toBeVisible();
     screenshots.push(await screenshot(page, testInfo, '05-edited-relationship'));
 
-    await expectRejectedCreate(page, {
-      crm_acr_source_account_id: sourceAccount.recordId,
-      crm_acr_target_account_id: sourceAccount.recordId,
-      crm_acr_relation_type: 'affiliate',
-      crm_acr_strength: 'standard',
-      crm_acr_status: 'active',
-    }, /不能与自身|cannot relate to itself/i);
-    await expectRejectedCreate(page, {
-      crm_acr_source_account_id: thirdAccount.recordId,
-      crm_acr_target_account_id: `missing-${uid}`,
-      crm_acr_relation_type: 'supplier',
-      crm_acr_strength: 'standard',
-      crm_acr_status: 'active',
-    }, /not found/i);
-    await expectRejectedCreate(page, {
-      crm_acr_source_account_id: sourceAccount.recordId,
-      crm_acr_target_account_id: targetAccount.recordId,
-      crm_acr_relation_type: 'partner',
-      crm_acr_strength: 'standard',
-      crm_acr_status: 'active',
-    }, /已存在|already exists/i);
+    await expectRejectedCreate(
+      page,
+      {
+        crm_acr_source_account_id: sourceAccount.recordId,
+        crm_acr_target_account_id: sourceAccount.recordId,
+        crm_acr_relation_type: 'affiliate',
+        crm_acr_strength: 'standard',
+        crm_acr_status: 'active',
+      },
+      /不能与自身|cannot relate to itself/i,
+    );
+    await expectRejectedCreate(
+      page,
+      {
+        crm_acr_source_account_id: thirdAccount.recordId,
+        crm_acr_target_account_id: `missing-${uid}`,
+        crm_acr_relation_type: 'supplier',
+        crm_acr_strength: 'standard',
+        crm_acr_status: 'active',
+      },
+      /not found/i,
+    );
+    await expectRejectedCreate(
+      page,
+      {
+        crm_acr_source_account_id: sourceAccount.recordId,
+        crm_acr_target_account_id: targetAccount.recordId,
+        crm_acr_relation_type: 'partner',
+        crm_acr_strength: 'standard',
+        crm_acr_status: 'active',
+      },
+      /已存在|already exists/i,
+    );
 
     const beforeDelete = await relationshipFacts(sourceAccount.recordId, targetAccount.recordId);
     expect(beforeDelete).toEqual({ count: 1, pairKeyCount: 1 });
@@ -214,10 +230,11 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
     );
     await page.getByTestId('confirm-ok').click();
     await expectOk(await deleteResponse, 'delete account relationship from detail');
-    await expect.poll(async () => (await relationshipFacts(
-      sourceAccount.recordId,
-      targetAccount.recordId,
-    )).count).toBe(0);
+    await expect
+      .poll(
+        async () => (await relationshipFacts(sourceAccount.recordId, targetAccount.recordId)).count,
+      )
+      .toBe(0);
 
     await openAccountDetail(page, sourceAccount.recordId);
     await page.getByRole('tab', { name: /客户关系|Relationships/i }).click();
@@ -266,7 +283,112 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
       )}\n`,
     );
   });
+
+  test('PAR05-REL-02: save upserts one fact and account 360 stays dense at 1280 @critical @golden', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const uid = uniqueId('crm_relation_save');
+    const sourceName = `保存源客户 ${uid.slice(-8)}`;
+    const targetName = `保存目标客户 ${uid.slice(-8)}`;
+    const source = await createAccount(page, sourceName, uid);
+    const target = await createAccount(page, targetName, uid);
+    const basePayload = {
+      crm_acr_source_account_id: source.recordId,
+      crm_acr_target_account_id: target.recordId,
+      crm_acr_relation_type: 'partner',
+      crm_acr_strength: 'standard',
+      crm_acr_status: 'active',
+      crm_acr_effective_from: '2026-08-23',
+      crm_acr_effective_to: '2027-08-23',
+      crm_acr_notes: `首次保存 ${uid}`,
+    };
+
+    await executeSaveRelationship(page, basePayload, 'create relationship through save');
+    const created = await relationshipIdentity(source.recordId, target.recordId, 'partner');
+    expect(created?.pid).toMatch(/\S+/);
+    await executeSaveRelationship(
+      page,
+      { ...basePayload, crm_acr_strength: 'strategic', crm_acr_notes: `重复保存更新 ${uid}` },
+      'update relationship through repeated save',
+    );
+    expect(await relationshipFacts(source.recordId, target.recordId)).toEqual({
+      count: 1,
+      pairKeyCount: 1,
+    });
+    expect(
+      (await relationshipIdentity(source.recordId, target.recordId, 'partner'))?.pid,
+      'upsert preserves the stable relationship PID',
+    ).toBe(created?.pid);
+
+    await openAccountDetail(page, source.recordId);
+    const relationshipsTab = page.getByRole('tab', { name: /客户关系|Relationships/i });
+    await relationshipsTab.click();
+    const row = page.locator('tbody tr', { hasText: targetName }).first();
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await expect(row).toContainText(/战略|Strategic/i);
+    expect(
+      await row.locator('td').count(),
+      'compact relationship row column count',
+    ).toBeLessThanOrEqual(6);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      'account relationship projection must not create page-level horizontal overflow at 1280',
+    ).toBe(true);
+    const relationshipScreenshot = await screenshot(page, testInfo, '08-relationship-density-1280');
+
+    const plansTab = page.getByRole('tab', { name: /客户计划|Customer Plans/i });
+    await expect(plansTab).toBeVisible();
+    await plansTab.click();
+    await expect(
+      page.getByRole('button', { name: /新建客户计划|New Customer Plan/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/加载中|Loading/i)).toHaveCount(0, { timeout: 15_000 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      'customer plan projection must not create page-level horizontal overflow at 1280',
+    ).toBe(true);
+    const planScreenshot = await screenshot(page, testInfo, '09-customer-plans-density-1280');
+
+    fs.writeFileSync(
+      testInfo.outputPath(`crm-account-save-density-${uid}.json`),
+      `${JSON.stringify(
+        {
+          runId: uid,
+          verdict: 'pass',
+          technicalVerdict: 'pass',
+          dataMigration: 'out-of-scope-development-stage',
+          scenarios: [
+            'save-create',
+            'save-repeat-upsert',
+            'stable-pid',
+            '1280-relationship-density',
+            'customer-plans-reachable',
+          ],
+          screenshots: [relationshipScreenshot, planScreenshot],
+          recordIds: {
+            source: source.recordId,
+            target: target.recordId,
+            relationship: created?.pid,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
 });
+
+async function executeSaveRelationship(
+  page: Page,
+  payload: Record<string, unknown>,
+  label: string,
+): Promise<void> {
+  const response = await page.request.post('/api/meta/commands/execute/crm:save_account_relation', {
+    data: { operationType: 'custom', payload },
+  });
+  await expectOk(response, label);
+}
 
 async function createAccount(page: Page, name: string, uid: string) {
   return executeCommandViaApi(page, 'crm:create_account', {
@@ -326,11 +448,7 @@ async function pickReference(
   await expect(trigger).toContainText(expectedLabel);
 }
 
-async function pickSmartSelect(
-  page: Page,
-  fieldCode: string,
-  optionName: RegExp,
-): Promise<void> {
+async function pickSmartSelect(page: Page, fieldCode: string, optionName: RegExp): Promise<void> {
   const trigger = page.getByTestId(`select-trigger-${fieldCode}`).first();
   await expect(trigger).toBeVisible({ timeout: 10_000 });
   await trigger.click();

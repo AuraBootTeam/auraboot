@@ -34,7 +34,8 @@ const EXPECTED_SCENARIOS = [
   'renewal-restores-access',
   'collaboration-upgrade-allows-update',
   'single-stable-public-share-row',
-  'revoke-removes-access',
+  'batch-delete-requires-confirmation',
+  'batch-revoke-removes-access',
   'revoked-account-absent-from-list',
 ] as const;
 const COVERAGE = {
@@ -103,6 +104,11 @@ test.describe('CRM account collaboration', () => {
       displayName: `CRM Recipient ${uid}`,
       password: PASSWORD,
     };
+    const batchRecipient: TestUser = {
+      email: `crm-batch-recipient-${uid}@e2e.local`,
+      displayName: `CRM Batch ${uid.slice(-12)}`,
+      password: PASSWORD,
+    };
     const otherTenantMember: TestUser = {
       email: `crm-other-tenant-${uid}@e2e.local`,
       displayName: `CRM Other Tenant ${uid}`,
@@ -111,6 +117,7 @@ test.describe('CRM account collaboration', () => {
 
     owner.pid = await provisionSalesUser(page, owner);
     recipient.pid = await provisionSalesUser(page, recipient);
+    batchRecipient.pid = await provisionSalesUser(page, batchRecipient);
     otherTenantMember.pid = await provisionSalesUser(page, otherTenantMember);
     await moveUserMembershipToIsolatedTenant(otherTenantMember.pid, uid);
 
@@ -381,9 +388,7 @@ test.describe('CRM account collaboration', () => {
         true,
         'renewed share restores recipient list/detail visibility',
       );
-      screenshots.push(
-        await captureScreenshot(ownerPage, testInfo, '05-collaboration-renewed'),
-      );
+      screenshots.push(await captureScreenshot(ownerPage, testInfo, '05-collaboration-renewed'));
 
       const existingOwnerToasts = ownerPage.getByRole('button', {
         name: 'Close notification',
@@ -409,9 +414,7 @@ test.describe('CRM account collaboration', () => {
       });
       await expect(shareRow).toContainText(/可协作|Collaborate/);
       await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(1);
-      screenshots.push(
-        await captureScreenshot(ownerPage, testInfo, '06-collaboration-upgraded'),
-      );
+      screenshots.push(await captureScreenshot(ownerPage, testInfo, '06-collaboration-upgraded'));
 
       const collaborativeName = `Collaborated Account ${uid}`;
       const allowedUpdate = await recipientPage.request.post(
@@ -431,14 +434,40 @@ test.describe('CRM account collaboration', () => {
       ).toBe(true);
       ownerAccount.name = collaborativeName;
 
+      await dialog.getByTestId('member-picker-add').click();
+      await dialog.getByTestId('member-picker-search-input').fill(batchRecipient.email);
+      const batchRecipientOption = dialog.getByTestId(`member-picker-option-${batchRecipient.pid}`);
+      await expect(batchRecipientOption).toBeVisible({ timeout: 10_000 });
+      await batchRecipientOption.click();
+      const secondShareResponse = ownerPage.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/record-share') && response.request().method() === 'POST',
+      );
+      await dialog.getByTestId('record-share-add-btn').click();
+      expect((await secondShareResponse).ok(), 'second collaborator share request').toBe(true);
+      await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(2);
+
+      await dialog.getByTestId('record-share-select-all').check();
+      await dialog.getByTestId('record-share-batch-remove').click();
+      const batchConfirm = dialog.getByTestId('record-share-batch-confirm');
+      await expect(batchConfirm).toBeVisible();
+      await expect(batchConfirm).toContainText(/2/);
+      screenshots.push(
+        await captureScreenshot(ownerPage, testInfo, '07-batch-revoke-confirmation'),
+      );
       const revokeResponse = ownerPage.waitForResponse(
         (response) =>
-          response.url().endsWith(`/api/record-share/${sharePid}`) &&
-          response.request().method() === 'DELETE',
+          response.url().endsWith('/api/record-share/batch-delete') &&
+          response.request().method() === 'POST',
       );
-      await dialog.getByTestId(`record-share-remove-${sharePid}`).click();
-      expect((await revokeResponse).ok(), 'owner revoke request').toBe(true);
+      await dialog.getByTestId('record-share-batch-confirm-ok').click();
+      const completedRevokeResponse = await revokeResponse;
+      expect(completedRevokeResponse.ok(), 'owner batch revoke request').toBe(true);
+      expect(completedRevokeResponse.request().postDataJSON()).toMatchObject({
+        sharePids: expect.arrayContaining([sharePid]),
+      });
       await expect(dialog.getByTestId(`record-share-row-${sharePid}`)).toHaveCount(0);
+      await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(0);
 
       await expectAccountVisibility(
         recipientPage,
@@ -453,7 +482,7 @@ test.describe('CRM account collaboration', () => {
       );
       await expect(recipientPage.getByText(/加载中|Loading/)).toHaveCount(0);
       screenshots.push(
-        await captureScreenshot(recipientPage, testInfo, '07-account-hidden-after-revoke'),
+        await captureScreenshot(recipientPage, testInfo, '08-account-hidden-after-revoke'),
       );
 
       expect(failedRuntimeRequests).toEqual([]);
@@ -479,6 +508,7 @@ test.describe('CRM account collaboration', () => {
             recordIds: {
               owner: owner.pid,
               recipient: recipient.pid,
+              batchRecipient: batchRecipient.pid,
               otherTenantMember: otherTenantMember.pid,
               ownerAccount: ownerAccount.pid,
               recipientAccount: recipientAccount.pid,

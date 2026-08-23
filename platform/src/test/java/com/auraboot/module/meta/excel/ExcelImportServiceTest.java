@@ -165,8 +165,69 @@ class ExcelImportServiceTest {
             assertEquals(
                     "No existing record matches code=MISSING-001",
                     status.getResult().getErrors().get(0).getMessage());
+            String terminalJson = new ObjectMapper().writeValueAsString(status);
+            assertTrue(terminalJson.contains("\"errorCount\":1"));
+            assertTrue(terminalJson.contains("\"rowNumber\":3"));
+            assertTrue(terminalJson.contains("No existing record matches code=MISSING-001"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("tenantId"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("createdBy"));
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void getImportStatus_shouldRestoreCancelledTaskWithTruthfulPartialCounts() {
+        ImportJob job = new ImportJob();
+        job.setPid("01KZVZ3H2H6KJRTA25BFKNS442");
+        job.setTenantId(7L);
+        job.setCreatedBy(42L);
+        job.setModelCode("test_model");
+        job.setStatus("cancelled");
+        job.setImportMode("insert");
+        job.setTotalRows(10_000);
+        job.setProcessedRows(503);
+        job.setSuccessRows(500);
+        job.setErrorRows(3);
+        when(importJobMapper.selectOne(any())).thenReturn(job);
+
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            ExcelImportService.AsyncImportStatus status =
+                    importService.requireImportStatus("test_model", job.getPid());
+            assertNotNull(status);
+            assertEquals("cancelled", status.getStatus());
+            assertEquals(10_000, status.getTotalRows());
+            assertEquals(503, status.getProcessedRows());
+            assertEquals(500, status.getResult().getCreatedCount());
+            assertEquals(3, status.getResult().getErrorCount());
+            assertTrue(status.getResult().isHasErrors());
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void cancelImport_shouldRejectTerminalTaskWithoutMutatingHistory() {
+        ImportJob job = new ImportJob();
+        job.setPid("01KZVZ3H2H6KJRTA25BFKNS443");
+        job.setTenantId(7L);
+        job.setCreatedBy(42L);
+        job.setModelCode("test_model");
+        job.setStatus("completed");
+        job.setImportMode("insert");
+        job.setTotalRows(1);
+        job.setProcessedRows(1);
+        job.setSuccessRows(1);
+        job.setErrorRows(0);
+        when(importJobMapper.selectOne(any())).thenReturn(job);
+
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> importService.cancelImport("test_model", job.getPid()));
+            assertEquals("Only a running import can be cancelled", error.getMessage());
+            verify(importJobMapper, never()).updateById(any(ImportJob.class));
         } finally {
             MetaContext.clear();
         }

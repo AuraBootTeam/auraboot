@@ -316,4 +316,24 @@ class RecordShareServiceImplTest {
 
         verify(recordShareMapper).deleteByPidInTenant(100L, "share-99");
     }
+
+    @Test
+    void removeByPidsDeletesEachUniqueTenantScopedShare() {
+        when(recordShareMapper.deleteByPidInTenant(100L, "share-1")).thenReturn(1);
+        when(recordShareMapper.deleteByPidInTenant(100L, "share-2")).thenReturn(1);
+
+        service.removeByPids(100L, List.of("share-1", "share-2"));
+
+        verify(recordShareMapper).deleteByPidInTenant(100L, "share-1");
+        verify(recordShareMapper).deleteByPidInTenant(100L, "share-2");
+    }
+
+    @Test
+    void removeByPidsRejectsDuplicatesBeforeDatabaseMutation() {
+        assertThatThrownBy(() -> service.removeByPids(100L, List.of("share-1", "share-1")))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("unique");
+
+        verify(recordShareMapper, never()).deleteByPidInTenant(anyLong(), anyString());
+    }
 }
