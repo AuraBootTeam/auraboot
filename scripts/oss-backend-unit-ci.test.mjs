@@ -78,8 +78,12 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform cleanTest test\s*$/);
+  assert.match(source, /platform\/gradlew -p platform cleanTest test bootstrapBillingAccountTest\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
+});
+
+test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
+  assert.match(source, /cleanTest test bootstrapBillingAccountTest/);
 });
 
 test('backend CI runner points fixed-stack tests at the isolated host ports', () => {

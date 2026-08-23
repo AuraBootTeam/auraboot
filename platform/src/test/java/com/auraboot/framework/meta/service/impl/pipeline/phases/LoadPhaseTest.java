@@ -44,6 +44,30 @@ class LoadPhaseTest {
         assertThat(request.getTargetRecordId()).isEqualTo("existing-ticket-pid");
     }
 
+    @Test
+    void requestCreate_clearsPidPropagatedByAPreviousExecution_whenConfigHasNoType() {
+        CommandExecuteRequest request = request("created-record-pid");
+        request.setOperationType("create");
+        CommandPipelineContext context = context("device:create", request);
+        stubCommand("device:create", "{}");
+
+        phase.execute(context);
+
+        assertThat(request.getTargetRecordId()).isNull();
+    }
+
+    @Test
+    void configuredUpdate_winsOverAConflictingRequestCreateHint() {
+        CommandExecuteRequest request = request("existing-ticket-pid");
+        request.setOperationType("create");
+        CommandPipelineContext context = context("ticket:update", request);
+        stubCommand("ticket:update", "{\"type\":\"update\"}");
+
+        phase.execute(context);
+
+        assertThat(request.getTargetRecordId()).isEqualTo("existing-ticket-pid");
+    }
+
     private CommandExecuteRequest request(String recordPid) {
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setTargetRecordId(recordPid);

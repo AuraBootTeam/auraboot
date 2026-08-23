@@ -245,7 +245,9 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
                 newMember != null ? newMember.getId() : null,
                 securityVersion
         );
-        // Register this JWT in server-side session store (NOT_SUPPORTED propagation, won't affect this transaction)
+        // Persist the session in the same transaction as the new tenant/member. The session FK
+        // must never observe a tenant_member row that is still uncommitted in a suspended
+        // transaction.
         sessionManagementService.createSession(user.getId(), newJwt, null, null);
 
         response.setStatus(StatusConstants.SUCCESS);

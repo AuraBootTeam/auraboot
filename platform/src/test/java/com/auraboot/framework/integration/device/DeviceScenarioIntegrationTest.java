@@ -173,6 +173,9 @@ class DeviceScenarioIntegrationTest extends BaseIntegrationTest {
 
         // 2. Create model with fields
         String modelCode = setupDeviceModel();
+        grantCommittedPermissionToTestRole(
+                "model." + modelCode + ".read", "model", modelCode, "read",
+                "Read device command targets");
 
         // 3. Create state machine
         setupDeviceStateMachine(modelCode);

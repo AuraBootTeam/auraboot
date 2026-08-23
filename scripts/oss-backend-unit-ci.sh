@@ -165,4 +165,4 @@ SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
 SPRING_DATA_REDIS_PORT='26389' \
 SPRING_DATA_REDIS_URL='redis://127.0.0.1:26389' \
-platform/gradlew -p platform cleanTest test
+platform/gradlew -p platform cleanTest test bootstrapBillingAccountTest

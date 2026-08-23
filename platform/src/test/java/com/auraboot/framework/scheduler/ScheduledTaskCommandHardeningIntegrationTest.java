@@ -83,6 +83,9 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
     void ensureScheduledTaskCommands() {
         ensureScheduledTaskModel();
         ensureScheduledTaskFields();
+        grantCommittedPermissionToTestRole(
+                "model.scheduled_task.read", "model", "scheduled_task", "read",
+                "Read scheduled task command targets");
         ensureCommand(CREATE_CMD,
                 "{\"type\":\"create\",\"inputFields\":[\"name\",\"description\",\"task_type\",\"cron_expression\",\"interval_ms\",\"handler_bean\",\"handler_method\",\"params\",\"max_retries\",\"timeout_ms\",\"enabled\"]}");
         ensureCommand(DELETE_CMD, "{\"type\":\"delete\"}");

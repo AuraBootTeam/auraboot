@@ -6,6 +6,7 @@ import com.auraboot.framework.saas.config.service.SystemConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,11 +34,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code PROPAGATION_NOT_SUPPORTED} so that bootstrap's own transaction
  * management is in control, and performs manual cleanup in {@link #cleanup()}.
  *
- * <p><b>Isolation:</b> run against {@code enterprise_5} (fresh reset-db) via the
- * env vars documented in the plan.  The test cleans up all data it creates.
+ * <p><b>Isolation:</b> the {@code destructive-bootstrap} tag is excluded from the shared
+ * {@code test} task and executed by {@code bootstrapBillingAccountTest} only after that task.
+ * The CI runner destroys the dedicated database immediately afterwards.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@Tag("destructive-bootstrap")
 @DisplayName("Bootstrap billing-account step — real-DB IT")
 class BootstrapBillingAccountIT {
 
@@ -153,16 +156,16 @@ class BootstrapBillingAccountIT {
     }
 
     private void cleanupBootstrapRows() {
+        // This test owns an isolated, terminal test task. Truncating the tenant root with
+        // CASCADE clears newer tenant/member dependants (sessions, Party Actor rows, etc.)
+        // without maintaining a fragile hand-written FK order every time the schema grows.
+        jdbcTemplate.execute("TRUNCATE TABLE ab_tenant CASCADE");
         jdbcTemplate.update("DELETE FROM ab_user_role WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_role_permission WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_subject_permission WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_menu WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_invitation WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_tenant_member WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_role WHERE 1=1");
-        // Detach billing_account_id FK before deleting tenants / accounts
-        jdbcTemplate.update("UPDATE ab_tenant SET billing_account_id = NULL WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_tenant WHERE 1=1");
         jdbcTemplate.execute("TRUNCATE TABLE ab_billing_account CASCADE");
         jdbcTemplate.update("DELETE FROM ab_user WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_system_config WHERE 1=1");

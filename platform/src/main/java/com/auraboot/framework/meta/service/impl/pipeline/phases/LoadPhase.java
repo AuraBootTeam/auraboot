@@ -89,9 +89,13 @@ public class LoadPhase implements CommandPhase {
 
     private void normalizeCreateTarget(CommandPipelineContext ctx) {
         Object configuredType = ctx.getExecConfig().get("type");
-        if (configuredType instanceof String type
-                && "create".equalsIgnoreCase(type)
-                && ctx.getRequest() != null) {
+        boolean configuredCreate = configuredType instanceof String type
+                && "create".equalsIgnoreCase(type);
+        boolean requestCreateWithoutConfiguredType = !(configuredType instanceof String type
+                && !type.isBlank())
+                && ctx.getRequest() != null
+                && "create".equalsIgnoreCase(ctx.getRequest().getOperationType());
+        if ((configuredCreate || requestCreateWithoutConfiguredType) && ctx.getRequest() != null) {
             ctx.getRequest().setTargetRecordId(null);
         }
     }
