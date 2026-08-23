@@ -225,6 +225,9 @@ class ExcelImportErrorReportServiceTest {
         assertEquals(7L, job.getValue().getTenantId());
         assertEquals(42L, job.getValue().getCreatedBy());
         assertEquals("completed", job.getValue().getStatus());
+        assertEquals(1, job.getValue().getErrorRows());
+        assertTrue(job.getValue().getErrorDetails().contains("\"rowNumber\":2"));
+        assertTrue(job.getValue().getErrorDetails().contains("Invalid value"));
     }
 
     @Test

@@ -35,6 +35,7 @@ export interface ImportResultData {
   updated: number;
   errors: ImportRowError[];
   taskId?: string | null;
+  asyncTask?: boolean;
   errorReportUrl?: string | null;
   errorReportFailed?: boolean;
   errorReportExpired?: boolean;
@@ -75,6 +76,7 @@ interface BackendImportResult {
   errors?: ImportRowError[];
   hasErrors: boolean;
   taskId?: string | null;
+  asyncTask?: boolean;
   errorReportUrl?: string | null;
   errorReportFailed?: boolean;
   errorReportExpired?: boolean;
@@ -86,6 +88,10 @@ interface AsyncImportStatus {
   totalRows: number;
   processedRows: number;
   result?: BackendImportResult | null;
+}
+
+export function hasCompleteRowErrorContract(result: BackendImportResult): boolean {
+  return result.errorCount === 0 || (result.errors?.length ?? 0) > 0;
 }
 
 interface ImportFieldMeta {
@@ -355,7 +361,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           throw apiError(response, body);
         }
         const status = body.data.status.toLowerCase();
-        if (status === 'completed' && body.data.result) return body.data.result;
+        if (
+          status === 'completed' &&
+          body.data.result &&
+          hasCompleteRowErrorContract(body.data.result)
+        ) {
+          return body.data.result;
+        }
         if (status === 'cancelled') {
           throw new Error(
             t(
@@ -414,7 +426,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         throw apiError(response, body);
       }
       if (body.data.taskId) setActiveTaskId(body.data.taskId);
-      const result = body.data.taskId ? await pollImport(body.data.taskId) : body.data;
+      const result =
+        body.data.taskId && body.data.asyncTask
+          ? await pollImport(body.data.taskId)
+          : body.data;
       presentResult(result);
       setActiveTaskId(null);
     } catch (cause) {
