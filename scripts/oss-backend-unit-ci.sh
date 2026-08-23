@@ -35,6 +35,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 command -v docker >/dev/null 2>&1 || environment_invalid 'docker is unavailable'
+command -v timeout >/dev/null 2>&1 || environment_invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || environment_invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || environment_invalid 'Docker daemon is unavailable to the CI account'
 
@@ -47,7 +48,7 @@ for image in \
   tdengine/tdengine:3.3.4.3 \
   testcontainers/ryuk:0.12.0; do
   if ! docker image inspect "$image" >/dev/null 2>&1; then
-    docker pull "$image" || environment_invalid "cannot pull $image"
+    timeout 10m docker pull "$image" || environment_invalid "cannot pull $image within 10 minutes"
   fi
 done
 

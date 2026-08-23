@@ -26,7 +26,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
   ]) {
     assert.match(source, new RegExp(image.replace(/[./:-]/g, '\\$&')));
   }
-  assert.match(source, /docker pull "\$image" \|\| environment_invalid/);
+  assert.match(source, /timeout 10m docker pull "\$image" \|\| environment_invalid/);
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
