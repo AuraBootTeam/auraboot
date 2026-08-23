@@ -1,6 +1,7 @@
 package com.auraboot.framework.file.controller;
 
 import com.auraboot.framework.file.entity.FileEntity;
+import com.auraboot.framework.file.entity.FileRelationEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.service.DataAccessAuthorizationHelper;
@@ -10,17 +11,21 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -56,7 +61,25 @@ class FileUploadControllerTest {
         ReflectionTestUtils.setField(controller, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);
         ReflectionTestUtils.setField(controller, "dataAccessAuthorizationHelper", dataAccessAuthorizationHelper);
-        mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        HandlerMethodArgumentResolver currentUserResolver = new HandlerMethodArgumentResolver() {
+            @Override
+            public boolean supportsParameter(org.springframework.core.MethodParameter parameter) {
+                return parameter.hasParameterAnnotation(
+                        com.auraboot.framework.application.annotation.CurrentUserId.class);
+            }
+
+            @Override
+            public Object resolveArgument(
+                    org.springframework.core.MethodParameter parameter,
+                    org.springframework.web.method.support.ModelAndViewContainer mavContainer,
+                    org.springframework.web.context.request.NativeWebRequest webRequest,
+                    org.springframework.web.bind.support.WebDataBinderFactory binderFactory) {
+                return 42L;
+            }
+        };
+        mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(currentUserResolver)
+                .build();
     }
 
     @Test
@@ -123,8 +146,8 @@ class FileUploadControllerTest {
     void endpoints_declare_separate_leastPrivilegeFileCapabilities() throws Exception {
         assertPermission("uploadFile", MetaPermission.SYS_FILE_UPLOAD,
                 org.springframework.web.multipart.MultipartFile.class, Long.class);
-        assertPermission("getFile", MetaPermission.SYS_FILE_READ, String.class);
-        assertPermission("downloadFile", MetaPermission.SYS_FILE_READ, String.class);
+        assertPermission("getFile", MetaPermission.SYS_FILE_READ, String.class, Long.class);
+        assertPermission("downloadFile", MetaPermission.SYS_FILE_READ, String.class, Long.class);
         assertPermission("deleteFile", MetaPermission.SYS_FILE_DELETE, String.class, Long.class);
         assertPermission("createFileRelation", MetaPermission.SYS_FILE_RELATION_MANAGE,
                 com.auraboot.framework.file.dto.FileRelationRequestDTO.class, Long.class);
@@ -152,6 +175,60 @@ class FileUploadControllerTest {
         verify(fileService).createFileRelation(request, 42L);
     }
 
+    @Test
+    void getFile_unrelatedUploaderCannotReadUnlinkedFileByPid() {
+        FileEntity file = storedFile("private.txt", "text/plain", "/tmp/private.txt");
+        file.setCreatedBy(7L);
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of());
+
+        assertThatThrownBy(() -> controller.getFile("file-pid", 42L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void downloadFile_linkedRecordIsReauthorizedOnEveryRequest() {
+        FileEntity file = storedFile("private.txt", "text/plain", "/tmp/private.txt");
+        file.setCreatedBy(7L);
+        FileRelationEntity relation = new FileRelationEntity()
+                .setEntityType("crm_account_common")
+                .setEntityId("account-pid")
+                .setFieldName("attachments");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(
+                eq("crm_account_common"), eq("read"), eq("account-pid"), any()))
+                .thenReturn(true);
+        when(storageProvider.download("/tmp/private.txt"))
+                .thenReturn(new ByteArrayInputStream("private".getBytes(StandardCharsets.UTF_8)));
+
+        ResponseEntity<org.springframework.core.io.Resource> response =
+                controller.downloadFile("file-pid", 42L);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        verify(dataAccessAuthorizationHelper).authorizeRecordId(
+                eq("crm_account_common"), eq("read"), eq("account-pid"), any());
+    }
+
+    @Test
+    void downloadFile_linkedRecordDenialStopsBeforeReadingBytes() {
+        FileEntity file = storedFile("private.txt", "text/plain", "/tmp/private.txt");
+        FileRelationEntity relation = new FileRelationEntity()
+                .setEntityType("crm_account_common")
+                .setEntityId("account-pid")
+                .setFieldName("attachments");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(
+                eq("crm_account_common"), eq("read"), eq("account-pid"), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+
+        assertThatThrownBy(() -> controller.downloadFile("file-pid", 42L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessage("revoked");
+        verify(storageProvider, org.mockito.Mockito.never()).download(any());
+    }
+
     private static void assertPermission(String methodName, String expected, Class<?>... parameterTypes)
             throws NoSuchMethodException {
         Method method = FileUploadController.class.getDeclaredMethod(methodName, parameterTypes);
@@ -166,6 +243,7 @@ class FileUploadControllerTest {
         file.setOriginalName(originalName);
         file.setMimeType(mimeType);
         file.setLocalPath(localPath);
+        file.setCreatedBy(42L);
         return file;
     }
 }
