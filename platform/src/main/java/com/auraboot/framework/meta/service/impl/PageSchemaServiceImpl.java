@@ -13,6 +13,8 @@ import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.event.SchemaPublishedEvent;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.meta.contribution.PageSchemaContributionComposer;
+import com.auraboot.framework.meta.contribution.PageSchemaContributionProvider;
 import com.auraboot.framework.meta.schema.SystemTabRegistry;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.PageSchemaService;
@@ -23,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -53,6 +56,8 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final PageSchemaDefaultBlockGenerator defaultBlockGenerator;
     private final ObjectMapper objectMapper;
     private final AuthoringRuntimePageMaterializer authoringRuntimePageMaterializer;
+    private final PageSchemaContributionComposer pageSchemaContributionComposer;
+    private final ObjectProvider<PageSchemaContributionProvider> pageSchemaContributionProvider;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -441,7 +446,11 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
         PageSchemaDTO baseline = pageSchemaConverter.toDTO(pageSchema);
         PageSchemaDTO materialized = authoringRuntimePageMaterializer.materialize(baseline);
-        return injectSystemTabs(enrichWithModelCategory(materialized));
+        PageSchemaContributionProvider provider = pageSchemaContributionProvider
+                .getIfAvailable(PageSchemaContributionProvider::none);
+        PageSchemaDTO composed = pageSchemaContributionComposer.compose(
+                materialized, provider.findActiveContributions(materialized));
+        return injectSystemTabs(enrichWithModelCategory(composed));
     }
 
     // ==================== 私有辅助方法 ====================
