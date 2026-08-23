@@ -51,6 +51,13 @@ test('lead detail requires explicit confirmation before irreversible graph conve
   assert.match(convert?.confirm?.['en-US'] ?? '', /follow-up records and comments will be preserved/i);
 });
 
+test('activity detail history uses the SubTableViewer parent-field contract', () => {
+  const page = readJson('config/pages/crm_activity_common_detail.json');
+  const history = findBlock(page.blocks, 'activity_history');
+  assert.equal(history?.subTable?.parentField, 'crm_act_parent_id');
+  assert.equal(history?.subTable?.foreignKey, undefined);
+});
+
 test('account timeline deduplicates one activity linked through account, contact and opportunity', () => {
   const queries = readJson('config/named-queries.json');
   const timeline = queries.find((query) => query.code === 'crm_account_timeline');

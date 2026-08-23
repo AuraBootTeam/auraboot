@@ -140,7 +140,7 @@
       },
       "subTable": {
         "childModel": "crm_activity_common",
-        "foreignKey": "crm_act_parent_id",
+        "parentField": "crm_act_parent_id",
         "readOnly": true,
         "columns": [
           {
