@@ -315,7 +315,9 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
         // Wait for agent run to complete or reach pending (approval gate)
         // The agent should attempt to send a reply (which requires approval) and then log a CRM activity.
-        await().atMost(120, TimeUnit.SECONDS)
+        // A real provider can cross the old two-minute boundary under ordinary queue latency;
+        // keep waiting for a governed terminal/approval state instead of accepting "running".
+        await().atMost(180, TimeUnit.SECONDS)
                 .pollInterval(5, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
                     MetaContext.setSystemTenantContext(tenantId);
