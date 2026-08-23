@@ -78,7 +78,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform test\s*$/);
+  assert.match(source, /platform\/gradlew -p platform cleanTest test\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
