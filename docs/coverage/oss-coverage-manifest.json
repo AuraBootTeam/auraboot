@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "c7ef0fa57",
+    "commit": "8ffc13e32",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2367,14 +2367,15 @@
         {
           "id": "crm:complete_task",
           "action": "crm:complete_task",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/crm-approval-case-config.test.mjs"
+            "tests/crm-approval-case-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
-          "assertion": "covered below the UI only — no browser evidence",
-          "verdict": "partial"
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:contact_lead",
@@ -2970,20 +2971,6 @@
           "verdict": "pass"
         },
         {
-          "id": "crm:delete_activity",
-          "action": "crm:delete_activity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "tests/crm-contact-lifecycle-config.test.mjs",
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
-            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
           "id": "crm:delete_activity_relation",
           "action": "crm:delete_activity_relation",
           "surface": "ui",
@@ -3129,6 +3116,33 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_follow_plan",
+          "action": "crm:delete_follow_plan",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-contact-lifecycle-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_follow_record",
+          "action": "crm:delete_follow_record",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-contact-lifecycle-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:delete_lead",
@@ -4522,14 +4536,15 @@
         {
           "id": "crm:start_task",
           "action": "crm:start_task",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/crm-approval-case-config.test.mjs"
+            "tests/crm-approval-case-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
-          "assertion": "covered below the UI only — no browser evidence",
-          "verdict": "partial"
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:submit_customer_request",
@@ -4624,7 +4639,8 @@
           "dependencies": "hermetic",
           "driver": "unit",
           "evidence": [
-            "tests/crm-approval-case-config.test.mjs"
+            "tests/crm-approval-case-config.test.mjs",
+            "tests/crm-contact-lifecycle-config.test.mjs"
           ],
           "assertion": "covered below the UI only — no browser evidence",
           "verdict": "partial"
@@ -11329,7 +11345,7 @@
     }
   ],
   "stats": {
-    "commands": 511,
+    "commands": 512,
     "untested": 320,
     "pages": 298,
     "pagesUntested": 200,
