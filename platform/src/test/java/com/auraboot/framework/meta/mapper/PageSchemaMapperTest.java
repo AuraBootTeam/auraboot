@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -207,7 +208,9 @@ class PageSchemaMapperTest extends BaseIntegrationTest {
     void testUpdatePublishStatus() {
         // Given
         pageSchemaMapper.insert(testPageSchema);
-        Instant publishTime = Instant.now();
+        // PostgreSQL timestamptz persists microseconds; do not assert JVM-only
+        // nanoseconds that cannot survive the real database round trip.
+        Instant publishTime = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
         // When
         int result = pageSchemaMapper.updatePublishStatus(testPageSchema.getPid(), "published", publishTime);

@@ -408,6 +408,12 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         String ticketModel = "drt_ticket_" + suffix;
         String supplierRefField = "supplier_ref_" + suffix;
         saveBusinessReferenceModels(supplierModel, supplierNameField, ticketModel, supplierRefField);
+        grantCommittedPermissionToTestRole(
+                "decision.reference." + supplierModel + ".read",
+                "model",
+                supplierModel,
+                "read",
+                "Read decision reference fixture " + supplierModel);
 
         String supplierName = "华东审批供应商 " + suffix;
         Map<String, Object> supplier = MetaContext.runWithCommandPermitScope("ALL", () ->

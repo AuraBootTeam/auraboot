@@ -857,6 +857,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("tenant_id", testTenant.getId());
         insertData.put("pid", UniqueIdGenerator.generate());
+        insertData.put("created_by", testUser.getPid());
+        insertData.put("updated_by", testUser.getPid());
         insertData.put("name_" + suffix, "test_record");
         insertData.put(statusField, "pending");
         dynamicDataMapper.insert(tableName, insertData);
@@ -941,6 +943,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("tenant_id", testTenant.getId());
         insertData.put("pid", UniqueIdGenerator.generate());
+        insertData.put("created_by", testUser.getPid());
+        insertData.put("updated_by", testUser.getPid());
         insertData.put("name_" + suffix, "invalid_transition");
         insertData.put(statusField, "pending");
         dynamicDataMapper.insert(tableName, insertData);
@@ -1661,6 +1665,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("pid", recordPid);
         insertData.put("tenant_id", testTenant.getId());
+        insertData.put("created_by", testUser.getPid());
+        insertData.put("updated_by", testUser.getPid());
         insertData.put(model.nameField(), "original_name");
         insertData.put(model.valueField(), 10);
         insertData.put("created_at", Instant.now());
@@ -1692,6 +1698,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("pid", recordPid);
         insertData.put("tenant_id", testTenant.getId());
+        insertData.put("created_by", testUser.getPid());
+        insertData.put("updated_by", testUser.getPid());
         insertData.put(model.nameField(), "keep_this_name");
         insertData.put(model.valueField(), 10);
         insertData.put("created_at", Instant.now());

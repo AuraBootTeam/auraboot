@@ -50,6 +50,13 @@ test('backend CI runner proves required platform seed rows before Gradle tests',
   assert.match(source, /platform seed verification failed/);
 });
 
+test('backend CI runner provisions the lockfile-pinned Playwright Chromium golden dependency', () => {
+  assert.match(source, /web-admin\/node_modules\/\.bin\/playwright/);
+  assert.match(source, /"\$PLAYWRIGHT_CLI" install chromium/);
+  assert.match(source, /playwright-install\.log/);
+  assert.match(source, /cannot install lockfile-pinned Playwright Chromium/);
+});
+
 test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
   for (const image of [
     'pgvector/pgvector:pg16',

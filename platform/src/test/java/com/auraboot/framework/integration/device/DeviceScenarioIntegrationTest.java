@@ -29,6 +29,8 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -56,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Device Scenario Integration Test - Complete Workflow Verification")
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class DeviceScenarioIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

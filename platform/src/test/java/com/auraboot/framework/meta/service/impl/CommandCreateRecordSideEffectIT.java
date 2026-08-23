@@ -60,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Slf4j
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
 
     @Autowired private MetaModelService metaModelService;

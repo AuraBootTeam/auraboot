@@ -52,6 +52,14 @@ public class LoadPhase implements CommandPhase {
         // Parse executionConfig
         ctx.setExecConfig(parseExecutionConfig(command));
 
+        // A CREATE command never operates on an existing command target. Callers such as
+        // automation legitimately carry the triggering record pid in the payload, but may also
+        // populate targetRecordId as a convenience for UPDATE/DELETE commands. Keeping that source
+        // pid as the target of a CREATE makes the authorization and snapshot phases look up the
+        // source pid in the new record's model. Clear it here, after the authoritative command type
+        // is known; FieldMapPhase will publish the newly created record pid back onto the request.
+        normalizeCreateTarget(ctx);
+
         // Resolve concurrency settings
         ctx.setConcurrencyKey(resolveConcurrencyKey(ctx.getExecConfig(), ctx.getPayload()));
         ctx.setLockTimeoutMs(resolveLockTimeout(ctx.getExecConfig()));
@@ -76,6 +84,15 @@ public class LoadPhase implements CommandPhase {
             log.error("Failed to parse executionConfig for command {}: {}", command.getCode(), e.getMessage());
             throw new BusinessException(ResponseCode.CommonValidationFailed,
                     "Invalid executionConfig for command " + command.getCode() + ": " + e.getMessage());
+        }
+    }
+
+    private void normalizeCreateTarget(CommandPipelineContext ctx) {
+        Object configuredType = ctx.getExecConfig().get("type");
+        if (configuredType instanceof String type
+                && "create".equalsIgnoreCase(type)
+                && ctx.getRequest() != null) {
+            ctx.getRequest().setTargetRecordId(null);
         }
     }
 

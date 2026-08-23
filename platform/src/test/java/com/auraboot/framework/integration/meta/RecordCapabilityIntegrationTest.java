@@ -462,6 +462,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
                     sc_status VARCHAR(64),
                     sc_name VARCHAR(255),
                     sc_code VARCHAR(128),
+                    row_version INTEGER NOT NULL DEFAULT 1,
                     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                     created_by VARCHAR(255),
                     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -472,6 +473,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_status VARCHAR(64)");
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_name VARCHAR(255)");
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS sc_code VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1");
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)");
         jdbcTemplate.execute("ALTER TABLE mt_showcase_all_fields ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");

@@ -22,6 +22,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -50,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code POST /api/meta/commands/execute/{commandCode}} hits in production.
  */
 @DisplayName("Scheduled Task Command Hardening: G-7 / G-8 / G-9")
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

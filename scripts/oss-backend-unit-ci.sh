@@ -58,6 +58,15 @@ for image in \
   fi
 done
 
+PLAYWRIGHT_CLI="$PROJECT_ROOT/web-admin/node_modules/.bin/playwright"
+[[ -x "$PLAYWRIGHT_CLI" ]] \
+  || environment_invalid 'web-admin lockfile dependencies do not provide Playwright'
+if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
+    timeout 10m "$PLAYWRIGHT_CLI" install chromium \
+    > "$ARTIFACTS/playwright-install.log" 2>&1; then
+  environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
+fi
+
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
   environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
 fi
