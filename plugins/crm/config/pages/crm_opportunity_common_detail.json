@@ -22,7 +22,7 @@
     "preserveListContext": true,
     "contributionSlots": [
       {
-        "id": "line-items.before",
+        "id": "line-items.blocks",
         "kind": "block",
         "anchor": {
           "target": "tab-blocks",

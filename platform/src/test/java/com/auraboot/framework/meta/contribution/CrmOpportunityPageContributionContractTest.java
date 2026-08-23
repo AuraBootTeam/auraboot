@@ -26,7 +26,7 @@ class CrmOpportunityPageContributionContractTest {
 
         assertThat(slots).containsExactly(
                 Map.of(
-                        "id", "line-items.before",
+                        "id", "line-items.blocks",
                         "kind", "block",
                         "anchor", Map.of(
                                 "target", "tab-blocks",
@@ -52,7 +52,7 @@ class CrmOpportunityPageContributionContractTest {
 
         PageSchemaDTO composed = composer.compose(base, List.of(
                 new PageSchemaContribution(
-                        "catalog-selector", "catalog-plugin", "line-items.before",
+                        "catalog-selector", "catalog-plugin", "line-items.blocks",
                         PageSchemaContributionKind.BLOCK, 100,
                         Map.of(
                                 "id", "catalog_product_selector",
