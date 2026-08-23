@@ -4,9 +4,10 @@
  * PC-001 @smoke  : Navigate to 商品管理 list → table visible, i18n headers
  * PC-002 @smoke  : Navigate to 品牌管理 list → table visible
  * PC-003 @smoke  : Navigate to 分类管理 list → table visible
- * PC-004 @critical: Created product appears in list with draft status
- * PC-005 @critical: Activate product → active via API + verify in list
- * PC-006 @critical: Created brand & category appear in their respective lists
+ * PC-004 @critical: Created product appears in list with planned status
+ * PC-005 @critical: Activate product through the row action → active
+ * PC-006 @critical: Discontinue product → discontinued via command + verify in list
+ * PC-007 @critical: Created brand & category appear in their respective lists
  *
  * Prerequisites:
  *   - product-catalog plugin imported and published
@@ -20,8 +21,40 @@ import {
   uniqueId,
   executeCommandViaApi,
   queryFilteredList,
-  findRowInPaginatedList,
+  clickRowActionByLocator,
 } from '../helpers/index';
+
+type ProductRecord = Record<string, unknown> & {
+  id?: number | string;
+  pid?: string;
+  prod_name?: string;
+  prod_status?: string;
+};
+
+async function fetchProductRecord(
+  page: import('@playwright/test').Page,
+  recordPid: string,
+): Promise<ProductRecord> {
+  const response = await page.request.get(`/api/dynamic/prod_product/${recordPid}`);
+  expect(response.ok(), `product detail ${recordPid} must be readable`).toBe(true);
+  const body = await response.json();
+  if (body?.code !== undefined) {
+    expect(String(body.code), `product detail ${recordPid} must succeed`).toBe('0');
+  }
+  return (body?.data ?? body) as ProductRecord;
+}
+
+function recordRow(
+  page: import('@playwright/test').Page,
+  record: Record<string, unknown>,
+  recordLabel: string,
+): import('@playwright/test').Locator {
+  const numericId = String(record.id ?? '');
+  expect(numericId, `${recordLabel} must expose a numeric id for exact row targeting`).toMatch(
+    /^\d+$/,
+  );
+  return page.locator(`[data-testid="table-row-${numericId}"]`);
+}
 
 // ---------------------------------------------------------------------------
 // Navigation Helper
@@ -38,9 +71,8 @@ async function navigateToCatalogPage(
   const rootBtn = nav.getByRole('button', { name: '商品中心' });
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el) => (el as HTMLElement).click());
-  // Allow sidebar to expand
-  await page.waitForResponse(() => true, { timeout: 2_000 }).catch(() => null);
   const leafLink = nav.getByRole('link', { name: leafName });
+  await expect(leafLink).toBeVisible({ timeout: 5_000 });
   await leafLink.scrollIntoViewIfNeeded();
   // Set up waitForResponse BEFORE click to avoid race condition
   const listResponsePromise = page.waitForResponse(
@@ -52,6 +84,23 @@ async function navigateToCatalogPage(
   await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
     timeout: 10_000,
   });
+}
+
+async function filterCatalogList(
+  page: import('@playwright/test').Page,
+  modelCode: string,
+  searchText: string,
+): Promise<void> {
+  const searchInput = page.getByTestId('list-search-input');
+  await expect(searchInput).toBeVisible({ timeout: 5_000 });
+  const listResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/dynamic/${modelCode}/list`) && response.status() === 200,
+    { timeout: 15_000 },
+  );
+  await searchInput.fill(searchText);
+  await searchInput.press('Enter');
+  await listResponsePromise;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,25 +219,58 @@ test.describe('Product Catalog Smoke Tests', () => {
   // CRITICAL TESTS
   // =========================================================================
 
-  test('PC-004 @critical: Created product appears in list with active status', async ({ page }) => {
-    // Query via API to verify the record exists with active status
-    // (prod:create_product auto-sets prod_status = active)
-    const records = await queryFilteredList(page, 'prod_product', 'prod_name', productName);
-    expect(records.length).toBeGreaterThan(0);
-    const productRecord = records[0] as Record<string, unknown>;
-    expect(String(productRecord.prod_status ?? '')).toBe('active');
+  test('PC-004 @critical: Created product appears in list with planned status', async ({
+    page,
+  }) => {
+    const productRecord = await fetchProductRecord(page, productRecordId);
+    expect(productRecord.pid).toBe(productRecordId);
+    expect(productRecord.prod_name).toBe(productName);
+    expect(productRecord.prod_status).toBe('planned');
 
-    // Navigate to the UI list and find the row
     await navigateToCatalogPage(page, '商品管理', 'prod_product');
-    const row = await findRowInPaginatedList(page, productName);
+    await filterCatalogList(page, 'prod_product', productName);
+    const row = recordRow(page, productRecord, 'product detail');
     await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toContainText(productName);
 
-    // Verify status text shows active indicator (Chinese: 已启用)
     const rowText = await row.innerText();
-    expect(rowText).toMatch(/active|已启用|启用/i);
+    expect(rowText).toMatch(/planned|规划中/i);
   });
 
-  test('PC-005 @critical: Discontinue product → DISCONTINUED via API + verify in list', async ({
+  test('PC-005 @critical: Activate product through the row action → active', async ({ page }) => {
+    const plannedRecord = await fetchProductRecord(page, productRecordId);
+    expect(plannedRecord.prod_status).toBe('planned');
+
+    await navigateToCatalogPage(page, '商品管理', 'prod_product');
+    await filterCatalogList(page, 'prod_product', productName);
+    const row = recordRow(page, plannedRecord, 'planned product detail');
+    await expect(row).toBeVisible({ timeout: 10_000 });
+
+    const activateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/prod:activate_product') &&
+        response.request().method() === 'POST',
+      { timeout: 20_000 },
+    );
+    await clickRowActionByLocator(page, row, 'activate', '启用商品');
+    const activateResponse = await activateResponsePromise;
+    const activateBody = await activateResponse.json();
+    expect(activateResponse.ok(), JSON.stringify(activateBody)).toBe(true);
+    expect(String(activateBody.code), JSON.stringify(activateBody)).toBe('0');
+
+    const activeRecord = await fetchProductRecord(page, productRecordId);
+    expect(activeRecord.prod_name).toBe(productName);
+    expect(activeRecord.prod_status).toBe('active');
+
+    await navigateToCatalogPage(page, '商品管理', 'prod_product');
+    await filterCatalogList(page, 'prod_product', productName);
+    const activeRow = recordRow(page, activeRecord, 'active product detail');
+    await expect(activeRow).toBeVisible({ timeout: 10_000 });
+    await expect(activeRow).toContainText(productName);
+    expect(await activeRow.innerText()).toMatch(/active|已启用/i);
+  });
+
+  test('PC-006 @critical: Discontinue product → discontinued via command + verify in list', async ({
     page,
   }) => {
     expect(productRecordId).toBeTruthy();
@@ -202,31 +284,34 @@ test.describe('Product Catalog Smoke Tests', () => {
       'state_transition',
     );
 
-    // Verify via filtered API query that status changed to DISCONTINUED
-    const records = await queryFilteredList(page, 'prod_product', 'prod_name', productName);
-    expect(records.length).toBeGreaterThan(0);
-    const productRecord = records[0] as Record<string, unknown>;
-    expect(String(productRecord.prod_status ?? '')).toBe('discontinued');
+    const productRecord = await fetchProductRecord(page, productRecordId);
+    expect(productRecord.prod_name).toBe(productName);
+    expect(productRecord.prod_status).toBe('discontinued');
 
-    // Navigate to the UI list and verify the status badge/text
     await navigateToCatalogPage(page, '商品管理', 'prod_product');
-    const row = await findRowInPaginatedList(page, productName);
+    await filterCatalogList(page, 'prod_product', productName);
+    const row = recordRow(page, productRecord, 'discontinued product detail');
     await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toContainText(productName);
 
     const rowText = await row.innerText();
-    expect(rowText).toMatch(/DISCONTINUED|已停产|停产/i);
+    expect(rowText).toMatch(/discontinued|已停产/i);
   });
 
-  test('PC-006 @critical: Created brand appears in brand list + created category appears in category list', async ({
+  test('PC-007 @critical: Created brand appears in brand list + created category appears in category list', async ({
     page,
   }) => {
     // --- Brand ---
     const brandRecords = await queryFilteredList(page, 'prod_brand', 'prod_brand_name', brandName);
     expect(brandRecords.length).toBeGreaterThan(0);
+    const brandRecord = brandRecords.find((record) => record.prod_brand_name === brandName);
+    expect(brandRecord, `brand ${brandName} must be returned by the filtered list`).toBeTruthy();
 
     await navigateToCatalogPage(page, '品牌管理', 'prod_brand');
-    const brandRow = await findRowInPaginatedList(page, brandName);
+    await filterCatalogList(page, 'prod_brand', brandName);
+    const brandRow = recordRow(page, brandRecord!, 'brand record');
     await expect(brandRow).toBeVisible({ timeout: 10_000 });
+    await expect(brandRow).toContainText(brandName);
 
     // --- Category ---
     const categoryRecords = await queryFilteredList(
@@ -236,9 +321,16 @@ test.describe('Product Catalog Smoke Tests', () => {
       categoryName,
     );
     expect(categoryRecords.length).toBeGreaterThan(0);
+    const categoryRecord = categoryRecords.find((record) => record.prod_cat_name === categoryName);
+    expect(
+      categoryRecord,
+      `category ${categoryName} must be returned by the filtered list`,
+    ).toBeTruthy();
 
     await navigateToCatalogPage(page, '分类管理', 'prod_category');
-    const categoryRow = await findRowInPaginatedList(page, categoryName);
+    await filterCatalogList(page, 'prod_category', categoryName);
+    const categoryRow = recordRow(page, categoryRecord!, 'category record');
     await expect(categoryRow).toBeVisible({ timeout: 10_000 });
+    await expect(categoryRow).toContainText(categoryName);
   });
 });
