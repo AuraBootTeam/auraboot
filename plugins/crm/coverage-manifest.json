@@ -27,8 +27,8 @@
       "model-surfaces": 50,
       "menus": 55,
       "pages": 128,
-      "page-blocks": 418,
-      "page-fields": 1769,
+      "page-blocks": 419,
+      "page-fields": 1773,
       "ui-actions": 640,
       "commands": 250,
       "permissions": 114,
@@ -37,7 +37,7 @@
     },
     "productVerdicts": {
       "pass": 736,
-      "untested": 2781
+      "untested": 2786
     },
     "fullProductNonGoals": [
       "data migration"
@@ -8084,8 +8084,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[1]"
         },
         {
-          "id": "block:crm_contact_common_form:basic:0",
-          "action": "Render and semantically verify form-section block basic on crm_contact_common_form",
+          "id": "block:crm_contact_common_form:identity_and_ownership:0",
+          "action": "Render and semantically verify form-section block identity_and_ownership on crm_contact_common_form",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
           "verdict": "untested",
@@ -8097,8 +8097,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0]"
         },
         {
-          "id": "block:crm_contact_common_form:buttons:1",
-          "action": "Render and semantically verify form-buttons block buttons on crm_contact_common_form",
+          "id": "block:crm_contact_common_form:channels_and_notes:1",
+          "action": "Render and semantically verify form-section block channels_and_notes on crm_contact_common_form",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
           "verdict": "untested",
@@ -8108,6 +8108,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1]"
+        },
+        {
+          "id": "block:crm_contact_common_form:buttons:2",
+          "action": "Render and semantically verify form-buttons block buttons on crm_contact_common_form",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[2]"
         },
         {
           "id": "block:crm_contact_common_list:crm_contact_toolbar:0",
@@ -12466,8 +12479,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_contacts:crm_ct_email:14",
-          "action": "Verify field crm_ct_email in block_contacts on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_owner:14",
+          "action": "Verify field crm_ct_owner in block_contacts on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12479,8 +12492,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_contacts:crm_ct_phone:15",
-          "action": "Verify field crm_ct_phone in block_contacts on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_email:15",
+          "action": "Verify field crm_ct_email in block_contacts on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12492,8 +12505,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_contacts:crm_ct_mobile:16",
-          "action": "Verify field crm_ct_mobile in block_contacts on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_phone:16",
+          "action": "Verify field crm_ct_phone in block_contacts on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12505,8 +12518,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_contacts:crm_ct_is_primary:17",
-          "action": "Verify field crm_ct_is_primary in block_contacts on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_mobile:17",
+          "action": "Verify field crm_ct_mobile in block_contacts on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12518,8 +12531,8 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_contacts:crm_ct_status:18",
-          "action": "Verify field crm_ct_status in block_contacts on crm_account_common_detail",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_is_primary:18",
+          "action": "Verify field crm_ct_is_primary in block_contacts on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -12531,7 +12544,20 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_target_account_id:19",
+          "id": "field:crm_account_common_detail:block_contacts:crm_ct_status:19",
+          "action": "Verify field crm_ct_status in block_contacts on crm_account_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[7].field"
+        },
+        {
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_target_account_id:20",
           "action": "Verify field crm_acr_target_account_id in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12544,7 +12570,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_relation_type:20",
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_relation_type:21",
           "action": "Verify field crm_acr_relation_type in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12557,7 +12583,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_strength:21",
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_strength:22",
           "action": "Verify field crm_acr_strength in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12570,7 +12596,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_status:22",
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_status:23",
           "action": "Verify field crm_acr_status in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12583,7 +12609,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_effective_to:23",
+          "id": "field:crm_account_common_detail:block_outgoing_relationships:crm_acr_effective_to:24",
           "action": "Verify field crm_acr_effective_to in block_outgoing_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12596,7 +12622,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[1].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_source_account_id:24",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_source_account_id:25",
           "action": "Verify field crm_acr_source_account_id in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12609,7 +12635,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_relation_type:25",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_relation_type:26",
           "action": "Verify field crm_acr_relation_type in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12622,7 +12648,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_strength:26",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_strength:27",
           "action": "Verify field crm_acr_strength in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12635,7 +12661,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_status:27",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_status:28",
           "action": "Verify field crm_acr_status in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12648,7 +12674,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_effective_to:28",
+          "id": "field:crm_account_common_detail:block_incoming_relationships:crm_acr_effective_to:29",
           "action": "Verify field crm_acr_effective_to in block_incoming_relationships on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12661,7 +12687,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[2].blocks[2].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_code:29",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_code:30",
           "action": "Verify field crm_opp_code in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12674,7 +12700,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_name:30",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_name:31",
           "action": "Verify field crm_opp_name in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12687,7 +12713,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_stage:31",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_stage:32",
           "action": "Verify field crm_opp_stage in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12700,7 +12726,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_amount:32",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_amount:33",
           "action": "Verify field crm_opp_expected_amount in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12713,7 +12739,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_close_date:33",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_expected_close_date:34",
           "action": "Verify field crm_opp_expected_close_date in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12726,7 +12752,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_owner:34",
+          "id": "field:crm_account_common_detail:block_opportunities:crm_opp_owner:35",
           "action": "Verify field crm_opp_owner in block_opportunities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12739,7 +12765,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[3].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_code:35",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_code:36",
           "action": "Verify field crm_cmp_code in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12752,7 +12778,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_type:36",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_type:37",
           "action": "Verify field crm_cmp_type in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12765,7 +12791,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_severity:37",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_severity:38",
           "action": "Verify field crm_cmp_severity in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12778,7 +12804,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_status:38",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_status:39",
           "action": "Verify field crm_cmp_status in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12791,7 +12817,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_date:39",
+          "id": "field:crm_account_common_detail:block_complaints:crm_cmp_date:40",
           "action": "Verify field crm_cmp_date in block_complaints on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12804,7 +12830,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[4].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_code:40",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_code:41",
           "action": "Verify field crm_cr_code in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12817,7 +12843,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_title:41",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_title:42",
           "action": "Verify field crm_cr_title in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12830,7 +12856,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_type:42",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_type:43",
           "action": "Verify field crm_cr_type in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12843,7 +12869,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_status:43",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_status:44",
           "action": "Verify field crm_cr_status in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12856,7 +12882,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_route_status:44",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_route_status:45",
           "action": "Verify field crm_cr_route_status in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12869,7 +12895,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_expected_date:45",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_expected_date:46",
           "action": "Verify field crm_cr_expected_date in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12882,7 +12908,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_owner:46",
+          "id": "field:crm_account_common_detail:block_customer_requests:crm_cr_owner:47",
           "action": "Verify field crm_cr_owner in block_customer_requests on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12895,7 +12921,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[5].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_code:47",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_code:48",
           "action": "Verify field crm_qs_code in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12908,7 +12934,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_customer_request_id:48",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_customer_request_id:49",
           "action": "Verify field crm_qs_customer_request_id in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12921,7 +12947,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_source_quote_type:49",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_source_quote_type:50",
           "action": "Verify field crm_qs_source_quote_type in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12934,7 +12960,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_status:50",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_status:51",
           "action": "Verify field crm_qs_status in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12947,7 +12973,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_quote_amount:51",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_quote_amount:52",
           "action": "Verify field crm_qs_quote_amount in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12960,7 +12986,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_currency:52",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_currency:53",
           "action": "Verify field crm_qs_currency in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12973,7 +12999,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_valid_until:53",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_valid_until:54",
           "action": "Verify field crm_qs_valid_until in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12986,7 +13012,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_won_lost_result:54",
+          "id": "field:crm_account_common_detail:block_quote_summaries:crm_qs_won_lost_result:55",
           "action": "Verify field crm_qs_won_lost_result in block_quote_summaries on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -12999,7 +13025,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[6].blocks[0].subTable.columns[7].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_subject:55",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_subject:56",
           "action": "Verify field crm_act_subject in block_account_follow_plans on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13012,7 +13038,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_status:56",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_status:57",
           "action": "Verify field crm_act_status in block_account_follow_plans on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13025,7 +13051,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_priority:57",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_priority:58",
           "action": "Verify field crm_act_priority in block_account_follow_plans on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13038,7 +13064,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_due_date:58",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:crm_act_due_date:59",
           "action": "Verify field crm_act_due_date in block_account_follow_plans on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13051,7 +13077,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_account_follow_plans:owner_name:59",
+          "id": "field:crm_account_common_detail:block_account_follow_plans:owner_name:60",
           "action": "Verify field owner_name in block_account_follow_plans on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13064,7 +13090,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[7].blocks[1].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_type:60",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_type:61",
           "action": "Verify field crm_act_type in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13077,7 +13103,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_subject:61",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_subject:62",
           "action": "Verify field crm_act_subject in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13090,7 +13116,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_date:62",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_date:63",
           "action": "Verify field crm_act_date in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13103,7 +13129,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_act_owner:63",
+          "id": "field:crm_account_common_detail:block_activities:crm_act_owner:64",
           "action": "Verify field crm_act_owner in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -13116,7 +13142,7 @@
           "source": "plugins/crm/config/pages/crm_account_common_detail.json#root[0].tabs[8].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_account_common_detail:block_activities:crm_ar_object_type:64",
+          "id": "field:crm_account_common_detail:block_activities:crm_ar_object_type:65",
           "action": "Verify field crm_ar_object_type in block_activities on crm_account_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18309,7 +18335,20 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[6].field"
         },
         {
-          "id": "field:crm_contact_common_detail:section_basic:crm_ct_status:7",
+          "id": "field:crm_contact_common_detail:section_basic:crm_ct_owner:7",
+          "action": "Verify field crm_ct_owner in section_basic on crm_contact_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[7].field"
+        },
+        {
+          "id": "field:crm_contact_common_detail:section_basic:crm_ct_status:8",
           "action": "Verify field crm_ct_status in section_basic on crm_contact_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
@@ -18321,24 +18360,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[7].field"
-        },
-        {
-          "id": "field:crm_contact_common_detail:section_basic:crm_ct_disabled_reason:8",
-          "action": "Verify field crm_ct_disabled_reason in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[8].field"
         },
         {
-          "id": "field:crm_contact_common_detail:section_basic:crm_ct_remark:9",
-          "action": "Verify field crm_ct_remark in section_basic on crm_contact_common_detail",
+          "id": "field:crm_contact_common_detail:section_basic:crm_ct_disabled_reason:9",
+          "action": "Verify field crm_ct_disabled_reason in section_basic on crm_contact_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18350,7 +18376,20 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[9].field"
         },
         {
-          "id": "field:crm_contact_common_detail:block_activities:crm_act_type:10",
+          "id": "field:crm_contact_common_detail:section_basic:crm_ct_remark:10",
+          "action": "Verify field crm_ct_remark in section_basic on crm_contact_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[0].blocks[0].fields[10].field"
+        },
+        {
+          "id": "field:crm_contact_common_detail:block_activities:crm_act_type:11",
           "action": "Verify field crm_act_type in block_activities on crm_contact_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18363,7 +18402,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_contact_common_detail:block_activities:crm_act_subject:11",
+          "id": "field:crm_contact_common_detail:block_activities:crm_act_subject:12",
           "action": "Verify field crm_act_subject in block_activities on crm_contact_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18376,7 +18415,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_contact_common_detail:block_activities:crm_act_date:12",
+          "id": "field:crm_contact_common_detail:block_activities:crm_act_date:13",
           "action": "Verify field crm_act_date in block_activities on crm_contact_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18389,7 +18428,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_contact_common_detail:block_activities:crm_act_owner:13",
+          "id": "field:crm_contact_common_detail:block_activities:crm_act_owner:14",
           "action": "Verify field crm_act_owner in block_activities on crm_contact_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18402,8 +18441,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_detail.json#root[0].tabs[1].blocks[0].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_account_id:0",
-          "action": "Verify field crm_ct_account_id in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_account_id:0",
+          "action": "Verify field crm_ct_account_id in identity_and_ownership on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18415,8 +18454,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[0].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_name:1",
-          "action": "Verify field crm_ct_name in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_name:1",
+          "action": "Verify field crm_ct_name in identity_and_ownership on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18428,8 +18467,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[1].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_title:2",
-          "action": "Verify field crm_ct_title in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_title:2",
+          "action": "Verify field crm_ct_title in identity_and_ownership on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18441,8 +18480,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[2].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_email:3",
-          "action": "Verify field crm_ct_email in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_owner:3",
+          "action": "Verify field crm_ct_owner in identity_and_ownership on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18454,8 +18493,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[3].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_phone:4",
-          "action": "Verify field crm_ct_phone in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_email:4",
+          "action": "Verify field crm_ct_email in channels_and_notes on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18464,11 +18503,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[4].field"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].fields[0].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_mobile:5",
-          "action": "Verify field crm_ct_mobile in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_phone:5",
+          "action": "Verify field crm_ct_phone in channels_and_notes on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18477,11 +18516,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[5].field"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].fields[1].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_is_primary:6",
-          "action": "Verify field crm_ct_is_primary in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_mobile:6",
+          "action": "Verify field crm_ct_mobile in channels_and_notes on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18490,11 +18529,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[6].field"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].fields[2].field"
         },
         {
-          "id": "field:crm_contact_common_form:basic:crm_ct_remark:7",
-          "action": "Verify field crm_ct_remark in basic on crm_contact_common_form",
+          "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_is_primary:7",
+          "action": "Verify field crm_ct_is_primary in channels_and_notes on crm_contact_common_form",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18503,7 +18542,20 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[0].fields[7].field"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].fields[3].field"
+        },
+        {
+          "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_remark:8",
+          "action": "Verify field crm_ct_remark in channels_and_notes on crm_contact_common_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].fields[4].field"
         },
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_name:0",
@@ -18547,8 +18599,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[2].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_email:3",
-          "action": "Verify field crm_ct_email in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_owner:3",
+          "action": "Verify field crm_ct_owner in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18560,8 +18612,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[3].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_phone:4",
-          "action": "Verify field crm_ct_phone in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_email:4",
+          "action": "Verify field crm_ct_email in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18573,8 +18625,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[4].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_mobile:5",
-          "action": "Verify field crm_ct_mobile in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_phone:5",
+          "action": "Verify field crm_ct_phone in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18586,8 +18638,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[5].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_is_primary:6",
-          "action": "Verify field crm_ct_is_primary in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_mobile:6",
+          "action": "Verify field crm_ct_mobile in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18599,8 +18651,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[6].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_status:7",
-          "action": "Verify field crm_ct_status in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_is_primary:7",
+          "action": "Verify field crm_ct_is_primary in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18612,8 +18664,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[7].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_dup_of:8",
-          "action": "Verify field crm_ct_dup_of in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_status:8",
+          "action": "Verify field crm_ct_status in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18625,8 +18677,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[8].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_dup_score:9",
-          "action": "Verify field crm_ct_dup_score in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_dup_of:9",
+          "action": "Verify field crm_ct_dup_of in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18638,8 +18690,8 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[9].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:actions:10",
-          "action": "Verify field actions in crm_contact_table on crm_contact_common_list",
+          "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_dup_score:10",
+          "action": "Verify field crm_ct_dup_score in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -18651,7 +18703,20 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].field"
         },
         {
-          "id": "field:crm_contact_common_list:crm_contact_table:created_at:11",
+          "id": "field:crm_contact_common_list:crm_contact_table:actions:11",
+          "action": "Verify field actions in crm_contact_table on crm_contact_common_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].field"
+        },
+        {
+          "id": "field:crm_contact_common_list:crm_contact_table:created_at:12",
           "action": "Verify field created_at in crm_contact_table on crm_contact_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -38170,7 +38235,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[2].buttons[0]"
         },
         {
           "id": "ui-action:crm_contact_common_form:buttons:cancel:1",
@@ -38183,7 +38248,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[1].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_contact_common_form.json#root[2].buttons[1]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_toolbar:create:0",
@@ -38235,7 +38300,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[0]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:4",
@@ -38248,7 +38313,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[1]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:set_primary:5",
@@ -38261,7 +38326,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[2]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[2]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:disable:6",
@@ -38274,7 +38339,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[3]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[3]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:enable:7",
@@ -38287,7 +38352,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[4]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[4]"
         },
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:8",
@@ -38300,7 +38365,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[5]"
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[11].buttons[5]"
         },
         {
           "id": "ui-action:crm_customer_360_workbench:crm_customer_actions:open_customer_record:0",
