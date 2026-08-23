@@ -155,6 +155,54 @@
         },
         "bulkActions": [
           {
+            "code": "bulk_transfer_owner",
+            "permissionCode": "crm.lead.manage",
+            "label": { "zh-CN": "批量转移负责人", "en-US": "Transfer Selected Owners" },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:update_lead",
+              "input": {
+                "field": "crm_lead_assigned_to",
+                "label": { "zh-CN": "新负责人", "en-US": "New Owner" },
+                "type": "reference",
+                "component": "MemberPicker",
+                "required": true,
+                "props": { "multiple": false }
+              }
+            }
+          },
+          {
+            "code": "bulk_update_source",
+            "permissionCode": "crm.lead.manage",
+            "label": { "zh-CN": "批量更新来源", "en-US": "Update Selected Sources" },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:update_lead",
+              "input": {
+                "field": "crm_lead_source",
+                "label": { "zh-CN": "线索来源", "en-US": "Lead Source" },
+                "type": "enum",
+                "dictCode": "crm_lead_source",
+                "required": true
+              }
+            }
+          },
+          {
+            "code": "bulk_delete_leads",
+            "permissionCode": "crm.lead.manage",
+            "variant": "danger",
+            "label": { "zh-CN": "批量删除", "en-US": "Delete Selected" },
+            "confirm": {
+              "zh-CN": "仅新建或已联系状态可删除；其他线索会被明确拒绝。确认继续？",
+              "en-US": "Only new or contacted leads can be deleted; other leads will be rejected. Continue?"
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "crm:delete_lead",
+              "operationType": "DELETE"
+            }
+          },
+          {
             "code": "bulk_contact",
             "permissionCode": "crm.lead.manage",
             "label": {
@@ -282,6 +330,21 @@
               }
             },
             {
+              "code": "convert_to_customer",
+              "permissionCode": "crm.lead.manage",
+              "label": { "zh-CN": "转为客户", "en": "Convert to Customer" },
+              "visibleWhen": "row.crm_lead_status == 'qualified'",
+              "confirm": {
+                "zh-CN": "仅创建客户和联系人，不创建商机或客户需求。确认继续？",
+                "en": "Create the account and contact only, without an opportunity or customer request?"
+              },
+              "action": {
+                "type": "command",
+                "command": "crm:convert_lead_to_customer",
+                "operationType": "update"
+              }
+            },
+            {
               "code": "move_to_pool",
               "permissionCode": "crm.lead_pool.move",
               "label": { "zh-CN": "移入线索池", "en": "Move to Pool" },
@@ -310,6 +373,17 @@
       "defaultSort": {
         "field": "created_at",
         "order": "desc"
+      },
+      "searchPlaceholder": {
+        "zh-CN": "搜索线索公司、编号或联系人",
+        "en": "Search lead company, code, or contact"
+      },
+      "empty": {
+        "title": { "zh-CN": "暂无符合条件的线索", "en": "No matching leads" },
+        "description": {
+          "zh-CN": "调整筛选，或使用“新建线索”开始录入。",
+          "en": "Adjust filters or use Create Lead to start capturing leads."
+        }
       }
     }
   ]
