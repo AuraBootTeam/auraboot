@@ -50,8 +50,8 @@
     "code": "crm_activities_by_object",
     "name:zh-CN": "按对象查活动",
     "name:en": "Activities by Related Object",
-    "description": "Get all activities related to a specific CRM object via association graph",
-    "fromSql": "SELECT a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, NULLIF(a.crm_act_ext->>'dueDate', '')::date AS crm_act_due_date, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE r.crm_ar_object_type = #{params.objectType} AND r.crm_ar_object_id = #{params.objectId} AND a.tenant_id = #{params.tenantId} ORDER BY a.crm_act_date DESC",
+    "description": "Get deduplicated activities related to a CRM object through either the direct anchor or association graph",
+    "fromSql": "SELECT timeline.* FROM (SELECT DISTINCT ON (a.pid) a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, NULLIF(a.crm_act_ext->>'dueDate', '')::date AS crm_act_due_date, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a LEFT JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND ((a.crm_act_related_model = CASE #{params.objectType} WHEN 'lead' THEN 'crm_lead_common' WHEN 'account' THEN 'crm_account_common' WHEN 'contact' THEN 'crm_contact_common' WHEN 'opportunity' THEN 'crm_opportunity_common' ELSE #{params.objectType} END AND a.crm_act_related_id = #{params.objectId}) OR (r.crm_ar_object_type = #{params.objectType} AND r.crm_ar_object_id = #{params.objectId})) ORDER BY a.pid, CASE WHEN a.crm_act_related_id = #{params.objectId} THEN 0 ELSE 1 END, r.id) timeline ORDER BY timeline.crm_act_date DESC",
     "outputFields": [
       {
         "code": "pid",
@@ -117,6 +117,27 @@
         "columnExpr": "crm_ar_role",
         "dataType": "string"
       }
+    ]
+  },
+  {
+    "code": "crm_follow_record_pool_list",
+    "name:zh-CN": "跟进记录聚合池",
+    "name:en": "Follow-up Record Pool",
+    "description": "Tenant-wide follow-up record pool with direct and graph anchor summaries; task plans are excluded",
+    "fromSql": "SELECT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_content, a.crm_act_date, a.crm_act_owner, a.crm_act_source, a.crm_act_related_model, a.crm_act_related_id, COALESCE(rel.anchor_count, 0) + CASE WHEN a.crm_act_related_id IS NULL OR a.crm_act_related_id = '' THEN 0 ELSE 1 END AS anchor_count, rel.object_types, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a LEFT JOIN (SELECT crm_ar_activity_id, COUNT(*) AS anchor_count, string_agg(DISTINCT crm_ar_object_type, ',' ORDER BY crm_ar_object_type) AS object_types FROM mt_crm_activity_relation_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_ar_activity_id) rel ON rel.crm_ar_activity_id = a.pid LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND a.crm_act_type IN ('call','email','meeting','note','visit') ORDER BY a.crm_act_date DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_act_type", "columnExpr": "crm_act_type", "dataType": "string", "searchable": true },
+      { "code": "crm_act_subject", "columnExpr": "crm_act_subject", "dataType": "string", "searchable": true },
+      { "code": "crm_act_content", "columnExpr": "crm_act_content", "dataType": "string" },
+      { "code": "crm_act_date", "columnExpr": "crm_act_date", "dataType": "date", "sortable": true },
+      { "code": "crm_act_owner", "columnExpr": "crm_act_owner", "dataType": "string" },
+      { "code": "crm_act_source", "columnExpr": "crm_act_source", "dataType": "string" },
+      { "code": "crm_act_related_model", "columnExpr": "crm_act_related_model", "dataType": "string" },
+      { "code": "crm_act_related_id", "columnExpr": "crm_act_related_id", "dataType": "string" },
+      { "code": "anchor_count", "columnExpr": "anchor_count", "dataType": "integer" },
+      { "code": "object_types", "columnExpr": "object_types", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" }
     ]
   },
   {
@@ -373,7 +394,7 @@
     "name:zh-CN": "客户时间线",
     "name:en": "Account Timeline",
     "description": "All activities related to an account (direct + via contacts + via opportunities)",
-    "fromSql": "SELECT timeline.* FROM (SELECT DISTINCT ON (a.pid) a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, r.crm_ar_object_type, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND ((r.crm_ar_object_type = 'account' AND r.crm_ar_object_id = #{params.objectId}) OR (r.crm_ar_object_type = 'contact' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_contact_common WHERE crm_ct_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (r.crm_ar_object_type = 'opportunity' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_opportunity_common WHERE crm_opp_account_id = #{params.objectId} AND tenant_id = #{params.tenantId}))) ORDER BY a.pid, CASE r.crm_ar_object_type WHEN 'account' THEN 0 WHEN 'contact' THEN 1 ELSE 2 END, r.id) timeline ORDER BY timeline.crm_act_date DESC",
+    "fromSql": "SELECT timeline.* FROM (SELECT DISTINCT ON (a.pid) a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, r.crm_ar_object_type, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a LEFT JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND ((a.crm_act_related_model = 'crm_account_common' AND a.crm_act_related_id = #{params.objectId}) OR (a.crm_act_related_model = 'crm_contact_common' AND a.crm_act_related_id IN (SELECT pid FROM mt_crm_contact_common WHERE crm_ct_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (a.crm_act_related_model = 'crm_opportunity_common' AND a.crm_act_related_id IN (SELECT pid FROM mt_crm_opportunity_common WHERE crm_opp_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (r.crm_ar_object_type = 'account' AND r.crm_ar_object_id = #{params.objectId}) OR (r.crm_ar_object_type = 'contact' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_contact_common WHERE crm_ct_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (r.crm_ar_object_type = 'opportunity' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_opportunity_common WHERE crm_opp_account_id = #{params.objectId} AND tenant_id = #{params.tenantId}))) ORDER BY a.pid, CASE WHEN a.crm_act_related_model = 'crm_account_common' AND a.crm_act_related_id = #{params.objectId} THEN 0 WHEN r.crm_ar_object_type = 'account' THEN 1 WHEN r.crm_ar_object_type = 'contact' THEN 2 ELSE 3 END, r.id) timeline ORDER BY timeline.crm_act_date DESC",
     "outputFields": [
       {
         "code": "pid",

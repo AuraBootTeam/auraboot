@@ -155,9 +155,6 @@
           "edit": {
             "permissionCode": "crm.activity.manage"
           },
-          "delete": {
-            "permissionCode": "crm.activity.manage"
-          },
           "export": {
             "permissionCode": "crm.activity.read"
           }
@@ -268,13 +265,39 @@
               }
             },
             {
-              "code": "delete",
+              "code": "delete_follow_plan",
               "danger": true,
               "permissionCode": "crm.activity.manage",
-              "label": "$i18n:common.button.delete",
-              "confirm": "delete.confirm",
+              "visibleWhen": "record.crm_act_type === 'task'",
+              "label": {
+                "zh-CN": "删除计划",
+                "en-US": "Delete Plan"
+              },
+              "confirm": {
+                "zh-CN": "确认删除此跟进计划？删除后无法恢复，关联评论也将不可见。",
+                "en-US": "Delete this follow-up plan? It cannot be restored and related comments will no longer be visible."
+              },
               "action": {
-                "type": "command"
+                "type": "command",
+                "command": "crm:delete_follow_plan"
+              }
+            },
+            {
+              "code": "delete_follow_record",
+              "danger": true,
+              "permissionCode": "crm.activity.manage",
+              "visibleWhen": "record.crm_act_type !== 'task'",
+              "label": {
+                "zh-CN": "删除记录",
+                "en-US": "Delete Record"
+              },
+              "confirm": {
+                "zh-CN": "确认删除此跟进记录？删除后无法恢复，关联评论也将不可见。",
+                "en-US": "Delete this follow-up record? It cannot be restored and related comments will no longer be visible."
+              },
+              "action": {
+                "type": "command",
+                "command": "crm:delete_follow_record"
               }
             }
           ],
@@ -284,6 +307,20 @@
       "searchFields": [
         "crm_act_subject"
       ],
+      "searchPlaceholder": {
+        "zh-CN": "搜索跟进主题",
+        "en": "Search follow-up subject"
+      },
+      "empty": {
+        "title": {
+          "zh-CN": "暂无符合条件的跟进",
+          "en": "No matching follow-ups"
+        },
+        "description": {
+          "zh-CN": "调整标签或搜索条件，或新建一条跟进计划/记录。",
+          "en": "Adjust the tab or search, or create a follow-up plan or record."
+        }
+      },
       "defaultSort": {
         "field": "crm_act_date",
         "order": "desc"

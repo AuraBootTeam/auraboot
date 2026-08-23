@@ -10,8 +10,8 @@
   },
   "blocks": [
     {
-      "id": "section_basic",
-      "blockType": "form-section",
+      "id": "activity_summary",
+      "blockType": "detail-section",
       "title": {
         "zh-CN": "活动信息",
         "en-US": "Activity Information"
@@ -55,11 +55,11 @@
       ]
     },
     {
-      "id": "section_related_context",
-      "blockType": "form-section",
+      "id": "activity_facts",
+      "blockType": "detail-section",
       "title": {
-        "zh-CN": "关联上下文",
-        "en-US": "Related Context"
+        "zh-CN": "关联事实",
+        "en-US": "Related Facts"
       },
       "columns": 2,
       "fields": [
@@ -132,6 +132,40 @@
       ]
     },
     {
+      "id": "activity_history",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "跟进履历",
+        "en-US": "Follow-up History"
+      },
+      "subTable": {
+        "childModel": "crm_activity_common",
+        "foreignKey": "crm_act_parent_id",
+        "readOnly": true,
+        "columns": [
+          {
+            "field": "crm_act_type",
+            "width": 100,
+            "renderType": "tag",
+            "dictCode": "crm_activity_type"
+          },
+          {
+            "field": "crm_act_subject",
+            "width": 260
+          },
+          {
+            "field": "crm_act_date",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "crm_act_owner",
+            "width": 140
+          }
+        ]
+      }
+    },
+    {
       "id": "activity_followup_comments",
       "blockType": "record-comments",
       "title": {
@@ -192,17 +226,41 @@
           }
         },
         {
-          "code": "delete",
+          "code": "delete_follow_plan",
           "icon": "Trash2",
           "danger": true,
           "permissionCode": "crm.activity.manage",
-          "label": "$i18n:common.button.delete",
+          "visibleWhen": "record.crm_act_type === 'task'",
+          "label": {
+            "zh-CN": "删除计划",
+            "en-US": "Delete Plan"
+          },
           "confirm": {
-            "zh-CN": "确定删除这条跟进计划或跟进记录吗？关联评论也将不可见。",
-            "en-US": "Delete this follow-up plan or record? Related comments will no longer be visible."
+            "zh-CN": "确认删除此跟进计划？删除后无法恢复，关联评论也将不可见。",
+            "en-US": "Delete this follow-up plan? It cannot be restored and related comments will no longer be visible."
           },
           "action": {
-            "type": "command"
+            "type": "command",
+            "command": "crm:delete_follow_plan"
+          }
+        },
+        {
+          "code": "delete_follow_record",
+          "icon": "Trash2",
+          "danger": true,
+          "permissionCode": "crm.activity.manage",
+          "visibleWhen": "record.crm_act_type !== 'task'",
+          "label": {
+            "zh-CN": "删除记录",
+            "en-US": "Delete Record"
+          },
+          "confirm": {
+            "zh-CN": "确认删除此跟进记录？删除后无法恢复，关联评论也将不可见。",
+            "en-US": "Delete this follow-up record? It cannot be restored and related comments will no longer be visible."
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:delete_follow_record"
           }
         }
       ]

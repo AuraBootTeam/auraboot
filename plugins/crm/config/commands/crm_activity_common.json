@@ -47,7 +47,6 @@
     "type": "update",
     "modelCode": "crm_activity_common",
     "inputFields": [
-      "crm_act_type",
       "crm_act_subject",
       "crm_act_content",
       "crm_act_date",
@@ -108,6 +107,15 @@
       "in_progress"
     ],
     "toState": "done",
+    "preconditions": [
+      {
+        "field": "crm_act_type",
+        "operator": "EQ",
+        "value": "task",
+        "message:zh-CN": "只有跟进计划可以完成",
+        "message:en": "Only follow-up plans can be completed"
+      }
+    ],
     "permissions": [
       "crm.activity.manage"
     ],
@@ -126,6 +134,15 @@
       "in_progress"
     ],
     "toState": "cancelled",
+    "preconditions": [
+      {
+        "field": "crm_act_type",
+        "operator": "EQ",
+        "value": "task",
+        "message:zh-CN": "只有跟进计划可以取消",
+        "message:en": "Only follow-up plans can be cancelled"
+      }
+    ],
     "permissions": [
       "crm.activity.manage"
     ],
@@ -133,19 +150,53 @@
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crm:delete_activity",
-    "displayName:zh-CN": "删除活动",
-    "displayName:en": "Delete Activity",
+    "code": "crm:delete_follow_plan",
+    "displayName:zh-CN": "删除跟进计划",
+    "displayName:en": "Delete Follow-up Plan",
     "type": "delete",
     "modelCode": "crm_activity_common",
+    "preconditions": [
+      {
+        "field": "crm_act_type",
+        "operator": "EQ",
+        "value": "task",
+        "message:zh-CN": "只能通过此动作删除跟进计划",
+        "message:en": "This action only deletes follow-up plans"
+      }
+    ],
     "extension": {
-      "confirmMessage:zh-CN": "确认删除此活动？",
-      "confirmMessage:en": "Confirm delete this activity?"
+      "confirmMessage:zh-CN": "确认删除此跟进计划？删除后无法恢复，关联评论也将不可见。",
+      "confirmMessage:en": "Delete this follow-up plan? It cannot be restored and related comments will no longer be visible."
     },
     "permissions": [
       "crm.activity.manage"
     ],
-    "agent_hint": "Delete crm activity record(s). This is irreversible.",
+    "agent_hint": "Delete a task-type follow-up plan. This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:delete_follow_record",
+    "displayName:zh-CN": "删除跟进记录",
+    "displayName:en": "Delete Follow-up Record",
+    "type": "delete",
+    "modelCode": "crm_activity_common",
+    "preconditions": [
+      {
+        "field": "crm_act_type",
+        "operator": "IN",
+        "value": ["call", "email", "meeting", "note", "visit"],
+        "message:zh-CN": "只能通过此动作删除跟进记录",
+        "message:en": "This action only deletes follow-up records"
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此跟进记录？删除后无法恢复，关联评论也将不可见。",
+      "confirmMessage:en": "Delete this follow-up record? It cannot be restored and related comments will no longer be visible."
+    },
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Delete a non-task follow-up record. This is irreversible.",
     "cmd_risk_level": "L4"
   },
   {
