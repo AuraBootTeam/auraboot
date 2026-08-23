@@ -65,8 +65,7 @@
             },
             "action": {
               "type": "bulk_record_command",
-              "command": "crm:delete_contact",
-              "operationType": "DELETE"
+              "command": "crm:delete_contact"
             }
           }
         ]
@@ -86,7 +85,8 @@
         },
         {
           "field": "crm_ct_title",
-          "width": 140
+          "width": 140,
+          "editable": true
         },
         {
           "field": "crm_ct_email",

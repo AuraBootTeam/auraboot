@@ -20,6 +20,13 @@ import static org.mockito.Mockito.when;
 class ContactPrimaryInvariantHandlerTest {
 
     @Test
+    void handlerOwnsContactCommandsInsteadOfRunningAfterGenericPersistence() {
+        ContactPrimaryInvariantHandler handler = new ContactPrimaryInvariantHandler();
+
+        assertTrue(!handler.chainsAfterPrimary());
+    }
+
+    @Test
     void primaryContactDemotesEveryOtherPrimaryForTheSameAccount() {
         DataAccessor db = mock(DataAccessor.class);
         when(db.getById("crm_contact_common", "contact-new")).thenReturn(Map.of(
