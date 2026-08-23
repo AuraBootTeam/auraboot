@@ -25,4 +25,7 @@ public interface FileRelationMapper extends BaseMapper<FileRelationEntity> {
      */
     @Select("SELECT file_id FROM ab_file_relation WHERE entity_type = #{entityType} AND entity_id = #{entityId} AND field_name = #{fieldName} AND deleted_flag = false ORDER BY sort_order ASC")
     List<String> findFileIdsByEntityAndField(@Param("entityType") String entityType, @Param("entityId") String entityId, @Param("fieldName") String fieldName);
+
+    @Select("SELECT * FROM ab_file_relation WHERE file_id = #{fileId} AND deleted_flag = false ORDER BY id ASC")
+    List<FileRelationEntity> findByFileId(@Param("fileId") String fileId);
 }

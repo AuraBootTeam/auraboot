@@ -3,6 +3,7 @@ package com.auraboot.framework.file.service;
 import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
+import com.auraboot.framework.file.entity.FileRelationEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -26,6 +27,11 @@ public interface FileService {
      * 根据文件ID获取文件信息
      */
     FileEntity getFileById(String fileId);
+
+    /**
+     * Return the active business-record relations for a public file identifier.
+     */
+    List<FileRelationEntity> getFileRelations(String fileId);
     
     /**
      * 根据用户ID获取文件列表
