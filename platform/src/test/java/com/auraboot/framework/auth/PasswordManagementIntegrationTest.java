@@ -67,6 +67,13 @@ class PasswordManagementIntegrationTest extends BaseIntegrationTest {
         SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
     }
 
+    @BeforeEach
+    void configureSingleTenantAdmission() {
+        SelfRegistrationTestSupport.configureSingleTenantAdmission(
+                systemConfigService,
+                getTestTenant().getId());
+    }
+
     // -----------------------------------------------------------------------
     // Test 1: changePassword with correct current password updates successfully
     // -----------------------------------------------------------------------

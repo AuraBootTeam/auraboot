@@ -58,6 +58,13 @@ class AuthServiceIntegrationTest extends BaseIntegrationTest {
         SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
     }
 
+    @BeforeEach
+    void configureSingleTenantAdmission() {
+        SelfRegistrationTestSupport.configureSingleTenantAdmission(
+                systemConfigService,
+                getTestTenant().getId());
+    }
+
     // -----------------------------------------------------------------------
     // Test 1: Register with valid data
     // -----------------------------------------------------------------------

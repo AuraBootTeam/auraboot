@@ -2,6 +2,7 @@ package com.auraboot.framework.integration;
 
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
+import com.auraboot.framework.saas.constant.SystemMode;
 
 /** Test-only fixture for suites that exercise public user registration. */
 public final class SelfRegistrationTestSupport {
@@ -26,6 +27,30 @@ public final class SelfRegistrationTestSupport {
                 "boolean",
                 "Allow self-registration",
                 false);
+        systemConfigService.evictCache();
+    }
+
+    public static void configureSingleTenantAdmission(
+            SystemConfigService systemConfigService,
+            long defaultTenantId
+    ) {
+        if (defaultTenantId <= 0) {
+            throw new IllegalArgumentException("A persisted business tenant is required");
+        }
+        systemConfigService.initialize(
+                SystemConfigKeys.SYSTEM_MODE,
+                SystemMode.SINGLE.getCode(),
+                "system",
+                "string",
+                "System mode (single/multi/hybrid)",
+                true);
+        systemConfigService.initialize(
+                SystemConfigKeys.SYSTEM_DEFAULT_TENANT_ID,
+                Long.toString(defaultTenantId),
+                "system",
+                "string",
+                "Default tenant ID",
+                true);
         systemConfigService.evictCache();
     }
 }
