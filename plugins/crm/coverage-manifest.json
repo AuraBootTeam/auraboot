@@ -27,17 +27,17 @@
       "model-surfaces": 50,
       "menus": 55,
       "pages": 128,
-      "page-blocks": 414,
-      "page-fields": 1766,
-      "ui-actions": 631,
-      "commands": 248,
+      "page-blocks": 415,
+      "page-fields": 1770,
+      "ui-actions": 633,
+      "commands": 249,
       "permissions": 114,
-      "queries": 55,
+      "queries": 56,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 735,
-      "untested": 2763
+      "pass": 739,
+      "untested": 2768
     },
     "fullProductNonGoals": [
       "data migration"
@@ -523,14 +523,16 @@
         "id": "crm:complete_task",
         "goals": [
           "RG-1",
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -766,20 +768,6 @@
         "verdict": "pass"
       },
       {
-        "id": "crm:delete_activity",
-        "goals": [
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
-        ],
-        "permissionCodes": [
-          "crm.activity.manage"
-        ],
-        "evidence": [
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
-        ],
-        "permissionsVerified": false,
-        "verdict": "pass"
-      },
-      {
         "id": "crm:delete_customer_capacity",
         "goals": [
           "CORDYS-CUSTOMER-POOL"
@@ -819,6 +807,34 @@
           "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
         ],
         "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:delete_follow_plan",
+        "goals": [
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:delete_follow_record",
+        "goals": [
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
         "verdict": "pass"
       },
       {
@@ -1129,14 +1145,16 @@
         "id": "crm:start_task",
         "goals": [
           "RG-1",
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -3057,8 +3075,8 @@
     {
       "id": "CRM-CONTACT-FOLLOWUP-LIFECYCLE",
       "filePrefix": "crm-contact-followup-lifecycle-",
-      "expectedScenarios": 10,
-      "minimumScreenshots": 6,
+      "expectedScenarios": 14,
+      "minimumScreenshots": 7,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_detail",
@@ -3070,7 +3088,8 @@
           "crm_contact_common_detail:crm_contact_detail_toolbar",
           "crm_activity_common_list:crm_act_tabs",
           "crm_activity_common_list:crm_act_table",
-          "crm_activity_common_detail:section_basic",
+          "crm_activity_common_detail:activity_summary",
+          "crm_activity_common_detail:activity_history",
           "crm_activity_common_detail:crm_activity_detail_toolbar"
         ],
         "fields": [
@@ -3081,10 +3100,10 @@
           "crm_activity_common_list:crm_act_table:crm_act_type",
           "crm_activity_common_list:crm_act_table:crm_act_subject",
           "crm_activity_common_list:crm_act_table:crm_act_date",
-          "crm_activity_common_detail:section_basic:crm_act_type",
-          "crm_activity_common_detail:section_basic:crm_act_subject",
-          "crm_activity_common_detail:section_basic:crm_act_date",
-          "crm_activity_common_detail:section_basic:crm_act_content"
+          "crm_activity_common_detail:activity_summary:crm_act_type",
+          "crm_activity_common_detail:activity_summary:crm_act_subject",
+          "crm_activity_common_detail:activity_summary:crm_act_date",
+          "crm_activity_common_detail:activity_summary:crm_act_content"
         ],
         "uiActions": [
           "crm_contact_common_detail:crm_contact_detail_toolbar:set_primary",
@@ -3093,7 +3112,9 @@
           "crm_activity_common_list:crm_act_tabs:follow_plans",
           "crm_activity_common_list:crm_act_tabs:follow_records",
           "crm_activity_common_detail:crm_activity_detail_toolbar:start_task",
-          "crm_activity_common_detail:crm_activity_detail_toolbar:delete"
+          "crm_activity_common_detail:crm_activity_detail_toolbar:complete_task",
+          "crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan",
+          "crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record"
         ],
         "commands": [
           "crm:create_account",
@@ -3102,7 +3123,10 @@
           "crm:disable_contact",
           "crm:enable_contact",
           "crm:create_activity",
-          "crm:delete_activity"
+          "crm:start_task",
+          "crm:complete_task",
+          "crm:delete_follow_plan",
+          "crm:delete_follow_record"
         ]
       },
       "expectedTechnicalVerdict": "pass",
@@ -6881,8 +6905,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1]"
         },
         {
-          "id": "block:crm_activity_common_detail:section_basic:0",
-          "action": "Render and semantically verify form-section block section_basic on crm_activity_common_detail",
+          "id": "block:crm_activity_common_detail:activity_summary:0",
+          "action": "Render and semantically verify detail-section block activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -6896,8 +6920,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0]"
         },
         {
-          "id": "block:crm_activity_common_detail:section_related_context:1",
-          "action": "Render and semantically verify form-section block section_related_context on crm_activity_common_detail",
+          "id": "block:crm_activity_common_detail:activity_facts:1",
+          "action": "Render and semantically verify detail-section block activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
           "verdict": "untested",
@@ -6935,7 +6959,22 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[3]"
         },
         {
-          "id": "block:crm_activity_common_detail:activity_followup_comments:4",
+          "id": "block:crm_activity_common_detail:activity_history:4",
+          "action": "Render and semantically verify sub-table block activity_history on crm_activity_common_detail",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+        },
+        {
+          "id": "block:crm_activity_common_detail:activity_followup_comments:5",
           "action": "Render and semantically verify record-comments block activity_followup_comments on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
@@ -6948,10 +6987,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5]"
         },
         {
-          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:5",
+          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:6",
           "action": "Render and semantically verify toolbar block crm_activity_detail_toolbar on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
@@ -6963,7 +7002,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6]"
         },
         {
           "id": "block:crm_activity_common_form:basic:0",
@@ -13652,8 +13691,8 @@
           "source": "plugins/crm/config/pages/crm_account_relation_common_list.json#root[1].defaultSort.field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_type:0",
-          "action": "Verify field crm_act_type in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_type:0",
+          "action": "Verify field crm_act_type in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13667,8 +13706,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[0].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_subject:1",
-          "action": "Verify field crm_act_subject in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_subject:1",
+          "action": "Verify field crm_act_subject in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13682,8 +13721,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[1].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_date:2",
-          "action": "Verify field crm_act_date in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_date:2",
+          "action": "Verify field crm_act_date in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13697,8 +13736,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[2].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_owner:3",
-          "action": "Verify field crm_act_owner in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_owner:3",
+          "action": "Verify field crm_act_owner in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13710,8 +13749,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[3].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_source:4",
-          "action": "Verify field crm_act_source in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_source:4",
+          "action": "Verify field crm_act_source in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13723,8 +13762,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[4].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_parent_id:5",
-          "action": "Verify field crm_act_parent_id in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_parent_id:5",
+          "action": "Verify field crm_act_parent_id in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13736,8 +13775,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[5].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_content:6",
-          "action": "Verify field crm_act_content in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_content:6",
+          "action": "Verify field crm_act_content in activity_summary on crm_activity_common_detail",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -13751,8 +13790,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[6].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_basic:crm_act_files:7",
-          "action": "Verify field crm_act_files in section_basic on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_summary:crm_act_files:7",
+          "action": "Verify field crm_act_files in activity_summary on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13764,8 +13803,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[0].fields[7].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_related_context:crm_act_related_model:8",
-          "action": "Verify field crm_act_related_model in section_related_context on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_facts:crm_act_related_model:8",
+          "action": "Verify field crm_act_related_model in activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13777,8 +13816,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[1].fields[0].field"
         },
         {
-          "id": "field:crm_activity_common_detail:section_related_context:crm_act_related_id:9",
-          "action": "Verify field crm_act_related_id in section_related_context on crm_activity_common_detail",
+          "id": "field:crm_activity_common_detail:activity_facts:crm_act_related_id:9",
+          "action": "Verify field crm_act_related_id in activity_facts on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
           "verdict": "untested",
@@ -13905,6 +13944,58 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[3].fields[4].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_type:19",
+          "action": "Verify field crm_act_type in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[0].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_subject:20",
+          "action": "Verify field crm_act_subject in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[1].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_date:21",
+          "action": "Verify field crm_act_date in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[2].field"
+        },
+        {
+          "id": "field:crm_activity_common_detail:activity_history:crm_act_owner:22",
+          "action": "Verify field crm_act_owner in activity_history on crm_activity_common_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].subTable.columns[3].field"
         },
         {
           "id": "field:crm_activity_common_form:basic:crm_act_type:0",
@@ -36229,7 +36320,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[0]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:start_task:1",
@@ -36244,20 +36335,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[1]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:complete_task:2",
           "action": "button complete_task on crm_activity_common_detail -> state_transition:crm:complete_task",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[2]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[2]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:cancel_task:3",
@@ -36270,11 +36363,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[3]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[3]"
         },
         {
-          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete:4",
-          "action": "button delete on crm_activity_common_detail -> command:crm:delete_activity",
+          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan:4",
+          "action": "button delete_follow_plan on crm_activity_common_detail -> command:crm:delete_follow_plan",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -36285,7 +36378,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[4]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record:5",
+          "action": "button delete_follow_record on crm_activity_common_detail -> command:crm:delete_follow_record",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[6].buttons[5]"
         },
         {
           "id": "ui-action:crm_activity_common_form:buttons:submit:0",
@@ -36513,8 +36621,8 @@
           "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[1]"
         },
         {
-          "id": "ui-action:crm_activity_common_list:crm_act_table:delete:15",
-          "action": "button delete on crm_activity_common_list -> command:crm:delete_activity",
+          "id": "ui-action:crm_activity_common_list:crm_act_table:delete_follow_plan:15",
+          "action": "button delete_follow_plan on crm_activity_common_list -> command:crm:delete_follow_plan",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36524,6 +36632,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[2]"
+        },
+        {
+          "id": "ui-action:crm_activity_common_list:crm_act_table:delete_follow_record:16",
+          "action": "button delete_follow_record on crm_activity_common_list -> command:crm:delete_follow_record",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_list.json#root[2].columns[7].buttons[3]"
         },
         {
           "id": "ui-action:crm_activity_service_desk:crm_activity_service_header_actions:open_task_record:0",
@@ -44266,7 +44387,8 @@
           "action": "Execute crm:start_task (state_transition) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44282,7 +44404,8 @@
           "action": "Execute crm:complete_task (state_transition) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44309,8 +44432,23 @@
           "source": "plugins/crm/config/commands/crm_activity_common.json"
         },
         {
-          "id": "command:crm:delete_activity",
-          "action": "Execute crm:delete_activity (delete) through its supported user or runtime path",
+          "id": "command:crm:delete_follow_plan",
+          "action": "Execute crm:delete_follow_plan (delete) through its supported user or runtime path",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/commands/crm_activity_common.json"
+        },
+        {
+          "id": "command:crm:delete_follow_record",
+          "action": "Execute crm:delete_follow_record (delete) through its supported user or runtime path",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
           ],
@@ -49037,6 +49175,19 @@
           "assertion": "The named query has registered release evidence.",
           "verdict": "pass",
           "verdict_by": "spec-assert",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "http",
+          "source": "plugins/crm/config/named-queries.json"
+        },
+        {
+          "id": "query:crm_follow_record_pool_list",
+          "action": "Execute crm_follow_record_pool_list with tenant isolation and assert non-empty business semantics where fixtures require data",
+          "evidence": [],
+          "assertion": "No real-stack response and consuming-page evidence pair is registered.",
+          "verdict": "untested",
+          "verdict_by": null,
           "surface": "api",
           "dependencies": "real-stack",
           "authority": "blocking-release",
