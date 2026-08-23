@@ -104,6 +104,26 @@ public interface DynamicDataMapper {
             @Param("currentUserId") Long currentUserId);
 
     /**
+     * PostgreSQL-native bounded lease claim. Tenant isolation is explicit in both the candidate
+     * SELECT and UPDATE because the CTE/RETURNING shape is outside the tenant interceptor's safe
+     * parser subset. Identifiers are host-resolved metadata; values are bound parameters.
+     */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "atomicBatchClaimReturning")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> atomicBatchClaimReturning(
+            @Param("tableName") String tableName,
+            @Param("pkColumn") String pkColumn,
+            @Param("exactFilters") Map<String, Object> exactFilters,
+            @Param("inFilters") Map<String, List<Object>> inFilters,
+            @Param("notAfterFilters") Map<String, Object> notAfterFilters,
+            @Param("claimValues") Map<String, Object> claimValues,
+            @Param("orderByColumns") List<String> orderByColumns,
+            @Param("softDelete") boolean softDelete,
+            @Param("limit") int limit,
+            @Param("tenantId") long tenantId,
+            @Param("currentUserId") Long currentUserId);
+
+    /**
      * 删除数据
      * @param tableName 表名
      * @param conditions 删除条件

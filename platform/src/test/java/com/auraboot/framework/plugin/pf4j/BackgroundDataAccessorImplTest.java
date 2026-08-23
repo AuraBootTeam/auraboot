@@ -12,6 +12,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+
+import javax.sql.DataSource;
 
 import java.util.List;
 import java.util.Map;
@@ -240,6 +246,78 @@ class BackgroundDataAccessorImplTest {
         assertThat(MetaContext.getCurrentMemberId()).isEqualTo(123L);
         assertThat(MetaContext.getCommandPermitScope()).isNull();
         assertThat(MetaContext.getCurrentRoleIds()).containsExactly(11L);
+    }
+
+    @Test
+    void productionConstructorReportsStableIdentityForTheActualDataSourceObject() {
+        BackgroundDataBatchService batches = mock(BackgroundDataBatchService.class);
+        DataSource firstDataSource = mock(DataSource.class);
+        DataSource secondDataSource = mock(DataSource.class);
+
+        BackgroundDataAccessorImpl first =
+                new BackgroundDataAccessorImpl(dds, batches, firstDataSource);
+        BackgroundDataAccessorImpl sameResource =
+                new BackgroundDataAccessorImpl(dds, batches, firstDataSource);
+        BackgroundDataAccessorImpl otherResource =
+                new BackgroundDataAccessorImpl(dds, batches, secondDataSource);
+
+        assertThat(first.transactionResourceId()).isNotBlank();
+        assertThat(sameResource.transactionResourceId())
+                .isEqualTo(first.transactionResourceId());
+        assertThat(otherResource.transactionResourceId())
+                .isNotEqualTo(first.transactionResourceId());
+    }
+
+    @Test
+    void executeInTransactionDelegatesToHostManagerAndPropagatesFailure() {
+        BackgroundDataBatchService batches = mock(BackgroundDataBatchService.class);
+        DataSource dataSource = mock(DataSource.class);
+        PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+        TransactionStatus status = new SimpleTransactionStatus();
+        when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(status);
+        BackgroundDataAccessorImpl productionAccessor =
+                new BackgroundDataAccessorImpl(dds, batches, dataSource, transactionManager);
+
+        java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean();
+        productionAccessor.executeInTransaction(() -> ran.set(true));
+
+        assertThat(ran).isTrue();
+        verify(transactionManager).commit(status);
+
+        RuntimeException failure = new RuntimeException("rollback-me");
+        assertThatThrownBy(() -> productionAccessor.executeInTransaction(() -> {
+            throw failure;
+        })).isSameAs(failure);
+        verify(transactionManager).rollback(status);
+    }
+
+    @Test
+    void queryPageBindsTenantAndDelegatesToDbNativeBatchService() {
+        BackgroundDataBatchService batches = mock(BackgroundDataBatchService.class);
+        DataSource dataSource = mock(DataSource.class);
+        BackgroundDataAccessorImpl productionAccessor =
+                new BackgroundDataAccessorImpl(dds, batches, dataSource);
+        when(batches.queryPage("job", Map.of("lane", 3), null, 10))
+                .thenAnswer(invocation -> {
+                    assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+                    return new com.auraboot.framework.plugin.extension.BackgroundDataAccessor.BoundedPage(
+                            List.of(Map.of("pid", "p1")), null);
+                });
+
+        assertThat(productionAccessor.queryPage(42L, "job", Map.of("lane", 3), null, 10)
+                .records()).singleElement().satisfies(row ->
+                        assertThat(row).containsEntry("pid", "p1"));
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void lightweightConstructorFailsClosedForNewBatchCapabilities() {
+        assertThatThrownBy(() -> accessor.queryPage(42L, "job", Map.of(), null, 10))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(accessor::transactionResourceId)
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> accessor.executeInTransaction(() -> { }))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
