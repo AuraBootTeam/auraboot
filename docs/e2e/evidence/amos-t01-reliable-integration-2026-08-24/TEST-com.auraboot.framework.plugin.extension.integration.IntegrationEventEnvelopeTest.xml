@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-23T15:57:31.623Z" hostname="Mac" time="0.025">
+<testsuite name="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:46:46.948Z" hostname="Mac" time="0.057">
   <properties/>
-  <testcase name="rejectsUnversionedOrUnscopedIdentityFields()" classname="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" time="0.02"/>
-  <testcase name="freezesVersionedProcurementInventoryContract()" classname="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" time="0.005"/>
+  <testcase name="rejectsUnversionedOrUnscopedIdentityFields()" classname="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" time="0.001"/>
+  <testcase name="loadsExactT04FixtureWithJsonNullAndTakesADeepImmutableSnapshot()" classname="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" time="0.055"/>
+  <testcase name="freezesVersionedProcurementInventoryContract()" classname="com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

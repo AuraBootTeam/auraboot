@@ -1,10 +1,22 @@
 {
-  "source": "platform/build/reports/jacoco/test/jacocoTestReport.xml",
-  "package": "com/auraboot/framework/integration",
-  "counter": "LINE",
-  "covered": 121,
-  "missed": 9,
-  "coveragePercent": 93.1,
-  "extraction": "xmllint XPath package/counter attributes",
-  "fullReport": "generated locally and intentionally not committed because it is an 8.6 MB whole-platform artifact"
+  "scopes": [
+    {
+      "source": "platform/build/reports/jacoco/test/jacocoTestReport.xml",
+      "target": "package com/auraboot/framework/integration",
+      "counter": "LINE",
+      "covered": 121,
+      "missed": 9,
+      "coveragePercent": 93.1
+    },
+    {
+      "source": "platform/platform-plugin-api/build/reports/jacoco/test/jacocoTestReport.xml",
+      "target": "class com/auraboot/framework/plugin/extension/integration/IntegrationEventEnvelope",
+      "counter": "LINE",
+      "covered": 39,
+      "missed": 7,
+      "coveragePercent": 84.8
+    }
+  ],
+  "extraction": "xmllint XPath package/class counter attributes",
+  "fullReports": "generated locally and intentionally not committed because the XML reports are reproducible build artifacts"
 }

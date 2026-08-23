@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="OutboxWorkerImpl Coverage IT — poll/retry + cleanup" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:08:56.256Z" hostname="Mac" time="0.079">
+<testsuite name="OutboxWorkerImpl Coverage IT — poll/retry + cleanup" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:44:18.977Z" hostname="Mac" time="0.082">
   <properties/>
-  <testcase name="pollAndDispatch claims a ready event and increments retry when it cannot deserialize" classname="com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT" time="0.072"/>
-  <testcase name="cleanupDelivered removes old delivered events" classname="com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT" time="0.007"/>
+  <testcase name="pollAndDispatch claims a ready event and increments retry when it cannot deserialize" classname="com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT" time="0.071"/>
+  <testcase name="cleanupDelivered removes old delivered events" classname="com.auraboot.framework.meta.service.impl.OutboxWorkerImplCoverageIT" time="0.011"/>
 </testsuite>

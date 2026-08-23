@@ -1,6 +1,6 @@
 # AMOS-T01 reliable integration runtime evidence
 
-Verdict: **10 pass, 0 fail, 0 skipped, 3 untested**. This is a verified Core runtime and
+Verdict: **11 pass, 0 fail, 0 skipped, 3 untested**. This is a verified Core runtime and
 contract result, not an assembled Procurement-to-Inventory business-journey result.
 
 ## Reproduction
@@ -20,9 +20,10 @@ The test runtime was `amos-t01-reliable-dev-20260823`, backed by isolated Postgr
   --tests com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest
 ```
 
-Both Gradle invocations completed with `BUILD SUCCESSFUL`. The four JUnit XML files record eight
+Both Gradle invocations completed with `BUILD SUCCESSFUL`. The four JUnit XML files record nine
 tests, zero failures, zero errors, and zero skipped tests. The JaCoCo report records 121 covered and
-9 missed lines for `com/auraboot/framework/integration` (93.1% line coverage).
+9 missed lines for `com/auraboot/framework/integration` (93.1%) and 39 covered / 7 missed lines for
+`IntegrationEventEnvelope` (84.8%).
 
 Fresh-database migration and schema evidence:
 
@@ -40,11 +41,16 @@ final run. The real PostgreSQL lifecycle test failed at the ordering assertion b
 remained pending while sequence 1 was incorrectly fenced. Restoring `<` made the same test pass.
 The final evidence files are from the restored implementation.
 
+The envelope payload copy was also temporarily mutated back to `Map.copyOf`. The hash-pinned T04
+`release-v2.json` contract test failed with `NullPointerException` at envelope construction because
+`specificationVersion` is a legal JSON null. Restoring the recursive null-safe snapshot made the
+same exact-fixture test pass.
+
 ## Evidence map
 
 - `acceptance-manifest.json`: denominator, four-axis classification, verdict, and explicit gaps.
 - `TEST-*.xml`: machine-readable contract, lifecycle, backoff, and legacy-worker test results.
-- `jacoco-summary.json`: extracted package-level counters from the final whole-platform JaCoCo XML;
-  the 8.6 MB full report remains a reproducible local build artifact and is not committed.
+- `jacoco-summary.json`: extracted package/class counters from the final JaCoCo XML reports; the
+  full reports remain reproducible local build artifacts and are not committed.
 - [`runtime contract`](../../../system-reference/reliable-integration-runtime-v1.md) and
   [`Procurement-to-Inventory fixture`](../../../system-reference/fixtures/integration-runtime/v1/procurement-inventory-receipt-request.json).

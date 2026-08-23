@@ -1,6 +1,12 @@
 package com.auraboot.framework.plugin.extension.integration;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -45,8 +51,8 @@ public record IntegrationEventEnvelope(
         if (sequence < 0) {
             throw new IllegalArgumentException("sequence must be non-negative");
         }
-        payload = Map.copyOf(Objects.requireNonNull(payload, "payload"));
-        headers = headers == null ? Map.of() : Map.copyOf(headers);
+        payload = immutableJsonObject(Objects.requireNonNull(payload, "payload"), "payload");
+        headers = immutableHeaders(headers);
     }
 
     private static String requireText(String value, String field) {
@@ -54,5 +60,51 @@ public record IntegrationEventEnvelope(
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value;
+    }
+
+    private static Map<String, Object> immutableJsonObject(Map<?, ?> source, String path) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            if (!(entry.getKey() instanceof String key)) {
+                throw new IllegalArgumentException(path + " must contain only string keys");
+            }
+            copy.put(key, immutableJsonValue(entry.getValue(), path + "." + key));
+        }
+        return Collections.unmodifiableMap(copy);
+    }
+
+    private static Object immutableJsonValue(Object value, String path) {
+        if (value == null || value instanceof String || value instanceof Boolean
+                || value instanceof Byte || value instanceof Short || value instanceof Integer
+                || value instanceof Long || value instanceof Float || value instanceof Double
+                || value instanceof BigInteger || value instanceof BigDecimal) {
+            return value;
+        }
+        if (value instanceof Map<?, ?> map) {
+            return immutableJsonObject(map, path);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> copy = new ArrayList<>(list.size());
+            for (int index = 0; index < list.size(); index++) {
+                copy.add(immutableJsonValue(list.get(index), path + "[" + index + "]"));
+            }
+            return Collections.unmodifiableList(copy);
+        }
+        throw new IllegalArgumentException(path + " contains a non-JSON value: "
+                + value.getClass().getName());
+    }
+
+    private static Map<String, String> immutableHeaders(Map<String, String> source) {
+        if (source == null || source.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : source.entrySet()) {
+            if (entry.getKey() == null) {
+                throw new IllegalArgumentException("headers must contain only non-null string keys");
+            }
+            copy.put(entry.getKey(), entry.getValue());
+        }
+        return Collections.unmodifiableMap(copy);
     }
 }

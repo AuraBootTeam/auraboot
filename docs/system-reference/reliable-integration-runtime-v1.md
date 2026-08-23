@@ -19,6 +19,8 @@ effects; they do not copy the dispatcher, receipt, lease, DLQ, or replay tables.
 - Ordering: events sharing `tenantId + orderingKey` are eligible by ascending `sequence`.
 - Source atomicity: `enqueue` fails without an active transaction and writes `ab_outbox` in the
   caller's business transaction.
+- Payload snapshot: legal JSON null is preserved. Nested JSON objects and arrays are recursively
+  copied into unmodifiable collections, so later caller mutation cannot change the envelope.
 - Consumer atomicity: one consumer effect and its `applied` receipt commit in one independent
   transaction. A thrown failure rolls both back.
 - Compatibility: legacy rows with `schema_version IS NULL` retain the former JVM-event path.
