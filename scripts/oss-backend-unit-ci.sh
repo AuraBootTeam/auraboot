@@ -45,6 +45,9 @@ for image in \
   pgvector/pgvector:pg16 \
   redis:7-alpine \
   postgres:16 \
+  mysql:8.0.39 \
+  mysql:8.0 \
+  confluentinc/cp-kafka:7.5.0 \
   tdengine/tdengine:3.3.4.3 \
   testcontainers/ryuk:0.12.0; do
   if ! docker image inspect "$image" >/dev/null 2>&1; then
