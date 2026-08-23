@@ -1,0 +1,148 @@
+{
+  "scope": "amos-t01-reliable-integration-runtime-v1",
+  "runtime": "amos-t01-reliable-dev-20260823",
+  "database": "auraboot_6",
+  "verdict": {
+    "pass": 10,
+    "untested": 3,
+    "fail": 0,
+    "skipped": 0
+  },
+  "items": [
+    {
+      "id": "T01-CONTRACT-01",
+      "action": "Validate the versioned envelope and stable event type contract",
+      "surface": "platform-plugin-api",
+      "dependency": "hermetic",
+      "oracle": "JUnit assertions",
+      "driver": "contract unit test",
+      "evidence": "TEST-com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-SOURCE-01",
+      "action": "Commit source fact and outbox atomically, and roll both back on source failure",
+      "surface": "service/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "persisted source and ab_outbox rows",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-SOURCE-02",
+      "action": "Reject enqueue without an active source transaction",
+      "surface": "public accessor",
+      "dependency": "real Spring transaction manager",
+      "oracle": "exception plus zero persisted outbox rows",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-LEASE-01",
+      "action": "Recover an expired claim after crash/restart",
+      "surface": "dispatcher/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "lease state and eventual consumer projection",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-RECEIPT-01",
+      "action": "Suppress duplicate delivery with one durable consumer receipt",
+      "surface": "consumer/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "unique projection and receipt counts",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-ORDER-01",
+      "action": "Fence out-of-order events by tenant, ordering key, and sequence",
+      "surface": "dispatcher/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "persisted consumer apply order",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-DLQ-01",
+      "action": "Move a poison event to a durable dead letter after bounded retries",
+      "surface": "dispatcher/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "failed outbox and open DLQ rows",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-LEASE-02",
+      "action": "Reject a stale worker completion after lease takeover",
+      "surface": "dispatcher/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "fenced update returns false",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-RECOVERY-01",
+      "action": "Replay a dead letter with attribution and reconcile expired leases",
+      "surface": "operations/database",
+      "dependency": "real PostgreSQL",
+      "oracle": "DLQ attribution, delivered state, and lease recovery count",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T01-OBS-01",
+      "action": "Expose low-cardinality outcome counters and health alerts",
+      "surface": "observability",
+      "dependency": "real Micrometer registry and PostgreSQL state",
+      "oracle": "counter values and health UP/DOWN transitions",
+      "driver": "Spring integration test",
+      "evidence": "TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml",
+      "status": "pass"
+    },
+    {
+      "id": "T02-PILOT-01",
+      "action": "Run the real Procurement producer through the real Inventory receipt command adapter",
+      "surface": "assembled business journey",
+      "dependency": "T02 branch and contract adapter",
+      "oracle": "real Procurement and Inventory business records",
+      "driver": "cross-repository integration test",
+      "evidence": null,
+      "status": "untested"
+    },
+    {
+      "id": "T05-CONSUMER-01",
+      "action": "Validate the T05 Quality Hold consumer against runtime v1",
+      "surface": "assembled business journey",
+      "dependency": "T04 event freeze and T05 branch",
+      "oracle": "real quality hold business record and receipt",
+      "driver": "cross-repository integration test",
+      "evidence": null,
+      "status": "untested"
+    },
+    {
+      "id": "T10-COMPOSITION-01",
+      "action": "Re-run the contract and lifecycle suite on the exact ten-lane integration composition",
+      "surface": "release composition",
+      "dependency": "T10 composed heads",
+      "oracle": "composition OIDs and real-stack suite",
+      "driver": "integration gate",
+      "evidence": null,
+      "status": "untested"
+    }
+  ],
+  "residualGaps": [
+    "The Core PostgreSQL pilot uses a test consumer fixture; the real T02 Procurement producer and Inventory command adapter are not present on this branch.",
+    "The T05 Quality Hold consumer contract depends on the T04 event-type freeze and was not composed here.",
+    "T10 must regenerate the schema snapshot and rerun these gates on the exact merged-head composition."
+  ]
+}

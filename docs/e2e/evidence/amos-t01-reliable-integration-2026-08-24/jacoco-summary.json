@@ -1,0 +1,10 @@
+{
+  "source": "platform/build/reports/jacoco/test/jacocoTestReport.xml",
+  "package": "com/auraboot/framework/integration",
+  "counter": "LINE",
+  "covered": 121,
+  "missed": 9,
+  "coveragePercent": 93.1,
+  "extraction": "xmllint XPath package/counter attributes",
+  "fullReport": "generated locally and intentionally not committed because it is an 8.6 MB whole-platform artifact"
+}
