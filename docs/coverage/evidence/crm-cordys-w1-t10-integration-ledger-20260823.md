@@ -22,7 +22,7 @@ Live state captured on 2026-08-23. A dependency is eligible only when its remote
 | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- |
 | T03 | `codex/crm-w1-lead-lifecycle-t03-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `4f8e3b4c7af2418a48f5cb28a3ce6a8d45666d56` | no | 3 | same as local | [#1655](https://github.com/AuraBootTeam/auraboot/pull/1655) | `/[]` keys `crm.saved_view.*`; `/[]` saved views with `viewKey` `crm_lead_*`; generated lead rows in `/productSurfaces/*`; release denominator assertions | `integrated-product-test-shared` |
 | T04 | `codex/crm-w1-account360-t04-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | same as base | no | 0 | absent | absent | pending handoff | `waiting-for-stable-head` |
-| T05 | `codex/crm-w1-contact-t05-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | same as base | no | 0 | absent | absent | pending handoff | `waiting-for-stable-head` |
+| T05 | `codex/crm-w1-contact-t05-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `3f35de7c63770e561900cbcbf077af786d44af5e` | no | 3 | same as local | [#1656](https://github.com/AuraBootTeam/auraboot/pull/1656) | `/[]/code=crm_contact_common/extension/importPolicy/modes`; `/[]/code=crm_contact_common/extension/importPolicy/updateKeys`; generated contact rows in `/productSurfaces/*`; release denominator assertions | `integrated-product-test-regenerated-shared` |
 | T06 | `codex/crm-w1-followup-t06-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | same as base | no | 0 | absent | absent | pending handoff | `waiting-for-stable-head` |
 | T07 | `codex/crm-w1-opportunity-t07-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `0e564e62740c74d20ef33cc10dd8d3a4d14bb27d` | no | 1 | same as local | [#1654](https://github.com/AuraBootTeam/auraboot/pull/1654) | generated opportunity rows in `/productSurfaces/*`; release denominator assertions | `integrated-split-product-test-shared` |
 | T08 | `codex/crm-w1-search-bulk-t08-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | same as base | no | 0 | absent | absent | pending handoff | `waiting-for-stable-head` |
@@ -32,7 +32,7 @@ Live state captured on 2026-08-23. A dependency is eligible only when its remote
 
 Initial preflight found no leaf delta to merge: all T03-T09 heads equaled the locked base. Therefore that conflict status was `not-applicable-yet`, not `clean`.
 
-The first stable wave (T03, T07, and T09) was rechecked against the current integration head. Merge-tree emitted no conflict markers. T07's mixed commit was split on T10 into product, test, and generated/shared layers. The manifest was regenerated from the combined product tree; no leaf manifest was accepted wholesale. The integrated denominator is currently `735 pass / 2762 untested` across `3497` product rows; this is a denominator snapshot, not a product completion percentage.
+The first stable wave (T03, T07, and T09) was rechecked against the current integration head. Merge-tree emitted no conflict markers. T07's mixed commit was split on T10 into product, test, and generated/shared layers. T05 then reported conflicts only in the generated manifest and its count assertions; its product and test commits were integrated, while its leaf-generated manifest commit was replaced by regeneration from the combined tree. No leaf manifest was accepted wholesale. The integrated denominator is currently `735 pass / 2763 untested` across `3498` product rows; this is a denominator snapshot, not a product completion percentage.
 
 For each stable leaf head, T10 will record:
 

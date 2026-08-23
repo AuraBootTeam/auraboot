@@ -29,7 +29,7 @@
       "pages": 128,
       "page-blocks": 414,
       "page-fields": 1766,
-      "ui-actions": 630,
+      "ui-actions": 631,
       "commands": 248,
       "permissions": 114,
       "queries": 55,
@@ -37,7 +37,7 @@
     },
     "productVerdicts": {
       "pass": 735,
-      "untested": 2762
+      "untested": 2763
     },
     "fullProductNonGoals": [
       "data migration"
@@ -37980,7 +37980,20 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].rowActions[0]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:view:2",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:bulk_delete_contacts:2",
+          "action": "bulk-action bulk_delete_contacts on crm_contact_common_list -> bulk_record_command:crm:delete_contact",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].table.bulkActions[0]"
+        },
+        {
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:view:3",
           "action": "button view on crm_contact_common_list -> navigate:crm_contact_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -37993,7 +38006,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[0]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:3",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:4",
           "action": "button edit on crm_contact_common_list -> navigate:crm_contact_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -38006,7 +38019,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[1]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:set_primary:4",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:set_primary:5",
           "action": "button set_primary on crm_contact_common_list -> command:crm:set_primary_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -38019,7 +38032,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[2]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:disable:5",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:disable:6",
           "action": "button disable on crm_contact_common_list -> state_transition:crm:disable_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -38032,7 +38045,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[3]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:enable:6",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:enable:7",
           "action": "button enable on crm_contact_common_list -> state_transition:crm:enable_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -38045,7 +38058,7 @@
           "source": "plugins/crm/config/pages/crm_contact_common_list.json#root[1].columns[10].buttons[4]"
         },
         {
-          "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:7",
+          "id": "ui-action:crm_contact_common_list:crm_contact_table:delete:8",
           "action": "button delete on crm_contact_common_list -> command:crm:delete_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -45081,7 +45094,7 @@
         },
         {
           "id": "command:crm:delete_contact",
-          "action": "Execute crm:delete_contact (delete) through its supported user or runtime path",
+          "action": "Execute crm:delete_contact (custom) through its supported user or runtime path",
           "evidence": [],
           "assertion": "No complete browser/backend evidence pair is registered for this command.",
           "verdict": "untested",
