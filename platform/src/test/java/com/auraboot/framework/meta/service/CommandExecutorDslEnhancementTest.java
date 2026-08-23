@@ -296,8 +296,8 @@ class CommandExecutorDslEnhancementTest {
         Map<String, Object> fullData = new HashMap<>(data);
         fullData.put("tenant_id", testTenant.getId());
         fullData.put("pid", UniqueIdGenerator.generate());
-        fullData.put("created_by", testUser.getPid());
-        fullData.put("updated_by", testUser.getPid());
+        fullData.put("created_by", testUser.getId());
+        fullData.put("updated_by", testUser.getId());
         fullData.put("created_at", Instant.now());
         fullData.put("updated_at", Instant.now());
         dynamicDataMapper.insert(tableName, fullData);

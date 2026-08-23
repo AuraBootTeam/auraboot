@@ -409,7 +409,7 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         String supplierRefField = "supplier_ref_" + suffix;
         saveBusinessReferenceModels(supplierModel, supplierNameField, ticketModel, supplierRefField);
         grantCommittedPermissionToTestRole(
-                "decision.reference." + supplierModel + ".read",
+                "model." + supplierModel + ".read",
                 "model",
                 supplierModel,
                 "read",

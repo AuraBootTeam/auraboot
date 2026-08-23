@@ -9,6 +9,7 @@ import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.VerificationCodeService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.integration.SelfRegistrationTestSupport;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.saas.constant.SystemMode;
@@ -43,7 +44,7 @@ class EmailOtpRegistrationPolicyIntegrationTest extends BaseIntegrationTest {
 
     @AfterEach
     void evictSystemConfigCache() {
-        systemConfigService.evictCache();
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
         MetaContext.clear();
     }
 
@@ -83,10 +84,7 @@ class EmailOtpRegistrationPolicyIntegrationTest extends BaseIntegrationTest {
     private void configureRegistration(SystemMode mode, boolean allowSelfRegistration) {
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, mode.getCode(),
                 "system", "string", "System mode (single/multi/hybrid)", true);
-        systemConfigService.initialize(SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION,
-                Boolean.toString(allowSelfRegistration),
-                "system", "boolean", "Allow self-registration", false);
-        systemConfigService.evictCache();
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, allowSelfRegistration);
     }
 
     private void sendLoginCode(String email) {
