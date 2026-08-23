@@ -19,7 +19,26 @@
       "crm_opp_code",
       "crm_opp_account_id"
     ],
-    "preserveListContext": true
+    "preserveListContext": true,
+    "contributionSlots": [
+      {
+        "id": "line-items.blocks",
+        "kind": "block",
+        "anchor": {
+          "target": "tab-blocks",
+          "blockId": "crm_opportunity_tabs",
+          "tabKey": "line_items"
+        }
+      },
+      {
+        "id": "line-items.actions",
+        "kind": "action",
+        "anchor": {
+          "target": "sub-table-actions",
+          "blockId": "block_line_items"
+        }
+      }
+    ]
   },
   "blocks": [
     {
