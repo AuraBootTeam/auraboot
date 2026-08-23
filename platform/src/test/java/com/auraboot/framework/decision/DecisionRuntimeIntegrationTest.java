@@ -40,6 +40,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -401,6 +403,7 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void evaluate_persistsFactMetadataSnapshotForBusinessReferenceModelFields() {
         String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
         String supplierModel = "drt_supplier_" + suffix;
