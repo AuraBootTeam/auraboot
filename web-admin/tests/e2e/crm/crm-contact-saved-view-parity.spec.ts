@@ -7,10 +7,7 @@ import {
   type TestInfo,
 } from '@playwright/test';
 import { Pool } from 'pg';
-import { PG_CONN } from '../../helpers/environments';
-
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5224';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:6524';
+import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 const RUN_ID = process.env.CRM_CONTACT_SAVED_VIEW_RUN_ID?.trim() || '';
 const ADMIN_EMAIL = process.env.CRM_CONTACT_SAVED_VIEW_ADMIN_EMAIL || 'admin@auraboot.com';
 const ADMIN_PASSWORD = process.env.CRM_CONTACT_SAVED_VIEW_ADMIN_PASSWORD || 'Test2026x';
