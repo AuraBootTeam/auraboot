@@ -4,6 +4,7 @@ import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Field;
@@ -16,16 +17,14 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,7 +49,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("CommandExecutor DSL Enhancement Tests - Phase 0")
-class CommandExecutorDslEnhancementTest {
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
     @Autowired
     private CommandExecutor commandExecutor;
@@ -76,15 +76,6 @@ class CommandExecutorDslEnhancementTest {
     @Autowired
     private DynamicDataService dynamicDataService;
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private TenantService tenantService;
-
-    @Autowired
-    private TenantMemberService tenantMemberService;
-
     // Test context
     private User testUser;
     private Tenant testTenant;
@@ -94,7 +85,8 @@ class CommandExecutorDslEnhancementTest {
 
     @BeforeEach
     void setUp() {
-        ensureTestDataExists();
+        testUser = getTestUser();
+        testTenant = getTestTenant();
         MetaContext.setContext(
                 testTenant.getId(),
                 testUser.getId(),
@@ -133,35 +125,6 @@ class CommandExecutorDslEnhancementTest {
         }
     }
 
-    private void ensureTestDataExists() {
-        String testEmail = "dsl-enhance-test@auraboot.com";
-        testUser = userService.findByEmail(testEmail);
-        if (testUser == null) {
-            testUser = userService.signUp(testEmail, "test-password-123");
-        }
-
-        String testTenantName = "dsl-enhance-test-tenant";
-        testTenant = tenantService.findByName(testTenantName);
-        if (testTenant == null) {
-            Tenant tenant = new Tenant();
-            tenant.setPid(UniqueIdGenerator.generate());
-            tenant.setName(testTenantName);
-            tenant.setDisplayName("DSL Enhancement Test Tenant");
-            tenant.setStatus("active");
-            tenant.setContactEmail("admin@dsl-enhance-test.com");
-            tenant.setDescription("Test tenant for DSL enhancement tests");
-            tenant.setDeletedFlag(false);
-            tenant.setCreatedAt(Instant.now());
-            tenant.setUpdatedAt(Instant.now());
-            testTenant = tenantService.createTenant(tenant);
-        }
-
-        TenantMember member = tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId());
-        if (member == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
-        }
-    }
-
     // ==================== Model & Command Setup Helpers ====================
 
     private String createModel(String suffix, String... fieldDefs) {
@@ -188,6 +151,12 @@ class CommandExecutorDslEnhancementTest {
 
         metaModelMapper.insert(model);
         createdModels.add(model);
+        grantCommittedPermissionToTestRole(
+                "model." + modelCode + ".read",
+                "model",
+                modelCode,
+                "read",
+                "Read command DSL fixture " + modelCode);
 
         // Parse field definitions: "fieldCode:dataType" or "fieldCode:dataType:required"
         int order = 1;
@@ -302,13 +271,7 @@ class CommandExecutorDslEnhancementTest {
         fullData.put("updated_at", Instant.now());
         dynamicDataMapper.insert(tableName, fullData);
 
-        // Read back to get the auto-generated id
-        String sql = "SELECT id FROM " + tableName
-                + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-        Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "pid", fullData.get("pid"));
-        List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
-        assertFalse(result.isEmpty(), "Inserted record should be findable");
-        return result.get(0).get("id").toString();
+        return fullData.get("pid").toString();
     }
 
     /**
@@ -316,10 +279,9 @@ class CommandExecutorDslEnhancementTest {
      */
     private Map<String, Object> readRecord(String modelCode, String recordId) {
         String tableName = "mt_" + modelCode.toLowerCase();
-        Long recordIdLong = Long.parseLong(recordId);
         String sql = "SELECT * FROM " + tableName
-                + " WHERE tenant_id = #{params.tenantId} AND id = #{params.id}";
-        Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "id", recordIdLong);
+                + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
+        Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "pid", recordId);
         List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
         return result.isEmpty() ? null : result.get(0);
     }
@@ -597,7 +559,7 @@ class CommandExecutorDslEnhancementTest {
 
         // Create child model with parent reference
         String childModel = createModel("child_" + suffix,
-                "parent_id_" + suffix + ":INTEGER",
+                "parent_id_" + suffix + ":STRING",
                 "child_name_" + suffix + ":STRING");
 
         // Insert parent record
@@ -607,20 +569,20 @@ class CommandExecutorDslEnhancementTest {
 
         // Insert child records
         insertRecord(childModel, Map.of(
-                "parent_id_" + suffix, Long.parseLong(parentId),
+                "parent_id_" + suffix, parentId,
                 "child_name_" + suffix, "Child 1"
         ));
         insertRecord(childModel, Map.of(
-                "parent_id_" + suffix, Long.parseLong(parentId),
+                "parent_id_" + suffix, parentId,
                 "child_name_" + suffix, "Child 2"
         ));
         insertRecord(childModel, Map.of(
-                "parent_id_" + suffix, Long.parseLong(parentId),
+                "parent_id_" + suffix, parentId,
                 "child_name_" + suffix, "Child 3"
         ));
 
         // Verify 3 children exist
-        assertEquals(3, countRecords(childModel, "parent_id_" + suffix, Long.parseLong(parentId)),
+        assertEquals(3, countRecords(childModel, "parent_id_" + suffix, parentId),
                 "Should have 3 child records before delete");
 
         // Create delete command with cascadeDelete config
@@ -646,7 +608,7 @@ class CommandExecutorDslEnhancementTest {
         assertNotNull(result, "Delete command should succeed");
 
         // Verify children were deleted
-        assertEquals(0, countRecords(childModel, "parent_id_" + suffix, Long.parseLong(parentId)),
+        assertEquals(0, countRecords(childModel, "parent_id_" + suffix, parentId),
                 "All child records should be deleted by cascade");
     }
 

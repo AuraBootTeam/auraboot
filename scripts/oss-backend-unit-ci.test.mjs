@@ -79,13 +79,13 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
 test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  assert.match(source, /cleanTest test bootstrapBillingAccountTest/);
+  assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
   assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
   assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
