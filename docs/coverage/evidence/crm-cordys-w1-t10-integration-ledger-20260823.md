@@ -52,4 +52,4 @@ Execution requirements for the verification runtime: single worker, retry `0`, f
 
 ## Current allowed claim
 
-`T10 integration initialized; T03-T09 dependencies are untested and waiting for stable heads. No W1 integration or product parity claim is allowed.`
+`T03-T09 filesystem integration and static/backend/component targeted gates passed. Verification runtime, W1 slice/full, and Cordys side-by-side did not run because the unique verification slot is externally occupied and T02 has no stable SSH/Cordys handoff. W1 VERIFIED is not allowed; Cordys full-product replacement = NOT MET.`
