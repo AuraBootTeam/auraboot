@@ -177,15 +177,56 @@
     }
   },
   {
-    "name": "Lead Board",
-    "description": "Lead pipeline kanban board grouped by status",
+    "name": "$i18n:crm.saved_view.all_leads",
+    "description": "$i18n:crm.saved_view.all_leads_description",
+    "modelCode": "crm_lead_common",
+    "pageKey": "crm_lead_common_list",
+    "viewKey": "crm_lead_all_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": true,
+    "sortOrder": 1,
+    "viewConfig": {
+      "filters": [],
+      "sorts": [{ "fieldCode": "updated_at", "direction": "desc", "priority": 1 }],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
+    "name": "$i18n:crm.saved_view.my_leads",
+    "description": "$i18n:crm.saved_view.my_leads_description",
+    "modelCode": "crm_lead_common",
+    "pageKey": "crm_lead_common_list",
+    "viewKey": "crm_lead_my_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": false,
+    "sortOrder": 2,
+    "pinAsQuickFilter": true,
+    "quickFilterIcon": "👤",
+    "quickFilterOrder": 1,
+    "viewConfig": {
+      "filters": [{
+        "fieldCode": "crm_lead_assigned_to",
+        "operator": "eq",
+        "value": null,
+        "isExpression": true,
+        "expression": "#currentUser"
+      }],
+      "sorts": [{ "fieldCode": "updated_at", "direction": "desc", "priority": 1 }],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
+    "name": "$i18n:crm.saved_view.lead_board",
+    "description": "$i18n:crm.saved_view.lead_board_description",
     "modelCode": "crm_lead_common",
     "pageKey": "crm_lead_common_list",
     "viewKey": "crm_lead_pipeline_board",
     "scope": "global",
     "viewType": "kanban",
     "isDefault": false,
-    "sortOrder": 1,
+    "sortOrder": 3,
     "viewConfig": {
       "groupByField": "crm_lead_status",
       "groupByDictCode": "crm_lead_status",
