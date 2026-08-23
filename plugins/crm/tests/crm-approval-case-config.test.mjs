@@ -228,7 +228,7 @@ test('CRM activity exposes direct related-object anchors for workspace sub-table
   }
 
   const detail = page('crm_activity_common_detail');
-  const relatedSection = detail.blocks?.find((block) => block.id === 'section_related_context');
+  const relatedSection = detail.blocks?.find((block) => block.id === 'activity_facts');
   assert.ok(relatedSection, 'activity detail should expose related context section');
   const relatedFields = new Set(relatedSection.fields?.map((field) => field.field));
   assert.ok(relatedFields.has('crm_act_related_model'), 'activity detail should show related model');

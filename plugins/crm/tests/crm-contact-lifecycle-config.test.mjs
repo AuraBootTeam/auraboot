@@ -113,14 +113,33 @@ test('follow-up list distinguishes plans from records and detail exposes governe
 
   const toolbar = findBlock(activityDetail, 'crm_activity_detail_toolbar');
   const actions = new Map(toolbar.buttons.map((button) => [button.code, button]));
-  assert.equal(actions.get('delete').action.command, undefined);
-  assert.equal(actions.get('delete').action.type, 'command');
-  assert.equal(activityCommands.get('crm:delete_activity').type, 'delete');
-  assert.equal(actions.get('delete').permissionCode, 'crm.activity.manage');
-  assert.ok(actions.get('delete').confirm['zh-CN']);
+  const deletePlan = actions.get('delete_follow_plan');
+  const deleteRecord = actions.get('delete_follow_record');
+  assert.equal(deletePlan.action.command, 'crm:delete_follow_plan');
+  assert.equal(deleteRecord.action.command, 'crm:delete_follow_record');
+  assert.match(deletePlan.visibleWhen, /=== 'task'/);
+  assert.match(deleteRecord.visibleWhen, /!== 'task'/);
+  assert.equal(activityCommands.get('crm:delete_follow_plan').type, 'delete');
+  assert.equal(activityCommands.get('crm:delete_follow_record').type, 'delete');
+  assert.equal(deletePlan.permissionCode, 'crm.activity.manage');
+  assert.equal(deleteRecord.permissionCode, 'crm.activity.manage');
+  assert.match(deletePlan.confirm['zh-CN'], /无法恢复/);
+  assert.match(deleteRecord.confirm['zh-CN'], /无法恢复/);
   for (const code of ['start_task', 'complete_task', 'cancel_task']) {
     assert.match(actions.get(code).visibleWhen, /crm_act_type/);
     assert.match(actions.get(code).visibleWhen, /crm_act_status/);
+  }
+  assert.equal(activityCommands.get('crm:update_activity').inputFields.includes('crm_act_type'), false);
+  for (const code of ['complete_task', 'cancel_task']) {
+    assert.deepEqual(activityCommands.get(`crm:${code}`).preconditions[0], {
+      field: 'crm_act_type',
+      operator: 'EQ',
+      value: 'task',
+      'message:zh-CN': code === 'complete_task' ? '只有跟进计划可以完成' : '只有跟进计划可以取消',
+      'message:en': code === 'complete_task'
+        ? 'Only follow-up plans can be completed'
+        : 'Only follow-up plans can be cancelled',
+    });
   }
 });
 
