@@ -53,6 +53,8 @@ test('contacts expose an explicit active/inactive lifecycle instead of overloadi
   );
   assert.equal(commands.get('crm:set_primary_contact').type, 'custom');
   assert.equal(commands.get('crm:set_primary_contact').handler, 'crm:set_primary_contact');
+  assert.equal(commands.get('crm:delete_contact').type, 'custom');
+  assert.equal(commands.get('crm:delete_contact').handler, 'crm:delete_contact');
 });
 
 test('primary-contact and lifecycle actions are available from list and detail with state guards', () => {
@@ -74,8 +76,26 @@ test('primary-contact and lifecycle actions are available from list and detail w
     assert.equal(actions.get('enable').action.command, 'crm:enable_contact');
     assert.match(actions.get('enable').visibleWhen, /inactive/);
   }
+  assert.equal(listActions.get('delete').action.command, 'crm:delete_contact');
   assert.equal(detailActions.get('log_activity').label['zh-CN'], '记录跟进');
   assert.equal(detailActions.get('create_task').label['zh-CN'], '新建计划');
+});
+
+test('contact list exposes governed bulk edit, delete, export and update import', () => {
+  const table = findBlock(listPage, 'crm_contact_table');
+  assert.equal(table.table.selection.mode, 'multiple');
+  assert.equal(table.selection.type, 'checkbox');
+  assert.equal(table.table.bulkCapabilities.edit.permissionCode, 'crm.contact.manage');
+  assert.equal(table.table.bulkCapabilities.export.permissionCode, 'crm.contact.read');
+  assert.equal(table.table.bulkCapabilities.delete, undefined);
+  const deleteAction = table.table.bulkActions.find(
+    (action) => action.code === 'bulk_delete_contacts',
+  );
+  assert.equal(deleteAction.action.type, 'bulk_record_command');
+  assert.equal(deleteAction.action.command, 'crm:delete_contact');
+  assert.equal(deleteAction.action.operationType, 'DELETE');
+  assert.deepEqual(listPage.extension.import.modes, ['insert', 'update']);
+  assert.deepEqual(listPage.extension.import.updateKeys, ['crm_ct_email']);
 });
 
 test('follow-up list distinguishes plans from records and detail exposes governed deletion', () => {
