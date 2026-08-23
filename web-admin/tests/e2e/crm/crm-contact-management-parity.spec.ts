@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '../../fixtures';
 import fs from 'node:fs';
 import * as XLSX from 'xlsx';
-import { executeCommandViaApi, uniqueId } from '../helpers';
+import { clickRowActionByLocator, executeCommandViaApi, uniqueId } from '../helpers';
 
 const CONTACT = 'crm_contact_common';
 
@@ -126,7 +126,9 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
       crm_ct_email: `${uid}-missing@example.com`,
     });
     expect(missingAccount.status).toBeGreaterThanOrEqual(400);
-    expect(JSON.stringify(missingAccount.body)).toMatch(/必须关联客户|belong to an account/i);
+    expect(JSON.stringify(missingAccount.body)).toMatch(
+      /必须关联客户|belong to an account|crm_ct_account_id.*required/i,
+    );
 
     const duplicate = await commandFailure(page, 'crm:create_contact', {
       crm_ct_account_id: account.recordId,
@@ -143,7 +145,7 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     }
 
     const editableRow = row(page, names.editable);
-    await editableRow.getByTestId('row-action-edit').click();
+    await clickRowActionByLocator(page, editableRow, 'edit', '编辑');
     const titleInput = page
       .locator('[data-testid="form-field-crm_ct_title"] input, input[name="crm_ct_title"]')
       .first();
@@ -192,7 +194,8 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     expect((await exported.json()).data.recordCount).toBe(2);
     const workbookPath = testInfo.outputPath('selected-contacts.xlsx');
     await download.saveAs(workbookPath);
-    const workbook = XLSX.readFile(workbookPath);
+    const workbookBytes = fs.readFileSync(workbookPath);
+    const workbook = XLSX.read(workbookBytes, { type: 'buffer' });
     const exportedText = JSON.stringify(
       XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]),
     );
@@ -200,7 +203,7 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     expect(exportedText).toContain(names.removable);
     expect(exportedText).not.toContain(names.primary);
     await testInfo.attach('selected-contacts.xlsx', {
-      body: fs.readFileSync(workbookPath),
+      body: workbookBytes,
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     await page.getByTestId('bulk-clear-selection-btn').click();

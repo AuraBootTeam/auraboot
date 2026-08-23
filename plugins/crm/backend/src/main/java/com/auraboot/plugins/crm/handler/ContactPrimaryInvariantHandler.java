@@ -49,7 +49,7 @@ public class ContactPrimaryInvariantHandler implements CommandHandlerExtension {
 
     @Override
     public boolean chainsAfterPrimary() {
-        return true;
+        return false;
     }
 
     @Override
