@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -89,6 +90,7 @@ public class ExcelImportService {
 
     private final ExecutorService asyncExecutor = Executors.newFixedThreadPool(2);
     private final Map<String, AsyncImportStatus> asyncTasks = new ConcurrentHashMap<>();
+    private final Map<String, AtomicBoolean> cancellationRequests = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> importEmitters = new ConcurrentHashMap<>();
 
     public int getAsyncThreshold() {
@@ -116,7 +118,7 @@ public class ExcelImportService {
         private Long tenantId;
         @JsonIgnore
         private Long createdBy;
-        private String status; // RUNNING, COMPLETED, FAILED
+        private String status; // RUNNING, COMPLETED, FAILED, CANCELLED
         private int totalRows;
         private int processedRows;
         private ExcelImportResult result;
@@ -373,6 +375,7 @@ public class ExcelImportService {
         status.setCreatedBy(userId);
         status.setStatus(StatusConstants.RUNNING);
         asyncTasks.put(taskId, status);
+        cancellationRequests.put(taskId, new AtomicBoolean(false));
 
         asyncExecutor.submit(() -> {
             try {
@@ -406,6 +409,15 @@ public class ExcelImportService {
                 // Emit final completion event
                 emitProgress(taskId, result.getTotalRows(), result.getTotalRows(),
                         result.getErrorCount(), "completed");
+            } catch (ImportCancelledException cancelled) {
+                ExcelImportResult result = cancelled.result();
+                status.setResult(result);
+                status.setProcessedRows(result.getSuccessCount() + result.getErrorCount());
+                status.setTotalRows(result.getTotalRows());
+                status.setStatus(StatusConstants.CANCELLED);
+                updateImportJob(jobId, StatusConstants.CANCELLED, result);
+                emitProgress(taskId, status.getProcessedRows(), result.getTotalRows(),
+                        result.getErrorCount(), StatusConstants.CANCELLED);
             } catch (Exception e) {
                 // CATCH: top-level async boundary — no caller can observe this failure, so keep
                 // the complete cause chain alongside the durable failed task state.
@@ -425,6 +437,7 @@ public class ExcelImportService {
                 // Completed tasks are reconstructed from the durable job row. Keeping every
                 // terminal result in memory would grow without bound on a long-lived node.
                 asyncTasks.remove(taskId);
+                cancellationRequests.remove(taskId);
             }
         });
 
@@ -494,6 +507,10 @@ public class ExcelImportService {
 
             boolean stop = false;
             for (int i = 0; i < batch.size(); i++) {
+                if (isCancellationRequested(taskId)) {
+                    throw new ImportCancelledException(cancelledResult(
+                            mappedRows.size(), success, errorCount, createdCount, updatedCount, errors));
+                }
                 int rowNumber = batchStart + i + 2;
                 try {
                     Map<String, Object> rowData = convertRowValues(fieldDefs, batch.get(i));
@@ -535,6 +552,59 @@ public class ExcelImportService {
                 .successCount(success).errorCount(errorCount)
                 .createdCount(createdCount).updatedCount(updatedCount)
                 .errors(errors).hasErrors(errorCount > 0).build();
+    }
+
+    /**
+     * Request cooperative cancellation of an import owned by the current tenant and user.
+     * Rows already committed remain visible and are reported truthfully; no later row starts
+     * after the worker observes the request.
+     */
+    public AsyncImportStatus cancelImport(String modelCode, String taskId) {
+        AsyncImportStatus status = requireImportStatus(modelCode, taskId);
+        if (status == null) {
+            return null;
+        }
+        if (!StatusConstants.RUNNING.equalsIgnoreCase(status.getStatus())) {
+            throw new BusinessException("Only a running import can be cancelled");
+        }
+        AtomicBoolean request = cancellationRequests.get(taskId);
+        if (request == null) {
+            throw new BusinessException("Import worker is no longer active: " + taskId);
+        }
+        request.set(true);
+        return status;
+    }
+
+    private boolean isCancellationRequested(String taskId) {
+        AtomicBoolean request = cancellationRequests.get(taskId);
+        return request != null && request.get();
+    }
+
+    private ExcelImportResult cancelledResult(int totalRows, int success, int errorCount,
+                                               int createdCount, int updatedCount,
+                                               List<ImportValidationError> errors) {
+        return ExcelImportResult.builder()
+                .totalRows(totalRows)
+                .successCount(success)
+                .errorCount(errorCount)
+                .createdCount(createdCount)
+                .updatedCount(updatedCount)
+                .errors(errors)
+                .hasErrors(true)
+                .build();
+    }
+
+    private static final class ImportCancelledException extends RuntimeException {
+        private final ExcelImportResult result;
+
+        private ImportCancelledException(ExcelImportResult result) {
+            super("Import cancelled by user");
+            this.result = result;
+        }
+
+        private ExcelImportResult result() {
+            return result;
+        }
     }
 
     /**
@@ -594,7 +664,9 @@ public class ExcelImportService {
                     .errorReportFailed(errorRows > 0
                             && job.getErrorReportUrl() == null && !reportExpired)
                     .errorReportExpired(reportExpired)
-                    .hasErrors(errorRows > 0 || StatusConstants.FAILED.equalsIgnoreCase(persistedStatus))
+                    .hasErrors(errorRows > 0
+                            || StatusConstants.FAILED.equalsIgnoreCase(persistedStatus)
+                            || StatusConstants.CANCELLED.equalsIgnoreCase(persistedStatus))
                     .build());
         }
         restored.setStatus(persistedStatus);

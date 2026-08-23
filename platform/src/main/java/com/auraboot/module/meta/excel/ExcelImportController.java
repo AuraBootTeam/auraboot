@@ -167,6 +167,18 @@ public class ExcelImportController {
                 : ApiResponse.success(status);
     }
 
+    /** Request cooperative cancellation of a running import owned by the current user. */
+    @PostMapping("/import/{modelCode}/cancel/{taskId}")
+    @RequirePermission("model.{modelCode}.import")
+    public ApiResponse<ExcelImportService.AsyncImportStatus> cancelImport(
+            @PathVariable String modelCode,
+            @PathVariable String taskId) {
+        ExcelImportService.AsyncImportStatus status = importService.cancelImport(modelCode, taskId);
+        return status == null
+                ? ApiResponse.error("Task not found: " + taskId)
+                : ApiResponse.success("Cancellation requested", status);
+    }
+
     /**
      * Validate an Excel file against the model's field definitions without importing.
      * Returns a detailed validation report with errors and warnings.
