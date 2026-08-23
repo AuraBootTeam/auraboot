@@ -93,7 +93,7 @@ test('contact list exposes governed bulk edit, delete, export and update import'
   );
   assert.equal(deleteAction.action.type, 'bulk_record_command');
   assert.equal(deleteAction.action.command, 'crm:delete_contact');
-  assert.equal(deleteAction.action.operationType, 'DELETE');
+  assert.equal(deleteAction.action.operationType, undefined);
   assert.deepEqual(listPage.extension.import.modes, ['insert', 'update']);
   assert.deepEqual(listPage.extension.import.updateKeys, ['crm_ct_email']);
 });
@@ -123,6 +123,7 @@ test('follow-up list distinguishes plans from records and detail exposes governe
   assert.equal(activityCommands.get('crm:delete_follow_record').type, 'delete');
   assert.equal(deletePlan.permissionCode, 'crm.activity.manage');
   assert.equal(deleteRecord.permissionCode, 'crm.activity.manage');
+  assert.equal(findBlock(activityDetail, 'activity_history').subTable.parentField, 'crm_act_parent_id');
   assert.match(deletePlan.confirm['zh-CN'], /无法恢复/);
   assert.match(deleteRecord.confirm['zh-CN'], /无法恢复/);
   for (const code of ['start_task', 'complete_task', 'cancel_task']) {

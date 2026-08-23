@@ -1,3 +1,9 @@
+---
+type: artifact
+status: active
+created: 2026-08-23
+---
+
 # CRM Cordys W1 T10 integration ledger
 
 Status: active
@@ -11,7 +17,9 @@ This is the process ledger for the T10 integration branch. Product parity remain
 - Data migration: excluded during development
 - Integration branch: `codex/crm-w1-integration-t10-20260823`
 - Integration worktree: `/Users/ghj/work/auraboot/.worktrees/auraboot-crm-w1-integration-t10-20260823`
-- Runtime policy: at most two development runtimes workspace-wide and one unique verification runtime; T10 currently owns no runtime
+- Runtime policy: at most two development runtimes workspace-wide and one unique verification runtime
+- T10 runtime: `crm-w1-integration-t10`, source `/Users/ghj/work/auraboot/.worktrees/auraboot-crm-w1-integration-t10-20260823`, backend `6410`, Vite `5110`, BFF `6110`, database `auraboot_10`, evidence root `/Users/ghj/work/auraboot/.workspace/evidence/crm-w1-integration-t10`
+- Cordys reference runtime: `ssh dev`, image pulled through China mirror `hub.1panel.dev`, digest pinned to `sha256:6ccfdfd5f89e7599727528908dcb3820f3c7e843751a558989bc1997c1e209f8`, loopback ports only
 - Final product verdict until the canonical denominator closes: `Cordys full-product replacement = NOT MET`
 
 ## Dependency ledger
@@ -22,11 +30,11 @@ Live state captured on 2026-08-23. A dependency is eligible only when its remote
 | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- |
 | T03 | `codex/crm-w1-lead-lifecycle-t03-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `4f8e3b4c7af2418a48f5cb28a3ce6a8d45666d56` | no | 3 | same as local | [#1655](https://github.com/AuraBootTeam/auraboot/pull/1655) | `/[]` keys `crm.saved_view.*`; `/[]` saved views with `viewKey` `crm_lead_*`; generated lead rows in `/productSurfaces/*`; release denominator assertions | `integrated-product-test-shared` |
 | T04 | `codex/crm-w1-account360-t04-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `568fc13e7d91dbb3969f71d2aae4fbaff9bc4f9b` | no | 1 | same as local | [#1660](https://github.com/AuraBootTeam/auraboot/pull/1660) | generated OSS manifest CRM command row `crm:save_account_relation` and stats | `integrated-split-product-test-regenerated-shared` |
-| T05 | `codex/crm-w1-contact-t05-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `3f35de7c63770e561900cbcbf077af786d44af5e` | no | 3 | same as local | [#1656](https://github.com/AuraBootTeam/auraboot/pull/1656) | `/[]/code=crm_contact_common/extension/importPolicy/modes`; `/[]/code=crm_contact_common/extension/importPolicy/updateKeys`; generated contact rows in `/productSurfaces/*`; release denominator assertions | `integrated-product-test-regenerated-shared` |
-| T06 | `codex/crm-w1-followup-t06-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `dd4f2a2b0ce4cd1cfebb364009a3168128d9e2f4` | no | 3 | same as local | [#1659](https://github.com/AuraBootTeam/auraboot/pull/1659) | `/[]` keys `command.crm:delete_follow_*`; generated activity rows in `/productSurfaces/*`; OSS manifest CRM rows; release verifier evidence contracts and denominator assertions | `integrated-product-test-regenerated-shared` |
+| T05 | `codex/crm-w1-contact-t05-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `c32d745cd57f0c1ae717d249a37e0fe21e7782dc` | no | 6 | same as local | [#1656](https://github.com/AuraBootTeam/auraboot/pull/1656) | `/[]/code=crm_contact_common/extension/importPolicy/modes`; `/[]/code=crm_contact_common/extension/importPolicy/updateKeys`; generated contact rows in `/productSurfaces/*`; release denominator assertions | `integrated-product-test-regenerated-shared` |
+| T06 | `codex/crm-w1-followup-t06-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `5d685b3e76d04a550c541095537dfd277703e3dc` | no | 6 | same as local | [#1659](https://github.com/AuraBootTeam/auraboot/pull/1659) | `/[]` keys `command.crm:delete_follow_*`; generated activity rows in `/productSurfaces/*`; OSS manifest CRM rows; release verifier evidence contracts and denominator assertions | `integrated-product-test-regenerated-shared` |
 | T07 | `codex/crm-w1-opportunity-t07-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `0e564e62740c74d20ef33cc10dd8d3a4d14bb27d` | no | 1 | same as local | [#1654](https://github.com/AuraBootTeam/auraboot/pull/1654) | generated opportunity rows in `/productSurfaces/*`; release denominator assertions | `integrated-split-product-test-shared` |
-| T08 | `codex/crm-w1-search-bulk-t08-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `f63f9bd517ef2af3df437d3e5ab335b991f546d8` | no | 1 | same as local | [#1658](https://github.com/AuraBootTeam/auraboot/pull/1658) | none | `integrated-split-product-test-report` |
-| T09 | `codex/crm-w1-governance-t09-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `92eaa0c73ac3d20759d25c8db4ba1b7492bd3d2f` | no | 3 | same as local | [#1653](https://github.com/AuraBootTeam/auraboot/pull/1653) | none | `integrated-product-test-report` |
+| T08 | `codex/crm-w1-search-bulk-t08-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `dd47c97c63bd35f0cd3e90cf8870b51b516f042c` | no | 3 | same as local | [#1658](https://github.com/AuraBootTeam/auraboot/pull/1658) | none | `integrated-product-test-runtime-evidence` |
+| T09 | `codex/crm-w1-governance-t09-20260823` | `8ffc13e32dc3ab6a9030a139ca465e4c9b78f043` | `09954bb6dca9a8490a63bacf448e47124932d8b5` | no | 4 | same as local | [#1653](https://github.com/AuraBootTeam/auraboot/pull/1653) | none | `integrated-product-test` |
 
 ## Merge-tree preflight
 
@@ -52,4 +60,8 @@ Execution requirements for the verification runtime: single worker, retry `0`, f
 
 ## Current allowed claim
 
-`T03-T09 filesystem integration and static/backend/component targeted gates passed. Verification runtime, W1 slice/full, and Cordys side-by-side did not run because the unique verification slot is externally occupied and T02 has no stable SSH/Cordys handoff. W1 VERIFIED is not allowed; Cordys full-product replacement = NOT MET.`
+The fresh T10 golden stack imported `org-management` and `crm`, then completed all nine startup stages. Static/schema/i18n/reachability/registration gates passed; the full CRM Node suite passed `96/96`; CRM backend and targeted platform authorization/import tests passed; the selected frontend component suite passed `20/20`; release-coverage mutation checks passed `5/5`.
+
+The unified W1 Playwright journey ran with one worker and retry `0`: the final full rerun passed `32`, skipped `1`, failed `0`. The skip is the fixture-import setup guard and does not hide a product action. The separate CMM-10 multimodel import journey passed `1/1` with retry `0`. Earlier full-run failures were retained and classified: three were `test-drift`; the remaining `400` exposed a real product configuration defect (`foreignKey` was ignored by the runtime) and was fixed by using `parentField` before the complete rerun.
+
+Cordys `v1.8.1` is healthy on `ssh dev` after using the China mirror, but authenticated side-by-side evidence is still pending the browser-enforced password-change submission. No cluster verification was run, by scope. The canonical denominator remains `736 pass / 2781 untested` across `3517` rows, so the allowed conclusion is: `W1 selected integrated journeys = VERIFIED; Cordys full-product replacement = NOT MET.`
