@@ -64,7 +64,8 @@
       "subtitleField": "crm_ct_email",
       "importPolicy": {
         "enabled": true,
-        "modes": ["insert"]
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_ct_email"]
       }
     },
     "semantic_description": "An individual person at a customer organization. Contacts are reference entities linked to an account and may participate in multiple opportunities and activities. LLM need to understand: primary contact flag, contact title, communication channels.",

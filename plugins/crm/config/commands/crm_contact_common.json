@@ -109,7 +109,8 @@
     "code": "crm:delete_contact",
     "displayName:zh-CN": "删除联系人",
     "displayName:en": "Delete Contact",
-    "type": "delete",
+    "type": "custom",
+    "handler": "crm:delete_contact",
     "modelCode": "crm_contact_common",
     "extension": {
       "confirmMessage:zh-CN": "确认删除此联系人？",

@@ -9,7 +9,8 @@
     "import": {
       "enabled": true,
       "permissionCode": "model.crm_contact_common.import",
-      "modes": ["insert"]
+      "modes": ["insert", "update"],
+      "updateKeys": ["crm_ct_email"]
     }
   },
   "layout": {
@@ -36,6 +37,43 @@
     {
       "id": "crm_contact_table",
       "blockType": "table",
+      "table": {
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        },
+        "bulkCapabilities": {
+          "edit": {
+            "permissionCode": "crm.contact.manage"
+          },
+          "export": {
+            "permissionCode": "crm.contact.read"
+          }
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_delete_contacts",
+            "permissionCode": "crm.contact.manage",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量删除",
+              "en-US": "Delete Selected"
+            },
+            "confirm": {
+              "zh-CN": "确定删除选中的联系人吗？主联系人或仍有关联商机的联系人会被拒绝并列出原因。",
+              "en-US": "Delete selected contacts? Primary contacts and contacts linked to opportunities will be rejected with reasons."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "crm:delete_contact",
+              "operationType": "DELETE"
+            }
+          }
+        ]
+      },
+      "selection": {
+        "type": "checkbox"
+      },
       "columns": [
         {
           "field": "crm_ct_name",
@@ -151,7 +189,8 @@
               "label": "$i18n:common.button.delete",
               "confirm": "delete.confirm",
               "action": {
-                "type": "command"
+                "type": "command",
+                "command": "crm:delete_contact"
               }
             }
           ],
