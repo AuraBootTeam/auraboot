@@ -33,3 +33,11 @@ test('backend CI runner preserves Gradle product-test exit status', () => {
   assert.match(source, /platform\/gradlew -p platform test\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
+
+test('backend CI runner points fixed-stack tests at the isolated host ports', () => {
+  assert.match(source, /TEST_DATABASE_URL='jdbc:postgresql:\/\/127\.0\.0\.1:25442\/aura_boot/);
+  assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
+  assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
+  assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
+  assert.match(source, /SPRING_DATA_REDIS_PORT='26389'/);
+});

@@ -57,4 +57,12 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
 fi
 
 cd "$PROJECT_ROOT" || environment_invalid 'cannot enter repository root'
+TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+TEST_DATABASE_USERNAME='auraboot' \
+TEST_DATABASE_PASSWORD='auraboot_dev' \
+DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+DATABASE_USERNAME='auraboot' \
+DATABASE_PASSWORD='auraboot_dev' \
+SPRING_DATA_REDIS_HOST='127.0.0.1' \
+SPRING_DATA_REDIS_PORT='26389' \
 platform/gradlew -p platform test
