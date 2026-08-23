@@ -52,6 +52,9 @@ test('backend CI runner proves required platform seed rows before Gradle tests',
 
 test('backend CI runner provisions the lockfile-pinned Playwright Chromium golden dependency', () => {
   assert.match(source, /web-admin\/node_modules\/\.bin\/playwright/);
+  assert.match(source, /VERSION_ID:-.*26\.04/);
+  assert.match(source, /PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24\.04-x64"/);
+  assert.match(source, /PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24\.04-arm64"/);
   assert.match(source, /"\$PLAYWRIGHT_CLI" install chromium/);
   assert.match(source, /playwright-install\.log/);
   assert.match(source, /cannot install lockfile-pinned Playwright Chromium/);
