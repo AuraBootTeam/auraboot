@@ -88,7 +88,8 @@ class SpringContextLoadsSmokeTest {
         // string with RedisUrlSyntaxException), which surfaced non-deterministically only when this
         // @SpringBootTest ran alongside others in the shared TestContext cache (it passes in
         // isolation). A syntactically-valid url is parsed lazily and never throws at context load.
-        registry.add("spring.data.redis.url", () -> "redis://localhost:6379");
+        registry.add("spring.data.redis.url", () -> System.getenv().getOrDefault(
+                "SPRING_DATA_REDIS_URL", "redis://localhost:6379"));
         registry.add("spring.kafka.bootstrap-servers", () -> "");
     }
 

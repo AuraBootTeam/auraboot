@@ -14,6 +14,8 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.match(source, /up -d --wait postgres redis/);
   assert.match(source, /down --volumes --remove-orphans/);
   assert.match(source, /trap cleanup EXIT HUP INT TERM/);
+  assert.match(source, /PostgreSQL init process complete; ready for start up\./);
+  assert.match(source, /pg_isready -U auraboot -d aura_boot/);
 });
 
 test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
@@ -41,6 +43,10 @@ test('backend CI runner points fixed-stack tests at the isolated host ports', ()
   assert.match(source, /TEST_DATABASE_URL='jdbc:postgresql:\/\/127\.0\.0\.1:25442\/aura_boot/);
   assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
   assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
+  assert.match(source, /SPRING_DATASOURCE_URL='jdbc:postgresql:\/\/127\.0\.0\.1:25442\/aura_boot/);
+  assert.match(source, /SPRING_DATASOURCE_USERNAME='auraboot'/);
+  assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
   assert.match(source, /SPRING_DATA_REDIS_PORT='26389'/);
+  assert.match(source, /SPRING_DATA_REDIS_URL='redis:\/\/127\.0\.0\.1:26389'/);
 });

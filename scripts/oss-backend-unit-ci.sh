@@ -59,6 +59,26 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
   environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
 fi
 
+# The PostgreSQL image reports healthy while its temporary init server is still
+# applying the mounted schema. That server is stopped once initialization
+# completes, which can reset an early test connection. Wait for the entrypoint's
+# final init marker and then prove the final server accepts connections.
+postgres_init_deadline=$((SECONDS + 300))
+postgres_initialized=false
+while (( SECONDS < postgres_init_deadline )); do
+  if docker compose "${COMPOSE_ARGS[@]}" logs --no-color postgres 2>&1 \
+      | grep -q 'PostgreSQL init process complete; ready for start up.' \
+    && docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+      pg_isready -U auraboot -d aura_boot >/dev/null 2>&1; then
+    postgres_initialized=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$postgres_initialized" != true ]]; then
+  environment_invalid 'skills-c2 PostgreSQL did not finish schema initialization within 5 minutes'
+fi
+
 cd "$PROJECT_ROOT" || environment_invalid 'cannot enter repository root'
 TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
 TEST_DATABASE_USERNAME='auraboot' \
@@ -66,6 +86,10 @@ TEST_DATABASE_PASSWORD='auraboot_dev' \
 DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
 DATABASE_USERNAME='auraboot' \
 DATABASE_PASSWORD='auraboot_dev' \
+SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+SPRING_DATASOURCE_USERNAME='auraboot' \
+SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
 SPRING_DATA_REDIS_PORT='26389' \
+SPRING_DATA_REDIS_URL='redis://127.0.0.1:26389' \
 platform/gradlew -p platform test
