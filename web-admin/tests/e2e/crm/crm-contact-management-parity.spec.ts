@@ -138,6 +138,16 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     expect(duplicate.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(duplicate.body)).toMatch(/相同联系方式|same contact detail/i);
 
+    await page.goto(`/p/crm_account_common/view/${account.recordId}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    const contactsTab = page.getByRole('tab', { name: /联系人|Contacts/i });
+    await expect(contactsTab).toBeVisible({ timeout: 15_000 });
+    await contactsTab.click();
+    for (const name of Object.values(names)) {
+      await expect(row(page, name)).toHaveCount(1, { timeout: 15_000 });
+    }
+
     await openContactsFromMenu(page);
     await search(page, uid);
     for (const name of Object.values(names)) {

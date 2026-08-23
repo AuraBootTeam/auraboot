@@ -2604,6 +2604,48 @@
     "refType": "saved_view"
   },
   {
+    "key": "crm.saved_view.all_contacts",
+    "zh-CN": "全部联系人",
+    "en-US": "All Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_contacts_description",
+    "zh-CN": "按最近更新时间查看可访问的全部联系人",
+    "en-US": "All accessible contacts ordered by latest update",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.my_contacts",
+    "zh-CN": "我的联系人",
+    "en-US": "My Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.my_contacts_description",
+    "zh-CN": "仅显示当前用户负责的联系人",
+    "en-US": "Contacts owned by the current user",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.department_contacts",
+    "zh-CN": "本部门联系人",
+    "en-US": "Department Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.department_contacts_description",
+    "zh-CN": "显示当前用户所在部门及下级部门成员负责的联系人",
+    "en-US": "Contacts owned by members of the current user's department and its subdepartments",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
     "key": "crm.saved_view.all_opportunities",
     "zh-CN": "全部商机",
     "en-US": "All Opportunities",

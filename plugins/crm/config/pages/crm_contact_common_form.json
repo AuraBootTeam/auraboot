@@ -12,38 +12,109 @@
   },
   "blocks": [
     {
-      "id": "basic",
+      "id": "identity_and_ownership",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "基本信息",
-        "en-US": "Basic Information"
+        "zh-CN": "身份与归属",
+        "en-US": "Identity and Ownership"
       },
       "fields": [
         {
           "field": "crm_ct_account_id",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "placeholder": {
+            "zh-CN": "选择联系人所属客户",
+            "en-US": "Select the account this contact belongs to"
+          },
+          "helpText": {
+            "zh-CN": "联系人必须归属于一个客户，客户关系决定后续商机和跟进范围。",
+            "en-US": "Every contact belongs to an account, which anchors opportunity and activity relationships."
+          }
         },
         {
           "field": "crm_ct_name",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "placeholder": {
+            "zh-CN": "例如：王海明",
+            "en-US": "e.g. Alex Wang"
+          },
+          "helpText": {
+            "zh-CN": "填写客户组织中可识别的真实姓名。",
+            "en-US": "Use the person's recognizable business name."
+          }
         },
         {
           "field": "crm_ct_title",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：采购经理",
+            "en-US": "e.g. Procurement Manager"
+          },
+          "helpText": {
+            "zh-CN": "职位用于判断决策角色和沟通重点。",
+            "en-US": "The title helps sellers understand decision influence and conversation focus."
+          }
         },
         {
+          "field": "crm_ct_owner",
+          "colSpan": 6,
+          "required": true,
+          "placeholder": {
+            "zh-CN": "选择负责维护该联系人的销售人员",
+            "en-US": "Select the seller responsible for this contact"
+          },
+          "helpText": {
+            "zh-CN": "新建时默认当前用户；负责人同时驱动“我的联系人”和“本部门联系人”视图。",
+            "en-US": "Defaults to the current user and drives the My Contacts and Department Contacts views."
+          }
+        }
+      ]
+    },
+    {
+      "id": "channels_and_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "联系方式与说明",
+        "en-US": "Contact Channels and Notes"
+      },
+      "fields": [
+        {
           "field": "crm_ct_email",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：alex.wang@example.com",
+            "en-US": "e.g. alex.wang@example.com"
+          },
+          "helpText": {
+            "zh-CN": "邮箱是联系人更新导入的业务匹配键，请使用工作邮箱。",
+            "en-US": "Email is the business match key for update imports; use a work address."
+          }
         },
         {
           "field": "crm_ct_phone",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：0755-12345678",
+            "en-US": "e.g. +86 755 1234 5678"
+          },
+          "helpText": {
+            "zh-CN": "填写座机及区号，便于团队统一识别。",
+            "en-US": "Include the area or country code so the team can recognize the number."
+          }
         },
         {
           "field": "crm_ct_mobile",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：138 0000 0000",
+            "en-US": "e.g. +86 138 0000 0000"
+          },
+          "helpText": {
+            "zh-CN": "填写可用于日常沟通的手机号。",
+            "en-US": "Use the mobile number suitable for day-to-day communication."
+          }
         },
         {
           "field": "crm_ct_is_primary",
@@ -55,7 +126,15 @@
         },
         {
           "field": "crm_ct_remark",
-          "colSpan": 12
+          "colSpan": 12,
+          "placeholder": {
+            "zh-CN": "例如：关注交期，周二下午便于联系",
+            "en-US": "e.g. Focused on delivery dates; best reached Tuesday afternoons"
+          },
+          "helpText": {
+            "zh-CN": "记录稳定的沟通偏好或业务背景，不在此填写敏感凭据。",
+            "en-US": "Capture durable communication preferences or business context, never credentials."
+          }
         }
       ]
     },

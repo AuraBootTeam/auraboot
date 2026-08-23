@@ -13,9 +13,14 @@
       "crm_ct_phone",
       "crm_ct_mobile",
       "crm_ct_is_primary",
+      "crm_ct_owner",
       "crm_ct_remark"
     ],
     "autoSetFields": {
+      "crm_ct_owner": {
+        "strategy": "current_user_pid",
+        "preserveInput": true
+      },
       "crm_ct_status": {
         "strategy": "fixed_value",
         "value": "active"
@@ -41,6 +46,7 @@
       "crm_ct_phone",
       "crm_ct_mobile",
       "crm_ct_is_primary",
+      "crm_ct_owner",
       "crm_ct_remark"
     ],
     "permissions": [

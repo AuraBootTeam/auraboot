@@ -67,8 +67,16 @@
   },
   {
     "modelCode": "crm_contact_common",
-    "fieldCode": "crm_ct_primary_account_key",
+    "fieldCode": "crm_ct_owner",
     "sequence": 8,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "crm_contact_common",
+    "fieldCode": "crm_ct_primary_account_key",
+    "sequence": 9,
     "required": false,
     "visible": false,
     "editable": false
@@ -76,7 +84,7 @@
   {
     "modelCode": "crm_contact_common",
     "fieldCode": "crm_ct_status",
-    "sequence": 9,
+    "sequence": 10,
     "required": true,
     "visible": true,
     "editable": false,
@@ -87,7 +95,7 @@
   {
     "modelCode": "crm_contact_common",
     "fieldCode": "crm_ct_disabled_reason",
-    "sequence": 10,
+    "sequence": 11,
     "required": false,
     "visible": true,
     "editable": false
@@ -95,7 +103,7 @@
   {
     "modelCode": "crm_contact_common",
     "fieldCode": "crm_ct_remark",
-    "sequence": 11,
+    "sequence": 12,
     "required": false,
     "visible": false,
     "editable": true
@@ -103,7 +111,7 @@
   {
     "modelCode": "crm_contact_common",
     "fieldCode": "crm_ct_dup_of",
-    "sequence": 12,
+    "sequence": 13,
     "required": false,
     "visible": true,
     "editable": false,
@@ -114,7 +122,7 @@
   {
     "modelCode": "crm_contact_common",
     "fieldCode": "crm_ct_dup_score",
-    "sequence": 13,
+    "sequence": 14,
     "required": false,
     "visible": true,
     "editable": false,

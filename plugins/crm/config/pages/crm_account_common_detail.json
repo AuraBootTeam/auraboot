@@ -115,6 +115,10 @@
                     "width": 120
                   },
                   {
+                    "field": "crm_ct_owner",
+                    "width": 150
+                  },
+                  {
                     "field": "crm_ct_email",
                     "width": 180
                   },
@@ -140,6 +144,7 @@
                 "actions": [
                   {
                     "code": "add",
+                    "permissionCode": "crm.contact.manage",
                     "label": "$i18n:common.button.create",
                     "action": {
                       "type": "navigate",
@@ -149,6 +154,7 @@
                   },
                   {
                     "code": "edit",
+                    "permissionCode": "crm.contact.manage",
                     "label": "$i18n:common.button.edit",
                     "action": {
                       "type": "navigate",
@@ -159,6 +165,7 @@
                   {
                     "code": "delete",
                     "danger": true,
+                    "permissionCode": "crm.contact.manage",
                     "label": "$i18n:common.button.delete",
                     "action": {
                       "type": "command",
