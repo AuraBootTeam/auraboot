@@ -7,6 +7,7 @@ import test from 'node:test';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
 const composeOverride = path.join(here, '..', 'docker-compose.oss-backend-ci.override.yml');
+const gradleBuild = path.join(here, '..', 'platform', 'build.gradle');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -83,7 +84,11 @@ test('backend CI runner preserves Gradle product-test exit status', () => {
 });
 
 test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
+  const buildSource = readFileSync(gradleBuild, 'utf8');
   assert.match(source, /cleanTest test bootstrapBillingAccountTest/);
+  assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
+  assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
+  assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
 });
 
 test('backend CI runner points fixed-stack tests at the isolated host ports', () => {

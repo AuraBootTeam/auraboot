@@ -647,6 +647,9 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     mustRunAfter tasks.named('test')
+    // The database is recreated outside Gradle, so task outputs cannot prove the external
+    // bootstrap contract was re-executed for this run.
+    outputs.upToDateWhen { false }
     maxParallelForks = 1
 
     def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")
