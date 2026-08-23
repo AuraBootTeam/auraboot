@@ -1,0 +1,345 @@
+{
+  "run": {
+    "id": "crm-w1-search-bulk-t08-20260823",
+    "target": "PAR-23/24 W1 search, bulk operations, export and import task lifecycle",
+    "sot": "delegated T08 contract + CordysCRM v1.8.1/ab96c96",
+    "runtime": "not-acquired: development slots occupied by crm-w1-contact-t05 and crm-w1-opportunity-t07",
+    "commit": "worktree-before-commit",
+    "fix_rounds": 1
+  },
+  "groups": [
+    {
+      "id": "search",
+      "title": "Global, advanced and personal search with permission and masking",
+      "requirement_ref": "PAR-23",
+      "rows": [
+        {
+          "id": "T08-SEARCH-PID",
+          "action": "Global record search builds navigation from public pid and rejects internal-id-only rows",
+          "evidence": ["web-admin/app/ui/__tests__/CommandPalette.test.ts"],
+          "assertion": "pid creates a public detail path; id-only input returns null",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "pure-logic",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-SEARCH-GLOBAL-PERM",
+          "action": "Global search returns only menu-visible, data-scope-authorized and masked CRM records for a non-admin role",
+          "evidence": [],
+          "assertion": "seeded permitted record is visible, denied record is absent, sensitive fields remain masked, direct detail URL stays denied",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-SEARCH-ADVANCED-ACCOUNT",
+          "action": "Account advanced filter supports nested conditions and persists URL/reload state",
+          "evidence": [],
+          "assertion": "AND/OR filter result, request filters payload and reload result match seeded accounts",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-SEARCH-PERSONAL-ACCOUNT",
+          "action": "Account personal saved view is owner-scoped, reloadable and removable",
+          "evidence": [],
+          "assertion": "saved filter reappears for owner after reload and remains absent for another user",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-SEARCH-LEAD",
+          "action": "Lead advanced/personal search with data scope and masking",
+          "evidence": [],
+          "assertion": "lead-specific search journey and permission negative",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-SEARCH-CONTACT",
+          "action": "Contact advanced/personal search with channel masking",
+          "evidence": [],
+          "assertion": "contact-specific search journey and masked phone/email result",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-SEARCH-OPPORTUNITY",
+          "action": "Opportunity advanced/personal search with data scope",
+          "evidence": [],
+          "assertion": "opportunity-specific search journey and permission negative",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        }
+      ]
+    },
+    {
+      "id": "bulk-export",
+      "title": "Batch transfer/edit/delete and selected/all matching export",
+      "requirement_ref": "PAR-24",
+      "rows": [
+        {
+          "id": "T08-BULK-ACCOUNT-TRANSFER",
+          "action": "Transfer selected accounts and verify ownership, old-owner denial and audit",
+          "evidence": [],
+          "assertion": "selected pids change owner exactly once and permissions recalculate after reload",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-BULK-ACCOUNT-EDIT",
+          "action": "Edit an allowed field across selected accounts and reject state-machine fields",
+          "evidence": [],
+          "assertion": "all selected rows persist the value after reload and forbidden fields are absent",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-BULK-ACCOUNT-DELETE",
+          "action": "Delete selected accounts with confirmation and permission failure atomicity",
+          "evidence": [],
+          "assertion": "authorized selection disappears; mixed unauthorized selection does not silently partially delete",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-EXPORT-SELECTED",
+          "action": "Export selected accounts and parse downloaded workbook",
+          "evidence": [],
+          "assertion": "filename/header/non-empty bytes and parsed rows equal selected public records with masking applied",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-EXPORT-ALL-MATCHING",
+          "action": "Export all matching accounts across pages with exclusions and parse workbook",
+          "evidence": [],
+          "assertion": "parsed workbook row count and keys match filtered denominator minus exclusions, not only current page",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-BULK-LEAD",
+          "action": "Lead transfer/edit/delete and selected/all matching export",
+          "evidence": [],
+          "assertion": "object-specific persistence, permission and parsed artifact checks",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-BULK-CONTACT",
+          "action": "Contact transfer/edit/delete and selected/all matching export",
+          "evidence": [],
+          "assertion": "object-specific persistence, permission, channel masking and parsed artifact checks",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-BULK-OPPORTUNITY",
+          "action": "Opportunity transfer/edit/delete and selected/all matching export",
+          "evidence": [],
+          "assertion": "object-specific persistence, permission and parsed artifact checks",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "title": "Import template, preflight, failure report, cancellation, retry and capacity",
+      "requirement_ref": "PAR-24 / CMM-C12",
+      "rows": [
+        {
+          "id": "T08-IMPORT-CANCEL-API",
+          "action": "Cancel API delegates the public task id and retains dynamic model import permission",
+          "evidence": ["platform/src/test/java/com/auraboot/module/meta/excel/ExcelImportControllerTest.java"],
+          "assertion": "route, model/task delegation, fail-closed unknown task and model.{modelCode}.import annotation",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-IMPORT-CANCEL-DURABLE",
+          "action": "Restore a cancelled task with full denominator and truthful partial counts",
+          "evidence": ["platform/src/test/java/com/auraboot/module/meta/excel/ExcelImportServiceTest.java"],
+          "assertion": "status=cancelled, total=10000, processed=503, success=500, error=3 and hasErrors=true",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-IMPORT-CANCEL-TERMINAL",
+          "action": "Reject cancellation of a terminal task without rewriting import history",
+          "evidence": ["platform/src/test/java/com/auraboot/module/meta/excel/ExcelImportServiceTest.java"],
+          "assertion": "completed task cancellation raises a business error and performs no update",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-IMPORT-RETRY-UI",
+          "action": "Failed import exposes explicit retry and reuses the validated source file",
+          "evidence": ["web-admin/app/framework/smart/components/data-tools/__tests__/ImportModal.correction.test.tsx"],
+          "assertion": "first execution failure shows Retry import; second execution succeeds without reselecting file",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-IMPORT-CANCEL-UI",
+          "action": "Running import exposes an explicit cancel control and returns the same file to retry state",
+          "evidence": ["web-admin/app/framework/smart/components/data-tools/__tests__/ImportModal.correction.test.tsx"],
+          "assertion": "cancel request targets the active task, shows cooperative-cancellation feedback and then exposes Retry import",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit"
+        },
+        {
+          "id": "T08-IMPORT-TEMPLATE-PREFLIGHT-REPORT",
+          "action": "Download template, parse headers/instructions, preflight invalid rows and parse correction workbook",
+          "evidence": [],
+          "assertion": "menu-driven browser journey parses both template and failure report contents",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-IMPORT-CANCEL-RUNTIME",
+          "action": "Cancel a running import from UI and verify persisted partial counts and no later writes",
+          "evidence": [],
+          "assertion": "cancel endpoint is owner-scoped; DB count stops at processedRows and remains stable",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-IMPORT-RETRY-RUNTIME",
+          "action": "Retry a failed/cancelled import from UI and verify idempotent persistence semantics",
+          "evidence": [],
+          "assertion": "retry persists the intended rows without duplicating already committed records",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-IMPORT-ROLLBACK",
+          "action": "Validate import failure rollback and partial-row policy against persisted CRM data",
+          "evidence": [],
+          "assertion": "preflight writes nothing; rejected row writes nothing; accepted prior rows match declared skipErrors semantics",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it"
+        },
+        {
+          "id": "T08-CAPACITY-10K",
+          "action": "10,000-row search/import/export capacity denominator",
+          "evidence": [],
+          "assertion": "10,000 seeded rows remain permission-correct and complete within an approved latency budget",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser"
+        },
+        {
+          "id": "T08-CAPACITY-100K",
+          "action": "100,000-row search/import/export capacity denominator",
+          "evidence": [],
+          "assertion": "100,000 seeded rows remain permission-correct and complete within an approved latency budget",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser"
+        }
+      ]
+    }
+  ]
+}
