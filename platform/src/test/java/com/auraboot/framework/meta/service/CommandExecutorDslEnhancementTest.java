@@ -18,8 +18,6 @@ import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.user.dao.entity.User;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,8 +51,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("CommandExecutor DSL Enhancement Tests - Phase 0")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
     private CommandExecutor commandExecutor;
@@ -161,12 +157,6 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 modelCode,
                 "read",
                 "Read command DSL fixture " + modelCode);
-        grantCommittedPermissionToTestRole(
-                "model." + modelCode + ".update",
-                "model",
-                modelCode,
-                "update",
-                "Update command DSL fixture " + modelCode);
 
         // Parse field definitions: "fieldCode:dataType" or "fieldCode:dataType:required"
         int order = 1;
@@ -235,7 +225,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         request.setDisplayName("DSL Test Command " + suffix);
         request.setDescription("Command for DSL enhancement tests");
         request.setModelCode(modelCode);
-        request.setExecutionConfig(withTestCommandAuthority(modelCode, executionConfigJson));
+        request.setExecutionConfig(executionConfigJson);
 
         CommandDefinitionDTO created = commandService.create(request);
         assertNotNull(created, "Command creation should succeed");
@@ -267,21 +257,6 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         return commandCode;
     }
 
-    private String withTestCommandAuthority(String modelCode, String executionConfigJson) {
-        try {
-            var parsed = OBJECT_MAPPER.readTree(executionConfigJson);
-            if (!(parsed instanceof ObjectNode config)) {
-                throw new IllegalArgumentException("Command execution config must be a JSON object");
-            }
-            if (!config.has("permissions")) {
-                config.putArray("permissions").add("model." + modelCode + ".update");
-            }
-            return OBJECT_MAPPER.writeValueAsString(config);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid command test execution config", e);
-        }
-    }
-
     /**
      * Insert a record directly into the dynamic table using low-level mapper.
      */
@@ -309,12 +284,6 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "pid", recordId);
         List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
         return result.isEmpty() ? null : result.get(0);
-    }
-
-    private long readInternalId(String modelCode, String recordPid) {
-        Map<String, Object> record = readRecord(modelCode, recordPid);
-        assertNotNull(record, "Record should be findable by public pid");
-        return ((Number) record.get("id")).longValue();
     }
 
     /**
@@ -869,7 +838,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
         // Target model (e.g., rectification)
         String rectModel = createModel("rect_" + suffix,
-                "rect_issue_id_" + suffix + ":INTEGER",
+                "rect_issue_id_" + suffix + ":STRING",
                 "rect_title_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING");
 
@@ -941,7 +910,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "decision_" + suffix + ":STRING");
 
         String rectModel = createModel("rect2_" + suffix,
-                "rect_issue_id_" + suffix + ":INTEGER",
+                "rect_issue_id_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING");
 
         String issueId = insertRecord(issueModel, Map.of(
@@ -1007,7 +976,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
         // Child model (e.g., monthly records)
         String childModel = createModel("monthly_" + suffix,
-                "plan_id_" + suffix + ":INTEGER",
+                "plan_id_" + suffix + ":STRING",
                 "month_" + suffix + ":INTEGER",
                 "amount_" + suffix + ":DECIMAL");
 
@@ -1016,7 +985,6 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "plan_name_" + suffix, "2026 Annual Plan",
                 "plan_year_" + suffix, 2026
         ));
-        long parentInternalId = readInternalId(parentModel, parentId);
 
         String execConfig = """
                 {
@@ -1052,7 +1020,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         assertNotNull(result, "Command should succeed");
 
         // Verify 12 child records were created
-        long childCount = countRecords(childModel, "plan_id_" + suffix, parentInternalId);
+        long childCount = countRecords(childModel, "plan_id_" + suffix, parentId);
         assertEquals(12, childCount,
                 "Should create 12 monthly records via CREATE_CHILDREN postAction");
     }
@@ -1067,13 +1035,12 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "name_" + suffix + ":STRING");
 
         String childModel = createModel("sub_" + suffix,
-                "parent_id_" + suffix + ":INTEGER",
+                "parent_id_" + suffix + ":STRING",
                 "seq_" + suffix + ":INTEGER");
 
         String parentId = insertRecord(parentModel, Map.of(
                 "name_" + suffix, "Test Plan"
         ));
-        long parentInternalId = readInternalId(parentModel, parentId);
 
         String execConfig = """
                 {
@@ -1103,7 +1070,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         assertNotNull(result);
 
         // Verify 3 child records created
-        long count = countRecords(childModel, "parent_id_" + suffix, parentInternalId);
+        long count = countRecords(childModel, "parent_id_" + suffix, parentId);
         assertEquals(3, count, "Should create 3 child records");
 
         // Read all children and verify seq values are 1,2,3
@@ -1111,7 +1078,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         String sql = "SELECT seq_" + suffix + " FROM " + tableName
                 + " WHERE tenant_id = #{params.tenantId} AND parent_id_" + suffix + " = #{params.parentId}"
                 + " ORDER BY seq_" + suffix;
-        Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "parentId", parentInternalId);
+        Map<String, Object> params = Map.of("tenantId", testTenant.getId(), "parentId", parentId);
         List<Map<String, Object>> children = dynamicDataMapper.selectByQuery(sql, params);
 
         assertEquals(3, children.size());
@@ -1137,7 +1104,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
         // Rectification model
         String rectModel = createModel("comb_rect_" + suffix,
-                "issue_id_" + suffix + ":INTEGER",
+                "issue_id_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING");
 
         // Insert issue
@@ -1207,7 +1174,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
         // Rectification model (source of command)
         String rectModel = createModel("upd_rect_" + suffix,
-                "issue_id_" + suffix + ":INTEGER",
+                "issue_id_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING",
                 "rect_remark_" + suffix + ":STRING");
 
@@ -1216,11 +1183,10 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "title_" + suffix, "Issue to be updated",
                 "status_" + suffix, "rectifying"
         ));
-        long issueInternalId = readInternalId(issueModel, issueId);
 
         // Insert rectification
         String rectId = insertRecord(rectModel, Map.of(
-                "issue_id_" + suffix, issueInternalId,
+                "issue_id_" + suffix, issueId,
                 "rect_status_" + suffix, "submitted",
                 "rect_remark_" + suffix, ""
         ));
