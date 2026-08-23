@@ -32,6 +32,7 @@ import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.notification.entity.NotificationTemplate;
 import com.auraboot.framework.notification.mapper.NotificationTemplateMapper;
+import com.auraboot.framework.meta.contribution.PageSchemaContributionImportService;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.view.entity.SavedView;
@@ -147,6 +148,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     private final SavedViewMapper savedViewMapper;
     private final PageSchemaMapper pageSchemaMapper;
+    private final PageSchemaContributionImportService pageSchemaContributionImportService;
     private final NotificationTemplateMapper notificationTemplateMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -1616,6 +1618,11 @@ public class PluginImportServiceImpl implements PluginImportService {
             log.info("Plugin import stage completed: pluginId={}, type={}, elapsedMs={}",
                     logSafe(manifest.getPluginId()), type, elapsedMs);
         }
+
+        // Contributions target the final imported page shape, so validate/replace only after
+        // the PAGE stage. The contribution importer never updates the base page row.
+        pageSchemaContributionImportService.replaceForPlugin(
+                pluginPid, manifest.getVersion(), tenantId, manifest.getPageContributions());
 
         // Import Drools rules and SLA configs (extension resources — not tracked via
         // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
