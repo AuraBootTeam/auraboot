@@ -6,6 +6,7 @@ import test from 'node:test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
+const composeOverride = path.join(here, '..', 'docker-compose.oss-backend-ci.override.yml');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -19,6 +20,36 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.match(source, /pg_isready -U auraboot -d aura_boot/);
 });
 
+test('backend CI runner migrates a blank database from the Flyway source of truth', () => {
+  const override = readFileSync(composeOverride, 'utf8');
+
+  assert.match(source, /docker-compose\.oss-backend-ci\.override\.yml/);
+  assert.match(override, /volumes:\s*!override/);
+  assert.doesNotMatch(override, /schema-current\.sql/);
+  assert.match(source, /flyway\/flyway:12\.8\.1/);
+  assert.match(source, /-locations=filesystem:\/flyway\/sql/);
+  assert.match(source, /-table=ab_flyway_schema_history/);
+  assert.match(source, /-baselineOnMigrate=false/);
+  assert.match(source, /-validateMigrationNaming=true/);
+  assert.match(source, /-cleanDisabled=true/);
+  assert.match(source, /migrate/);
+  assert.match(source, /validate/);
+});
+
+test('backend CI runner proves required platform seed rows before Gradle tests', () => {
+  for (const table of [
+    'ab_object_alias',
+    'ab_agent_capability',
+    'ab_login_application',
+    'ab_login_channel',
+    'ab_login_channel_auth_method',
+    'ab_billing_resource_catalog',
+  ]) {
+    assert.match(source, new RegExp(escapeRegex(table)));
+  }
+  assert.match(source, /platform seed verification failed/);
+});
+
 test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
   for (const image of [
     'pgvector/pgvector:pg16',
@@ -29,6 +60,7 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
     'confluentinc/cp-kafka:7.5.0',
     'tdengine/tdengine:3.3.4.3',
     'testcontainers/ryuk:0.12.0',
+    'flyway/flyway:12.8.1',
   ]) {
     assert.match(source, new RegExp(escapeRegex(image)));
   }

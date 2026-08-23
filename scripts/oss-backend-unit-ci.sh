@@ -14,9 +14,11 @@ ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-uni
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
   -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
+  -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
   --profile skills-c2-stack
 )
+FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
 mkdir -p "$ARTIFACTS"
 
@@ -49,7 +51,8 @@ for image in \
   mysql:8.0 \
   confluentinc/cp-kafka:7.5.0 \
   tdengine/tdengine:3.3.4.3 \
-  testcontainers/ryuk:0.12.0; do
+  testcontainers/ryuk:0.12.0 \
+  "$FLYWAY_IMAGE"; do
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     timeout 10m docker pull "$image" || environment_invalid "cannot pull $image within 10 minutes"
   fi
@@ -59,10 +62,9 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
   environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
 fi
 
-# The PostgreSQL image reports healthy while its temporary init server is still
-# applying the mounted schema. That server is stopped once initialization
-# completes, which can reset an early test connection. Wait for the entrypoint's
-# final init marker and then prove the final server accepts connections.
+# The PostgreSQL image reports healthy while its temporary init server may still
+# be finishing. Wait for the entrypoint's final init marker and then prove the
+# final server accepts connections before Flyway owns the blank-database setup.
 postgres_init_deadline=$((SECONDS + 300))
 postgres_initialized=false
 while (( SECONDS < postgres_init_deadline )); do
@@ -77,6 +79,52 @@ while (( SECONDS < postgres_init_deadline )); do
 done
 if [[ "$postgres_initialized" != true ]]; then
   environment_invalid 'skills-c2 PostgreSQL did not finish schema initialization within 5 minutes'
+fi
+
+FLYWAY_ARGS=(
+  -url=jdbc:postgresql://127.0.0.1:25442/aura_boot
+  -user=auraboot
+  -password=auraboot_dev
+  -locations=filesystem:/flyway/sql
+  -table=ab_flyway_schema_history
+  -baselineOnMigrate=false
+  -validateMigrationNaming=true
+  -cleanDisabled=true
+)
+run_flyway() {
+  docker run --rm --network host \
+    -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
+    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+}
+
+if ! run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: Flyway migrate failed\n' >&2
+  exit 1
+fi
+if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: Flyway validate failed\n' >&2
+  exit 1
+fi
+
+# Tests exercise migration-owned defaults; prove the denominator before Gradle
+# so a missing seed is reported as database bootstrap drift rather than dozens
+# of misleading service-level assertion failures.
+seed_counts="$(docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+  psql -U auraboot -d aura_boot -Atc "
+    SELECT count(*) FROM ab_object_alias WHERE tenant_id = -1
+    UNION ALL SELECT count(*) FROM ab_agent_capability WHERE tenant_id = -1
+    UNION ALL SELECT count(*) FROM ab_login_application WHERE status = 'active'
+    UNION ALL SELECT count(*) FROM ab_login_channel WHERE status = 'active'
+    UNION ALL SELECT count(*) FROM ab_login_channel_auth_method WHERE status = 'active'
+    UNION ALL SELECT count(*) FROM ab_billing_resource_catalog WHERE status = 'ACTIVE';
+  " 2> "$ARTIFACTS/platform-seed-verification.log")" || {
+    printf '[oss-backend-unit-ci] product-failure: platform seed verification query failed\n' >&2
+    exit 1
+  }
+printf '%s\n' "$seed_counts" > "$ARTIFACTS/platform-seed-verification.log"
+if [[ "$(printf '%s\n' "$seed_counts" | awk '$1 > 0 { ok++ } END { print ok + 0 }')" -ne 6 ]]; then
+  printf '[oss-backend-unit-ci] product-failure: platform seed verification failed\n' >&2
+  exit 1
 fi
 
 cd "$PROJECT_ROOT" || environment_invalid 'cannot enter repository root'

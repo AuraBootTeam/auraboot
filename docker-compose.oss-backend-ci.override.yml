@@ -1,0 +1,7 @@
+# Linux CI only: start the fixed-port PostgreSQL database empty. The backend
+# integration runner applies the canonical Flyway migrations after PostgreSQL
+# is healthy so both schema and migration-owned platform seed rows are tested.
+services:
+  postgres:
+    volumes: !override
+      - skills_c2_postgres_data:/var/lib/postgresql/data
