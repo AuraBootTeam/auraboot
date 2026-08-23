@@ -95,7 +95,8 @@ const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
     'crm_contact_common_detail:crm_contact_detail_toolbar',
     'crm_activity_common_list:crm_act_tabs',
     'crm_activity_common_list:crm_act_table',
-    'crm_activity_common_detail:section_basic',
+    'crm_activity_common_detail:activity_summary',
+    'crm_activity_common_detail:activity_history',
     'crm_activity_common_detail:crm_activity_detail_toolbar',
   ],
   fields: [
@@ -106,10 +107,10 @@ const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
     'crm_activity_common_list:crm_act_table:crm_act_type',
     'crm_activity_common_list:crm_act_table:crm_act_subject',
     'crm_activity_common_list:crm_act_table:crm_act_date',
-    'crm_activity_common_detail:section_basic:crm_act_type',
-    'crm_activity_common_detail:section_basic:crm_act_subject',
-    'crm_activity_common_detail:section_basic:crm_act_date',
-    'crm_activity_common_detail:section_basic:crm_act_content',
+    'crm_activity_common_detail:activity_summary:crm_act_type',
+    'crm_activity_common_detail:activity_summary:crm_act_subject',
+    'crm_activity_common_detail:activity_summary:crm_act_date',
+    'crm_activity_common_detail:activity_summary:crm_act_content',
   ],
   uiActions: [
     'crm_contact_common_detail:crm_contact_detail_toolbar:set_primary',
@@ -118,7 +119,9 @@ const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
     'crm_activity_common_list:crm_act_tabs:follow_plans',
     'crm_activity_common_list:crm_act_tabs:follow_records',
     'crm_activity_common_detail:crm_activity_detail_toolbar:start_task',
-    'crm_activity_common_detail:crm_activity_detail_toolbar:delete',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:complete_task',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_plan',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:delete_follow_record',
   ],
   commands: [
     'crm:create_account',
@@ -127,7 +130,10 @@ const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
     'crm:disable_contact',
     'crm:enable_contact',
     'crm:create_activity',
-    'crm:delete_activity',
+    'crm:start_task',
+    'crm:complete_task',
+    'crm:delete_follow_plan',
+    'crm:delete_follow_record',
   ],
 };
 const LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE = {
@@ -2101,8 +2107,8 @@ export function buildReleaseManifest() {
       {
         id: 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
         filePrefix: 'crm-contact-followup-lifecycle-',
-        expectedScenarios: 10,
-        minimumScreenshots: 6,
+        expectedScenarios: 14,
+        minimumScreenshots: 7,
         expectedCoverage: CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE,
         expectedTechnicalVerdict: 'pass',
         expectedDataMigration: 'out-of-scope-development-stage',

@@ -1346,7 +1346,7 @@ async function cleanupCrmWorkbenchFixture(
   if (!fixture) return;
   await executeCommandViaApi(
     page,
-    'crm:delete_activity',
+    'crm:delete_follow_record',
     {},
     fixture.activityId,
     'delete',
