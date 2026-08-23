@@ -142,6 +142,15 @@ public class PageSchemaContributionComposer {
                 Map<String, Object> subTable = (Map<String, Object>) rawSubTable;
                 appendAction(subTable, "actions", contribution.payload(), slot);
             }
+            case SUB_TABLE_TOOLBAR_ACTIONS -> {
+                Object rawSubTable = block.get("subTable");
+                if (!(rawSubTable instanceof Map<?, ?>)) {
+                    throw invalid("missing subTable anchor on block: " + slot.blockId);
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> subTable = (Map<String, Object>) rawSubTable;
+                appendAction(subTable, "toolbarActions", contribution.payload(), slot);
+            }
         }
     }
 
@@ -315,7 +324,8 @@ public class PageSchemaContributionComposer {
     private enum AnchorTarget {
         TAB_BLOCKS,
         BLOCK_ACTIONS,
-        SUB_TABLE_ACTIONS
+        SUB_TABLE_ACTIONS,
+        SUB_TABLE_TOOLBAR_ACTIONS
     }
 
     private record Slot(String id, PageSchemaContributionKind kind, AnchorTarget target,

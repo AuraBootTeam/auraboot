@@ -307,6 +307,12 @@ describe('canonicalizePageSchemaDto', () => {
                         navigateTo: 'history_detail',
                       },
                     ],
+                    toolbarActions: [
+                      {
+                        code: 'create',
+                        navigateTo: 'history_form',
+                      },
+                    ],
                   },
                 },
               ],
@@ -326,6 +332,12 @@ describe('canonicalizePageSchemaDto', () => {
       action: {
         type: 'navigate',
         to: 'history_detail',
+      },
+    });
+    expect(subTable.toolbarActions[0]).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: 'history_form',
       },
     });
     expect(validateStructure(schema)).toEqual([]);

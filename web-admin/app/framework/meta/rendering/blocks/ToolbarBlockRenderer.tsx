@@ -53,6 +53,14 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   const initialRecord = initialRecordCandidates.find((candidate) =>
     Boolean(getLegacyCompatibleRecordPid(candidate)),
   );
+  const actionContext = initialRecord
+    ? {
+        ...context,
+        record: initialRecord,
+        row: initialRecord,
+        form: initialRecord,
+      }
+    : context;
   const showToast = React.useCallback(
     (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
       switch (type) {
@@ -77,9 +85,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     runtime,
     navigate,
     tableName,
-    context: {
-      record: initialRecord,
-    },
+    context: actionContext,
     dataSourceManager,
     locale,
     t,
@@ -140,7 +146,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
 
           // 条件渲染
           if (button.visibleWhen) {
-            const visible = evaluator.evaluateCondition(button.visibleWhen, context);
+            const visible = evaluator.evaluateCondition(button.visibleWhen, actionContext);
             if (!visible) return null;
           }
 

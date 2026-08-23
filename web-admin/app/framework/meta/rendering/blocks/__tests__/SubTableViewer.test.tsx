@@ -7,6 +7,7 @@ const fetchResultMock = vi.fn();
 const navigateMock = vi.hoisted(() => vi.fn());
 const hasPermissionMock = vi.hoisted(() => vi.fn(() => true));
 const confirmDialogMock = vi.hoisted(() => vi.fn(async (_options?: unknown) => true));
+const toolbarRendererMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
@@ -56,6 +57,13 @@ vi.mock('~/framework/meta/components/subtable/SubTableSummaryRow', () => ({
   SubTableSummaryRow: () => null,
 }));
 
+vi.mock('../ToolbarBlockRenderer', () => ({
+  ToolbarBlockRenderer: (props: any) => {
+    toolbarRendererMock(props);
+    return <div data-testid="mock-subtable-toolbar">toolbar</div>;
+  },
+}));
+
 import { SubTableViewer } from '../SubTableViewer';
 
 function buildConfig(overrides?: Partial<SubTableConfig>): SubTableConfig {
@@ -79,6 +87,39 @@ describe('SubTableViewer', () => {
     hasPermissionMock.mockReturnValue(true);
     confirmDialogMock.mockReset();
     confirmDialogMock.mockResolvedValue(true);
+    toolbarRendererMock.mockReset();
+  });
+
+  it('renders parent-scoped toolbar actions above an empty child collection', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
+
+    render(
+      <SubTableViewer
+        config={buildConfig({
+          toolbarActions: [
+            {
+              code: 'add-priced-product',
+              label: 'Add priced product',
+              action: { type: 'navigate', to: 'priced_product_form' },
+            },
+          ],
+        })}
+        parentRecordPid="OPP-PARENT-1"
+        parentRecordData={{ pid: 'STALE-PID', crm_opp_name: 'Enterprise renewal' }}
+        runtime={{} as any}
+        t={(key) => (key === 'common.noData' ? 'No data' : key)}
+      />,
+    );
+
+    await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-toolbar-actions')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-subtable-toolbar')).toBeInTheDocument();
+    const renderedBlock = toolbarRendererMock.mock.calls.at(-1)?.[0]?.block;
+    expect(renderedBlock.buttons[0].code).toBe('add-priced-product');
+    expect(renderedBlock.record).toEqual({
+      pid: 'OPP-PARENT-1',
+      crm_opp_name: 'Enterprise renewal',
+    });
   });
 
   afterEach(() => {

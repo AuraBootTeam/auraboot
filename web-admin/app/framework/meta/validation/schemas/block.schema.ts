@@ -241,6 +241,7 @@ const subTableConfigSchema = z.object({
   parentField: z.string(),
   readOnly: z.boolean().optional(),
   columns: z.array(columnSchema),
+  toolbarActions: z.array(buttonSchema).optional(),
   actions: z.array(buttonSchema).optional(),
   summary: summaryConfigSchema.optional(),
   resolveVia: z

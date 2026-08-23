@@ -522,6 +522,9 @@ export interface SubTableConfig {
   readOnly?: boolean;
   editableWhen?: string;
   columns: ColumnConfig[];
+  /** Parent-record actions rendered above the child collection, including when it is empty. */
+  toolbarActions?: ButtonConfig[];
+  /** Row-scoped actions. Their command target is the selected child record. */
   actions?: ButtonConfig[];
   /** @deprecated Use actions. Kept for imported DSL compatibility. */
   rowActions?: ButtonConfig[];

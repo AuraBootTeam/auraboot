@@ -2707,10 +2707,12 @@ export function FormPageContent(props: PageContentProps) {
                         key={`${blockKey}-${recordPid}`}
                         config={subTableConfig}
                         parentRecordPid={recordPid!}
+                        parentRecordData={{ ...formData, pid: recordPid }}
                         token={token || undefined}
                         locale={locale}
                         t={t}
                         isEditable={!subTableConfig.readOnly}
+                        runtime={runtime}
                       />
                     ) : !editDataLoaded ? (
                       <div className="text-text-3 py-4 text-center text-sm">

@@ -69,6 +69,27 @@ class PageSchemaContributionComposerTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void actionContributionCanTargetParentScopedSubTableToolbarActions() {
+        PageSchemaDTO base = detailPage(List.of(slot(
+                "line-toolbar-actions", "action", "sub-table-toolbar-actions", "base-related", null)));
+
+        PageSchemaDTO composed = composer.compose(base, List.of(contribution(
+                "add-priced-product", "sales-plugin", "line-toolbar-actions",
+                PageSchemaContributionKind.ACTION, 0,
+                Map.of("code", "add_priced_product", "label", "Add priced product"))));
+
+        Map<String, Object> relatedBlock = findBlock(tabBlocks(composed), "base-related");
+        Map<String, Object> subTable = (Map<String, Object>) relatedBlock.get("subTable");
+        List<Map<String, Object>> actions =
+                (List<Map<String, Object>>) (List<?>) subTable.get("toolbarActions");
+        assertThat(actions).extracting(item -> item.get("code"))
+                .containsExactly("add_priced_product");
+        assertThat(((Map<String, Object>) findBlock(tabBlocks(base), "base-related").get("subTable")))
+                .doesNotContainKey("toolbarActions");
+    }
+
+    @Test
     void missingAnchorFailsClosed() {
         PageSchemaDTO base = detailPage(List.of(slot(
                 "missing", "block", "tab-blocks", "unknown-tabs", "related")));

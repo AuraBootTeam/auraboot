@@ -2062,6 +2062,7 @@ function DetailBlockRenderer({
             childModel: (block as any).modelCode,
             parentField: (block as any).foreignKey,
             columns: (block as any).columns || [],
+            toolbarActions: (block as any).toolbarActions,
             actions: (block as any).actions,
             readOnly: true,
             dataSource: blockDataSource,
@@ -2091,6 +2092,7 @@ function DetailBlockRenderer({
             t={t}
             isEditable={isEditable}
             onDataChange={onDataChange}
+            runtime={runtime}
           />
         </div>
       );
