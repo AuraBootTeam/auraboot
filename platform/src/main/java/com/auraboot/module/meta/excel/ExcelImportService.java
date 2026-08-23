@@ -398,13 +398,15 @@ public class ExcelImportService {
                         result.setErrorReportFailed(true);
                     }
                 }
+                // Persist the complete terminal contract (including row errors) before making
+                // COMPLETED observable. Pollers must never consume a terminal snapshot whose
+                // counts/report exist while its inline error details are not durable yet.
+                updateImportJob(jobId, "completed", result);
+
                 status.setResult(result);
                 status.setProcessedRows(result.getTotalRows());
                 status.setTotalRows(result.getTotalRows());
                 status.setStatus(StatusConstants.COMPLETED);
-
-                // Update import job
-                updateImportJob(jobId, "completed", result);
 
                 // Emit final completion event
                 emitProgress(taskId, result.getTotalRows(), result.getTotalRows(),

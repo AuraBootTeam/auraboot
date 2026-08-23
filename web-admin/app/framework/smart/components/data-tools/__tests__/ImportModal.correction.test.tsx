@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
-import { ImportModal } from '../ImportModal';
+import { hasCompleteRowErrorContract, ImportModal } from '../ImportModal';
 
 vi.mock('xlsx', () => ({
   read: () => ({ SheetNames: ['Import'], Sheets: { Import: {} } }),
@@ -26,6 +26,32 @@ describe('ImportModal correction workflow', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('does not accept a partial terminal contract without inline row errors', () => {
+    expect(
+      hasCompleteRowErrorContract({
+        totalRows: 2,
+        successCount: 1,
+        errorCount: 1,
+        createdCount: 0,
+        updatedCount: 1,
+        errors: [],
+        hasErrors: true,
+        errorReportUrl: '/api/meta/excel/import/crm_lead/error-report/01KPARTIAL',
+      }),
+    ).toBe(false);
+    expect(
+      hasCompleteRowErrorContract({
+        totalRows: 2,
+        successCount: 1,
+        errorCount: 1,
+        createdCount: 0,
+        updatedCount: 1,
+        errors: [{ rowNumber: 3, message: 'No existing record matches code=MISSING' }],
+        hasErrors: true,
+      }),
+    ).toBe(true);
   });
 
   it('offers an authorized correction workbook and accepts the corrected file in-place', async () => {
@@ -159,6 +185,8 @@ describe('ImportModal correction workflow', () => {
           updatedCount: 0,
           errors: [],
           hasErrors: false,
+          taskId: '01KSYNCREPORT',
+          asyncTask: false,
         });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -206,7 +234,7 @@ describe('ImportModal correction workflow', () => {
         });
       }
       if (url.endsWith('/api/meta/excel/import/crm_lead?mode=insert&locale=zh-CN&skipErrors=true')) {
-        return jsonResponse({ taskId: '01KCANCEL', totalRows: 10_000 });
+        return jsonResponse({ taskId: '01KCANCEL', totalRows: 10_000, asyncTask: true });
       }
       if (url.includes('/api/meta/excel/import/crm_lead/cancel/01KCANCEL')) {
         return jsonResponse({ taskId: '01KCANCEL', status: 'running' });

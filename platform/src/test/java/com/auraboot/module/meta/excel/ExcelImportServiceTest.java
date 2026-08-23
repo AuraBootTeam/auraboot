@@ -165,6 +165,10 @@ class ExcelImportServiceTest {
             assertEquals(
                     "No existing record matches code=MISSING-001",
                     status.getResult().getErrors().get(0).getMessage());
+            String terminalJson = new ObjectMapper().writeValueAsString(status);
+            assertTrue(terminalJson.contains("\"errorCount\":1"));
+            assertTrue(terminalJson.contains("\"rowNumber\":3"));
+            assertTrue(terminalJson.contains("No existing record matches code=MISSING-001"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("tenantId"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("createdBy"));
         } finally {

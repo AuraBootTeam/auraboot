@@ -135,7 +135,7 @@ public class ExcelImportController {
                 String taskId = importService.importExcelAsync(modelCode,
                         new java.io.ByteArrayInputStream(fileBytes), options, file.getOriginalFilename());
                 ExcelImportResult asyncResult = ExcelImportResult.builder()
-                        .totalRows(rowCount).taskId(taskId).build();
+                        .totalRows(rowCount).taskId(taskId).asyncTask(true).build();
                 return ApiResponse.success("Import started asynchronously", asyncResult);
             }
 

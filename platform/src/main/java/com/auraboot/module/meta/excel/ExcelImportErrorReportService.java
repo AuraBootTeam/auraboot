@@ -3,6 +3,7 @@ package com.auraboot.module.meta.excel;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.util.JsonUtil;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -114,7 +115,7 @@ public class ExcelImportErrorReportService {
         upload(storageKey, correctionWorkbook);
         try {
             ImportJob job = completedJob(taskId, tenantId, userId, modelCode, fileName, mode,
-                    totalRows, successRows, errorCount(errors), downloadUrl);
+                    totalRows, successRows, errors, downloadUrl);
             if (importJobMapper.insert(job) != 1 || job.getId() == null) {
                 throw new BusinessException("Failed to persist the import error report");
             }
@@ -287,7 +288,8 @@ public class ExcelImportErrorReportService {
 
     private ImportJob completedJob(String taskId, Long tenantId, Long userId, String modelCode,
                                    String fileName, String mode, int totalRows, int successRows,
-                                   int errorRows, String downloadUrl) {
+                                   List<ImportValidationError> errors, String downloadUrl) {
+        int errorRows = errorCount(errors);
         LocalDateTime now = utcNow();
         ImportJob job = new ImportJob();
         job.setPid(taskId);
@@ -299,6 +301,7 @@ public class ExcelImportErrorReportService {
         job.setProcessedRows(totalRows);
         job.setSuccessRows(successRows);
         job.setErrorRows(errorRows);
+        job.setErrorDetails(errorRows == 0 ? null : JsonUtil.toJson(errors));
         job.setImportMode(normalizeMode(mode));
         job.setErrorReportUrl(downloadUrl);
         job.setCreatedAt(now);

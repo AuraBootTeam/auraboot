@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,5 +59,15 @@ class ExcelImportControllerTest {
                 method.getAnnotation(PostMapping.class).value()[0]);
         assertEquals("model.{modelCode}.import",
                 method.getAnnotation(RequirePermission.class).value());
+    }
+
+    @Test
+    void asyncAcknowledgement_isExplicitlyDistinguishedFromReportTaskIds() {
+        ExcelImportResult result = ExcelImportResult.builder()
+                .taskId("01KASYNC")
+                .asyncTask(true)
+                .build();
+
+        assertTrue(result.isAsyncTask());
     }
 }
