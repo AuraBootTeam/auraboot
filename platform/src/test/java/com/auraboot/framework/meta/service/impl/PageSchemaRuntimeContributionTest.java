@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PageSchemaRuntimeContributionTest {
@@ -89,6 +90,21 @@ class PageSchemaRuntimeContributionTest {
         assertThat(blocks).extracting(block -> block.get("id")).containsExactly("base", "catalog");
         assertThat(materialized.getBlocks().toString()).doesNotContain("catalog");
         verify(providerObject).getIfAvailable(any());
+    }
+
+    @Test
+    void authoringLookupReturnsUncomposedBaseSoReimportCannotSeeOldContributions() {
+        PageSchemaDTO base = pageWithSlot();
+        base.getBlocks().add(Map.of("id", "base-only", "blockType", "text"));
+        when(mapper.selectAnyByPageKey("opportunity-detail")).thenReturn(entity);
+        when(converter.toDTO(entity)).thenReturn(base);
+
+        PageSchemaDTO result = service.findAnyByPageKey("opportunity-detail");
+
+        assertThat(result).isSameAs(base);
+        assertThat(result.getBlocks()).extracting(block -> String.valueOf(((Map<?, ?>) block).get("id")))
+                .containsExactly("detail-tabs", "base-only");
+        verifyNoInteractions(materializer, providerObject);
     }
 
     private PageSchemaDTO pageWithSlot() {

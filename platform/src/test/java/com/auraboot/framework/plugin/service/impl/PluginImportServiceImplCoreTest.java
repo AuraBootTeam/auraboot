@@ -162,6 +162,8 @@ class PluginImportServiceImplCoreTest {
     @Mock private com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     @Mock private SavedViewMapper savedViewMapper;
     @Mock private PageSchemaMapper pageSchemaMapper;
+    @Mock private com.auraboot.framework.meta.contribution.PageSchemaContributionImportService
+            pageSchemaContributionImportService;
     @Mock private AutoPermissionAssignmentService autoPermissionAssignmentService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private DocumentCommandGenerator documentCommandGenerator;

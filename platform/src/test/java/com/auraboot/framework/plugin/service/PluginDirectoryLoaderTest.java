@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.service;
 
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.PageContributionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.service.impl.PluginDirectoryLoader;
@@ -363,6 +364,39 @@ class PluginDirectoryLoaderTest {
                     assertThat(new String(resource.content()))
                             .contains("version");
                 });
+    }
+
+    @Test
+    @DisplayName("Should load page contribution resources from the declared config path")
+    void shouldLoadPageContributionResources() throws IOException {
+        Path contributionsDir = tempDir.resolve("config/page-contributions");
+        Files.createDirectories(contributionsDir);
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {
+                  "pluginId": "com.test.sales",
+                  "namespace": "sales",
+                  "version": "1.0.0",
+                  "resourceDirs": {"pageContributions": "config/page-contributions"}
+                }
+                """);
+        Files.writeString(contributionsDir.resolve("opportunity-actions.json"), """
+                {
+                  "id": "select-product",
+                  "targetPageKey": "crm-opportunity-detail",
+                  "slotId": "product-actions",
+                  "kind": "action",
+                  "priority": 100,
+                  "payload": {"code": "select_product", "label": "Select product"}
+                }
+                """);
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(tempDir);
+
+        assertThat(manifest.getPageContributions())
+                .singleElement()
+                .extracting(PageContributionDefinitionDTO::getId)
+                .isEqualTo("select-product");
+        assertThat(manifest.getResourceCounts()).containsEntry("pageContributions", 1);
     }
 
     // ==================== Helpers ====================

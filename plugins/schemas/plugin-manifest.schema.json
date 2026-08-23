@@ -206,6 +206,7 @@
         "roles": { "type": "string" },
         "menus": { "type": "string" },
         "pages": { "type": "string" },
+        "pageContributions": { "type": "string" },
         "dashboards": { "type": "string" },
         "reports": { "type": "string" },
         "namedQueries": { "type": "string" },
