@@ -35,7 +35,7 @@ const SAMPLE_BOM = findSampleBom();
 async function post(page: Page, code: string, payload: any, op = 'create', targetRecordPid?: string) {
   const data: any = { payload, operationType: op };
   if (targetRecordPid) data.targetRecordPid = targetRecordPid;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
+  const r = await page.context().request.post(`/api/meta/commands/execute/${code}`, { data });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.data?.recordId || b?.data?.data?.quote?.pid
@@ -63,7 +63,7 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       const projId = pid(proj.body);
       expect(projId, 'project created').toBeTruthy();
       const buf = fs.readFileSync(SAMPLE_BOM!);
-      const up = await page.request.post('/api/file/upload', {
+      const up = await page.context().request.post('/api/file/upload', {
         multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
       });
       const fileId = (await up.json())?.data?.fileId;
@@ -93,7 +93,7 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
         `QO-07: generate_document reachable + not denied (status=${gen.status})`).toBeTruthy();
       const docFileId = gen.status === 200 ? findFileId(eb) : '';
       if (docFileId) {
-        const dl = await page.request.get(`/api/file/download/${docFileId}`);
+        const dl = await page.context().request.get(`/api/file/download/${docFileId}`);
         expect(dl.status(), 'quote doc downloadable').toBe(200);
         const wb = XLSX.read(await dl.body(), { type: 'buffer' });
         const sheet = wb.Sheets[wb.SheetNames[0]];

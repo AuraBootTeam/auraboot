@@ -47,10 +47,10 @@ test.describe('Quote form reference dropdowns searchable (DD-04/05) @smoke', () 
     await ctx.close();
     const s = await openQuoteRolePage(browser, users['sales']);
     try {
-      await s.page.request.post('/api/meta/commands/execute/crm:create_account', {
+      await s.page.context().request.post('/api/meta/commands/execute/crm:create_account', {
         data: { payload: { crm_acc_name: `LDD Cust ${uid}` }, operationType: 'create' },
       });
-      await s.page.request.post('/api/meta/commands/execute/bom:create_project', {
+      await s.page.context().request.post('/api/meta/commands/execute/bom:create_project', {
         data: { payload: { bom_project_name: `LDD Proj ${uid}`, bom_pcba_code: `LDD-${uid}` }, operationType: 'create' },
       });
     } finally {

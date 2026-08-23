@@ -62,13 +62,14 @@ test('source identity, original snapshot, provenance and evidence are immutable 
     item.fieldCode === 'crm_cr_field_evidence')?.visible, false);
 });
 
-test('source channel becomes immutable at creation and cannot be rewritten by ordinary edit', () => {
+test('source channel is immutable and only declared creation flows may write it', () => {
   const sourceChannel = byCode.get('crm_cr_source_channel');
   assert.equal(sourceChannel?.immutable, true);
   assert.deepEqual(sourceChannel?.allowedWriterCommands, [
     'crm:create_customer_request',
     'crm:convert_lead',
     'crm:intake_customer_request',
+    'qo_quote_common:create',
   ]);
   assert.ok(commandByCode.get('crm:create_customer_request')?.inputFields
     .includes('crm_cr_source_channel'));

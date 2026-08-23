@@ -309,19 +309,23 @@ async function generateAndValidateWorkbook(
   // user-facing obstruction.
   const closeDeadline = Date.now() + 10_000;
   let hiddenSince = 0;
-  while (Date.now() < closeDeadline) {
-    if (await drawer.isVisible().catch(() => false)) {
-      await expect(drawerClose).toBeVisible({ timeout: 2_000 });
-      await drawerClose.click();
-      await expect(drawer).toBeHidden({ timeout: 2_000 });
-      hiddenSince = 0;
-    } else if (hiddenSince === 0) {
-      hiddenSince = Date.now();
-    } else if (Date.now() - hiddenSince >= 1_000) {
-      break;
-    }
-    await page.waitForTimeout(200);
-  }
+  await expect
+    .poll(
+      async () => {
+        if (Date.now() >= closeDeadline) return false;
+        if (await drawer.isVisible().catch(() => false)) {
+          await expect(drawerClose).toBeVisible({ timeout: 2_000 });
+          await drawerClose.click();
+          await expect(drawer).toBeHidden({ timeout: 2_000 });
+          hiddenSince = 0;
+          return false;
+        }
+        if (hiddenSince === 0) hiddenSince = Date.now();
+        return Date.now() - hiddenSince >= 1_000;
+      },
+      { timeout: 10_000, intervals: [100, 200, 200, 500] },
+    )
+    .toBe(true);
   await expect(drawer).toBeHidden({ timeout: 2_000 });
   await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
   const action = page.getByTestId('workbench-action-generate_quote_excel');
