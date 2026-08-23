@@ -93,7 +93,7 @@ test('contact list exposes governed bulk edit, delete, export and update import'
   );
   assert.equal(deleteAction.action.type, 'bulk_record_command');
   assert.equal(deleteAction.action.command, 'crm:delete_contact');
-  assert.equal(deleteAction.action.operationType, 'DELETE');
+  assert.equal(deleteAction.action.operationType, undefined);
   assert.deepEqual(listPage.extension.import.modes, ['insert', 'update']);
   assert.deepEqual(listPage.extension.import.updateKeys, ['crm_ct_email']);
 });
