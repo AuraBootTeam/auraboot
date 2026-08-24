@@ -31,6 +31,10 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/oss-test\.sh/);
   assert.match(gate, /node --test scripts\/dev\/lib\/env-registry\.test\.mjs/);
   assert.match(gate, /node --test scripts\/dev\/resolve-plugin-backends\.test\.mjs/);
+  assert.match(
+    gate,
+    /node --test web-admin\/tests\/e2e\/product-catalog\/row-contract\.unit\.mjs/,
+  );
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
@@ -272,7 +276,12 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /resolve-plugin-backends\.mjs/);
   assert.match(resolver, /manifest\.backend == null/);
   assert.doesNotMatch(resolver, /pluginType\s*!==\s*['"]hybrid['"]/);
-  assert.match(golden, /:platform-plugin-api:publishToMavenLocal/);
+  assert.match(
+    golden,
+    /:platform-plugin-api:publishToMavenLocal :publishToMavenLocal/,
+    'PF4J builds must receive both platform-plugin-api and root auraboot-core publications',
+  );
+  assert.match(golden, /platform-plugin-api\/auraboot-core publish failed/);
   assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
   assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
   assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
@@ -290,6 +299,19 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
     'backend jars must be staged before the PF4J host starts',
   );
   assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
+});
+
+test('Product Catalog smoke fails closed on list PID and current DOM business-cell uniqueness', () => {
+  const smoke = read('web-admin/tests/e2e/product-catalog/prod-catalog-smoke.spec.ts');
+  const rowContract = read('web-admin/tests/e2e/product-catalog/row-contract.mjs');
+
+  assert.match(smoke, /dynamicListRecords\(await response\.json\(\)/);
+  assert.match(smoke, /assertUniqueListRecordPid\(visibleRecords, recordPid, recordLabel\)/);
+  assert.match(smoke, /getByRole\('cell', \{ name: recordText, exact: true \}\)/);
+  assert.match(smoke, /must map to exactly one current DOM row/);
+  assert.match(rowContract, /export function assertUniqueListRecordPid/);
+  assert.match(rowContract, /must occur exactly once in the list response/);
+  assert.doesNotMatch(smoke, /record\.id|numericId|table-row-\$\{index\}/);
 });
 
 test('host-side build scripts never fall back to the system Gradle executable', () => {
