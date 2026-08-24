@@ -13,10 +13,106 @@
   },
   "widgets": [
     {
+      "id": "block_sales_period_overview",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 2,
+      "title": { "zh-CN": "销售节奏总览", "en": "Sales Rhythm Overview" },
+      "config": {
+        "title": { "zh-CN": "销售节奏总览", "en": "Sales Rhythm Overview" },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": { "datasourceId": "nq:crm_sales_period_overview", "format": "records", "maxItems": "10" },
+          "dimensionDicts": { "metric_group": "crm_sales_period_metric_group" }
+        },
+        "table": {
+          "columns": [
+            { "field": "metric_group", "width": 150, "renderType": "tag", "dictCode": "crm_sales_period_metric_group", "label": { "zh-CN": "类别", "en": "Category" } },
+            { "field": "today_count", "width": 92, "align": "right", "label": { "zh-CN": "今日数量", "en": "Today Count" } },
+            { "field": "today_amount", "width": 122, "align": "right", "format": "currency", "label": { "zh-CN": "今日金额", "en": "Today Amount" } },
+            { "field": "week_count", "width": 92, "align": "right", "label": { "zh-CN": "本周数量", "en": "Week Count" } },
+            { "field": "week_amount", "width": 122, "align": "right", "format": "currency", "label": { "zh-CN": "本周金额", "en": "Week Amount" } },
+            { "field": "month_count", "width": 92, "align": "right", "label": { "zh-CN": "本月数量", "en": "Month Count" } },
+            { "field": "month_amount", "width": 122, "align": "right", "format": "currency", "label": { "zh-CN": "本月金额", "en": "Month Amount" } },
+            { "field": "year_count", "width": 92, "align": "right", "label": { "zh-CN": "本年数量", "en": "Year Count" } },
+            { "field": "year_amount", "width": 122, "align": "right", "format": "currency", "label": { "zh-CN": "本年金额", "en": "Year Amount" } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "block_sales_shortcuts",
+      "type": "smart-shortcuts",
+      "x": 0,
+      "y": 2,
+      "w": 4,
+      "h": 3,
+      "title": { "zh-CN": "快捷入口", "en": "Quick Entries" },
+      "config": {
+        "title": { "zh-CN": "快捷入口", "en": "Quick Entries" },
+        "dataSource": { "type": "static" },
+        "shortcuts": [
+          { "label": { "zh-CN": "新建线索", "en": "New Lead" }, "icon": "IconRadar", "path": "/p/crm_lead_common/new" },
+          { "label": { "zh-CN": "新建客户", "en": "New Account" }, "icon": "IconBuilding", "path": "/p/crm_account_common/new" },
+          { "label": { "zh-CN": "新建商机", "en": "New Opportunity" }, "icon": "IconTrendingUp", "path": "/p/crm_opportunity_common/new" },
+          { "label": { "zh-CN": "新建计划", "en": "New Plan" }, "icon": "IconCalendarPlus", "path": "/p/crm_activity_common/new" },
+          { "label": { "zh-CN": "我的任务", "en": "My Tasks" }, "icon": "IconChecklist", "path": "/p/crm_my_tasks" },
+          { "label": { "zh-CN": "活动与服务", "en": "Activity and Service" }, "icon": "IconActivity", "path": "/p/c/crm_activity_service_desk" }
+        ]
+      }
+    },
+    {
+      "id": "block_sales_inbox",
+      "type": "smart-inbox",
+      "x": 4,
+      "y": 2,
+      "w": 8,
+      "h": 3,
+      "title": { "zh-CN": "待办与消息", "en": "Inbox and Messages" },
+      "config": {
+        "title": { "zh-CN": "待办与消息", "en": "Inbox and Messages" },
+        "dataSource": { "type": "static" },
+        "visualization": { "maxItems": 6 }
+      }
+    },
+    {
+      "id": "block_sales_plans",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 5,
+      "w": 12,
+      "h": 2,
+      "title": { "zh-CN": "我的计划", "en": "My Plans" },
+      "config": {
+        "title": { "zh-CN": "我的计划", "en": "My Plans" },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": { "datasourceId": "nq:crm_my_tasks", "format": "records", "maxItems": "8" },
+          "dimensionDicts": { "crm_act_status": "crm_task_status", "crm_act_priority": "crm_task_priority" }
+        },
+        "table": {
+          "columns": [
+            { "field": "crm_act_subject", "width": 280, "label": { "zh-CN": "计划", "en": "Plan" } },
+            { "field": "crm_act_status", "width": 120, "renderType": "tag", "dictCode": "crm_task_status", "label": { "zh-CN": "状态", "en": "Status" } },
+            { "field": "crm_act_priority", "width": 120, "renderType": "tag", "dictCode": "crm_task_priority", "label": { "zh-CN": "优先级", "en": "Priority" } },
+            { "field": "crm_act_due_date", "width": 150, "format": "date", "label": { "zh-CN": "截止日期", "en": "Due Date" } },
+            { "field": "crm_act_date", "width": 170, "format": "datetime", "label": { "zh-CN": "计划时间", "en": "Planned At" } }
+          ],
+          "rowActions": [
+            { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_activity_common_detail" } }
+          ]
+        }
+      }
+    },
+    {
       "id": "block_kpi_cards",
       "type": "smart-number-card",
       "x": 0,
-      "y": 0,
+      "y": 7,
       "w": 12,
       "h": 1,
       "title": {
@@ -155,7 +251,7 @@
       "id": "chart_opp_pipeline",
       "type": "smart-bar-chart",
       "x": 0,
-      "y": 1,
+      "y": 8,
       "w": 6,
       "h": 2,
       "title": {
@@ -205,7 +301,7 @@
       "id": "chart_lead_source",
       "type": "smart-pie-chart",
       "x": 6,
-      "y": 1,
+      "y": 8,
       "w": 6,
       "h": 2,
       "title": {
@@ -255,7 +351,7 @@
       "id": "chart_opp_monthly_trend",
       "type": "smart-line-chart",
       "x": 0,
-      "y": 3,
+      "y": 10,
       "w": 8,
       "h": 2,
       "title": {
@@ -307,7 +403,7 @@
       "id": "chart_win_loss",
       "type": "smart-bar-chart",
       "x": 8,
-      "y": 3,
+      "y": 10,
       "w": 4,
       "h": 2,
       "title": {
@@ -357,7 +453,7 @@
       "id": "block_lead_pipeline",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 5,
+      "y": 12,
       "w": 4,
       "h": 2,
       "title": {
@@ -418,7 +514,7 @@
       "id": "block_recent_opportunities",
       "type": "smart-table-chart",
       "x": 4,
-      "y": 5,
+      "y": 12,
       "w": 4,
       "h": 2,
       "title": {
@@ -498,7 +594,7 @@
       "id": "block_recent_activities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 7,
+      "y": 14,
       "w": 6,
       "h": 2,
       "title": {
@@ -568,7 +664,7 @@
       "id": "block_recent_leads",
       "type": "smart-table-chart",
       "x": 8,
-      "y": 5,
+      "y": 12,
       "w": 4,
       "h": 2,
       "title": {
@@ -645,7 +741,7 @@
       "id": "block_pending_quotes",
       "type": "smart-table-chart",
       "x": 6,
-      "y": 7,
+      "y": 14,
       "w": 6,
       "h": 2,
       "title": {
@@ -736,7 +832,7 @@
       "id": "block_stale_opportunities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 9,
+      "y": 16,
       "w": 8,
       "h": 2,
       "title": {
@@ -821,7 +917,7 @@
       "id": "chart_lost_reason_breakdown",
       "type": "smart-pie-chart",
       "x": 8,
-      "y": 9,
+      "y": 16,
       "w": 4,
       "h": 2,
       "title": {
