@@ -119,9 +119,10 @@ stage_requested_backend_jars() {
   mkdir -p "$maven_repo" "$gradle_home"
   ( cd "$REPO_ROOT/platform" \
     && GRADLE_USER_HOME="$gradle_home" ./gradlew --no-daemon --no-build-cache \
-      -Dmaven.repo.local="$maven_repo" :platform-plugin-api:publishToMavenLocal --console=plain \
-  ) >"$sd/plugin-api-publish.log" 2>&1 \
-    || die "platform-plugin-api publish failed — see $sd/plugin-api-publish.log"
+      -Dmaven.repo.local="$maven_repo" \
+      :platform-plugin-api:publishToMavenLocal :publishToMavenLocal --console=plain \
+  ) >"$sd/platform-publications.log" 2>&1 \
+    || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
   local spec staged_path jar_hash
   for spec in "${backend_specs[@]}"; do
