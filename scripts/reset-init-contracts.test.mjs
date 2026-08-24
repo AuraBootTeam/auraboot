@@ -562,6 +562,27 @@ test('plugin import validates latest import state instead of whole history', () 
   assert.doesNotMatch(script, /where status <> 'success'/i);
 });
 
+test('plugin import activates every imported plugin after reference validation', () => {
+  const script = read('scripts/import-plugins.sh');
+
+  assert.match(script, /plugin_pid = d\.get\('pluginPid'\)/);
+  assert.match(script, /successful_plugin_pids=\(\)/);
+  assert.match(script, /enable_imported_plugins\(\)/);
+  assert.match(script, /api\/plugins\/\$plugin_pid\/enable/);
+  assert.match(script, /data\.get\('status'\) == 'active'/);
+  assert.match(script, /failed to enable imported plugin/);
+
+  const tail = script.slice(script.indexOf('if [ "${#failures[@]}" -gt 0 ]'));
+  assert.ok(
+    tail.indexOf('verify_reference_integrity') < tail.indexOf('enable_imported_plugins'),
+    'plugins must be enabled only after cross-plugin references are verified',
+  );
+  assert.ok(
+    tail.indexOf('enable_imported_plugins') < tail.indexOf('seed_bom_defaults_if_imported'),
+    'lifecycle-aware handlers and contributions must be active before product seeds run',
+  );
+});
+
 test('plugin import seeds BOM defaults when bom-standardization is imported', () => {
   const script = read('scripts/import-plugins.sh');
 
