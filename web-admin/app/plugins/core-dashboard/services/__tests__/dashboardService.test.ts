@@ -224,6 +224,7 @@ describe('dashboardService.normalizeDashboard', () => {
           config: {
             title: 'Runtime Shortcuts',
             dataSource: { type: 'static' },
+            personalizable: true,
             shortcuts: [
               {
                 label: 'Runtime Dashboards',
@@ -241,6 +242,7 @@ describe('dashboardService.normalizeDashboard', () => {
       shortcuts?: Array<{ label: string; path: string }>;
     };
     expect(config.dataSource).toMatchObject({ type: 'static' });
+    expect(config.personalizable).toBe(true);
     expect(config.shortcuts).toEqual([
       {
         label: 'Runtime Dashboards',

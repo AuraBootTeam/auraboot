@@ -71,6 +71,22 @@ class UserEngagementServiceImplTest {
     }
 
     @Test
+    void upsert_appendsAfterHighestSortOrderWhenOrderIsOmitted() {
+        UserEngagement last = entity(88L);
+        last.setSortOrder(4);
+        when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null, last);
+        UserEngagementDTO dto = new UserEngagementDTO();
+        dto.setTargetType("menu");
+        dto.setTargetId("crm_tasks");
+        dto.setTargetLabel("My Tasks");
+        dto.setEngagementType("favorite");
+
+        service.upsert(1L, 2L, dto);
+
+        verify(engagementMapper).insert(argThat((UserEngagement e) -> e.getSortOrder() == 5));
+    }
+
+    @Test
     void upsert_updatesExistingPreservesIdentity() {
         UserEngagement existing = entity(99L);
         when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existing);
@@ -201,6 +217,7 @@ class UserEngagementServiceImplTest {
         dto.setSortOrder(7);
         service.upsert(1L, 2L, dto);
         verify(engagementMapper).insert(argThat((UserEngagement e) -> e.getSortOrder() == 7));
+        verify(engagementMapper, times(1)).selectOne(any(LambdaQueryWrapper.class));
     }
 
     @Test

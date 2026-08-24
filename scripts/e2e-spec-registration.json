@@ -34,6 +34,7 @@
     },
     "plugins/crm/e2e": {
       "crm-dashboards.golden": "Selected by the dedicated crm-dashboards.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "crm-smart-shortcuts.golden": "Selected by the dedicated crm-smart-shortcuts.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "forecast-variance.golden": "Selected by the dedicated forecast-variance.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "opportunity-department-scope.golden": "Selected by the dedicated opportunity-department-scope.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "opportunity-efficiency.golden": "Selected by the dedicated opportunity-efficiency.playwright.config.ts project; intentionally excluded from the QDP-only project.",
