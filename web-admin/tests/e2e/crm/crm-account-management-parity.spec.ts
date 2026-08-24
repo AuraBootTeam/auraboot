@@ -28,6 +28,9 @@ const SOURCE_IDS = [
   'api:customer:customer:opportunity-export-all',
   'api:customer:customer:opportunity-export-select',
   'api:customer:customer:chart',
+  'api:customer:customer:list:account-opportunity-page',
+  'api:customer:customer:source-customer-page',
+  'api:customer:customer:merge',
   'route:web:customer:10',
 ] as const;
 const completed = new Set<string>();
@@ -216,6 +219,34 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     expect((await readRecord(page, created.recordId))?.crm_acc_name).toBe(updated);
     completed.add('api:customer:customer:update');
 
+    const opportunityName = `Account Opportunity ${uid}`;
+    await executeCommandViaApi(
+      page,
+      'crm:create_opportunity',
+      {
+        crm_opp_name: opportunityName,
+        crm_opp_account_id: created.recordId,
+        crm_opp_expected_amount: 128000,
+      },
+      undefined,
+      'create',
+    );
+    await page.goto(`/p/${MODEL}/view/${created.recordId}`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('tab', { name: /商机|Opportunities/i }).click();
+    await expect(page.getByText(opportunityName, { exact: true })).toBeVisible();
+    const opportunityListResponse = page.waitForResponse(
+      (response) =>
+        response.ok() &&
+        response.url().includes('/api/dynamic/crm_opportunity_common/list') &&
+        response.url().includes(encodeURIComponent(created.recordId)),
+    );
+    await page.getByRole('tab', { name: /概览|Overview/i }).click();
+    await page.getByRole('tab', { name: /商机|Opportunities/i }).click();
+    await opportunityListResponse;
+    await expect(page.getByText(opportunityName, { exact: true })).toBeVisible();
+    completed.add('api:customer:customer:list:account-opportunity-page');
+    await shot(page, testInfo, '01b-account-opportunity-context-list');
+
     await openAccountsFromMenu(page);
     await search(page, uid);
     await page.getByTestId('view-analysis-open').click();
@@ -317,6 +348,55 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     expect(await readRecord(page, records[2].recordId)).toBeNull();
     completed.add('api:customer:customer:delete');
     await shot(page, testInfo, '02-account-batch-and-row-delete-complete');
+  });
+
+  test('merge moves child records to the surviving account and removes the source @critical @golden', async ({
+    page,
+  }, testInfo) => {
+    trackRuntimeFailures(page);
+    const uid = uniqueId('crm_account_merge');
+    const sourceName = `Account Merge Source ${uid}`;
+    const targetName = `Account Merge Target ${uid}`;
+    const source = await createAccount(page, sourceName, uid);
+    const target = await createAccount(page, targetName, uid);
+    const contact = await executeCommandViaApi(
+      page,
+      'crm:create_contact',
+      {
+        crm_ct_account_id: source.recordId,
+        crm_ct_name: `Merge Contact ${uid}`,
+        crm_ct_mobile: '13800005555',
+        crm_ct_is_primary: true,
+      },
+      undefined,
+      'create',
+    );
+
+    await openAccountsFromMenu(page);
+    await search(page, uid);
+    await clickRowActionByLocator(page, row(page, sourceName), 'merge', '合并到其他客户');
+    const dialog = page.getByTestId('form-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('form-dialog-field-targetAccountId').selectOption(target.recordId);
+    const mergeResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/meta/commands/execute/crm:merge_account'),
+    );
+    await dialog.getByTestId('form-dialog-submit').click();
+    const merged = await mergeResponse;
+    expect(merged.ok(), await merged.text()).toBe(true);
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(async () => readRecord(page, source.recordId)).toBeNull();
+    expect((await readRecord(page, target.recordId))?.crm_acc_phone).toBe('13800004444');
+    const contactResponse = await page.request.get(
+      `/api/dynamic/crm_contact_common/${contact.recordId}`,
+    );
+    expect(contactResponse.ok(), await contactResponse.text()).toBe(true);
+    expect((await contactResponse.json())?.data?.crm_ct_account_id).toBe(target.recordId);
+    completed.add('api:customer:customer:source-customer-page');
+    completed.add('api:customer:customer:merge');
+    await shot(page, testInfo, '02b-account-merge-complete');
   });
 
   test('owner transfer and governed customer-pool moves persist @critical @golden', async ({
