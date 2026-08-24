@@ -417,9 +417,13 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   if (!visible) return null;
 
   const componentProps: Record<string, any> = {
-    // DSL/component-specific options are defaults. Controlled state and governance resolved by
-    // this wrapper below are authoritative and must never be shadowed by metadata extension keys.
+    // Inferred presentation defaults may be overridden by an explicit DSL/component option.
+    ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
+      ? { dateType: 'datetime-local' }
+      : {}),
     ...field.props,
+    // Controlled identity, state, and governance resolved by this wrapper are authoritative and
+    // must never be shadowed by metadata extension keys.
     name: field.field,
     // label is rendered by ControlledFieldRenderer wrapper, not passed to component
     // to ensure consistent vertical label-above-input layout across all components
@@ -430,9 +434,6 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     required: isRequired,
     error,
     context,
-    ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
-      ? { dateType: 'datetime-local' }
-      : {}),
   };
   // Owned by this wrapper (see resolvedHelpText); keep it out of the control's props so
   // SmartInput does not render a second copy under its own FieldBase.
