@@ -1838,8 +1838,6 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         name: '鑫然科技产品知识库',
         description:
           '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },

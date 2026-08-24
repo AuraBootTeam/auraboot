@@ -633,6 +633,24 @@ test('showcase CRM opportunity seeds send date-only values to DATE fields', () =
   }
 });
 
+test('deployment-neutral knowledge-base seeds use the configured embedding profile', () => {
+  for (const path of [
+    'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
+    'web-admin/tests/e2e/ai/knowledge-base-smoke.spec.ts',
+  ]) {
+    const source = read(path);
+    assert.doesNotMatch(source, /embeddingProvider:\s*['"]openai['"]/);
+    assert.doesNotMatch(source, /embeddingModel:\s*['"]text-embedding-3-small['"]/);
+  }
+
+  const aiSeed = read('web-admin/tests/api/setup/seed-showcase-ai.spec.ts');
+  assert.match(aiSeed, /\/api\/ai\/knowledge\/embedding-profiles/);
+  assert.match(aiSeed, /embeddingProfiles\.length[\s\S]*toBeGreaterThan\(0\)/);
+  assert.match(aiSeed, /embeddingProvider\)\.toBe\(expectedProfile\.providerCode\)/);
+  assert.match(aiSeed, /embeddingModel\)\.toBe\(expectedProfile\.defaultModel\)/);
+});
+
 test('docker GA bootstrap initializes a blank stack before admin login', () => {
   const script = read('scripts/docker-ga-e2e-bootstrap.sh');
 

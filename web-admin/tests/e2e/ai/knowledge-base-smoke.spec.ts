@@ -89,8 +89,6 @@ test.describe('RAG Knowledge Base', () => {
       data: {
         name: KB_NAME,
         description: 'E2E test knowledge base for smoke testing',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },
@@ -101,6 +99,8 @@ test.describe('RAG Knowledge Base', () => {
     expect(kbPid).toBeTruthy();
     expect(body.data.name).toBe(KB_NAME);
     expect(body.data.status).toBe('active');
+    expect(body.data.embeddingProvider).toBeTruthy();
+    expect(body.data.embeddingModel).toBeTruthy();
     expect(body.data.docCount).toBe(0);
   });
 

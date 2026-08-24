@@ -80,11 +80,25 @@ async function listKnowledgeBases(page: any): Promise<any[]> {
   return Array.isArray(body?.data) ? body.data : [];
 }
 
+async function listEmbeddingProfiles(page: any): Promise<any[]> {
+  const resp = await page.request.get('/api/ai/knowledge/embedding-profiles');
+  const body = await expectApiSuccess(resp, 'List embedding profiles');
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
 async function ensureKnowledgeBase(page: any): Promise<string> {
+  const embeddingProfiles = await listEmbeddingProfiles(page);
+  expect(
+    embeddingProfiles.length,
+    'Showcase knowledge-base seed requires one explicitly enabled embedding profile',
+  ).toBeGreaterThan(0);
+  const expectedProfile = embeddingProfiles[0];
   const existing = (await listKnowledgeBases(page)).find(
     (kb: any) => kb?.name === KNOWLEDGE_BASE_NAME,
   );
   if (existing?.pid) {
+    expect(existing.embeddingProvider).toBe(expectedProfile.providerCode);
+    expect(existing.embeddingModel).toBe(expectedProfile.defaultModel);
     console.log(`  Ensured existing knowledge base: ${KNOWLEDGE_BASE_NAME} (${existing.pid})`);
     return existing.pid;
   }
@@ -94,8 +108,6 @@ async function ensureKnowledgeBase(page: any): Promise<string> {
       name: KNOWLEDGE_BASE_NAME,
       description:
         '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
-      embeddingProvider: 'openai',
-      embeddingModel: 'text-embedding-3-small',
       chunkSize: 300,
       chunkOverlap: 30,
     },
@@ -103,6 +115,8 @@ async function ensureKnowledgeBase(page: any): Promise<string> {
   const kbBody = await expectApiSuccess(kbResp, 'Create knowledge base');
   const kbPid = kbBody.data?.pid;
   expect(kbPid, JSON.stringify(kbBody).slice(0, 200)).toBeTruthy();
+  expect(kbBody.data?.embeddingProvider).toBe(expectedProfile.providerCode);
+  expect(kbBody.data?.embeddingModel).toBe(expectedProfile.defaultModel);
   console.log(`  Created knowledge base: ${KNOWLEDGE_BASE_NAME} (${kbPid})`);
   return kbPid;
 }
