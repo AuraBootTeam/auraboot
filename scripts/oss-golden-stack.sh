@@ -40,8 +40,12 @@ set -euo pipefail
 # ---- locate this checkout + the workspace root (dir holding dev.sh) ------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"            # the auraboot checkout this script lives in
-# Normal case: this checkout lives under the workspace, so dev.sh is an ancestor.
-WORKSPACE="$REPO_ROOT"
+# CI uses sibling repositories; local worktrees usually find dev.sh above them.
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
+fi
+[ -n "$WORKSPACE" ] || WORKSPACE="$REPO_ROOT"
 while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 # Sibling-worktree case: `git worktree add` outside the workspace tree (e.g.
 # /Users/.../auraboot-golden alongside /Users/.../auraboot) means dev.sh is NOT
@@ -54,7 +58,7 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
     [ -f "$cand/dev.sh" ] && WORKSPACE="$cand"
   fi
 fi
-[ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh above $REPO_ROOT (and no sibling main-worktree fallback)"; exit 1; }
+[ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/dev.sh"
 

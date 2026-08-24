@@ -20,9 +20,13 @@ test('fresh OSS gate keeps the registered slot for the same stable runtime name'
 
 test('OSS gate resolves the workspace in local and sibling-repository CI layouts', () => {
   const source = readFileSync(gatePath, 'utf8');
+  const stack = readFileSync(stackPath, 'utf8');
   assert.match(source, /AURA_WORKSPACE_ROOT/u);
   assert.match(source, /AURA_CI_WORKSPACE_ROOT/u);
   assert.match(source, /auraboot-workspace\/dev\.sh/u);
+  assert.match(stack, /AURA_CI_WORKSPACE_ROOT/u);
+  assert.match(stack, /auraboot-workspace\/dev\.sh/u);
+  assert.match(source, /ENVIRONMENT-INVALID:[^]*exit 2/u);
 });
 
 test('golden stack uses idempotent runtime identity with source worktree metadata', () => {

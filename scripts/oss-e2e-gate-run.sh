@@ -34,7 +34,7 @@
 #     the failures are then phantom "Command not found: e2et:*" harness noise).
 #
 # The exit code distinguishes the two kinds of failure in its message:
-#   * environment-invalid (stack did not come up / seed failed) -> exit 3
+#   * environment-invalid (stack did not come up / seed failed) -> exit 2
 #   * test-failure        (the slice went red)                  -> exit = the
 #                                                                  Playwright rc
 #
@@ -118,7 +118,7 @@ log()  { printf '%s[oss-e2e-gate]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
 die()  { printf '%s[oss-e2e-gate] ERROR:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; exit 2; }
 # environment-invalid: the stack could not be made ready. Distinct exit code (3)
 # so a caller can tell "the gate's world was broken" from "the code went red".
-die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 3; }
+die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 2; }
 ENV_INVALID=0
 
 # True if a dashboard `code` is imported into ab_dashboard (any tenant). Uses the
