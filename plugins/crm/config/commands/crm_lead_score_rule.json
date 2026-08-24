@@ -83,6 +83,13 @@
     "type": "custom",
     "modelCode": "crm_lead_common",
     "handler": "crm:rescore_lead",
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": ["new", "contacted", "qualified"]
+      }
+    ],
     "description": "Recompute a lead's score by evaluating every active crm_lead_score_rule against the lead and summing the points of all matching rules. Pass the lead record id as the target. Delegates to the Java scoring engine (RescoreLeadHandler). Idempotent: re-running recomputes deterministically. When no active scoring rule exists the command fails loud (no rules configured), rather than silently leaving the score unchanged.",
     "permissions": ["crm.lead.manage"],
     "agent_hint": "Recompute a lead's lead_score from the active scorecard rules. Target = lead id.",

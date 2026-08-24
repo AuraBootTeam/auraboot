@@ -25,19 +25,19 @@
     ],
     "productDenominator": {
       "model-surfaces": 50,
-      "menus": 55,
-      "pages": 128,
-      "page-blocks": 419,
-      "page-fields": 1773,
-      "ui-actions": 640,
-      "commands": 250,
-      "permissions": 114,
+      "menus": 56,
+      "pages": 131,
+      "page-blocks": 425,
+      "page-fields": 1813,
+      "ui-actions": 653,
+      "commands": 255,
+      "permissions": 115,
       "queries": 56,
       "dashboards": 37
     },
     "productVerdicts": {
       "pass": 769,
-      "untested": 2753
+      "untested": 2822
     },
     "fullProductNonGoals": [
       "data migration"
@@ -4822,6 +4822,19 @@
           "source": "plugins/crm/config/menus.json"
         },
         {
+          "id": "menu:crm_lead_pool_mobile_queue",
+          "action": "Navigate through menu crm_lead_pool_mobile_queue to /p/crm_lead_pool_mobile",
+          "evidence": [],
+          "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/menus.json"
+        },
+        {
           "id": "menu:crm_lead_pool_settings",
           "action": "Navigate through menu crm_lead_pool_settings to /p/crm_lead_pool_common",
           "evidence": [],
@@ -4862,7 +4875,7 @@
         },
         {
           "id": "menu:crm_lead_owner_history_common",
-          "action": "Navigate through menu crm_lead_owner_history_common to /p/crm_lead_owner_history_common",
+          "action": "Navigate through menu crm_lead_owner_history_common to /p/c/crm_lead_owner_history_list",
           "evidence": [],
           "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
           "verdict": "untested",
@@ -6023,6 +6036,19 @@
           "source": "plugins/crm/config/pages/crm_lead_desk_workbench.json"
         },
         {
+          "id": "page:crm_lead_move_to_pool_form",
+          "action": "Open crm_lead_move_to_pool_form (form) from its supported product entry and exercise its complete page journey",
+          "evidence": [],
+          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json"
+        },
+        {
           "id": "page:crm_lead_owner_history_detail",
           "action": "Open crm_lead_owner_history_detail (detail) from its supported product entry and exercise its complete page journey",
           "evidence": [],
@@ -6125,6 +6151,32 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json"
+        },
+        {
+          "id": "page:crm_lead_pool_mobile_detail",
+          "action": "Open crm_lead_pool_mobile_detail (detail) from its supported product entry and exercise its complete page journey",
+          "evidence": [],
+          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json"
+        },
+        {
+          "id": "page:crm_lead_pool_mobile_list",
+          "action": "Open crm_lead_pool_mobile_list (list) from its supported product entry and exercise its complete page journey",
+          "evidence": [],
+          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json"
         },
         {
           "id": "page:crm_lead_pool_recycle_rule_detail",
@@ -10393,6 +10445,45 @@
           "source": "plugins/crm/config/pages/crm_lead_desk_workbench.json#root[6]"
         },
         {
+          "id": "block:crm_lead_move_to_pool_form:lead_context:0",
+          "action": "Render and semantically verify form-section block lead_context on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[0]"
+        },
+        {
+          "id": "block:crm_lead_move_to_pool_form:target_pool:1",
+          "action": "Render and semantically verify form-section block target_pool on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[1]"
+        },
+        {
+          "id": "block:crm_lead_move_to_pool_form:buttons:2",
+          "action": "Render and semantically verify form-buttons block buttons on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[2]"
+        },
+        {
           "id": "block:crm_lead_owner_history_detail:ownership_evidence:0",
           "action": "Render and semantically verify form-section block ownership_evidence on crm_lead_owner_history_detail",
           "evidence": [],
@@ -10677,6 +10768,45 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1]"
+        },
+        {
+          "id": "block:crm_lead_pool_mobile_detail:lead_snapshot:0",
+          "action": "Render and semantically verify form-section block lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0]"
+        },
+        {
+          "id": "block:crm_lead_pool_mobile_detail:pool_evidence:1",
+          "action": "Render and semantically verify form-section block pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1]"
+        },
+        {
+          "id": "block:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:0",
+          "action": "Render and semantically verify table block crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0]"
         },
         {
           "id": "block:crm_lead_pool_recycle_rule_detail:condition:0",
@@ -26714,6 +26844,71 @@
           "source": "plugins/crm/config/pages/crm_lead_desk_workbench.json#root[6].sections[5].field"
         },
         {
+          "id": "field:crm_lead_move_to_pool_form:lead_context:crm_lead_company:0",
+          "action": "Verify field crm_lead_company in lead_context on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[0].fields[0].field"
+        },
+        {
+          "id": "field:crm_lead_move_to_pool_form:lead_context:crm_lead_contact_name:1",
+          "action": "Verify field crm_lead_contact_name in lead_context on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[0].fields[1].field"
+        },
+        {
+          "id": "field:crm_lead_move_to_pool_form:lead_context:crm_lead_code:2",
+          "action": "Verify field crm_lead_code in lead_context on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[0].fields[2].field"
+        },
+        {
+          "id": "field:crm_lead_move_to_pool_form:lead_context:crm_lead_pool_state:3",
+          "action": "Verify field crm_lead_pool_state in lead_context on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[0].fields[3].field"
+        },
+        {
+          "id": "field:crm_lead_move_to_pool_form:target_pool:crm_lead_target_pool_id:4",
+          "action": "Verify field crm_lead_target_pool_id in target_pool on crm_lead_move_to_pool_form",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[1].fields[0].field"
+        },
+        {
           "id": "field:crm_lead_owner_history_detail:ownership_evidence:crm_loh_lead_id:0",
           "action": "Verify field crm_loh_lead_id in ownership_evidence on crm_lead_owner_history_detail",
           "evidence": [],
@@ -27000,7 +27195,33 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[1].action.input.field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_pool_id:4",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lead_source:4",
+          "action": "Verify field crm_lead_source in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[2].action.input.field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lead_score:5",
+          "action": "Verify field crm_lead_score in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[3].action.input.field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_pool_id:6",
           "action": "Verify field crm_lpi_pool_id in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27013,7 +27234,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[0].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_company:5",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_company:7",
           "action": "Verify field crm_lpi_company in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27026,7 +27247,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[1].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_contact_name:6",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_contact_name:8",
           "action": "Verify field crm_lpi_contact_name in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27039,7 +27260,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[2].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_source:7",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_source:9",
           "action": "Verify field crm_lpi_source in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27052,7 +27273,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[3].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_score:8",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_score:10",
           "action": "Verify field crm_lpi_score in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27065,7 +27286,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[4].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_previous_owner:9",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_previous_owner:11",
           "action": "Verify field crm_lpi_previous_owner in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27078,7 +27299,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[5].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_entered_at:10",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_entered_at:12",
           "action": "Verify field crm_lpi_entered_at in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27091,7 +27312,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[6].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_claim_release_at:11",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_claim_release_at:13",
           "action": "Verify field crm_lpi_claim_release_at in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27104,7 +27325,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[7].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:actions:12",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:actions:14",
           "action": "Verify field actions in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27117,7 +27338,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_claimed_by:13",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_claimed_by:15",
           "action": "Verify field crm_lpi_claimed_by in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -27130,7 +27351,59 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[3].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_entered_at:14",
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_company:16",
+          "action": "Verify field crm_lpi_company in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_contact_name:17",
+          "action": "Verify field crm_lpi_contact_name in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_source:18",
+          "action": "Verify field crm_lpi_source in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_score:19",
+          "action": "Verify field crm_lpi_score in pool_queue on crm_lead_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[3].field"
+        },
+        {
+          "id": "field:crm_lead_pool_batch_list:pool_queue:crm_lpi_entered_at:20",
           "action": "Verify field crm_lpi_entered_at in pool_queue on crm_lead_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -28027,7 +28300,98 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].field"
         },
         {
-          "id": "field:crm_lead_pool_list:crm_lp_table:updated_at:9",
+          "id": "field:crm_lead_pool_list:crm_lp_table:crm_lp_daily_pick_limit:9",
+          "action": "Verify field crm_lp_daily_pick_limit in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:crm_lp_description:10",
+          "action": "Verify field crm_lp_description in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:importType:11",
+          "action": "Verify field importType in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[4].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:importFileId:12",
+          "action": "Verify field importFileId in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[4].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:importType:13",
+          "action": "Verify field importType in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[5].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:importFileId:14",
+          "action": "Verify field importFileId in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[5].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:skipErrors:15",
+          "action": "Verify field skipErrors in crm_lp_table on crm_lead_pool_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[5].action.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_lead_pool_list:crm_lp_table:updated_at:16",
           "action": "Verify field updated_at in crm_lp_table on crm_lead_pool_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -28038,6 +28402,292 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].defaultSort.field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_lead_code:0",
+          "action": "Verify field crm_lpi_lead_code in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_company:1",
+          "action": "Verify field crm_lpi_company in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_contact_name:2",
+          "action": "Verify field crm_lpi_contact_name in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[2].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_contact_phone:3",
+          "action": "Verify field crm_lpi_contact_phone in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[3].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_source:4",
+          "action": "Verify field crm_lpi_source in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[4].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:lead_snapshot:crm_lpi_score:5",
+          "action": "Verify field crm_lpi_score in lead_snapshot on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[0].fields[5].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_pool_id:6",
+          "action": "Verify field crm_lpi_pool_id in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_status:7",
+          "action": "Verify field crm_lpi_status in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_entered_at:8",
+          "action": "Verify field crm_lpi_entered_at in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[2].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_claim_release_at:9",
+          "action": "Verify field crm_lpi_claim_release_at in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[3].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_claimed_at:10",
+          "action": "Verify field crm_lpi_claimed_at in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[4].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_claimed_by:11",
+          "action": "Verify field crm_lpi_claimed_by in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[5].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_previous_owner:12",
+          "action": "Verify field crm_lpi_previous_owner in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[6].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_detail:pool_evidence:crm_lpi_reason:13",
+          "action": "Verify field crm_lpi_reason in pool_evidence on crm_lead_pool_mobile_detail",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_detail.json#root[1].fields[7].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_company:0",
+          "action": "Verify field crm_lpi_company in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[0].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_contact_name:1",
+          "action": "Verify field crm_lpi_contact_name in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[1].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_contact_phone:2",
+          "action": "Verify field crm_lpi_contact_phone in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[2].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_lead_code:3",
+          "action": "Verify field crm_lpi_lead_code in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[3].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_status:4",
+          "action": "Verify field crm_lpi_status in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[4].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_claim_release_at:5",
+          "action": "Verify field crm_lpi_claim_release_at in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[5].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:actions:6",
+          "action": "Verify field actions in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[6].field"
+        },
+        {
+          "id": "field:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:crm_lpi_entered_at:7",
+          "action": "Verify field crm_lpi_entered_at in crm_lead_pool_mobile_table on crm_lead_pool_mobile_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].defaultSort.field"
         },
         {
           "id": "field:crm_lead_pool_recycle_rule_detail:condition:crm_lprr_code:0",
@@ -41352,8 +42002,8 @@
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[3]"
         },
         {
-          "id": "ui-action:crm_lead_common_list:crm_lead_table:delete:19",
-          "action": "button delete on crm_lead_common_list -> command:crm:delete_lead",
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:move_to_pool_mobile:19",
+          "action": "button move_to_pool_mobile on crm_lead_common_list -> navigate:crm_lead_move_to_pool_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41363,6 +42013,19 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_lead_common_list:crm_lead_table:delete:20",
+          "action": "button delete on crm_lead_common_list -> command:crm:delete_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_common_list.json#root[2].columns[8].buttons[5]"
         },
         {
           "id": "ui-action:crm_lead_conversion:crm_lead_conversion_tabs:overview:0",
@@ -41559,6 +42222,32 @@
           "source": "plugins/crm/config/pages/crm_lead_desk_workbench.json#root[5].actions[3]"
         },
         {
+          "id": "ui-action:crm_lead_move_to_pool_form:buttons:move_to_pool_confirm:0",
+          "action": "button move_to_pool_confirm on crm_lead_move_to_pool_form -> command:crm:move_lead_to_pool",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[2].buttons[0]"
+        },
+        {
+          "id": "ui-action:crm_lead_move_to_pool_form:buttons:cancel:1",
+          "action": "button cancel on crm_lead_move_to_pool_form -> unknown:n/a",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_move_to_pool_form.json#root[2].buttons[1]"
+        },
+        {
           "id": "ui-action:crm_lead_owner_history_list:history:view:0",
           "action": "button view on crm_lead_owner_history_list -> navigate:crm_lead_owner_history_detail",
           "evidence": [],
@@ -41637,7 +42326,46 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[1]"
         },
         {
-          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:view_pool_evidence:5",
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:batch_update_source:5",
+          "action": "bulk-action batch_update_source on crm_lead_pool_batch_list -> bulk_field_command:crm:update_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[2]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:batch_update_score:6",
+          "action": "bulk-action batch_update_score on crm_lead_pool_batch_list -> bulk_field_command:crm:update_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[3]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:batch_delete:7",
+          "action": "bulk-action batch_delete on crm_lead_pool_batch_list -> bulk_record_command:crm:delete_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].table.bulkActions[4]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:view_pool_evidence:8",
           "action": "button view_pool_evidence on crm_lead_pool_batch_list -> navigate:crm_lead_pool_item_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -41650,7 +42378,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[0]"
         },
         {
-          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:open_lead:6",
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:open_lead:9",
           "action": "button open_lead on crm_lead_pool_batch_list -> navigate:/p/crm_lead_common/view/${row.crm_lpi_lead_id}",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -41663,7 +42391,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[1]"
         },
         {
-          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:claim:7",
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:claim:10",
           "action": "button claim on crm_lead_pool_batch_list -> command:crm:claim_pool_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -41676,7 +42404,7 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[2]"
         },
         {
-          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:assign:8",
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:assign:11",
           "action": "button assign on crm_lead_pool_batch_list -> command:crm:assign_pool_lead",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -41687,6 +42415,32 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[3]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:quick_update:12",
+          "action": "button quick_update on crm_lead_pool_batch_list -> command:crm:update_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_batch_list:pool_queue:delete:13",
+          "action": "button delete on crm_lead_pool_batch_list -> command:crm:delete_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_batch_list.json#root[2].columns[8].buttons[5]"
         },
         {
           "id": "ui-action:crm_lead_pool_detail:actions:edit:0",
@@ -41884,8 +42638,8 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[1]"
         },
         {
-          "id": "ui-action:crm_lead_pool_list:crm_lp_table:toggle:4",
-          "action": "button toggle on crm_lead_pool_list -> command:crm:toggle_lead_pool",
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:quick_update:4",
+          "action": "button quick_update on crm_lead_pool_list -> command:crm:update_lead_pool",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41897,8 +42651,8 @@
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[2]"
         },
         {
-          "id": "ui-action:crm_lead_pool_list:crm_lp_table:delete:5",
-          "action": "button delete on crm_lead_pool_list -> command:crm:delete_lead_pool",
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:download_import_template:5",
+          "action": "button download_import_template on crm_lead_pool_list -> command:crm:download_lead_pool_import_template",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -41908,6 +42662,71 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[3]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:precheck_import:6",
+          "action": "button precheck_import on crm_lead_pool_list -> command:crm:precheck_lead_pool_import",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:import_leads:7",
+          "action": "button import_leads on crm_lead_pool_list -> command:crm:import_lead_pool_leads",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[5]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:toggle:8",
+          "action": "button toggle on crm_lead_pool_list -> command:crm:toggle_lead_pool",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[6]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_list:crm_lp_table:delete:9",
+          "action": "button delete on crm_lead_pool_list -> command:crm:delete_lead_pool",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_list.json#root[1].columns[8].buttons[7]"
+        },
+        {
+          "id": "ui-action:crm_lead_pool_mobile_list:crm_lead_pool_mobile_table:claim:0",
+          "action": "button claim on crm_lead_pool_mobile_list -> command:crm:claim_pool_lead",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_lead_pool_mobile_list.json#root[0].columns[6].buttons[0]"
         },
         {
           "id": "ui-action:crm_lead_pool_recycle_rule_detail:actions:edit:0",
@@ -46984,8 +47803,73 @@
           "source": "plugins/crm/config/commands/crm_lead_pool.json"
         },
         {
+          "id": "command:crm:update_pool_lead",
+          "action": "Execute crm:update_pool_lead (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_lead_pool.json"
+        },
+        {
+          "id": "command:crm:delete_pool_lead",
+          "action": "Execute crm:delete_pool_lead (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_lead_pool.json"
+        },
+        {
           "id": "command:crm:list_lead_pool_items",
           "action": "Execute crm:list_lead_pool_items (query) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_lead_pool.json"
+        },
+        {
+          "id": "command:crm:download_lead_pool_import_template",
+          "action": "Execute crm:download_lead_pool_import_template (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_lead_pool.json"
+        },
+        {
+          "id": "command:crm:precheck_lead_pool_import",
+          "action": "Execute crm:precheck_lead_pool_import (custom) through its supported user or runtime path",
+          "evidence": [],
+          "assertion": "No complete browser/backend evidence pair is registered for this command.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "it",
+          "source": "plugins/crm/config/commands/crm_lead_pool.json"
+        },
+        {
+          "id": "command:crm:import_lead_pool_leads",
+          "action": "Execute crm:import_lead_pool_leads (custom) through its supported user or runtime path",
           "evidence": [],
           "assertion": "No complete browser/backend evidence pair is registered for this command.",
           "verdict": "untested",
@@ -49276,6 +50160,19 @@
         {
           "id": "permission:crm.lead_pool.recycle",
           "action": "Verify allow, deny, menu, action and direct-API behavior for crm.lead_pool.recycle",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:crm.lead_pool.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for crm.lead_pool.import",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",

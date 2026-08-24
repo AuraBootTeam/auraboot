@@ -3,6 +3,8 @@ package com.auraboot.framework.permission.interceptor;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.security.AdminRoleChecker;
@@ -66,6 +68,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private final UserPermissionService userPermissionService;
     private final MenuMapper menuMapper;
     private final AdminRoleChecker adminRoleChecker;
+    private final PageSchemaMapper pageSchemaMapper;
 
     /**
      * REG-5/6 (DDR-2026-06-30): role/permission ASSIGNMENT is restricted to tenant_admin.
@@ -167,6 +170,21 @@ public class PermissionInterceptor implements HandlerInterceptor {
                 if (hasPermission) {
                     log.debug("Permission check passed via raw pageKey fallback: userId={}, permission={}, endpoint={}",
                         userId, rawPermissionCode, request.getRequestURI());
+                }
+            }
+        }
+
+        // Custom workflow/form page keys do not necessarily follow
+        // <model>_<kind> (for example crm_lead_move_to_pool_form). Resolve the
+        // published page's declared model before denying the dynamic endpoint;
+        // the controller uses the same page -> model contract for data access.
+        if (!hasPermission && permissionTemplate.contains("{pageKey}")) {
+            String pageModelPermissionCode = resolvePermissionByPageSchema(permissionTemplate, request);
+            if (pageModelPermissionCode != null) {
+                hasPermission = userPermissionService.hasPermission(userId, pageModelPermissionCode);
+                if (hasPermission) {
+                    log.debug("Permission check passed via page schema model fallback: userId={}, permission={}, endpoint={}",
+                        userId, pageModelPermissionCode, request.getRequestURI());
                 }
             }
         }
@@ -475,6 +493,25 @@ public class PermissionInterceptor implements HandlerInterceptor {
         }
 
         return menuMapper.findPermissionCodeByPageKey(tenantId, pageKey);
+    }
+
+    private String resolvePermissionByPageSchema(String template, HttpServletRequest request) {
+        if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null) {
+            return null;
+        }
+        String pageKey = rawPageKey(request);
+        if (pageKey == null) {
+            return null;
+        }
+        PageSchema pageSchema = pageSchemaMapper.selectByPageKey(pageKey);
+        if (pageSchema == null || pageSchema.getModelCode() == null) {
+            return null;
+        }
+        String modelCode = pageSchema.getModelCode().replace("-", "_").toLowerCase();
+        if (!SAFE_IDENTIFIER.matcher(modelCode).matches()) {
+            return null;
+        }
+        return template.replace("{pageKey}", modelCode);
     }
 
     private String rawPageKey(HttpServletRequest request) {

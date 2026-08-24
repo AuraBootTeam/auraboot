@@ -8,6 +8,7 @@ const json = async (path) => JSON.parse(await readFile(new URL(path, root), 'utf
 test('PAR-04 lead pool exposes the complete Cordys policy denominator', async () => {
   const models = await json('config/models.json');
   const commands = await json('config/commands/crm_lead_pool.json');
+  const menus = await json('config/menus.json');
   const recycleRuleCommands = await json('config/commands/crm_lead_pool_recycle_rule.json');
   const permissions = await json('config/permissions.json');
   const roles = await json('config/roles.json');
@@ -32,6 +33,10 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   const dictionaries = await json('config/dicts.json');
   const handler = await readFile(
     new URL('backend/src/main/java/com/auraboot/plugins/crm/handler/LeadPoolCommandHandler.java', root),
+    'utf8',
+  );
+  const importService = await readFile(
+    new URL('backend/src/main/java/com/auraboot/plugins/crm/handler/LeadPoolImportService.java', root),
     'utf8',
   );
   const scheduler = await readFile(
@@ -125,10 +130,21 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm:move_lead_to_pool',
     'crm:claim_pool_lead',
     'crm:assign_pool_lead',
+    'crm:update_pool_lead',
+    'crm:delete_pool_lead',
     'crm:toggle_lead_pool',
     'crm:delete_lead_pool',
+    'crm:download_lead_pool_import_template',
+    'crm:precheck_lead_pool_import',
+    'crm:import_lead_pool_leads',
     'crm:run_lead_pool_recycle',
   ]) assert.ok(commandCodes.has(code), `missing command ${code}`);
+
+  assert.equal(
+    menus.find((menu) => menu.code === 'crm_lead_owner_history_common')?.path,
+    '/p/c/crm_lead_owner_history_list',
+    'the ownership-history menu must address its explicit pageKey instead of a derived auto-created stub',
+  );
 
   for (const code of ['crm:create_lead_pool', 'crm:update_lead_pool']) {
     assert.ok(
@@ -158,8 +174,13 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm:move_lead_to_pool',
     'crm:claim_pool_lead',
     'crm:assign_pool_lead',
+    'crm:update_pool_lead',
+    'crm:delete_pool_lead',
     'crm:toggle_lead_pool',
     'crm:delete_lead_pool',
+    'crm:download_lead_pool_import_template',
+    'crm:precheck_lead_pool_import',
+    'crm:import_lead_pool_leads',
     'crm:run_lead_pool_recycle',
   ]) {
     const command = commands.find((candidate) => candidate.code === code);
@@ -261,10 +282,34 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   const batchQueue = batchPage.blocks.find((block) => block.id === 'pool_queue');
   assert.deepEqual(
     batchQueue.table.bulkActions.map((action) => action.code),
-    ['batch_claim', 'batch_assign'],
+    ['batch_claim', 'batch_assign', 'batch_update_source', 'batch_update_score', 'batch_delete'],
   );
   const batchAssign = batchQueue.table.bulkActions.find((action) => action.code === 'batch_assign');
   assert.equal(batchAssign.action.input.component, 'MemberPicker');
+  assert.equal(
+    batchQueue.table.bulkActions.find((action) => action.code === 'batch_update_source').action.command,
+    'crm:update_pool_lead',
+  );
+  assert.deepEqual(
+    batchQueue.table.bulkActions.find((action) => action.code === 'batch_delete').action,
+    { type: 'bulk_record_command', command: 'crm:delete_pool_lead', operationType: 'DELETE' },
+  );
+  const rowActions = batchQueue.columns.find((column) => column.isActionColumn).buttons;
+  assert.equal(rowActions.find((action) => action.code === 'quick_update').action.command, 'crm:update_pool_lead');
+  assert.equal(rowActions.find((action) => action.code === 'delete').action.command, 'crm:delete_pool_lead');
+  const capacityDelete = pages[4].blocks
+    .find((block) => block.id === 'table').columns
+    .find((column) => column.isActionColumn).buttons
+    .find((action) => action.code === 'delete');
+  assert.equal(capacityDelete.action.command, 'crm:delete_lead_capacity');
+  const poolRowActions = pages[0].blocks
+    .find((block) => block.id === 'crm_lp_table').columns
+    .find((column) => column.isActionColumn).buttons;
+  assert.equal(poolRowActions.find((action) => action.code === 'quick_update').action.command, 'crm:update_lead_pool');
+  for (const code of ['download_import_template', 'precheck_import', 'import_leads']) {
+    assert.ok(poolRowActions.some((action) => action.code === code), `missing pool action ${code}`);
+  }
+  assert.equal(poolRowActions.find((action) => action.code === 'precheck_import').action.inputFields[1].type, 'file');
   assert.ok(
     operations.blocks
       .find((block) => block.id === 'crm_lead_pool_header_actions')
@@ -298,12 +343,15 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm.lead_pool.assign',
     'crm.lead_pool.manage',
     'crm.lead_pool.recycle',
+    'crm.lead_pool.import',
   ]) assert.ok(permissionCodes.has(code), `missing permission ${code}`);
   const role = (code) => roles.find((candidate) => candidate.code === code).permissions;
   assert.ok(role('crm_sales').includes('crm.lead_pool.pick'));
+  assert.ok(role('crm_sales').includes('crm.lead_pool.import'));
   assert.ok(!role('crm_sales').includes('crm.lead_pool.assign'));
   assert.ok(role('crm_sales_manager').includes('crm.lead_pool.assign'));
   assert.ok(role('crm_sales_manager').includes('crm.lead_pool.recycle'));
+  assert.ok(role('crm_sales_manager').includes('crm.lead_pool.import'));
 
   for (const proof of [
     'incrementWithinCap',
@@ -321,6 +369,13 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.match(handler, /replaceReadSharesForUsers/);
   assert.match(shareSync, /chainsAfterPrimary\(\).*true/);
   assert.match(shareSync, /crm_lead_owner_history_common/);
+  for (const proof of [
+    'crm-lead-pool-import-template.xlsx',
+    'importFileId is required',
+    'Uploaded file owner does not match',
+    'crm_lead_pool_item_common',
+    'crm_lead_pool_state',
+  ]) assert.match(importService, new RegExp(proof));
 
   const poolItem = models.find((model) => model.code === 'crm_lead_pool_item_common');
   assert.equal(poolItem.extension?.dataScope?.ownerField, 'crm_lpi_claimed_by');
@@ -337,6 +392,66 @@ test('PAR-04 workbench search fields request import-managed trigram indexes', as
     assert.ok(binding, `${fieldCode} binding must exist`);
     assert.equal(binding.displayConfig?.searchable, true, `${fieldCode} must drive schema search indexing`);
   }
+});
+
+test('PAR-04 mobile routes expose governed move-to-pool and pooled-lead detail journeys', async () => {
+  const [menus, plugin, leadFields, leadList, moveForm, poolList, poolDetail] = await Promise.all([
+    json('config/menus.json'),
+    json('plugin.json'),
+    json('config/fields/crm_lead_common.json'),
+    json('config/pages/crm_lead_common_list.json'),
+    json('config/pages/crm_lead_move_to_pool_form.json'),
+    json('config/pages/crm_lead_pool_mobile_list.json'),
+    json('config/pages/crm_lead_pool_mobile_detail.json'),
+  ]);
+
+  const webMenu = menus.find((menu) => menu.code === 'crm_lead_pool_queue');
+  const mobileMenu = menus.find((menu) => menu.code === 'crm_lead_pool_mobile_queue');
+  assert.deepEqual(webMenu.extension.platforms, ['web']);
+  assert.deepEqual(mobileMenu.extension.platforms, ['mobile']);
+  assert.equal(mobileMenu.pageKey, 'crm_lead_pool_mobile_list');
+
+  const providedPages = new Set(
+    plugin.provides.filter((entry) => entry.type === 'page').map((entry) => entry.code),
+  );
+  for (const pageKey of [
+    'crm_lead_move_to_pool_form',
+    'crm_lead_pool_mobile_list',
+    'crm_lead_pool_mobile_detail',
+  ]) assert.ok(providedPages.has(pageKey), `missing mobile page ${pageKey}`);
+
+  const targetPool = leadFields.find((field) => field.code === 'crm_lead_target_pool_id');
+  assert.equal(targetPool.referenceModelCode, 'crm_lead_pool_common');
+  assert.equal(targetPool.refTarget.displayField, 'crm_lp_name');
+  const leadActions = leadList.blocks
+    .find((block) => block.id === 'crm_lead_table').columns
+    .find((column) => column.isActionColumn).buttons;
+  assert.equal(leadActions.find((action) => action.code === 'move_to_pool').mobile.disabled, true);
+  assert.equal(
+    leadActions.find((action) => action.code === 'move_to_pool_mobile').action.to,
+    'crm_lead_move_to_pool_form',
+  );
+  assert.equal(
+    moveForm.blocks.find((block) => block.id === 'target_pool').fields[0].field,
+    'crm_lead_target_pool_id',
+  );
+  assert.equal(
+    moveForm.blocks.find((block) => block.id === 'buttons').buttons[0].action.command,
+    'crm:move_lead_to_pool',
+  );
+
+  assert.equal(poolList.kind, 'list');
+  assert.equal(poolList.mobileUx.list.card.title.field, 'crm_lpi_company');
+  const claim = poolList.blocks[0].columns
+    .find((column) => column.isActionColumn).buttons[0];
+  assert.equal(claim.action.command, 'crm:claim_pool_lead');
+  assert.equal(claim.permissionCode, 'crm.lead_pool.pick');
+  assert.equal(poolDetail.kind, 'detail');
+  assert.equal(poolDetail.mobileUx.detail.header.title.field, 'crm_lpi_company');
+  assert.ok(
+    poolDetail.mobileUx.detail.sections.some((section) =>
+      section.fields?.includes('crm_lpi_claim_release_at')),
+  );
 });
 
 test('PAR-04 config mutation proves missing claim permission turns the contract red', async () => {

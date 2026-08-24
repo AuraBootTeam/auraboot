@@ -6,10 +6,12 @@ async function json(path) {
   return JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
 }
 
-const [workspace, commands, savedViews] = await Promise.all([
+const [workspace, commands, savedViews, detail, list] = await Promise.all([
   json('../config/pages/crm_opportunity_workspace.json'),
   json('../config/commands/crm_opportunity_common.json'),
   json('../config/saved-views.json'),
+  json('../config/pages/crm_opportunity_common_detail.json'),
+  json('../config/pages/crm_opportunity_common_list.json'),
 ]);
 
 function findBlock(blocks, id) {
@@ -65,6 +67,12 @@ test('won and lost commands enforce closing rules in the command pipeline', () =
   );
   assert.ok(lose.inputFields.includes('crm_opp_lost_reason_code'));
   assert.ok(lose.preconditions.some((rule) => rule.field === 'crm_opp_lost_reason_code'));
+  assert.equal(win.handler, 'crm:close_opportunity');
+  assert.equal(lose.handler, 'crm:close_opportunity');
+  assert.equal(win.handlerParams?.dslPersistence, false);
+  assert.equal(lose.handlerParams?.dslPersistence, false);
+  assert.equal(win.concurrencyKey, 'crm:opportunity-close:${recordPid}');
+  assert.equal(lose.concurrencyKey, win.concurrencyKey);
 
   const stageActions = findBlock(workspace.blocks, 'crm_opportunity_stage_actions');
   const loseAction = stageActions.actions.find((action) => action.code === 'lose_opportunity');
@@ -76,6 +84,26 @@ test('won and lost commands enforce closing rules in the command pipeline', () =
   assert.equal(inputFields[0].required, true);
   assert.ok(inputFields.every((field) => field.placeholder && field.helpText));
   assert.ok(loseAction.onClick.args.feedback.errorMessage['zh-CN'].includes('检查商机状态'));
+  assert.match(loseAction.visibleWhen, /closed_won/);
+  assert.match(loseAction.visibleWhen, /closed_lost/);
+
+  const detailLose = findBlock(detail.blocks, 'crm_opp_detail_toolbar').buttons.find(
+    (button) => button.code === 'lose',
+  );
+  assert.deepEqual(
+    detailLose.action.inputFields.map((field) => field.field),
+    ['crm_opp_lost_reason_code', 'crm_opp_competitor', 'crm_opp_lost_reason'],
+  );
+  assert.equal(detailLose.action.inputFields[0].required, true);
+
+  const bulkLose = findBlock(list.blocks, 'crm_opp_table').table.bulkActions.find(
+    (button) => button.code === 'bulk_mark_lost',
+  );
+  assert.deepEqual(
+    bulkLose.action.inputFields.map((field) => field.field),
+    ['crm_opp_lost_reason_code', 'crm_opp_competitor', 'crm_opp_lost_reason'],
+  );
+  assert.equal(bulkLose.action.inputFields[0].required, true);
 });
 
 test('read and manage permissions keep personal shortcuts and close actions role-safe', () => {

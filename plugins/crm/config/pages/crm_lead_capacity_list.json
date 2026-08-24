@@ -8,7 +8,7 @@
       { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [
         { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_lead_capacity_detail" } },
         { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_capacity_form" } },
-        { "code": "delete", "danger": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.delete", "confirm": "delete.confirm", "action": { "type": "command" } }
+        { "code": "delete", "danger": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.delete", "confirm": "delete.confirm", "action": { "type": "command", "command": "crm:delete_lead_capacity", "operationType": "DELETE" } }
       ] }
     ] }
   ]

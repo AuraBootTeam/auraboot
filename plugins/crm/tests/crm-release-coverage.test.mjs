@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 128);
-  assert.equal(committed.scope.productDenominator.commands, 250);
-  assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 419);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1773);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 640);
+  assert.equal(committed.scope.productDenominator.pages, 131);
+  assert.equal(committed.scope.productDenominator.commands, 255);
+  assert.equal(committed.scope.productDenominator.permissions, 115);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 425);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1813);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 653);
   assert.equal(committed.scope.productDenominator.queries, 56);
   assert.equal(committed.scope.productVerdicts.pass, 769);
-  assert.equal(committed.scope.productVerdicts.untested, 2753);
+  assert.equal(committed.scope.productVerdicts.untested, 2822);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(

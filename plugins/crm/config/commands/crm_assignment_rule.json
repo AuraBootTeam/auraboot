@@ -84,6 +84,18 @@
     "type": "custom",
     "modelCode": "crm_lead_common",
     "handler": "crm:auto_assign_lead",
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": ["new", "contacted", "qualified"]
+      },
+      {
+        "field": "crm_lead_pool_state",
+        "operator": "EQ",
+        "value": "owned"
+      }
+    ],
     "description": "Assign a lead to a sales rep by evaluating the active crm_assignment_rule set ordered by priority (lowest number first). round_robin cycles the rep pool via a persisted cursor; by_territory matches a lead field to the rule's match value and assigns the single target rep; by_load assigns to the pooled rep with the fewest open (non-converted, non-lost) leads. Writes crm_lead_assigned_to. Pass the lead record id as target. Delegates to the Java AssignmentEngine (AutoAssignLeadHandler). When no active rule matches, the command FAILS LOUD (no silent fallback to a default rep, red line §8).",
     "permissions": ["crm.lead.manage"],
     "agent_hint": "Auto-assign a lead to a sales rep from the active assignment rules. Target = lead id. Fails loud when no rule matches.",

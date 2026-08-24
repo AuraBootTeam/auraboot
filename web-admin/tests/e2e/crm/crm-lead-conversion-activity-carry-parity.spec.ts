@@ -57,6 +57,13 @@ const COVERAGE = {
   ],
 } as const;
 
+const CORDYS_SOURCE_IDS = [
+  'api:clue:clue:get',
+  'api:clue:clue:add',
+  'api:clue:clue:update-status',
+  'api:clue:clue:transform',
+] as const;
+
 type JsonResponse = {
   ok(): boolean;
   status(): number;
@@ -72,11 +79,7 @@ async function expectOk(response: JsonResponse, label: string): Promise<any> {
   return body;
 }
 
-async function createLeadActivity(
-  page: Page,
-  leadPid: string,
-  subject: string,
-): Promise<string> {
+async function createLeadActivity(page: Page, leadPid: string, subject: string): Promise<string> {
   const response = await page.request.post('/api/meta/commands/execute/crm:log_lead_activity', {
     data: {
       payload: {
@@ -113,13 +116,12 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string): Promise
   return output;
 }
 
-async function openActivities(
-  page: Page,
-  route: string,
-  subjects: string[],
-): Promise<void> {
+async function openActivities(page: Page, route: string, subjects: string[]): Promise<void> {
   await page.goto(route, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('tab', { name: /活动记录|活动|Activities/ }).first().click();
+  await page
+    .getByRole('tab', { name: /活动记录|活动|Activities/ })
+    .first()
+    .click();
   const timeline = page.getByTestId('activity-timeline').first();
   await expect(timeline).toBeVisible({ timeout: 20_000 });
   for (const subject of subjects) {
@@ -146,7 +148,9 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
 
     page.on('response', (response) => {
       if (response.status() >= 400 && response.url().includes('/api/')) {
-        failedRuntimeRequests.push(`${response.status()} ${response.request().method()} ${response.url()}`);
+        failedRuntimeRequests.push(
+          `${response.status()} ${response.request().method()} ${response.url()}`,
+        );
       }
     });
 
@@ -190,11 +194,16 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
     await convertButton.click();
     const confirmDialog = page.getByTestId('confirm-dialog');
     await expect(confirmDialog).toBeVisible();
-    await expect(confirmDialog).toContainText(/客户、联系人、商机和客户需求|account, contact, opportunity, and customer request/i);
+    await expect(confirmDialog).toContainText(
+      /客户、联系人、商机和客户需求|account, contact, opportunity, and customer request/i,
+    );
     screenshots.push(await screenshot(page, testInfo, '02-conversion-confirmation'));
 
     await page.getByTestId('confirm-ok').click();
-    const conversionBody = await expectOk(await conversionResponsePromise, 'convert lead from detail');
+    const conversionBody = await expectOk(
+      await conversionResponsePromise,
+      'convert lead from detail',
+    );
     const conversion = conversionBody?.data?.data ?? conversionBody?.data ?? {};
     const accountPid = String(conversion.accountId ?? '');
     const contactPid = String(conversion.contactId ?? '');
@@ -239,20 +248,24 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
           ORDER BY crm_ar_activity_id, crm_ar_object_type`,
         [[directActivity.recordId, relatedActivityPid]],
       );
-      expect(relationRows.rows, 'two activities each retain lead and gain account/contact/opportunity')
-        .toHaveLength(8);
+      expect(
+        relationRows.rows,
+        'two activities each retain lead and gain account/contact/opportunity',
+      ).toHaveLength(8);
       expect(relationRows.rows.every((row) => row.edge_count === '1')).toBe(true);
       for (const activityPid of [directActivity.recordId, relatedActivityPid]) {
         const edges = relationRows.rows
           .filter((row) => row.crm_ar_activity_id === activityPid)
           .map((row) => `${row.crm_ar_object_type}:${row.crm_ar_object_id}`)
           .sort();
-        expect(edges).toEqual([
-          `account:${accountPid}`,
-          `contact:${contactPid}`,
-          `lead:${lead.recordId}`,
-          `opportunity:${opportunityPid}`,
-        ].sort());
+        expect(edges).toEqual(
+          [
+            `account:${accountPid}`,
+            `contact:${contactPid}`,
+            `lead:${lead.recordId}`,
+            `opportunity:${opportunityPid}`,
+          ].sort(),
+        );
       }
 
       const directAnchor = await pool.query<{
@@ -308,10 +321,18 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
           technicalVerdict: 'pass',
           fixtureMode: 'self-seeded',
           dataMigration: 'out-of-scope-development-stage',
+          cordysSourceEvidence: {
+            sourceIds: CORDYS_SOURCE_IDS,
+            assertionScope:
+              'self-seeded lead create, detail, qualification/status and conversion persistence',
+          },
           expectedScenarios: EXPECTED_SCENARIOS,
           completedScenarios: EXPECTED_SCENARIOS,
           coverage: Object.fromEntries(
-            Object.entries(COVERAGE).map(([axis, expected]) => [axis, { expected, completed: expected }]),
+            Object.entries(COVERAGE).map(([axis, expected]) => [
+              axis,
+              { expected, completed: expected },
+            ]),
           ),
           screenshots,
           failedRuntimeRequests,

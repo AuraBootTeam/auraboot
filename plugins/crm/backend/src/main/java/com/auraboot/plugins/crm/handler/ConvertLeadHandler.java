@@ -80,7 +80,7 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
             throw new IllegalStateException("Converted account id is empty for lead " + leadId);
         }
 
-        Map<String, Object> contact = findOrCreateContact(db, lead, accountId);
+            Map<String, Object> contact = findOrCreateContact(db, lead, accountId, owner);
         String contactId = resolveId(contact);
 
         boolean customerOnly = CUSTOMER_ONLY_COMMAND_TYPE.equals(context.commandType());
@@ -229,7 +229,8 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         return db.create("crm_account_common", data);
     }
 
-    private static Map<String, Object> findOrCreateContact(DataAccessor db, Map<String, Object> lead, String accountId) {
+    private static Map<String, Object> findOrCreateContact(
+            DataAccessor db, Map<String, Object> lead, String accountId, String owner) {
         String name = str(lead.get("crm_lead_contact_name"));
         if (isBlank(name)) {
             return Map.of();
@@ -250,6 +251,7 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         data.put("crm_ct_email", email);
         data.put("crm_ct_phone", lead.get("crm_lead_contact_phone"));
         data.put("crm_ct_mobile", lead.get("crm_lead_contact_phone"));
+        data.put("crm_ct_owner", owner);
         data.put("crm_ct_is_primary", true);
         data.put("crm_ct_primary_account_key", accountId);
         data.put("crm_ct_status", "active");

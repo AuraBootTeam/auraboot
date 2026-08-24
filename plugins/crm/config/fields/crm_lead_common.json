@@ -126,6 +126,19 @@
     "feature": { "readonly": true, "searchable": true }
   },
   {
+    "code": "crm_lead_target_pool_id",
+    "displayName:zh-CN": "目标线索池",
+    "displayName:en": "Target Lead Pool",
+    "dataType": "reference",
+    "referenceModelCode": "crm_lead_pool_common",
+    "refTarget": {
+      "targetModel": "crm_lead_pool_common",
+      "valueField": "pid",
+      "displayField": "crm_lp_name"
+    },
+    "feature": { "searchable": false }
+  },
+  {
     "code": "crm_lead_claimed_at",
     "displayName:zh-CN": "最近领取时间",
     "displayName:en": "Last Claimed At",

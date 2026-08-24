@@ -956,7 +956,24 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 `state_transition command ${actionDef.command} requires a target record`,
               );
             }
-            await executeCommand(actionDef.command, targetRecordPid, {}, 'update');
+            let payload: Record<string, any> = {};
+            if (Array.isArray(actionDef.inputFields) && actionDef.inputFields.length > 0) {
+              try {
+                payload = await promptInputForm(
+                  actionDef.inputFields,
+                  actionDef.inputFieldsTitle,
+                  fetchResult,
+                  actionDef.inputFieldsSubmitLabel,
+                  {
+                    ...(runtime?.getContext?.() ?? {}),
+                    record: record || context.data,
+                  },
+                );
+              } catch {
+                return;
+              }
+            }
+            await executeCommand(actionDef.command, targetRecordPid, payload, 'update');
             if (context.loadData) {
               await context.loadData();
             } else {

@@ -349,7 +349,19 @@
               "permissionCode": "crm.lead_pool.move",
               "label": { "zh-CN": "移入线索池", "en": "Move to Pool" },
               "visibleWhen": "row.crm_lead_pool_state != 'in_pool'",
+              "mobile": {
+                "disabled": true,
+                "reason": "Mobile uses the governed target-pool form so the selected pool is saved before the command executes."
+              },
               "action": { "type": "command", "command": "crm:move_lead_to_pool" }
+            },
+            {
+              "code": "move_to_pool_mobile",
+              "permissionCode": "crm.lead_pool.move",
+              "label": { "zh-CN": "移入线索池", "en": "Move to Pool" },
+              "visibleWhen": "row.crm_lead_pool_state != 'in_pool'",
+              "mobileOnly": true,
+              "action": { "type": "navigate", "to": "crm_lead_move_to_pool_form" }
             },
             {
               "code": "delete",
