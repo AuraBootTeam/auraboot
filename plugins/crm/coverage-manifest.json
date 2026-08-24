@@ -36,8 +36,8 @@
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 736,
-      "untested": 2786
+      "pass": 769,
+      "untested": 2753
     },
     "fullProductNonGoals": [
       "data migration"
@@ -83,6 +83,11 @@
       "id": "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
       "verdict": "pass",
       "note": "A self-seeded real-stack journey verifies contact primary/enable-disable invariants and the Web follow-up plan/record lifecycle without development-data migration."
+    },
+    {
+      "id": "CORDYS-CONTACT-MANAGEMENT",
+      "verdict": "pass",
+      "note": "Two self-seeded browser journeys cover contact create validation, full business persistence, list/detail/edit navigation, analysis, business-label exports, bulk edit/delete and governed failures without development-data migration."
     },
     {
       "id": "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY",
@@ -576,6 +581,7 @@
         "goals": [
           "RELEASE-B",
           "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-CONTACT-MANAGEMENT",
           "CORDYS-ACCOUNT-COLLABORATION",
           "CORDYS-ACCOUNT-RELATIONSHIP"
         ],
@@ -586,6 +592,7 @@
           "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
           "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
           "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
           "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
         ],
         "permissionsVerified": true,
@@ -627,14 +634,16 @@
         "id": "crm:create_contact",
         "goals": [
           "RELEASE-B",
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-CONTACT-MANAGEMENT"
         ],
         "permissionCodes": [
           "crm.contact.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -765,6 +774,20 @@
           "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
         ],
         "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:delete_contact",
+        "goals": [
+          "CORDYS-CONTACT-MANAGEMENT"
+        ],
+        "permissionCodes": [
+          "crm.contact.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
         "verdict": "pass"
       },
       {
@@ -1231,6 +1254,20 @@
         "verdict": "pass"
       },
       {
+        "id": "crm:update_contact",
+        "goals": [
+          "CORDYS-CONTACT-MANAGEMENT"
+        ],
+        "permissionCodes": [
+          "crm.contact.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
         "id": "crm:update_customer_capacity",
         "goals": [
           "CORDYS-CUSTOMER-POOL"
@@ -1413,13 +1450,28 @@
         "id": "crm_contact_common_detail",
         "goals": [
           "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-CONTACT-MANAGEMENT",
           "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "kind": "detail",
         "permissionCodes": [],
         "evidence": [
           "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
           "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_contact_common_form",
+        "goals": [
+          "CORDYS-CONTACT-MANAGEMENT"
+        ],
+        "kind": "form",
+        "permissionCodes": [],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -1427,14 +1479,16 @@
       {
         "id": "crm_contact_common_list",
         "goals": [
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-CONTACT-MANAGEMENT"
         ],
         "kind": "list",
         "permissionCodes": [
           "crm.contact.read"
         ],
         "evidence": [
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -1801,6 +1855,7 @@
           "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
           "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
           "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
           "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
         ],
         "verdict": "pass"
@@ -3134,6 +3189,71 @@
       "requireNoFailedRuntimeRequests": true
     },
     {
+      "id": "CRM-CONTACT-MANAGEMENT",
+      "filePrefix": "crm-contact-management-",
+      "expectedScenarios": 2,
+      "minimumScreenshots": 5,
+      "expectedCoverage": {
+        "pages": [
+          "crm_contact_common_list",
+          "crm_contact_common_form",
+          "crm_contact_common_detail"
+        ],
+        "blocks": [
+          "crm_contact_common_list:crm_contact_toolbar",
+          "crm_contact_common_list:crm_contact_table",
+          "crm_contact_common_form:identity_and_ownership",
+          "crm_contact_common_form:channels_and_notes",
+          "crm_contact_common_form:buttons",
+          "crm_contact_common_detail:section_basic",
+          "crm_contact_common_detail:crm_contact_detail_toolbar"
+        ],
+        "fields": [
+          "crm_contact_common_list:crm_contact_table:crm_ct_name",
+          "crm_contact_common_list:crm_contact_table:crm_ct_account_id",
+          "crm_contact_common_list:crm_contact_table:crm_ct_title",
+          "crm_contact_common_list:crm_contact_table:crm_ct_email",
+          "crm_contact_common_list:crm_contact_table:crm_ct_phone",
+          "crm_contact_common_list:crm_contact_table:crm_ct_mobile",
+          "crm_contact_common_form:identity_and_ownership:crm_ct_account_id",
+          "crm_contact_common_form:identity_and_ownership:crm_ct_name",
+          "crm_contact_common_form:identity_and_ownership:crm_ct_title",
+          "crm_contact_common_form:identity_and_ownership:crm_ct_owner",
+          "crm_contact_common_form:channels_and_notes:crm_ct_email",
+          "crm_contact_common_form:channels_and_notes:crm_ct_phone",
+          "crm_contact_common_form:channels_and_notes:crm_ct_mobile",
+          "crm_contact_common_form:channels_and_notes:crm_ct_is_primary",
+          "crm_contact_common_form:channels_and_notes:crm_ct_remark",
+          "crm_contact_common_detail:section_basic:crm_ct_account_id",
+          "crm_contact_common_detail:section_basic:crm_ct_name",
+          "crm_contact_common_detail:section_basic:crm_ct_title",
+          "crm_contact_common_detail:section_basic:crm_ct_email",
+          "crm_contact_common_detail:section_basic:crm_ct_phone",
+          "crm_contact_common_detail:section_basic:crm_ct_mobile",
+          "crm_contact_common_detail:section_basic:crm_ct_remark"
+        ],
+        "uiActions": [
+          "crm_contact_common_list:crm_contact_toolbar:create",
+          "crm_contact_common_list:crm_contact_table:bulk_delete_contacts",
+          "crm_contact_common_list:crm_contact_table:view",
+          "crm_contact_common_list:crm_contact_table:edit",
+          "crm_contact_common_form:buttons:submit",
+          "crm_contact_common_form:buttons:cancel",
+          "crm_contact_common_detail:crm_contact_detail_toolbar:edit"
+        ],
+        "commands": [
+          "crm:create_account",
+          "crm:create_contact",
+          "crm:update_contact",
+          "crm:delete_contact"
+        ]
+      },
+      "expectedTechnicalVerdict": "pass",
+      "expectedDataMigration": "out-of-scope-development-stage",
+      "requireNoFailedRuntimeRequests": true,
+      "expectedFixtureMode": "self-seeded"
+    },
+    {
       "id": "CRM-LEAD-CONVERSION-ACTIVITY-CARRY",
       "filePrefix": "crm-lead-conversion-activity-carry-",
       "expectedScenarios": 10,
@@ -4261,7 +4381,8 @@
           "id": "menu:crm_contacts",
           "action": "Navigate through menu crm_contacts to /p/crm_contact_common",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The release browser journey enters this product surface through the menu.",
           "verdict": "pass",
@@ -5259,6 +5380,7 @@
           "action": "Open crm_contact_common_detail (detail) from its supported product entry and exercise its complete page journey",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "Real-stack browser evidence exists for the current release scope.",
@@ -5273,10 +5395,12 @@
         {
           "id": "page:crm_contact_common_form",
           "action": "Open crm_contact_common_form (form) from its supported product entry and exercise its complete page journey",
-          "evidence": [],
-          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "Real-stack browser evidence exists for the current release scope.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -5287,7 +5411,8 @@
           "id": "page:crm_contact_common_list",
           "action": "Open crm_contact_common_list (list) from its supported product entry and exercise its complete page journey",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "Real-stack browser evidence exists for the current release scope.",
           "verdict": "pass",
@@ -8042,7 +8167,8 @@
           "id": "block:crm_contact_common_detail:section_basic:1",
           "action": "Render and semantically verify form-section block section_basic on crm_contact_common_detail",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -8072,7 +8198,8 @@
           "id": "block:crm_contact_common_detail:crm_contact_detail_toolbar:3",
           "action": "Render and semantically verify toolbar block crm_contact_detail_toolbar on crm_contact_common_detail",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -8086,10 +8213,12 @@
         {
           "id": "block:crm_contact_common_form:identity_and_ownership:0",
           "action": "Render and semantically verify form-section block identity_and_ownership on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -8099,10 +8228,12 @@
         {
           "id": "block:crm_contact_common_form:channels_and_notes:1",
           "action": "Render and semantically verify form-section block channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -8112,10 +8243,12 @@
         {
           "id": "block:crm_contact_common_form:buttons:2",
           "action": "Render and semantically verify form-buttons block buttons on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -8125,10 +8258,12 @@
         {
           "id": "block:crm_contact_common_list:crm_contact_toolbar:0",
           "action": "Render and semantically verify toolbar block crm_contact_toolbar on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -8139,7 +8274,8 @@
           "id": "block:crm_contact_common_list:crm_contact_table:1",
           "action": "Render and semantically verify table block crm_contact_table on crm_contact_common_list",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -18241,7 +18377,8 @@
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_account_id:0",
           "action": "Verify field crm_ct_account_id in section_basic on crm_contact_common_detail",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
           "verdict": "pass",
@@ -18256,7 +18393,8 @@
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_name:1",
           "action": "Verify field crm_ct_name in section_basic on crm_contact_common_detail",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
           "verdict": "pass",
@@ -18270,10 +18408,12 @@
         {
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_title:2",
           "action": "Verify field crm_ct_title in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18283,10 +18423,12 @@
         {
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_email:3",
           "action": "Verify field crm_ct_email in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18296,10 +18438,12 @@
         {
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_phone:4",
           "action": "Verify field crm_ct_phone in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18309,10 +18453,12 @@
         {
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_mobile:5",
           "action": "Verify field crm_ct_mobile in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18378,10 +18524,12 @@
         {
           "id": "field:crm_contact_common_detail:section_basic:crm_ct_remark:10",
           "action": "Verify field crm_ct_remark in section_basic on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18443,10 +18591,12 @@
         {
           "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_account_id:0",
           "action": "Verify field crm_ct_account_id in identity_and_ownership on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18456,10 +18606,12 @@
         {
           "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_name:1",
           "action": "Verify field crm_ct_name in identity_and_ownership on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18469,10 +18621,12 @@
         {
           "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_title:2",
           "action": "Verify field crm_ct_title in identity_and_ownership on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18482,10 +18636,12 @@
         {
           "id": "field:crm_contact_common_form:identity_and_ownership:crm_ct_owner:3",
           "action": "Verify field crm_ct_owner in identity_and_ownership on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18495,10 +18651,12 @@
         {
           "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_email:4",
           "action": "Verify field crm_ct_email in channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18508,10 +18666,12 @@
         {
           "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_phone:5",
           "action": "Verify field crm_ct_phone in channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18521,10 +18681,12 @@
         {
           "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_mobile:6",
           "action": "Verify field crm_ct_mobile in channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18534,10 +18696,12 @@
         {
           "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_is_primary:7",
           "action": "Verify field crm_ct_is_primary in channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18547,10 +18711,12 @@
         {
           "id": "field:crm_contact_common_form:channels_and_notes:crm_ct_remark:8",
           "action": "Verify field crm_ct_remark in channels_and_notes on crm_contact_common_form",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18561,7 +18727,8 @@
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_name:0",
           "action": "Verify field crm_ct_name in crm_contact_table on crm_contact_common_list",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
           "verdict": "pass",
@@ -18575,10 +18742,12 @@
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_account_id:1",
           "action": "Verify field crm_ct_account_id in crm_contact_table on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18588,10 +18757,12 @@
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_title:2",
           "action": "Verify field crm_ct_title in crm_contact_table on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18614,10 +18785,12 @@
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_email:4",
           "action": "Verify field crm_ct_email in crm_contact_table on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18627,10 +18800,12 @@
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_phone:5",
           "action": "Verify field crm_ct_phone in crm_contact_table on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18640,10 +18815,12 @@
         {
           "id": "field:crm_contact_common_list:crm_contact_table:crm_ct_mobile:6",
           "action": "Verify field crm_ct_mobile in crm_contact_table on crm_contact_common_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38143,10 +38320,12 @@
         {
           "id": "ui-action:crm_contact_common_detail:crm_contact_detail_toolbar:edit:2",
           "action": "button edit on crm_contact_common_detail -> navigate:crm_contact_common_form",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38227,10 +38406,12 @@
         {
           "id": "ui-action:crm_contact_common_form:buttons:submit:0",
           "action": "button submit on crm_contact_common_form -> command:n/a",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38240,10 +38421,12 @@
         {
           "id": "ui-action:crm_contact_common_form:buttons:cancel:1",
           "action": "button cancel on crm_contact_common_form -> unknown:n/a",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38253,10 +38436,12 @@
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_toolbar:create:0",
           "action": "button create on crm_contact_common_list -> navigate:crm_contact_common_form",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38279,10 +38464,12 @@
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:bulk_delete_contacts:2",
           "action": "bulk-action bulk_delete_contacts on crm_contact_common_list -> bulk_record_command:crm:delete_contact",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38292,10 +38479,12 @@
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:view:3",
           "action": "button view on crm_contact_common_list -> navigate:crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38305,10 +38494,12 @@
         {
           "id": "ui-action:crm_contact_common_list:crm_contact_table:edit:4",
           "action": "button edit on crm_contact_common_list -> navigate:crm_contact_common_form",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -44379,6 +44570,7 @@
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
@@ -45350,7 +45542,8 @@
           "action": "Execute crm:create_contact (create) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -45364,14 +45557,16 @@
         {
           "id": "command:crm:update_contact",
           "action": "Execute crm:update_contact (update) through its supported user or runtime path",
-          "evidence": [],
-          "assertion": "No complete browser/backend evidence pair is registered for this command.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "service",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
           "dependencies": "real-stack",
           "authority": "blocking-release",
-          "driver": "it",
+          "driver": "browser",
           "source": "plugins/crm/config/commands/crm_contact_common.json"
         },
         {
@@ -45422,14 +45617,16 @@
         {
           "id": "command:crm:delete_contact",
           "action": "Execute crm:delete_contact (custom) through its supported user or runtime path",
-          "evidence": [],
-          "assertion": "No complete browser/backend evidence pair is registered for this command.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "service",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
           "dependencies": "real-stack",
           "authority": "blocking-release",
-          "driver": "it",
+          "driver": "browser",
           "source": "plugins/crm/config/commands/crm_contact_common.json"
         },
         {
@@ -47782,6 +47979,7 @@
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
           ],
           "assertion": "The permission participates in registered release evidence.",

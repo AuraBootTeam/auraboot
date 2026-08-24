@@ -140,6 +140,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return map;
     }
 
+    /**
+     * Replace reference identifiers with the already-authorized display values prepared by
+     * {@link #enrichReferenceDisplayFields(String, List)} before writing a user-facing export.
+     *
+     * <p>A missing display value deliberately becomes {@code null}. Falling back to the raw value
+     * would expose an opaque pid when the target record is outside the caller's row scope, its
+     * display field is masked, or display enrichment fails closed.
+     */
+    static List<Map<String, Object>> materializeReferenceDisplayValues(
+            List<Map<String, Object>> rows, Set<String> referenceFieldCodes) {
+        if (rows == null || rows.isEmpty() || referenceFieldCodes == null
+                || referenceFieldCodes.isEmpty()) {
+            return rows;
+        }
+        List<Map<String, Object>> materialized = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> copy = new LinkedHashMap<>(row);
+            for (String fieldCode : referenceFieldCodes) {
+                copy.put(fieldCode, row.get(fieldCode + "_display"));
+            }
+            materialized.add(copy);
+        }
+        return materialized;
+    }
+
     // Lazy lookup to break circular dependency: DynamicDataService → AutomationTriggerService → CreateRecordExecutor → DynamicDataService
     private AutomationTriggerService getAutomationTriggerService() {
         return applicationContext.getBean(AutomationTriggerService.class);
@@ -3250,6 +3275,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         .map(FieldDefinition::getCode)
                         .collect(Collectors.toList());
             }
+
+            Set<String> requestedExportFields = new LinkedHashSet<>(exportFields);
+            Set<String> referenceExportFields = model.getFields().stream()
+                    .filter(field -> requestedExportFields.contains(field.getCode()))
+                    .filter(field -> resolveEnrichmentTarget(field) != null)
+                    .map(FieldDefinition::getCode)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            data = materializeReferenceDisplayValues(data, referenceExportFields);
 
             // Build field code → display label map for human-readable headers
             Map<String, String> fieldLabelMap = buildFieldLabelMap(model.getFields());
