@@ -282,12 +282,12 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
     'PF4J builds must receive both platform-plugin-api and root auraboot-core publications',
   );
   assert.match(golden, /platform-plugin-api\/auraboot-core publish failed/);
-  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
-  assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
-  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
+  assert.match(golden, /"\$DEV" gradle "\$runtime_name" --project "\$REPO_ROOT\/platform"/);
+  assert.match(golden, /--project "\$backend_dir"/);
+  assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
-  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo"/);
+  assert.match(golden, /seeds the runtime's shared wrapper distribution/);
   assert.match(golden, /META-INF\/extensions\.idx/);
   assert.match(golden, /pf4j-staging\.tsv/);
   assert.match(golden, /staged PF4J jar hash mismatch/);

@@ -121,20 +121,24 @@ stage_requested_backend_jars() {
   [ -n "$maven_repo" ] || die "runtime Maven repository is missing for $runtime_name"
   [ -n "$gradle_home" ] || die "runtime Gradle home is missing for $runtime_name"
   mkdir -p "$maven_repo" "$gradle_home"
-  ( cd "$REPO_ROOT/platform" \
-    && GRADLE_USER_HOME="$gradle_home" ./gradlew --no-daemon --no-build-cache \
-      -Dmaven.repo.local="$maven_repo" \
+  # Use the workspace managed Gradle entry instead of invoking the wrapper
+  # directly. Besides preserving the runtime-local Maven/Gradle homes, this
+  # seeds the runtime's shared wrapper distribution from the validated host
+  # cache and injects the canonical China mirror init script. A direct wrapper
+  # call here made fresh CI runtimes bypass both contracts and redownload the
+  # Gradle distribution from services.gradle.org.
+  "$DEV" gradle "$runtime_name" --project "$REPO_ROOT/platform" -- \
+      --no-build-cache \
       :platform-plugin-api:publishToMavenLocal :publishToMavenLocal --console=plain \
-  ) >"$sd/platform-publications.log" 2>&1 \
+      >"$sd/platform-publications.log" 2>&1 \
     || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
   local spec staged_path jar_hash
   for spec in "${backend_specs[@]}"; do
     IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path <<< "$spec"
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
-    ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" "$REPO_ROOT/platform/gradlew" \
-      --project-dir "$backend_dir" --no-daemon \
-      -Dmaven.repo.local="$maven_repo" clean jar --console=plain ) \
+    "$DEV" gradle "$runtime_name" --project "$backend_dir" \
+      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar --console=plain \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
