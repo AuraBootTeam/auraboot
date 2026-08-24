@@ -249,6 +249,38 @@
               }
             },
             {
+              "code": "merge",
+              "permissionCode": "crm.account.manage",
+              "label": { "zh-CN": "合并到其他客户", "en": "Merge into Account" },
+              "action": {
+                "type": "command",
+                "command": "crm:merge_account",
+                "operationType": "update",
+                "inputFieldsTitle": { "zh-CN": "合并客户", "en": "Merge Account" },
+                "inputFieldsSubmitLabel": { "zh-CN": "确认合并", "en": "Confirm Merge" },
+                "inputFields": [
+                  {
+                    "field": "targetAccountId",
+                    "label": { "zh-CN": "保留的目标客户", "en": "Surviving Account" },
+                    "type": "select",
+                    "searchable": true,
+                    "dataSource": {
+                      "type": "api",
+                      "endpoint": "/api/dynamic/crm_account_common/list",
+                      "params": { "pageNum": 1, "pageSize": 200 },
+                      "valueField": "pid",
+                      "labelField": "crm_acc_name"
+                    },
+                    "required": true,
+                    "helpText": {
+                      "zh-CN": "联系人、商机、活动及其他客户业务记录会迁移到目标客户；公海客户须先领取或分配。",
+                      "en": "Contacts, opportunities, activities and other account records move to the target. Pool accounts must be claimed or assigned first."
+                    }
+                  }
+                ]
+              }
+            },
+            {
               "code": "delete",
               "danger": true,
               "permissionCode": "crm.account.manage",

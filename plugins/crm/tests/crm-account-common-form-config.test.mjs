@@ -8,11 +8,12 @@ async function readJson(path) {
   return JSON.parse(await readFile(new URL(path, configRoot), 'utf8'));
 }
 
-const [fields, bindings, formPage, listPage, commands, dicts, menus] = await Promise.all([
+const [fields, bindings, formPage, listPage, detailPage, commands, dicts, menus] = await Promise.all([
   readJson('fields/crm_account_common.json'),
   readJson('bindings/crm_account_common.json'),
   readJson('pages/crm_account_common_form.json'),
   readJson('pages/crm_account_common_list.json'),
+  readJson('pages/crm_account_common_detail.json'),
   readJson('commands/crm_account_common.json'),
   readJson('dicts.json'),
   readJson('menus.json'),
@@ -150,7 +151,7 @@ test('new accounts start in the owned state required by the customer-pool state 
   assert.equal(create.autoSetFields?.crm_acc_pool_state?.value, 'owned');
 });
 
-test('account list exposes governed transfer, update, delete, and customer-pool operations', () => {
+test('account list exposes governed transfer, update, merge, delete, and customer-pool operations', () => {
   const table = (listPage.blocks ?? []).find((block) => block.id === 'crm_account_table');
   assert.ok(table, 'account list should expose the main table');
   const bulkActions = new Map((table.table?.bulkActions ?? []).map((action) => [action.code, action]));
@@ -168,10 +169,38 @@ test('account list exposes governed transfer, update, delete, and customer-pool 
       ?.buttons?.map((action) => [action.code, action]),
   );
   assert.equal(actions.get('delete')?.action?.operationType, 'DELETE');
+  assert.equal(actions.get('merge')?.action?.command, 'crm:merge_account');
+  assert.equal(actions.get('merge')?.action?.inputFields?.[0]?.field, 'targetAccountId');
+  assert.equal(
+    actions.get('merge')?.action?.inputFields?.[0]?.dataSource?.endpoint,
+    '/api/dynamic/crm_account_common/list',
+  );
   assert.equal(
     actions.get('move_to_customer_pool')?.action?.inputFields?.[0]?.dataSource?.endpoint,
     '/api/dynamic/crm_customer_pool_common/list',
   );
   assert.equal(listColumn('crm_acc_name').ellipsis, true);
   assert.equal(commandByCode.get('crm:update_account')?.inputFields?.includes('crm_acc_owner'), true);
+  assert.equal(commandByCode.get('crm:merge_account')?.handler, 'crm:merge_account');
+  assert.equal(commandByCode.get('crm:merge_account')?.cmd_risk_level, 'L3');
+});
+
+test('account detail exposes the optional commercial-360 contribution slot', () => {
+  const commercialSlot = (detailPage.extension?.contributionSlots ?? []).find(
+    (slot) => slot.id === 'commercial.blocks',
+  );
+  assert.deepEqual(commercialSlot, {
+    id: 'commercial.blocks',
+    kind: 'block',
+    anchor: {
+      target: 'tab-blocks',
+      blockId: 'crm_account_tabs',
+      tabKey: 'quote_summaries',
+    },
+  });
+
+  const tabs = detailPage.blocks.find((block) => block.id === 'crm_account_tabs');
+  const commercialTab = tabs?.tabs?.find((tab) => tab.key === 'quote_summaries');
+  assert.equal(commercialTab?.label?.['zh-CN'], '报价与商业');
+  assert.equal(commercialTab?.label?.['en-US'], 'Quotes & Commercial');
 });
