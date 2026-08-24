@@ -73,9 +73,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 
-# Locate the workspace dev.sh (for the slot-auto-pick's `runtime list` read). Same
-# ancestor-walk + sibling-worktree fallback oss-golden-stack.sh uses.
-WORKSPACE="$REPO_ROOT"
+# Locate the workspace dev.sh (for the slot-auto-pick's `runtime list` read).
+# CI keeps repositories as siblings under /opt/aura-ci/repos, while developer
+# worktrees usually find dev.sh by walking their ancestors.
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
+fi
+if [ -z "$WORKSPACE" ]; then
+  WORKSPACE="$REPO_ROOT"
+fi
 while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 if [ ! -f "$WORKSPACE/dev.sh" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
