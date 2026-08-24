@@ -670,6 +670,19 @@ test('deployment-neutral knowledge-base seeds use the configured embedding profi
   assert.match(aiSeed, /embeddingModel\)\.toBe\(expectedProfile\.defaultModel\)/);
 });
 
+test('Vite prebundles lazy rich-text form dependencies before an operator can type', () => {
+  const source = read('web-admin/vite.config.ts');
+  for (const dependency of [
+    '@tiptap/extension-link',
+    '@tiptap/extension-placeholder',
+    '@tiptap/react',
+    '@tiptap/starter-kit',
+  ]) {
+    assert.match(source, new RegExp(`['"]${dependency.replace('/', '\\\/')}['"]`));
+  }
+  assert.match(source, /reloading the entire form and discarding local state/);
+});
+
 test('docker GA bootstrap initializes a blank stack before admin login', () => {
   const script = read('scripts/docker-ga-e2e-bootstrap.sh');
 

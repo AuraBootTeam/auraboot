@@ -58,11 +58,10 @@
 #     --keep       leave the stack up after the run (to debug a failure). By
 #                  default the stack is ALWAYS torn down, even on failure.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
-#     --workers N  Playwright worker count (default: 1). The host-first gate uses
-#                  Vite development mode; concurrent routes can discover new
-#                  optimized dependencies and trigger a global dev-page reload
-#                  while another worker is editing a form. Higher concurrency is
-#                  available only as an explicit diagnostic override.
+#     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
+#                  or 4). Heavy-canvas areas (designer/page-designer) need a low
+#                  count — they time out on visibility when 4 canvas specs
+#                  contend for the browser. Use --workers 1 for those.
 #     -h, --help   show this help
 #
 # Crontab example (nightly 02:00):
@@ -97,7 +96,7 @@ SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
 KEEP=0
 REPEAT=1
-WORKERS="1"        # deterministic Vite dev runtime; see --workers contract above
+WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
 
 # The curated, currently-green regression areas. These are the areas the recent
 # OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which

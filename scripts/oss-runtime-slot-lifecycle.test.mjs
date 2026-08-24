@@ -45,10 +45,3 @@ test('fresh gate marks its runtime as verification evidence rather than feature 
   assert.match(source, /SEED_LOG_DIR="\$AURA_EVIDENCE_ROOT/u);
   assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });
-
-test('OSS gate serializes browser work so Vite dependency discovery cannot reset another form', () => {
-  const source = readFileSync(gatePath, 'utf8');
-  assert.match(source, /WORKERS="1"/u);
-  assert.match(source, /trigger a global dev-page reload/u);
-  assert.match(source, /PW_ARGS\+=\(--workers="\$WORKERS"\)/u);
-});

@@ -247,6 +247,13 @@ export default defineConfig({
       '@radix-ui/react-switch',
       '@tanstack/react-query',
       '@tanstack/react-virtual',
+      // F12 (2026-08-24): the all-fields form reaches RichTextEditor lazily. Leaving its direct
+      // Tiptap entries to Vite discovery caused "optimized dependencies changed" immediately
+      // after the operator started typing, reloading the entire form and discarding local state.
+      '@tiptap/extension-link',
+      '@tiptap/extension-placeholder',
+      '@tiptap/react',
+      '@tiptap/starter-kit',
       '@heroicons/react/24/outline',
       '@messageformat/core',
       'dayjs/plugin/relativeTime',
