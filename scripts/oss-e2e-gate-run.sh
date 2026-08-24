@@ -58,10 +58,11 @@
 #     --keep       leave the stack up after the run (to debug a failure). By
 #                  default the stack is ALWAYS torn down, even on failure.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
-#     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
-#                  or 4). Heavy-canvas areas (designer/page-designer) need a low
-#                  count — they time out on visibility when 4 canvas specs
-#                  contend for the browser. Use --workers 1 for those.
+#     --workers N  Playwright worker count (default: 1). The host-first gate uses
+#                  Vite development mode; concurrent routes can discover new
+#                  optimized dependencies and trigger a global dev-page reload
+#                  while another worker is editing a form. Higher concurrency is
+#                  available only as an explicit diagnostic override.
 #     -h, --help   show this help
 #
 # Crontab example (nightly 02:00):
@@ -96,7 +97,7 @@ SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
 KEEP=0
 REPEAT=1
-WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
+WORKERS="1"        # deterministic Vite dev runtime; see --workers contract above
 
 # The curated, currently-green regression areas. These are the areas the recent
 # OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which
@@ -116,8 +117,8 @@ SLICE_DIRS=(
 C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
 log()  { printf '%s[oss-e2e-gate]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
 die()  { printf '%s[oss-e2e-gate] ERROR:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; exit 2; }
-# environment-invalid: the stack could not be made ready. Distinct exit code (3)
-# so a caller can tell "the gate's world was broken" from "the code went red".
+# environment-invalid: the stack could not be made ready. Exit 2 is the workspace
+# orchestrator's canonical environment-invalid contract; Playwright/product failures use exit 1.
 die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 2; }
 ENV_INVALID=0
 
