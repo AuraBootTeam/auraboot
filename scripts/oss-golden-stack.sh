@@ -445,7 +445,16 @@ cmd_up() {
         ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
       else
         log "    no reusable node_modules found; installing from lockfile with the runtime pnpm store"
-        NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}" \
+        local npm_registry="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
+        local pnpm_version="${AURA_PNPM_VERSION:-9.15.9}"
+        COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
+          COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+          "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
+            corepack install --global "pnpm@$pnpm_version" \
+            >"$sd/frontend-corepack.log" 2>&1 \
+          || die "pnpm $pnpm_version bootstrap failed — see $sd/frontend-corepack.log"
+        NPM_CONFIG_REGISTRY="$npm_registry" \
+          COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
             pnpm install --frozen-lockfile >"$sd/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
