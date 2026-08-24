@@ -301,7 +301,8 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     .find((block) => block.id === 'table').columns
     .find((column) => column.isActionColumn).buttons
     .find((action) => action.code === 'delete');
-  assert.equal(capacityDelete.action.command, 'crm:delete_lead_capacity');
+  assert.equal(capacityDelete.action.command, undefined);
+  assert.equal(capacityDelete.action.operationType, 'DELETE');
   const poolRowActions = pages[0].blocks
     .find((block) => block.id === 'crm_lp_table').columns
     .find((column) => column.isActionColumn).buttons;
