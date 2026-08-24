@@ -378,6 +378,12 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     const priceInput = page.locator('[data-testid="field-sc_price"] input').first();
     await expect(quantityInput).toBeVisible({ timeout: 5_000 });
     await expect(priceInput).toBeVisible({ timeout: 5_000 });
+    // The product must not expose provisional controls before async field metadata selects the
+    // authoritative widget/value adapter. This readiness assertion prevents the historical race
+    // where DOM values were typed into a temporary SmartInput and disappeared before submit.
+    await expect(nameInput).toBeEnabled({ timeout: 5_000 });
+    await expect(quantityInput).toBeEnabled({ timeout: 5_000 });
+    await expect(priceInput).toBeEnabled({ timeout: 5_000 });
 
     // Enum widget — Priority. Native <select> inside the field wrapper.
     const prioritySelect = page.locator('[data-testid="field-sc_priority"] select').first();
