@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.entitlement.spi.EntitlementProvisioner;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
@@ -96,6 +97,7 @@ public class TestSeedController {
     private final JwtUtil jwtUtil;
     private final SessionManagementService sessionManagementService;
     private final PluginImportService pluginImportService;
+    private final EntitlementProvisioner entitlementProvisioner;
     private final RoleService roleService;
     private final UserRoleService userRoleService;
     private final RolePermissionService rolePermissionService;
@@ -942,6 +944,7 @@ public class TestSeedController {
                 .build();
         var result = pluginImportService.execute(preview.getImportId(), importRequest);
         if (result.isSuccess()) {
+            entitlementProvisioner.createFreeEntitlement(tenantId, result.getPluginId());
             log.info("{} plugin installed for tenant {}: counts={}",
                     pluginName, tenantId, result.getResourceCounts());
         } else {

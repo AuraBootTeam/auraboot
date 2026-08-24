@@ -1508,6 +1508,12 @@ const widgetDefinitions: WidgetDefinition[] = [
         type: 'number',
         defaultValue: 3,
       },
+      {
+        key: 'personalizable',
+        label: '允许用户个性化',
+        type: 'boolean',
+        defaultValue: false,
+      },
     ],
   },
   {

@@ -2,8 +2,9 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { ShortcutsWidget } from '../ShortcutsWidget';
 
-const { listFavoritesMock, rootLoaderData } = vi.hoisted(() => ({
+const { listFavoritesMock, rootLoaderData, translateMock } = vi.hoisted(() => ({
   listFavoritesMock: vi.fn(),
+  translateMock: (key: string) => key,
   rootLoaderData: {
     value: {
       menus: [
@@ -21,7 +22,7 @@ vi.mock('~/shared/services/engagementService', () => ({
 }));
 
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (k: string) => k }),
+  useI18n: () => ({ t: translateMock }),
 }));
 
 vi.mock('~/root-data', () => ({
@@ -105,5 +106,71 @@ describe('ShortcutsWidget — redesign', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('客户详情');
     expect(rows[0].textContent).not.toContain('销售订单');
+  });
+
+  it('keeps authored shortcuts static unless personalization is explicitly enabled', async () => {
+    const { findAllByTestId, queryByTestId } = render(
+      <ShortcutsWidget
+        shortcuts={[
+          { label: '新建客户', path: '/p/crm_account_common/new', icon: 'IconBuilding' },
+        ]}
+      />,
+    );
+
+    const rows = await findAllByTestId('shortcut-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('新建客户');
+    expect(listFavoritesMock).not.toHaveBeenCalled();
+    expect(queryByTestId('shortcuts-customize-button')).toBeNull();
+  });
+
+  it('uses authored shortcuts as the personalizable baseline when no favorites exist', async () => {
+    const { findAllByTestId, findByTestId } = render(
+      <ShortcutsWidget
+        personalizable
+        shortcuts={[
+          { label: '新建客户', path: '/p/crm_account_common/new', icon: 'IconBuilding' },
+        ]}
+      />,
+    );
+
+    const rows = await findAllByTestId('shortcut-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('新建客户');
+    expect(listFavoritesMock).toHaveBeenCalledWith('menu');
+    expect(await findByTestId('shortcuts-customize-button')).not.toBeNull();
+  });
+
+  it('replaces the authored baseline with the user ordered favorites', async () => {
+    listFavoritesMock.mockResolvedValueOnce([
+      {
+        id: 'F2',
+        targetLabel: '报价单',
+        targetId: 'qo_quote_common',
+        targetContext: { path: '/p/qo_quote_common', icon: 'FileText' },
+      },
+      {
+        id: 'F1',
+        targetLabel: '客户',
+        targetId: 'crm_account_common',
+        targetContext: { path: '/p/crm_account_common', icon: 'IconBuilding' },
+      },
+    ]);
+
+    const { findAllByTestId, findByText } = render(
+      <ShortcutsWidget
+        personalizable
+        shortcuts={[
+          { label: '新建客户', path: '/p/crm_account_common/new', icon: 'IconBuilding' },
+        ]}
+      />,
+    );
+
+    const rows = await findAllByTestId('shortcut-row');
+    expect(rows.map((row: HTMLElement) => row.textContent)).toEqual([
+      expect.stringContaining('报价单'),
+      expect.stringContaining('客户'),
+    ]);
+    expect(await findByText('workbench.shortcuts.edit')).not.toBeNull();
   });
 });

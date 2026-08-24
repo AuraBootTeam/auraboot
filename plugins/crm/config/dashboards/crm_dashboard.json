@@ -54,6 +54,7 @@
       "config": {
         "title": { "zh-CN": "快捷入口", "en": "Quick Entries" },
         "dataSource": { "type": "static" },
+        "personalizable": true,
         "shortcuts": [
           { "label": { "zh-CN": "新建线索", "en": "New Lead" }, "icon": "IconRadar", "path": "/p/crm_lead_common/new" },
           { "label": { "zh-CN": "新建客户", "en": "New Account" }, "icon": "IconBuilding", "path": "/p/crm_account_common/new" },

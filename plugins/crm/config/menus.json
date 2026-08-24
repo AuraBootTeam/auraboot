@@ -263,6 +263,21 @@
     "pageKey": "crm_my_tasks_list"
   },
   {
+    "code": "crm_contact_duplicate_mobile",
+    "parentCode": "crm_records",
+    "name:zh-CN": "联系人查重",
+    "name:en": "Contact Duplicate Check",
+    "path": "/p/crm_contact_duplicate_mobile",
+    "component": null,
+    "icon": "IconCopyCheck",
+    "type": 1,
+    "permissionCode": "crm.contact.read",
+    "orderNo": 7,
+    "visible": true,
+    "pageKey": "crm_contact_duplicate_mobile_list",
+    "extension": { "platforms": ["mobile"] }
+  },
+  {
     "code": "crm_activities",
     "parentCode": "crm_records",
     "name:zh-CN": "活动",

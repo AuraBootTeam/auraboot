@@ -28,6 +28,11 @@ export interface ShortcutItem {
 interface ShortcutsWidgetProps {
   title?: string;
   shortcuts?: ShortcutItem[];
+  /**
+   * Treat authored shortcuts as the user's initial baseline while still
+   * allowing menu favorites to replace and reorder that baseline.
+   */
+  personalizable?: boolean;
   className?: string;
 }
 
@@ -81,6 +86,7 @@ function renderShortcutIcon(item: ShortcutItem): React.ReactNode {
 export function ShortcutsWidget({
   title,
   shortcuts: overrideShortcuts,
+  personalizable = false,
   className = '',
 }: ShortcutsWidgetProps) {
   const { t } = useI18n();
@@ -123,8 +129,9 @@ export function ShortcutsWidget({
   );
 
   const loadFavorites = useCallback(async () => {
-    if (overrideShortcuts) {
+    if (overrideShortcuts && !personalizable) {
       setItems(filterToVisibleMenus(overrideShortcuts));
+      setIsFromFavorites(false);
       setLoading(false);
       return;
     }
@@ -136,11 +143,12 @@ export function ShortcutsWidget({
       setItems(visibleFavorites);
       setIsFromFavorites(true);
     } else {
-      setItems(menuShortcuts);
+      const baseline = overrideShortcuts ?? menuShortcuts;
+      setItems(filterToVisibleMenus(baseline));
       setIsFromFavorites(false);
     }
     setLoading(false);
-  }, [filterToVisibleMenus, menuShortcuts, overrideShortcuts]);
+  }, [filterToVisibleMenus, menuShortcuts, overrideShortcuts, personalizable]);
 
   useEffect(() => {
     loadFavorites();
@@ -311,7 +319,7 @@ export function ShortcutsWidget({
       </ul>
 
       {/* Customize hint when showing defaults — clicking opens the modal */}
-      {!isFromFavorites && !editing && (
+      {!isFromFavorites && !editing && (!overrideShortcuts || personalizable) && (
         <div className="px-4 pb-3 text-center">
           <button
             type="button"
