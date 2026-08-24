@@ -4451,5 +4451,17 @@
       { "value": "active", "label": "Active", "label:zh-CN": "生效", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
       { "value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
     ]
+  },
+  {
+    "code": "crm_sales_period_metric_group",
+    "name": "Sales Home Metric Group",
+    "name:zh-CN": "销售首页指标类别",
+    "dictType": "static",
+    "items": [
+      { "value": "lead", "label": "New Leads", "label:zh-CN": "新增线索", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "opportunity", "label": "New Opportunities", "label:zh-CN": "新增商机", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "open_opportunity", "label": "Open Opportunities", "label:zh-CN": "进行中商机", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "won", "label": "Won Opportunities", "label:zh-CN": "赢单", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } }
+    ]
   }
 ]
