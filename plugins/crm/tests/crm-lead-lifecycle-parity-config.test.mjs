@@ -76,6 +76,11 @@ test('terminal leads do not retain assignment, pool, or scoring capabilities', (
 });
 
 test('lead list exposes guarded transfer, update, delete, pool, import, and export capabilities', () => {
+  assert.equal(table.columns.find((column) => column.field === 'crm_lead_company')?.ellipsis, true);
+  assert.equal(
+    table.columns.find((column) => column.field === 'crm_lead_contact_name')?.ellipsis,
+    true,
+  );
   assert.deepEqual(table.table.bulkCapabilities, {
     edit: { permissionCode: 'crm.lead.manage' },
     delete: { permissionCode: 'crm.lead.manage' },
@@ -101,6 +106,23 @@ test('lead list exposes guarded transfer, update, delete, pool, import, and expo
     bulkByCode.get('bulk_move_to_pool')?.action?.command,
     'crm:move_lead_to_pool',
   );
+  assert.deepEqual(bulkByCode.get('bulk_move_to_pool')?.action?.input?.refTarget, {
+    targetModel: 'crm_lead_pool_common',
+    valueField: 'pid',
+    displayField: 'crm_lp_name',
+  });
+  assert.deepEqual(rowByCode.get('move_to_pool')?.action?.inputFields?.[0]?.dataSource, {
+    type: 'api',
+    endpoint: '/api/dynamic/crm_lead_pool_common/list',
+    params: { pageNum: 1, pageSize: 200 },
+    valueField: 'pid',
+    labelField: 'crm_lp_name',
+  });
+  assert.deepEqual(rowByCode.get('delete')?.action, {
+    type: 'command',
+    command: 'crm:delete_lead',
+    operationType: 'DELETE',
+  });
 });
 
 test('lead list configuration provides localized table and chart views', () => {

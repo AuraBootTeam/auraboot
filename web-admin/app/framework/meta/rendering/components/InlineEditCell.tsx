@@ -225,7 +225,7 @@ export const InlineEditCell: React.FC<InlineEditCellProps> = ({
         handleDoubleClick();
       }}
       onClick={(e) => e.stopPropagation()}
-      className="hover:bg-accent-weak -mx-1 min-h-[24px] cursor-text rounded px-1 transition-colors"
+      className="hover:bg-accent-weak -mx-1 block min-h-[24px] max-w-full min-w-0 cursor-text truncate overflow-hidden rounded px-1 whitespace-nowrap transition-colors"
       title="Double-click to edit"
       data-testid={`inline-edit-cell-${column.field}`}
     >
