@@ -4,6 +4,7 @@ import {
   collectFormFieldDataTypes,
   getJsonFormValueError,
   getFormFieldValueWithAlias,
+  isFormButtonDisabled,
   mergeLoadedRecordWithDirtyFields,
   normalizeCommandPayloadValue,
   normalizeLoadedRecordResponseForForm,
@@ -13,6 +14,7 @@ import {
   resolveAsyncCommandDispatch,
   resolveEditRecordEndpoint,
   resolveFormBackLink,
+  resolveValidationToastMessage,
   resolveFormSubmitEndpoint,
   resolveCreateSubTableEmptyState,
   resolveSubmitCommandCode,
@@ -20,6 +22,38 @@ import {
   shouldLoadMainRecordForForm,
   unwrapJsonLikeValue,
 } from '../FormPageContent';
+
+describe('isFormButtonDisabled', () => {
+  it('keeps cancel available while required-field metadata is still loading', () => {
+    expect(isFormButtonDisabled({ code: 'submit', primary: true }, false, false, false)).toBe(true);
+    expect(isFormButtonDisabled({ code: 'cancel' }, false, false, false)).toBe(false);
+  });
+
+  it('disables every form action during an active submission', () => {
+    expect(isFormButtonDisabled({ code: 'cancel' }, false, true, true)).toBe(true);
+    expect(isFormButtonDisabled({ code: 'refresh' }, true, false, true)).toBe(true);
+  });
+});
+
+describe('resolveValidationToastMessage', () => {
+  it('keeps field validation inline instead of creating a stale global toast', () => {
+    expect(
+      resolveValidationToastMessage({
+        fieldErrors: { account_id: 'Please select an account' },
+        summaryErrors: [],
+      }),
+    ).toBeNull();
+  });
+
+  it('preserves cross-field summary feedback that has no single field anchor', () => {
+    expect(
+      resolveValidationToastMessage({
+        fieldErrors: {},
+        summaryErrors: ['End date must follow start date'],
+      }),
+    ).toBe('End date must follow start date');
+  });
+});
 
 describe('resolveCreateSubTableEmptyState', () => {
   const t = (key: string) => key;

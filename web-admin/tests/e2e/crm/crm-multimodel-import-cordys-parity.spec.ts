@@ -279,6 +279,12 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
   let leadTemplate: Buffer;
   let contactTemplate: Buffer;
   let opportunityTemplate: Buffer;
+  const expectedContactSourceCases = [
+    'contact-template-and-real-import',
+    'contact-precheck-correction-and-real-import',
+    'contact-ambiguous-reference-precheck',
+  ];
+  const completedContactSourceCases: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -395,6 +401,53 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     }
   });
 
+  test.afterAll(() => {
+    const completed = [...new Set(completedContactSourceCases)];
+    const verdict =
+      completed.length === expectedContactSourceCases.length &&
+      expectedContactSourceCases.every((caseId) => completed.includes(caseId))
+        ? 'pass'
+        : 'fail';
+    writeFileSync(
+      `${EVIDENCE_DIR}/crm-contact-import-source-evidence.json`,
+      `${JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          verdict,
+          technicalVerdict: verdict,
+          fixtureMode: 'self-seeded',
+          dataMigration: 'out-of-scope-development-stage',
+          runtime: {
+            name: process.env.CRM_IMPORT_RUNTIME_NAME ?? null,
+            slot: process.env.CRM_IMPORT_RUNTIME_SLOT ?? null,
+            web: BASE_URL,
+            backend: BACKEND_URL,
+            database: PG_CONN.database,
+            sourceRoot: process.cwd().replace(/\/web-admin$/, ''),
+          },
+          sourceIds: [
+            'api:customer:customer-contact:download-import-tpl',
+            'api:customer:customer-contact:pre-check',
+            'api:customer:customer-contact:real-import',
+          ],
+          expectedCases: expectedContactSourceCases,
+          completedCases: completed,
+          evidence: [
+            '02-contact-code-precheck.png',
+            '03-contact-correction-offered.png',
+            '04-contact-correction-original.xlsx',
+            '04-contact-correction-fixed.xlsx',
+            '04-contact-correction-passed.png',
+            '05-contact-ambiguous-blocked.png',
+          ],
+          trust: { retries: 0, workerCount: 1, driver: 'browser', dependencies: 'real-stack' },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
+
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page, ADMIN_EMAIL, PASSWORD);
   });
@@ -489,6 +542,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     const pidRecords = await recordsByField(page, CONTACT, 'crm_ct_name', pidContact);
     expect(pidRecords).toHaveLength(1);
     expect(pidRecords[0].crm_ct_account_id).toBe(accountPid);
+    completedContactSourceCases.push('contact-template-and-real-import');
   });
 
   test('CMM-04 failed precheck downloads, corrects, and re-uploads all pending rows', async ({
@@ -550,6 +604,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     await submitAndExpect(page, CONTACT, { created: 2, updated: 0, total: 2 });
     expect(await recordsByField(page, CONTACT, 'crm_ct_name', validContactName)).toHaveLength(1);
     expect(await recordsByField(page, CONTACT, 'crm_ct_name', invalidContactName)).toHaveLength(1);
+    completedContactSourceCases.push('contact-precheck-correction-and-real-import');
   });
 
   test('CMM-05 ambiguous account name blocks contact with zero writes', async ({ page }) => {
@@ -573,6 +628,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
       fullPage: true,
     });
     expect(await recordsByField(page, CONTACT, 'crm_ct_name', contactName)).toHaveLength(0);
+    completedContactSourceCases.push('contact-ambiguous-reference-precheck');
   });
 
   test('CMM-06 opportunity resolves account and source lead business codes', async ({ page }) => {

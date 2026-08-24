@@ -4,8 +4,10 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -71,5 +73,32 @@ class DynamicDataExportLabelTest {
         assertEquals("status", map.get("status"));        // fallback
         assertEquals("notes", map.get("notes"));           // fallback (empty)
         assertEquals("Order Date", map.get("date"));
+    }
+
+    @Test
+    void materializeReferenceDisplayValues_usesBusinessLabelsWithoutMutatingQueryRows() {
+        Map<String, Object> queryRow = new LinkedHashMap<>();
+        queryRow.put("name", "Alice");
+        queryRow.put("account_id", "01M0RAWPID");
+        queryRow.put("account_id_display", "Acme Manufacturing");
+
+        List<Map<String, Object>> result = DynamicDataServiceImpl.materializeReferenceDisplayValues(
+                List.of(queryRow), Set.of("account_id"));
+
+        assertEquals("Acme Manufacturing", result.getFirst().get("account_id"));
+        assertEquals("01M0RAWPID", queryRow.get("account_id"));
+    }
+
+    @Test
+    void materializeReferenceDisplayValues_doesNotFallBackToUnauthorizedPid() {
+        Map<String, Object> queryRow = Map.of(
+                "name", "Alice",
+                "account_id", "01M0RAWPID");
+
+        List<Map<String, Object>> result = DynamicDataServiceImpl.materializeReferenceDisplayValues(
+                List.of(queryRow), Set.of("account_id"));
+
+        assertNull(result.getFirst().get("account_id"));
+        assertFalse(result.getFirst().containsValue("01M0RAWPID"));
     }
 }

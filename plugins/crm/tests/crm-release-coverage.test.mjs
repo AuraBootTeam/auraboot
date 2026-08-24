@@ -19,8 +19,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 60);
-  assert.equal(committed.axes.pages.length, 34);
+  assert.equal(committed.axes.commands.length, 62);
+  assert.equal(committed.axes.pages.length, 35);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 40);
   assert.deepEqual(
@@ -51,8 +51,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(committed.scope.productDenominator['page-fields'], 1773);
   assert.equal(committed.scope.productDenominator['ui-actions'], 640);
   assert.equal(committed.scope.productDenominator.queries, 56);
-  assert.equal(committed.scope.productVerdicts.pass, 736);
-  assert.equal(committed.scope.productVerdicts.untested, 2786);
+  assert.equal(committed.scope.productVerdicts.pass, 769);
+  assert.equal(committed.scope.productVerdicts.untested, 2753);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -163,10 +163,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(followupCommentsContract.expectedScenarios, 12);
   assert.equal(followupCommentsContract.minimumScreenshots, 6);
   assert.equal(followupCommentsContract.expectedTechnicalVerdict, 'pass');
-  assert.equal(
-    followupCommentsContract.expectedDataMigration,
-    'out-of-scope-development-stage',
-  );
+  assert.equal(followupCommentsContract.expectedDataMigration, 'out-of-scope-development-stage');
   assert.equal(followupCommentsContract.requireNoFailedRuntimeRequests, true);
   const contactFollowupLifecycleContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
@@ -184,6 +181,20 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'out-of-scope-development-stage',
   );
   assert.equal(contactFollowupLifecycleContract.requireNoFailedRuntimeRequests, true);
+  const contactManagementContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-CONTACT-MANAGEMENT',
+  );
+  assert.equal(contactManagementContract.expectedScenarios, 2);
+  assert.equal(contactManagementContract.minimumScreenshots, 5);
+  assert.equal(contactManagementContract.expectedCoverage.pages.length, 3);
+  assert.equal(contactManagementContract.expectedCoverage.blocks.length, 7);
+  assert.equal(contactManagementContract.expectedCoverage.fields.length, 22);
+  assert.equal(contactManagementContract.expectedCoverage.uiActions.length, 7);
+  assert.equal(contactManagementContract.expectedCoverage.commands.length, 4);
+  assert.equal(contactManagementContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(contactManagementContract.expectedDataMigration, 'out-of-scope-development-stage');
+  assert.equal(contactManagementContract.requireNoFailedRuntimeRequests, true);
+  assert.equal(contactManagementContract.expectedFixtureMode, 'self-seeded');
   const leadConversionActivityCarryContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-LEAD-CONVERSION-ACTIVITY-CARRY',
   );
@@ -221,10 +232,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(accountRelationshipContract.expectedCoverage.fields.length, 8);
   assert.equal(accountRelationshipContract.expectedCoverage.uiActions.length, 6);
   assert.equal(accountRelationshipContract.expectedTechnicalVerdict, 'pass');
-  assert.equal(
-    accountRelationshipContract.expectedDataMigration,
-    'out-of-scope-development-stage',
-  );
+  assert.equal(accountRelationshipContract.expectedDataMigration, 'out-of-scope-development-stage');
   assert.equal(accountRelationshipContract.requireNoFailedRuntimeRequests, true);
   assert.equal(accountRelationshipContract.expectedFixtureMode, 'self-seeded');
   assert.deepEqual(accountRelationshipContract.requiredRecordIds, [

@@ -112,6 +112,16 @@ interface FormValidationResult {
   summaryErrors: string[];
 }
 
+export function resolveValidationToastMessage(
+  validationResult: FormValidationResult,
+): string | null {
+  const firstSummaryError = validationResult.summaryErrors[0];
+  if (firstSummaryError) return firstSummaryError;
+  // Field errors are already rendered inline and focused below. Duplicating the first field
+  // message in a global toast leaves stale feedback floating over a corrected or saved form.
+  return null;
+}
+
 function pushUniqueMessage(target: string[], message?: string) {
   const normalized = String(message || '').trim();
   if (!normalized || target.includes(normalized)) return;
@@ -656,6 +666,19 @@ export function shouldBypassFormSubmit(
     !button?.commandCode &&
     typeof actionCommand !== 'string'
   );
+}
+
+export function isFormButtonDisabled(
+  button: { code?: string; primary?: boolean },
+  loading: boolean,
+  submitting: boolean,
+  submitReady: boolean,
+): boolean {
+  if (loading || submitting) return true;
+
+  const code = String(button.code || '').toLowerCase();
+  const submitsForm = button.primary === true || code === 'submit' || code === 'save';
+  return submitsForm && !submitReady;
 }
 
 /**
@@ -1643,11 +1666,8 @@ export function FormPageContent(props: PageContentProps) {
   const notifyValidationFailure = useCallback(
     (validationResult: FormValidationResult) => {
       const firstFieldCode = Object.keys(validationResult.fieldErrors)[0];
-      const firstFieldError = firstFieldCode
-        ? validationResult.fieldErrors[firstFieldCode]
-        : undefined;
-      const firstSummaryError = validationResult.summaryErrors[0];
-      showErrorToast(firstSummaryError || firstFieldError || 'Please fix validation errors');
+      const toastMessage = resolveValidationToastMessage(validationResult);
+      if (toastMessage) showErrorToast(toastMessage);
       // §4: scroll to + focus the first invalid field on submit (mixed-timing
       // validation — field-level errors render, and the page jumps to the first one).
       if (firstFieldCode && typeof document !== 'undefined') {
@@ -2774,7 +2794,12 @@ export function FormPageContent(props: PageContentProps) {
                             button.code,
                           )}
                           onClick={() => handleFormAction(button)}
-                          disabled={loading || submitting || !formInteractionReady}
+                          disabled={isFormButtonDisabled(
+                            button,
+                            loading,
+                            submitting,
+                            formInteractionReady,
+                          )}
                           className={`rounded-control px-4 py-2 text-sm font-medium ${
                             button.primary
                               ? 'bg-accent hover:bg-accent-hover text-white disabled:bg-blue-400'

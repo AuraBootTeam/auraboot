@@ -5,6 +5,83 @@
   "modelCode": "crm_contact_common",
   "kind": "detail",
   "schemaVersion": 4,
+  "mobileUx": {
+    "detail": {
+      "header": {
+        "title": {
+          "field": "crm_ct_name"
+        },
+        "subtitle": {
+          "template": "{{crm_ct_title}} · {{crm_ct_email}}"
+        },
+        "badges": [
+          {
+            "field": "crm_ct_status",
+            "renderer": "statusBadge"
+          },
+          {
+            "field": "crm_ct_is_primary",
+            "renderer": "booleanStatus"
+          }
+        ]
+      },
+      "tabs": [
+        {
+          "id": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en": "Overview"
+          }
+        },
+        {
+          "id": "activity",
+          "label": {
+            "zh-CN": "活动记录",
+            "en": "Activities"
+          }
+        }
+      ],
+      "sections": [
+        {
+          "id": "relationship",
+          "title": {
+            "zh-CN": "客户关系",
+            "en": "Account Relationship"
+          },
+          "type": "fieldGrid",
+          "fields": [
+            "crm_ct_account_id",
+            "crm_ct_title",
+            "crm_ct_owner",
+            "crm_ct_is_primary",
+            "crm_ct_status"
+          ]
+        },
+        {
+          "id": "channels",
+          "title": {
+            "zh-CN": "联系方式",
+            "en": "Contact Channels"
+          },
+          "type": "fieldGrid",
+          "fields": ["crm_ct_email", "crm_ct_phone", "crm_ct_mobile"]
+        },
+        {
+          "id": "notes",
+          "title": {
+            "zh-CN": "沟通说明",
+            "en": "Communication Notes"
+          },
+          "type": "description",
+          "field": "crm_ct_remark"
+        }
+      ],
+      "bottomActions": {
+        "source": "capabilities",
+        "maxPrimary": 2
+      }
+    }
+  },
   "layout": {
     "type": "stack"
   },

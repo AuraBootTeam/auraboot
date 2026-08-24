@@ -311,6 +311,25 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
 });
 
+test('OSS golden stack rejects dependency capsules with dangling required-package links', () => {
+  const golden = read('scripts/oss-golden-stack.sh');
+  assert.match(golden, /web_admin_node_modules_usable\(\)/);
+  assert.match(golden, /react\/index\.js/);
+  assert.match(golden, /react-dom\/client\.js/);
+  assert.match(golden, /@tailwindcss\/vite\/dist\/index\.mjs/);
+  assert.match(golden, /tailwindcss\/index\.css/);
+  assert.match(golden, /candidate_real="\$\(cd "\$candidate"/);
+  assert.match(golden, /checkout_node_modules_real=/);
+  assert.match(golden, /entry_real="\$\(realpath "\$candidate\/\$entry"/);
+  assert.match(golden, /"\$candidate_real"\/\*/);
+  assert.match(golden, /"\$checkout_node_modules_real"\/\*/);
+  assert.match(
+    golden,
+    /if ! web_admin_node_modules_usable "\$REPO_ROOT\/web-admin\/node_modules"/,
+  );
+  assert.match(golden, /refusing to replace a real directory/);
+});
+
 test('Product Catalog smoke fails closed on list PID and current DOM business-cell uniqueness', () => {
   const smoke = read('web-admin/tests/e2e/product-catalog/prod-catalog-smoke.spec.ts');
   const rowContract = read('web-admin/tests/e2e/product-catalog/row-contract.mjs');

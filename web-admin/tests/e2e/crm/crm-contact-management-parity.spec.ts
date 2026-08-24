@@ -1,19 +1,88 @@
 import { expect, test, type Page } from '../../fixtures';
+import type { TestInfo } from '@playwright/test';
 import fs from 'node:fs';
+import path from 'node:path';
 import * as XLSX from 'xlsx';
-import { clickRowActionByLocator, executeCommandViaApi, uniqueId } from '../helpers';
+import {
+  clickRowActionByLocator,
+  executeCommandViaApi,
+  uniqueId,
+  waitForFormReady,
+} from '../helpers';
 
 const CONTACT = 'crm_contact_common';
+const EXPECTED_SCENARIOS = ['contact-form-detail-analysis-export', 'contact-list-bulk-governance'];
+const CONTACT_MANAGEMENT_COVERAGE = {
+  pages: ['crm_contact_common_list', 'crm_contact_common_form', 'crm_contact_common_detail'],
+  blocks: [
+    'crm_contact_common_list:crm_contact_toolbar',
+    'crm_contact_common_list:crm_contact_table',
+    'crm_contact_common_form:identity_and_ownership',
+    'crm_contact_common_form:channels_and_notes',
+    'crm_contact_common_form:buttons',
+    'crm_contact_common_detail:section_basic',
+    'crm_contact_common_detail:crm_contact_detail_toolbar',
+  ],
+  fields: [
+    'crm_contact_common_list:crm_contact_table:crm_ct_name',
+    'crm_contact_common_list:crm_contact_table:crm_ct_account_id',
+    'crm_contact_common_list:crm_contact_table:crm_ct_title',
+    'crm_contact_common_list:crm_contact_table:crm_ct_email',
+    'crm_contact_common_list:crm_contact_table:crm_ct_phone',
+    'crm_contact_common_list:crm_contact_table:crm_ct_mobile',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_account_id',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_name',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_title',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_owner',
+    'crm_contact_common_form:channels_and_notes:crm_ct_email',
+    'crm_contact_common_form:channels_and_notes:crm_ct_phone',
+    'crm_contact_common_form:channels_and_notes:crm_ct_mobile',
+    'crm_contact_common_form:channels_and_notes:crm_ct_is_primary',
+    'crm_contact_common_form:channels_and_notes:crm_ct_remark',
+    'crm_contact_common_detail:section_basic:crm_ct_account_id',
+    'crm_contact_common_detail:section_basic:crm_ct_name',
+    'crm_contact_common_detail:section_basic:crm_ct_title',
+    'crm_contact_common_detail:section_basic:crm_ct_email',
+    'crm_contact_common_detail:section_basic:crm_ct_phone',
+    'crm_contact_common_detail:section_basic:crm_ct_mobile',
+    'crm_contact_common_detail:section_basic:crm_ct_remark',
+  ],
+  uiActions: [
+    'crm_contact_common_list:crm_contact_toolbar:create',
+    'crm_contact_common_list:crm_contact_table:bulk_delete_contacts',
+    'crm_contact_common_list:crm_contact_table:view',
+    'crm_contact_common_list:crm_contact_table:edit',
+    'crm_contact_common_form:buttons:submit',
+    'crm_contact_common_form:buttons:cancel',
+    'crm_contact_common_detail:crm_contact_detail_toolbar:edit',
+  ],
+  commands: [
+    'crm:create_account',
+    'crm:create_contact',
+    'crm:update_contact',
+    'crm:delete_contact',
+  ],
+};
+const completedScenarios: string[] = [];
+const evidenceScreenshots: string[] = [];
+const failedRuntimeRequests: string[] = [];
+
+function trackRuntimeFailures(page: Page): void {
+  page.on('response', (response) => {
+    if (response.status() >= 500 && response.url().includes('/api/')) {
+      failedRuntimeRequests.push(
+        `${response.request().method()} ${response.url()} HTTP ${response.status()}`,
+      );
+    }
+  });
+}
 
 async function openContactsFromMenu(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
   const link = page.locator('nav a[href="/p/crm_contact_common"]').first();
   await expect(link).toBeVisible({ timeout: 15_000 });
-  const response = page.waitForResponse(
-    (candidate) => candidate.url().includes(`/api/dynamic/${CONTACT}`) && candidate.ok(),
-  );
   await link.click();
-  await response;
+  await expect(page).toHaveURL(new RegExp(`/p/${CONTACT}$`), { timeout: 15_000 });
   await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -25,8 +94,7 @@ async function search(page: Page, keyword: string): Promise<void> {
     .first();
   await expect(input).toBeVisible();
   const response = page.waitForResponse(
-    (candidate) =>
-      candidate.url().includes(`/api/dynamic/${CONTACT}/list`) && candidate.ok(),
+    (candidate) => candidate.url().includes(`/api/dynamic/${CONTACT}/list`) && candidate.ok(),
   );
   await input.fill(keyword);
   await input.press('Enter');
@@ -35,6 +103,21 @@ async function search(page: Page, keyword: string): Promise<void> {
 
 function row(page: Page, name: string) {
   return page.locator('tbody tr').filter({ hasText: name });
+}
+
+async function selectSingleOption(page: Page, field: string, label: string): Promise<void> {
+  await page.getByTestId(`select-trigger-${field}`).click();
+  const searchInput = page.getByTestId(`select-search-${field}`);
+  await expect(searchInput).toBeVisible();
+  await searchInput.fill(label);
+  await page.getByRole('option', { name: label, exact: true }).click();
+}
+
+async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  const path = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path, fullPage: true });
+  evidenceScreenshots.push(path);
+  await testInfo.attach(name, { path, contentType: 'image/png' });
 }
 
 async function commandFailure(
@@ -55,9 +138,184 @@ async function commandFailure(
 test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
   test.setTimeout(180_000);
 
+  test.afterAll(() => {
+    const evidenceRoot = process.env.AURA_EVIDENCE_ROOT;
+    if (!evidenceRoot) return;
+    const completed = EXPECTED_SCENARIOS.every((scenario) => completedScenarios.includes(scenario));
+    const verdict = completed && failedRuntimeRequests.length === 0 ? 'pass' : 'fail';
+    const receipt = {
+      runId: `crm-contact-management-${Date.now()}`,
+      verdict,
+      technicalVerdict: verdict,
+      dataMigration: 'out-of-scope-development-stage',
+      fixtureMode: 'self-seeded',
+      expectedScenarios: EXPECTED_SCENARIOS,
+      completedScenarios,
+      screenshots: evidenceScreenshots,
+      failedRuntimeRequests,
+      coverage: Object.fromEntries(
+        Object.entries(CONTACT_MANAGEMENT_COVERAGE).map(([axis, expected]) => [
+          axis,
+          { expected, completed: verdict === 'pass' ? expected : [] },
+        ]),
+      ),
+    };
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(evidenceRoot, `crm-contact-management-${Date.now()}.json`),
+      `${JSON.stringify(receipt, null, 2)}\n`,
+    );
+  });
+
+  test('form, detail, analysis and full export stay reachable from product entries @critical @golden', async ({
+    page,
+  }, testInfo) => {
+    trackRuntimeFailures(page);
+    const uid = uniqueId('crm_contact_form');
+    const accountName = `Contact Form Account ${uid}`;
+    const contactName = `Contact Form Person ${uid}`;
+    const account = await executeCommandViaApi(
+      page,
+      'crm:create_account',
+      {
+        crm_acc_name: accountName,
+        crm_acc_industry: 'manufacturing',
+        crm_acc_rating: 'A',
+      },
+      undefined,
+      'create',
+    );
+    expect(account.recordId).toBeTruthy();
+
+    await openContactsFromMenu(page);
+    await page.getByTestId('toolbar-btn-create').click();
+    await expect(page).toHaveURL(/\/p\/crm_contact_common\/new$/);
+    await waitForFormReady(page, 15_000);
+
+    const requiredFields = ['crm_ct_account_id', 'crm_ct_name', 'crm_ct_owner'];
+    const optionalFields = [
+      'crm_ct_title',
+      'crm_ct_email',
+      'crm_ct_phone',
+      'crm_ct_mobile',
+      'crm_ct_is_primary',
+      'crm_ct_remark',
+    ];
+    for (const field of [...requiredFields, ...optionalFields]) {
+      await expect(page.getByTestId(`form-field-${field}`)).toBeVisible();
+    }
+    await expect(page.getByTestId('form-btn-cancel')).toBeEnabled();
+    await page.getByTestId('form-btn-submit').click();
+    await expect(page.getByTestId('form-field-crm_ct_account_id')).toContainText(
+      /请选择所属客户|account.*required/i,
+    );
+    await expect(page.getByTestId('form-field-crm_ct_name')).toContainText(
+      /请填写联系人姓名|contact name.*required/i,
+    );
+    await expect(page.getByTestId('form-field-crm_ct_owner')).toContainText(
+      /请选择负责人|owner.*required/i,
+    );
+    await expect(page).toHaveURL(/\/p\/crm_contact_common\/new$/);
+    await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0);
+    await attachScreenshot(page, testInfo, '01-contact-required-validation');
+
+    await selectSingleOption(page, 'crm_ct_account_id', accountName);
+    await selectSingleOption(page, 'crm_ct_owner', 'Admin');
+    await page.getByTestId('form-field-crm_ct_name').locator('input').fill(contactName);
+    await page.getByTestId('form-field-crm_ct_title').locator('input').fill('采购总监');
+    await page.getByTestId('form-field-crm_ct_email').locator('input').fill(`${uid}@example.com`);
+    await page.getByTestId('form-field-crm_ct_phone').locator('input').fill('0755-12345678');
+    await page.getByTestId('form-field-crm_ct_mobile').locator('input').fill('13800001111');
+    await page
+      .getByTestId('form-field-crm_ct_remark')
+      .locator('textarea')
+      .fill('关注交期，周二下午便于联系');
+    await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0);
+    await attachScreenshot(page, testInfo, '02-contact-full-form');
+
+    const createResponse = page.waitForResponse(
+      (candidate) =>
+        candidate.url().includes('/api/meta/commands/execute/crm:create_contact') && candidate.ok(),
+    );
+    await page.getByTestId('form-btn-submit').click();
+    const created = await createResponse;
+    const createdBody = await created.json();
+    const contactPid = String(createdBody?.data?.data?.recordPid || '');
+    expect(contactPid).toBeTruthy();
+    await expect(page).toHaveURL(/\/p\/crm_contact_common$/);
+
+    await search(page, uid);
+    const createdRow = row(page, contactName);
+    await expect(createdRow).toHaveCount(1);
+    await expect(createdRow).toContainText(accountName);
+    await expect(createdRow).toContainText('采购总监');
+    await expect(createdRow).toContainText(`${uid}@example.com`);
+    await expect(createdRow).toContainText('0755-12345678');
+    await expect(createdRow).toContainText('13800001111');
+
+    await page.getByTestId('view-analysis-open').click();
+    const analysis = page.getByTestId('view-analysis-drawer');
+    await expect(analysis).toBeVisible();
+    await expect(analysis.getByTestId('view-analysis-error')).toHaveCount(0);
+    await expect(analysis.locator('[data-testid^="view-analysis-breakdown-"]').first()).toBeVisible(
+      { timeout: 15_000 },
+    );
+    await analysis.getByTestId('view-analysis-chart-donut').click();
+    await expect(analysis.getByTestId('view-analysis-chart-donut')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(analysis.locator('canvas').first()).toBeVisible({ timeout: 10_000 });
+    await attachScreenshot(page, testInfo, '03-contact-configurable-analysis');
+    await analysis.getByTestId('view-analysis-close').click();
+
+    const fullExportResponse = page.waitForResponse(
+      (candidate) =>
+        candidate.request().method() === 'POST' &&
+        candidate.url().includes(`/api/dynamic/${CONTACT}/export`),
+    );
+    const fullDownload = page.waitForEvent('download');
+    await page.getByTestId('toolbar-more-menu').click();
+    await page.getByTestId('more-menu-export-excel').click();
+    const [exported, download] = await Promise.all([fullExportResponse, fullDownload]);
+    expect(exported.ok()).toBe(true);
+    const workbookPath = testInfo.outputPath('all-matching-contacts.xlsx');
+    await download.saveAs(workbookPath);
+    const workbookBytes = fs.readFileSync(workbookPath);
+    const workbook = XLSX.read(workbookBytes, { type: 'buffer' });
+    const exportedText = JSON.stringify(
+      XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]),
+    );
+    expect(exportedText).toContain(contactName);
+    expect(exportedText).toContain(accountName);
+    await testInfo.attach('all-matching-contacts.xlsx', {
+      body: workbookBytes,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    await clickRowActionByLocator(page, createdRow, 'view', '详情');
+    await expect(page).toHaveURL(new RegExp(`/p/${CONTACT}/view/${contactPid}$`));
+    await expect(page.getByText(contactName, { exact: true })).toBeVisible();
+    await expect(page.getByText(accountName, { exact: true })).toBeVisible();
+    await expect(page.getByText('采购总监', { exact: true })).toBeVisible();
+    await expect(page.getByText(`${uid}@example.com`, { exact: true })).toBeVisible();
+    await expect(page.getByText('0755-12345678', { exact: true })).toBeVisible();
+    await expect(page.getByText('13800001111', { exact: true })).toBeVisible();
+    await expect(page.getByText('关注交期，周二下午便于联系', { exact: true })).toBeVisible();
+    await attachScreenshot(page, testInfo, '04-contact-business-detail');
+
+    await page.getByTestId('toolbar-btn-edit').click();
+    await expect(page).toHaveURL(new RegExp(`/p/${CONTACT}/edit/${contactPid}$`));
+    await waitForFormReady(page, 15_000);
+    await page.getByTestId('form-btn-cancel').click();
+    await expect(page).toHaveURL(new RegExp(`/p/${CONTACT}/view/${contactPid}$`));
+    completedScenarios.push('contact-form-detail-analysis-export');
+  });
+
   test('list, update, bulk edit/export/delete and governed failures @critical @golden', async ({
     page,
   }, testInfo) => {
+    trackRuntimeFailures(page);
     const uid = uniqueId('crm_contact_t05');
     const account = await executeCommandViaApi(
       page,
@@ -238,6 +496,7 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     await expect(row(page, names.primary)).toHaveCount(1);
     await expect(row(page, names.linked)).toHaveCount(1);
 
-    await page.screenshot({ path: testInfo.outputPath('contact-management-final.png'), fullPage: true });
+    await attachScreenshot(page, testInfo, '05-contact-management-final');
+    completedScenarios.push('contact-list-bulk-governance');
   });
 });

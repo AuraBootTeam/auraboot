@@ -77,15 +77,50 @@ runtime_env() {
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
 
+web_admin_node_modules_usable() {
+  local candidate="$1"
+  local candidate_real checkout_root checkout_node_modules_real entry entry_real
+  [ -d "$candidate" ] || return 1
+  candidate_real="$(cd "$candidate" 2>/dev/null && pwd -P)" || return 1
+  checkout_root="$(cd "$(dirname "$candidate")/.." 2>/dev/null && pwd -P)" || return 1
+  checkout_node_modules_real=""
+  if [ -d "$checkout_root/node_modules" ]; then
+    checkout_node_modules_real="$(cd "$checkout_root/node_modules" 2>/dev/null && pwd -P)" || return 1
+  fi
+
+  # A published dependency view must own the files it exposes. Merely checking
+  # package.json readability accepts capsules whose package symlinks escape into
+  # a removed worktree. A normal pnpm workspace may resolve into the same
+  # checkout's root node_modules/.pnpm store, so that one local boundary is also
+  # allowed. Anything outside both boundaries is stale and must be rejected.
+  for entry in \
+    react/index.js \
+    react-dom/client.js \
+    @tailwindcss/vite/dist/index.mjs \
+    tailwindcss/index.css
+  do
+    [ -r "$candidate/$entry" ] || return 1
+    entry_real="$(realpath "$candidate/$entry" 2>/dev/null)" || return 1
+    case "$entry_real" in
+      "$candidate_real"/*) continue ;;
+    esac
+    [ -n "$checkout_node_modules_real" ] || return 1
+    case "$entry_real" in
+      "$checkout_node_modules_real"/*) ;;
+      *) return 1 ;;
+    esac
+  done
+}
+
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
   done
 
   while IFS= read -r candidate; do
     candidate="$candidate/web-admin/node_modules"
-    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -438,7 +473,12 @@ cmd_up() {
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
-    if [ ! -e "$REPO_ROOT/web-admin/node_modules" ]; then
+    if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
+      if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
+        rm -f "$REPO_ROOT/web-admin/node_modules"
+      elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
+        die "web-admin/node_modules exists but required runtime packages are unreadable; refusing to replace a real directory"
+      fi
       local node_modules_seed
       node_modules_seed="$(web_admin_node_modules_seed || true)"
       if [ -n "$node_modules_seed" ]; then
@@ -459,8 +499,8 @@ cmd_up() {
             pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
             >"$sd/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
-        [ -d "$REPO_ROOT/web-admin/node_modules" ] \
-          || die "web-admin dependency install completed without node_modules"
+        web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+          || die "web-admin dependency install completed without usable runtime packages"
       fi
     fi
     # A slot can be reused by a newer checkout/composition. Vite's on-disk optimized dependency

@@ -5,6 +5,98 @@
   "modelCode": "crm_contact_common",
   "kind": "list",
   "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        {
+          "id": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "id": "active",
+          "label": {
+            "zh-CN": "在职联系人",
+            "en": "Active"
+          },
+          "filter": {
+            "field": "crm_ct_status",
+            "op": "EQ",
+            "value": "active"
+          }
+        },
+        {
+          "id": "primary",
+          "label": {
+            "zh-CN": "主联系人",
+            "en": "Primary"
+          },
+          "filter": {
+            "field": "crm_ct_is_primary",
+            "op": "EQ",
+            "value": true
+          }
+        },
+        {
+          "id": "inactive",
+          "label": {
+            "zh-CN": "已停用",
+            "en": "Inactive"
+          },
+          "filter": {
+            "field": "crm_ct_status",
+            "op": "EQ",
+            "value": "inactive"
+          }
+        }
+      ],
+      "defaultSort": [
+        {
+          "field": "created_at",
+          "direction": "DESC"
+        }
+      ],
+      "card": {
+        "title": {
+          "field": "crm_ct_name"
+        },
+        "subtitle": {
+          "template": "{{crm_ct_title}} · {{crm_ct_email}}"
+        },
+        "badges": [
+          {
+            "field": "crm_ct_status",
+            "renderer": "statusBadge"
+          }
+        ],
+        "summary": {
+          "field": "crm_ct_remark",
+          "maxLines": 2
+        },
+        "facts": [
+          {
+            "field": "crm_ct_mobile",
+            "label": {
+              "zh-CN": "手机",
+              "en": "Mobile"
+            },
+            "renderer": "phone"
+          },
+          {
+            "field": "crm_ct_phone",
+            "label": {
+              "zh-CN": "座机",
+              "en": "Phone"
+            },
+            "renderer": "phone"
+          }
+        ],
+        "actions": ["favorite", "more"]
+      }
+    }
+  },
   "extension": {
     "import": {
       "enabled": true,
