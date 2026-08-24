@@ -27,6 +27,7 @@ test('sales-owned CRM models expose owner fields used by the self scope', async 
   const byCode = new Map(models.map((model) => [model.code, model]));
   const expectedOwnerFields = {
     crm_account_common: 'crm_acc_owner',
+    crm_contact_common: 'crm_ct_owner',
     crm_lead_common: 'crm_lead_assigned_to',
     crm_opportunity_common: 'crm_opp_owner',
     crm_forecast_submission: 'crm_fcst_owner',
