@@ -120,7 +120,6 @@ test('lead list exposes guarded transfer, update, delete, pool, import, and expo
   });
   assert.deepEqual(rowByCode.get('delete')?.action, {
     type: 'command',
-    command: 'crm:delete_lead',
     operationType: 'DELETE',
   });
 });

@@ -49,6 +49,7 @@ async function openLeadsFromMenu(page: Page): Promise<void> {
   await expect(link).toBeVisible({ timeout: 15_000 });
   const listResponse = page.waitForResponse(
     (response) => response.url().includes(`/api/dynamic/${MODEL}/list`) && response.ok(),
+    { timeout: 15_000 },
   );
   await link.click();
   await listResponse;
