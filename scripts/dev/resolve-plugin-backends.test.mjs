@@ -18,10 +18,14 @@ function writeJson(file, value) {
 }
 
 function addPlugin(root, name, manifest) {
+  const backend = manifest.backend == null
+    ? undefined
+    : { entryClass: `com.auraboot.${name}.Plugin`, ...manifest.backend };
   writeJson(path.join(root, name, "plugin.json"), {
     pluginId: `com.auraboot.${name}`,
     pluginType: "config",
     ...manifest,
+    ...(backend == null ? {} : { backend }),
   });
 }
 
@@ -138,6 +142,7 @@ test("CLI accepts an explicit independent root and emits a shell-safe TSV contra
     path.join(extraRoot, "inventory"),
     path.join(extraRoot, "inventory/backend"),
     path.join(extraRoot, "inventory/backend/build/libs/inventory-plugin.jar"),
+    "com.auraboot.inventory.Plugin",
   ]);
 });
 
@@ -193,5 +198,25 @@ test("fails closed when a backend jar path escapes or lacks a build boundary", (
         plugins: ["unbuildable"],
       }),
     /must contain <backend>\/build\//,
+  );
+});
+
+test("fails closed when a backend omits its PF4J entry class", (t) => {
+  const { repoRoot } = fixture(t);
+  writeJson(path.join(repoRoot, "plugins/missing-entry/plugin.json"), {
+    pluginId: "com.auraboot.missing-entry",
+    pluginType: "config",
+    backend: { jarPath: "backend/build/libs/plugin.jar" },
+  });
+
+  assert.throws(
+    () =>
+      resolvePluginBackends({
+        repoRoot,
+        profile: "none",
+        extraPluginRoots: [],
+        plugins: ["missing-entry"],
+      }),
+    /without backend\.entryClass/,
   );
 });

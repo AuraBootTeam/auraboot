@@ -104,9 +104,9 @@ stage_requested_backend_jars() {
     --repo-root "$REPO_ROOT" --format tsv "$@")" \
     || die "could not resolve requested plugin backends"
 
-  local plugin_name plugin_dir backend_dir jar_path
-  while IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path; do
-    [ -n "$plugin_name" ] && backend_specs+=("$plugin_name"$'\t'"$plugin_dir"$'\t'"$backend_dir"$'\t'"$jar_path")
+  local plugin_name plugin_dir backend_dir jar_path entry_class
+  while IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class; do
+    [ -n "$plugin_name" ] && backend_specs+=("$plugin_name"$'\t'"$plugin_dir"$'\t'"$backend_dir"$'\t'"$jar_path"$'\t'"$entry_class")
   done <<< "$backend_rows"
 
   mkdir -p "$sd/pf4j-plugins"
@@ -133,18 +133,22 @@ stage_requested_backend_jars() {
       >"$sd/platform-publications.log" 2>&1 \
     || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
-  local spec staged_path jar_hash
+  local spec staged_path jar_hash jar_entry_class entry_class_path
   for spec in "${backend_specs[@]}"; do
-    IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path <<< "$spec"
+    IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class <<< "$spec"
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
       --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar --console=plain \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
-    unzip -p "$jar_path" META-INF/extensions.idx 2>/dev/null \
-      | grep -qE '^[^#[:space:]]' \
-      || die "plugin backend jar has no registered PF4J extensions: $jar_path"
+    jar_entry_class="$(unzip -p "$jar_path" META-INF/MANIFEST.MF 2>/dev/null \
+      | tr -d '\r' | awk '$1 == "Plugin-Class:" { print $2; exit }')"
+    [ "$jar_entry_class" = "$entry_class" ] \
+      || die "plugin backend entryClass mismatch for $plugin_name: declared=$entry_class jar=${jar_entry_class:-missing}"
+    entry_class_path="${entry_class//./\/}.class"
+    jar tf "$jar_path" | grep -Fxq "$entry_class_path" \
+      || die "plugin backend entryClass is missing from jar for $plugin_name: $entry_class_path"
     staged_path="$sd/pf4j-plugins/$(basename "$jar_path")"
     [ ! -e "$staged_path" ] || die "duplicate staged PF4J jar name: $staged_path"
     cp "$jar_path" "$staged_path"

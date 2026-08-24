@@ -288,7 +288,9 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
   assert.match(golden, /seeds the runtime's shared wrapper distribution/);
-  assert.match(golden, /META-INF\/extensions\.idx/);
+  assert.match(golden, /META-INF\/MANIFEST\.MF/);
+  assert.match(golden, /plugin backend entryClass mismatch/);
+  assert.match(golden, /entryClass is missing from jar/);
   assert.match(golden, /pf4j-staging\.tsv/);
   assert.match(golden, /staged PF4J jar hash mismatch/);
   assert.match(golden, /AURA_PLUGINS_DIR="\$sd\/pf4j-plugins"/);
