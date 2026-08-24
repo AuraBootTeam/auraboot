@@ -392,10 +392,28 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // Fill required + a few interesting widgets.
     const ts = Date.now();
     const submitName = `E2E Form ${ts}`;
+    await nameInput.evaluate((element) => {
+      (window as any).__p62InitialNameInput = element;
+    });
     await nameInput.click();
     await nameInput.fill(submitName);
+    await expect(nameInput, 'name must enter controlled form state immediately').toHaveValue(
+      submitName,
+      { timeout: 3_000 },
+    );
     await quantityInput.click();
     await quantityInput.fill('42');
+    const nameInputRemountedAfterQuantity = await nameInput.evaluate(
+      (element) => element !== (window as any).__p62InitialNameInput,
+    );
+    test.info().annotations.push({
+      type: 'form-state-provenance',
+      description: `name input remounted after quantity=${nameInputRemountedAfterQuantity}`,
+    });
+    await expect(
+      nameInput,
+      `name must survive quantity edit; remounted=${nameInputRemountedAfterQuantity}`,
+    ).toHaveValue(submitName, { timeout: 3_000 });
     await priceInput.click();
     await priceInput.fill('123.45');
 
