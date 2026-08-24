@@ -91,13 +91,13 @@ echo "[3/4] Docker Build Contexts"
 if [[ -f "$REPO_ROOT/platform/Dockerfile" ]]; then
   pass "platform/Dockerfile exists"
 else
-  fail "platform/Dockerfile missing — docker-publish.yml backend job will fail"
+  fail "platform/Dockerfile missing — build-image.yml backend image will fail"
 fi
 
 if [[ -f "$REPO_ROOT/web-admin/Dockerfile" ]]; then
   pass "web-admin/Dockerfile exists"
 else
-  fail "web-admin/Dockerfile missing — docker-publish.yml frontend job will fail"
+  fail "web-admin/Dockerfile missing — build-image.yml frontend image will fail"
 fi
 echo ""
 
@@ -119,38 +119,52 @@ for f in docker-compose.yml docker-compose.prod.yml; do
 done
 echo ""
 
-# ─── 6. Cross-reference: docker-publish.yml checks ───────
-echo "[5/5] Docker Publish Workflow Cross-References"
-DOCKER_WF="$WORKFLOWS_DIR/docker-publish.yml"
+# ─── 6. Cross-reference: canonical OSS image workflow ───────
+echo "[5/5] OSS Image Workflow Cross-References"
+DOCKER_WF="$WORKFLOWS_DIR/build-image.yml"
 if [[ -f "$DOCKER_WF" ]]; then
   # Check it references GHCR
   if grep -q "ghcr.io" "$DOCKER_WF"; then
-    pass "docker-publish.yml targets GHCR"
+    pass "build-image.yml targets GHCR"
   else
-    warn "docker-publish.yml does not reference ghcr.io"
+    fail "build-image.yml does not reference ghcr.io"
   fi
 
   # Check it uses docker/build-push-action
   if grep -q "docker/build-push-action" "$DOCKER_WF"; then
-    pass "docker-publish.yml uses build-push-action"
+    pass "build-image.yml uses build-push-action"
   else
-    fail "docker-publish.yml missing docker/build-push-action"
+    fail "build-image.yml missing docker/build-push-action"
   fi
 
-  # Check both backend and frontend contexts
-  if grep -q "context: platform" "$DOCKER_WF"; then
-    pass "docker-publish.yml builds backend (platform/)"
+  # Both Dockerfiles require repository-root context for workspace packages.
+  if grep -qE '^          context: \.$' "$DOCKER_WF"; then
+    pass "build-image.yml uses the repository-root build context"
   else
-    fail "docker-publish.yml missing backend build context"
+    fail "build-image.yml must use the repository-root build context"
   fi
 
-  if grep -q "context: web-admin" "$DOCKER_WF"; then
-    pass "docker-publish.yml builds frontend (web-admin/)"
+  if grep -qE 'backend\).*file=platform/Dockerfile' "$DOCKER_WF"; then
+    pass "build-image.yml selects platform/Dockerfile for backend"
   else
-    fail "docker-publish.yml missing frontend build context"
+    fail "build-image.yml does not select platform/Dockerfile for backend"
+  fi
+
+  if grep -qE 'frontend\).*file=web-admin/Dockerfile' "$DOCKER_WF"; then
+    pass "build-image.yml selects web-admin/Dockerfile for frontend"
+  else
+    fail "build-image.yml does not select web-admin/Dockerfile for frontend"
+  fi
+
+  if grep -q 'push-by-digest=true' "$DOCKER_WF" \
+    && grep -q 'docker buildx imagetools create' "$DOCKER_WF" \
+    && grep -q 'docker buildx imagetools inspect' "$DOCKER_WF"; then
+    pass "build-image.yml publishes and inspects immutable manifests"
+  else
+    fail "build-image.yml is missing digest publication or manifest inspection"
   fi
 else
-  fail "docker-publish.yml not found"
+  fail "build-image.yml not found"
 fi
 echo ""
 
