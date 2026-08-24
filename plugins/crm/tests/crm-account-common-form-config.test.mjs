@@ -149,3 +149,29 @@ test('new accounts start in the owned state required by the customer-pool state 
   assert.equal(create.autoSetFields?.crm_acc_pool_state?.strategy, 'fixed_value');
   assert.equal(create.autoSetFields?.crm_acc_pool_state?.value, 'owned');
 });
+
+test('account list exposes governed transfer, update, delete, and customer-pool operations', () => {
+  const table = (listPage.blocks ?? []).find((block) => block.id === 'crm_account_table');
+  assert.ok(table, 'account list should expose the main table');
+  const bulkActions = new Map((table.table?.bulkActions ?? []).map((action) => [action.code, action]));
+  assert.equal(bulkActions.get('bulk_transfer_owner')?.action?.input?.field, 'crm_acc_owner');
+  assert.equal(bulkActions.get('bulk_update_industry')?.action?.input?.dictCode, 'crm_account_industry');
+  assert.equal(bulkActions.get('bulk_delete_accounts')?.action?.operationType, 'DELETE');
+  assert.equal(
+    bulkActions.get('bulk_move_to_customer_pool')?.action?.input?.referenceModelCode,
+    'crm_customer_pool_common',
+  );
+
+  const actions = new Map(
+    (table.columns ?? [])
+      .find((column) => column.isActionColumn)
+      ?.buttons?.map((action) => [action.code, action]),
+  );
+  assert.equal(actions.get('delete')?.action?.operationType, 'DELETE');
+  assert.equal(
+    actions.get('move_to_customer_pool')?.action?.inputFields?.[0]?.dataSource?.endpoint,
+    '/api/dynamic/crm_customer_pool_common/list',
+  );
+  assert.equal(listColumn('crm_acc_name').ellipsis, true);
+  assert.equal(commandByCode.get('crm:update_account')?.inputFields?.includes('crm_acc_owner'), true);
+});
