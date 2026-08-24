@@ -99,7 +99,13 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
         // 空值检查
         if (value == null || (value instanceof String && ((String) value).trim().isEmpty())) {
-            if (fieldDefinition.isRequired() && context != ValidationContext.UPDATE) {
+            // A transient field is command/form input only. It is deliberately filtered from
+            // persistence, so model-level CREATE validation must not require it on the record
+            // written by a handler. The command/form layer remains responsible for requiring
+            // the caller's input.
+            if (fieldDefinition.isRequired()
+                    && !fieldDefinition.isTransientField()
+                    && context != ValidationContext.UPDATE) {
                 errors.add("Field '" + fieldDefinition.getName() + "' is required");
             }
             return FieldValidationResult.builder()
@@ -473,7 +479,9 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         }
 
         for (FieldDefinition field : modelDefinition.getFields()) {
-            if (field.isRequired() && (context != ValidationContext.UPDATE || data.containsKey(field.getCode()))) {
+            if (field.isRequired()
+                    && !field.isTransientField()
+                    && (context != ValidationContext.UPDATE || data.containsKey(field.getCode()))) {
                 Object value = data.get(field.getCode());
                 if (value == null || (value instanceof String && ((String) value).trim().isEmpty())) {
                     errors.add("Required field '" + field.getName() + "' is missing");

@@ -306,8 +306,11 @@ except Exception:
     sys.exit(0)
 if d.get('success') is True or d.get('code') == '0':
     plugin_id = d.get('pluginId') or d.get('data', {}).get('pluginId') or ''
-    if plugin_id:
-        print('ok\\t' + plugin_id)
+    plugin_pid = d.get('pluginPid') or d.get('data', {}).get('pluginPid') or ''
+    if plugin_id and plugin_pid:
+        print('ok\\t' + plugin_id + '\\t' + plugin_pid)
+    elif plugin_id:
+        print('missing pluginPid in import response')
     else:
         print('missing pluginId in import response')
 else:
@@ -318,6 +321,7 @@ else:
 
 failures=()
 successful_plugin_ids=()
+successful_plugin_pids=()
 for plugin in "${PLUGINS[@]}"; do
     if ! path="$(container_plugin_path "$plugin")"; then
         echo "  FAIL $plugin: plugin.json not found in configured plugin roots"
@@ -336,7 +340,9 @@ for plugin in "${PLUGINS[@]}"; do
 
         result="$(import_plugin_once "$path")"
         if [[ "$result" == ok$'\t'* ]]; then
-            successful_plugin_ids+=("${result#*$'\t'}")
+            IFS=$'\t' read -r _ imported_plugin_id imported_plugin_pid <<< "$result"
+            successful_plugin_ids+=("$imported_plugin_id")
+            successful_plugin_pids+=("$imported_plugin_pid")
             imported=1
             echo "OK ($path)"
             break
@@ -459,6 +465,44 @@ else:
     return 1
 }
 
+enable_imported_plugins() {
+    local plugin_pid resp summary
+
+    if [ "${#successful_plugin_pids[@]}" -ne "${#successful_plugin_ids[@]}" ]; then
+        echo "ERROR: successful plugin ID/PID counts differ" >&2
+        return 1
+    fi
+
+    for plugin_pid in "${successful_plugin_pids[@]}"; do
+        if [[ ! "$plugin_pid" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "ERROR: unsafe pluginPid returned by import API: $plugin_pid" >&2
+            return 1
+        fi
+        resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/$plugin_pid/enable" \
+            -H "Authorization: Bearer $jwt" \
+            -H "Content-Type: application/json")"
+        summary="$(printf '%s' "$resp" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print('parse-error')
+    sys.exit(0)
+data=d.get('data') or {}
+if str(d.get('code')) == '0' and data.get('status') == 'active':
+    print('ok')
+else:
+    print(d.get('message') or d.get('errorMessage') or str(d)[:300])
+" 2>/dev/null || echo "parse-error")"
+        if [ "$summary" != "ok" ]; then
+            echo "ERROR: failed to enable imported plugin $plugin_pid: $summary" >&2
+            return 1
+        fi
+    done
+
+    echo "Plugin activation: OK (${#successful_plugin_pids[@]} enabled)"
+}
+
 bom_standardization_imported() {
     local plugin_id
 
@@ -538,6 +582,12 @@ if [ "${#failures[@]}" -gt 0 ]; then
 fi
 
 verify_reference_integrity
+
+# Page contributions and other lifecycle-aware runtime extensions are deliberately
+# invisible while their owning plugin remains merely installed. Directory import
+# persists config resources, then this explicit activation phase makes the complete
+# imported plugin active only after the cross-plugin reference sweep succeeds.
+enable_imported_plugins
 
 seed_bom_defaults_if_imported
 
