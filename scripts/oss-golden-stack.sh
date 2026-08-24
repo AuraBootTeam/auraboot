@@ -75,11 +75,37 @@ runtime_env() {
 
 web_admin_node_modules_usable() {
   local candidate="$1"
-  [ -d "$candidate" ] \
-    && [ -r "$candidate/react/package.json" ] \
-    && [ -r "$candidate/react-dom/package.json" ] \
-    && [ -r "$candidate/@tailwindcss/vite/package.json" ] \
-    && [ -r "$candidate/tailwindcss/package.json" ]
+  local candidate_real checkout_root checkout_node_modules_real entry entry_real
+  [ -d "$candidate" ] || return 1
+  candidate_real="$(cd "$candidate" 2>/dev/null && pwd -P)" || return 1
+  checkout_root="$(cd "$(dirname "$candidate")/.." 2>/dev/null && pwd -P)" || return 1
+  checkout_node_modules_real=""
+  if [ -d "$checkout_root/node_modules" ]; then
+    checkout_node_modules_real="$(cd "$checkout_root/node_modules" 2>/dev/null && pwd -P)" || return 1
+  fi
+
+  # A published dependency view must own the files it exposes. Merely checking
+  # package.json readability accepts capsules whose package symlinks escape into
+  # a removed worktree. A normal pnpm workspace may resolve into the same
+  # checkout's root node_modules/.pnpm store, so that one local boundary is also
+  # allowed. Anything outside both boundaries is stale and must be rejected.
+  for entry in \
+    react/index.js \
+    react-dom/client.js \
+    @tailwindcss/vite/dist/index.mjs \
+    tailwindcss/index.css
+  do
+    [ -r "$candidate/$entry" ] || return 1
+    entry_real="$(realpath "$candidate/$entry" 2>/dev/null)" || return 1
+    case "$entry_real" in
+      "$candidate_real"/*) continue ;;
+    esac
+    [ -n "$checkout_node_modules_real" ] || return 1
+    case "$entry_real" in
+      "$checkout_node_modules_real"/*) ;;
+      *) return 1 ;;
+    esac
+  done
 }
 
 web_admin_node_modules_seed() {
