@@ -254,6 +254,21 @@ async function seedJourney(): Promise<void> {
   managerJwt = await loginJwt(MANAGER_EMAIL, PERSONA_PASSWORD);
   childRepJwt = await loginJwt(CHILD_REP_EMAIL, PERSONA_PASSWORD);
   southRepJwt = await loginJwt(SOUTH_REP_EMAIL, PERSONA_PASSWORD);
+
+  const [managerIdentity, childIdentity, southIdentity] = await Promise.all([
+    api('/api/auth/me', managerJwt),
+    api('/api/auth/me', childRepJwt),
+    api('/api/auth/me', southRepJwt),
+  ]);
+  expect(managerIdentity?.user?.pid, 'manager auth identity must expose the sys_user PID').toBe(
+    ids.managerUser,
+  );
+  expect(childIdentity?.user?.pid, 'child auth identity must expose the sys_user PID').toBe(
+    ids.childUser,
+  );
+  expect(southIdentity?.user?.pid, 'south auth identity must expose the sys_user PID').toBe(
+    ids.southUser,
+  );
 }
 
 function departmentResolver(): Record<string, unknown> {
@@ -408,7 +423,7 @@ test.describe('CRM contact SavedView — Cordys parity slice', () => {
     expect(
       contactNames(
         await listContacts(managerJwt, [
-          { fieldName: 'crm_ct_owner', operator: 'EQ', values: [ids.managerUser] },
+          { fieldName: 'crm_ct_owner', operator: 'EQ', value: ids.managerUser },
         ]),
       ),
     ).toEqual([CONTACT_NAMES.manager]);
@@ -466,6 +481,11 @@ test.describe('CRM contact SavedView — Cordys parity slice', () => {
       expect((await setDefaultResponse).ok()).toBe(true);
       await manager.page.getByTestId(`saved-view-select-${personalViewPid}`).click();
       await expect(manager.page).toHaveURL(new RegExp(`view=${personalViewPid}`));
+      await manager.page
+        .getByTestId('saved-view-manage-panel')
+        .getByRole('button', { name: /Close|关闭/ })
+        .click();
+      await expect(manager.page.getByTestId('saved-view-manage-panel')).toHaveCount(0);
 
       await manager.page.getByTestId('row-height-btn').click();
       await manager.page.getByTestId('row-height-option-tall').click();
@@ -569,7 +589,13 @@ test.describe('CRM contact SavedView — Cordys parity slice', () => {
     const forbiddenDetail = await fetch(`${BACKEND_URL}/api/views/${personalViewPid}`, {
       headers: { Authorization: `Bearer ${southRepJwt}` },
     });
-    expect([403, 404]).toContain(forbiddenDetail.status);
+    expect(forbiddenDetail.status).toBe(422);
+    expect(await forbiddenDetail.json()).toMatchObject({
+      code: '35000',
+      message: 'Bad parameter',
+      data: null,
+      context: { error: "You don't have access to this view" },
+    });
 
     const south = await newPersonaPage(browser, SOUTH_REP_EMAIL);
     try {

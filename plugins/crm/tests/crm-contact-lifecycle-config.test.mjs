@@ -113,6 +113,18 @@ test('contact saved views expose all, current-user and department ownership scop
     isExpression: true,
     expression: '#currentDepartmentOwners',
   });
+
+  const manager = readJson('config/roles.json').find((role) => role.code === 'crm_sales_manager');
+  assert.equal(
+    manager.permissions.includes('dashboard.saved_view.update'),
+    true,
+    'sales managers must be able to persist their personal contact SavedViews',
+  );
+  assert.equal(
+    manager.permissions.includes('dashboard.saved_view.team.update'),
+    false,
+    'personal SavedView persistence must not implicitly grant team SavedView administration',
+  );
 });
 
 test('contact list exposes ownership, discoverable search and explicit empty-state recovery', () => {
