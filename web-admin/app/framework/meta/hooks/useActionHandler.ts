@@ -497,12 +497,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       commandOptions: ExecuteCommandOptions = {},
     ) => {
       const normalizedOp = operationType?.toUpperCase();
-      if ((normalizedOp === 'update' || normalizedOp === 'delete') && !targetRecordPid) {
+      if ((normalizedOp === 'UPDATE' || normalizedOp === 'DELETE') && !targetRecordPid) {
         throw new Error(
           `Command ${commandCode} requires targetRecordPid when operationType=${normalizedOp}`,
         );
       }
-      if (normalizedOp === 'create' && targetRecordPid) {
+      if (normalizedOp === 'CREATE' && targetRecordPid) {
         throw new Error(
           `Command ${commandCode} should not carry targetRecordPid when operationType=CREATE`,
         );
@@ -815,6 +815,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     : targetRecordPid
                       ? 'update'
                       : undefined);
+            const conventionOperationType = operationType?.toLowerCase();
             const refreshIds = resolveCommandRefreshIds(
               actionDef as unknown as Record<string, unknown>,
               normalizedButton as unknown as Record<string, unknown>,
@@ -826,7 +827,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // command still wins.
             const effectiveCommand =
               explicitCommand ||
-              (operationType ? runtime?.getSchema?.()?.commands?.[operationType] : undefined) ||
+              (conventionOperationType
+                ? runtime?.getSchema?.()?.commands?.[conventionOperationType]
+                : undefined) ||
               undefined;
             if (!effectiveCommand) {
               throw new Error(

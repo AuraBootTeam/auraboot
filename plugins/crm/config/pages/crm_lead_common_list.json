@@ -257,6 +257,12 @@
                 "field": "crm_lead_last_pool_id",
                 "label": { "zh-CN": "目标线索池", "en-US": "Target Lead Pool" },
                 "type": "reference",
+                "referenceModelCode": "crm_lead_pool_common",
+                "refTarget": {
+                  "targetModel": "crm_lead_pool_common",
+                  "valueField": "pid",
+                  "displayField": "crm_lp_name"
+                },
                 "required": true
               }
             }
@@ -275,12 +281,14 @@
         {
           "field": "crm_lead_company",
           "width": 200,
+          "ellipsis": true,
           "sortable": true,
           "editable": true
         },
         {
           "field": "crm_lead_contact_name",
-          "width": 120
+          "width": 120,
+          "ellipsis": true
         },
         {
           "field": "crm_lead_contact_phone",
@@ -353,7 +361,28 @@
                 "disabled": true,
                 "reason": "Mobile uses the governed target-pool form so the selected pool is saved before the command executes."
               },
-              "action": { "type": "command", "command": "crm:move_lead_to_pool" }
+              "action": {
+                "type": "command",
+                "command": "crm:move_lead_to_pool",
+                "operationType": "update",
+                "inputFieldsTitle": { "zh-CN": "移入线索池", "en": "Move to Lead Pool" },
+                "inputFields": [
+                  {
+                    "field": "crm_lead_last_pool_id",
+                    "label": { "zh-CN": "目标线索池", "en": "Target Lead Pool" },
+                    "type": "select",
+                    "searchable": true,
+                    "dataSource": {
+                      "type": "api",
+                      "endpoint": "/api/dynamic/crm_lead_pool_common/list",
+                      "params": { "pageNum": 1, "pageSize": 200 },
+                      "valueField": "pid",
+                      "labelField": "crm_lp_name"
+                    },
+                    "required": true
+                  }
+                ]
+              }
             },
             {
               "code": "move_to_pool_mobile",
@@ -370,7 +399,8 @@
               "label": "$i18n:common.button.delete",
               "confirm": "delete.confirm",
               "action": {
-                "type": "command"
+                "type": "command",
+                "operationType": "DELETE"
               }
             }
           ],
