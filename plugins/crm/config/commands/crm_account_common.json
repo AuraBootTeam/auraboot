@@ -50,6 +50,7 @@
       "crm_acc_website",
       "crm_acc_phone",
       "crm_acc_address",
+      "crm_acc_owner",
       "crm_acc_rating",
       "crm_acc_status",
       "crm_acc_remark"
