@@ -266,6 +266,7 @@
         {
           "code": "convert",
           "primary": true,
+          "visibleWhen": "record.crm_lead_status == 'qualified'",
           "label": {
             "zh-CN": "转化线索",
             "en-US": "Convert Lead"

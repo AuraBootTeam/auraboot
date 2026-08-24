@@ -253,7 +253,7 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "标记丢单", "en": "Mark Lost" },
           "variant": "danger",
-          "visibleWhen": "state.selectedOpportunity != null",
+          "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage != 'closed_won' && state.selectedOpportunity.crm_opp_stage != 'closed_lost'",
           "confirm": { "zh-CN": "丢单后将退出在途队列，失败原因会保留用于复盘。确认继续吗？", "en": "The opportunity will leave the open queue and the loss reason will be retained for review. Continue?" },
           "onClick": {
             "action": "command.execute",
@@ -327,7 +327,7 @@
           "code": "create_next_step",
           "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "创建下一步任务", "en": "Create Next-step Task" },
-          "visibleWhen": "state.selectedOpportunity != null",
+          "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage != 'closed_won' && state.selectedOpportunity.crm_opp_stage != 'closed_lost'",
           "action": {
             "type": "navigate",
             "to": "/p/crm_activity_common/new?command=crm:create_opp_task&sourceRecordPid=${state.selectedOpportunity.pid}"

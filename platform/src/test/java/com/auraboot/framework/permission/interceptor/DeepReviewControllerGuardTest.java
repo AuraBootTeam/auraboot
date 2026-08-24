@@ -16,6 +16,7 @@ import com.auraboot.framework.view.controller.ViewShareController;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.permission.controller.SubjectPermissionController;
@@ -74,6 +75,8 @@ class DeepReviewControllerGuardTest {
     @Mock
     private AdminRoleChecker adminRoleChecker;
     @Mock
+    private PageSchemaMapper pageSchemaMapper;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -82,7 +85,7 @@ class DeepReviewControllerGuardTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker);
+        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker, pageSchemaMapper);
     }
 
     @AfterEach

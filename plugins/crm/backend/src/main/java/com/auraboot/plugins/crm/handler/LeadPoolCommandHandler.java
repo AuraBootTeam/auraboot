@@ -2,6 +2,7 @@ package com.auraboot.plugins.crm.handler;
 
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.plugins.crm.engine.LeadPoolRules;
 import org.pf4j.Extension;
@@ -32,10 +33,33 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
     public static final String MOVE = "crm:move_lead_to_pool";
     public static final String CLAIM = "crm:claim_pool_lead";
     public static final String ASSIGN = "crm:assign_pool_lead";
+    public static final String UPDATE_LEAD = "crm:update_pool_lead";
+    public static final String DELETE_LEAD = "crm:delete_pool_lead";
     public static final String TOGGLE = "crm:toggle_lead_pool";
     public static final String DELETE_POOL = "crm:delete_lead_pool";
     public static final String RUN_RECYCLE = "crm:run_lead_pool_recycle";
-    private static final Set<String> TYPES = Set.of(MOVE, CLAIM, ASSIGN, TOGGLE, DELETE_POOL, RUN_RECYCLE);
+    public static final String DOWNLOAD_IMPORT_TEMPLATE = "crm:download_lead_pool_import_template";
+    public static final String PRECHECK_IMPORT = "crm:precheck_lead_pool_import";
+    public static final String IMPORT_LEADS = "crm:import_lead_pool_leads";
+    private static final Set<String> TYPES = Set.of(
+            MOVE, CLAIM, ASSIGN, UPDATE_LEAD, DELETE_LEAD, TOGGLE, DELETE_POOL, RUN_RECYCLE,
+            DOWNLOAD_IMPORT_TEMPLATE, PRECHECK_IMPORT, IMPORT_LEADS);
+    private static final Map<String, String> LEAD_SNAPSHOT_FIELDS = Map.of(
+            "crm_lead_company", "crm_lpi_company",
+            "crm_lead_contact_name", "crm_lpi_contact_name",
+            "crm_lead_contact_phone", "crm_lpi_contact_phone",
+            "crm_lead_source", "crm_lpi_source",
+            "crm_lead_score", "crm_lpi_score");
+    private static final Map<String, String> SNAPSHOT_PAYLOAD_FIELDS = Map.of(
+            "crm_lpi_company", "crm_lead_company",
+            "crm_lpi_contact_name", "crm_lead_contact_name",
+            "crm_lpi_contact_phone", "crm_lead_contact_phone",
+            "crm_lpi_source", "crm_lead_source",
+            "crm_lpi_score", "crm_lead_score");
+    private static final Set<String> POOL_LEAD_EDITABLE_FIELDS = Set.of(
+            "crm_lead_company", "crm_lead_contact_name", "crm_lead_contact_phone",
+            "crm_lead_contact_email", "crm_lead_source", "crm_lead_industry",
+            "crm_lead_score", "crm_lead_status", "crm_lead_requirement");
     private static final Set<String> OPEN_LEAD_STATES = Set.of("new", "contacted", "qualified");
     private static final Set<String> RECYCLE_SOURCE_STATES = Set.of("claimed", "assigned");
     private static final Set<String> RECYCLE_LEASE_STATES = Set.of("recycling", "recycling_retry");
@@ -63,17 +87,27 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         String actor = requireActor(context);
         return switch (context.commandType()) {
             case MOVE -> moveToPool(db, required(context.recordId(), "Lead id is required"),
-                    required(first(payload(context, "poolId"), payload(context, "crm_lead_last_pool_id")), "poolId is required"), actor,
+                    resolveMovePoolId(db, required(context.recordId(), "Lead id is required"), context), actor,
                     string(payload(context, "reason")), "moved_to_pool", Instant.now(), shares, context.tenantId());
             case CLAIM -> claim(db, required(context.recordId(), "Pool item id is required"), actor,
                     Instant.now(), shares, context.tenantId());
             case ASSIGN -> assign(db, required(context.recordId(), "Pool item id is required"), actor,
                     required(first(payload(context, "assigneeId"), payload(context, "crm_lpi_claimed_by")), "assigneeId is required"),
                     Instant.now(), shares, context.tenantId());
+            case UPDATE_LEAD -> updatePoolLead(db, required(context.recordId(), "Pool item id is required"),
+                    actor, context.payload());
+            case DELETE_LEAD -> deletePoolLead(db, required(context.recordId(), "Pool item id is required"), actor);
             case TOGGLE -> toggle(db, required(context.recordId(), "Pool id is required"), actor);
             case DELETE_POOL -> deletePool(db, required(context.recordId(), "Pool id is required"), actor);
             case RUN_RECYCLE -> recycleDetailed(db, shares, context.tenantId(), actor, Instant.now(),
                     DEFAULT_RECYCLE_LEASE_TIMEOUT).asMap();
+            case DOWNLOAD_IMPORT_TEMPLATE -> LeadPoolImportService.downloadTemplate();
+            case PRECHECK_IMPORT -> LeadPoolImportService.precheck(db, requireFiles(context),
+                    required(context.recordId(), "Pool id is required"), actor,
+                    requireUploadOwner(context), context.payload());
+            case IMPORT_LEADS -> LeadPoolImportService.importLeads(db, requireFiles(context), shares,
+                    context.tenantId(), required(context.recordId(), "Pool id is required"), actor,
+                    requireUploadOwner(context), context.payload());
             default -> throw new IllegalArgumentException("Unsupported lead-pool command: " + context.commandType());
         };
     }
@@ -106,6 +140,7 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         leadPatch.put("crm_lead_assigned_to", null);
         leadPatch.put("crm_lead_pool_state", "in_pool");
         leadPatch.put("crm_lead_last_pool_id", poolId);
+        leadPatch.put("crm_lead_target_pool_id", null);
         db.update("crm_lead_common", leadId, leadPatch);
         Map<String, Object> history = appendHistory(db, leadId, poolId, event, previousOwner, null,
                 systemRecycle ? null : actor, reason, now);
@@ -113,6 +148,16 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         syncPoolRecordShares(shares, tenantId, pool, "crm_lead_pool_item_common", string(item.get("pid")));
         syncPoolRecordShares(shares, tenantId, pool, "crm_lead_owner_history_common", string(history.get("pid")));
         return Map.of("leadId", leadId, "poolId", poolId, "poolItemId", string(item.get("pid")), "status", "available");
+    }
+
+    private static String resolveMovePoolId(DataAccessor db, String leadId, CommandContext context) {
+        String payloadPoolId = string(first(
+                payload(context, "poolId"),
+                first(payload(context, "crm_lead_last_pool_id"),
+                        payload(context, "crm_lead_target_pool_id"))));
+        if (payloadPoolId != null && !payloadPoolId.isBlank()) return payloadPoolId;
+        Map<String, Object> lead = requireRecord(db, "crm_lead_common", leadId, "Lead");
+        return required(lead.get("crm_lead_target_pool_id"), "Target lead pool is required");
     }
 
     private static Map<String, Object> claim(DataAccessor db, String itemId, String actor, Instant now,
@@ -188,6 +233,76 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         String next = "enabled".equals(string(pool.get("crm_lp_status"))) ? "disabled" : "enabled";
         db.update("crm_lead_pool_common", poolId, Map.of("crm_lp_status", next));
         return Map.of("poolId", poolId, "status", next);
+    }
+
+    private static Map<String, Object> updatePoolLead(DataAccessor db, String itemId, String actor,
+                                                       Map<String, Object> payload) {
+        Map<String, Object> item = requireRecord(db, "crm_lead_pool_item_common", itemId, "Pool item");
+        requirePoolMember(db, required(item.get("crm_lpi_pool_id"), "Pool item has no pool"), actor);
+        String leadId = required(item.get("crm_lpi_lead_id"), "Pool item has no lead");
+        requireRecord(db, "crm_lead_common", leadId, "Lead");
+
+        HashMap<String, Object> leadPatch = new HashMap<>();
+        if (payload != null) {
+            for (String field : POOL_LEAD_EDITABLE_FIELDS) {
+                if (payload.containsKey(field)) leadPatch.put(field, payload.get(field));
+            }
+            for (Map.Entry<String, String> mapping : SNAPSHOT_PAYLOAD_FIELDS.entrySet()) {
+                if (payload.containsKey(mapping.getKey())) leadPatch.put(mapping.getValue(), payload.get(mapping.getKey()));
+            }
+        }
+        if (leadPatch.isEmpty()) throw new IllegalArgumentException("At least one editable lead field is required");
+        if (leadPatch.containsKey("crm_lead_company")) {
+            required(leadPatch.get("crm_lead_company"), "Lead company is required");
+        }
+
+        db.update("crm_lead_common", leadId, leadPatch);
+        HashMap<String, Object> snapshotPatch = new HashMap<>();
+        for (Map.Entry<String, String> mapping : LEAD_SNAPSHOT_FIELDS.entrySet()) {
+            if (leadPatch.containsKey(mapping.getKey())) {
+                snapshotPatch.put(mapping.getValue(), leadPatch.get(mapping.getKey()));
+            }
+        }
+        if (!snapshotPatch.isEmpty()) db.update("crm_lead_pool_item_common", itemId, snapshotPatch);
+        return Map.of("leadId", leadId, "poolItemId", itemId,
+                "updatedFields", List.copyOf(leadPatch.keySet()));
+    }
+
+    private static Map<String, Object> deletePoolLead(DataAccessor db, String itemId, String actor) {
+        Map<String, Object> item = requireRecord(db, "crm_lead_pool_item_common", itemId, "Pool item");
+        Map<String, Object> pool = requirePoolMember(db,
+                required(item.get("crm_lpi_pool_id"), "Pool item has no pool"), actor);
+        if (!LeadPoolRules.isAdministrator(pool.get("crm_lp_admin_user_ids"), actor)) {
+            throw new SecurityException("Only a lead-pool administrator may permanently delete pooled leads");
+        }
+        String leadId = required(item.get("crm_lpi_lead_id"), "Pool item has no lead");
+        Map<String, Object> lead = requireRecord(db, "crm_lead_common", leadId, "Lead");
+        if (string(lead.get("crm_lead_converted_at")) != null) {
+            throw new IllegalStateException("Converted leads cannot be permanently deleted from the lead pool");
+        }
+
+        db.delete("crm_lead_pool_item_common", itemId);
+        // Ownership history is an immutable audit ledger. Keep the historical move/claim facts
+        // even after the unconverted lead is purged; attempting to batch-delete that model would
+        // violate the immutable-model contract and turn the governed delete into a partial failure.
+        deleteMatching(db, "crm_activity_relation_common", Map.of(
+                "crm_ar_object_type", "lead", "crm_ar_object_id", leadId));
+        deleteMatching(db, "crm_activity_common", Map.of(
+                "crm_act_related_model", "crm_lead_common", "crm_act_related_id", leadId));
+        db.delete("crm_lead_common", leadId);
+        return Map.of("leadId", leadId, "poolItemId", itemId, "deleted", true);
+    }
+
+    private static void deleteMatching(DataAccessor db, String model, String field, String value) {
+        deleteMatching(db, model, Map.of(field, value));
+    }
+
+    private static void deleteMatching(DataAccessor db, String model, Map<String, Object> filters) {
+        List<String> ids = db.query(model, filters).stream()
+                .map(record -> string(record.get("pid")))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        db.batchDelete(model, ids);
     }
 
     private static Map<String, Object> deletePool(DataAccessor db, String poolId, String actor) {
@@ -628,9 +743,19 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         return context.recordShareAccessor();
     }
 
+    private static FileAccessor requireFiles(CommandContext context) {
+        if (context.fileAccessor() == null) throw new IllegalStateException("FileAccessor unavailable");
+        return context.fileAccessor();
+    }
+
     private static String requireActor(CommandContext context) {
         return required(context.currentUserPid(),
                 "Authenticated actor context is required");
+    }
+
+    private static String requireUploadOwner(CommandContext context) {
+        Object value = context.settings() == null ? null : context.settings().get("__currentUser");
+        return required(value, "Authenticated upload owner context is required");
     }
 
     private static Object payload(CommandContext context, String key) {

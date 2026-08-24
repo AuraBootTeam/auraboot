@@ -30,7 +30,10 @@ import type {
   ButtonConfig,
   TableConfig,
 } from '~/framework/meta/schemas/types';
-import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
+import {
+  actionRegistry,
+  promptInputForm,
+} from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import {
@@ -2903,11 +2906,33 @@ function ListPageContentInner(props: PageContentProps) {
         if (!confirmed) return;
       }
 
+      let commandPayload: Record<string, unknown> = {};
+      const inputFields = Array.isArray((actionDef as any)?.inputFields)
+        ? (actionDef as any).inputFields
+        : [];
+      if (inputFields.length > 0) {
+        try {
+          commandPayload = await promptInputForm(
+            inputFields,
+            (actionDef as any)?.inputFieldsTitle,
+            fetchResult,
+            (actionDef as any)?.inputFieldsSubmitLabel,
+            {
+              selectedCount: ids.length,
+              selectedIds: ids,
+              modelCode,
+            },
+          );
+        } catch {
+          return;
+        }
+      }
+
       if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
         await executeTargetedBulkCommand(
           button,
           ids,
-          {},
+          commandPayload,
           (actionDef as any)?.operationType || 'UPDATE',
         );
         return;

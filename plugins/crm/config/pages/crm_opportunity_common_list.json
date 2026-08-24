@@ -193,7 +193,35 @@
             },
             "action": {
               "type": "bulk_state_transition",
-              "command": "crm:lose_opportunity"
+              "command": "crm:lose_opportunity",
+              "inputFieldsTitle": {
+                "zh-CN": "批量关闭商机并记录失败原因",
+                "en-US": "Close Selected Opportunities and Record Loss Reason"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "确认批量丢单",
+                "en-US": "Confirm Bulk Loss"
+              },
+              "inputFields": [
+                {
+                  "field": "crm_opp_lost_reason_code",
+                  "label": { "zh-CN": "失败原因", "en-US": "Loss Reason" },
+                  "type": "enum",
+                  "dictCode": "crm_opp_lost_reason",
+                  "required": true,
+                  "placeholder": { "zh-CN": "选择本批商机的主要失败原因", "en-US": "Select the primary reason for these opportunities" }
+                },
+                {
+                  "field": "crm_opp_competitor",
+                  "label": { "zh-CN": "竞争对手", "en-US": "Competitor" },
+                  "type": "text"
+                },
+                {
+                  "field": "crm_opp_lost_reason",
+                  "label": { "zh-CN": "补充说明", "en-US": "Loss Notes" },
+                  "type": "textarea"
+                }
+              ]
             }
           },
           {

@@ -6,13 +6,20 @@ async function json(path) {
   return JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
 }
 
-const [commands, listPage, savedViews] = await Promise.all([
+const [commands, poolCommands, assignmentCommands, scoreCommands, listPage, detailPage, savedViews] = await Promise.all([
   json('../config/commands/crm_lead_common.json'),
+  json('../config/commands/crm_lead_pool.json'),
+  json('../config/commands/crm_assignment_rule.json'),
+  json('../config/commands/crm_lead_score_rule.json'),
   json('../config/pages/crm_lead_common_list.json'),
+  json('../config/pages/crm_lead_common_detail.json'),
   json('../config/saved-views.json'),
 ]);
 
-const commandByCode = new Map(commands.map((command) => [command.code, command]));
+const commandByCode = new Map(
+  [...commands, ...poolCommands, ...assignmentCommands, ...scoreCommands]
+    .map((command) => [command.code, command]),
+);
 const table = listPage.blocks.find((block) => block.id === 'crm_lead_table');
 const bulkByCode = new Map(table.table.bulkActions.map((action) => [action.code, action]));
 const rowByCode = new Map(
@@ -20,8 +27,16 @@ const rowByCode = new Map(
 );
 
 test('customer-only conversion is distinct from full opportunity conversion', () => {
+  const fullCommand = commandByCode.get('crm:convert_lead');
+  assert.equal(fullCommand?.executionConfig?.executionMode, 'confirm_dialog');
+  const fullDetailAction = detailPage.blocks
+    .flatMap((block) => block.buttons ?? [])
+    .find((button) => button.action?.command === 'crm:convert_lead');
+  assert.equal(fullDetailAction?.visibleWhen, "record.crm_lead_status == 'qualified'");
+
   const command = commandByCode.get('crm:convert_lead_to_customer');
   assert.equal(command?.handler, 'crm:convert_lead_to_customer');
+  assert.equal(command?.executionConfig?.executionMode, 'confirm_dialog');
   assert.deepEqual(command?.permissions, ['crm.lead.manage']);
   assert.deepEqual(command?.preconditions?.[0]?.value, ['qualified']);
   assert.match(command?.extension?.['confirmMessage:zh-CN'] ?? '', /不会创建商机或客户需求/);
@@ -30,6 +45,34 @@ test('customer-only conversion is distinct from full opportunity conversion', ()
   assert.equal(action?.permissionCode, 'crm.lead.manage');
   assert.equal(action?.visibleWhen, "row.crm_lead_status == 'qualified'");
   assert.equal(action?.action?.command, 'crm:convert_lead_to_customer');
+});
+
+test('terminal leads do not retain assignment, pool, or scoring capabilities', () => {
+  const activeStatuses = ['new', 'contacted', 'qualified'];
+  for (const code of [
+    'crm:update_lead',
+    'crm:auto_assign_lead',
+    'crm:move_lead_to_pool',
+    'crm:rescore_lead',
+  ]) {
+    const command = commandByCode.get(code);
+    const statusGuard = command?.preconditions?.find(
+      (condition) => condition.field === 'crm_lead_status',
+    );
+    assert.deepEqual(statusGuard, {
+      field: 'crm_lead_status',
+      operator: 'IN',
+      value: activeStatuses,
+    });
+  }
+  const poolGuard = commandByCode.get('crm:move_lead_to_pool')?.preconditions?.find(
+    (condition) => condition.field === 'crm_lead_pool_state',
+  );
+  assert.deepEqual(poolGuard, {
+    field: 'crm_lead_pool_state',
+    operator: 'EQ',
+    value: 'owned',
+  });
 });
 
 test('lead list exposes guarded transfer, update, delete, pool, import, and export capabilities', () => {

@@ -4,8 +4,11 @@ import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension.CommandContext;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -15,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Base64;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
@@ -48,6 +52,21 @@ class LeadPoolCommandHandlerTest {
         assertTrue(shares.calls.stream().anyMatch(call ->
                 call.resourceCode().equals("crm_lead_owner_history_common")
                         && call.permissionMask().equals("read")));
+    }
+
+    @Test
+    void mobileMoveFormUsesPersistedTargetPoolAndClearsTheStagedIntent() {
+        FakeDb db = baseline();
+        db.getById("crm_lead_common", "lead-1").put("crm_lead_target_pool_id", "pool-1");
+
+        Map<?, ?> result = execute(db, new FakeShares(), LeadPoolCommandHandler.MOVE,
+                "lead-1", "member-a", Map.of());
+
+        assertEquals("pool-1", result.get("poolId"));
+        Map<String, Object> lead = db.getById("crm_lead_common", "lead-1");
+        assertEquals("pool-1", lead.get("crm_lead_last_pool_id"));
+        assertNull(lead.get("crm_lead_target_pool_id"));
+        assertEquals("in_pool", lead.get("crm_lead_pool_state"));
     }
 
     @Test
@@ -144,6 +163,62 @@ class LeadPoolCommandHandlerTest {
         assertEquals(1, count);
         assertEquals("in_pool", recycle.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
         assertEquals("auto_recycled", recycle.query("crm_lead_owner_history_common", Map.of()).getFirst().get("crm_loh_event"));
+    }
+
+    @Test
+    void pooledLeadQuickUpdateKeepsLeadAndSnapshotConsistent() {
+        FakeDb db = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+
+        Map<String, Object> result = execute(db, LeadPoolCommandHandler.UPDATE_LEAD,
+                "item-1", "manager", Map.of(
+                        "crm_lpi_company", "Updated Company",
+                        "crm_lpi_contact_name", "Updated Contact",
+                        "crm_lpi_source", "referral",
+                        "crm_lpi_score", 95));
+
+        assertEquals("lead-1", result.get("leadId"));
+        assertEquals("Updated Company", db.getById("crm_lead_common", "lead-1").get("crm_lead_company"));
+        assertEquals("Updated Company", db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_company"));
+        assertEquals("Updated Contact", db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_contact_name"));
+        assertEquals("referral", db.getById("crm_lead_common", "lead-1").get("crm_lead_source"));
+        assertEquals(95, db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_score"));
+    }
+
+    @Test
+    void pooledLeadDeleteRequiresAdministratorAndBlocksConvertedLeads() {
+        FakeDb unauthorized = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        assertThrows(SecurityException.class, () -> execute(unauthorized, LeadPoolCommandHandler.DELETE_LEAD,
+                "item-1", "member-a", Map.of()));
+
+        FakeDb converted = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        converted.getById("crm_lead_common", "lead-1").put("crm_lead_converted_at", "2026-08-24T00:00:00Z");
+        assertThrows(IllegalStateException.class, () -> execute(converted, LeadPoolCommandHandler.DELETE_LEAD,
+                "item-1", "manager", Map.of()));
+
+        FakeDb deletable = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        Map<String, Object> result = execute(deletable, LeadPoolCommandHandler.DELETE_LEAD,
+                "item-1", "manager", Map.of());
+        assertEquals(true, result.get("deleted"));
+        assertNull(deletable.getById("crm_lead_pool_item_common", "item-1"));
+        assertNull(deletable.getById("crm_lead_common", "lead-1"));
+    }
+
+    @Test
+    void leadPoolImportTemplateIsAReadableGovernedWorkbook() throws Exception {
+        Map<String, Object> template = LeadPoolImportService.downloadTemplate();
+
+        assertEquals("crm-lead-pool-import-template.xlsx", template.get("fileName"));
+        byte[] bytes = Base64.getDecoder().decode(template.get("contentBase64").toString());
+        try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertEquals("线索池导入", workbook.getSheetAt(0).getSheetName());
+            assertEquals("crm_lead_code", workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
+            assertEquals("crm_lead_company", workbook.getSheetAt(0).getRow(0).getCell(1).getStringCellValue());
+            assertEquals("crm_lead_status", workbook.getSheetAt(0).getRow(0).getCell(8).getStringCellValue());
+        }
     }
 
     @Test

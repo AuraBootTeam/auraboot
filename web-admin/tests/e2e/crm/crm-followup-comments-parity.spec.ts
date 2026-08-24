@@ -8,14 +8,12 @@ import {
   type TestInfo,
 } from '@playwright/test';
 import fs from 'node:fs';
-import { createCookieSessionStorage } from 'react-router';
 import { Pool } from 'pg';
 import { executeCommandViaApi, uniqueId } from '../helpers';
 import { PG_CONN } from '../../helpers/environments';
 
 const PASSWORD = 'Test2026x';
 const MODEL_CODE = 'crm_activity_common';
-const JWT_TOKEN_KEY = 'jwtToken';
 const DEFAULT_BASE_URL = 'http://127.0.0.1:5173';
 const EXPECTED_SCENARIOS = [
   'empty-state',
@@ -32,29 +30,11 @@ const EXPECTED_SCENARIOS = [
   'root-cascade-delete',
 ] as const;
 
-const authSessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: '__session',
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: process.env.NODE_ENV === 'production',
-  },
-});
-
 type TestUser = {
   email: string;
   displayName: string;
   password: string;
   pid?: string;
-};
-
-type TenantSpace = {
-  id?: string | number;
-  tenantId?: string | number;
-  type?: string;
-  spaceType?: string;
 };
 
 type NotificationRow = {
@@ -100,72 +80,28 @@ async function provisionCrmAdmin(adminPage: Page, user: TestUser): Promise<strin
   return String(created.pid);
 }
 
-async function loginAndResolveJwt(page: Page, baseURL: string, user: TestUser): Promise<string> {
-  const loginResponse = await page.request.post(`${baseURL}/api/auth/login`, {
-    data: { email: user.email, password: user.password },
-  });
-  await expectOk(loginResponse, `login ${user.email}`);
-  const loginBody = await loginResponse.json();
-  const loginJwt = String(loginBody?.data?.jwt ?? '');
-  expect(loginJwt, `login jwt for ${user.email}`).toBeTruthy();
-  if (loginBody?.data?.tenantId) return loginJwt;
-
-  const spacesResponse = await page.request.get(`${baseURL}/api/tenant-selection/my-spaces`, {
-    headers: { Authorization: `Bearer ${loginJwt}` },
-  });
-  await expectOk(spacesResponse, `tenant spaces for ${user.email}`);
-  const spacesBody = await spacesResponse.json().catch(() => ({}));
-  const spaces: TenantSpace[] = Array.isArray(spacesBody?.data) ? spacesBody.data : [];
-  const space =
-    spaces.find(
-      (candidate) => String(candidate.spaceType ?? candidate.type).toLowerCase() === 'business',
-    ) ?? spaces.find((candidate) => candidate.tenantId ?? candidate.id);
-  const tenantId = space?.tenantId ?? space?.id;
-  expect(tenantId, `business tenant for ${user.email}`).toBeTruthy();
-
-  const selectResponse = await page.request.post(`${baseURL}/api/tenant-selection/process`, {
-    headers: { Authorization: `Bearer ${loginJwt}` },
-    data: { action: 'select', tenantId },
-  });
-  await expectOk(selectResponse, `select tenant for ${user.email}`);
-  const selectBody = await selectResponse.json().catch(() => ({}));
-  return String(selectBody?.data?.jwt ?? loginJwt);
-}
-
 async function newAuthenticatedContext(
   browser: Browser,
   baseURL: string,
   user: TestUser,
 ): Promise<BrowserContext> {
-  const loginContext = await browser.newContext({
+  const context = await browser.newContext({
     baseURL,
     storageState: { cookies: [], origins: [] },
   });
-  const loginPage = await loginContext.newPage();
-  let jwt: string;
-  try {
-    jwt = await loginAndResolveJwt(loginPage, baseURL, user);
-  } finally {
-    await loginContext.close();
-  }
-
-  const session = await authSessionStorage.getSession();
-  session.set(JWT_TOKEN_KEY, jwt);
-  const setCookie = await authSessionStorage.commitSession(session, { maxAge: 60 * 60 * 24 * 7 });
-  const cookieValue = setCookie.match(/__session=([^;]+)/)?.[1];
-  expect(cookieValue, `session cookie for ${user.email}`).toBeTruthy();
-
-  const context = await browser.newContext({ baseURL });
-  await context.addCookies([
-    {
-      name: '__session',
-      value: cookieValue!,
-      httpOnly: true,
-      sameSite: 'Lax',
-      expires: Math.floor(Date.now() / 1000) + 604800,
-      url: baseURL,
-    },
-  ]);
+  const loginPage = await context.newPage();
+  await loginPage.goto('/login', { waitUntil: 'domcontentloaded' });
+  await loginPage.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+  await loginPage
+    .locator('input[placeholder*="用户名"], input[name="identifier"], input[type="email"]')
+    .first()
+    .fill(user.email);
+  await loginPage.getByRole('textbox', { name: '密码' }).fill(user.password);
+  await loginPage.getByRole('button', { name: '立即登录', exact: true }).click();
+  await loginPage.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20_000 });
+  const meResponse = await loginPage.request.get('/api/auth/me');
+  await expectOk(meResponse, `authenticated browser session ${user.email}`);
+  await loginPage.close();
   return context;
 }
 
@@ -277,9 +213,7 @@ test.describe('CRM follow-up comments — Cordys PAR-12 parity', () => {
       await expect(notificationCard, 'notification center shows the new mention').toBeVisible({
         timeout: 15_000,
       });
-      screenshots.push(
-        await attachScreenshot(teammatePage, testInfo, '04-mention-notification'),
-      );
+      screenshots.push(await attachScreenshot(teammatePage, testInfo, '04-mention-notification'));
       await notificationCard.getByText('你在评论中被 @ 提及').click();
       await expect(teammatePage).toHaveURL(
         new RegExp(`/p/${MODEL_CODE}/view/${activityPid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
@@ -308,9 +242,7 @@ test.describe('CRM follow-up comments — Cordys PAR-12 parity', () => {
       expect((await replyResponse).ok(), 'reply create response').toBe(true);
       await expect(teammateThread.getByText(replyText)).toBeVisible();
       await expect(teammateThread.getByText(/回复|replied to/).last()).toBeVisible();
-      screenshots.push(
-        await attachScreenshot(teammatePage, testInfo, '05-two-level-reply-thread'),
-      );
+      screenshots.push(await attachScreenshot(teammatePage, testInfo, '05-two-level-reply-thread'));
 
       await expect
         .poll(
@@ -381,6 +313,63 @@ test.describe('CRM follow-up comments — Cordys PAR-12 parity', () => {
         await poolAfterDelete.end();
       }
 
+      const followRecord = await executeCommandViaApi(page, 'crm:create_activity', {
+        crm_act_type: 'meeting',
+        crm_act_subject: `PAR-12 跟进记录评论 ${uid}`,
+        crm_act_content: `验证记录型 activity 的评论等价契约 ${uid}`,
+        crm_act_source: 'manual',
+        crm_act_status: 'completed',
+        crm_act_priority: 'medium',
+      });
+      expect(followRecord.recordId, 'self-seeded follow-record public PID').toBeTruthy();
+      const followRecordPid = followRecord.recordId;
+      const recordRootText = `会议复盘评论 ${uid}`;
+      const editedRecordRootText = `${recordRootText}（已确认）`;
+
+      await page.goto(`/p/${MODEL_CODE}/view/${followRecordPid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      const recordThread = page.getByTestId('record-comments');
+      await expect(recordThread, 'follow-record detail renders the comment thread').toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(recordThread.getByTestId('comment-empty')).toBeVisible();
+      const recordInput = recordThread.getByTestId('comment-input').first();
+      await recordInput.fill(recordRootText);
+      const recordCreateResponse = page.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/api/records/${MODEL_CODE}/${followRecordPid}/comments`) &&
+          response.request().method() === 'POST',
+      );
+      await recordThread.getByTestId('comment-submit').first().click();
+      expect((await recordCreateResponse).ok(), 'follow-record comment create response').toBe(true);
+      const recordRoot = recordThread
+        .locator('article[data-testid^="comment-"]')
+        .filter({ hasText: recordRootText })
+        .first();
+      await expect(recordRoot).toContainText(recordRootText);
+      await recordRoot.getByRole('button', { name: /编辑|Edit/ }).click();
+      await recordRoot.getByTestId('comment-input').fill(editedRecordRootText);
+      await recordRoot.getByTestId('comment-submit').click();
+      await expect(recordRoot).toContainText(editedRecordRootText);
+      screenshots.push(await attachScreenshot(page, testInfo, '07-follow-record-comment-edited'));
+      await recordRoot.getByRole('button', { name: /删除|Delete/ }).click();
+      await recordRoot.getByRole('button', { name: /确认|Confirm/ }).click();
+      await expect(recordThread.getByTestId('comment-empty')).toBeVisible();
+
+      const followRecordPool = new Pool(PG_CONN);
+      try {
+        const deleted = await followRecordPool.query<{ deleted_count: string }>(
+          `SELECT count(*) FILTER (WHERE deleted_flag = true)::text AS deleted_count
+           FROM ab_record_comment
+           WHERE model_code = $1 AND record_pid = $2`,
+          [MODEL_CODE, followRecordPid],
+        );
+        expect(deleted.rows[0]?.deleted_count, 'follow-record comment delete persists').toBe('1');
+      } finally {
+        await followRecordPool.end();
+      }
+
       fs.writeFileSync(
         testInfo.outputPath(`crm-followup-comments-parity-${uid}.json`),
         `${JSON.stringify(
@@ -388,6 +377,20 @@ test.describe('CRM follow-up comments — Cordys PAR-12 parity', () => {
             runId: uid,
             verdict: 'pass',
             technicalVerdict: 'pass',
+            cordysSourceEvidence: {
+              sourceIds: [
+                'api:follow:follow-up-plan-comment:page',
+                'api:follow:follow-up-plan-comment:add',
+                'api:follow:follow-up-plan-comment:update',
+                'api:follow:follow-up-plan-comment:delete',
+                'api:follow:follow-up-record-comment:page',
+                'api:follow:follow-up-record-comment:add',
+                'api:follow:follow-up-record-comment:update',
+                'api:follow:follow-up-record-comment:delete',
+              ],
+              assertionScope:
+                'plan/task and follow-record comment page, add, author update and delete persistence',
+            },
             fixtureMode: 'self-seeded',
             dataMigration: 'out-of-scope-development-stage',
             expectedScenarios: EXPECTED_SCENARIOS,

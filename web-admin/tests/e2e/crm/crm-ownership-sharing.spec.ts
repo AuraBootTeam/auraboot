@@ -54,6 +54,13 @@ const COVERAGE = {
   ],
 } as const;
 
+const CORDYS_SOURCE_IDS = [
+  'api:customer:customer-collaboration:list',
+  'api:customer:customer-collaboration:add',
+  'api:customer:customer-collaboration:update',
+  'api:customer:customer-collaboration:delete',
+] as const;
+
 const authSessionStorage = createCookieSessionStorage({
   cookie: {
     name: '__session',
@@ -495,6 +502,11 @@ test.describe('CRM account collaboration', () => {
             technicalVerdict: 'pass',
             fixtureMode: 'self-seeded',
             dataMigration: 'out-of-scope-development-stage',
+            cordysSourceEvidence: {
+              sourceIds: CORDYS_SOURCE_IDS,
+              assertionScope:
+                'owner-driven collaboration list, grant, upgrade and revoke with access checks',
+            },
             expectedScenarios: EXPECTED_SCENARIOS,
             completedScenarios: EXPECTED_SCENARIOS,
             coverage: Object.fromEntries(

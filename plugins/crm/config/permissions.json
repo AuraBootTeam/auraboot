@@ -745,6 +745,13 @@
     "module": "crm"
   },
   {
+    "code": "crm.lead_pool.import",
+    "name:zh-CN": "导入线索到线索池",
+    "name:en": "Import Leads to Lead Pool",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
     "code": "model.crm_lead_pool_common.read",
     "name:zh-CN": "查看线索池模型",
     "name:en": "Read Lead Pool Model",

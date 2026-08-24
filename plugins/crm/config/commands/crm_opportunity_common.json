@@ -53,6 +53,13 @@
       "crm_opp_forecast_category",
       "crm_opp_competitor"
     ],
+    "preconditions": [
+      {
+        "field": "crm_opp_stage",
+        "operator": "IN",
+        "value": ["discovery", "qualification", "proposal", "negotiation"]
+      }
+    ],
     "permissions": [
       "crm.opportunity.manage"
     ],
@@ -121,6 +128,11 @@
       "negotiation"
     ],
     "toState": "closed_won",
+    "handler": "crm:close_opportunity",
+    "handlerParams": { "dslPersistence": false },
+    "concurrencyKey": "crm:opportunity-close:${recordPid}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
     "preconditions": [
       {
         "field": "crm_opp_expected_amount",
@@ -160,6 +172,11 @@
       "negotiation"
     ],
     "toState": "closed_lost",
+    "handler": "crm:close_opportunity",
+    "handlerParams": { "dslPersistence": false },
+    "concurrencyKey": "crm:opportunity-close:${recordPid}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
     "inputFields": [
       "crm_opp_lost_reason",
       "crm_opp_lost_reason_code",

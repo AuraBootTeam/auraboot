@@ -75,6 +75,21 @@ const completedCoverage = Object.fromEntries(
   Object.entries(COVERAGE).map(([axis, expected]) => [axis, { expected, completed: expected }]),
 );
 
+const CORDYS_SOURCE_IDS = [
+  'api:customer:customer-follow-plan:add',
+  'api:customer:customer-follow-plan:get',
+  'api:customer:customer-follow-record:add',
+  'api:customer:customer-follow-record:get',
+  'api:customer:customer-follow-record:delete-record',
+  'api:follow:follow-up-plan:list',
+  'api:follow:follow-up-plan:add',
+  'api:follow:follow-up-plan:get',
+  'api:follow:follow-up-record:list',
+  'api:follow:follow-up-record:add',
+  'api:follow:follow-up-record:get',
+  'api:follow:follow-up-record:delete',
+] as const;
+
 async function screenshot(page: Page, testInfo: TestInfo, name: string): Promise<string> {
   const path = testInfo.outputPath(`${name}.png`);
   await page.screenshot({ path, fullPage: true });
@@ -472,6 +487,11 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
             technicalVerdict: 'pass',
             fixtureMode: 'self-seeded',
             dataMigration: 'out-of-scope-development-stage',
+            cordysSourceEvidence: {
+              sourceIds: CORDYS_SOURCE_IDS,
+              assertionScope:
+                'separate plan and record tabs, create/detail/state/delete with PostgreSQL persistence',
+            },
             expectedScenarios: EXPECTED_SCENARIOS,
             completedScenarios: EXPECTED_SCENARIOS,
             coverage: completedCoverage,

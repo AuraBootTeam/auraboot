@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -41,6 +43,8 @@ class PermissionInterceptorTest {
     @Mock
     private AdminRoleChecker adminRoleChecker;
     @Mock
+    private PageSchemaMapper pageSchemaMapper;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -49,7 +53,7 @@ class PermissionInterceptorTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker);
+        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker, pageSchemaMapper);
     }
 
     @AfterEach
@@ -239,6 +243,25 @@ class PermissionInterceptorTest {
 
         assertThat(ok).isTrue();
         verify(menuMapper).findPermissionCodeByPageKey(100L, "decisionops_definitions_list");
+    }
+
+    @Test
+    void preHandle_customFormPage_allowsViaDeclaredPageModelPermission() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "dynamicModelRead");
+        authenticate(7L);
+        MetaContext.setContext(100L, 7L, "u-pid", "tester");
+        Map<String, String> pathVars = new HashMap<>();
+        pathVars.put("pageKey", "crm_lead_move_to_pool_form");
+        when(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE)).thenReturn(pathVars);
+        when(userPermissionService.hasPermission(7L, "model.crm_lead_move_to_pool.read")).thenReturn(false);
+        when(userPermissionService.hasPermission(7L, "model.crm_lead_move_to_pool_form.read")).thenReturn(false);
+        PageSchema page = new PageSchema();
+        page.setModelCode("crm_lead_common");
+        when(pageSchemaMapper.selectByPageKey("crm_lead_move_to_pool_form")).thenReturn(page);
+        when(userPermissionService.hasPermission(7L, "model.crm_lead_common.read")).thenReturn(true);
+
+        assertThat(interceptor.preHandle(request, response, hm)).isTrue();
+        verify(pageSchemaMapper).selectByPageKey("crm_lead_move_to_pool_form");
     }
 
     @Test

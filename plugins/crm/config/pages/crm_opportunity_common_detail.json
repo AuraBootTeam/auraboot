@@ -850,7 +850,37 @@
           "confirm": "crm.opportunity.lose.confirm",
           "action": {
             "type": "state_transition",
-            "command": "crm:lose_opportunity"
+            "command": "crm:lose_opportunity",
+            "inputFieldsTitle": {
+              "zh-CN": "关闭商机并记录失败原因",
+              "en-US": "Close Opportunity and Record Loss Reason"
+            },
+            "inputFieldsSubmitLabel": {
+              "zh-CN": "确认丢单",
+              "en-US": "Confirm Loss"
+            },
+            "inputFields": [
+              {
+                "field": "crm_opp_lost_reason_code",
+                "label": { "zh-CN": "失败原因", "en-US": "Loss Reason" },
+                "type": "enum",
+                "dictCode": "crm_opp_lost_reason",
+                "required": true,
+                "placeholder": { "zh-CN": "选择最主要的失败原因", "en-US": "Select the primary loss reason" }
+              },
+              {
+                "field": "crm_opp_competitor",
+                "label": { "zh-CN": "竞争对手", "en-US": "Competitor" },
+                "type": "text",
+                "placeholder": { "zh-CN": "例如：华东智造云", "en-US": "For example: East China Manufacturing Cloud" }
+              },
+              {
+                "field": "crm_opp_lost_reason",
+                "label": { "zh-CN": "补充说明", "en-US": "Loss Notes" },
+                "type": "textarea",
+                "placeholder": { "zh-CN": "记录关键原因，便于后续复盘", "en-US": "Record the decisive reason for review" }
+              }
+            ]
           }
         }
       ]

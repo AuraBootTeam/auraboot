@@ -63,6 +63,13 @@ const COVERAGE = {
   ],
 } as const;
 
+const CORDYS_SOURCE_IDS = [
+  'api:customer:customer-relation:list',
+  'api:customer:customer-relation:add',
+  'api:customer:customer-relation:update',
+  'api:customer:customer-relation:delete',
+] as const;
+
 test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
   test.setTimeout(120_000);
 
@@ -255,6 +262,11 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
           runId: uid,
           verdict: 'pass',
           technicalVerdict: 'pass',
+          cordysSourceEvidence: {
+            sourceIds: CORDYS_SOURCE_IDS,
+            assertionScope:
+              'two-sided relationship list plus create, update and confirmed delete persistence',
+          },
           fixtureMode: 'self-seeded',
           dataMigration: 'out-of-scope-development-stage',
           expectedScenarios: EXPECTED_SCENARIOS,
