@@ -301,6 +301,20 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
 });
 
+test('OSS golden stack rejects dependency capsules with dangling required-package links', () => {
+  const golden = read('scripts/oss-golden-stack.sh');
+  assert.match(golden, /web_admin_node_modules_usable\(\)/);
+  assert.match(golden, /react\/package\.json/);
+  assert.match(golden, /react-dom\/package\.json/);
+  assert.match(golden, /@tailwindcss\/vite\/package\.json/);
+  assert.match(golden, /tailwindcss\/package\.json/);
+  assert.match(
+    golden,
+    /if ! web_admin_node_modules_usable "\$REPO_ROOT\/web-admin\/node_modules"/,
+  );
+  assert.match(golden, /refusing to replace a real directory/);
+});
+
 test('Product Catalog smoke fails closed on list PID and current DOM business-cell uniqueness', () => {
   const smoke = read('web-admin/tests/e2e/product-catalog/prod-catalog-smoke.spec.ts');
   const rowContract = read('web-admin/tests/e2e/product-catalog/row-contract.mjs');

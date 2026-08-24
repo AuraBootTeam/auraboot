@@ -368,7 +368,6 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await expect(recordTab).toBeVisible();
       await planTab.click();
       await expect(page.getByText(planSubject).first()).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText(/跟进履历|Follow-up History/)).toBeVisible();
       await expect(page.getByText(recordSubject)).toHaveCount(0);
       await recordTab.click();
       await expect(page.getByText(recordSubject).first()).toBeVisible({ timeout: 15_000 });
@@ -379,6 +378,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
         waitUntil: 'domcontentloaded',
       });
       await expect(page.getByText(planSubject).first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/跟进履历|Follow-up History/)).toBeVisible();
       const startTask = page.getByRole('button', { name: /开始任务|Start Task/ });
       await expect(startTask).toBeVisible();
       await expect(page.getByRole('button', { name: /删除计划|Delete Plan/ })).toBeVisible();
@@ -411,10 +411,9 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await expect(page.getByRole('button', { name: /取消任务|Cancel Task/ })).toHaveCount(0);
       screenshots.push(await screenshot(page, testInfo, '06-follow-plan-terminal-state'));
 
-      const terminalCancel = await page.request.post(
-        '/api/meta/commands/execute/crm:cancel_task',
-        { data: { payload: {}, targetRecordPid: plan.recordId } },
-      );
+      const terminalCancel = await page.request.post('/api/meta/commands/execute/crm:cancel_task', {
+        data: { payload: {}, targetRecordPid: plan.recordId },
+      });
       expect(terminalCancel.ok()).toBe(false);
 
       await page.goto(`/p/crm_activity_common/view/${record.recordId}`, {

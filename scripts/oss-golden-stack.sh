@@ -73,15 +73,24 @@ runtime_env() {
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
 
+web_admin_node_modules_usable() {
+  local candidate="$1"
+  [ -d "$candidate" ] \
+    && [ -r "$candidate/react/package.json" ] \
+    && [ -r "$candidate/react-dom/package.json" ] \
+    && [ -r "$candidate/@tailwindcss/vite/package.json" ] \
+    && [ -r "$candidate/tailwindcss/package.json" ]
+}
+
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
   done
 
   while IFS= read -r candidate; do
     candidate="$candidate/web-admin/node_modules"
-    [ -d "$candidate" ] && { echo "$candidate"; return 0; }
+    web_admin_node_modules_usable "$candidate" && { echo "$candidate"; return 0; }
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -426,10 +435,15 @@ cmd_up() {
 
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: symlink node_modules (if missing) + start Vite+BFF"
-    if [ ! -e "$REPO_ROOT/web-admin/node_modules" ]; then
+    if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
+      if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
+        rm -f "$REPO_ROOT/web-admin/node_modules"
+      elif [ -e "$REPO_ROOT/web-admin/node_modules" ]; then
+        die "web-admin/node_modules exists but required runtime packages are unreadable; refusing to replace a real directory"
+      fi
       local node_modules_seed
       node_modules_seed="$(web_admin_node_modules_seed)" \
-        || die "web-admin/node_modules not found in canonical checkout or existing worktrees"
+        || die "no usable web-admin/node_modules capsule found in canonical checkout or existing worktrees"
       ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
     fi
     # A slot can be reused by a newer checkout/composition. Vite's on-disk optimized dependency

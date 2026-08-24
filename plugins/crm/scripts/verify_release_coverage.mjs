@@ -56,8 +56,8 @@ const EVIDENCE = {
   forecastVariance: 'plugins/crm/e2e/forecast-variance.golden.spec.ts',
   customerPool: 'web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts',
   followupComments: 'web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts',
-  contactFollowupLifecycle:
-    'web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts',
+  contactFollowupLifecycle: 'web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts',
+  contactManagement: 'web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts',
   leadConversionActivityCarry:
     'web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts',
   accountCollaboration: 'web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts',
@@ -85,11 +85,7 @@ const FOLLOWUP_COMMENT_COVERAGE = {
   blocks: ['crm_activity_common_detail:activity_followup_comments'],
 };
 const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
-  pages: [
-    'crm_contact_common_detail',
-    'crm_activity_common_list',
-    'crm_activity_common_detail',
-  ],
+  pages: ['crm_contact_common_detail', 'crm_activity_common_list', 'crm_activity_common_detail'],
   blocks: [
     'crm_contact_common_detail:section_basic',
     'crm_contact_common_detail:crm_contact_detail_toolbar',
@@ -134,6 +130,57 @@ const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
     'crm:complete_task',
     'crm:delete_follow_plan',
     'crm:delete_follow_record',
+  ],
+};
+const CONTACT_MANAGEMENT_COVERAGE = {
+  pages: ['crm_contact_common_list', 'crm_contact_common_form', 'crm_contact_common_detail'],
+  blocks: [
+    'crm_contact_common_list:crm_contact_toolbar',
+    'crm_contact_common_list:crm_contact_table',
+    'crm_contact_common_form:identity_and_ownership',
+    'crm_contact_common_form:channels_and_notes',
+    'crm_contact_common_form:buttons',
+    'crm_contact_common_detail:section_basic',
+    'crm_contact_common_detail:crm_contact_detail_toolbar',
+  ],
+  fields: [
+    'crm_contact_common_list:crm_contact_table:crm_ct_name',
+    'crm_contact_common_list:crm_contact_table:crm_ct_account_id',
+    'crm_contact_common_list:crm_contact_table:crm_ct_title',
+    'crm_contact_common_list:crm_contact_table:crm_ct_email',
+    'crm_contact_common_list:crm_contact_table:crm_ct_phone',
+    'crm_contact_common_list:crm_contact_table:crm_ct_mobile',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_account_id',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_name',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_title',
+    'crm_contact_common_form:identity_and_ownership:crm_ct_owner',
+    'crm_contact_common_form:channels_and_notes:crm_ct_email',
+    'crm_contact_common_form:channels_and_notes:crm_ct_phone',
+    'crm_contact_common_form:channels_and_notes:crm_ct_mobile',
+    'crm_contact_common_form:channels_and_notes:crm_ct_is_primary',
+    'crm_contact_common_form:channels_and_notes:crm_ct_remark',
+    'crm_contact_common_detail:section_basic:crm_ct_account_id',
+    'crm_contact_common_detail:section_basic:crm_ct_name',
+    'crm_contact_common_detail:section_basic:crm_ct_title',
+    'crm_contact_common_detail:section_basic:crm_ct_email',
+    'crm_contact_common_detail:section_basic:crm_ct_phone',
+    'crm_contact_common_detail:section_basic:crm_ct_mobile',
+    'crm_contact_common_detail:section_basic:crm_ct_remark',
+  ],
+  uiActions: [
+    'crm_contact_common_list:crm_contact_toolbar:create',
+    'crm_contact_common_list:crm_contact_table:bulk_delete_contacts',
+    'crm_contact_common_list:crm_contact_table:view',
+    'crm_contact_common_list:crm_contact_table:edit',
+    'crm_contact_common_form:buttons:submit',
+    'crm_contact_common_form:buttons:cancel',
+    'crm_contact_common_detail:crm_contact_detail_toolbar:edit',
+  ],
+  commands: [
+    'crm:create_account',
+    'crm:create_contact',
+    'crm:update_contact',
+    'crm:delete_contact',
   ],
 };
 const LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE = {
@@ -822,6 +869,9 @@ const contactFollowupLifecycleCoverageSets = Object.fromEntries(
     new Set(values),
   ]),
 );
+const contactManagementCoverageSets = Object.fromEntries(
+  Object.entries(CONTACT_MANAGEMENT_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
+);
 const leadConversionActivityCarryCoverageSets = Object.fromEntries(
   Object.entries(LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE).map(([axis, values]) => [
     axis,
@@ -829,16 +879,10 @@ const leadConversionActivityCarryCoverageSets = Object.fromEntries(
   ]),
 );
 const accountCollaborationCoverageSets = Object.fromEntries(
-  Object.entries(ACCOUNT_COLLABORATION_COVERAGE).map(([axis, values]) => [
-    axis,
-    new Set(values),
-  ]),
+  Object.entries(ACCOUNT_COLLABORATION_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
 const accountRelationshipCoverageSets = Object.fromEntries(
-  Object.entries(ACCOUNT_RELATIONSHIP_COVERAGE).map(([axis, values]) => [
-    axis,
-    new Set(values),
-  ]),
+  Object.entries(ACCOUNT_RELATIONSHIP_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
@@ -936,6 +980,9 @@ function evidenceForCommand(code, rg1Commands) {
   if (customerPoolCoverageSets.commands.has(code)) files.push(EVIDENCE.customerPool);
   if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
     files.push(EVIDENCE.contactFollowupLifecycle);
+  }
+  if (contactManagementCoverageSets.commands.has(code)) {
+    files.push(EVIDENCE.contactManagement);
   }
   if (leadConversionActivityCarryCoverageSets.commands.has(code)) {
     files.push(EVIDENCE.leadConversionActivityCarry);
@@ -1210,12 +1257,11 @@ function buildProductGroups({
         ...(forecastVarianceCoverageSets.blocks.has(blockKey) ? [EVIDENCE.forecastVariance] : []),
         ...(amosB01CoverageSets.blocks.has(blockKey) ? [EVIDENCE.amosB01Browser] : []),
         ...(customerPoolCoverageSets.blocks.has(blockKey) ? [EVIDENCE.customerPool] : []),
-        ...(followupCommentCoverageSets.blocks.has(blockKey)
-          ? [EVIDENCE.followupComments]
-          : []),
+        ...(followupCommentCoverageSets.blocks.has(blockKey) ? [EVIDENCE.followupComments] : []),
         ...(contactFollowupLifecycleCoverageSets.blocks.has(blockKey)
           ? [EVIDENCE.contactFollowupLifecycle]
           : []),
+        ...(contactManagementCoverageSets.blocks.has(blockKey) ? [EVIDENCE.contactManagement] : []),
         ...(leadConversionActivityCarryCoverageSets.blocks.has(blockKey)
           ? [EVIDENCE.leadConversionActivityCarry]
           : []),
@@ -1252,6 +1298,7 @@ function buildProductGroups({
         ...(contactFollowupLifecycleCoverageSets.fields.has(fieldKey)
           ? [EVIDENCE.contactFollowupLifecycle]
           : []),
+        ...(contactManagementCoverageSets.fields.has(fieldKey) ? [EVIDENCE.contactManagement] : []),
         ...(accountRelationshipCoverageSets.fields.has(fieldKey)
           ? [EVIDENCE.accountRelationship]
           : []),
@@ -1285,10 +1332,12 @@ function buildProductGroups({
       const customerPoolAction = customerPoolCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
-      const contactFollowupLifecycleAction =
-        contactFollowupLifecycleCoverageSets.uiActions.has(
-          `${page.pageKey}:${item.blockId}:${item.code}`,
-        );
+      const contactFollowupLifecycleAction = contactFollowupLifecycleCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
+      const contactManagementAction = contactManagementCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
       const leadConversionActivityCarryAction =
         leadConversionActivityCarryCoverageSets.uiActions.has(
           `${page.pageKey}:${item.blockId}:${item.code}`,
@@ -1306,6 +1355,7 @@ function buildProductGroups({
         ...(amosB01Action ? [EVIDENCE.amosB01Browser] : []),
         ...(customerPoolAction ? [EVIDENCE.customerPool] : []),
         ...(contactFollowupLifecycleAction ? [EVIDENCE.contactFollowupLifecycle] : []),
+        ...(contactManagementAction ? [EVIDENCE.contactManagement] : []),
         ...(leadConversionActivityCarryAction ? [EVIDENCE.leadConversionActivityCarry] : []),
         ...(accountCollaborationAction ? [EVIDENCE.accountCollaboration] : []),
         ...(accountRelationshipAction ? [EVIDENCE.accountRelationship] : []),
@@ -1688,6 +1738,7 @@ export function buildReleaseManifest() {
     ...RELEASE_B_COVERAGE.commands,
     ...CUSTOMER_POOL_COVERAGE.commands,
     ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.commands,
+    ...CONTACT_MANAGEMENT_COVERAGE.commands,
     ...LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE.commands,
     ...ACCOUNT_COLLABORATION_COVERAGE.commands,
     ...ACCOUNT_RELATIONSHIP_COVERAGE.commands,
@@ -1704,6 +1755,9 @@ export function buildReleaseManifest() {
     if (customerPoolCoverageSets.commands.has(code)) goals.push('CORDYS-CUSTOMER-POOL');
     if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
       goals.push('CORDYS-CONTACT-FOLLOWUP-LIFECYCLE');
+    }
+    if (contactManagementCoverageSets.commands.has(code)) {
+      goals.push('CORDYS-CONTACT-MANAGEMENT');
     }
     if (leadConversionActivityCarryCoverageSets.commands.has(code)) {
       goals.push('CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY');
@@ -1740,83 +1794,78 @@ export function buildReleaseManifest() {
     ...CUSTOMER_POOL_COVERAGE.pages,
     ...FOLLOWUP_COMMENT_COVERAGE.pages,
     ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.pages,
+    ...CONTACT_MANAGEMENT_COVERAGE.pages,
     ...LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE.pages,
     ...ACCOUNT_COLLABORATION_COVERAGE.pages,
     ...ACCOUNT_RELATIONSHIP_COVERAGE.pages,
-  ]).map(
-    (pageKey) => {
-      const page = pages.get(pageKey);
-      assert.ok(page, `missing release page ${pageKey}`);
-      const goals = [
-        ...(RG1_PAGES.includes(pageKey) ? ['RG-1'] : []),
-        ...(pageKey === 'crm_lead_desk_workbench' ? ['RG-3'] : []),
-        ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
-        ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
-        ...(customerPoolCoverageSets.pages.has(pageKey) ? ['CORDYS-CUSTOMER-POOL'] : []),
-        ...(followupCommentCoverageSets.pages.has(pageKey)
-          ? ['CORDYS-FOLLOWUP-COMMENTS']
-          : []),
-        ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
-          ? ['CORDYS-CONTACT-FOLLOWUP-LIFECYCLE']
-          : []),
-        ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
-          ? ['CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY']
-          : []),
-        ...(accountCollaborationCoverageSets.pages.has(pageKey)
-          ? ['CORDYS-ACCOUNT-COLLABORATION']
-          : []),
-        ...(accountRelationshipCoverageSets.pages.has(pageKey)
-          ? ['CORDYS-ACCOUNT-RELATIONSHIP']
-          : []),
-      ];
-      const evidence = uniq([
-        ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
-        ...(pageKey === 'crm_lead_desk_workbench' ? [EVIDENCE.rg3Journey] : []),
-        ...(pageKey === 'crm_qdp_release_workbench' ? [EVIDENCE.rg2QdpBrowser] : []),
-        ...(RG2_PAGES.includes(pageKey) && pageKey !== 'crm_qdp_release_workbench'
-          ? [EVIDENCE.rg2OrderBrowser]
-          : []),
-        ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
-        ...(customerPoolCoverageSets.pages.has(pageKey) ? [EVIDENCE.customerPool] : []),
-        ...(followupCommentCoverageSets.pages.has(pageKey)
-          ? [EVIDENCE.followupComments]
-          : []),
-        ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
-          ? [EVIDENCE.contactFollowupLifecycle]
-          : []),
-        ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
-          ? [EVIDENCE.leadConversionActivityCarry]
-          : []),
-        ...(accountCollaborationCoverageSets.pages.has(pageKey)
-          ? [EVIDENCE.accountCollaboration]
-          : []),
-        ...(accountRelationshipCoverageSets.pages.has(pageKey)
-          ? [EVIDENCE.accountRelationship]
-          : []),
-      ]);
-      const menuPermissions = menus
-        .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
-        .map((menu) => menu.permissionCode);
-      return {
-        id: pageKey,
-        goals,
-        kind: page.kind,
-        permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
-        evidence: uniq(evidence),
-        permissionsVerified: goals.some((goal) =>
-          [
-            'RG-1',
-            'RG-2',
-            'RG-3',
-            'CORDYS-CUSTOMER-POOL',
-            'CORDYS-ACCOUNT-COLLABORATION',
-            'CORDYS-ACCOUNT-RELATIONSHIP',
-          ].includes(goal),
-        ),
-        verdict: 'pass',
-      };
-    },
-  );
+  ]).map((pageKey) => {
+    const page = pages.get(pageKey);
+    assert.ok(page, `missing release page ${pageKey}`);
+    const goals = [
+      ...(RG1_PAGES.includes(pageKey) ? ['RG-1'] : []),
+      ...(pageKey === 'crm_lead_desk_workbench' ? ['RG-3'] : []),
+      ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
+      ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
+      ...(customerPoolCoverageSets.pages.has(pageKey) ? ['CORDYS-CUSTOMER-POOL'] : []),
+      ...(followupCommentCoverageSets.pages.has(pageKey) ? ['CORDYS-FOLLOWUP-COMMENTS'] : []),
+      ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
+        ? ['CORDYS-CONTACT-FOLLOWUP-LIFECYCLE']
+        : []),
+      ...(contactManagementCoverageSets.pages.has(pageKey) ? ['CORDYS-CONTACT-MANAGEMENT'] : []),
+      ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
+        ? ['CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY']
+        : []),
+      ...(accountCollaborationCoverageSets.pages.has(pageKey)
+        ? ['CORDYS-ACCOUNT-COLLABORATION']
+        : []),
+      ...(accountRelationshipCoverageSets.pages.has(pageKey)
+        ? ['CORDYS-ACCOUNT-RELATIONSHIP']
+        : []),
+    ];
+    const evidence = uniq([
+      ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
+      ...(pageKey === 'crm_lead_desk_workbench' ? [EVIDENCE.rg3Journey] : []),
+      ...(pageKey === 'crm_qdp_release_workbench' ? [EVIDENCE.rg2QdpBrowser] : []),
+      ...(RG2_PAGES.includes(pageKey) && pageKey !== 'crm_qdp_release_workbench'
+        ? [EVIDENCE.rg2OrderBrowser]
+        : []),
+      ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
+      ...(customerPoolCoverageSets.pages.has(pageKey) ? [EVIDENCE.customerPool] : []),
+      ...(followupCommentCoverageSets.pages.has(pageKey) ? [EVIDENCE.followupComments] : []),
+      ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
+        ? [EVIDENCE.contactFollowupLifecycle]
+        : []),
+      ...(contactManagementCoverageSets.pages.has(pageKey) ? [EVIDENCE.contactManagement] : []),
+      ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
+        ? [EVIDENCE.leadConversionActivityCarry]
+        : []),
+      ...(accountCollaborationCoverageSets.pages.has(pageKey)
+        ? [EVIDENCE.accountCollaboration]
+        : []),
+      ...(accountRelationshipCoverageSets.pages.has(pageKey) ? [EVIDENCE.accountRelationship] : []),
+    ]);
+    const menuPermissions = menus
+      .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
+      .map((menu) => menu.permissionCode);
+    return {
+      id: pageKey,
+      goals,
+      kind: page.kind,
+      permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
+      evidence: uniq(evidence),
+      permissionsVerified: goals.some((goal) =>
+        [
+          'RG-1',
+          'RG-2',
+          'RG-3',
+          'CORDYS-CUSTOMER-POOL',
+          'CORDYS-ACCOUNT-COLLABORATION',
+          'CORDYS-ACCOUNT-RELATIONSHIP',
+        ].includes(goal),
+      ),
+      verdict: 'pass',
+    };
+  });
 
   const permissionEvidence = new Map();
   const addPermissionEvidence = (code, files) => {
@@ -1992,6 +2041,11 @@ export function buildReleaseManifest() {
         note: 'A self-seeded real-stack journey verifies contact primary/enable-disable invariants and the Web follow-up plan/record lifecycle without development-data migration.',
       },
       {
+        id: 'CORDYS-CONTACT-MANAGEMENT',
+        verdict: 'pass',
+        note: 'Two self-seeded browser journeys cover contact create validation, full business persistence, list/detail/edit navigation, analysis, business-label exports, bulk edit/delete and governed failures without development-data migration.',
+      },
+      {
         id: 'CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY',
         verdict: 'pass',
         note: 'A self-seeded browser journey converts a qualified lead and proves that direct and relation-anchored follow-up activities, comments and deduplicated customer history remain visible across the resulting account, contact and opportunity graph.',
@@ -2115,6 +2169,17 @@ export function buildReleaseManifest() {
         requireNoFailedRuntimeRequests: true,
       },
       {
+        id: 'CRM-CONTACT-MANAGEMENT',
+        filePrefix: 'crm-contact-management-',
+        expectedScenarios: 2,
+        minimumScreenshots: 5,
+        expectedCoverage: CONTACT_MANAGEMENT_COVERAGE,
+        expectedTechnicalVerdict: 'pass',
+        expectedDataMigration: 'out-of-scope-development-stage',
+        requireNoFailedRuntimeRequests: true,
+        expectedFixtureMode: 'self-seeded',
+      },
+      {
         id: 'CRM-LEAD-CONVERSION-ACTIVITY-CARRY',
         filePrefix: 'crm-lead-conversion-activity-carry-',
         expectedScenarios: 10,
@@ -2162,12 +2227,7 @@ export function buildReleaseManifest() {
         expectedDataMigration: 'out-of-scope-development-stage',
         requireNoFailedRuntimeRequests: true,
         expectedFixtureMode: 'self-seeded',
-        requiredRecordIds: [
-          'sourceAccount',
-          'targetAccount',
-          'thirdAccount',
-          'relationship',
-        ],
+        requiredRecordIds: ['sourceAccount', 'targetAccount', 'thirdAccount', 'relationship'],
       },
     ],
     untested: [
