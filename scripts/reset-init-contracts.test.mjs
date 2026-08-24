@@ -291,6 +291,9 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /META-INF\/MANIFEST\.MF/);
   assert.match(golden, /plugin backend entryClass mismatch/);
   assert.match(golden, /entryClass is missing from jar/);
+  assert.match(golden, /pnpm install --frozen-lockfile/);
+  assert.match(golden, /NPM_CONFIG_REGISTRY="\$\{NPM_CONFIG_REGISTRY:-https:\/\/registry\.npmmirror\.com\}"/);
+  assert.match(golden, /frontend-dependencies\.log/);
   assert.match(golden, /pf4j-staging\.tsv/);
   assert.match(golden, /staged PF4J jar hash mismatch/);
   assert.match(golden, /AURA_PLUGINS_DIR="\$sd\/pf4j-plugins"/);

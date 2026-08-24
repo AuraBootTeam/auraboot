@@ -437,12 +437,21 @@ cmd_up() {
   fi
 
   if [ "$frontend" -eq 1 ]; then
-    log "7/9 frontend: symlink node_modules (if missing) + start Vite+BFF"
+    log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
     if [ ! -e "$REPO_ROOT/web-admin/node_modules" ]; then
       local node_modules_seed
-      node_modules_seed="$(web_admin_node_modules_seed)" \
-        || die "web-admin/node_modules not found in canonical checkout or existing worktrees"
-      ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
+      node_modules_seed="$(web_admin_node_modules_seed || true)"
+      if [ -n "$node_modules_seed" ]; then
+        ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
+      else
+        log "    no reusable node_modules found; installing from lockfile with the runtime pnpm store"
+        NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}" \
+          "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
+            pnpm install --frozen-lockfile >"$sd/frontend-dependencies.log" 2>&1 \
+          || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
+        [ -d "$REPO_ROOT/web-admin/node_modules" ] \
+          || die "web-admin dependency install completed without node_modules"
+      fi
     fi
     # A slot can be reused by a newer checkout/composition. Vite's on-disk optimized dependency
     # cache is keyed by port for this runner; keeping it across destroy→up allowed React itself and
