@@ -291,7 +291,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /META-INF\/MANIFEST\.MF/);
   assert.match(golden, /plugin backend entryClass mismatch/);
   assert.match(golden, /entryClass is missing from jar/);
-  assert.match(golden, /pnpm install --frozen-lockfile/);
+  assert.match(golden, /CI=true NPM_CONFIG_REGISTRY="\$npm_registry"/);
+  assert.match(golden, /pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only/);
   assert.match(golden, /npm_registry="\$\{NPM_CONFIG_REGISTRY:-https:\/\/registry\.npmmirror\.com\}"/);
   assert.match(golden, /pnpm_version="\$\{AURA_PNPM_VERSION:-9\.15\.9\}"/);
   assert.match(golden, /COREPACK_NPM_REGISTRY="\$npm_registry" COREPACK_DEFAULT_TO_LATEST=0/);

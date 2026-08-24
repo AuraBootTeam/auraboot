@@ -453,10 +453,11 @@ cmd_up() {
             corepack install --global "pnpm@$pnpm_version" \
             >"$sd/frontend-corepack.log" 2>&1 \
           || die "pnpm $pnpm_version bootstrap failed — see $sd/frontend-corepack.log"
-        NPM_CONFIG_REGISTRY="$npm_registry" \
+        CI=true NPM_CONFIG_REGISTRY="$npm_registry" \
           COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
-            pnpm install --frozen-lockfile >"$sd/frontend-dependencies.log" 2>&1 \
+            pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
+            >"$sd/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
         [ -d "$REPO_ROOT/web-admin/node_modules" ] \
           || die "web-admin dependency install completed without node_modules"
