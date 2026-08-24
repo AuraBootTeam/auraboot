@@ -2604,6 +2604,48 @@
     "refType": "saved_view"
   },
   {
+    "key": "crm.saved_view.all_contacts",
+    "zh-CN": "全部联系人",
+    "en-US": "All Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_contacts_description",
+    "zh-CN": "按最近更新时间查看可访问的全部联系人",
+    "en-US": "All accessible contacts ordered by latest update",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.my_contacts",
+    "zh-CN": "我的联系人",
+    "en-US": "My Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.my_contacts_description",
+    "zh-CN": "仅显示当前用户负责的联系人",
+    "en-US": "Contacts owned by the current user",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.department_contacts",
+    "zh-CN": "本部门联系人",
+    "en-US": "Department Contacts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.department_contacts_description",
+    "zh-CN": "显示当前用户所在部门及下级部门成员负责的联系人",
+    "en-US": "Contacts owned by members of the current user's department and its subdepartments",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
     "key": "crm.saved_view.all_opportunities",
     "zh-CN": "全部商机",
     "en-US": "All Opportunities",
@@ -5747,9 +5789,16 @@
     "refType": "command"
   },
   {
-    "key": "command.crm:delete_activity.label",
-    "zh-CN": "删除活动",
-    "en-US": "Delete Activity",
+    "key": "command.crm:delete_follow_plan.label",
+    "zh-CN": "删除跟进计划",
+    "en-US": "Delete Follow-up Plan",
+    "source": "import",
+    "refType": "command"
+  },
+  {
+    "key": "command.crm:delete_follow_record.label",
+    "zh-CN": "删除跟进记录",
+    "en-US": "Delete Follow-up Record",
     "source": "import",
     "refType": "command"
   },
@@ -6907,5 +6956,47 @@
     "en-US": "Recompute Subscription",
     "source": "import",
     "refType": "command"
+  },
+  {
+    "key": "crm.saved_view.all_leads",
+    "zh-CN": "全部线索",
+    "en-US": "All Leads",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.all_leads_description",
+    "zh-CN": "按最近更新时间查看全部可见线索",
+    "en-US": "Review all visible leads by latest update",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.my_leads",
+    "zh-CN": "我的线索",
+    "en-US": "My Leads",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.my_leads_description",
+    "zh-CN": "仅查看当前负责人名下的线索",
+    "en-US": "Show leads assigned to the current owner",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.lead_board",
+    "zh-CN": "线索看板",
+    "en-US": "Lead Board",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "crm.saved_view.lead_board_description",
+    "zh-CN": "按生命周期状态查看线索漏斗",
+    "en-US": "View the lead funnel grouped by lifecycle status",
+    "source": "import",
+    "refType": "page"
   }
 ]

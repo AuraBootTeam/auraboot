@@ -262,6 +262,16 @@ public class PluginDirectoryLoader {
             }
         }
 
+        if (resourceDirs.containsKey("pageContributions")) {
+            List<PageContributionDefinitionDTO> contributions = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "pageContributions"),
+                    PageContributionDefinitionDTO.class);
+            if (!contributions.isEmpty()) {
+                manifest.setPageContributions(
+                        mergeList(manifest.getPageContributions(), contributions));
+            }
+        }
+
         // Load processes (if any)
         if (resourceDirs.containsKey("processes")) {
             List<ProcessDefinitionDTO> processes = loadResourceList(
@@ -667,6 +677,9 @@ public class PluginDirectoryLoader {
                 manifest.setPages(mergeList(manifest.getPages(), converted));
             }
         }
+
+        loadSourceResource(source, resourceDirs, "pageContributions", PageContributionDefinitionDTO.class,
+                manifest::getPageContributions, manifest::setPageContributions);
 
         loadSourceResource(source, resourceDirs, "processes", ProcessDefinitionDTO.class,
                 manifest::getProcesses, manifest::setProcesses);

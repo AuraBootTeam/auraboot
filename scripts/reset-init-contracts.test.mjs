@@ -15,6 +15,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
   assert.match(gate, /bash -n scripts\/db\/cleanup-scheduler-residue\.sh/);
   assert.match(gate, /bash -n scripts\/import-plugins\.sh/);
+  assert.match(gate, /bash -n scripts\/oss-golden-stack\.sh/);
   assert.match(gate, /bash -n scripts\/lib\/reset-init-common\.sh/);
   assert.match(gate, /bash -n scripts\/lib\/runtime-process-owner\.sh/);
   assert.match(gate, /bash -n scripts\/lib\/test-runtime-process-owner\.sh/);
@@ -29,6 +30,11 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/env\/reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/oss-test\.sh/);
   assert.match(gate, /node --test scripts\/dev\/lib\/env-registry\.test\.mjs/);
+  assert.match(gate, /node --test scripts\/dev\/resolve-plugin-backends\.test\.mjs/);
+  assert.match(
+    gate,
+    /node --test web-admin\/tests\/e2e\/product-catalog\/row-contract\.unit\.mjs/,
+  );
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
@@ -261,11 +267,21 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   }
 });
 
-test('OSS golden stack stages current-source hybrid jars before import', () => {
+test('OSS golden stack stages manifest-declared backend jars from explicit roots before import', () => {
   const golden = read('scripts/oss-golden-stack.sh');
+  const resolver = read('scripts/dev/resolve-plugin-backends.mjs');
 
-  assert.match(golden, /stage_requested_hybrid_jars\(\)/);
-  assert.match(golden, /:platform-plugin-api:publishToMavenLocal/);
+  assert.match(golden, /--extra-plugin-root PATH/);
+  assert.match(golden, /stage_requested_backend_jars\(\)/);
+  assert.match(golden, /resolve-plugin-backends\.mjs/);
+  assert.match(resolver, /manifest\.backend == null/);
+  assert.doesNotMatch(resolver, /pluginType\s*!==\s*['"]hybrid['"]/);
+  assert.match(
+    golden,
+    /:platform-plugin-api:publishToMavenLocal :publishToMavenLocal/,
+    'PF4J builds must receive both platform-plugin-api and root auraboot-core publications',
+  );
+  assert.match(golden, /platform-plugin-api\/auraboot-core publish failed/);
   assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
   assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
   assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
@@ -273,12 +289,29 @@ test('OSS golden stack stages current-source hybrid jars before import', () => {
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
   assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo"/);
   assert.match(golden, /META-INF\/extensions\.idx/);
+  assert.match(golden, /pf4j-staging\.tsv/);
+  assert.match(golden, /staged PF4J jar hash mismatch/);
   assert.match(golden, /AURA_PLUGINS_DIR="\$sd\/pf4j-plugins"/);
+  assert.match(golden, /args\+=\("--extra-plugin-root=\$extra_root"\)/);
   assert.ok(
-    golden.indexOf('stage_requested_hybrid_jars "$sd"') <
+    golden.indexOf('stage_requested_backend_jars "$sd"') <
       golden.indexOf('log "5/9 start backend'),
-    'hybrid jars must be staged before the PF4J host starts',
+    'backend jars must be staged before the PF4J host starts',
   );
+  assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
+});
+
+test('Product Catalog smoke fails closed on list PID and current DOM business-cell uniqueness', () => {
+  const smoke = read('web-admin/tests/e2e/product-catalog/prod-catalog-smoke.spec.ts');
+  const rowContract = read('web-admin/tests/e2e/product-catalog/row-contract.mjs');
+
+  assert.match(smoke, /dynamicListRecords\(await response\.json\(\)/);
+  assert.match(smoke, /assertUniqueListRecordPid\(visibleRecords, recordPid, recordLabel\)/);
+  assert.match(smoke, /getByRole\('cell', \{ name: recordText, exact: true \}\)/);
+  assert.match(smoke, /must map to exactly one current DOM row/);
+  assert.match(rowContract, /export function assertUniqueListRecordPid/);
+  assert.match(rowContract, /must occur exactly once in the list response/);
+  assert.doesNotMatch(smoke, /record\.id|numericId|table-row-\$\{index\}/);
 });
 
 test('host-side build scripts never fall back to the system Gradle executable', () => {
@@ -527,6 +560,27 @@ test('plugin import validates latest import state instead of whole history', () 
   assert.match(script, /distinct on \(plugin_id\)/);
   assert.match(script, /latest import status is not success/);
   assert.doesNotMatch(script, /where status <> 'success'/i);
+});
+
+test('plugin import activates every imported plugin after reference validation', () => {
+  const script = read('scripts/import-plugins.sh');
+
+  assert.match(script, /plugin_pid = d\.get\('pluginPid'\)/);
+  assert.match(script, /successful_plugin_pids=\(\)/);
+  assert.match(script, /enable_imported_plugins\(\)/);
+  assert.match(script, /api\/plugins\/\$plugin_pid\/enable/);
+  assert.match(script, /data\.get\('status'\) == 'active'/);
+  assert.match(script, /failed to enable imported plugin/);
+
+  const tail = script.slice(script.indexOf('if [ "${#failures[@]}" -gt 0 ]'));
+  assert.ok(
+    tail.indexOf('verify_reference_integrity') < tail.indexOf('enable_imported_plugins'),
+    'plugins must be enabled only after cross-plugin references are verified',
+  );
+  assert.ok(
+    tail.indexOf('enable_imported_plugins') < tail.indexOf('seed_bom_defaults_if_imported'),
+    'lifecycle-aware handlers and contributions must be active before product seeds run',
+  );
 });
 
 test('plugin import seeds BOM defaults when bom-standardization is imported', () => {

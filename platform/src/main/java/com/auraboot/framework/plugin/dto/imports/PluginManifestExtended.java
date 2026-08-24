@@ -117,6 +117,9 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<PageSchemaDTO> pages;
 
+    /** Runtime-only additions to slots explicitly declared by existing base pages. */
+    private List<PageContributionDefinitionDTO> pageContributions;
+
     /**
      * Dictionary definitions to import.
      */
@@ -346,6 +349,14 @@ public class PluginManifestExtended extends PluginManifest {
         if (pages != null) {
             for (PageSchemaDTO page : pages) {
                 if (!page.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        if (pageContributions != null) {
+            for (PageContributionDefinitionDTO contribution : pageContributions) {
+                if (contribution == null || !contribution.isValid()) {
                     return false;
                 }
             }
@@ -587,6 +598,16 @@ public class PluginManifestExtended extends PluginManifest {
             }
         }
 
+
+        if (pageContributions != null) {
+            for (int i = 0; i < pageContributions.size(); i++) {
+                PageContributionDefinitionDTO contribution = pageContributions.get(i);
+                if (contribution == null || !contribution.isValid()) {
+                    errors.add("pageContributions[" + i + "]: id, targetPageKey, slotId, kind and payload are required");
+                }
+            }
+        }
+
         return errors;
     }
 
@@ -607,6 +628,8 @@ public class PluginManifestExtended extends PluginManifest {
         collectUnknownFieldWarnings(warnings, "roles", roles, RoleDefinitionDTO::getUnknownFields, RoleDefinitionDTO::getCode);
         collectUnknownFieldWarnings(warnings, "menus", menus, MenuDefinitionDTO::getUnknownFields, MenuDefinitionDTO::getCode);
         collectUnknownFieldWarnings(warnings, "pages", pages, PageSchemaDTO::getUnknownFields, PageSchemaDTO::getPageKey);
+        collectUnknownFieldWarnings(warnings, "pageContributions", pageContributions,
+                PageContributionDefinitionDTO::getUnknownFields, PageContributionDefinitionDTO::getId);
         collectUnknownFieldWarnings(warnings, "dicts", dicts, DictDefinitionDTO::getUnknownFields, DictDefinitionDTO::getCode);
         collectUnknownFieldWarnings(warnings, "namedQueries", namedQueries,
                 NamedQueryDefinitionDTO::getUnknownFields, NamedQueryDefinitionDTO::getCode);
@@ -673,6 +696,7 @@ public class PluginManifestExtended extends PluginManifest {
                 || (menus != null && !menus.isEmpty())
                 || (processes != null && !processes.isEmpty())
                 || (pages != null && !pages.isEmpty())
+                || (pageContributions != null && !pageContributions.isEmpty())
                 || (dicts != null && !dicts.isEmpty())
                 || (i18nResources != null && !i18nResources.isEmpty())
                 || (namedQueries != null && !namedQueries.isEmpty())
@@ -705,6 +729,7 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("menus", menus != null ? menus.size() : 0),
                 Map.entry("processes", processes != null ? processes.size() : 0),
                 Map.entry("pages", pages != null ? pages.size() : 0),
+                Map.entry("pageContributions", pageContributions != null ? pageContributions.size() : 0),
                 Map.entry("dicts", dicts != null ? dicts.size() : 0),
                 Map.entry("i18nResources", i18nResources != null ? i18nResources.size() : 0),
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
@@ -741,6 +766,8 @@ public class PluginManifestExtended extends PluginManifest {
         menus = sanitized(menus, m -> isCommentObject(m.getCode(), m.getUnknownFields()));
         processes = sanitized(processes, p -> isCommentObject(p.getKey(), p.getUnknownFields()));
         pages = sanitized(pages, p -> isCommentObject(p.getPageKey(), p.getUnknownFields()));
+        pageContributions = sanitized(pageContributions,
+                contribution -> isCommentObject(contribution.getId(), contribution.getUnknownFields()));
         dicts = sanitized(dicts, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         namedQueries = sanitized(namedQueries, n -> isCommentObject(n.getCode(), n.getUnknownFields()));
         agentDefinitions = sanitized(agentDefinitions, a -> isCommentObject(a.getAgentCode(), a.getUnknownFields()));

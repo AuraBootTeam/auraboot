@@ -16,11 +16,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import type {
+  BlockConfig,
   ButtonConfig,
   ColumnConfig,
   SubTableConfig,
   ValidationRule,
 } from '~/framework/meta/schemas/types';
+import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -47,6 +49,7 @@ import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry
 import { useAuth } from '~/contexts/AuthContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
+import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -57,6 +60,7 @@ export interface SubTableViewerProps {
   t?: (key: string) => string;
   isEditable?: boolean;
   onDataChange?: () => void;
+  runtime?: SchemaRuntime | null;
 }
 
 interface ChildFieldMeta {
@@ -98,6 +102,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   t = (key: string) => key,
   isEditable = false,
   onDataChange,
+  runtime,
 }) => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -1144,6 +1149,19 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   );
 
   const configuredRowActions = config.actions ?? config.rowActions ?? [];
+  const configuredToolbarActions = config.toolbarActions ?? [];
+  const toolbarBlock = useMemo<BlockConfig | null>(() => {
+    if (configuredToolbarActions.length === 0) return null;
+    return {
+      id: `subtable-toolbar-${config.childModel}`,
+      blockType: 'toolbar',
+      buttons: configuredToolbarActions,
+      record: {
+        ...(parentRecordData || {}),
+        pid: parentRecordPid,
+      },
+    } as BlockConfig;
+  }, [configuredToolbarActions, config.childModel, parentRecordData, parentRecordPid]);
   const hasConfiguredRowActions = configuredRowActions.length > 0;
   const hasActions =
     hasConfiguredRowActions ||
@@ -1235,6 +1253,15 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       className="rounded-card border-border overflow-x-auto border"
       data-testid="subtable-viewer"
     >
+      {toolbarBlock && runtime ? (
+        <div
+          className="border-border bg-subtle flex justify-end border-b px-4 py-3"
+          data-testid="subtable-toolbar-actions"
+        >
+          <ToolbarBlockRenderer block={toolbarBlock} runtime={runtime} />
+        </div>
+      ) : null}
+
       {/* Cross-row validation errors banner */}
       {crossRowErrors.length > 0 && (
         <div

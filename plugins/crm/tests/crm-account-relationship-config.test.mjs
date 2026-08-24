@@ -33,6 +33,7 @@ test('PAR-05 account relationships are a governed bidirectional customer detail 
     [
       'crm:create_account_relation',
       'crm:update_account_relation',
+      'crm:save_account_relation',
       'crm:delete_account_relation',
       'crm:detail_account_relation',
       'crm:list_account_relations',
@@ -67,6 +68,29 @@ test('PAR-05 account relationships are a governed bidirectional customer detail 
   assert.equal(incoming?.subTable?.parentField, 'crm_acr_target_account_id');
   assert.equal(incoming?.subTable?.readOnly, true);
   assert.deepEqual(incoming?.subTable?.actions?.map((action) => action.code), ['view']);
+});
+
+test('PAR-05 customer plan and compact relationship hierarchy stay DSL-first', async () => {
+  const [accountDetail, relationList] = await Promise.all([
+    json('../config/pages/crm_account_common_detail.json'),
+    json('../config/pages/crm_account_relation_common_list.json'),
+  ]);
+  const tabs = new Map(accountDetail.blocks.find((block) => block.id === 'crm_account_tabs')
+    ?.tabs?.map((tab) => [tab.key, tab]));
+  const plans = tabs.get('follow_plans');
+  const planTable = plans?.blocks?.find((block) => block.id === 'block_account_follow_plans');
+  assert.equal(planTable?.subTable?.dataSource?.params?.objectType, 'account');
+  assert.deepEqual(planTable?.subTable?.actions?.map((action) => action.code),
+    ['view_task', 'start_task', 'complete_task', 'cancel_task']);
+
+  const relationColumns = relationList.blocks.find((block) => block.id === 'relationship_table')
+    ?.columns?.filter((column) => !column.isActionColumn);
+  const saveAction = relationList.blocks.find((block) => block.id === 'relationship_toolbar')
+    ?.buttons?.find((button) => button.code === 'save');
+  assert.equal(saveAction?.action?.command, 'crm:save_account_relation');
+  assert.ok(relationColumns.reduce((sum, column) => sum + column.width, 0) <= 1000);
+  assert.ok(!relationColumns.some((column) => column.field === 'crm_acr_owner'));
+  assert.ok(relationColumns.some((column) => column.field === 'crm_acr_effective_to'));
 });
 
 test('PAR-05 relationship invariant rejects self, invalid-window and duplicate edges', async () => {

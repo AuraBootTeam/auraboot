@@ -22,12 +22,21 @@
         {
           "field": "crm_act_type",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "readOnlyWhen": "record.pid != null"
         },
         {
           "field": "crm_act_subject",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "placeholder": {
+            "zh-CN": "例如：确认采购决策链或完成现场拜访",
+            "en": "For example: confirm buying committee or complete site visit"
+          },
+          "helpText": {
+            "zh-CN": "用可识别的业务结果描述本次计划或记录。",
+            "en": "Describe the intended or completed business outcome."
+          }
         },
         {
           "field": "crm_act_date",
@@ -40,15 +49,39 @@
         },
         {
           "field": "crm_act_parent_id",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "选择要回复或补充的上级跟进",
+            "en": "Select the parent follow-up to reply to or supplement"
+          },
+          "helpText": {
+            "zh-CN": "仅在本条记录是另一条跟进的补充时选择。",
+            "en": "Use only when this entry supplements another follow-up."
+          }
         },
         {
           "field": "crm_act_files",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "上传会议纪要、照片或其他跟进证据",
+            "en": "Upload meeting notes, photos, or other follow-up evidence"
+          },
+          "helpText": {
+            "zh-CN": "附件会随本条跟进保留，避免放入敏感凭据。",
+            "en": "Attachments remain with this follow-up; do not upload credentials."
+          }
         },
         {
           "field": "crm_act_content",
-          "colSpan": 12
+          "colSpan": 12,
+          "placeholder": {
+            "zh-CN": "记录客户反馈、下一步和待确认事项",
+            "en": "Capture customer feedback, next steps, and open questions"
+          },
+          "helpText": {
+            "zh-CN": "跟进记录写已发生事实；跟进计划写预期动作和完成标准。",
+            "en": "Records describe completed facts; plans describe intended actions and completion criteria."
+          }
         }
       ]
     },
@@ -74,7 +107,15 @@
         },
         {
           "field": "crm_act_assignee",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "填写执行人业务账号",
+            "en": "Enter the assignee business account"
+          },
+          "helpText": {
+            "zh-CN": "执行人负责推进计划；活动负责人仍由系统记录。",
+            "en": "The assignee advances the plan; the activity owner remains system-managed."
+          }
         }
       ]
     },
@@ -88,7 +129,15 @@
       "fields": [
         {
           "field": "crm_act_duration",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：45",
+            "en": "For example: 45"
+          },
+          "helpText": {
+            "zh-CN": "填写通话或会议的实际分钟数。",
+            "en": "Enter the actual call or meeting duration in minutes."
+          }
         },
         {
           "field": "crm_act_direction",
@@ -96,7 +145,15 @@
         },
         {
           "field": "crm_act_location",
-          "colSpan": 6
+          "colSpan": 6,
+          "placeholder": {
+            "zh-CN": "例如：客户上海办公室或线上会议",
+            "en": "For example: customer Shanghai office or online meeting"
+          },
+          "helpText": {
+            "zh-CN": "填写可供团队识别的拜访或会议地点。",
+            "en": "Use a meeting or visit location recognizable to the team."
+          }
         },
         {
           "field": "crm_act_start_time",

@@ -9,6 +9,7 @@ bash -n scripts/oss-reset-and-init.sh
 bash -n scripts/reset-db.sh
 bash -n scripts/db/cleanup-scheduler-residue.sh
 bash -n scripts/import-plugins.sh
+bash -n scripts/oss-golden-stack.sh
 bash -n scripts/lib/reset-init-common.sh
 bash -n scripts/lib/runtime-process-owner.sh
 bash -n scripts/lib/test-runtime-process-owner.sh
@@ -26,6 +27,8 @@ bash -n scripts/oss-test.sh
 
 echo "[reset-init-contracts] node regression"
 node --test scripts/dev/lib/env-registry.test.mjs
+node --test scripts/dev/resolve-plugin-backends.test.mjs
+node --test web-admin/tests/e2e/product-catalog/row-contract.unit.mjs
 node --test scripts/reset-init-contracts.test.mjs
 node --test scripts/db/cleanup-scheduler-residue.test.mjs
 node --test scripts/audit-oss-plugins.test.mjs

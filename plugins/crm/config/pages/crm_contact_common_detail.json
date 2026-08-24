@@ -58,6 +58,10 @@
                   "readOnly": true
                 },
                 {
+                  "field": "crm_ct_owner",
+                  "readOnly": true
+                },
+                {
                   "field": "crm_ct_status",
                   "readOnly": true
                 },

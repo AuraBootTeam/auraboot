@@ -8,9 +8,9 @@
 |---|--:|---|
 | **gate** | 43 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
-| **entrypoint** | 26 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
+| **entrypoint** | 27 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
-| **tooling** | 66 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
+| **tooling** | 67 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
 | **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
 
 ## Conventions
@@ -80,7 +80,7 @@
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 
-## entrypoint (26)
+## entrypoint (27)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -104,6 +104,7 @@
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
+| `oss-backend-unit-ci.sh` | 1 | 2026-08-24 | Self-contained Linux CI runner for the complete OSS Gradle test task and its dedicated PostgreSQL/Redis dependencies. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
 | `p1-verify-in-docker.sh` | 0 | 2026-05-08 | P1' ACP platformization — docker isolated stack verification. |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
@@ -129,7 +130,7 @@
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 | `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
 
-## tooling (66)
+## tooling (67)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -157,6 +158,7 @@
 | `dev/prepare-bugfix-demo.sh` | 2 | 2026-05-22 | Prepare a running daily bugfix environment for OSS demo debugging. |
 | `dev/purge-private-pem-from-history.sh` | 1 | 2026-05-09 | Purge platform/src/main/resources/license/private.pem from the entire git |
 | `dev/r2-env-export.sh` | 8 | 2026-05-22 | r2-env-export.sh — single-line `source` to set up the env for an |
+| `dev/resolve-plugin-backends.mjs` | 3 | 2026-08-24 | Resolve requested plugin backends across the OSS root and explicit fallback roots for deterministic PF4J staging. |
 | `dev/run-agent-runtime-full-gate-docker.sh` | 2 | 2026-05-21 | Fresh isolated Docker gate for the canonical agent runtime chain. |
 | `dev/run-playwright-runner.sh` | 2 | 2026-05-12 | Run the optional Linux Playwright runner for an isolated stack. |
 | `dev/start-dev-infra.sh` | 4 | 2026-05-22 | Start per-worktree infrastructure only for daily host-mode development. |

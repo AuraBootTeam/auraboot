@@ -205,6 +205,7 @@
       "meta.command.execute",
       "data.datasource.read",
       "meta.query.read",
+      "dashboard.saved_view.update",
       "crm.account.manage",
       "crm.account.read",
       "crm.account.contact_unmask",

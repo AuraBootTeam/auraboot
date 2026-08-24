@@ -35,6 +35,7 @@ export interface ImportResultData {
   updated: number;
   errors: ImportRowError[];
   taskId?: string | null;
+  asyncTask?: boolean;
   errorReportUrl?: string | null;
   errorReportFailed?: boolean;
   errorReportExpired?: boolean;
@@ -75,6 +76,7 @@ interface BackendImportResult {
   errors?: ImportRowError[];
   hasErrors: boolean;
   taskId?: string | null;
+  asyncTask?: boolean;
   errorReportUrl?: string | null;
   errorReportFailed?: boolean;
   errorReportExpired?: boolean;
@@ -86,6 +88,10 @@ interface AsyncImportStatus {
   totalRows: number;
   processedRows: number;
   result?: BackendImportResult | null;
+}
+
+export function hasCompleteRowErrorContract(result: BackendImportResult): boolean {
+  return result.errorCount === 0 || (result.errors?.length ?? 0) > 0;
 }
 
 interface ImportFieldMeta {
@@ -123,9 +129,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [validation, setValidation] = useState<ValidationReport | null>(null);
   const [importResult, setImportResult] = useState<ImportResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [taskNotice, setTaskNotice] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [downloadingErrorReport, setDownloadingErrorReport] = useState(false);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isBusy =
     step === 'validating' || step === 'importing' || downloadingTemplate || downloadingErrorReport;
@@ -139,6 +148,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     setValidation(null);
     setImportResult(null);
     setError(null);
+    setTaskNotice(null);
+    setActiveTaskId(null);
+    setRetrying(false);
     setDragOver(false);
     setMode(modes[0]);
     setMatchKey(config?.updateKeys?.[0] || '');
@@ -349,14 +361,29 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           throw apiError(response, body);
         }
         const status = body.data.status.toLowerCase();
-        if (status === 'completed' && body.data.result) return body.data.result;
+        if (
+          status === 'completed' &&
+          body.data.result &&
+          hasCompleteRowErrorContract(body.data.result)
+        ) {
+          return body.data.result;
+        }
+        if (status === 'cancelled') {
+          throw new Error(
+            t(
+              'import.error.cancelled',
+              undefined,
+              '导入已取消。已提交的行保持不变，可使用同一文件重试。',
+            ),
+          );
+        }
         if (status === 'failed') {
           throw new Error(body.data.result?.errors?.[0]?.message || 'Import task failed');
         }
       }
       throw new Error('Import is still running. Check the task status later.');
     },
-    [modelCode],
+    [modelCode, t],
   );
 
   const presentResult = useCallback((result: BackendImportResult) => {
@@ -381,6 +408,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     if (!file || !validation?.valid) return;
     setStep('importing');
     setError(null);
+    setTaskNotice(null);
+    setRetrying(false);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -396,10 +425,17 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       if (!response.ok || !body || !ResultHelper.isSuccess(body) || !body.data) {
         throw apiError(response, body);
       }
-      const result = body.data.taskId ? await pollImport(body.data.taskId) : body.data;
+      if (body.data.taskId) setActiveTaskId(body.data.taskId);
+      const result =
+        body.data.taskId && body.data.asyncTask
+          ? await pollImport(body.data.taskId)
+          : body.data;
       presentResult(result);
+      setActiveTaskId(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Import failed');
+      setRetrying(true);
+      setActiveTaskId(null);
       setStep('preview');
     }
   }, [
@@ -412,6 +448,32 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     requestParams,
     validation?.valid,
   ]);
+
+  const handleCancelImport = useCallback(async () => {
+    if (!activeTaskId) return;
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/meta/excel/import/${modelCode}/cancel/${activeTaskId}`,
+        { method: 'post' },
+      );
+      const body = (await response.json().catch(() => undefined)) as
+        | ApiEnvelope<AsyncImportStatus>
+        | undefined;
+      if (!response.ok || !body || !ResultHelper.isSuccess(body)) {
+        throw apiError(response, body);
+      }
+      setTaskNotice(
+        t('import.cancelling', undefined, '正在取消导入，等待当前行安全结束…'),
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t('import.error.cancel_request', undefined, '取消导入失败，请重试。'),
+      );
+    }
+  }, [activeTaskId, modelCode, t]);
 
   const validationMessage = useCallback(
     (message: string) => {
@@ -875,9 +937,27 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 {error}
               </div>
             )}
+            {taskNotice && (
+              <div
+                role="status"
+                className="border-accent bg-accent-weak text-accent rounded-control mt-4 border p-3 text-sm"
+              >
+                {taskNotice}
+              </div>
+            )}
           </main>
 
           <footer className="border-border flex justify-end gap-3 border-t px-6 py-4">
+            {step === 'importing' && activeTaskId && (
+              <button
+                type="button"
+                data-testid="import-cancel-task"
+                onClick={() => void handleCancelImport()}
+                className="border-status-red text-status-red rounded-control border px-4 py-2 text-sm"
+              >
+                {t('import.cancel_task', undefined, '取消导入任务')}
+              </button>
+            )}
             <button
               type="button"
               disabled={isBusy}
@@ -896,7 +976,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 onClick={() => void handleImport()}
                 className="bg-accent rounded-control px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {t('import.start', { mode: modeLabel }, `开始${modeLabel}`)}
+                {retrying
+                  ? t('import.retry', undefined, '重试导入')
+                  : t('import.start', { mode: modeLabel }, `开始${modeLabel}`)}
               </button>
             )}
           </footer>

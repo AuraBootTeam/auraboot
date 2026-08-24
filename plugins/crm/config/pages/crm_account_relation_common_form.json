@@ -13,14 +13,22 @@
       "title": { "zh-CN": "关系信息", "en-US": "Relationship" },
       "columns": 2,
       "fields": [
-        { "field": "crm_acr_source_account_id", "required": true },
-        { "field": "crm_acr_target_account_id", "required": true },
+        { "field": "crm_acr_source_account_id", "required": true, "placeholder": { "zh-CN": "选择关系发起客户", "en-US": "Choose the source account" }, "helpText": { "zh-CN": "关系由此客户维护，并在关联客户侧只读投影。", "en-US": "This account owns the relationship; the related account sees a read-only projection." } },
+        { "field": "crm_acr_target_account_id", "required": true, "placeholder": { "zh-CN": "选择关联客户", "en-US": "Choose the related account" }, "helpText": { "zh-CN": "不能选择发起客户自身。", "en-US": "The related account must differ from the source account." } },
         { "field": "crm_acr_relation_type", "required": true },
         { "field": "crm_acr_strength", "required": true },
-        { "field": "crm_acr_status", "required": true },
+        { "field": "crm_acr_status", "required": true }
+      ]
+    },
+    {
+      "id": "relationship_validity",
+      "blockType": "form-section",
+      "title": { "zh-CN": "有效期与协作说明", "en-US": "Validity and Collaboration Notes" },
+      "columns": 2,
+      "fields": [
         { "field": "crm_acr_effective_from" },
         { "field": "crm_acr_effective_to" },
-        { "field": "crm_acr_notes", "span": 2 }
+        { "field": "crm_acr_notes", "span": 2, "placeholder": { "zh-CN": "例如：联合交付、渠道协同或季度复盘安排", "en-US": "For example: joint delivery, channel coordination, or quarterly review" }, "helpText": { "zh-CN": "记录双方协作背景与后续安排。", "en-US": "Capture the collaboration context and next steps." } }
       ]
     },
     {

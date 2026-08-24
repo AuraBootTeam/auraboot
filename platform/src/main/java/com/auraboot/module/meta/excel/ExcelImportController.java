@@ -135,7 +135,7 @@ public class ExcelImportController {
                 String taskId = importService.importExcelAsync(modelCode,
                         new java.io.ByteArrayInputStream(fileBytes), options, file.getOriginalFilename());
                 ExcelImportResult asyncResult = ExcelImportResult.builder()
-                        .totalRows(rowCount).taskId(taskId).build();
+                        .totalRows(rowCount).taskId(taskId).asyncTask(true).build();
                 return ApiResponse.success("Import started asynchronously", asyncResult);
             }
 
@@ -165,6 +165,18 @@ public class ExcelImportController {
         return status == null
                 ? ApiResponse.error("Task not found: " + taskId)
                 : ApiResponse.success(status);
+    }
+
+    /** Request cooperative cancellation of a running import owned by the current user. */
+    @PostMapping("/import/{modelCode}/cancel/{taskId}")
+    @RequirePermission("model.{modelCode}.import")
+    public ApiResponse<ExcelImportService.AsyncImportStatus> cancelImport(
+            @PathVariable String modelCode,
+            @PathVariable String taskId) {
+        ExcelImportService.AsyncImportStatus status = importService.cancelImport(modelCode, taskId);
+        return status == null
+                ? ApiResponse.error("Task not found: " + taskId)
+                : ApiResponse.success("Cancellation requested", status);
     }
 
     /**

@@ -139,7 +139,7 @@ export function CommandPalette() {
   const rootData = useRootLoaderData();
   const { t: rawT } = useI18n();
   const isHydrated = useHydrated();
-  const menus = rootData?.menus ?? [];
+  const menus = useMemo(() => rootData?.menus ?? [], [rootData?.menus]);
 
   // t() with fallback (I18nContext returns key if missing, so we detect and use fallback)
   const t = useCallback(
@@ -230,13 +230,9 @@ export function CommandPalette() {
                 params: { keyword: query, pageSize: '3', pageNum: '1' },
               });
               if (ResultHelper.isSuccess(resp) && resp.data?.records?.length > 0) {
-                return resp.data.records.map((r: any) => ({
-                  pid: r.pid || r.id,
-                  displayText: extractDisplayText(r),
-                  modelCode: model.code,
-                  modelName: model.name,
-                  path: `/p/${model.code}/view/${r.pid || r.id}`,
-                }));
+                return resp.data.records
+                  .map((record: unknown) => toRecordHit(record, model.code, model.name))
+                  .filter((hit: RecordHit | null): hit is RecordHit => hit !== null);
               }
             } catch {
               // Ignore individual model search failures
@@ -767,4 +763,22 @@ function extractDisplayText(record: any): string {
   }
 
   return record.pid || 'Unknown';
+}
+
+/** Build a public navigation hit without leaking or accepting internal database ids. */
+export function toRecordHit(
+  record: unknown,
+  modelCode: string,
+  modelName: string,
+): RecordHit | null {
+  if (!record || typeof record !== 'object') return null;
+  const row = record as Record<string, unknown>;
+  if (typeof row.pid !== 'string' || !row.pid.trim()) return null;
+  return {
+    pid: row.pid,
+    displayText: extractDisplayText(row),
+    modelCode,
+    modelName,
+    path: `/p/${modelCode}/view/${encodeURIComponent(row.pid)}`,
+  };
 }

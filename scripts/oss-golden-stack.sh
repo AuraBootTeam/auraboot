@@ -15,14 +15,16 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
 #                   otherwise refuses to run on a database that predates the current
 #                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
 #                   TABLE, so it cannot back-fill columns into tables that already exist).
-#   ./scripts/oss-golden-stack.sh import <name> [--plugin-profile P|--plugin X]
+#       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
+#                            sibling plugin repositories are never guessed implicitly.
+#   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
 #   ./scripts/oss-golden-stack.sh status <name>
@@ -85,53 +87,30 @@ web_admin_node_modules_seed() {
   return 1
 }
 
-# Resolve hybrid packages from the requested import profile/explicit plugin list,
-# build their PF4J jars from THIS checkout, and stage them before the backend starts.
+# Resolve backend packages from the requested import profile/explicit plugin list,
+# build their PF4J jars from the explicitly configured roots, and stage them before
+# the backend starts. A backend.jarPath declaration is the packaging denominator:
+# pluginType can drift, but a declared runtime backend must never be silently skipped.
 # Import-time handler validation is intentionally fail-closed: importing the DSL
-# first and hot-loading a jar later leaves a hybrid package impossible to install.
-stage_requested_hybrid_jars() {
-  local sd="$1" runtime_name="$2" plugin_profile="$3"; shift 3
-  local hybrid_specs=()
+# first and hot-loading a jar later leaves a backend package impossible to install.
+stage_requested_backend_jars() {
+  local sd="$1" runtime_name="$2"; shift 2
+  local backend_rows backend_specs=()
+  backend_rows="$(node "$SCRIPT_DIR/dev/resolve-plugin-backends.mjs" \
+    --repo-root "$REPO_ROOT" --format tsv "$@")" \
+    || die "could not resolve requested plugin backends"
 
-  while IFS='|' read -r plugin_name jar_rel; do
-    [ -n "$plugin_name" ] && hybrid_specs+=("$plugin_name|$jar_rel")
-  done < <(node - "$REPO_ROOT" "$plugin_profile" "$@" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
+  local plugin_name plugin_dir backend_dir jar_path
+  while IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path; do
+    [ -n "$plugin_name" ] && backend_specs+=("$plugin_name"$'\t'"$plugin_dir"$'\t'"$backend_dir"$'\t'"$jar_path")
+  done <<< "$backend_rows"
 
-const [repoRoot, profile, ...explicit] = process.argv.slice(2);
-const profiles = JSON.parse(
-  fs.readFileSync(path.join(repoRoot, 'scripts/dev/plugin-import-profiles.json'), 'utf8'),
-);
-const selected = [];
-if (profile && profile !== 'none') {
-  const configured = profiles[profile];
-  if (!Array.isArray(configured)) {
-    process.stderr.write(`Unknown plugin profile: ${profile}\n`);
-    process.exit(2);
-  }
-  selected.push(...configured);
-}
-selected.push(...explicit);
+  mkdir -p "$sd/pf4j-plugins"
+  find "$sd/pf4j-plugins" -maxdepth 1 -type f -name '*.jar' -delete
+  printf 'plugin\tplugin_dir\tsource_jar\tstaged_jar\tsha256\n' >"$sd/pf4j-staging.tsv"
+  [ "${#backend_specs[@]}" -gt 0 ] || return 0
 
-for (const pluginName of [...new Set(selected)]) {
-  const manifestPath = path.join(repoRoot, 'plugins', pluginName, 'plugin.json');
-  if (!fs.existsSync(manifestPath)) continue;
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (manifest.pluginType !== 'hybrid') continue;
-  const jarPath = manifest.backend?.jarPath;
-  if (!jarPath || typeof jarPath !== 'string') {
-    process.stderr.write(`Hybrid plugin ${pluginName} has no backend.jarPath\n`);
-    process.exit(2);
-  }
-  process.stdout.write(`${pluginName}|${jarPath}\n`);
-}
-NODE
-  )
-
-  [ "${#hybrid_specs[@]}" -gt 0 ] || return 0
-
-  log "4.5/9 build and stage ${#hybrid_specs[@]} hybrid PF4J jar(s) from current source"
+  log "4.5/9 build and stage ${#backend_specs[@]} PF4J backend jar(s) from explicit source roots"
   local maven_repo gradle_home
   maven_repo="$(runtime_env "$runtime_name" MAVEN_REPO_LOCAL)"
   gradle_home="$(runtime_env "$runtime_name" GRADLE_USER_HOME)"
@@ -140,30 +119,36 @@ NODE
   mkdir -p "$maven_repo" "$gradle_home"
   ( cd "$REPO_ROOT/platform" \
     && GRADLE_USER_HOME="$gradle_home" ./gradlew --no-daemon --no-build-cache \
-      -Dmaven.repo.local="$maven_repo" :platform-plugin-api:publishToMavenLocal --console=plain \
-  ) >"$sd/plugin-api-publish.log" 2>&1 \
-    || die "platform-plugin-api publish failed — see $sd/plugin-api-publish.log"
+      -Dmaven.repo.local="$maven_repo" \
+      :platform-plugin-api:publishToMavenLocal :publishToMavenLocal --console=plain \
+  ) >"$sd/platform-publications.log" 2>&1 \
+    || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
-  mkdir -p "$sd/pf4j-plugins"
-  local spec plugin_name jar_rel backend_dir jar_path
-  for spec in "${hybrid_specs[@]}"; do
-    plugin_name="${spec%%|*}"
-    jar_rel="${spec#*|}"
-    backend_dir="$REPO_ROOT/plugins/$plugin_name/backend"
-    jar_path="$REPO_ROOT/plugins/$plugin_name/$jar_rel"
-    [ -d "$backend_dir" ] || die "hybrid backend missing for $plugin_name: $backend_dir"
+  local spec staged_path jar_hash
+  for spec in "${backend_specs[@]}"; do
+    IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path <<< "$spec"
+    [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
     ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" "$REPO_ROOT/platform/gradlew" \
       --project-dir "$backend_dir" --no-daemon \
       -Dmaven.repo.local="$maven_repo" clean jar --console=plain ) \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
-      || die "hybrid jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
-    [ -f "$jar_path" ] || die "hybrid jar missing after build for $plugin_name: $jar_path"
+      || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
+    [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
     unzip -p "$jar_path" META-INF/extensions.idx 2>/dev/null \
       | grep -qE '^[^#[:space:]]' \
-      || die "hybrid jar has no registered PF4J extensions: $jar_path"
-    cp "$jar_path" "$sd/pf4j-plugins/"
-    log "    staged $plugin_name ($(shasum -a 256 "$jar_path" | awk '{print substr($1,1,12)}'))"
+      || die "plugin backend jar has no registered PF4J extensions: $jar_path"
+    staged_path="$sd/pf4j-plugins/$(basename "$jar_path")"
+    [ ! -e "$staged_path" ] || die "duplicate staged PF4J jar name: $staged_path"
+    cp "$jar_path" "$staged_path"
+    jar_hash="$(shasum -a 256 "$jar_path" | awk '{print $1}')"
+    [ "$jar_hash" = "$(shasum -a 256 "$staged_path" | awk '{print $1}')" ] \
+      || die "staged PF4J jar hash mismatch for $plugin_name"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$plugin_name" "$plugin_dir" "$jar_path" "$staged_path" "$jar_hash" \
+      >>"$sd/pf4j-staging.tsv"
+    log "    staged $plugin_name (${jar_hash:0:12})"
   done
+  log "    PF4J staging receipt: $sd/pf4j-staging.tsv"
 }
 
 poll_http() {  # poll_http <url> <pattern> <timeout-s> <label>
@@ -228,7 +213,8 @@ PY
 cmd_up() {
   local name="$1"; shift
   local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
-  local plugin_profile="" import_plugins=()
+  local plugin_profile="" import_plugins=() extra_plugin_roots=()
+  local extra_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
@@ -236,6 +222,17 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --extra-plugin-root)
+      [ -d "$2" ] || die "extra plugin root does not exist: $2"
+      extra_plugin_roots+=("$(cd "$2" && pwd)")
+      shift 2
+      ;;
+    --extra-plugin-root=*)
+      extra_root="${1#--extra-plugin-root=}"
+      [ -d "$extra_root" ] || die "extra plugin root does not exist: $extra_root"
+      extra_plugin_roots+=("$(cd "$extra_root" && pwd)")
+      shift
+      ;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
     --plugin) import_plugins+=("$2"); shift 2;;
     --plugins)
@@ -362,13 +359,18 @@ cmd_up() {
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
 
-  if [ "${#import_plugins[@]}" -gt 0 ]; then
-    stage_requested_hybrid_jars "$sd" "$name" "${plugin_profile:-none}" "${import_plugins[@]}"
-  else
-    # macOS Bash 3.2 + `set -u` treats an expansion of an empty array as an
-    # unbound variable even when it was declared above.
-    stage_requested_hybrid_jars "$sd" "$name" "${plugin_profile:-none}"
+  local staging_args=(--profile "${plugin_profile:-none}")
+  if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
+    for extra_root in "${extra_plugin_roots[@]}"; do
+      staging_args+=(--extra-plugin-root "$extra_root")
+    done
   fi
+  if [ "${#import_plugins[@]}" -gt 0 ]; then
+    for plugin_item in "${import_plugins[@]}"; do
+      staging_args+=(--plugin "$plugin_item")
+    done
+  fi
+  stage_requested_backend_jars "$sd" "$name" "${staging_args[@]}"
 
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
@@ -408,7 +410,18 @@ cmd_up() {
   log "    bootstrap OK ($ADMIN_EMAIL / $ADMIN_PASSWORD)"
 
   if [ -n "$plugin_profile" ] || [ "${#import_plugins[@]}" -gt 0 ]; then
-    cmd_import "$name" --plugin-profile "${plugin_profile:-none}" "${import_plugins[@]/#/--plugin=}"
+    local import_args=(--plugin-profile "${plugin_profile:-none}")
+    if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
+      for extra_root in "${extra_plugin_roots[@]}"; do
+        import_args+=(--extra-plugin-root "$extra_root")
+      done
+    fi
+    if [ "${#import_plugins[@]}" -gt 0 ]; then
+      for plugin_item in "${import_plugins[@]}"; do
+        import_args+=(--plugin "$plugin_item")
+      done
+    fi
+    cmd_import "$name" "${import_args[@]}"
   fi
 
   if [ "$frontend" -eq 1 ]; then
@@ -466,12 +479,24 @@ cmd_import() {
   read -r server_port _vite_port _bff_port <"$sd/ports"
 
   local plugin_profile="core" profile_explicit=0
-  local plugins=()
+  local plugins=() extra_plugin_roots=()
+  local extra_root
   while [ $# -gt 0 ]; do case "$1" in
     --plugin-profile) plugin_profile="$2"; profile_explicit=1; shift 2;;
     --plugin-profile=*) plugin_profile="${1#--plugin-profile=}"; profile_explicit=1; shift;;
     --profile) plugin_profile="$2"; profile_explicit=1; shift 2;;
     --profile=*) plugin_profile="${1#--profile=}"; profile_explicit=1; shift;;
+    --extra-plugin-root)
+      [ -d "$2" ] || die "extra plugin root does not exist: $2"
+      extra_plugin_roots+=("$(cd "$2" && pwd)")
+      shift 2
+      ;;
+    --extra-plugin-root=*)
+      extra_root="${1#--extra-plugin-root=}"
+      [ -d "$extra_root" ] || die "extra plugin root does not exist: $extra_root"
+      extra_plugin_roots+=("$(cd "$extra_root" && pwd)")
+      shift
+      ;;
     --plugin) plugins+=("$2"); shift 2;;
     --plugin=*) plugins+=("${1#--plugin=}"); shift;;
     --plugins)
@@ -501,6 +526,11 @@ cmd_import() {
   fi
 
   local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins")
+  if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
+    for extra_root in "${extra_plugin_roots[@]}"; do
+      args+=("--extra-plugin-root=$extra_root")
+    done
+  fi
   if [ "${#plugins[@]}" -gt 0 ]; then
     args+=("${plugins[@]}")
     log "6.5/9 import plugins (host-first): ${plugins[*]}"

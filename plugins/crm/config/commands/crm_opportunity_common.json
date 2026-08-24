@@ -121,6 +121,21 @@
       "negotiation"
     ],
     "toState": "closed_won",
+    "preconditions": [
+      {
+        "field": "crm_opp_expected_amount",
+        "operator": "GT",
+        "value": 0,
+        "message:zh-CN": "赢单前必须填写大于 0 的预期金额",
+        "message:en": "Expected amount must be greater than zero before marking the opportunity won"
+      },
+      {
+        "field": "crm_opp_expected_close_date",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "赢单前必须填写预计成交日期",
+        "message:en": "Expected close date is required before marking the opportunity won"
+      }
+    ],
     "extension": {
       "confirmMessage:zh-CN": "确认标记此商机为赢单？",
       "confirmMessage:en": "Confirm mark this opportunity as won?"
@@ -149,6 +164,21 @@
       "crm_opp_lost_reason",
       "crm_opp_lost_reason_code",
       "crm_opp_competitor"
+    ],
+    "preconditions": [
+      {
+        "field": "crm_opp_lost_reason_code",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "丢单前必须选择失败原因",
+        "message:en": "A loss reason is required before marking the opportunity lost"
+      },
+      {
+        "field": "crm_opp_lost_reason_code",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "丢单前必须选择失败原因",
+        "message:en": "A loss reason is required before marking the opportunity lost"
+      }
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认标记此商机为丢单？",

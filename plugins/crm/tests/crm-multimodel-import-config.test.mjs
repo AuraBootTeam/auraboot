@@ -28,7 +28,8 @@ test('CRM core models expose the supported insert and update import modes', () =
   });
   assert.deepEqual(model('crm_contact_common')?.extension?.importPolicy, {
     enabled: true,
-    modes: ['insert'],
+    modes: ['insert', 'update'],
+    updateKeys: ['crm_ct_email'],
   });
   assert.deepEqual(model('crm_lead_common')?.extension?.importPolicy, {
     enabled: true,

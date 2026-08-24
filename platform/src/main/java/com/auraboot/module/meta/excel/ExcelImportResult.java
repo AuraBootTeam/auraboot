@@ -33,6 +33,9 @@ public class ExcelImportResult {
     private boolean hasErrors;
     /** Task ID for async imports. Null for synchronous imports. */
     private String taskId;
+    /** True only when taskId identifies an asynchronous execution that must be polled. */
+    @Builder.Default
+    private boolean asyncTask = false;
     /** Authorized API URL for downloading a failed-row correction workbook. */
     private String errorReportUrl;
     /** True when row errors exist but the correction workbook could not be generated. */

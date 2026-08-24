@@ -19,7 +19,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 59);
+  assert.equal(committed.axes.commands.length, 60);
   assert.equal(committed.axes.pages.length, 34);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 40);
@@ -45,14 +45,14 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     ],
   );
   assert.equal(committed.scope.productDenominator.pages, 128);
-  assert.equal(committed.scope.productDenominator.commands, 247);
+  assert.equal(committed.scope.productDenominator.commands, 250);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 413);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1761);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 624);
-  assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 735);
-  assert.equal(committed.scope.productVerdicts.untested, 2749);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 419);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1773);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 640);
+  assert.equal(committed.scope.productDenominator.queries, 56);
+  assert.equal(committed.scope.productVerdicts.pass, 736);
+  assert.equal(committed.scope.productVerdicts.untested, 2786);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -171,13 +171,13 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const contactFollowupLifecycleContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
   );
-  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 10);
-  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 6);
+  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 14);
+  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 7);
   assert.equal(contactFollowupLifecycleContract.expectedCoverage.pages.length, 3);
-  assert.equal(contactFollowupLifecycleContract.expectedCoverage.blocks.length, 6);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.blocks.length, 7);
   assert.equal(contactFollowupLifecycleContract.expectedCoverage.fields.length, 11);
-  assert.equal(contactFollowupLifecycleContract.expectedCoverage.uiActions.length, 7);
-  assert.equal(contactFollowupLifecycleContract.expectedCoverage.commands.length, 7);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.uiActions.length, 9);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.commands.length, 10);
   assert.equal(contactFollowupLifecycleContract.expectedTechnicalVerdict, 'pass');
   assert.equal(
     contactFollowupLifecycleContract.expectedDataMigration,

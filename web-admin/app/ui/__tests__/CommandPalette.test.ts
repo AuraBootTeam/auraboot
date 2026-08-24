@@ -12,7 +12,7 @@ vi.mock('~/root-data', () => ({
   useRootLoaderData: () => ({ menus: [] }),
 }));
 
-import { loadRecent, saveRecent } from '~/ui/CommandPalette';
+import { loadRecent, saveRecent, toRecordHit } from '~/ui/CommandPalette';
 
 describe('CommandPalette local storage recovery', () => {
   const storage = new Map<string, string>();
@@ -68,5 +68,28 @@ describe('CommandPalette local storage recovery', () => {
       '7',
       '8',
     ]);
+  });
+});
+
+describe('CommandPalette public record identity', () => {
+  it('builds record navigation from pid only', () => {
+    expect(
+      toRecordHit(
+        { pid: '01KPUBLIC', id: 9_007_199_254_740_993n, crm_acc_name: 'Acme' },
+        'crm_account_common',
+        'Accounts',
+      ),
+    ).toEqual({
+      pid: '01KPUBLIC',
+      displayText: 'Acme',
+      modelCode: 'crm_account_common',
+      modelName: 'Accounts',
+      path: '/p/crm_account_common/view/01KPUBLIC',
+    });
+  });
+
+  it('fails closed when a search response exposes only an internal id', () => {
+    expect(toRecordHit({ id: 42, crm_acc_name: 'Internal only' }, 'crm_account_common', 'Accounts'))
+      .toBeNull();
   });
 });

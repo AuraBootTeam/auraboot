@@ -176,8 +176,7 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
     await createComment(page, relatedActivityPid, commentText);
 
     const subjects = [directSubject, relatedSubject];
-    await openActivities(page, `/p/crm_lead_common/view/${lead.recordId}`, [relatedSubject]);
-    await expect(page.getByTestId('activity-timeline').first().getByText(directSubject)).toHaveCount(0);
+    await openActivities(page, `/p/crm_lead_common/view/${lead.recordId}`, subjects);
     screenshots.push(await screenshot(page, testInfo, '01-lead-history-before-conversion'));
 
     const convertButton = page.getByRole('button', { name: /转化线索|Convert Lead/ }).first();

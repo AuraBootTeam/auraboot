@@ -473,6 +473,12 @@ record_share:
   update_failed: 更新协作权限失败
   load_failed: 加载协作成员失败
   current_members: 当前协作成员
+  select_all: 全选
+  remove_selected: 移除所选
+  batch_confirm: 确认移除选中的 {count} 位协作成员？
+  confirm_remove: 确认移除
+  batch_removed: 已移除所选协作成员
+  batch_remove_failed: 批量移除协作成员失败
   empty_title: 暂无协作成员
   empty_description: 选择成员和权限即可开始协作
   unavailable_member: 成员已不可用
