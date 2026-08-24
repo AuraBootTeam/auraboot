@@ -675,8 +675,9 @@ public class TestSeedController {
             return;
         }
 
-        // Minimum payload covers both NOT NULL columns (crm_acc_code, crm_acc_name).
-        // Optional fields populated for realistic list/detail rendering in smoke tests.
+        // Minimum payload follows the current CRM account creation contract. Pool state is
+        // required and read-only in the page schema, so test fixtures must supply the same
+        // initial "owned" state that the production create command assigns.
         List<Map<String, Object>> demoRecords = List.of(
                 buildCrmAccountPayload("E2E-ACC-001", "E2E Demo Account Alpha",
                         "technology", "active", "A"),
@@ -696,7 +697,7 @@ public class TestSeedController {
         log.info("Seeded {} crm_account_common demo record(s) for E2E tenant {}", created, tenant.getId());
     }
 
-    private Map<String, Object> buildCrmAccountPayload(String code, String name,
+    static Map<String, Object> buildCrmAccountPayload(String code, String name,
             String industry, String status, String rating) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("crm_acc_code", code);
@@ -704,6 +705,7 @@ public class TestSeedController {
         payload.put("crm_acc_industry", industry);
         payload.put("crm_acc_status", status);
         payload.put("crm_acc_rating", rating);
+        payload.put("crm_acc_pool_state", "owned");
         return payload;
     }
 
