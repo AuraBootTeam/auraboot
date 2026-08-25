@@ -50,6 +50,7 @@
       "crm_acc_website",
       "crm_acc_phone",
       "crm_acc_address",
+      "crm_acc_owner",
       "crm_acc_rating",
       "crm_acc_status",
       "crm_acc_remark"
@@ -59,6 +60,19 @@
     ],
     "agent_hint": "Update an existing crm account record. Editable fields: name, industry, website, phone, address.",
     "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:merge_account",
+    "displayName:zh-CN": "合并客户",
+    "displayName:en": "Merge Account",
+    "type": "custom",
+    "modelCode": "crm_account_common",
+    "handler": "crm:merge_account",
+    "permissions": [
+      "crm.account.manage"
+    ],
+    "agent_hint": "Merge the source account into a distinct owned target account, move all open-core child records and remove the source account.",
+    "cmd_risk_level": "L3"
   },
   {
     "code": "crm:delete_account",

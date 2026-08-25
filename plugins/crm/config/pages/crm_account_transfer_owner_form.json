@@ -1,0 +1,55 @@
+{
+  "pageKey": "crm_account_transfer_owner_form",
+  "name:zh-CN": "转移客户负责人",
+  "name:en": "Transfer Account Owner",
+  "modelCode": "crm_account_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "account_context",
+      "blockType": "form-section",
+      "title": { "zh-CN": "待转移客户", "en": "Account to Transfer" },
+      "fields": [
+        { "field": "crm_acc_name", "colSpan": 6, "readOnly": true },
+        { "field": "crm_acc_code", "colSpan": 6, "readOnly": true },
+        { "field": "crm_acc_status", "colSpan": 6, "readOnly": true },
+        { "field": "crm_acc_pool_state", "colSpan": 6, "readOnly": true }
+      ]
+    },
+    {
+      "id": "new_owner",
+      "blockType": "form-section",
+      "title": { "zh-CN": "选择新负责人", "en": "Choose New Owner" },
+      "description": {
+        "zh-CN": "提交后由客户更新命令原子变更负责人，并立即收敛数据权限。",
+        "en": "Submission atomically changes ownership and immediately reconciles record access."
+      },
+      "fields": [
+        {
+          "field": "crm_acc_owner",
+          "colSpan": 12,
+          "required": true,
+          "readOnly": false,
+          "renderComponent": "memberpicker",
+          "props": { "multiple": false }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "transfer_owner_confirm",
+          "primary": true,
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "确认转移", "en": "Confirm Transfer" },
+          "action": { "type": "command", "command": "crm:update_account" }
+        },
+        { "code": "cancel", "label": { "zh-CN": "取消", "en": "Cancel" } }
+      ]
+    }
+  ]
+}

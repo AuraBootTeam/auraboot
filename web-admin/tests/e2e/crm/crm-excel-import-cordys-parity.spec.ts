@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { test, expect, type Page } from '../../fixtures';
 import { read as xlsxRead, utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { loginViaUI } from '../../helpers/wd-fixtures';
@@ -6,6 +8,13 @@ const MODEL = 'crm_account_common';
 const EVIDENCE_DIR =
   process.env.CRM_IMPORT_EVIDENCE_DIR ||
   '/Users/ghj/work/auraboot/.workspace/evidence/crm-excel-import-cordys-20260813-s133-r1';
+const SOURCE_IDS = [
+  'api:customer:customer:download-import-tpl',
+  'api:customer:customer:pre-check',
+  'api:customer:customer:real-import',
+] as const;
+const completedSourceIds = new Set<string>();
+const sourceScreenshots: string[] = [];
 
 function workbook(rows: Array<Record<string, unknown>>, template?: Buffer): Buffer {
   const book = template ? xlsxRead(template, { type: 'buffer' }) : XLSXUtils.book_new();
@@ -19,7 +28,11 @@ function workbook(rows: Array<Record<string, unknown>>, template?: Buffer): Buff
         Object.entries(row).map(([key, value]) => [actualHeader.get(key) || key, value]),
       ),
     );
-    XLSXUtils.sheet_add_json(sheet, filledRows, { header: headers, origin: 'A2', skipHeader: true });
+    XLSXUtils.sheet_add_json(sheet, filledRows, {
+      header: headers,
+      origin: 'A2',
+      skipHeader: true,
+    });
   } else {
     XLSXUtils.book_append_sheet(book, XLSXUtils.json_to_sheet(rows), 'Import');
   }
@@ -29,8 +42,9 @@ function workbook(rows: Array<Record<string, unknown>>, template?: Buffer): Buff
 function templateHeaders(template: Buffer): string[] {
   const book = xlsxRead(template, { type: 'buffer' });
   const sheet = book.Sheets[book.SheetNames[0]];
-  return ((XLSXUtils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })[0] || []) as unknown[])
-    .map(String);
+  return (
+    (XLSXUtils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })[0] || []) as unknown[]
+  ).map(String);
 }
 
 async function downloadTemplate(page: Page): Promise<Buffer> {
@@ -100,11 +114,41 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     try {
       for (const pid of accountPids) {
         const cleanup = await context.request.delete(`/api/dynamic/${MODEL}/${pid}`);
-        expect(cleanup.ok(), `failed to clean CRM import fixture ${pid}: ${await cleanup.text()}`).toBeTruthy();
+        expect(
+          cleanup.ok(),
+          `failed to clean CRM import fixture ${pid}: ${await cleanup.text()}`,
+        ).toBeTruthy();
       }
     } finally {
       await context.close();
     }
+
+    const evidenceRoot = process.env.AURA_EVIDENCE_ROOT || EVIDENCE_DIR;
+    const sourceIds = SOURCE_IDS.map((sourceId) => ({
+      sourceId,
+      verdict: completedSourceIds.has(sourceId) ? 'pass' : 'untested',
+    }));
+    const verdict = sourceIds.every((item) => item.verdict === 'pass') ? 'pass' : 'fail';
+    mkdirSync(evidenceRoot, { recursive: true });
+    writeFileSync(
+      path.join(evidenceRoot, `crm-account-import-${Date.now()}.json`),
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          runId: process.env.CRM_ACCOUNT_IMPORT_RUN_ID || `crm-account-import-${Date.now()}`,
+          runtime: process.env.AURA_RUNTIME_NAME || null,
+          verdict,
+          technicalVerdict: verdict,
+          dataMigration: 'not-required-development-stage',
+          runner: { browser: 'chromium', workers: 1, retries: 0 },
+          sourceIds,
+          screenshots: sourceScreenshots,
+          productOwnerScreenshotSignOff: 'pending-human-signature',
+        },
+        null,
+        2,
+      )}\n`,
+    );
   });
 
   test('CEI-001 INSERT: precheck, command defaults, result and screenshot', async ({ page }) => {
@@ -119,26 +163,34 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     await openImport(page);
 
     insertTemplate = await downloadTemplate(page);
+    completedSourceIds.add('api:customer:customer:download-import-tpl');
     const headers = templateHeaders(insertTemplate);
     expect(headers.some((header) => header.includes('客户名称'))).toBeTruthy();
     expect(headers.some((header) => header.includes('crm_acc_'))).toBeFalsy();
 
-    await upload(page, `crm-account-insert-${suffix}.xlsx`, [
-      {
-        客户名称: accountName,
-        行业: 'manufacturing',
-        网站: 'https://before.example.test',
-        电话: '021-55550001',
-        备注: 'Cordys parity insert',
-      },
-    ], insertTemplate);
+    await upload(
+      page,
+      `crm-account-insert-${suffix}.xlsx`,
+      [
+        {
+          客户名称: accountName,
+          行业: 'manufacturing',
+          网站: 'https://before.example.test',
+          电话: '021-55550001',
+          备注: 'Cordys parity insert',
+        },
+      ],
+      insertTemplate,
+    );
 
     await expect(page.getByText('预检通过，可以导入')).toBeVisible();
+    completedSourceIds.add('api:customer:customer:pre-check');
     await expect(page.getByTestId('import-submit')).toBeEnabled();
     await page.screenshot({
       path: `${EVIDENCE_DIR}/01-insert-precheck.png`,
       fullPage: true,
     });
+    sourceScreenshots.push(`${EVIDENCE_DIR}/01-insert-precheck.png`);
 
     await page.getByTestId('import-submit').click();
     const result = page.getByTestId('import-result');
@@ -146,6 +198,7 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     await expect(page.getByTestId('import-result-created')).toHaveText('1');
     await expect(page.getByTestId('import-result-failed')).toHaveText('0');
     await page.screenshot({ path: `${EVIDENCE_DIR}/02-insert-result.png`, fullPage: true });
+    sourceScreenshots.push(`${EVIDENCE_DIR}/02-insert-result.png`);
 
     const record = await findAccount(page, accountName);
     accountPid = String(record.pid);
@@ -153,6 +206,7 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     expect(String(record.crm_acc_code)).toMatch(/^ACC-\d{8}-\d+$/);
     expect(record.crm_acc_status).toBe('active');
     expect(record.crm_acc_website).toBe('https://before.example.test');
+    completedSourceIds.add('api:customer:customer:real-import');
   });
 
   test('CEI-002 UPDATE: code match, no create, blank cell preserves value', async ({ page }) => {
@@ -166,14 +220,19 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     await page.getByTestId('import-mode-update').click();
     updateTemplate = await downloadTemplate(page);
 
-    await upload(page, `crm-account-update-${suffix}.xlsx`, [
-      {
-        客户编号: accountCode,
-        客户名称: `${accountName} Updated`,
-        网站: '',
-        电话: '021-55559999',
-      },
-    ], updateTemplate);
+    await upload(
+      page,
+      `crm-account-update-${suffix}.xlsx`,
+      [
+        {
+          客户编号: accountCode,
+          客户名称: `${accountName} Updated`,
+          网站: '',
+          电话: '021-55559999',
+        },
+      ],
+      updateTemplate,
+    );
 
     await expect(page.getByText('预检通过，可以导入')).toBeVisible();
     await page.getByTestId('import-submit').click();
@@ -197,15 +256,16 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15_000 });
     await openImport(page);
 
-    await upload(page, `crm-account-invalid-${suffix}.xlsx`, [
-      { 客户名称: '', 电话: '021-00000000' },
-    ], insertTemplate);
+    await upload(
+      page,
+      `crm-account-invalid-${suffix}.xlsx`,
+      [{ 客户名称: '', 电话: '021-00000000' }],
+      insertTemplate,
+    );
 
     await expect(page.getByText('预检未通过，请修正文件')).toBeVisible();
     await expect(page.getByTestId('import-submit')).toBeDisabled();
-    await expect(
-      page.getByTestId('import-validation-summary').getByText(/客户名称/),
-    ).toBeVisible();
+    await expect(page.getByTestId('import-validation-summary').getByText(/客户名称/)).toBeVisible();
     await expect(page.getByTestId('import-validation-summary')).not.toContainText('crm_acc_name');
     await page.screenshot({ path: `${EVIDENCE_DIR}/04-invalid-blocked.png`, fullPage: true });
   });
@@ -259,16 +319,16 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     }
   });
 
-  test('CEI-005 async INSERT: persisted job completes and returns all rows', async ({ page }) => {
-    const asyncNames = [1, 2, 3].map((index) => `Cordys Async ${suffix}-${index}`);
+  test('CEI-005 small INSERT stays synchronous and returns all rows', async ({ page }) => {
+    const synchronousNames = [1, 2, 3].map((index) => `Cordys Sync ${suffix}-${index}`);
 
     await page.goto(`/p/${MODEL}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15_000 });
     await openImport(page);
     await upload(
       page,
-      `crm-account-async-${suffix}.xlsx`,
-      asyncNames.map((name, index) => ({
+      `crm-account-sync-${suffix}.xlsx`,
+      synchronousNames.map((name, index) => ({
         客户名称: name,
         行业: 'manufacturing',
         电话: `021-5555010${index}`,
@@ -287,7 +347,8 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     expect(importResponse.ok(), await importResponse.text()).toBeTruthy();
     const importBody = await importResponse.json();
     const taskId = String(importBody?.data?.taskId ?? '');
-    expect(taskId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(taskId).toBe('');
+    expect(importBody?.data?.asyncTask).toBe(false);
 
     const result = page.getByTestId('import-result');
     await expect(result).toContainText('导入完成', { timeout: 30_000 });
@@ -295,16 +356,9 @@ test.describe('CRM Excel import — Cordys parity slice', () => {
     await expect(page.getByTestId('import-result-failed')).toHaveText('0');
     await expect(page.getByTestId('import-result-total')).toHaveText('3');
 
-    const statusResponse = await page.request.get(
-      `/api/meta/excel/import/${MODEL}/status/${taskId}`,
-    );
-    expect(statusResponse.ok(), await statusResponse.text()).toBeTruthy();
-    const statusBody = await statusResponse.json();
-    expect(String(statusBody?.data?.status).toLowerCase()).toBe('completed');
-    expect(statusBody?.data?.processedRows).toBe(3);
-    await page.screenshot({ path: `${EVIDENCE_DIR}/06-async-result.png`, fullPage: true });
+    await page.screenshot({ path: `${EVIDENCE_DIR}/06-sync-result.png`, fullPage: true });
 
-    for (const name of asyncNames) {
+    for (const name of synchronousNames) {
       const record = await findAccount(page, name);
       accountPids.add(String(record.pid));
       expect(String(record.crm_acc_code)).toMatch(/^ACC-\d{8}-\d+$/);

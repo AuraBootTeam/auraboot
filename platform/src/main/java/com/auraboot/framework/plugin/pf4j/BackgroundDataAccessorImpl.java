@@ -7,8 +7,13 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -31,9 +36,32 @@ import java.util.function.Supplier;
 public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
 
     private final DynamicDataService dynamicDataService;
+    private final BackgroundDataBatchService batchService;
+    private final String transactionResourceId;
+    private final TransactionTemplate transactionTemplate;
 
+    /** Lightweight constructor retained for hermetic callers that only use the legacy methods. */
     public BackgroundDataAccessorImpl(DynamicDataService dynamicDataService) {
+        this(dynamicDataService, null, null, null);
+    }
+
+    public BackgroundDataAccessorImpl(DynamicDataService dynamicDataService,
+                                      BackgroundDataBatchService batchService,
+                                      @Qualifier("dataSource") DataSource dataSource) {
+        this(dynamicDataService, batchService, dataSource, null);
+    }
+
+    @Autowired
+    public BackgroundDataAccessorImpl(DynamicDataService dynamicDataService,
+                                      BackgroundDataBatchService batchService,
+                                      @Qualifier("dataSource") DataSource dataSource,
+                                      PlatformTransactionManager transactionManager) {
         this.dynamicDataService = dynamicDataService;
+        this.batchService = batchService;
+        this.transactionResourceId = dataSource == null
+                ? null : TransactionResourceIdentityRegistry.identityOf(dataSource);
+        this.transactionTemplate = transactionManager == null
+                ? null : new TransactionTemplate(transactionManager);
     }
 
     @Override
@@ -81,6 +109,42 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
             PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
             return result.getRecords() != null ? result.getRecords() : List.<Map<String, Object>>of();
         });
+    }
+
+    @Override
+    public BoundedPage queryPage(long tenantId,
+                                 String modelCode,
+                                 Map<String, Object> exactFilters,
+                                 String afterRecordPid,
+                                 int limit) {
+        BackgroundDataBatchService service = requireBatchService("bounded-page");
+        return withTenant(tenantId, () -> service.queryPage(
+                modelCode, exactFilters, afterRecordPid, limit));
+    }
+
+    @Override
+    public List<Map<String, Object>> claimBatch(long tenantId, BatchClaimRequest request) {
+        BackgroundDataBatchService service = requireBatchService("atomic-claim");
+        return withTenant(tenantId, () -> service.claimBatch(tenantId, request));
+    }
+
+    @Override
+    public String transactionResourceId() {
+        if (transactionResourceId == null || transactionResourceId.isBlank()) {
+            throw new UnsupportedOperationException(
+                    "BackgroundDataAccessor transaction-resource identity is unavailable");
+        }
+        return transactionResourceId;
+    }
+
+    @Override
+    public void executeInTransaction(Runnable work) {
+        if (transactionTemplate == null) {
+            throw new UnsupportedOperationException(
+                    "BackgroundDataAccessor transaction-execution capability is unavailable");
+        }
+        java.util.Objects.requireNonNull(work, "work");
+        transactionTemplate.executeWithoutResult(status -> work.run());
     }
 
     @Override
@@ -184,5 +248,13 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
                 MetaContext.clear();
             }
         }
+    }
+
+    private BackgroundDataBatchService requireBatchService(String capability) {
+        if (batchService == null) {
+            throw new UnsupportedOperationException(
+                    "BackgroundDataAccessor " + capability + " capability is unavailable");
+        }
+        return batchService;
     }
 }

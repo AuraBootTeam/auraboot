@@ -182,6 +182,109 @@ public class DynamicSqlProvider {
         return sql.toString();
     }
 
+    /**
+     * Build one PostgreSQL lease-claim statement.
+     *
+     * <p>Every identifier has already been resolved from model metadata and is validated again
+     * here. Every value remains a MyBatis bound parameter. The candidate locks and mutation live
+     * in one statement, so concurrent workers either lock disjoint rows through
+     * {@code SKIP LOCKED} or observe the post-claim values.</p>
+     */
+    @SuppressWarnings("unchecked")
+    public static String atomicBatchClaimReturning(Map<String, Object> params) {
+        String tableName = requireName((String) params.get("tableName"), "table name");
+        String pkColumn = requireName((String) params.get("pkColumn"), "primary key column");
+        Map<String, Object> exact = (Map<String, Object>) params.get("exactFilters");
+        Map<String, List<Object>> in = (Map<String, List<Object>>) params.get("inFilters");
+        Map<String, Object> notAfter = (Map<String, Object>) params.get("notAfterFilters");
+        Map<String, Object> updates = (Map<String, Object>) params.get("claimValues");
+        List<String> orderBy = (List<String>) params.get("orderByColumns");
+        boolean dynamicTable = tableName.startsWith(
+                com.auraboot.framework.meta.constant.SystemFieldConstants.DYNAMIC_TABLE_PREFIX);
+
+        if (updates == null || updates.isEmpty()) {
+            throw new IllegalArgumentException("Atomic batch claim values cannot be empty");
+        }
+
+        StringBuilder sql = new StringBuilder("WITH candidates AS (SELECT ")
+                .append(pkColumn).append(" FROM ").append(tableName)
+                .append(" WHERE tenant_id = #{tenantId}");
+        appendExactPredicates(sql, exact);
+        appendInPredicates(sql, in);
+        appendUpperBoundPredicates(sql, notAfter);
+        if (Boolean.TRUE.equals(params.get("softDelete"))) {
+            sql.append(" AND (deleted_flag = FALSE OR deleted_flag IS NULL)");
+        }
+        sql.append(" ORDER BY ");
+        boolean firstOrder = true;
+        if (orderBy != null) {
+            for (String column : orderBy) {
+                requireName(column, "claim order column");
+                if (!firstOrder) sql.append(", ");
+                sql.append(column).append(" ASC");
+                firstOrder = false;
+            }
+        }
+        if (!firstOrder) sql.append(", ");
+        sql.append(pkColumn).append(" ASC")
+                .append(" LIMIT #{limit} FOR UPDATE SKIP LOCKED) ")
+                .append("UPDATE ").append(tableName).append(" AS target SET ");
+
+        boolean firstUpdate = true;
+        for (String column : updates.keySet()) {
+            requireName(column, "claim update column");
+            if (!firstUpdate) sql.append(", ");
+            sql.append(column).append(" = #{claimValues.").append(column).append("}");
+            firstUpdate = false;
+        }
+        if (dynamicTable) {
+            sql.append(", row_version = target.row_version + 1")
+                    .append(", updated_at = now()")
+                    .append(", updated_by = #{currentUserId}");
+        }
+        sql.append(" FROM candidates WHERE target.").append(pkColumn)
+                .append(" = candidates.").append(pkColumn)
+                .append(" AND target.tenant_id = #{tenantId}")
+                .append(" RETURNING target.*");
+        return sql.toString();
+    }
+
+    private static void appendExactPredicates(StringBuilder sql, Map<String, Object> filters) {
+        if (filters == null) return;
+        for (String column : filters.keySet()) {
+            requireName(column, "exact filter column");
+            sql.append(" AND ").append(column)
+                    .append(" = #{exactFilters.").append(column).append("}");
+        }
+    }
+
+    private static void appendInPredicates(StringBuilder sql, Map<String, List<Object>> filters) {
+        if (filters == null) return;
+        for (Map.Entry<String, List<Object>> entry : filters.entrySet()) {
+            String column = requireName(entry.getKey(), "IN filter column");
+            List<Object> values = entry.getValue();
+            if (values == null || values.isEmpty()) {
+                throw new IllegalArgumentException("IN filter values cannot be empty");
+            }
+            sql.append(" AND ").append(column).append(" IN (");
+            for (int i = 0; i < values.size(); i++) {
+                if (i > 0) sql.append(", ");
+                sql.append("#{inFilters.").append(column).append("[").append(i).append("]}");
+            }
+            sql.append(")");
+        }
+    }
+
+    private static void appendUpperBoundPredicates(
+            StringBuilder sql, Map<String, Object> filters) {
+        if (filters == null) return;
+        for (String column : filters.keySet()) {
+            requireName(column, "upper-bound filter column");
+            sql.append(" AND ").append(column)
+                    .append(" <= #{notAfterFilters.").append(column).append("}");
+        }
+    }
+
     public static String delete(Map<String, Object> params) {
         String tableName = requireName((String) params.get("tableName"), "table name");
         @SuppressWarnings("unchecked")

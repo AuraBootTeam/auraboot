@@ -68,6 +68,7 @@ const CORDYS_SOURCE_IDS = [
   'api:customer:customer-relation:add',
   'api:customer:customer-relation:update',
   'api:customer:customer-relation:delete',
+  'api:customer:customer-relation:save',
 ] as const;
 
 test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {

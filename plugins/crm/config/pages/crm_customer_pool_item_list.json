@@ -184,23 +184,8 @@
           "mobileOnly": true,
           "visibleWhen": "record.crm_cpi_status == 'available'",
           "action": {
-            "type": "command",
-            "command": "crm:assign_pool_customer",
-            "operationType": "update",
-            "inputFieldsTitle": { "zh-CN": "分配池内客户", "en": "Assign Pooled Customer" },
-            "inputFields": [
-              {
-                "field": "crm_cpi_claimed_by",
-                "label": { "zh-CN": "分配给", "en": "Assign To" },
-                "type": "reference",
-                "component": "MemberPicker",
-                "required": true,
-                "placeholder": { "zh-CN": "选择该公海池内的销售成员", "en": "Select a sales member in this pool" },
-                "helpText": { "zh-CN": "分配会校验成员资格与客户库容，并立即收敛数据权限。", "en": "Assignment validates pool membership and customer capacity, then narrows record access immediately." },
-                "props": { "multiple": false }
-              }
-            ],
-            "reload": ["poolStats", "poolQueue"]
+            "type": "navigate",
+            "to": "crm_customer_pool_assign_form"
           }
         },
       {

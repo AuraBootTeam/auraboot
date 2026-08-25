@@ -5,6 +5,49 @@
   "modelCode": "crm_account_common",
   "kind": "list",
   "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        {
+          "id": "all",
+          "label": { "zh-CN": "全部", "en": "All" }
+        },
+        {
+          "id": "active",
+          "label": { "zh-CN": "活跃客户", "en": "Active" },
+          "filter": { "field": "crm_acc_status", "op": "EQ", "value": "active" }
+        },
+        {
+          "id": "in_pool",
+          "label": { "zh-CN": "公海客户", "en": "Public Pool" },
+          "filter": { "field": "crm_acc_pool_state", "op": "EQ", "value": "in_pool" }
+        },
+        {
+          "id": "inactive",
+          "label": { "zh-CN": "已停用", "en": "Inactive" },
+          "filter": { "field": "crm_acc_status", "op": "EQ", "value": "inactive" }
+        }
+      ],
+      "defaultSort": [
+        { "field": "created_at", "direction": "DESC" }
+      ],
+      "card": {
+        "title": { "field": "crm_acc_name" },
+        "subtitle": { "template": "{{crm_acc_code}} · {{crm_acc_industry}}" },
+        "badges": [
+          { "field": "crm_acc_status", "renderer": "statusBadge" },
+          { "field": "crm_acc_pool_state", "renderer": "statusBadge" }
+        ],
+        "summary": { "field": "crm_acc_remark", "maxLines": 2 },
+        "facts": [
+          { "field": "crm_acc_owner", "label": { "zh-CN": "负责人", "en": "Owner" } },
+          { "field": "crm_acc_phone", "label": { "zh-CN": "电话", "en": "Phone" }, "renderer": "phone" },
+          { "field": "crm_acc_address", "label": { "zh-CN": "地址", "en": "Address" } }
+        ],
+        "actions": ["favorite", "more"]
+      }
+    }
+  },
   "extension": {
     "import": {
       "enabled": true,
@@ -84,6 +127,54 @@
         },
         "bulkActions": [
           {
+            "code": "bulk_transfer_owner",
+            "permissionCode": "crm.account.manage",
+            "label": { "zh-CN": "批量转移负责人", "en-US": "Transfer Selected Owners" },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:update_account",
+              "input": {
+                "field": "crm_acc_owner",
+                "label": { "zh-CN": "新负责人", "en-US": "New Owner" },
+                "type": "reference",
+                "component": "MemberPicker",
+                "required": true,
+                "props": { "multiple": false }
+              }
+            }
+          },
+          {
+            "code": "bulk_update_industry",
+            "permissionCode": "crm.account.manage",
+            "label": { "zh-CN": "批量更新行业", "en-US": "Update Selected Industries" },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:update_account",
+              "input": {
+                "field": "crm_acc_industry",
+                "label": { "zh-CN": "行业", "en-US": "Industry" },
+                "type": "enum",
+                "dictCode": "crm_account_industry",
+                "required": true
+              }
+            }
+          },
+          {
+            "code": "bulk_delete_accounts",
+            "permissionCode": "crm.account.manage",
+            "variant": "danger",
+            "label": { "zh-CN": "批量删除", "en-US": "Delete Selected" },
+            "confirm": {
+              "zh-CN": "确认删除选中的客户？有关联业务的客户会被明确拒绝。",
+              "en-US": "Delete the selected accounts? Accounts with related business records will be rejected."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "crm:delete_account",
+              "operationType": "DELETE"
+            }
+          },
+          {
             "code": "bulk_move_to_customer_pool",
             "permissionCode": "crm.customer_pool.move",
             "label": { "zh-CN": "批量移入客户公海", "en-US": "Move Selected to Public Pool" },
@@ -94,6 +185,12 @@
                 "field": "crm_acc_last_pool_id",
                 "label": { "zh-CN": "目标客户公海", "en-US": "Target Customer Pool" },
                 "type": "reference",
+                "referenceModelCode": "crm_customer_pool_common",
+                "refTarget": {
+                  "targetModel": "crm_customer_pool_common",
+                  "valueField": "pid",
+                  "displayField": "crm_cp_name"
+                },
                 "required": true
               }
             }
@@ -111,6 +208,7 @@
         {
           "field": "crm_acc_name",
           "width": 200,
+          "ellipsis": true,
           "sortable": true
         },
         {
@@ -156,21 +254,83 @@
                 "to": "crm_account_common_detail"
               }
             },
-            {
-              "code": "edit",
+        {
+          "code": "edit",
               "permissionCode": "crm.account.manage",
               "label": "$i18n:common.button.edit",
               "action": {
                 "type": "navigate",
                 "to": "crm_account_common_form"
+          }
+        },
+        {
+          "code": "transfer_owner_mobile",
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "转移负责人", "en": "Transfer Owner" },
+          "mobileOnly": true,
+              "action": {
+            "type": "navigate",
+            "to": "crm_account_transfer_owner_form"
+          }
+        },
+        {
+          "code": "move_to_customer_pool",
+              "permissionCode": "crm.customer_pool.move",
+              "label": { "zh-CN": "移入客户公海", "en": "Move to Public Pool" },
+              "action": {
+                "type": "command",
+                "command": "crm:move_customer_to_pool",
+                "operationType": "update",
+                "inputFieldsTitle": { "zh-CN": "移入客户公海", "en": "Move to Customer Pool" },
+                "inputFields": [
+                  {
+                    "field": "crm_acc_last_pool_id",
+                    "label": { "zh-CN": "目标客户公海", "en": "Target Customer Pool" },
+                    "type": "select",
+                    "searchable": true,
+                    "dataSource": {
+                      "type": "api",
+                      "endpoint": "/api/dynamic/crm_customer_pool_common/list",
+                      "params": { "pageNum": 1, "pageSize": 200 },
+                      "valueField": "pid",
+                      "labelField": "crm_cp_name"
+                    },
+                    "required": true
+                  }
+                ]
               }
             },
             {
-              "code": "move_to_customer_pool",
-              "permissionCode": "crm.customer_pool.move",
-              "label": { "zh-CN": "移入客户公海", "en": "Move to Public Pool" },
-              "visibleWhen": "row.crm_acc_pool_state != 'in_pool' && row.crm_acc_status == 'active'",
-              "action": { "type": "command", "command": "crm:move_customer_to_pool" }
+              "code": "merge",
+              "permissionCode": "crm.account.manage",
+              "label": { "zh-CN": "合并到其他客户", "en": "Merge into Account" },
+              "action": {
+                "type": "command",
+                "command": "crm:merge_account",
+                "operationType": "update",
+                "inputFieldsTitle": { "zh-CN": "合并客户", "en": "Merge Account" },
+                "inputFieldsSubmitLabel": { "zh-CN": "确认合并", "en": "Confirm Merge" },
+                "inputFields": [
+                  {
+                    "field": "targetAccountId",
+                    "label": { "zh-CN": "保留的目标客户", "en": "Surviving Account" },
+                    "type": "select",
+                    "searchable": true,
+                    "dataSource": {
+                      "type": "api",
+                      "endpoint": "/api/dynamic/crm_account_common/list",
+                      "params": { "pageNum": 1, "pageSize": 200 },
+                      "valueField": "pid",
+                      "labelField": "crm_acc_name"
+                    },
+                    "required": true,
+                    "helpText": {
+                      "zh-CN": "联系人、商机、活动及其他客户业务记录会迁移到目标客户；公海客户须先领取或分配。",
+                      "en": "Contacts, opportunities, activities and other account records move to the target. Pool accounts must be claimed or assigned first."
+                    }
+                  }
+                ]
+              }
             },
             {
               "code": "delete",
@@ -179,7 +339,8 @@
               "label": "$i18n:common.button.delete",
               "confirm": "delete.confirm",
               "action": {
-                "type": "command"
+                "type": "command",
+                "operationType": "DELETE"
               }
             }
           ],
