@@ -30,10 +30,7 @@ import type {
   ButtonConfig,
   TableConfig,
 } from '~/framework/meta/schemas/types';
-import {
-  actionRegistry,
-  promptInputForm,
-} from '~/framework/meta/runtime/actions/ActionRegistry';
+import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import {
@@ -2804,7 +2801,7 @@ function ListPageContentInner(props: PageContentProps) {
             failures.push({
               recordPid: id,
               recordLabel: recordLabelById.get(id) || id,
-              reason: resolveCommandErrorMessage(result, command),
+              reason: resolveCommandErrorMessage(result, command, t),
             });
           }
         } catch (error) {
@@ -2961,7 +2958,7 @@ function ListPageContentInner(props: PageContentProps) {
           failures.push({
             recordPid: command,
             recordLabel: command,
-            reason: resolveCommandErrorMessage(result, command),
+            reason: resolveCommandErrorMessage(result, command, t),
           });
         }
       } else {

@@ -37,6 +37,7 @@ import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -1299,7 +1300,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode);
         if (commandPermitInForce
                 && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
-            throw new MetaServiceException("Access denied: command permit scope does not include this record");
+            throw new AccessDeniedException("Access denied: command permit scope does not include this record");
         }
 
         if (!commandPermitInForce) {
@@ -1311,6 +1312,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // sees the original record shape.
             try {
                 enforceRuleCenterRecordPermission(modelCode, recordId, record);
+            } catch (AccessDeniedException denied) {
+                throw denied;
             } catch (MetaServiceException e) {
                 throw e;
             } catch (Exception e) {
@@ -1330,8 +1333,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             try {
                 Long userId = getCurrentUserId();
                 if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
-                    throw new MetaServiceException("Access denied: you do not have permission to view this record");
+                    throw new AccessDeniedException("Access denied: you do not have permission to view this record");
                 }
+            } catch (AccessDeniedException denied) {
+                throw denied;
             } catch (MetaServiceException e) {
                 throw e;
             } catch (Exception e) {
@@ -1406,7 +1411,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         PermissionResult result = facade.canOperate(subjectId, modelCode, "read", record);
         if (!result.granted()) {
-            throw new MetaServiceException("Access denied: you do not have permission to view this record");
+            throw new AccessDeniedException("Access denied: you do not have permission to view this record");
         }
     }
 

@@ -243,6 +243,8 @@ const REQUIRED_JSON_EDITOR_KEYS = [
   'common.json_editor.format',
 ];
 
+const REQUIRED_SEED_ONLY_KEYS = ['common.error.backendRequestTimeout'];
+
 /**
  * Extract `common:` block lines (between `^common:` and the next top-level
  * key starting at column 0 that's not a comment/blank). Returns flattened
@@ -329,5 +331,15 @@ describe('DSL list page i18n zh-CN yaml resource', () => {
     expect(entry, `${key} must be seeded for DB-backed /api/i18n`).toBeDefined();
     expect(entry?.['zh-CN']).toBeTruthy();
     expect(entry?.['en-US']).toBeTruthy();
+  });
+
+  it.each(REQUIRED_SEED_ONLY_KEYS)('%s exists bilingually in seed/i18n-base.json', (key) => {
+    const entries = JSON.parse(fs.readFileSync(SEED_JSON, 'utf-8')) as Array<
+      Record<string, string>
+    >;
+    const entry = entries.find((item) => item.key === key);
+    expect(entry, `${key} must be seeded for DB-backed /api/i18n`).toBeDefined();
+    expect(entry?.['zh-CN']).toMatch(/[一-龥]/);
+    expect(entry?.['en-US']).not.toMatch(/[一-龥]/);
   });
 });

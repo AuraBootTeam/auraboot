@@ -1009,6 +1009,11 @@
     "en-US": "Save failed"
   },
   {
+    "key": "common.error.backendRequestTimeout",
+    "zh-CN": "后端请求超时，操作可能仍在处理中。请先检查任务或记录列表，确认结果后再决定是否重试。文件较大时处理可能需要更长时间。",
+    "en-US": "The backend request timed out and the operation may still be processing. Check the task or record list before retrying. Large files may take longer to process."
+  },
+  {
     "key": "common.loading",
     "zh-CN": "加载中…",
     "en-US": "Loading…"
