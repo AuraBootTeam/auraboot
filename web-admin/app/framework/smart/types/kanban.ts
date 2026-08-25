@@ -31,6 +31,10 @@ export interface KanbanColumn {
   cards: KanbanCard[];
   /** Number of cards in this column */
   count: number;
+  /** Number of card rows materialized in the browser for this column. */
+  loadedCount?: number;
+  /** Whether the server reports more rows than the browser materialized. */
+  hasMore?: boolean;
   /** Aggregation results for this column */
   aggregations?: Record<string, number>;
   /** Column accent color (resolved from dict extras or view config) */
