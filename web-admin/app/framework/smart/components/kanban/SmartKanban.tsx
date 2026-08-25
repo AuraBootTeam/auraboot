@@ -284,9 +284,20 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
                 {column.title}
               </span>
               {showCount && (
-                <span className="ml-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-medium text-gray-600">
-                  {column.count}
-                </span>
+                <div className="ml-2 flex items-center gap-1.5">
+                  <span className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-medium text-gray-600">
+                    {column.count}
+                  </span>
+                  {column.hasMore && (
+                    <span
+                      className="text-[11px] whitespace-nowrap text-gray-500"
+                      title={`${column.loadedCount ?? column.cards.length} / ${column.count}`}
+                    >
+                      {fallbackText('kanban.loadedCount', '已加载', 'Loaded')}{' '}
+                      {column.loadedCount ?? column.cards.length}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             {/* Aggregations */}

@@ -159,6 +159,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
   } = options;
 
   const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
+  const [aggregateRows, setAggregateRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -178,6 +179,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
     // Handle static data source
     if (dataSource.type === 'static' && dataSource.staticData) {
       setRawData(dataSource.staticData);
+      setAggregateRows([]);
       return;
     }
 
@@ -194,32 +196,65 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       let rows: Record<string, unknown>[] = [];
 
       if (dataSource.type === 'aggregate' && dataSource.modelCode) {
-        // For aggregate type with a modelCode, fetch individual records
-        // from the dynamic list API (not the chart-data aggregate endpoint)
+        // Fetch authoritative per-column totals, then materialize a bounded
+        // card sample for every non-empty column. A single pageSize=500 list
+        // request makes a large board silently report partial totals.
         const slug = dataSource.modelCode;
-        const params: Record<string, string> = {
-          pageSize: String(dataSource.limit || 500),
-          pageNum: '1',
-        };
-
-        // Build filters JSON
         const allFilters = [...(dataSource.filters || []), ...(linkageFilters || [])];
-        if (allFilters.length > 0) {
-          params.filters = JSON.stringify(
-            allFilters.map((f) => ({
-              fieldName: f.field,
-              operator: f.operator?.toUpperCase() || 'EQ',
-              value: f.value,
+        const aggregateMetrics = [
+          { field: idField, aggregation: 'count' as const, alias: 'kanban_total_count' },
+          ...(aggregations || [])
+            .filter((aggregation) => aggregation.function !== 'count')
+            .map((aggregation, index) => ({
+              field: aggregation.field,
+              aggregation: aggregation.function,
+              alias: `kanban_aggregation_${index}`,
             })),
-          );
-        }
-
-        const result = await fetchResult<any>(`/api/dynamic/${slug}/list`, {
-          method: 'get',
-          params,
+        ];
+        const aggregateResponse = await chartDataService.fetchChartData({
+          type: 'aggregate',
+          modelCode: slug,
+          dimensions: [groupByField],
+          metrics: aggregateMetrics,
+          filters: allFilters,
+          limit: 1000,
         });
-        if (ResultHelper.isSuccess(result) && result.data?.records) {
-          rows = result.data.records;
+        const totals = aggregateResponse.rows || [];
+        const perColumnLimit = Math.min(Math.max(dataSource.limit || 50, 1), 500);
+        const cardPages = await Promise.all(
+          totals.map(async (totalRow) => {
+            const groupValue = totalRow[groupByField];
+            const listFilters = [
+              ...allFilters.map((filter) => ({
+                fieldName: filter.field,
+                operator: filter.operator?.toUpperCase() || 'EQ',
+                value: filter.value,
+              })),
+              {
+                fieldName: groupByField,
+                operator: groupValue === null || groupValue === undefined ? 'IS_NULL' : 'EQ',
+                value: groupValue,
+              },
+            ];
+            const result = await fetchResult<any>(`/api/dynamic/${slug}/list`, {
+              method: 'get',
+              params: {
+                pageSize: String(perColumnLimit),
+                pageNum: '1',
+                filters: JSON.stringify(listFilters),
+              },
+            });
+            if (!ResultHelper.isSuccess(result) || !result.data?.records) {
+              throw new Error(
+                result.desc || `Failed to load Kanban cards for ${String(groupValue)}`,
+              );
+            }
+            return result.data.records as Record<string, unknown>[];
+          }),
+        );
+        rows = cardPages.flat();
+        if (mountedRef.current) {
+          setAggregateRows(totals);
         }
       } else {
         // For namedQuery or other types, use the chart-data aggregate endpoint
@@ -241,6 +276,9 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
 
         const response = await chartDataService.fetchChartData(request);
         rows = response.rows;
+        if (mountedRef.current) {
+          setAggregateRows([]);
+        }
       }
 
       // Only update state if component is still mounted
@@ -257,13 +295,14 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       if (mountedRef.current) {
         setError(err instanceof Error ? err : new Error('Unknown error'));
         setRawData([]);
+        setAggregateRows([]);
       }
     } finally {
       if (mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [dataSource, groupByField, linkageFilters, enabled]);
+  }, [dataSource, groupByField, idField, aggregations, linkageFilters, enabled]);
 
   /**
    * Effect for initial fetch and dependency changes
@@ -335,16 +374,32 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       groupedData.get(groupKey)!.cards.push(card);
     }
 
+    const totalsByGroup = new Map(
+      aggregateRows.map((row) => [String(row[groupByField] ?? ''), row] as const),
+    );
+
     // Convert grouped data to columns. Map insertion order is preserved, so
     // dict-seeded keys come first in dict order, followed by any drift keys.
     const result: KanbanColumn[] = [];
 
     for (const [groupKey, { title, cards }] of groupedData) {
+      const authoritative = totalsByGroup.get(groupKey);
+      const authoritativeCount = Number(authoritative?.kanban_total_count);
+      const count = Number.isFinite(authoritativeCount) ? authoritativeCount : cards.length;
       const columnAggregations: Record<string, number> = {};
       if (aggregations) {
+        let serverAggregationIndex = 0;
         for (const agg of aggregations) {
           const key = agg.label || agg.field;
-          columnAggregations[key] = calculateAggregation(cards, agg);
+          if (agg.function === 'count') {
+            columnAggregations[key] = count;
+          } else {
+            const value = Number(authoritative?.[`kanban_aggregation_${serverAggregationIndex}`]);
+            columnAggregations[key] = Number.isFinite(value)
+              ? value
+              : calculateAggregation(cards, agg);
+            serverAggregationIndex += 1;
+          }
         }
       }
 
@@ -357,13 +412,15 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
         title: typeof refTitle === 'string' && refTitle ? refTitle : title,
         value: cards[0]?.[groupByField] ?? groupKey,
         cards,
-        count: cards.length,
+        count,
+        loadedCount: cards.length,
+        hasMore: count > cards.length,
         aggregations: Object.keys(columnAggregations).length > 0 ? columnAggregations : undefined,
       });
     }
 
     return result;
-  }, [rawData, groupByField, idField, aggregations, groupByDictItems]);
+  }, [rawData, aggregateRows, groupByField, idField, aggregations, groupByDictItems]);
 
   /**
    * Move a card between columns with optimistic update + persistence.
@@ -427,6 +484,8 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
             code: String(result.code),
             message: result.message || result.desc || 'Move failed',
           });
+        } else if (dataSource.type === 'aggregate') {
+          await fetchData();
         }
       } catch (err) {
         rollback();
@@ -434,7 +493,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
         onMoveError?.({ code: 'NETWORK_ERROR', message });
       }
     },
-    [idField, groupByField, pageKey, onMoveError],
+    [idField, groupByField, pageKey, onMoveError, fetchData, dataSource.type],
   );
 
   return {
