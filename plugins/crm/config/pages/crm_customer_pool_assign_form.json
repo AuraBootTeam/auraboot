@@ -1,0 +1,55 @@
+{
+  "pageKey": "crm_customer_pool_assign_form",
+  "name:zh-CN": "分配池内客户",
+  "name:en": "Assign Pooled Customer",
+  "modelCode": "crm_customer_pool_item_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "pool_customer_context",
+      "blockType": "form-section",
+      "title": { "zh-CN": "待分配客户", "en": "Customer to Assign" },
+      "fields": [
+        { "field": "crm_cpi_account_name", "colSpan": 6, "readOnly": true },
+        { "field": "crm_cpi_account_code", "colSpan": 6, "readOnly": true },
+        { "field": "crm_cpi_rating", "colSpan": 6, "readOnly": true },
+        { "field": "crm_cpi_status", "colSpan": 6, "readOnly": true }
+      ]
+    },
+    {
+      "id": "assignee",
+      "blockType": "form-section",
+      "title": { "zh-CN": "选择获配成员", "en": "Choose Assignee" },
+      "description": {
+        "zh-CN": "系统会校验成员资格、客户库容和并发归属，再原子更新负责人。",
+        "en": "Membership, capacity, and concurrent ownership are validated before ownership changes atomically."
+      },
+      "fields": [
+        {
+          "field": "crm_cpi_claimed_by",
+          "colSpan": 12,
+          "required": true,
+          "readOnly": false,
+          "renderComponent": "memberpicker",
+          "props": { "multiple": false }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "assign_pool_customer_confirm",
+          "primary": true,
+          "permissionCode": "crm.customer_pool.assign",
+          "label": { "zh-CN": "确认分配", "en": "Confirm Assignment" },
+          "action": { "type": "command", "command": "crm:assign_pool_customer" }
+        },
+        { "code": "cancel", "label": { "zh-CN": "取消", "en": "Cancel" } }
+      ]
+    }
+  ]
+}

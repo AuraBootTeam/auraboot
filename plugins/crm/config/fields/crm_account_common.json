@@ -119,6 +119,10 @@
       "valueField": "pid",
       "displayField": "displayName"
     },
+    "extension": {
+      "renderComponent": "memberpicker",
+      "multiple": false
+    },
     "constraints": {
       "maxLength": 100
     }

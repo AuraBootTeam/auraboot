@@ -98,6 +98,10 @@
       "code": "crm_lead_move_to_pool_form"
     },
     {
+      "type": "page",
+      "code": "crm_account_transfer_owner_form"
+    },
+    {
       "type": "model",
       "code": "crm_customer_pool_common"
     },
@@ -132,6 +136,14 @@
     {
       "type": "page",
       "code": "crm_customer_pool_item_list"
+    },
+    {
+      "type": "page",
+      "code": "crm_customer_pool_mobile_list"
+    },
+    {
+      "type": "page",
+      "code": "crm_customer_pool_assign_form"
     },
     {
       "type": "model",
