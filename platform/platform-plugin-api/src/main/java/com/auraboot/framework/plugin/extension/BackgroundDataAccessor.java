@@ -23,13 +23,17 @@ import java.util.Optional;
  * on unique-constraint violation, letting at-least-once message consumers
  * (Kafka, retries) re-process the same logical record without throwing.
  *
- * <p><b>Transactions:</b> Each method runs in its own transaction. Callers
- * needing atomic multi-operation work should compose at a higher layer
- * (e.g. wrap their @KafkaListener method with @Transactional).
+ * <p><b>Transactions:</b> Each method participates in an existing host transaction when one is
+ * active. Background plugins that need a durable multi-model unit must use
+ * {@link #executeInTransaction(Runnable)}; the default fails closed rather than silently exposing
+ * a write-to-outbox crash window.
  *
  * @since 2.5.0
  */
 public interface BackgroundDataAccessor {
+
+    /** Hard ceiling for one database-backed background page or claim. */
+    int MAX_BOUNDED_BATCH_SIZE = 1_000;
 
     /**
      * Insert a row.
@@ -70,6 +74,67 @@ public interface BackgroundDataAccessor {
      * @param filters field-code &rarr; value, all ANDed equality
      */
     List<Map<String, Object>> query(long tenantId, String modelCode, Map<String, Object> filters);
+
+    /**
+     * Query one keyset page ordered by the model's stable public {@code pid}.
+     *
+     * <p>The predicate, cursor, ordering and limit must all be executed by the database. A host
+     * implementation must not call {@link #query} and truncate the returned list in memory. The
+     * default fails closed so older plugin test doubles remain source-compatible without silently
+     * claiming production-grade scan semantics.</p>
+     *
+     * @param afterRecordPid exclusive public-record cursor, or {@code null} for the first page
+     * @since 2.9.0
+     */
+    default BoundedPage queryPage(long tenantId,
+                                  String modelCode,
+                                  Map<String, Object> exactFilters,
+                                  String afterRecordPid,
+                                  int limit) {
+        throw new UnsupportedOperationException(
+                "BackgroundDataAccessor bounded-page capability is unavailable");
+    }
+
+    /**
+     * Atomically claim a bounded set of rows for leased background work.
+     *
+     * <p>Production implementations must select eligible rows, lock them without waiting on rows
+     * claimed by another worker, apply {@link BatchClaimRequest#claimValues()}, and return the
+     * claimed rows in one database transaction. The contract is deliberately generic: queue and
+     * outbox plugins provide model field codes, while the host resolves those codes through model
+     * metadata and owns the SQL.</p>
+     *
+     * @since 2.9.0
+     */
+    default List<Map<String, Object>> claimBatch(long tenantId, BatchClaimRequest request) {
+        throw new UnsupportedOperationException(
+                "BackgroundDataAccessor atomic-claim capability is unavailable");
+    }
+
+    /**
+     * Opaque, process-local identity of the physical transaction resource used by this accessor.
+     * Accessors participating in one atomic unit must report the same non-blank identity.
+     *
+     * @since 2.9.0
+     */
+    default String transactionResourceId() {
+        throw new UnsupportedOperationException(
+                "BackgroundDataAccessor transaction-resource identity is unavailable");
+    }
+
+    /**
+     * Execute all accessor calls made by {@code work} in one host-owned transaction.
+     *
+     * <p>The transaction manager behind this capability must own the same physical resource
+     * reported by {@link #transactionResourceId()}. Implementations must roll back the whole unit
+     * when {@code work} throws. The default deliberately fails closed.</p>
+     *
+     * @since 2.9.0
+     */
+    default void executeInTransaction(Runnable work) {
+        throw new UnsupportedOperationException(
+                "BackgroundDataAccessor transaction-execution capability is unavailable");
+    }
 
     /**
      * Query records whose field value belongs to a tenant-scoped candidate set.
@@ -146,5 +211,85 @@ public interface BackgroundDataAccessor {
     default Optional<Long> increment(long tenantId, String modelCode, String recordId,
                                      String counterCode, long delta) {
         return incrementWithinCap(tenantId, modelCode, recordId, counterCode, delta, null);
+    }
+
+    /** Immutable result of a database-backed keyset page. */
+    record BoundedPage(List<Map<String, Object>> records, String nextCursor) {
+        public BoundedPage {
+            records = records == null ? List.of() : List.copyOf(records);
+            if (records.size() > MAX_BOUNDED_BATCH_SIZE) {
+                throw new IllegalArgumentException("bounded page exceeds hard maximum");
+            }
+        }
+    }
+
+    /**
+     * Generic scalar-field lease claim.
+     *
+     * <p>{@code exactFilters} are equality predicates, {@code inFilters} are SQL {@code IN}
+     * predicates, and {@code notAfterFilters} are inclusive upper bounds ({@code <=}). Every map
+     * key and order field is a model field code, never a physical column supplied by a plugin.
+     * JSON/array claim mutations are intentionally outside this mechanical-control-plane API.</p>
+     */
+    record BatchClaimRequest(
+            String modelCode,
+            Map<String, Object> exactFilters,
+            Map<String, List<Object>> inFilters,
+            Map<String, Object> notAfterFilters,
+            Map<String, Object> claimValues,
+            List<String> orderByFields,
+            int limit) {
+
+        public BatchClaimRequest {
+            if (modelCode == null || modelCode.isBlank()) {
+                throw new IllegalArgumentException("modelCode cannot be null or blank");
+            }
+            if (limit <= 0 || limit > MAX_BOUNDED_BATCH_SIZE) {
+                throw new IllegalArgumentException(
+                        "limit must be between 1 and " + MAX_BOUNDED_BATCH_SIZE);
+            }
+            exactFilters = immutableMap(exactFilters);
+            notAfterFilters = immutableMap(notAfterFilters);
+            claimValues = immutableMap(claimValues);
+            if (claimValues.isEmpty()) {
+                throw new IllegalArgumentException("claimValues cannot be empty");
+            }
+            if (claimValues.values().stream().anyMatch(java.util.Objects::isNull)) {
+                throw new IllegalArgumentException("claimValues cannot contain null values");
+            }
+            if (exactFilters.values().stream().anyMatch(java.util.Objects::isNull)
+                    || notAfterFilters.values().stream().anyMatch(java.util.Objects::isNull)) {
+                throw new IllegalArgumentException("claim filters cannot contain null values");
+            }
+            Map<String, List<Object>> copiedIn = new java.util.LinkedHashMap<>();
+            if (inFilters != null) {
+                inFilters.forEach((field, values) -> {
+                    if (field == null || field.isBlank() || values == null || values.isEmpty()
+                            || values.stream().anyMatch(java.util.Objects::isNull)) {
+                        throw new IllegalArgumentException(
+                                "IN filters require a field and non-null candidate values");
+                    }
+                    copiedIn.put(field, List.copyOf(values));
+                });
+            }
+            inFilters = Map.copyOf(copiedIn);
+            orderByFields = orderByFields == null ? List.of() : List.copyOf(orderByFields);
+            if (orderByFields.stream().anyMatch(
+                    field -> field == null || field.isBlank())) {
+                throw new IllegalArgumentException("orderByFields cannot contain blanks");
+            }
+        }
+
+        private static Map<String, Object> immutableMap(Map<String, Object> source) {
+            if (source == null || source.isEmpty()) return Map.of();
+            java.util.LinkedHashMap<String, Object> copy = new java.util.LinkedHashMap<>();
+            source.forEach((field, value) -> {
+                if (field == null || field.isBlank()) {
+                    throw new IllegalArgumentException("claim field codes cannot be blank");
+                }
+                copy.put(field, value);
+            });
+            return java.util.Collections.unmodifiableMap(copy);
+        }
     }
 }
