@@ -13,6 +13,7 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   const permissions = await json('config/permissions.json');
   const roles = await json('config/roles.json');
   const namedQueries = await json('config/named-queries.json');
+  const poolItemDetail = await json('config/pages/crm_lead_pool_item_detail.json');
   const pages = await Promise.all([
     'crm_lead_pool_list.json',
     'crm_lead_pool_form.json',
@@ -335,6 +336,31 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'processing'/);
   assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
+
+  const timelineQuery = namedQueries.find((query) => query.code === 'crm_pool_lead_timeline');
+  assert.equal(timelineQuery.resourceCode, 'crm.lead_pool');
+  assert.match(timelineQuery.fromSql, /i\.pid = #\{params\.poolItemId\}/);
+  assert.match(timelineQuery.fromSql, /i\.crm_lpi_lead_id/);
+  assert.match(timelineQuery.fromSql, /crm_lp_member_user_ids/);
+  assert.match(timelineQuery.fromSql, /crm_lp_admin_user_ids/);
+  assert.match(timelineQuery.fromSql, /a\.crm_act_related_model = 'crm_lead_common'/);
+  assert.match(timelineQuery.fromSql, /r\.crm_ar_activity_id = a\.pid/);
+  assert.equal(
+    poolItemDetail.blocks.find((block) => block.id === 'pooled_lead_summary').blockType,
+    'detail-section',
+  );
+  const poolItemActions = poolItemDetail.blocks.find(
+    (block) => block.id === 'pooled_lead_actions',
+  );
+  assert.deepEqual(
+    poolItemActions.buttons.map((button) => button.code),
+    ['open_lead', 'claim', 'assign'],
+  );
+  assert.equal(
+    poolItemDetail.blocks.find((block) => block.id === 'pool_lead_activity_timeline')
+      .dataSource.params.datasourceId,
+    'nq:crm_pool_lead_timeline',
+  );
 
   const permissionCodes = new Set(permissions.map((permission) => permission.code));
   for (const code of [

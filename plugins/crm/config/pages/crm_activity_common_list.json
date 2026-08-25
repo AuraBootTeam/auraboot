@@ -204,41 +204,48 @@
         ]
       },
       "columns": [
-        {
-          "field": "crm_act_type",
+    {
+      "field": "crm_act_type",
+      "label": { "zh-CN": "活动类型", "en-US": "Activity Type" },
           "width": 100,
           "renderType": "tag",
           "dictCode": "crm_activity_type"
         },
-        {
-          "field": "crm_act_subject",
+    {
+      "field": "crm_act_subject",
+      "label": { "zh-CN": "跟进主题", "en-US": "Subject" },
           "width": 250,
           "sortable": true
         },
-        {
-          "field": "crm_act_date",
+    {
+      "field": "crm_act_date",
+      "label": { "zh-CN": "活动时间", "en-US": "Activity Time" },
           "width": 160,
           "sortable": true,
           "format": "YYYY-MM-DD HH:mm"
         },
-        {
-          "field": "crm_act_owner",
+    {
+      "field": "crm_act_owner",
+      "label": { "zh-CN": "负责人", "en-US": "Owner" },
           "width": 120
         },
-        {
-          "field": "crm_act_status",
+    {
+      "field": "crm_act_status",
+      "label": { "zh-CN": "任务状态", "en-US": "Task Status" },
           "width": 100,
           "renderType": "tag",
           "dictCode": "crm_task_status"
         },
-        {
-          "field": "crm_act_priority",
+    {
+      "field": "crm_act_priority",
+      "label": { "zh-CN": "优先级", "en-US": "Priority" },
           "width": 100,
           "renderType": "tag",
           "dictCode": "crm_task_priority"
         },
-        {
-          "field": "crm_act_source",
+    {
+      "field": "crm_act_source",
+      "label": { "zh-CN": "记录来源", "en-US": "Source" },
           "width": 100,
           "renderType": "tag",
           "dictCode": "crm_activity_source"

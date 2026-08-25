@@ -141,6 +141,26 @@
     ]
   },
   {
+    "code": "crm_pool_lead_timeline",
+    "name:zh-CN": "池内线索跟进记录",
+    "name:en": "Pooled Lead Activity Timeline",
+    "description": "Follow-up records for one exact pooled lead, restricted to current lead-pool membership.",
+    "resourceCode": "crm.lead_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT DISTINCT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_content, a.crm_act_date, a.crm_act_owner, a.crm_act_source, a.crm_act_ext->>'status' AS crm_act_status, COALESCE(u.nick_name, u.user_name, a.crm_act_owner, '') AS owner_name FROM mt_crm_lead_pool_item_common i JOIN mt_crm_lead_pool_common p ON p.pid = i.crm_lpi_pool_id AND p.tenant_id = i.tenant_id JOIN mt_crm_activity_common a ON a.tenant_id = i.tenant_id LEFT JOIN mt_crm_activity_relation_common r ON r.crm_ar_activity_id = a.pid AND r.tenant_id = i.tenant_id AND r.crm_ar_object_type = 'lead' AND r.crm_ar_object_id = i.crm_lpi_lead_id LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE i.tenant_id = #{params.tenantId} AND i.pid = #{params.poolItemId} AND ((a.crm_act_related_model = 'crm_lead_common' AND a.crm_act_related_id = i.crm_lpi_lead_id) OR r.pid IS NOT NULL) AND (p.crm_lp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_lp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%')) ORDER BY a.crm_act_date DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_act_type", "columnExpr": "crm_act_type", "dataType": "string" },
+      { "code": "crm_act_subject", "columnExpr": "crm_act_subject", "dataType": "string", "searchable": true },
+      { "code": "crm_act_content", "columnExpr": "crm_act_content", "dataType": "string" },
+      { "code": "crm_act_date", "columnExpr": "crm_act_date", "dataType": "date", "sortable": true },
+      { "code": "crm_act_owner", "columnExpr": "crm_act_owner", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
+      { "code": "crm_act_source", "columnExpr": "crm_act_source", "dataType": "string" },
+      { "code": "crm_act_status", "columnExpr": "crm_act_status", "dataType": "string" }
+    ]
+  },
+  {
     "code": "crm_direct_tasks_by_related_object",
     "name:zh-CN": "按直接关联对象查任务",
     "name:en": "Direct Tasks by Related Object",
