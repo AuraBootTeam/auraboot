@@ -29,8 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>Verifies that {@code /api/admin/infrastructure/**} and
  * {@code /api/admin/cloud-config/**} require {@code platform_admin}, while all
- * other {@code /api/admin/**} paths (e.g. {@code /api/admin/users}) still
- * require {@code tenant_admin} — and that the two roles are <em>disjoint</em>:
+ * other {@code /api/admin/**} paths still require {@code tenant_admin}, except for
+ * exact handlers explicitly marked {@code @AuthenticatedAccess} — and that the two
+ * admin roles are <em>disjoint</em>:
  * holding one does not grant access to the other's paths.
  *
  * <p>Probe endpoints chosen for deterministic GET semantics (no body required):
@@ -135,20 +136,18 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
     }
 
     // =========================================================================
-    // T4: platform_admin user is rejected on /api/admin/users
-    //     (tenant_admin required — roles are disjoint)
+    // T4: platform_admin is still an authenticated tenant member and can use picker reads
     // =========================================================================
 
     @Test
-    @DisplayName("T4: platform_admin is rejected on /api/admin/users (disjoint roles)")
-    void platformAdmin_isRejected_onUserListEndpoint() throws Exception {
+    @DisplayName("T4: platform_admin can use authenticated-only user picker search")
+    void platformAdmin_canUseUserPickerSearch() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
         AdminGuardTestSupport.grantPlatformAdmin(jdbc, tenantId, testUser.getId());
 
         mockMvc().perform(get(USERS_URL).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("409"))
-                .andExpect(jsonPath("$.message").value("admin role required"));
+                .andExpect(jsonPath("$.code").value("0"));
     }
 
     // =========================================================================
@@ -194,7 +193,7 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
                             tenantId, testUser.getId().toString());
                     assertThat(rows).hasSize(1);
                     Map<String, Object> row = rows.get(0);
-                    assertThat(row.get("actor_role")).isEqualTo("tenant_admin");
+                    assertThat(row.get("actor_role")).isEqualTo("authenticated_tenant_member");
                     assertThat((String) row.get("path")).startsWith("/api/admin/users");
                     assertThat(row.get("method")).isEqualTo("GET");
                 });
@@ -205,7 +204,7 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("T7: afterCompletion writes audit row for rejected request (tenant_admin on /api/admin/infrastructure)")
+    @DisplayName("T7: rejected tenant_admin infrastructure request writes an audit row")
     void afterCompletion_writesAuditRow_forRejectedRequest() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
         // Grant tenant_admin — insufficient for infrastructure (requires platform_admin)

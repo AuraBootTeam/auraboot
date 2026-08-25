@@ -9,6 +9,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionRequest;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.user.dto.EmployeeAccountImportPreviewResponse;
@@ -192,6 +193,7 @@ public class AdminUserController {
      */
     @GetMapping("/search")
     @Operation(summary = "Search users in the current tenant by keyword (for picker UIs)")
+    @AuthenticatedAccess("tenant-scoped picker search for authenticated tenant members")
     public ApiResponse<List<UserSearchDTO>> search(
             @RequestParam(required = false, defaultValue = "") String keyword,
             @RequestParam(required = false, defaultValue = "20") int size) {
@@ -211,6 +213,7 @@ public class AdminUserController {
      */
     @GetMapping("/{userPid}")
     @Operation(summary = "Get a single user by PID (picker resolve-name)")
+    @AuthenticatedAccess("tenant-scoped picker resolution for authenticated tenant members")
     public ApiResponse<UserSearchDTO> getOne(@PathVariable String userPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null) {
