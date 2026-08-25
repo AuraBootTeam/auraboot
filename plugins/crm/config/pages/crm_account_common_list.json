@@ -5,6 +5,49 @@
   "modelCode": "crm_account_common",
   "kind": "list",
   "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        {
+          "id": "all",
+          "label": { "zh-CN": "全部", "en": "All" }
+        },
+        {
+          "id": "active",
+          "label": { "zh-CN": "活跃客户", "en": "Active" },
+          "filter": { "field": "crm_acc_status", "op": "EQ", "value": "active" }
+        },
+        {
+          "id": "in_pool",
+          "label": { "zh-CN": "公海客户", "en": "Public Pool" },
+          "filter": { "field": "crm_acc_pool_state", "op": "EQ", "value": "in_pool" }
+        },
+        {
+          "id": "inactive",
+          "label": { "zh-CN": "已停用", "en": "Inactive" },
+          "filter": { "field": "crm_acc_status", "op": "EQ", "value": "inactive" }
+        }
+      ],
+      "defaultSort": [
+        { "field": "created_at", "direction": "DESC" }
+      ],
+      "card": {
+        "title": { "field": "crm_acc_name" },
+        "subtitle": { "template": "{{crm_acc_code}} · {{crm_acc_industry}}" },
+        "badges": [
+          { "field": "crm_acc_status", "renderer": "statusBadge" },
+          { "field": "crm_acc_pool_state", "renderer": "statusBadge" }
+        ],
+        "summary": { "field": "crm_acc_remark", "maxLines": 2 },
+        "facts": [
+          { "field": "crm_acc_owner", "label": { "zh-CN": "负责人", "en": "Owner" } },
+          { "field": "crm_acc_phone", "label": { "zh-CN": "电话", "en": "Phone" }, "renderer": "phone" },
+          { "field": "crm_acc_address", "label": { "zh-CN": "地址", "en": "Address" } }
+        ],
+        "actions": ["favorite", "more"]
+      }
+    }
+  },
   "extension": {
     "import": {
       "enabled": true,
@@ -211,20 +254,29 @@
                 "to": "crm_account_common_detail"
               }
             },
-            {
-              "code": "edit",
+        {
+          "code": "edit",
               "permissionCode": "crm.account.manage",
               "label": "$i18n:common.button.edit",
               "action": {
                 "type": "navigate",
                 "to": "crm_account_common_form"
-              }
-            },
-            {
-              "code": "move_to_customer_pool",
+          }
+        },
+        {
+          "code": "transfer_owner_mobile",
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "转移负责人", "en": "Transfer Owner" },
+          "mobileOnly": true,
+              "action": {
+            "type": "navigate",
+            "to": "crm_account_transfer_owner_form"
+          }
+        },
+        {
+          "code": "move_to_customer_pool",
               "permissionCode": "crm.customer_pool.move",
               "label": { "zh-CN": "移入客户公海", "en": "Move to Public Pool" },
-              "visibleWhen": "row.crm_acc_pool_state != 'in_pool' && row.crm_acc_status == 'active'",
               "action": {
                 "type": "command",
                 "command": "crm:move_customer_to_pool",

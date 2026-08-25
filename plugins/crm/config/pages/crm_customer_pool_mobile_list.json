@@ -1,0 +1,70 @@
+{
+  "pageKey": "crm_customer_pool_mobile_list",
+  "name:zh-CN": "客户公海",
+  "name:en": "Customer Public Pool",
+  "modelCode": "crm_customer_pool_item_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        { "id": "all", "label": { "zh-CN": "全部", "en": "All" } },
+        { "id": "available", "label": { "zh-CN": "待分配", "en": "Available" }, "filter": { "field": "crm_cpi_status", "op": "EQ", "value": "available" } },
+        { "id": "assigned", "label": { "zh-CN": "已分配", "en": "Assigned" }, "filter": { "field": "crm_cpi_status", "op": "IN", "value": ["claimed", "assigned"] } }
+      ],
+      "defaultSort": [
+        { "field": "crm_cpi_entered_at", "direction": "DESC" }
+      ],
+      "card": {
+        "title": { "field": "crm_cpi_account_name" },
+        "subtitle": { "template": "{{crm_cpi_account_code}} · {{crm_cpi_phone}}" },
+        "badges": [
+          { "field": "crm_cpi_status", "renderer": "statusBadge" },
+          { "field": "crm_cpi_rating", "renderer": "statusBadge" }
+        ],
+        "summary": { "field": "crm_cpi_reason", "maxLines": 2 },
+        "facts": [
+          { "field": "crm_cpi_pool_id", "label": { "zh-CN": "所属公海", "en": "Pool" } },
+          { "field": "crm_cpi_entered_at", "label": { "zh-CN": "入池时间", "en": "Entered At" }, "renderer": "datetime" }
+        ],
+        "actions": ["more"]
+      }
+    }
+  },
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_customer_pool_mobile_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_cpi_account_name", "width": 180 },
+        { "field": "crm_cpi_account_code", "width": 140 },
+        { "field": "crm_cpi_pool_id", "width": 160 },
+        { "field": "crm_cpi_phone", "width": 140 },
+        { "field": "crm_cpi_status", "width": 110, "renderType": "tag", "dictCode": "crm_customer_pool_item_status" },
+        { "field": "crm_cpi_entered_at", "width": 160, "valueType": "datetime" },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "assign",
+              "permissionCode": "crm.customer_pool.manage",
+              "primary": true,
+              "label": { "zh-CN": "分配", "en": "Assign" },
+              "action": { "type": "navigate", "to": "crm_customer_pool_assign_form" }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": ["crm_cpi_account_name", "crm_cpi_account_code", "crm_cpi_phone"],
+      "defaultSort": { "field": "crm_cpi_entered_at", "order": "desc" },
+      "searchPlaceholder": { "zh-CN": "搜索客户名称、编号或电话", "en": "Search customer name, code, or phone" },
+      "empty": {
+        "title": { "zh-CN": "当前客户公海没有可见记录", "en": "No visible pooled customers" },
+        "description": { "zh-CN": "从客户列表移入客户公海，或调整当前筛选。", "en": "Move a customer into a public pool, or adjust the filter." }
+      }
+    }
+  ]
+}

@@ -736,7 +736,23 @@
     "permissionCode": "crm.customer_pool.read",
     "orderNo": 5,
     "visible": true,
-    "pageKey": "crm_customer_pool_item_list"
+    "pageKey": "crm_customer_pool_item_list",
+    "extension": { "platforms": ["web"] }
+  },
+  {
+    "code": "crm_customer_pool_mobile_queue",
+    "parentCode": "crm_records",
+    "name:zh-CN": "客户公海",
+    "name:en": "Customer Public Pool",
+    "path": "/p/crm_customer_pool_mobile",
+    "component": null,
+    "icon": "IconBuilding",
+    "type": 1,
+    "permissionCode": "crm.customer_pool.read",
+    "orderNo": 5,
+    "visible": true,
+    "pageKey": "crm_customer_pool_mobile_list",
+    "extension": { "platforms": ["mobile"] }
   },
   {
     "code": "crm_customer_pool_settings",
