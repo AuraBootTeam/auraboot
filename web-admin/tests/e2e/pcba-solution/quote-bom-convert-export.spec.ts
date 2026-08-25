@@ -26,12 +26,12 @@ const users: Record<string, QuoteRoleUser> = {};
 async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
   const data: any = { payload, operationType: op };
   if (target) data.targetRecordPid = target;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
+  const r = await page.context().request.post(`/api/meta/commands/execute/${code}`, { data });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 
 async function countStandardLines(page: Page, taskId: string): Promise<number> {
-  const r = await page.request.get(
+  const r = await page.context().request.get(
     '/api/dynamic/bom_standard_line_pcba/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc',
   );
   const b = await r.json().catch(() => ({}) as any);
@@ -118,7 +118,7 @@ test.describe('BOM workbench + export deep (BOM-05/08 + XLS-B) @smoke', () => {
         exportFileId,
         'XLS-B: command response contains a downloadable export file id',
       ).toBeTruthy();
-      const dl = await page.request.get(`/api/file/download/${exportFileId}`);
+      const dl = await page.context().request.get(`/api/file/download/${exportFileId}`);
       expect(dl.status(), 'export downloadable').toBe(200);
       const wb = XLSX.read(await dl.body(), { type: 'buffer' });
       expect(wb.SheetNames, 'XLS-B: standard workbook has all contract sheets').toEqual([

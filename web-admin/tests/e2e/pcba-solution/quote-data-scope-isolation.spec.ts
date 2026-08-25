@@ -80,10 +80,10 @@ async function listHasMarker(page: Page, marker: string): Promise<boolean> {
   return (await page.locator(`table tbody tr:has-text("${marker}")`).count()) > 0;
 }
 
-// provision a quote through the real command pipeline using the role's session cookie (page.request)
+// provision a quote through the real command pipeline using the role's browser-context session cookie
 async function provisionQuote(page: Page, code: string): Promise<void> {
   const suffix = code;
-  const proj = await page.request.post('/api/meta/commands/execute/bom:create_project', {
+  const proj = await page.context().request.post('/api/meta/commands/execute/bom:create_project', {
     data: { payload: { bom_project_name: `W2B ${suffix}`, bom_pcba_code: `W2B-${suffix}`, bom_project_remark: 'qo-iso' }, operationType: 'create' },
   });
   const projBody = await proj.json();
@@ -91,7 +91,7 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
   expect(projId, `project created for ${code}`).toBeTruthy();
 
   const buf = fs.readFileSync(SAMPLE_BOM!);
-  const up = await page.request.post('/api/file/upload', {
+  const up = await page.context().request.post('/api/file/upload', {
     multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
   });
   const upBody = await up.json();
@@ -99,7 +99,7 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
   expect(fileId, `BOM uploaded for ${code}`).toBeTruthy();
 
   const corrected = JSON.stringify([{ name: 'bom.xlsx', url: `/api/file/download/${fileId}`, size: buf.length, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileId }]);
-  const cr = await page.request.post('/api/meta/commands/execute/qo_quote_common:create', {
+  const cr = await page.context().request.post('/api/meta/commands/execute/qo_quote_common:create', {
     data: { payload: { qo_quote_code: code, qo_quote_customer: `W2B ${suffix}`, qo_quote_project_id: projId, corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx' }, operationType: 'create' },
   });
   expect(cr.status(), `quote created for ${code}`).toBe(200);

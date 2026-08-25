@@ -16,7 +16,7 @@ const uid = uniqueId('fin').replace(/_/g, '-');
 const users: Record<string, QuoteRoleUser> = {};
 
 async function post(page: Page, code: string, payload: any, op = 'create') {
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, {
+  const r = await page.context().request.post(`/api/meta/commands/execute/${code}`, {
     data: { payload, operationType: op },
   });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
@@ -25,7 +25,7 @@ const pid = (b: any) =>
   b?.data?.data?.recordPid || b?.data?.data?.recordId || b?.data?.recordPid || b?.data?.recordId;
 
 async function listConversionTasks(page: Page): Promise<any[]> {
-  const list = await page.request.get(
+  const list = await page.context().request.get(
     '/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc',
   );
   const lb = await list.json().catch(() => ({}) as any);
@@ -42,7 +42,7 @@ function findTask(recs: any[], projId: string, fileId: string): any | undefined 
 }
 
 async function countStandardLines(page: Page, taskId: string): Promise<number> {
-  const response = await page.request.get(
+  const response = await page.context().request.get(
     '/api/dynamic/bom_standard_line_pcba/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc',
   );
   const body = await response.json().catch(() => ({}) as any);
@@ -79,7 +79,7 @@ test.describe('Quote/BOM bad-file convert + permissions page (BOM-04 / SYS-04) @
       expect(projId, 'project created').toBeTruthy();
       // upload a clearly-invalid "xlsx" (plain text bytes) — not a real workbook
       const badBuf = Buffer.from('this is not a valid excel workbook ' + uid, 'utf8');
-      const up = await page.request.post('/api/file/upload', {
+      const up = await page.context().request.post('/api/file/upload', {
         multipart: {
           file: {
             name: 'bad.xlsx',
@@ -200,8 +200,8 @@ test.describe('Quote/BOM bad-file convert + permissions page (BOM-04 / SYS-04) @
       for (const c of candidates) {
         const r =
           c.method === 'put'
-            ? await page.request.put(c.url, { data: c.body })
-            : await page.request.post(c.url, { data: c.body });
+            ? await context.request.put(c.url, { data: c.body })
+            : await context.request.post(c.url, { data: c.body });
         statuses.push(r.status());
       }
       // none of the assignment attempts may succeed (2xx) for a non-admin; expect denial (401/403)

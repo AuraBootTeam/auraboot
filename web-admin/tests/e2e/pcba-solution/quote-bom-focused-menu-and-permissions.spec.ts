@@ -1,4 +1,4 @@
-import type { Browser } from '@playwright/test';
+import type { APIRequestContext, Browser } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import {
@@ -157,7 +157,7 @@ function bomProjectPayload(seed: string): Record<string, unknown> {
 }
 
 async function createCustomRole(page: Page, roleCode: string): Promise<string> {
-  const resp = await page.request.post('/api/roles', {
+  const resp = await page.context().request.post('/api/roles', {
     data: {
       code: roleCode,
       name: `E2E No Business ${roleCode.slice(-12)}`,
@@ -178,8 +178,8 @@ async function createCustomRole(page: Page, roleCode: string): Promise<string> {
   return rolePid;
 }
 
-async function grantPlatformBaseOnly(page: Page, rolePid: string): Promise<void> {
-  const resp = await page.request.put(
+async function grantPlatformBaseOnly(request: APIRequestContext, rolePid: string): Promise<void> {
+  const resp = await request.put(
     `/api/permission/capabilities?rolePid=${encodeURIComponent(rolePid)}`,
     {
       data: [PLATFORM_BASE_CAPABILITY],
@@ -213,7 +213,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     const page = await context.newPage();
     try {
       const noBusinessRolePid = await createCustomRole(page, noBusinessRoleCode);
-      await grantPlatformBaseOnly(page, noBusinessRolePid);
+      await grantPlatformBaseOnly(page.context().request, noBusinessRolePid);
       for (const user of Object.values(users)) {
         await ensureQuoteRoleUser(page, user);
       }
