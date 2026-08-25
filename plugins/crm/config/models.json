@@ -33,7 +33,7 @@
     "displayName:en": "Account Relationship",
     "description": "Governed directional relationship between two CRM accounts",
     "modelType": "entity",
-    "modelCategory": "relationship",
+    "modelCategory": "entity",
     "extension": {
       "icon": "Network",
       "category": "crm",

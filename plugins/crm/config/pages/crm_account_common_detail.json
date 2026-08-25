@@ -9,6 +9,19 @@
   "layout": {
     "type": "stack"
   },
+  "extension": {
+    "contributionSlots": [
+      {
+        "id": "commercial.blocks",
+        "kind": "block",
+        "anchor": {
+          "target": "tab-blocks",
+          "blockId": "crm_account_tabs",
+          "tabKey": "quote_summaries"
+        }
+      }
+    ]
+  },
   "blocks": [
     {
       "id": "crm_account_tabs",
@@ -460,8 +473,8 @@
         {
           "key": "quote_summaries",
           "label": {
-            "zh-CN": "报价摘要",
-            "en-US": "Quote Summaries"
+            "zh-CN": "报价与商业",
+            "en-US": "Quotes & Commercial"
           },
           "blocks": [
             {
@@ -695,6 +708,39 @@
           "action": {
             "type": "navigate",
             "to": "/dashboards/view/crm_account_360?recordPid={pid}"
+          }
+        },
+        {
+          "code": "merge",
+          "icon": "Combine",
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "合并客户", "en-US": "Merge Account" },
+          "action": {
+            "type": "command",
+            "command": "crm:merge_account",
+            "operationType": "update",
+            "inputFieldsTitle": { "zh-CN": "合并到目标客户", "en-US": "Merge into Account" },
+            "inputFieldsSubmitLabel": { "zh-CN": "确认合并", "en-US": "Confirm Merge" },
+            "inputFields": [
+              {
+                "field": "targetAccountId",
+                "label": { "zh-CN": "保留的目标客户", "en-US": "Surviving Account" },
+                "type": "select",
+                "searchable": true,
+                "dataSource": {
+                  "type": "api",
+                  "endpoint": "/api/dynamic/crm_account_common/list",
+                  "params": { "pageNum": 1, "pageSize": 200 },
+                  "valueField": "pid",
+                  "labelField": "crm_acc_name"
+                },
+                "required": true,
+                "helpText": {
+                  "zh-CN": "当前客户会被删除，所有关联业务记录迁移到目标客户。",
+                  "en-US": "The current account is removed after all related records move to the target."
+                }
+              }
+            ]
           }
         },
         {

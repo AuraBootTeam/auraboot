@@ -20,11 +20,16 @@
     "autoSetFields": {
       "crm_lead_code": {
         "strategy": "auto_generate",
-        "pattern": "LEAD-{yyyyMMdd}-{seq}"
+        "pattern": "LEAD-{yyyyMMdd}-{seq}",
+        "preserveInput": true
       },
       "crm_lead_status": {
         "strategy": "fixed_value",
         "value": "new"
+      },
+      "crm_lead_pool_state": {
+        "strategy": "fixed_value",
+        "value": "owned"
       }
     },
     "permissions": [
@@ -50,6 +55,13 @@
       "crm_lead_campaign",
       "crm_lead_assigned_to",
       "crm_lead_requirement"
+    ],
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": ["new", "contacted", "qualified"]
+      }
     ],
     "permissions": [
       "crm.lead.manage"
@@ -98,6 +110,9 @@
     "displayName:en": "Convert Lead",
     "type": "custom",
     "handler": "crm:convert_lead",
+    "executionConfig": {
+      "executionMode": "confirm_dialog"
+    },
     "modelCode": "crm_lead_common",
     "preconditions": [
       {
@@ -124,6 +139,9 @@
     "displayName:en": "Convert to Customer",
     "type": "custom",
     "handler": "crm:convert_lead_to_customer",
+    "executionConfig": {
+      "executionMode": "confirm_dialog"
+    },
     "modelCode": "crm_lead_common",
     "preconditions": [
       {

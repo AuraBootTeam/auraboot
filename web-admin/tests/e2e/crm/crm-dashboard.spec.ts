@@ -156,7 +156,7 @@ test.describe('CRM Dashboard @smoke', () => {
     await gotoDashboard(page);
 
     // Title should be visible
-    const title = page.locator('text=CRM 驾驶舱').or(page.locator('text=CRM Dashboard'));
+    const title = page.locator('text=销售首页').or(page.locator('text=Sales Home'));
     await expect(title.first()).toBeVisible({ timeout: 10000 });
   });
 

@@ -55,6 +55,13 @@ public interface OrganizationService {
     List<String> getCurrentDepartmentUserPids(boolean includeSubDepartments);
 
     /**
+     * Resolve the department PID linked to the current tenant member.
+     *
+     * @return current department PID, or null when no employee/department link exists
+     */
+    String getCurrentDepartmentPid();
+
+    /**
      * Batch find employees by member PIDs.
      *
      * @param memberPids collection of member PIDs

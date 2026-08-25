@@ -666,6 +666,27 @@ async function executeWorkbenchAction(
   expect(String(body?.code), JSON.stringify(body)).toBe('0');
 }
 
+async function executeOpportunityLossAction(page: Page): Promise<void> {
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/commands/execute/crm:lose_opportunity'),
+  { timeout: 20_000 });
+  await page.getByTestId('workbench-action-lose_opportunity').click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-ok').click();
+  const lossReason = page
+    .getByTestId('form-dialog')
+    .getByTestId('form-dialog-field-crm_opp_lost_reason_code');
+  await expect(lossReason).toBeVisible();
+  await lossReason.selectOption('competitor');
+  await page.getByRole('button', { name: /确认丢单|Confirm loss/i }).click();
+  const response = await responsePromise;
+  const body = await response.json().catch(() => ({}));
+  expect(response.ok(), `crm:lose_opportunity: HTTP ${response.status()} ${JSON.stringify(body)}`)
+    .toBeTruthy();
+  expect(String(body?.code), JSON.stringify(body)).toBe('0');
+}
+
 async function openCreateRouteWithKeyboard(
   page: Page,
   actionCode: (typeof EXPECTED_ACTIONS)[number],
@@ -1101,7 +1122,9 @@ test('all five workbenches expose an explicit no-match empty state', async ({ pa
     /商机工作台|Opportunity Workspace/,
   );
   await searchNamedQueryQueue(page, 'crm_opp_name', 'crm_opportunity_workspace_queue', noMatch);
-  await expect(page.getByTestId('table-block').first()).toContainText(/暂无数据|No data/);
+  await expect(page.getByTestId('table-block').first()).toContainText(
+    /暂无数据|当前没有符合条件的在途商机|No data/,
+  );
   await shot(page, testInfo, 'crm-opportunity-workspace-empty.png');
 
   await gotoWorkbench(page, 'crm_forecast_cockpit', 'crm_forecast_cockpit_stats', /预测驾驶舱|Forecast Cockpit/);
@@ -1265,7 +1288,7 @@ test('Opportunity Workspace advances a selected deal and keeps the decision cont
     completedActions.add('win_opportunity');
 
     await selectRow(page, `${RUN} Opportunity Lose`);
-    await executeWorkbenchAction(page, 'lose_opportunity', 'crm:lose_opportunity', true);
+    await executeOpportunityLossAction(page);
     await expect.poll(async () =>
       (await getRecord('crm_opportunity_common', ids.opportunityLose)).crm_opp_stage)
       .toBe('closed_lost');
@@ -1331,12 +1354,17 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
         && url.searchParams.get('commandCode') === 'crm:log_opp_activity'
         && url.searchParams.get('sourceRecordPid') === ids.journeyOpportunity,
     );
-    await page.getByTestId('select-trigger-crm_act_type').click();
+    const activityType = page.getByTestId('select-trigger-crm_act_type');
+    await activityType.click();
     await page.getByRole('option', { name: /会议|Meeting/ }).click();
-    await page.getByTestId('field-crm_act_subject').locator('input').fill(activitySubject);
+    await expect(activityType).toContainText(/会议|Meeting/);
+    const subjectInput = page.getByTestId('field-crm_act_subject').locator('input');
+    await subjectInput.fill(activitySubject);
+    await expect(subjectInput).toHaveValue(activitySubject);
     const dateInput = page.getByTestId('date-picker-input-crm_act_date');
     await expect(dateInput).toHaveAttribute('type', 'datetime-local');
     await dateInput.fill(JOURNEY_ACTIVITY_LOCAL);
+    await expect(dateInput).toHaveValue(JOURNEY_ACTIVITY_LOCAL);
 
     const createActivityResponse = page.waitForResponse((response) =>
       response.request().method() === 'POST'

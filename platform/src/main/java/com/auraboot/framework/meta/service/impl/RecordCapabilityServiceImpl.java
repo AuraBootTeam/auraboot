@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -141,6 +142,13 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
             return null;
         }
 
+        // Filter: command preconditions apply to every contextual command, not
+        // only state_transition commands. Otherwise a completed workflow can
+        // still advertise an action that the execution pipeline will reject.
+        if (!checkPreconditionsAllowed(execConfig, record)) {
+            return null;
+        }
+
         // Filter: state_transition commands must match current record state
         if ("state_transition".equals(cmdType) && !checkStateTransitionAllowed(execConfig, record)) {
             return null;
@@ -220,6 +228,104 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
                     .anyMatch(currentState::equals);
         }
         return true; // no fromStates restriction = allow
+    }
+
+    private boolean checkPreconditionsAllowed(Map<String, Object> execConfig,
+                                              Map<String, Object> record) {
+        Object preconditionsObj = execConfig.get("preconditions");
+        if (!(preconditionsObj instanceof List<?> preconditions) || preconditions.isEmpty()) {
+            return true;
+        }
+        if (record == null) {
+            return false;
+        }
+        Set<String> actionInputFields = extractStringSet(execConfig.get("inputFields"));
+        for (Object item : preconditions) {
+            if (!(item instanceof Map<?, ?> condition)) {
+                return false;
+            }
+            String field = Objects.toString(condition.get("field"), "").trim();
+            // Preconditions over fields supplied by the action form are submit-time
+            // validation, not record availability rules. Evaluating them against the
+            // current record would hide the action before the user can provide input
+            // (for example, lose_opportunity requires a loss reason in its dialog).
+            if (actionInputFields.contains(field)) {
+                continue;
+            }
+            String operator = normalizePreconditionOperator(
+                    Objects.toString(condition.get("operator"), "EQ"));
+            if (field.isEmpty() || !matchesPrecondition(record.get(field), operator, condition.get("value"))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesPrecondition(Object actual, String operator, Object expected) {
+        return switch (operator) {
+            case "EQ", "=" -> Objects.equals(normalizeValue(actual), normalizeValue(expected));
+            case "NEQ" -> !Objects.equals(normalizeValue(actual), normalizeValue(expected));
+            case "IN" -> expected instanceof Collection<?> values
+                    && values.stream().anyMatch(value ->
+                            Objects.equals(normalizeValue(actual), normalizeValue(value)));
+            case "NOT_IN" -> expected instanceof Collection<?> values
+                    && values.stream().noneMatch(value ->
+                            Objects.equals(normalizeValue(actual), normalizeValue(value)));
+            case "NULL" -> actual == null;
+            case "NOT_NULL" -> actual != null;
+            case "GT", "GE", "LT", "LE" -> compareValues(actual, expected, operator);
+            default -> false;
+        };
+    }
+
+    private Set<String> extractStringSet(Object value) {
+        if (!(value instanceof Collection<?> values)) {
+            return Set.of();
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+    }
+
+    private String normalizePreconditionOperator(String operator) {
+        return switch (operator.trim().toLowerCase(Locale.ROOT)) {
+            case "eq", "==", "=" -> "EQ";
+            case "ne", "neq", "!=", "<>" -> "NEQ";
+            case "in" -> "IN";
+            case "not_in", "notin" -> "NOT_IN";
+            case "is_null", "null", "isnull" -> "NULL";
+            case "is_not_null", "not_null", "notnull" -> "NOT_NULL";
+            case "gt", ">" -> "GT";
+            case "gte", "ge", ">=" -> "GE";
+            case "lt", "<" -> "LT";
+            case "lte", "le", "<=" -> "LE";
+            default -> operator.trim().toUpperCase(Locale.ROOT);
+        };
+    }
+
+    private boolean compareValues(Object actual, Object expected, String operator) {
+        if (actual == null || expected == null) {
+            return false;
+        }
+        int comparison;
+        try {
+            comparison = new BigDecimal(actual.toString())
+                    .compareTo(new BigDecimal(expected.toString()));
+        } catch (NumberFormatException ignored) {
+            comparison = actual.toString().compareTo(expected.toString());
+        }
+        return switch (operator) {
+            case "GT" -> comparison > 0;
+            case "GE" -> comparison >= 0;
+            case "LT" -> comparison < 0;
+            case "LE" -> comparison <= 0;
+            default -> false;
+        };
+    }
+
+    private Object normalizeValue(Object value) {
+        return value instanceof String text ? text.trim().toLowerCase(Locale.ROOT) : value;
     }
 
     private boolean checkPlatformAllowed(Map<String, Object> execConfig, String platform) {

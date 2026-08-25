@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.organization.service.OrganizationService;
+import com.auraboot.framework.organization.service.PermittedDepartmentTreeService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
@@ -39,6 +40,7 @@ public class OrgController {
     private static final String MODEL_ORG_DEPARTMENT = "org_department";
 
     private final OrganizationService organizationService;
+    private final PermittedDepartmentTreeService permittedDepartmentTreeService;
     private final OrgEmployeeService orgEmployeeService;
     private final DynamicDataService dynamicDataService;
     private final TenantMemberMapper tenantMemberMapper;
@@ -53,6 +55,14 @@ public class OrgController {
     public ApiResponse<List<DepartmentTreeNode>> getDepartmentTree() {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(organizationService.getDepartmentTree(tenantId));
+    }
+
+    /** Get the department tree permitted by the caller's effective resource data scope. */
+    @GetMapping("/departments/permitted-tree")
+    public ApiResponse<List<DepartmentTreeNode>> getPermittedDepartmentTree(
+            @RequestParam String resource,
+            @RequestParam(defaultValue = "read") String action) {
+        return ApiResponse.success(permittedDepartmentTreeService.getPermittedTree(resource, action));
     }
 
     /**

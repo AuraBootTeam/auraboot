@@ -349,6 +349,72 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
   });
 
+  it('collects state-transition inputFields before executing the exact target command', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: { commandCode: 'crm:lose_opportunity', phaseReached: 'completed' },
+    });
+    const formListener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      detail.onSubmit({
+        crm_opp_lost_reason_code: 'competitor',
+        crm_opp_competitor: 'Parity competitor',
+      });
+    });
+    window.addEventListener('dialog:form', formListener);
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { loadData, data: { pid: 'opp-001' } } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction(
+        {
+          code: 'lose',
+          action: {
+            type: 'state_transition',
+            command: 'crm:lose_opportunity',
+            inputFieldsTitle: 'Record loss',
+            inputFields: [
+              {
+                field: 'crm_opp_lost_reason_code',
+                type: 'enum',
+                required: true,
+              },
+              { field: 'crm_opp_competitor', type: 'text' },
+            ],
+          },
+        } as unknown as ButtonConfig,
+        { pid: 'opp-001' },
+      );
+    });
+    window.removeEventListener('dialog:form', formListener);
+
+    expect(formListener).toHaveBeenCalled();
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm:lose_opportunity',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordPid: 'opp-001',
+          operationType: 'UPDATE',
+          payload: {
+            crm_opp_lost_reason_code: 'competitor',
+            crm_opp_competitor: 'Parity competitor',
+          },
+        }),
+      }),
+    );
+    expect(loadData).toHaveBeenCalled();
+  });
+
   it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
     fetchResultMock
       .mockResolvedValueOnce({
@@ -1401,5 +1467,45 @@ describe('useActionHandler - handlerParams.async polling', () => {
       }),
     );
     expect(reload).toHaveBeenCalledWith(['rfqSourceAttachments']);
+  });
+
+  it('resolves an uppercase DELETE operation through the lowercase convention command map', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { deleted: 1 } });
+    const runtime = makeRuntime();
+    vi.spyOn(runtime, 'getSchema').mockReturnValue({
+      id: 'lead-list',
+      modelCode: 'crm_lead_common',
+      commands: { delete: 'crm:delete_lead' },
+    } as any);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'crm_lead_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { loadData: vi.fn().mockResolvedValue(undefined) } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction(
+        {
+          code: 'delete',
+          action: { type: 'command', operationType: 'DELETE' },
+        } as unknown as ButtonConfig,
+        { pid: 'LEAD-1' },
+      );
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm:delete_lead',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          targetRecordPid: 'LEAD-1',
+          operationType: 'DELETE',
+        }),
+      }),
+    );
   });
 });

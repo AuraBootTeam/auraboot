@@ -75,6 +75,7 @@ class ConvertLeadHandlerTest {
         assertEquals("PID1", contact.get("crm_ct_account_id"));
         assertEquals("Ada Chen", contact.get("crm_ct_name"));
         assertEquals("ada@example.com", contact.get("crm_ct_email"));
+        assertEquals("sales-a", contact.get("crm_ct_owner"));
         assertEquals(true, contact.get("crm_ct_is_primary"));
         assertEquals("PID1", contact.get("crm_ct_primary_account_key"));
 

@@ -206,6 +206,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     'label',
     'trend',
     'shortcuts',
+    'personalizable',
     'orientation',
     'stacked',
     'showLabel',
