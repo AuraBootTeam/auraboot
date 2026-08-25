@@ -100,9 +100,15 @@ function backendSpec(pluginName, pluginDir) {
   if (manifest.backend == null) return null;
 
   const jarRelativePath = manifest.backend?.jarPath;
+  const entryClass = manifest.backend?.entryClass;
   if (typeof jarRelativePath !== "string" || jarRelativePath.length === 0) {
     throw new Error(
       `plugin ${pluginName} declares backend without backend.jarPath`,
+    );
+  }
+  if (typeof entryClass !== "string" || entryClass.length === 0) {
+    throw new Error(
+      `plugin ${pluginName} declares backend without backend.entryClass`,
     );
   }
 
@@ -139,6 +145,7 @@ function backendSpec(pluginName, pluginDir) {
       normalizedRelativePath.slice(0, buildMarkerIndex),
     ),
     jarPath,
+    entryClass,
   };
 }
 
@@ -167,8 +174,8 @@ export function resolvePluginBackends({
 
 function renderTsv(backends) {
   return backends
-    .map(({ plugin, pluginDir, buildDir, jarPath }) =>
-      [plugin, pluginDir, buildDir, jarPath].join("\t"),
+    .map(({ plugin, pluginDir, buildDir, jarPath, entryClass }) =>
+      [plugin, pluginDir, buildDir, jarPath, entryClass].join("\t"),
     )
     .join("\n");
 }

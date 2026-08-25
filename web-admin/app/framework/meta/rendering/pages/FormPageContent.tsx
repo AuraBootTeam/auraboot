@@ -2310,7 +2310,13 @@ export function FormPageContent(props: PageContentProps) {
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
-  const submitReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
+  // Field metadata decides the concrete widget type and its controlled-value adapter.
+  // Rendering editable provisional controls before metadata resolves lets a fast user type into
+  // a SmartInput that is then replaced by (for example) SmartNumberInput. Keep the form in one
+  // explicit loading state until both record and field contracts are authoritative so values can
+  // never live only in a provisional control's local state.
+  const formInteractionReady =
+    mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
   // B-003 (DR-20260715-B-003): kind:form previously hard-coded form-section / tabs /
   // custom / form-buttons / sub-table and silently dropped every other top-level block —
@@ -2410,7 +2416,7 @@ export function FormPageContent(props: PageContentProps) {
 
             {/* Form Content - Using ComponentLoader Pattern */}
             <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
-              {!mainRecordLoaded ? (
+              {!formInteractionReady ? (
                 <div
                   className="text-text-3 py-8 text-center text-sm"
                   data-testid="dynamic-form-loading"
@@ -2788,7 +2794,12 @@ export function FormPageContent(props: PageContentProps) {
                             button.code,
                           )}
                           onClick={() => handleFormAction(button)}
-                          disabled={isFormButtonDisabled(button, loading, submitting, submitReady)}
+                          disabled={isFormButtonDisabled(
+                            button,
+                            loading,
+                            submitting,
+                            formInteractionReady,
+                          )}
                           className={`rounded-control px-4 py-2 text-sm font-medium ${
                             button.primary
                               ? 'bg-accent hover:bg-accent-hover text-white disabled:bg-blue-400'

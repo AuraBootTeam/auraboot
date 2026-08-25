@@ -9,6 +9,50 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('keeps wrapper-owned controlled state authoritative over metadata props', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ props }: { props: Record<string, unknown> }) => {
+        capturedPropsSpy({ props });
+        return <div data-testid="component-loader">loaded</div>;
+      },
+    }));
+
+    const controlledOnChange = vi.fn();
+    const metadataOnChange = vi.fn();
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'sc_name',
+            component: 'SmartInput',
+            props: {
+              value: '',
+              onChange: metadataOnChange,
+              disabled: true,
+              placeholder: 'metadata option remains allowed',
+            },
+          } as any
+        }
+        value="parent-owned value"
+        onChange={controlledOnChange}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('component-loader')).toBeInTheDocument());
+    const componentProps = capturedPropsSpy.mock.calls.at(-1)?.[0]?.props;
+    expect(componentProps).toMatchObject({
+      value: 'parent-owned value',
+      disabled: false,
+      placeholder: 'metadata option remains allowed',
+    });
+    expect(componentProps?.onChange).toBe(controlledOnChange);
+    expect(componentProps?.onChange).not.toBe(metadataOnChange);
+  });
+
   it('resolves model-scoped field labels before probing generic field keys', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

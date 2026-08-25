@@ -40,8 +40,12 @@ set -euo pipefail
 # ---- locate this checkout + the workspace root (dir holding dev.sh) ------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"            # the auraboot checkout this script lives in
-# Normal case: this checkout lives under the workspace, so dev.sh is an ancestor.
-WORKSPACE="$REPO_ROOT"
+# CI uses sibling repositories; local worktrees usually find dev.sh above them.
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
+fi
+[ -n "$WORKSPACE" ] || WORKSPACE="$REPO_ROOT"
 while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 # Sibling-worktree case: `git worktree add` outside the workspace tree (e.g.
 # /Users/.../auraboot-golden alongside /Users/.../auraboot) means dev.sh is NOT
@@ -54,7 +58,7 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
     [ -f "$cand/dev.sh" ] && WORKSPACE="$cand"
   fi
 fi
-[ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh above $REPO_ROOT (and no sibling main-worktree fallback)"; exit 1; }
+[ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
 DEV="$WORKSPACE/dev.sh"
 
@@ -135,9 +139,9 @@ stage_requested_backend_jars() {
     --repo-root "$REPO_ROOT" --format tsv "$@")" \
     || die "could not resolve requested plugin backends"
 
-  local plugin_name plugin_dir backend_dir jar_path
-  while IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path; do
-    [ -n "$plugin_name" ] && backend_specs+=("$plugin_name"$'\t'"$plugin_dir"$'\t'"$backend_dir"$'\t'"$jar_path")
+  local plugin_name plugin_dir backend_dir jar_path entry_class
+  while IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class; do
+    [ -n "$plugin_name" ] && backend_specs+=("$plugin_name"$'\t'"$plugin_dir"$'\t'"$backend_dir"$'\t'"$jar_path"$'\t'"$entry_class")
   done <<< "$backend_rows"
 
   mkdir -p "$sd/pf4j-plugins"
@@ -152,26 +156,34 @@ stage_requested_backend_jars() {
   [ -n "$maven_repo" ] || die "runtime Maven repository is missing for $runtime_name"
   [ -n "$gradle_home" ] || die "runtime Gradle home is missing for $runtime_name"
   mkdir -p "$maven_repo" "$gradle_home"
-  ( cd "$REPO_ROOT/platform" \
-    && GRADLE_USER_HOME="$gradle_home" ./gradlew --no-daemon --no-build-cache \
-      -Dmaven.repo.local="$maven_repo" \
+  # Use the workspace managed Gradle entry instead of invoking the wrapper
+  # directly. Besides preserving the runtime-local Maven/Gradle homes, this
+  # seeds the runtime's shared wrapper distribution from the validated host
+  # cache and injects the canonical China mirror init script. A direct wrapper
+  # call here made fresh CI runtimes bypass both contracts and redownload the
+  # Gradle distribution from services.gradle.org.
+  "$DEV" gradle "$runtime_name" --project "$REPO_ROOT/platform" -- \
+      --no-build-cache \
       :platform-plugin-api:publishToMavenLocal :publishToMavenLocal --console=plain \
-  ) >"$sd/platform-publications.log" 2>&1 \
+      >"$sd/platform-publications.log" 2>&1 \
     || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
-  local spec staged_path jar_hash
+  local spec staged_path jar_hash jar_entry_class entry_class_path
   for spec in "${backend_specs[@]}"; do
-    IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path <<< "$spec"
+    IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class <<< "$spec"
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
-    ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" "$REPO_ROOT/platform/gradlew" \
-      --project-dir "$backend_dir" --no-daemon \
-      -Dmaven.repo.local="$maven_repo" clean jar --console=plain ) \
+    "$DEV" gradle "$runtime_name" --project "$backend_dir" \
+      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar --console=plain \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
-    unzip -p "$jar_path" META-INF/extensions.idx 2>/dev/null \
-      | grep -qE '^[^#[:space:]]' \
-      || die "plugin backend jar has no registered PF4J extensions: $jar_path"
+    jar_entry_class="$(unzip -p "$jar_path" META-INF/MANIFEST.MF 2>/dev/null \
+      | tr -d '\r' | awk '$1 == "Plugin-Class:" { print $2; exit }')"
+    [ "$jar_entry_class" = "$entry_class" ] \
+      || die "plugin backend entryClass mismatch for $plugin_name: declared=$entry_class jar=${jar_entry_class:-missing}"
+    entry_class_path="${entry_class//./\/}.class"
+    jar tf "$jar_path" | grep -Fxq "$entry_class_path" \
+      || die "plugin backend entryClass is missing from jar for $plugin_name: $entry_class_path"
     staged_path="$sd/pf4j-plugins/$(basename "$jar_path")"
     [ ! -e "$staged_path" ] || die "duplicate staged PF4J jar name: $staged_path"
     cp "$jar_path" "$staged_path"
@@ -460,7 +472,7 @@ cmd_up() {
   fi
 
   if [ "$frontend" -eq 1 ]; then
-    log "7/9 frontend: symlink node_modules (if missing) + start Vite+BFF"
+    log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
     if ! web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules"; then
       if [ -L "$REPO_ROOT/web-admin/node_modules" ]; then
         rm -f "$REPO_ROOT/web-admin/node_modules"
@@ -468,9 +480,28 @@ cmd_up() {
         die "web-admin/node_modules exists but required runtime packages are unreadable; refusing to replace a real directory"
       fi
       local node_modules_seed
-      node_modules_seed="$(web_admin_node_modules_seed)" \
-        || die "no usable web-admin/node_modules capsule found in canonical checkout or existing worktrees"
-      ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
+      node_modules_seed="$(web_admin_node_modules_seed || true)"
+      if [ -n "$node_modules_seed" ]; then
+        ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
+      else
+        log "    no reusable node_modules found; installing from lockfile with the runtime pnpm store"
+        local npm_registry="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
+        local pnpm_version="${AURA_PNPM_VERSION:-9.15.9}"
+        COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
+          COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+          "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
+            corepack install --global "pnpm@$pnpm_version" \
+            >"$sd/frontend-corepack.log" 2>&1 \
+          || die "pnpm $pnpm_version bootstrap failed — see $sd/frontend-corepack.log"
+        CI=true NPM_CONFIG_REGISTRY="$npm_registry" \
+          COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
+          "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
+            pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
+            >"$sd/frontend-dependencies.log" 2>&1 \
+          || die "web-admin dependency install failed — see $sd/frontend-dependencies.log"
+        web_admin_node_modules_usable "$REPO_ROOT/web-admin/node_modules" \
+          || die "web-admin dependency install completed without usable runtime packages"
+      fi
     fi
     # A slot can be reused by a newer checkout/composition. Vite's on-disk optimized dependency
     # cache is keyed by port for this runner; keeping it across destroy→up allowed React itself and

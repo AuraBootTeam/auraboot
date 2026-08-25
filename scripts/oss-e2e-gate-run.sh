@@ -34,7 +34,7 @@
 #     the failures are then phantom "Command not found: e2et:*" harness noise).
 #
 # The exit code distinguishes the two kinds of failure in its message:
-#   * environment-invalid (stack did not come up / seed failed) -> exit 3
+#   * environment-invalid (stack did not come up / seed failed) -> exit 2
 #   * test-failure        (the slice went red)                  -> exit = the
 #                                                                  Playwright rc
 #
@@ -73,9 +73,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 
-# Locate the workspace dev.sh (for the slot-auto-pick's `runtime list` read). Same
-# ancestor-walk + sibling-worktree fallback oss-golden-stack.sh uses.
-WORKSPACE="$REPO_ROOT"
+# Locate the workspace dev.sh (for the slot-auto-pick's `runtime list` read).
+# CI keeps repositories as siblings under /opt/aura-ci/repos, while developer
+# worktrees usually find dev.sh by walking their ancestors.
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [ -z "$WORKSPACE" ] && [ -f "$(dirname "$REPO_ROOT")/auraboot-workspace/dev.sh" ]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
+fi
+if [ -z "$WORKSPACE" ]; then
+  WORKSPACE="$REPO_ROOT"
+fi
 while [ "$WORKSPACE" != "/" ] && [ ! -f "$WORKSPACE/dev.sh" ]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 if [ ! -f "$WORKSPACE/dev.sh" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
@@ -109,9 +116,9 @@ SLICE_DIRS=(
 C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
 log()  { printf '%s[oss-e2e-gate]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
 die()  { printf '%s[oss-e2e-gate] ERROR:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; exit 2; }
-# environment-invalid: the stack could not be made ready. Distinct exit code (3)
-# so a caller can tell "the gate's world was broken" from "the code went red".
-die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 3; }
+# environment-invalid: the stack could not be made ready. Exit 2 is the workspace
+# orchestrator's canonical environment-invalid contract; Playwright/product failures use exit 1.
+die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 2; }
 ENV_INVALID=0
 
 # True if a dashboard `code` is imported into ab_dashboard (any tenant). Uses the

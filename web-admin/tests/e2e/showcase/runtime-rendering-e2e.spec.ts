@@ -378,6 +378,12 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     const priceInput = page.locator('[data-testid="field-sc_price"] input').first();
     await expect(quantityInput).toBeVisible({ timeout: 5_000 });
     await expect(priceInput).toBeVisible({ timeout: 5_000 });
+    // The product must not expose provisional controls before async field metadata selects the
+    // authoritative widget/value adapter. This readiness assertion prevents the historical race
+    // where DOM values were typed into a temporary SmartInput and disappeared before submit.
+    await expect(nameInput).toBeEnabled({ timeout: 5_000 });
+    await expect(quantityInput).toBeEnabled({ timeout: 5_000 });
+    await expect(priceInput).toBeEnabled({ timeout: 5_000 });
 
     // Enum widget — Priority. Native <select> inside the field wrapper.
     const prioritySelect = page.locator('[data-testid="field-sc_priority"] select').first();
@@ -386,10 +392,48 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // Fill required + a few interesting widgets.
     const ts = Date.now();
     const submitName = `E2E Form ${ts}`;
+    await nameInput.evaluate((element) => {
+      (window as any).__p62MountRefs = {
+        input: element,
+        field: element.closest('[data-testid="field-sc_name"]'),
+        section: element.closest('.form-section'),
+        form: element.closest('form'),
+        page: element.closest('[data-testid^="dynamic-page-"]'),
+      };
+    });
+    const readNameMountChanges = () =>
+      nameInput.evaluate((element) => {
+        const initial = (window as any).__p62MountRefs || {};
+        return {
+          input: element !== initial.input,
+          field: element.closest('[data-testid="field-sc_name"]') !== initial.field,
+          section: element.closest('.form-section') !== initial.section,
+          form: element.closest('form') !== initial.form,
+          page: element.closest('[data-testid^="dynamic-page-"]') !== initial.page,
+        };
+      });
     await nameInput.click();
     await nameInput.fill(submitName);
+    await expect(nameInput, 'name must enter controlled form state immediately').toHaveValue(
+      submitName,
+      { timeout: 3_000 },
+    );
+    const mountChangesAfterName = await readNameMountChanges();
+    test.info().annotations.push({
+      type: 'form-state-provenance',
+      description: `mount changes after name=${JSON.stringify(mountChangesAfterName)}`,
+    });
     await quantityInput.click();
     await quantityInput.fill('42');
+    const mountChangesAfterQuantity = await readNameMountChanges();
+    test.info().annotations.push({
+      type: 'form-state-provenance',
+      description: `mount changes after quantity=${JSON.stringify(mountChangesAfterQuantity)}`,
+    });
+    await expect(
+      nameInput,
+      `name must survive quantity edit; mounts=${JSON.stringify(mountChangesAfterQuantity)}`,
+    ).toHaveValue(submitName, { timeout: 3_000 });
     await priceInput.click();
     await priceInput.fill('123.45');
 

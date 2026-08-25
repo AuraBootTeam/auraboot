@@ -282,13 +282,23 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
     'PF4J builds must receive both platform-plugin-api and root auraboot-core publications',
   );
   assert.match(golden, /platform-plugin-api\/auraboot-core publish failed/);
-  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
-  assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
-  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
+  assert.match(golden, /"\$DEV" gradle "\$runtime_name" --project "\$REPO_ROOT\/platform"/);
+  assert.match(golden, /--project "\$backend_dir"/);
+  assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
-  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo"/);
-  assert.match(golden, /META-INF\/extensions\.idx/);
+  assert.match(golden, /seeds the runtime's shared wrapper distribution/);
+  assert.match(golden, /META-INF\/MANIFEST\.MF/);
+  assert.match(golden, /plugin backend entryClass mismatch/);
+  assert.match(golden, /entryClass is missing from jar/);
+  assert.match(golden, /CI=true NPM_CONFIG_REGISTRY="\$npm_registry"/);
+  assert.match(golden, /pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only/);
+  assert.match(golden, /npm_registry="\$\{NPM_CONFIG_REGISTRY:-https:\/\/registry\.npmmirror\.com\}"/);
+  assert.match(golden, /pnpm_version="\$\{AURA_PNPM_VERSION:-9\.15\.9\}"/);
+  assert.match(golden, /COREPACK_NPM_REGISTRY="\$npm_registry" COREPACK_DEFAULT_TO_LATEST=0/);
+  assert.match(golden, /corepack install --global "pnpm@\$pnpm_version"/);
+  assert.match(golden, /frontend-corepack\.log/);
+  assert.match(golden, /frontend-dependencies\.log/);
   assert.match(golden, /pf4j-staging\.tsv/);
   assert.match(golden, /staged PF4J jar hash mismatch/);
   assert.match(golden, /AURA_PLUGINS_DIR="\$sd\/pf4j-plugins"/);
@@ -640,6 +650,37 @@ test('showcase CRM opportunity seeds send date-only values to DATE fields', () =
       `${file} must keep opportunity closeDate seed values date-only`,
     );
   }
+});
+
+test('deployment-neutral knowledge-base seeds use the configured embedding profile', () => {
+  for (const path of [
+    'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
+    'web-admin/tests/e2e/ai/knowledge-base-smoke.spec.ts',
+  ]) {
+    const source = read(path);
+    assert.doesNotMatch(source, /embeddingProvider:\s*['"]openai['"]/);
+    assert.doesNotMatch(source, /embeddingModel:\s*['"]text-embedding-3-small['"]/);
+  }
+
+  const aiSeed = read('web-admin/tests/api/setup/seed-showcase-ai.spec.ts');
+  assert.match(aiSeed, /\/api\/ai\/knowledge\/embedding-profiles/);
+  assert.match(aiSeed, /embeddingProfiles\.length[\s\S]*toBeGreaterThan\(0\)/);
+  assert.match(aiSeed, /embeddingProvider\)\.toBe\(expectedProfile\.providerCode\)/);
+  assert.match(aiSeed, /embeddingModel\)\.toBe\(expectedProfile\.defaultModel\)/);
+});
+
+test('Vite prebundles lazy rich-text form dependencies before an operator can type', () => {
+  const source = read('web-admin/vite.config.ts');
+  for (const dependency of [
+    '@tiptap/extension-link',
+    '@tiptap/extension-placeholder',
+    '@tiptap/react',
+    '@tiptap/starter-kit',
+  ]) {
+    assert.match(source, new RegExp(`['"]${dependency.replace('/', '\\\/')}['"]`));
+  }
+  assert.match(source, /reloading the entire form and discarding local state/);
 });
 
 test('docker GA bootstrap initializes a blank stack before admin login', () => {
