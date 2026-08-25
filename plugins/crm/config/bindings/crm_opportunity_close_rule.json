@@ -1,0 +1,9 @@
+[
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_code", "sequence": 1, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_close_type", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_rule_type", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_status", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_sequence", "sequence": 6, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_close_rule", "fieldCode": "crm_ocr_error_message", "sequence": 7, "required": false, "visible": true, "editable": true }
+]

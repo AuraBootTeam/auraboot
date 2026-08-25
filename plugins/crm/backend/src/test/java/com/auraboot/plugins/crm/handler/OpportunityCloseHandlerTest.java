@@ -71,7 +71,7 @@ class OpportunityCloseHandlerTest {
                         && "Cordys".equals(values.get("crm_opp_competitor")))))
                 .thenReturn(Map.of("pid", "opp-1", "crm_opp_stage", "closed_lost"));
 
-        assertThrows(IllegalArgumentException.class, () -> handler.execute(
+        assertThrows(IllegalStateException.class, () -> handler.execute(
                 context(db, OpportunityCloseHandler.LOSE_COMMAND, Map.of(), false)));
 
         @SuppressWarnings("unchecked")
@@ -100,6 +100,57 @@ class OpportunityCloseHandlerTest {
                 .thenReturn(null);
         assertThrows(IllegalStateException.class, () -> handler.execute(
                 context(unavailableDb, OpportunityCloseHandler.WIN_COMMAND, Map.of(), false)));
+    }
+
+    @Test
+    void configuredRulesAreAuthoritativeAndUseCustomFailureMessage() {
+        DataAccessor db = mock(DataAccessor.class);
+        when(db.getById("crm_opportunity_common", "opp-1")).thenReturn(readyOpportunity());
+        when(db.query("crm_opportunity_close_rule", Map.of())).thenReturn(List.of(
+                Map.of(
+                        "crm_ocr_status", "active",
+                        "crm_ocr_close_type", "won",
+                        "crm_ocr_rule_type", "positive_amount",
+                        "crm_ocr_sequence", 10,
+                        "crm_ocr_error_message", "请先确认本次商机金额")));
+        Map<String, Object> noAmount = new HashMap<>(readyOpportunity());
+        noAmount.put("crm_opp_expected_amount", 0);
+        when(db.getById("crm_opportunity_common", "opp-1")).thenReturn(noAmount);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> handler.execute(
+                context(db, OpportunityCloseHandler.WIN_COMMAND, Map.of(), false)));
+
+        assertEquals("请先确认本次商机金额", failure.getMessage());
+        verify(db, never()).update(eq("crm_opportunity_common"), eq("opp-1"),
+                org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void inactiveTerminalStageBlocksCloseAndConfiguredProbabilityIsPersisted() {
+        DataAccessor blocked = mock(DataAccessor.class);
+        when(blocked.getById("crm_opportunity_common", "opp-1")).thenReturn(readyOpportunity());
+        when(blocked.query("crm_opportunity_close_rule", Map.of())).thenReturn(List.of(
+                Map.of("crm_ocr_status", "inactive", "crm_ocr_close_type", "won",
+                        "crm_ocr_rule_type", "positive_amount", "crm_ocr_sequence", 10)));
+        when(blocked.query("crm_opportunity_stage_config", Map.of("crm_osc_code", "closed_won")))
+                .thenReturn(List.of(Map.of("crm_osc_status", "inactive", "crm_osc_probability", 95)));
+        assertThrows(IllegalStateException.class, () -> handler.execute(
+                context(blocked, OpportunityCloseHandler.WIN_COMMAND, Map.of(), false)));
+
+        DataAccessor configured = mock(DataAccessor.class);
+        when(configured.getById("crm_opportunity_common", "opp-1")).thenReturn(readyOpportunity());
+        when(configured.query("crm_opportunity_close_rule", Map.of())).thenReturn(List.of(
+                Map.of("crm_ocr_status", "inactive", "crm_ocr_close_type", "won",
+                        "crm_ocr_rule_type", "positive_amount", "crm_ocr_sequence", 10)));
+        when(configured.query("crm_opportunity_stage_config", Map.of("crm_osc_code", "closed_won")))
+                .thenReturn(List.of(Map.of("crm_osc_status", "active", "crm_osc_probability", 95)));
+        when(configured.update(eq("crm_opportunity_common"), eq("opp-1"), argThat(values ->
+                Integer.valueOf(95).equals(values.get("crm_opp_probability")))))
+                .thenReturn(Map.of("pid", "opp-1", "crm_opp_stage", "closed_won"));
+
+        handler.execute(context(configured, OpportunityCloseHandler.WIN_COMMAND, Map.of(), false));
+        verify(configured).update(eq("crm_opportunity_common"), eq("opp-1"), argThat(values ->
+                Integer.valueOf(95).equals(values.get("crm_opp_probability"))));
     }
 
     private static Map<String, Object> readyOpportunity() {

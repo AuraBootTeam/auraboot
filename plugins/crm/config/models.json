@@ -1046,5 +1046,31 @@
     "domain_category": "crm",
     "data_sensitivity": "internal",
     "lifecycle_description": "Append-only during the customer lifecycle; records are never edited and are deleted only as part of the parent customer's authorized permanent purge, matching CordysCRM deletion semantics."
+  },
+  {
+    "code": "crm_opportunity_stage_config",
+    "displayName:zh-CN": "商机阶段配置",
+    "displayName:en": "Opportunity Stage Configuration",
+    "description": "Tenant-scoped opportunity stage presentation, order, probability and availability.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": { "icon": "Route", "category": "crm", "titleField": "crm_osc_name", "subtitleField": "crm_osc_code" },
+    "semantic_description": "Administrator-owned stage catalogue consumed by opportunity close execution. Stable codes preserve integrations while labels, order, probability, rollback policy and availability remain tenant configurable.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE <-> INACTIVE. Inactive configured terminal stages reject new close operations without rewriting historical opportunities."
+  },
+  {
+    "code": "crm_opportunity_close_rule",
+    "displayName:zh-CN": "商机关单规则",
+    "displayName:en": "Opportunity Close Rule",
+    "description": "Ordered structured validations evaluated before an opportunity is won or lost.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": { "icon": "ShieldCheck", "category": "crm", "titleField": "crm_ocr_name", "subtitleField": "crm_ocr_rule_type" },
+    "semantic_description": "Tenant-scoped structured close validation. The runtime evaluates active rules in sequence; no executable expression or raw JSON is exposed to administrators.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE <-> INACTIVE. Active rules are enforced transactionally by opportunity close; inactive rules remain auditable but are skipped."
   }
 ]

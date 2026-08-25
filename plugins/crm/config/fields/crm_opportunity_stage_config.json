@@ -1,0 +1,10 @@
+[
+  { "code": "crm_osc_code", "displayName:zh-CN": "阶段编码", "displayName:en": "Stage Code", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_osc_name", "displayName:zh-CN": "阶段名称", "displayName:en": "Stage Name", "dataType": "string", "constraints": { "required": true, "maxLength": 100 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_osc_type", "displayName:zh-CN": "阶段类型", "displayName:en": "Stage Type", "dataType": "enum", "dictCode": "crm_opportunity_stage_type", "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_osc_probability", "displayName:zh-CN": "默认成功概率", "displayName:en": "Default Probability", "dataType": "integer", "constraints": { "required": true, "min": 0, "max": 100 }, "feature": { "sortable": true } },
+  { "code": "crm_osc_sequence", "displayName:zh-CN": "显示顺序", "displayName:en": "Display Order", "dataType": "integer", "constraints": { "required": true, "min": 0 }, "feature": { "sortable": true } },
+  { "code": "crm_osc_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "crm_opportunity_config_status", "defaultValue": "active", "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_osc_allow_rollback", "displayName:zh-CN": "允许回退", "displayName:en": "Allow Rollback", "dataType": "boolean", "defaultValue": false },
+  { "code": "crm_osc_description", "displayName:zh-CN": "阶段说明", "displayName:en": "Stage Description", "dataType": "text" }
+]

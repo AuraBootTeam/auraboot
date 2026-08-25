@@ -889,5 +889,30 @@
     "module": "crm",
     "resourceCode": "crm_customer_owner_history_common",
     "action": "read"
+  },
+  {
+    "code": "crm.opportunity.configure",
+    "name:zh-CN": "配置商机阶段与关单规则",
+    "name:en": "Configure Opportunity Governance",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_opportunity_stage_config.read",
+    "name:zh-CN": "查看商机阶段配置模型",
+    "name:en": "Read Opportunity Stage Configuration Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_opportunity_stage_config",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_opportunity_close_rule.read",
+    "name:zh-CN": "查看商机关单规则模型",
+    "name:en": "Read Opportunity Close Rule Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_opportunity_close_rule",
+    "action": "read"
   }
 ]

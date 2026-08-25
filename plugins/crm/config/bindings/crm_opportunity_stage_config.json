@@ -1,0 +1,10 @@
+[
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_code", "sequence": 1, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_type", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_probability", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_sequence", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_status", "sequence": 6, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_allow_rollback", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_stage_config", "fieldCode": "crm_osc_description", "sequence": 8, "required": false, "visible": true, "editable": true }
+]
