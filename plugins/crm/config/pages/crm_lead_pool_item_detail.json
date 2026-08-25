@@ -1,15 +1,128 @@
 {
-  "pageKey": "crm_lead_pool_item_detail", "name:zh-CN": "池内线索详情", "name:en": "Pooled Lead Detail", "modelCode": "crm_lead_pool_item_common", "kind": "detail", "schemaVersion": 4,
+  "pageKey": "crm_lead_pool_item_detail",
+  "name:zh-CN": "池内线索详情",
+  "name:en": "Pooled Lead Detail",
+  "modelCode": "crm_lead_pool_item_common",
+  "kind": "detail",
+  "schemaVersion": 4,
   "layout": { "type": "stack" },
   "blocks": [
-    { "id": "lead_snapshot", "blockType": "form-section", "title": { "zh-CN": "线索快照", "en": "Lead Snapshot" }, "columns": 3, "fields": [
-      { "field": "crm_lpi_pool_id", "readOnly": true }, { "field": "crm_lpi_status", "readOnly": true }, { "field": "crm_lpi_lead_code", "readOnly": true },
-      { "field": "crm_lpi_company", "readOnly": true }, { "field": "crm_lpi_contact_name", "readOnly": true }, { "field": "crm_lpi_contact_phone", "readOnly": true },
-      { "field": "crm_lpi_source", "readOnly": true }, { "field": "crm_lpi_score", "readOnly": true }, { "field": "crm_lpi_previous_owner", "readOnly": true }
-    ] },
-    { "id": "pool_evidence", "blockType": "form-section", "title": { "zh-CN": "入池与领取证据", "en": "Pool and Claim Evidence" }, "columns": 3, "fields": [
-      { "field": "crm_lpi_entered_at", "readOnly": true }, { "field": "crm_lpi_entered_by", "readOnly": true }, { "field": "crm_lpi_claim_release_at", "readOnly": true },
-      { "field": "crm_lpi_claimed_at", "readOnly": true }, { "field": "crm_lpi_claimed_by", "readOnly": true }, { "field": "crm_lpi_reason", "readOnly": true }
-    ] }
+    {
+      "id": "pooled_lead_summary",
+      "blockType": "detail-section",
+      "title": { "zh-CN": "池内线索摘要", "en": "Pooled Lead Summary" },
+      "columns": 3,
+      "fields": [
+        { "field": "crm_lpi_lead_code", "readOnly": true },
+        { "field": "crm_lpi_company", "readOnly": true },
+        { "field": "crm_lpi_contact_name", "readOnly": true },
+        { "field": "crm_lpi_contact_phone", "readOnly": true },
+        { "field": "crm_lpi_source", "readOnly": true },
+        { "field": "crm_lpi_score", "readOnly": true }
+      ]
+    },
+    {
+      "id": "pooled_lead_progress",
+      "blockType": "detail-section",
+      "title": { "zh-CN": "领取状态", "en": "Claim Status" },
+      "columns": 3,
+      "fields": [
+        { "field": "crm_lpi_pool_id", "readOnly": true },
+        { "field": "crm_lpi_status", "readOnly": true },
+        { "field": "crm_lpi_previous_owner", "readOnly": true }
+      ]
+    },
+    {
+      "id": "pooled_lead_actions",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "open_lead",
+          "label": { "zh-CN": "查看原始线索", "en": "View Lead" },
+          "action": { "type": "navigate", "to": "/p/crm_lead_common/view/{crm_lpi_lead_id}" }
+        },
+        {
+          "code": "claim",
+          "primary": true,
+          "permissionCode": "crm.lead_pool.pick",
+          "visibleWhen": "record.crm_lpi_status == 'available'",
+          "label": { "zh-CN": "领取线索", "en": "Claim Lead" },
+          "confirm": {
+            "zh-CN": "将校验当前容量、当日额度和冷却期。确认领取该线索？",
+            "en": "Capacity, daily quota and cooldown rules will be checked. Claim this lead?"
+          },
+          "action": { "type": "command", "command": "crm:claim_pool_lead", "operationType": "update" }
+        },
+        {
+          "code": "assign",
+          "permissionCode": "crm.lead_pool.assign",
+          "visibleWhen": "record.crm_lpi_status == 'available'",
+          "label": { "zh-CN": "分配线索", "en": "Assign Lead" },
+          "action": {
+            "type": "command",
+            "command": "crm:assign_pool_lead",
+            "operationType": "update",
+            "inputFieldsTitle": { "zh-CN": "选择接收成员", "en": "Choose Assignee" },
+            "inputFields": [
+              {
+                "field": "crm_lpi_claimed_by",
+                "label": { "zh-CN": "分配给", "en": "Assign To" },
+                "type": "reference",
+                "component": "MemberPicker",
+                "required": true,
+                "placeholder": {
+                  "zh-CN": "搜索并选择负责推进该线索的成员",
+                  "en": "Search for the member who will own this lead"
+                },
+                "helpText": {
+                  "zh-CN": "分配后该成员成为线索负责人，并受个人容量与池策略约束。",
+                  "en": "The selected member becomes the lead owner, subject to capacity and pool policy."
+                },
+                "props": { "multiple": false }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pool_evidence",
+      "blockType": "detail-section",
+      "title": { "zh-CN": "入池与领取证据", "en": "Pool and Claim Evidence" },
+      "columns": 3,
+      "fields": [
+        { "field": "crm_lpi_entered_at", "readOnly": true },
+        { "field": "crm_lpi_entered_by", "readOnly": true },
+        { "field": "crm_lpi_claim_release_at", "readOnly": true },
+        { "field": "crm_lpi_claimed_at", "readOnly": true },
+        { "field": "crm_lpi_claimed_by", "readOnly": true },
+        { "field": "crm_lpi_reason", "readOnly": true }
+      ]
+    },
+    {
+      "id": "pool_lead_activity_timeline",
+      "blockType": "activity-timeline",
+      "title": { "zh-CN": "线索跟进履历", "en": "Lead Follow-up History" },
+      "subTable": {
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "method": "get",
+          "params": {
+            "datasourceId": "nq:crm_pool_lead_timeline",
+            "poolItemId": "${recordPid}",
+            "format": "records"
+          }
+        },
+        "readOnly": true,
+        "columns": [
+          { "field": "crm_act_type", "width": 100, "renderType": "tag" },
+          { "field": "crm_act_subject", "width": 220 },
+          { "field": "crm_act_content", "width": 280 },
+          { "field": "crm_act_date", "width": 160, "format": "YYYY-MM-DD HH:mm" },
+          { "field": "owner_name", "width": 140 }
+        ]
+      }
+    }
   ]
 }

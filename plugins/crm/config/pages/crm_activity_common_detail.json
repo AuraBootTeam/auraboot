@@ -18,37 +18,45 @@
       },
       "columns": 2,
       "fields": [
-        {
-          "field": "crm_act_type",
+      {
+        "field": "crm_act_type",
+        "label": { "zh-CN": "活动类型", "en-US": "Activity Type" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_subject",
+      {
+        "field": "crm_act_subject",
+        "label": { "zh-CN": "跟进主题", "en-US": "Subject" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_date",
+      {
+        "field": "crm_act_date",
+        "label": { "zh-CN": "活动时间", "en-US": "Activity Time" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_owner",
+      {
+        "field": "crm_act_owner",
+        "label": { "zh-CN": "负责人", "en-US": "Owner" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_source",
+      {
+        "field": "crm_act_source",
+        "label": { "zh-CN": "记录来源", "en-US": "Source" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_parent_id",
+      {
+        "field": "crm_act_parent_id",
+        "label": { "zh-CN": "上级活动", "en-US": "Parent Activity" },
           "readOnly": true
         },
-        {
-          "field": "crm_act_content",
+      {
+        "field": "crm_act_content",
+        "label": { "zh-CN": "跟进内容", "en-US": "Follow-up Notes" },
           "span": 2,
           "readOnly": true
         },
-        {
-          "field": "crm_act_files",
+      {
+        "field": "crm_act_files",
+        "label": { "zh-CN": "附件", "en-US": "Attachments" },
           "span": 2,
           "readOnly": true
         }
