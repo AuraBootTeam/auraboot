@@ -55,8 +55,9 @@ class AllAdminControllersGuardIntegrationTest extends BaseIntegrationTest {
             "/api/admin/exchange-rates",
             // TenantTimezoneController — root mapping probe
             "/api/admin/tenants/timezone",
-            // AdminUserController — /search GET is the only no-arg read endpoint
-            "/api/admin/users/search",
+            // AdminUserController — picker reads are intentionally authenticated-only;
+            // the employee import template remains a tenant-admin management endpoint.
+            "/api/admin/users/employee-accounts/import/template",
             // EnvironmentController
             "/api/admin/environments",
             // InfrastructureController

@@ -3,6 +3,7 @@ package com.auraboot.framework.application.security;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.tracing.Tracer;
@@ -15,6 +16,7 @@ import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
@@ -30,7 +32,8 @@ import java.util.List;
  *   <li>{@code /api/admin/infrastructure/**} and {@code /api/admin/cloud-config/**}
  *       require {@link com.auraboot.framework.permission.enums.RoleCodes#PLATFORM_ADMIN}.</li>
  *   <li>All other {@code /api/admin/**} paths require
- *       {@link com.auraboot.framework.permission.enums.RoleCodes#TENANT_ADMIN}.</li>
+ *       {@link com.auraboot.framework.permission.enums.RoleCodes#TENANT_ADMIN}, unless the
+ *       exact handler explicitly declares {@link AuthenticatedAccess}.</li>
  * </ul>
  * Roles are <em>disjoint</em>: holding {@code platform_admin} does NOT grant
  * access to tenant-admin-only paths and vice versa.
@@ -83,6 +86,7 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
 
     public static final String DENY_MESSAGE = "admin role required";
     public static final int DENY_CODE = 409;
+    static final String AUTHENTICATED_TENANT_MEMBER = "authenticated_tenant_member";
 
     /** Request attribute: the role code that was required for this path. */
     public static final String ATTR_RESOLVED_ROLE = "auraboot.admin.resolved_role";
@@ -139,6 +143,11 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
         // even if MetaContext has been cleared by another interceptor running earlier.
         request.setAttribute(ATTR_TENANT_ID, tenantId);
         request.setAttribute(ATTR_USER_ID, userId);
+        if (hasAuthenticatedAccess(handler)) {
+            request.setAttribute(ATTR_RESOLVED_ROLE, AUTHENTICATED_TENANT_MEMBER);
+            request.setAttribute(ATTR_START_TIME_MS, System.currentTimeMillis());
+            return true;
+        }
         String requiredRole = resolveRequiredRole(request.getRequestURI());
         // Set resolved role before any deny so afterCompletion always sees what was required.
         request.setAttribute(ATTR_RESOLVED_ROLE, requiredRole);
@@ -165,6 +174,20 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /**
+     * Allows a reviewed, method-exact authenticated-only contract to override the
+     * coarse {@code /api/admin/**} role prefix. Authentication and tenant context
+     * are still mandatory because this check runs only after MetaContext validation.
+     * Class-level annotations are intentionally ignored so an entire admin controller
+     * cannot bypass the role guard accidentally.
+     */
+    private boolean hasAuthenticatedAccess(Object handler) {
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            return false;
+        }
+        return handlerMethod.getMethodAnnotation(AuthenticatedAccess.class) != null;
+    }
+
     @Override
     public void afterCompletion(HttpServletRequest req, HttpServletResponse resp,
                                 Object handler, Exception ex) {
@@ -173,7 +196,9 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
         // by the time afterCompletion runs in the reverse-order phase.
         Long tenantId = (Long) req.getAttribute(ATTR_TENANT_ID);
         Long userId = (Long) req.getAttribute(ATTR_USER_ID);
-        if (tenantId == null || userId == null) return;
+        if (tenantId == null || userId == null) {
+            return;
+        }
 
         String resolvedRole = (String) req.getAttribute(ATTR_RESOLVED_ROLE);
         Long startMs = (Long) req.getAttribute(ATTR_START_TIME_MS);
