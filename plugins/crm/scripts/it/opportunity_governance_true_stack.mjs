@@ -1,8 +1,10 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const backend = process.env.BACKEND_URL ?? 'http://127.0.0.1:6455';
-const evidenceRoot = process.env.AURA_EVIDENCE_ROOT ?? '/tmp/crm-par09-evidence';
+const evidenceRoot = process.env.AURA_EVIDENCE_ROOT
+  ?? mkdtempSync(join(tmpdir(), 'crm-par09-evidence-'));
 const run = `PAR09-${Date.now()}`;
 let jwt = '';
 const checks = [];
