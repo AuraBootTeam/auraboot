@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "854f3a321",
+    "commit": "00160ec52",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2300,6 +2300,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2390,6 +2391,7 @@
           "evidence": [
             "tests/crm-approval-case-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
@@ -2533,6 +2535,7 @@
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
+            "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
@@ -2925,6 +2928,26 @@
           "verdict": "pass"
         },
         {
+          "id": "crm:create_opportunity_close_rule",
+          "action": "crm:create_opportunity_close_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_opportunity_stage_config",
+          "action": "crm:create_opportunity_stage_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:create_quote_summary",
           "action": "crm:create_quote_summary",
           "surface": "ui",
@@ -3307,6 +3330,26 @@
           "verdict": "pass"
         },
         {
+          "id": "crm:delete_opportunity_close_rule",
+          "action": "crm:delete_opportunity_close_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_opportunity_stage_config",
+          "action": "crm:delete_opportunity_stage_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:delete_pool_customer",
           "action": "crm:delete_pool_customer",
           "surface": "ui",
@@ -3587,6 +3630,28 @@
         {
           "id": "crm:detail_opportunity",
           "action": "crm:detail_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_opportunity_close_rule",
+          "action": "crm:detail_opportunity_close_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_opportunity_stage_config",
+          "action": "crm:detail_opportunity_stage_config",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -4099,6 +4164,28 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:list_opportunity_close_rules",
+          "action": "crm:list_opportunity_close_rules",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_opportunity_stage_configs",
+          "action": "crm:list_opportunity_stage_configs",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "crm:list_quote_summaries",
           "action": "crm:list_quote_summaries",
           "surface": "ui",
@@ -4262,6 +4349,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-opportunity-daily-outcome-config.test.mjs",
+            "tests/crm-opportunity-governance-config.test.mjs",
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "plugins/crm/e2e/crm-dashboards.golden.spec.ts"
           ],
@@ -4734,6 +4822,7 @@
           "evidence": [
             "tests/crm-approval-case-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
@@ -5089,6 +5178,26 @@
           "verdict": "partial"
         },
         {
+          "id": "crm:update_opportunity_close_rule",
+          "action": "crm:update_opportunity_close_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_opportunity_stage_config",
+          "action": "crm:update_opportunity_stage_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:update_pool_customer",
           "action": "crm:update_pool_customer",
           "surface": "ui",
@@ -5184,6 +5293,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-opportunity-daily-outcome-config.test.mjs",
+            "tests/crm-opportunity-governance-config.test.mjs",
             "tests/crm-release-coverage.test.mjs",
             "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
@@ -6481,6 +6591,28 @@
           "note": "kind=list model=crm_omni_session"
         },
         {
+          "id": "page:crm_opportunity_close_rule_form",
+          "action": "crm_opportunity_close_rule_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_opportunity_close_rule"
+        },
+        {
+          "id": "page:crm_opportunity_close_rule_list",
+          "action": "crm_opportunity_close_rule_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_opportunity_close_rule"
+        },
+        {
           "id": "page:crm_opportunity_common_detail",
           "action": "crm_opportunity_common_detail",
           "surface": "ui",
@@ -6523,6 +6655,7 @@
             "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
             "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-permission-matrix.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-forecast.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
@@ -6534,6 +6667,28 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=crm_opportunity_common"
+        },
+        {
+          "id": "page:crm_opportunity_stage_config_form",
+          "action": "crm_opportunity_stage_config_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_opportunity_stage_config"
+        },
+        {
+          "id": "page:crm_opportunity_stage_config_list",
+          "action": "crm_opportunity_stage_config_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_opportunity_stage_config"
         },
         {
           "id": "page:crm_opportunity_workspace",
@@ -11732,10 +11887,10 @@
     }
   ],
   "stats": {
-    "commands": 520,
-    "untested": 307,
-    "pages": 305,
-    "pagesUntested": 188,
+    "commands": 530,
+    "untested": 317,
+    "pages": 309,
+    "pagesUntested": 192,
     "platformPages": 99,
     "platformPagesUntested": 41
   }
