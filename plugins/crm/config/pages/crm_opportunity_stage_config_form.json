@@ -1,0 +1,17 @@
+{
+  "pageKey": "crm_opportunity_stage_config_form", "name:zh-CN": "阶段编辑", "name:en": "Stage Editor", "modelCode": "crm_opportunity_stage_config", "kind": "form", "schemaVersion": 4, "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    { "id": "stage_identity", "blockType": "form-section", "title": { "zh-CN": "阶段身份", "en": "Stage Identity" }, "fields": [
+      { "field": "crm_osc_code", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "例如 negotiation", "en": "e.g. negotiation" }, "helpText": { "zh-CN": "保存后作为稳定集成编码使用，建议只使用小写字母和下划线。", "en": "This becomes the stable integration code; use lowercase letters and underscores." } },
+      { "field": "crm_osc_name", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "例如 商务谈判", "en": "e.g. Negotiation" }, "helpText": { "zh-CN": "使用销售人员熟悉的业务名称。", "en": "Use a business label familiar to sales teams." } },
+      { "field": "crm_osc_type", "colSpan": 6, "required": true }, { "field": "crm_osc_status", "colSpan": 6, "required": true, "defaultValue": "active" }
+    ] },
+    { "id": "stage_behavior", "blockType": "form-section", "title": { "zh-CN": "管道行为", "en": "Pipeline Behavior" }, "fields": [
+      { "field": "crm_osc_probability", "colSpan": 4, "required": true, "placeholder": { "zh-CN": "0 到 100", "en": "0 to 100" }, "helpText": { "zh-CN": "机会进入该阶段时采用的默认成功概率。", "en": "Default probability used for opportunities in this stage." } },
+      { "field": "crm_osc_sequence", "colSpan": 4, "required": true, "placeholder": { "zh-CN": "例如 40", "en": "e.g. 40" }, "helpText": { "zh-CN": "数字越小越靠前，也决定管理员列表排序。", "en": "Lower values appear first and order the administrator list." } },
+      { "field": "crm_osc_allow_rollback", "colSpan": 4 },
+      { "field": "crm_osc_description", "colSpan": 12, "placeholder": { "zh-CN": "说明进入条件、退出条件和销售动作", "en": "Describe entry criteria, exit criteria, and sales actions" }, "helpText": { "zh-CN": "说明用于团队协作，不作为机器可执行表达式。", "en": "Guidance for teams; it is not an executable expression." } }
+    ] },
+    { "id": "stage_buttons", "blockType": "form-buttons", "buttons": [ { "code": "submit", "primary": true, "permissionCode": "crm.opportunity.configure", "label": "$i18n:common.button.save", "action": { "type": "command" } }, { "code": "cancel", "label": "$i18n:common.button.cancel" } ] }
+  ]
+}

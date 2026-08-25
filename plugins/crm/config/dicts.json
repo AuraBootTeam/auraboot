@@ -4463,5 +4463,50 @@
       { "value": "open_opportunity", "label": "Open Opportunities", "label:zh-CN": "进行中商机", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "won", "label": "Won Opportunities", "label:zh-CN": "赢单", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } }
     ]
+  },
+  {
+    "code": "crm_opportunity_stage_type",
+    "name": "Opportunity Stage Type",
+    "name:zh-CN": "商机阶段类型",
+    "dictType": "static",
+    "items": [
+      { "value": "open", "label": "Open", "label:zh-CN": "进行中", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "won", "label": "Won", "label:zh-CN": "赢单终态", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "lost", "label": "Lost", "label:zh-CN": "丢单终态", "sortNo": 30, "status": "enabled", "extension": { "color": "red" } }
+    ]
+  },
+  {
+    "code": "crm_opportunity_config_status",
+    "name": "Opportunity Configuration Status",
+    "name:zh-CN": "商机配置状态",
+    "dictType": "static",
+    "items": [
+      { "value": "active", "label": "Active", "label:zh-CN": "生效", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_opportunity_close_type",
+    "name": "Opportunity Close Type",
+    "name:zh-CN": "商机关单类型",
+    "dictType": "static",
+    "items": [
+      { "value": "won", "label": "Won", "label:zh-CN": "赢单", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "lost", "label": "Lost", "label:zh-CN": "丢单", "sortNo": 20, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "both", "label": "Both", "label:zh-CN": "赢单与丢单", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_opportunity_close_rule_type",
+    "name": "Opportunity Close Validation",
+    "name:zh-CN": "商机关单校验条件",
+    "dictType": "static",
+    "items": [
+      { "value": "negotiation_stage", "label": "Negotiation stage required", "label:zh-CN": "必须处于商务谈判阶段", "sortNo": 10, "status": "enabled" },
+      { "value": "positive_amount", "label": "Positive amount required", "label:zh-CN": "预期金额必须大于零", "sortNo": 20, "status": "enabled" },
+      { "value": "close_date", "label": "Close date required", "label:zh-CN": "必须填写预计成交日期", "sortNo": 30, "status": "enabled" },
+      { "value": "competitor", "label": "Competitor required", "label:zh-CN": "必须填写竞争对手", "sortNo": 40, "status": "enabled" },
+      { "value": "loss_note", "label": "Loss review note required", "label:zh-CN": "必须填写丢单复盘备注", "sortNo": 50, "status": "enabled" }
+    ]
   }
 ]

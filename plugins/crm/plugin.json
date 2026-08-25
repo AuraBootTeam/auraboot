@@ -151,6 +151,22 @@
     },
     {
       "type": "model",
+      "code": "crm_opportunity_stage_config"
+    },
+    {
+      "type": "model",
+      "code": "crm_opportunity_close_rule"
+    },
+    {
+      "type": "page",
+      "code": "crm_opportunity_stage_config_list"
+    },
+    {
+      "type": "page",
+      "code": "crm_opportunity_close_rule_list"
+    },
+    {
+      "type": "model",
       "code": "crm_campaign_member"
     },
     {

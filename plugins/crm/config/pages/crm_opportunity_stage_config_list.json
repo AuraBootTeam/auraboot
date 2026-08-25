@@ -1,0 +1,15 @@
+{
+  "pageKey": "crm_opportunity_stage_config_list", "name:zh-CN": "商机阶段设置", "name:en": "Opportunity Stage Settings", "modelCode": "crm_opportunity_stage_config", "kind": "list", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    { "id": "stage_toolbar", "blockType": "toolbar", "buttons": [
+      { "code": "create", "primary": true, "permissionCode": "crm.opportunity.configure", "label": { "zh-CN": "新增阶段", "en": "Add Stage" }, "action": { "type": "navigate", "to": "crm_opportunity_stage_config_form" } },
+      { "code": "close_rules", "permissionCode": "crm.opportunity.configure", "label": { "zh-CN": "关单规则", "en": "Close Rules" }, "action": { "type": "navigate", "to": "crm_opportunity_close_rule_list" } }
+    ] },
+    { "id": "stage_guidance", "blockType": "description", "content": { "zh-CN": "<h3>统一销售管道</h3><p>阶段编码是稳定业务契约；名称、概率、顺序和启停可按租户维护。停用终态后，新的赢单或丢单会被运行时阻止，历史数据不会被改写。</p>", "en": "<h3>One governed pipeline</h3><p>Stage codes are stable business contracts. Labels, probability, order and availability are tenant managed. Disabling a terminal stage blocks new closes without rewriting history.</p>" } },
+    { "id": "stage_table", "blockType": "table", "columns": [
+      { "field": "crm_osc_name", "width": 180, "sortable": true }, { "field": "crm_osc_code", "width": 160 }, { "field": "crm_osc_type", "width": 120, "renderType": "tag", "dictCode": "crm_opportunity_stage_type" }, { "field": "crm_osc_probability", "width": 120, "align": "right" }, { "field": "crm_osc_sequence", "width": 100, "align": "right", "sortable": true }, { "field": "crm_osc_status", "width": 100, "renderType": "tag", "dictCode": "crm_opportunity_config_status" }, { "field": "crm_osc_allow_rollback", "width": 110 },
+      { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [ { "code": "edit", "permissionCode": "crm.opportunity.configure", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_opportunity_stage_config_form" } }, { "code": "delete", "danger": true, "permissionCode": "crm.opportunity.configure", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "删除后不可恢复，确认继续？", "en": "Deletion cannot be undone. Continue?" }, "action": { "type": "command" } } ] }
+    ], "searchFields": ["crm_osc_code", "crm_osc_name"], "searchPlaceholder": { "zh-CN": "搜索阶段编码或名称", "en": "Search stage code or name" }, "empty": { "title": { "zh-CN": "尚未维护阶段", "en": "No stages configured" }, "description": { "zh-CN": "新增阶段后，销售管道会按显示顺序呈现并由运行时校验终态可用性。", "en": "Add stages to order the pipeline and govern terminal-stage availability." } }, "defaultSort": { "field": "crm_osc_sequence", "order": "asc" } }
+  ]
+}
