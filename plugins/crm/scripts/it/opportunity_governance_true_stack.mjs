@@ -43,12 +43,20 @@ const login = await api('/api/auth/login', {
 jwt = String(expectOk(login, 'admin login')?.jwt ?? '');
 if (!jwt) throw new Error('login did not return jwt');
 
-const stageCreate = await command('crm:create_opportunity_stage_config', {
+const stagePayload = {
   crm_osc_code: 'closed_won', crm_osc_name: `${run} 赢单`, crm_osc_type: 'won',
   crm_osc_probability: 93, crm_osc_sequence: 90, crm_osc_status: 'inactive',
   crm_osc_allow_rollback: false, crm_osc_description: 'PAR09 true-stack terminal stage',
-});
-const stagePid = recordPid(expectOk(stageCreate, 'create inactive won stage'));
+};
+const stageRows = expectOk(await api('/api/dynamic/crm_opportunity_stage_config/list?pageNum=1&pageSize=100'), 'list stage configuration')?.records ?? [];
+const existingStage = stageRows.find((row) => row.crm_osc_code === 'closed_won');
+const stagePid = existingStage?.pid ?? recordPid(expectOk(
+  await command('crm:create_opportunity_stage_config', stagePayload),
+  'create inactive won stage',
+));
+if (existingStage) {
+  expectOk(await command('crm:update_opportunity_stage_config', stagePayload, stagePid), 'reset won stage inactive');
+}
 
 const ruleCreate = await command('crm:create_opportunity_close_rule', {
   crm_ocr_code: `${run}-AMOUNT`, crm_ocr_name: `${run} 金额校验`, crm_ocr_close_type: 'won',

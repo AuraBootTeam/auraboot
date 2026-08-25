@@ -63,11 +63,13 @@ public class OpportunityCloseHandler implements CommandHandlerExtension {
         Map<String, Object> patch = new LinkedHashMap<>();
         if (WIN_COMMAND.equals(commandCode)) {
             evaluateCloseRules(db, opportunityPid, opportunity, context.payload(), "won");
+            requireQuoteApprovalsReady(db, opportunityPid, null);
             requireTerminalStageAvailable(db, "closed_won");
             patch.put("crm_opp_stage", "closed_won");
             patch.put("crm_opp_probability", configuredProbability(db, "closed_won", 100));
         } else if (LOSE_COMMAND.equals(commandCode)) {
             Map<String, Object> payload = context.payload() == null ? Map.of() : context.payload();
+            required(payload.get("crm_opp_lost_reason_code"), "丢单前必须选择失败原因");
             evaluateCloseRules(db, opportunityPid, opportunity, payload, "lost");
             requireTerminalStageAvailable(db, "closed_lost");
             patch.put("crm_opp_stage", "closed_lost");
@@ -119,8 +121,8 @@ public class OpportunityCloseHandler implements CommandHandlerExtension {
                 case "negotiation_stage" -> require("negotiation".equals(text(opportunity.get("crm_opp_stage"))), customMessage, "只有商务谈判阶段的商机才能赢单");
                 case "positive_amount" -> require(decimal(opportunity.get("crm_opp_expected_amount")).compareTo(BigDecimal.ZERO) > 0, customMessage, "赢单前预计金额必须大于零");
                 case "close_date" -> require(rawText(opportunity.get("crm_opp_expected_close_date")) != null, customMessage, "赢单前必须填写预计成交日期");
-                case "quote_approval" -> requireQuoteApprovalsReady(db, opportunityPid, customMessage);
-                case "loss_reason" -> require(rawText(safePayload.get("crm_opp_lost_reason_code")) != null, customMessage, "丢单前必须选择失败原因");
+                case "competitor" -> require(rawText(safePayload.get("crm_opp_competitor")) != null, customMessage, "丢单前必须填写竞争对手");
+                case "loss_note" -> require(rawText(safePayload.get("crm_opp_lost_reason")) != null, customMessage, "丢单前必须填写复盘备注");
                 default -> throw new IllegalStateException("不支持的关单规则类型：" + type);
             }
         }
@@ -132,9 +134,6 @@ public class OpportunityCloseHandler implements CommandHandlerExtension {
             rules.add(Map.of("crm_ocr_rule_type", "negotiation_stage"));
             rules.add(Map.of("crm_ocr_rule_type", "positive_amount"));
             rules.add(Map.of("crm_ocr_rule_type", "close_date"));
-            rules.add(Map.of("crm_ocr_rule_type", "quote_approval"));
-        } else {
-            rules.add(Map.of("crm_ocr_rule_type", "loss_reason"));
         }
         return rules;
     }

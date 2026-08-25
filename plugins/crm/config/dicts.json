@@ -4505,8 +4505,8 @@
       { "value": "negotiation_stage", "label": "Negotiation stage required", "label:zh-CN": "必须处于商务谈判阶段", "sortNo": 10, "status": "enabled" },
       { "value": "positive_amount", "label": "Positive amount required", "label:zh-CN": "预期金额必须大于零", "sortNo": 20, "status": "enabled" },
       { "value": "close_date", "label": "Close date required", "label:zh-CN": "必须填写预计成交日期", "sortNo": 30, "status": "enabled" },
-      { "value": "quote_approval", "label": "Quotes must be approved", "label:zh-CN": "关联报价必须审批通过", "sortNo": 40, "status": "enabled" },
-      { "value": "loss_reason", "label": "Loss reason required", "label:zh-CN": "必须选择丢单原因", "sortNo": 50, "status": "enabled" }
+      { "value": "competitor", "label": "Competitor required", "label:zh-CN": "必须填写竞争对手", "sortNo": 40, "status": "enabled" },
+      { "value": "loss_note", "label": "Loss review note required", "label:zh-CN": "必须填写丢单复盘备注", "sortNo": 50, "status": "enabled" }
     ]
   }
 ]

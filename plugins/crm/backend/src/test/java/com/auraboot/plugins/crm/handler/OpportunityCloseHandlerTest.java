@@ -71,7 +71,7 @@ class OpportunityCloseHandlerTest {
                         && "Cordys".equals(values.get("crm_opp_competitor")))))
                 .thenReturn(Map.of("pid", "opp-1", "crm_opp_stage", "closed_lost"));
 
-        assertThrows(IllegalStateException.class, () -> handler.execute(
+        assertThrows(IllegalArgumentException.class, () -> handler.execute(
                 context(db, OpportunityCloseHandler.LOSE_COMMAND, Map.of(), false)));
 
         @SuppressWarnings("unchecked")
@@ -123,6 +123,27 @@ class OpportunityCloseHandlerTest {
         assertEquals("请先确认本次商机金额", failure.getMessage());
         verify(db, never()).update(eq("crm_opportunity_common"), eq("opp-1"),
                 org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void configuredRulesCannotBypassQuoteApprovalOrLossReasonInvariants() {
+        DataAccessor winDb = mock(DataAccessor.class);
+        when(winDb.getById("crm_opportunity_common", "opp-1")).thenReturn(readyOpportunity());
+        when(winDb.query("crm_opportunity_close_rule", Map.of())).thenReturn(List.of(
+                Map.of("crm_ocr_status", "active", "crm_ocr_close_type", "won",
+                        "crm_ocr_rule_type", "positive_amount", "crm_ocr_sequence", 10)));
+        when(winDb.query("crm_quote_summary_common", Map.of("crm_qs_opportunity_id", "opp-1")))
+                .thenReturn(List.of(Map.of("crm_qs_approval_status", "pending")));
+        assertThrows(IllegalStateException.class, () -> handler.execute(
+                context(winDb, OpportunityCloseHandler.WIN_COMMAND, Map.of(), false)));
+
+        DataAccessor lossDb = mock(DataAccessor.class);
+        when(lossDb.getById("crm_opportunity_common", "opp-1")).thenReturn(readyOpportunity());
+        when(lossDb.query("crm_opportunity_close_rule", Map.of())).thenReturn(List.of(
+                Map.of("crm_ocr_status", "inactive", "crm_ocr_close_type", "lost",
+                        "crm_ocr_rule_type", "loss_note", "crm_ocr_sequence", 10)));
+        assertThrows(IllegalArgumentException.class, () -> handler.execute(
+                context(lossDb, OpportunityCloseHandler.LOSE_COMMAND, Map.of(), false)));
     }
 
     @Test
