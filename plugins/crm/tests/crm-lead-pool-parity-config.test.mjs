@@ -358,7 +358,7 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   );
   assert.equal(
     poolItemDetail.blocks.find((block) => block.id === 'pool_lead_activity_timeline')
-      .subTable.dataSource.params.datasourceId,
+      .dataSource.params.datasourceId,
     'nq:crm_pool_lead_timeline',
   );
 

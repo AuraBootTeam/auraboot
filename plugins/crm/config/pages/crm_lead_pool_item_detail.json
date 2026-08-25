@@ -103,25 +103,15 @@
       "id": "pool_lead_activity_timeline",
       "blockType": "activity-timeline",
       "title": { "zh-CN": "线索跟进履历", "en": "Lead Follow-up History" },
-      "subTable": {
-        "dataSource": {
-          "type": "api",
-          "url": "/api/datasource/list",
-          "method": "get",
-          "params": {
-            "datasourceId": "nq:crm_pool_lead_timeline",
-            "poolItemId": "${recordPid}",
-            "format": "records"
-          }
-        },
-        "readOnly": true,
-        "columns": [
-          { "field": "crm_act_type", "width": 100, "renderType": "tag" },
-          { "field": "crm_act_subject", "width": 220 },
-          { "field": "crm_act_content", "width": 280 },
-          { "field": "crm_act_date", "width": 160, "format": "YYYY-MM-DD HH:mm" },
-          { "field": "owner_name", "width": 140 }
-        ]
+      "dataSource": {
+        "type": "api",
+        "url": "/api/datasource/list",
+        "method": "get",
+        "params": {
+          "datasourceId": "nq:crm_pool_lead_timeline",
+          "poolItemId": "${recordPid}",
+          "format": "records"
+        }
       }
     }
   ]
