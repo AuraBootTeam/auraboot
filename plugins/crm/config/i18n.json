@@ -2514,15 +2514,15 @@
   },
   {
     "key": "page.crm_dashboard.title",
-    "zh-CN": "CRM 驾驶舱",
-    "en-US": "CRM Dashboard",
+    "zh-CN": "销售首页",
+    "en-US": "Sales Home",
     "source": "import",
     "refType": "page"
   },
   {
     "key": "page.crm_dashboard.description",
-    "zh-CN": "销售全景、商机管道、线索来源与客户行动的一体化经营视图",
-    "en-US": "An integrated operating view of sales, pipeline, lead sources and customer actions",
+    "zh-CN": "聚合销售节奏、快捷入口、计划、待办和经营分析的一体化个人销售首页",
+    "en-US": "A unified personal sales home for sales rhythm, quick entries, plans, inbox, and operating analytics",
     "source": "import",
     "refType": "page"
   },

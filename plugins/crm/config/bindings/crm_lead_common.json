@@ -20,5 +20,6 @@
   { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_converted_contact_id", "sequence": 19, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
   { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_converted_opportunity_id", "sequence": 20, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
   { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_converted_request_id", "sequence": 21, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
-  { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_converted_at", "sequence": 22, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } }
+  { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_converted_at", "sequence": 22, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_lead_common", "fieldCode": "crm_lead_target_pool_id", "sequence": 23, "required": false, "visible": false, "editable": true }
 ]

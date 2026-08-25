@@ -200,6 +200,8 @@ export interface WidgetConfig {
   /** Single-card eyebrow override (string or LocalizedText). */
   label?: DashboardText;
   trend?: Record<string, unknown>;
+  /** Allow the current user to replace and reorder authored shortcut defaults. */
+  personalizable?: boolean;
 }
 
 /**

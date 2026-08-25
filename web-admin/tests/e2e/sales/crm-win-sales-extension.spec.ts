@@ -1,5 +1,7 @@
 import type { TestInfo } from '@playwright/test';
 import { test, expect, type Locator, type Page } from '../../fixtures';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   dateOffsetStr,
   executeCommandViaApi,
@@ -17,6 +19,24 @@ const contractName = opportunityName;
 const paymentPlanName = `项目验收款-${businessSuffix}`;
 const overrunPlanName = `超额计划-${businessSuffix}`;
 let opportunityPid = '';
+let accountPid = '';
+let orderPid = '';
+let contractPid = '';
+let planPid = '';
+const COMMERCIAL_SOURCE_IDS = [
+  'api:customer:customer:contract-list',
+  'api:customer:customer:calculate-customer-contract-statistic',
+  'api:customer:customer:contract-list:account-contract-payment-plan-page',
+  'api:customer:customer:calculate-customer-payment-plan-statistic',
+  'api:customer:customer:record-list',
+  'api:customer:customer:calculate-customer-payment-record-statistic',
+  'api:customer:customer:invoice-list',
+  'api:customer:customer:invoice-list:account-order-page',
+  'api:customer:customer:calculate-customer-invoice-statistic',
+] as const;
+const completedCommercialSources = new Set<string>();
+const evidenceScreenshots: string[] = [];
+const failedRuntimeRequests: string[] = [];
 
 type DynamicRecord = Record<string, unknown> & { pid?: string };
 
@@ -236,11 +256,17 @@ async function readRecord(page: Page, modelCode: string, pid: string): Promise<D
 }
 
 async function capture(page: Page, testInfo: TestInfo, fileName: string): Promise<void> {
-  await page.screenshot({ path: testInfo.outputPath(fileName), fullPage: true });
+  const output = testInfo.outputPath(fileName);
+  await page.screenshot({ path: output, fullPage: true });
+  evidenceScreenshots.push(output);
+  await testInfo.attach(fileName, { path: output, contentType: 'image/png' });
 }
 
 async function captureViewport(page: Page, testInfo: TestInfo, fileName: string): Promise<void> {
-  await page.screenshot({ path: testInfo.outputPath(fileName), fullPage: false });
+  const output = testInfo.outputPath(fileName);
+  await page.screenshot({ path: output, fullPage: false });
+  evidenceScreenshots.push(output);
+  await testInfo.attach(fileName, { path: output, contentType: 'image/png' });
 }
 
 async function openOpportunityFromSidebar(page: Page): Promise<void> {
@@ -271,6 +297,50 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
   test.setTimeout(180_000);
   test.use({ viewport: { width: 1440, height: 960 } });
 
+  test.beforeEach(({ page }) => {
+    page.on('response', (response) => {
+      if (response.status() >= 500 && response.url().includes('/api/')) {
+        failedRuntimeRequests.push(
+          `${response.request().method()} ${response.url()} HTTP ${response.status()}`,
+        );
+      }
+    });
+  });
+
+  test.afterAll(() => {
+    const evidenceRoot = process.env.AURA_EVIDENCE_ROOT;
+    if (!evidenceRoot) return;
+    const rows = COMMERCIAL_SOURCE_IDS.map((sourceId) => ({
+      sourceId,
+      verdict: completedCommercialSources.has(sourceId) ? 'pass' : 'untested',
+    }));
+    const verdict =
+      rows.every((row) => row.verdict === 'pass') && failedRuntimeRequests.length === 0
+        ? 'pass'
+        : 'fail';
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(evidenceRoot, `crm-account-commercial-360-${Date.now()}.json`),
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          runId: process.env.CRM_COMMERCIAL_360_RUN_ID || `crm-commercial-360-${Date.now()}`,
+          runtime: process.env.AURA_RUNTIME_NAME || null,
+          verdict,
+          technicalVerdict: verdict,
+          dataMigration: 'not-required-development-stage',
+          runner: { browser: 'chromium', workers: 1, retries: 0 },
+          sourceIds: rows,
+          screenshots: evidenceScreenshots,
+          failedRuntimeRequests,
+          productOwnerScreenshotSignOff: 'pending-human-signature',
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
+
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({
       storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
@@ -288,12 +358,13 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
         undefined,
         'create',
       );
+      accountPid = account.recordId;
       const opportunity = await executeCommandViaApi(
         page,
         'crm:create_opportunity',
         {
           crm_opp_name: opportunityName,
-          crm_opp_account_id: account.recordId,
+          crm_opp_account_id: accountPid,
           crm_opp_currency_code: 'CNY',
           crm_opp_expected_amount: 150,
           crm_opp_expected_close_date: '2026-12-31T18:00:00+08:00',
@@ -376,7 +447,7 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
     expect(Number(order.sl_so_total_qty)).toBe(2);
     expect(Number(order.sl_so_total_amount)).toBe(150);
 
-    const orderPid = String(order.pid);
+    orderPid = String(order.pid);
     const lines = await queryFilteredList(
       page,
       'sl_sales_order_line_common',
@@ -415,7 +486,7 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
       { operator: 'EQ' },
     );
     expect(contracts).toHaveLength(1);
-    const contractPid = String(contracts[0].pid);
+    contractPid = String(contracts[0].pid);
     expect(contracts[0].sl_ctr_name).toBe(contractName);
     expect(contracts[0].sl_ctr_status).toBe('draft');
     expect(contracts[0].sl_ctr_order_id).toBe(orderPid);
@@ -500,7 +571,7 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
       { operator: 'EQ' },
     );
     expect(plans).toHaveLength(1);
-    const planPid = String(plans[0].pid);
+    planPid = String(plans[0].pid);
     expect(plans[0].sl_cpp_status).toBe('planned');
     expect(Number(plans[0].sl_cpp_amount)).toBe(150);
 
@@ -633,5 +704,91 @@ test.describe('CRM win → contract → collection commercial fulfillment', () =
     expect(contract.sl_ctr_status).toBe('completed');
     await expect(page.getByText(/已完成|Completed/).first()).toBeVisible({ timeout: 12_000 });
     await captureViewport(page, testInfo, '06-contract-completed.png');
+  });
+
+  test('shows account commercial 360 with contracts, plans, collections, invoices and orders @critical @golden', async ({
+    page,
+  }, testInfo) => {
+    expect(accountPid).toBeTruthy();
+    expect(orderPid).toBeTruthy();
+    expect(contractPid).toBeTruthy();
+    expect(planPid).toBeTruthy();
+
+    const invoice = await executeCommandViaApi(
+      page,
+      'sl:create_customer_invoice',
+      {
+        sl_inv_account_id: accountPid,
+        sl_inv_contract_id: contractPid,
+        sl_inv_order_id: orderPid,
+        sl_inv_issue_date: todayStr(),
+        sl_inv_due_date: dateOffsetStr(30),
+        sl_inv_amount: 150,
+        sl_inv_currency_code: 'cny',
+        sl_inv_tax_document_ref: `CRM360-${businessSuffix}`,
+        sl_inv_remark: '客户商业 360 真栈验收数据',
+      },
+      undefined,
+      'create',
+    );
+    await executeCommandViaApi(
+      page,
+      'sl:issue_customer_invoice',
+      {},
+      invoice.recordId,
+      'state_transition',
+    );
+
+    await page.goto(`/p/crm_account_common/view/${accountPid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('tab', { name: /报价与商业|Quotes & Commercial/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    const dataSourceResponses = new Set<string>();
+    page.on('response', (response) => {
+      const url = response.url();
+      if (response.ok() && url.includes('/api/datasource/list')) dataSourceResponses.add(url);
+    });
+    await page.getByRole('tab', { name: /报价与商业|Quotes & Commercial/i }).click();
+
+    for (const title of ['商业汇总', '销售合同', '回款计划', '收款记录', '客户发票', '销售订单']) {
+      await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
+    }
+    await expect(page.getByText(contractName, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(paymentPlanName, { exact: true }).first()).toBeVisible();
+    const invoiceRecord = await readRecord(page, 'sl_customer_invoice_common', invoice.recordId);
+    await expect(
+      page.getByText(String(invoiceRecord.sl_inv_code), { exact: true }).first(),
+    ).toBeVisible();
+
+    await expect
+      .poll(
+        () =>
+          [...dataSourceResponses].some((url) =>
+            decodeURIComponent(url).includes('nq:sl_customer_commercial_summary'),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        () =>
+          [...dataSourceResponses].some((url) =>
+            decodeURIComponent(url).includes('nq:sl_customer_payment_plans'),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        () =>
+          [...dataSourceResponses].some((url) =>
+            decodeURIComponent(url).includes('nq:sl_customer_payment_records'),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+
+    for (const sourceId of COMMERCIAL_SOURCE_IDS) completedCommercialSources.add(sourceId);
+    await capture(page, testInfo, '07-account-commercial-360.png');
   });
 });

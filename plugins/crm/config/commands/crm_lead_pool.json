@@ -7,7 +7,7 @@
     "modelCode": "crm_lead_pool_common",
     "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_match_mode", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
     "autoSetFields": {
-      "crm_lp_code": { "strategy": "auto_generate", "pattern": "LP-{yyyyMMdd}-{seq}" },
+      "crm_lp_code": { "strategy": "auto_generate", "pattern": "LP-{yyyyMMdd}-{seq}", "preserveInput": true },
       "crm_lp_status": { "strategy": "fixed_value", "value": "enabled" }
     },
     "permissions": ["crm.lead_pool.manage"],
@@ -73,6 +73,18 @@
     "handler": "crm:move_lead_to_pool",
     "handlerParams": { "dslPersistence": false },
     "inputFields": ["crm_lead_last_pool_id"],
+    "preconditions": [
+      {
+        "field": "crm_lead_status",
+        "operator": "IN",
+        "value": ["new", "contacted", "qualified"]
+      },
+      {
+        "field": "crm_lead_pool_state",
+        "operator": "EQ",
+        "value": "owned"
+      }
+    ],
     "permissions": ["crm.lead_pool.move"],
     "agent_hint": "Move an owned lead into an enabled pool. Payload poolId or crm_lead_last_pool_id is required.",
     "cmd_risk_level": "L2"
@@ -103,6 +115,50 @@
     "cmd_risk_level": "L2"
   },
   {
+    "code": "crm:update_pool_lead",
+    "displayName:zh-CN": "编辑池内线索",
+    "displayName:en": "Update Pooled Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_item_common",
+    "handler": "crm:update_pool_lead",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": [
+      "crm_lead_company",
+      "crm_lead_contact_name",
+      "crm_lead_contact_phone",
+      "crm_lead_contact_email",
+      "crm_lead_source",
+      "crm_lead_industry",
+      "crm_lead_score",
+      "crm_lead_status",
+      "crm_lead_requirement",
+      "crm_lpi_company",
+      "crm_lpi_contact_name",
+      "crm_lpi_contact_phone",
+      "crm_lpi_source",
+      "crm_lpi_score"
+    ],
+    "permissions": ["crm.lead_pool.manage"],
+    "agent_hint": "Update the underlying lead from a pool item and keep the pool snapshot consistent.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_pool_lead",
+    "displayName:zh-CN": "永久删除池内线索",
+    "displayName:en": "Permanently Delete Pooled Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_item_common",
+    "handler": "crm:delete_pool_lead",
+    "handlerParams": { "dslPersistence": false },
+    "extension": {
+      "confirmMessage:zh-CN": "线索及其池内记录将被永久删除；已转化线索会被阻止。确认继续？",
+      "confirmMessage:en": "The lead and its pool record will be permanently deleted. Converted leads are blocked. Continue?"
+    },
+    "permissions": ["crm.lead_pool.manage"],
+    "agent_hint": "Permanently delete an unconverted pooled lead and its pool-owned activity evidence.",
+    "cmd_risk_level": "L4"
+  },
+  {
     "code": "crm:list_lead_pool_items",
     "displayName:zh-CN": "线索池条目列表",
     "displayName:en": "List Lead Pool Items",
@@ -110,6 +166,68 @@
     "modelCode": "crm_lead_pool_item_common",
     "permissions": ["crm.lead_pool.read"],
     "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:download_lead_pool_import_template",
+    "displayName:zh-CN": "下载线索池导入模板",
+    "displayName:en": "Download Lead Pool Import Template",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_common",
+    "handler": "crm:download_lead_pool_import_template",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.lead_pool.import"],
+    "agent_hint": "Download the governed .xlsx template for lead-pool ADD or UPDATE imports.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:precheck_lead_pool_import",
+    "displayName:zh-CN": "预检线索池导入",
+    "displayName:en": "Pre-check Lead Pool Import",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_common",
+    "handler": "crm:precheck_lead_pool_import",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "线索池导入预检", "en": "Lead Pool Import Pre-check" },
+        "completedMessage": { "zh-CN": "预检完成，未写入线索数据", "en": "Pre-check completed without lead writes" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "validRows", "label": { "zh-CN": "可导入", "en": "Valid rows" }, "tone": "success" },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.lead_pool.import"],
+    "agent_hint": "Validate an actor-owned .xlsx file against pool membership and lead rules without mutation.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:import_lead_pool_leads",
+    "displayName:zh-CN": "导入线索到线索池",
+    "displayName:en": "Import Leads to Lead Pool",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_common",
+    "handler": "crm:import_lead_pool_leads",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "线索池批量导入", "en": "Lead Pool Bulk Import" },
+        "completedMessage": { "zh-CN": "线索池导入完成", "en": "Lead pool import completed" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "importedRows", "label": { "zh-CN": "已导入", "en": "Imported rows" }, "tone": "success" },
+          { "field": "createdRows", "label": { "zh-CN": "新增", "en": "Created rows" }, "tone": "success" },
+          { "field": "updatedRows", "label": { "zh-CN": "更新", "en": "Updated rows" } },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.lead_pool.import"],
+    "agent_hint": "Import valid ADD or UPDATE rows through the lead-pool ownership state machine.",
+    "cmd_risk_level": "L2"
   },
   {
     "code": "crm:run_lead_pool_recycle",

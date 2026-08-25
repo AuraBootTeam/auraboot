@@ -1,0 +1,71 @@
+{
+  "pageKey": "crm_lead_pool_mobile_list",
+  "name:zh-CN": "线索池",
+  "name:en": "Lead Pool",
+  "modelCode": "crm_lead_pool_item_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        { "id": "all", "label": { "zh-CN": "全部", "en": "All" } },
+        { "id": "available", "label": { "zh-CN": "待领取", "en": "Available" }, "filter": { "field": "crm_lpi_status", "op": "EQ", "value": "available" } },
+        { "id": "owned", "label": { "zh-CN": "已获配", "en": "Owned" }, "filter": { "field": "crm_lpi_status", "op": "IN", "value": ["claimed", "assigned"] } }
+      ],
+      "defaultSort": [
+        { "field": "crm_lpi_entered_at", "direction": "DESC" }
+      ],
+      "card": {
+        "title": { "field": "crm_lpi_company" },
+        "subtitle": { "template": "{{crm_lpi_contact_name}} · {{crm_lpi_contact_phone}}" },
+        "badges": [
+          { "field": "crm_lpi_status", "renderer": "statusBadge" }
+        ],
+        "summary": { "field": "crm_lpi_reason", "maxLines": 2 },
+        "facts": [
+          { "field": "crm_lpi_lead_code", "label": { "zh-CN": "线索编号", "en": "Lead Code" } },
+          { "field": "crm_lpi_claim_release_at", "label": { "zh-CN": "可领取时间", "en": "Available At" }, "renderer": "datetime" }
+        ],
+        "actions": ["more"]
+      }
+    }
+  },
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_lead_pool_mobile_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_lpi_company", "width": 180 },
+        { "field": "crm_lpi_contact_name", "width": 120 },
+        { "field": "crm_lpi_contact_phone", "width": 140 },
+        { "field": "crm_lpi_lead_code", "width": 140 },
+        { "field": "crm_lpi_status", "width": 110, "renderType": "tag", "dictCode": "crm_lead_pool_item_status" },
+        { "field": "crm_lpi_claim_release_at", "width": 160, "valueType": "datetime" },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "claim",
+              "permissionCode": "crm.lead_pool.pick",
+              "primary": true,
+              "label": { "zh-CN": "领取", "en": "Claim" },
+              "visibleWhen": "row.crm_lpi_status == 'available'",
+              "confirm": { "zh-CN": "系统将再次校验冷却、每日上限、人员库容和并发状态。确认领取？", "en": "Cooldown, quota, capacity, and concurrency will be rechecked. Continue?" },
+              "action": { "type": "command", "command": "crm:claim_pool_lead", "operationType": "update" }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": ["crm_lpi_company", "crm_lpi_lead_code", "crm_lpi_contact_name"],
+      "defaultSort": { "field": "crm_lpi_entered_at", "order": "desc" },
+      "searchPlaceholder": { "zh-CN": "搜索公司、线索编号或联系人", "en": "Search company, lead code, or contact" },
+      "empty": {
+        "title": { "zh-CN": "当前线索池没有可见记录", "en": "No visible pooled leads" },
+        "description": { "zh-CN": "从线索列表将线索移入已启用的线索池，或调整当前筛选。", "en": "Move a lead from the lead list into an enabled pool, or adjust the filter." }
+      }
+    }
+  ]
+}

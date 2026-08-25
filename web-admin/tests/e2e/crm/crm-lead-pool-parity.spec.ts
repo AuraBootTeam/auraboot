@@ -376,7 +376,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
         queueRows.length,
         'lead-pool queue query must return seeded records',
       ).toBeGreaterThanOrEqual(7);
-      await expect(salesPage).toHaveURL(/crm_lead_pool_item_common/, { timeout: 15_000 });
+      await expect(salesPage).toHaveURL(/\/p\/c\/crm_lead_pool_item_list$/, { timeout: 15_000 });
       await expect(salesPage.getByTestId('metric-strip-item-ready')).toBeVisible({
         timeout: 15_000,
       });
@@ -650,7 +650,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       await managerSession.context.close();
     }
 
-    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/crm_lead_owner_history_common');
+    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/c/crm_lead_owner_history_list');
     await expect(page.getByText(/领取|Claimed/).first()).toBeVisible();
     await expect(page.getByText('CordysCRM W1 automated parity journey').first()).toBeVisible();
     await testInfo.attach('lead-owner-history', {
@@ -664,6 +664,36 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
     expect(String(persistedBody?.data?.crm_lead_pool_state)).toBe('owned');
     await testInfo.attach('lead-pool-sql-budget.json', {
       body: Buffer.from(JSON.stringify(sqlEvidence, null, 2)),
+      contentType: 'application/json',
+    });
+    await testInfo.attach('crm-lead-pool-cordys-source-evidence.json', {
+      body: Buffer.from(
+        JSON.stringify(
+          {
+            verdict: 'pass',
+            fixtureMode: 'self-seeded',
+            dataMigration: 'out-of-scope-development-stage',
+            sourceIds: [
+              'api:clue:clue-capacity:add',
+              'api:clue:clue-capacity:update',
+              'api:clue:clue-pool:add',
+              'api:clue:clue-pool:update',
+              'api:clue:pool-clue:list',
+              'api:clue:pool-clue:pick',
+              'api:clue:pool-clue:assign',
+              'api:clue:pool-clue:get',
+              'api:clue:pool-clue:batch-pick',
+              'api:clue:pool-clue:chart',
+              'route:web:clue:3',
+            ],
+            assertionScope:
+              'real-stack pool/capacity setup, scoped queue/detail, claim, assign, batch claim, metrics and menu route',
+            sqlEvidence,
+          },
+          null,
+          2,
+        ),
+      ),
       contentType: 'application/json',
     });
   });

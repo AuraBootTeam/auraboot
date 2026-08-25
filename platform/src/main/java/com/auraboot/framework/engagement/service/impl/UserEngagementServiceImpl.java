@@ -76,7 +76,9 @@ public class UserEngagementServiceImpl implements UserEngagementService {
             entity.setTargetLabel(dto.getTargetLabel());
             entity.setTargetContext(dto.getTargetContext());
             entity.setEngagementType(dto.getEngagementType());
-            entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+            entity.setSortOrder(dto.getSortOrder() != null
+                    ? dto.getSortOrder()
+                    : nextSortOrder(userId, tenantId, dto.getEngagementType(), dto.getTargetType()));
             entity.setCreatedAt(now);
             entity.setUpdatedAt(now);
             engagementMapper.insert(entity);
@@ -120,6 +122,20 @@ public class UserEngagementServiceImpl implements UserEngagementService {
     }
 
     // ─── Private helpers ───────────────────────────────────────────────────────
+
+    private int nextSortOrder(Long userId, Long tenantId, String engagementType, String targetType) {
+        UserEngagement last = engagementMapper.selectOne(
+                new LambdaQueryWrapper<UserEngagement>()
+                        .eq(UserEngagement::getUserId, userId)
+                        .eq(UserEngagement::getTenantId, tenantId)
+                        .eq(UserEngagement::getEngagementType, engagementType)
+                        .eq(UserEngagement::getTargetType, targetType)
+                        .orderByDesc(UserEngagement::getSortOrder)
+                        .orderByDesc(UserEngagement::getUpdatedAt)
+                        .last("LIMIT 1")
+        );
+        return last == null || last.getSortOrder() == null ? 0 : last.getSortOrder() + 1;
+    }
 
     /**
      * Prune the oldest recent_view records beyond the RECENT_VIEW_MAX cap.

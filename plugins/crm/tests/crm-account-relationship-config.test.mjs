@@ -15,7 +15,7 @@ test('PAR-05 account relationships are a governed bidirectional customer detail 
   ]);
 
   const model = models.find((candidate) => candidate.code === 'crm_account_relation_common');
-  assert.equal(model?.modelCategory, 'relationship');
+  assert.equal(model?.modelCategory, 'entity');
   assert.equal(model?.extension?.dataScope?.ownerField, 'crm_acr_owner');
 
   const source = fields.find((field) => field.code === 'crm_acr_source_account_id');

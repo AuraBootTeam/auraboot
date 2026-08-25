@@ -52,6 +52,14 @@ const FALLBACK_LABELS: Record<string, string> = {
   [I18N_KEYS.close]: 'Close',
 };
 
+const ZH_FALLBACK_LABELS: Record<string, string> = {
+  [I18N_KEYS.title]: '添加快捷入口',
+  [I18N_KEYS.search]: '搜索菜单项...',
+  [I18N_KEYS.noResults]: '没有匹配的菜单项',
+  [I18N_KEYS.loading]: '加载中...',
+  [I18N_KEYS.close]: '关闭',
+};
+
 /**
  * Extract leaf menu items (type=1, with a path) from a nested menu tree,
  * grouped by their parent folder name.
@@ -94,7 +102,7 @@ function buildFavoriteLookup(favorites: UserEngagement[]): Map<string, UserEngag
 }
 
 export function AddFavoriteModal({ open, onClose, onChanged }: AddFavoriteModalProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [menuItems, setMenuItems] = useState<LeafMenuItem[]>([]);
   const [favorites, setFavorites] = useState<Map<string, UserEngagement>>(new Map());
   const [search, setSearch] = useState('');
@@ -107,9 +115,12 @@ export function AddFavoriteModal({ open, onClose, onChanged }: AddFavoriteModalP
     (key: string) => {
       const translated = t(key);
       // If t() returns the key itself, use fallback
-      return translated === key ? (FALLBACK_LABELS[key] || key) : translated;
+      const fallback = locale.toLowerCase().startsWith('zh')
+        ? ZH_FALLBACK_LABELS[key]
+        : FALLBACK_LABELS[key];
+      return translated === key ? (fallback || key) : translated;
     },
-    [t],
+    [locale, t],
   );
 
   // Fetch menu tree + existing favorites on open

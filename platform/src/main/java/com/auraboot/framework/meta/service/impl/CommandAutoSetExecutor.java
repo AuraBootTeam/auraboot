@@ -108,8 +108,8 @@ public class CommandAutoSetExecutor {
     private String generateAutoCode(String modelCode, String fieldCode, Map<String, Object> config) {
         try {
             // Security: validate fieldCode and tableName to prevent SQL injection
-            CommandExecutorUtils.validateSqlIdentifier(fieldCode, "autoCode fieldCode");
             Long tenantId = MetaContext.getCurrentTenantId();
+            CommandExecutorUtils.validateSqlIdentifier(fieldCode, "autoCode fieldCode");
             String tableName = metaModelService.getTableName(modelCode);
             CommandExecutorUtils.validateSqlIdentifier(tableName, "autoCode tableName");
             String datePrefix = tenantClock.businessDate(MetaContext.getCurrentTenantId())
@@ -130,7 +130,10 @@ public class CommandAutoSetExecutor {
             List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
             long nextSeq = 1;
             if (result != null && !result.isEmpty() && result.get(0) != null) {
-                Object maxSeq = result.get(0).get("max_seq");
+                Map<String, Object> row = result.get(0);
+                Object maxSeq = row.get("max_seq");
+                if (maxSeq == null) maxSeq = row.get("MAX_SEQ");
+                if (maxSeq == null) maxSeq = row.get("maxSeq");
                 if (maxSeq instanceof Number) {
                     nextSeq = ((Number) maxSeq).longValue() + 1;
                 }

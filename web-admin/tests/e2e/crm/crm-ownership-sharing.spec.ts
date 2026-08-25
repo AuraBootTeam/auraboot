@@ -54,6 +54,14 @@ const COVERAGE = {
   ],
 } as const;
 
+const CORDYS_SOURCE_IDS = [
+  'api:customer:customer-collaboration:list',
+  'api:customer:customer-collaboration:add',
+  'api:customer:customer-collaboration:update',
+  'api:customer:customer-collaboration:delete',
+  'api:customer:customer-collaboration:batch-delete',
+] as const;
+
 const authSessionStorage = createCookieSessionStorage({
   cookie: {
     name: '__session',
@@ -495,6 +503,11 @@ test.describe('CRM account collaboration', () => {
             technicalVerdict: 'pass',
             fixtureMode: 'self-seeded',
             dataMigration: 'out-of-scope-development-stage',
+            cordysSourceEvidence: {
+              sourceIds: CORDYS_SOURCE_IDS,
+              assertionScope:
+                'owner-driven collaboration list, grant, upgrade and revoke with access checks',
+            },
             expectedScenarios: EXPECTED_SCENARIOS,
             completedScenarios: EXPECTED_SCENARIOS,
             coverage: Object.fromEntries(
@@ -778,6 +791,9 @@ async function openAccountDetailFromMenu(page: Page, accountName: string): Promi
   await searchAccountList(page, accountName);
   const row = page.locator('tbody tr', { hasText: accountName }).first();
   await expect(row).toBeVisible({ timeout: 10_000 });
+  await expect(
+    row.locator('[data-testid="row-action-view"], [data-testid="row-action-more"]').first(),
+  ).toBeVisible({ timeout: 10_000 });
   await clickRowActionByLocator(page, row, 'view', 'detail');
   await expect(page.locator('[data-testid$="share-btn"]')).toBeVisible({ timeout: 10_000 });
 }
@@ -791,7 +807,10 @@ async function searchAccountList(page: Page, keyword: string): Promise<void> {
   await expect(input).toBeVisible({ timeout: 10_000 });
   const response = page.waitForResponse(
     (candidate) =>
-      candidate.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && candidate.status() === 200,
+      candidate.url().includes(`/api/dynamic/${MODEL_CODE}/list`) &&
+      candidate.url().includes('keyword=') &&
+      candidate.status() === 200,
+    { timeout: 15_000 },
   );
   await input.fill(keyword);
   await input.press('Enter');

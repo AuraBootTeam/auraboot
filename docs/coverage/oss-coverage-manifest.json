@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "e04049d04",
+    "commit": "fcea8f440",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2160,6 +2160,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
@@ -2174,6 +2175,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
@@ -2213,6 +2215,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2225,6 +2228,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-lead-lifecycle-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2433,6 +2437,8 @@
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-par07-visual-signoff.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
@@ -2444,6 +2450,7 @@
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
@@ -2625,6 +2632,8 @@
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-par07-visual-signoff.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
@@ -2758,6 +2767,7 @@
             "web-admin/tests/e2e/crm/crm-import-provider-lifecycle.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
             "web-admin/tests/e2e/crm/crm-multimodel-import-cordys-parity.spec.ts",
@@ -2776,6 +2786,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2789,6 +2800,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2855,6 +2867,7 @@
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
@@ -2869,9 +2882,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:create_review",
@@ -3065,14 +3080,15 @@
         {
           "id": "crm:delete_contact",
           "action": "crm:delete_contact",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/crm-contact-lifecycle-config.test.mjs"
+            "tests/crm-contact-lifecycle-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
           ],
-          "assertion": "covered below the UI only — no browser evidence",
-          "verdict": "partial"
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:delete_customer_capacity",
@@ -3185,21 +3201,24 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:delete_lead_pool",
           "action": "crm:delete_lead_pool",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/crm-lead-pool-parity-config.test.mjs"
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
-          "assertion": "covered below the UI only — no browser evidence",
-          "verdict": "partial"
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:delete_lead_pool_recycle_rule",
@@ -3246,6 +3265,19 @@
           "evidence": [
             "tests/crm-customer-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_pool_lead",
+          "action": "crm:delete_pool_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -3583,6 +3615,19 @@
           "verdict": "partial"
         },
         {
+          "id": "crm:download_lead_pool_import_template",
+          "action": "crm:download_lead_pool_import_template",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:enable_contact",
           "action": "crm:enable_contact",
           "surface": "ui",
@@ -3664,6 +3709,19 @@
           "evidence": [
             "tests/crm-customer-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:import_lead_pool_leads",
+          "action": "crm:import_lead_pool_leads",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4201,6 +4259,7 @@
           "evidence": [
             "tests/crm-lead-lifecycle-parity-config.test.mjs",
             "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -4235,6 +4294,19 @@
           "evidence": [
             "tests/crm-customer-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:precheck_lead_pool_import",
+          "action": "crm:precheck_lead_pool_import",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4284,6 +4356,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
@@ -4401,6 +4474,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-lead-lifecycle-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -4634,14 +4708,15 @@
         {
           "id": "crm:toggle_lead_pool",
           "action": "crm:toggle_lead_pool",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/crm-lead-pool-parity-config.test.mjs"
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
-          "assertion": "covered below the UI only — no browser evidence",
-          "verdict": "partial"
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:update_account",
@@ -4764,9 +4839,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "tests/crm-contact-lifecycle-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:update_customer_capacity",
@@ -4856,6 +4934,7 @@
           "driver": "unit",
           "evidence": [
             "tests/crm-lead-assignment-ref-config.test.mjs",
+            "tests/crm-lead-lifecycle-parity-config.test.mjs",
             "tests/crm-lead-pool-parity-config.test.mjs"
           ],
           "assertion": "covered below the UI only — no browser evidence",
@@ -4868,6 +4947,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -4881,6 +4961,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -4929,6 +5010,19 @@
           "evidence": [
             "tests/crm-customer-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_pool_lead",
+          "action": "crm:update_pool_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -5004,6 +5098,7 @@
           "evidence": [
             "tests/crm-opportunity-daily-outcome-config.test.mjs",
             "tests/crm-release-coverage.test.mjs",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts"
           ],
@@ -5028,6 +5123,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
@@ -5409,6 +5505,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
           ],
@@ -5422,9 +5519,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=crm_contact_common"
         },
         {
@@ -5436,6 +5535,8 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-par07-visual-signoff.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -5940,6 +6041,17 @@
           "note": "kind=detail model=crm_lead_common"
         },
         {
+          "id": "page:crm_lead_move_to_pool_form",
+          "action": "crm_lead_move_to_pool_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_lead_common"
+        },
+        {
           "id": "page:crm_lead_owner_history_detail",
           "action": "crm_lead_owner_history_detail",
           "surface": "ui",
@@ -5956,9 +6068,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=crm_lead_owner_history_common"
         },
         {
@@ -5967,9 +6081,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=crm_lead_pool_item_common"
         },
         {
@@ -6024,10 +6140,34 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-extended-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_lead_pool_common"
+        },
+        {
+          "id": "page:crm_lead_pool_mobile_detail",
+          "action": "crm_lead_pool_mobile_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_lead_pool_common"
+          "note": "kind=detail model=crm_lead_pool_item_common"
+        },
+        {
+          "id": "page:crm_lead_pool_mobile_list",
+          "action": "crm_lead_pool_mobile_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_lead_pool_item_common"
         },
         {
           "id": "page:crm_lead_pool_recycle_rule_detail",
@@ -6174,6 +6314,7 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -6201,6 +6342,7 @@
             "web-admin/tests/e2e/crm/crm-m4-forecast.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
           ],
@@ -7104,6 +7246,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
             "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
             "web-admin/tests/e2e/organization/org-department.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
@@ -7134,6 +7277,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
             "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
@@ -10236,6 +10380,7 @@
             "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-par07-visual-signoff.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
@@ -10247,6 +10392,7 @@
             "web-admin/tests/e2e/crm/crm-merge-queue.spec.ts",
             "web-admin/tests/e2e/crm/crm-multimodel-import-cordys-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
             "web-admin/tests/e2e/crm/crm-web-form.spec.ts",
@@ -11385,10 +11531,10 @@
     }
   ],
   "stats": {
-    "commands": 514,
-    "untested": 316,
-    "pages": 298,
-    "pagesUntested": 200,
+    "commands": 519,
+    "untested": 313,
+    "pages": 301,
+    "pagesUntested": 199,
     "platformPages": 99,
     "platformPagesUntested": 41
   }

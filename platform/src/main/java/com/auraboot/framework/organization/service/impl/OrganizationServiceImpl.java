@@ -153,18 +153,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     @Override
     public List<String> getCurrentDepartmentUserPids(boolean includeSubDepartments) {
-        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
-        if (memberId == null) {
-            return List.of();
-        }
-        TenantMember member = tenantMemberService.getById(memberId);
-        if (member == null || member.getPid() == null || member.getPid().isBlank()) {
-            return List.of();
-        }
-        Map<String, Object> currentEmployee = getEmployeeByMemberPid(member.getPid());
-        String currentDeptPid = currentEmployee != null
-                ? asString(currentEmployee.get(EMP_DEPT_ID)) : null;
-        if (currentDeptPid == null || currentDeptPid.isBlank()) {
+        String currentDeptPid = getCurrentDepartmentPid();
+        if (currentDeptPid == null) {
             return List.of();
         }
 
@@ -201,6 +191,25 @@ public class OrganizationServiceImpl implements OrganizationService {
             pageNum++;
         } while (pageNum <= totalPages);
         return List.copyOf(userPids);
+    }
+
+    @Override
+    public String getCurrentDepartmentPid() {
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return null;
+        }
+        TenantMember member = tenantMemberService.getById(memberId);
+        if (member == null || member.getPid() == null || member.getPid().isBlank()) {
+            return null;
+        }
+        Map<String, Object> currentEmployee = getEmployeeByMemberPid(member.getPid());
+        String currentDeptPid = currentEmployee != null
+                ? asString(currentEmployee.get(EMP_DEPT_ID)) : null;
+        if (currentDeptPid == null || currentDeptPid.isBlank()) {
+            return null;
+        }
+        return currentDeptPid;
     }
 
     @Override

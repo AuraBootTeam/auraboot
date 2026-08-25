@@ -1,0 +1,86 @@
+{
+  "pageKey": "crm_contact_duplicate_mobile_list",
+  "name:zh-CN": "联系人查重",
+  "name:en": "Contact Duplicate Check",
+  "modelCode": "crm_contact_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "mobileUx": {
+    "list": {
+      "views": [
+        { "id": "all", "label": { "zh-CN": "全部", "en": "All" } },
+        {
+          "id": "suspected",
+          "label": { "zh-CN": "疑似重复", "en": "Suspected" },
+          "filter": { "field": "crm_ct_dup_score", "op": "GT", "value": 0 }
+        }
+      ],
+      "defaultSort": [
+        { "field": "crm_ct_dup_score", "direction": "DESC" },
+        { "field": "updated_at", "direction": "DESC" }
+      ],
+      "card": {
+        "title": { "field": "crm_ct_name" },
+        "subtitle": { "template": "{{crm_ct_email}} · {{crm_ct_mobile}}" },
+        "badges": [
+          { "field": "crm_ct_status", "renderer": "statusBadge" }
+        ],
+        "summary": { "field": "crm_ct_remark", "maxLines": 2 },
+        "facts": [
+          { "field": "crm_ct_account_id", "label": { "zh-CN": "所属客户", "en": "Account" } },
+          { "field": "crm_ct_dup_of", "label": { "zh-CN": "疑似重复联系人", "en": "Possible Duplicate" } },
+          { "field": "crm_ct_dup_score", "label": { "zh-CN": "相似度", "en": "Similarity" }, "renderer": "number" }
+        ],
+        "actions": ["more"]
+      }
+    }
+  },
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_contact_duplicate_mobile_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_ct_name", "width": 150 },
+        { "field": "crm_ct_account_id", "width": 180 },
+        { "field": "crm_ct_email", "width": 200 },
+        { "field": "crm_ct_mobile", "width": 140 },
+        { "field": "crm_ct_dup_of", "width": 180 },
+        { "field": "crm_ct_dup_score", "width": 110 },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "scan_duplicate",
+              "permissionCode": "crm.contact.manage",
+              "primary": true,
+              "label": { "zh-CN": "立即查重", "en": "Check Now" },
+              "action": { "type": "command", "command": "crm:scan_duplicates" }
+            },
+            {
+              "code": "view_contact",
+              "permissionCode": "crm.contact.read",
+              "label": { "zh-CN": "查看联系人", "en": "View Contact" },
+              "action": { "type": "navigate", "to": "crm_contact_common_detail" }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": ["crm_ct_name", "crm_ct_email", "crm_ct_phone", "crm_ct_mobile"],
+      "defaultSort": { "field": "crm_ct_dup_score", "order": "desc" },
+      "searchPlaceholder": {
+        "zh-CN": "搜索联系人姓名、邮箱或电话",
+        "en": "Search contact name, email, or phone"
+      },
+      "empty": {
+        "title": { "zh-CN": "当前没有待查重联系人", "en": "No contacts to check" },
+        "description": {
+          "zh-CN": "新建或导入联系人后会出现在这里；也可切换到“全部”重新执行查重。",
+          "en": "New or imported contacts appear here. Switch to All to run duplicate checks again."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "pageKey": "crm_lead_move_to_pool_form",
+  "name:zh-CN": "移入线索池",
+  "name:en": "Move Lead to Pool",
+  "modelCode": "crm_lead_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "lead_context",
+      "blockType": "form-section",
+      "title": { "zh-CN": "待移入线索", "en": "Lead to Move" },
+      "fields": [
+        { "field": "crm_lead_company", "colSpan": 6, "readOnly": true },
+        { "field": "crm_lead_contact_name", "colSpan": 6, "readOnly": true },
+        { "field": "crm_lead_code", "colSpan": 6, "readOnly": true },
+        { "field": "crm_lead_pool_state", "colSpan": 6, "readOnly": true }
+      ]
+    },
+    {
+      "id": "target_pool",
+      "blockType": "form-section",
+      "title": { "zh-CN": "选择目标线索池", "en": "Choose Target Pool" },
+      "description": {
+        "zh-CN": "提交时会再次校验线索池已启用、当前用户有移入权限，并原子清除原负责人。",
+        "en": "Submission rechecks that the pool is enabled and the user may move the lead, then clears ownership atomically."
+      },
+      "fields": [
+        {
+          "field": "crm_lead_target_pool_id",
+          "colSpan": 12,
+          "required": true,
+          "placeholder": { "zh-CN": "选择已启用且有权限的线索池", "en": "Choose an enabled authorized lead pool" }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "move_to_pool_confirm",
+          "primary": true,
+          "permissionCode": "crm.lead_pool.move",
+          "label": { "zh-CN": "确认移入", "en": "Move to Pool" },
+          "action": { "type": "command", "command": "crm:move_lead_to_pool" }
+        },
+        { "code": "cancel", "label": "$i18n:common.button.cancel" }
+      ]
+    }
+  ]
+}

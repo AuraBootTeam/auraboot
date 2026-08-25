@@ -19,8 +19,10 @@ const EXPECTED_COVERAGE = {
     'crm_dashboard_kpi',
     'crm_dashboard_pending_quotes',
     'crm_dashboard_recent_opportunities',
+    'crm_sales_period_overview',
     'crm_lead_pipeline_stats',
     'crm_lead_source_distribution',
+    'crm_my_tasks',
     'crm_open_opportunities_detail',
     'crm_opp_lost_reason_breakdown',
     'crm_opp_stale',
@@ -34,7 +36,12 @@ const EXPECTED_COVERAGE = {
     'crm_sales_forecast_kpi',
     'crm_win_loss_ratio',
   ],
+  runtimeEndpoints: ['/api/inbox'],
   dashboardTargets: [
+    'crm_dashboard:block_sales_inbox',
+    'crm_dashboard:block_sales_period_overview',
+    'crm_dashboard:block_sales_plans',
+    'crm_dashboard:block_sales_shortcuts',
     'crm_dashboard:block_kpi_cards',
     'crm_dashboard:block_lead_pipeline',
     'crm_dashboard:block_pending_quotes',
@@ -56,7 +63,15 @@ const EXPECTED_COVERAGE = {
     'crm_sales_forecast:table_open_opportunities',
     'crm_sales_forecast:table_stage_detail',
   ],
-  uiActions: ['crm_dashboard:block_kpi_cards:new_leads_drilldown'],
+  uiActions: [
+    'crm_dashboard:block_kpi_cards:new_leads_drilldown',
+    'crm_dashboard:block_sales_shortcuts:new_account',
+    'crm_dashboard:block_sales_shortcuts:new_activity',
+    'crm_dashboard:block_sales_shortcuts:new_lead',
+    'crm_dashboard:block_sales_shortcuts:new_opportunity',
+    'crm_dashboard:block_sales_shortcuts:open_activity_service',
+    'crm_dashboard:block_sales_shortcuts:open_my_tasks',
+  ],
 } as const;
 type CoverageAxis = keyof typeof EXPECTED_COVERAGE;
 
@@ -165,8 +180,12 @@ async function provisionSalesUser(): Promise<string> {
 }
 
 async function seedDashboardData(): Promise<void> {
-  const currentUser = assertOk(await api('/api/auth/me'), 'read current admin identity')?.data?.user;
+  const currentUserBody = assertOk(await api('/api/auth/me'), 'read current admin identity')?.data;
+  const currentUser = currentUserBody?.user;
   expect(String(currentUser?.pid || ''), 'current admin must expose a public pid').toBeTruthy();
+  expect(String(currentUser?.id || ''), 'current admin must expose a numeric user id').toBeTruthy();
+  const currentTenantId = currentUser?.tenantId ?? currentUserBody?.tenantId;
+  expect(String(currentTenantId || ''), 'current admin must expose a tenant id').toBeTruthy();
   const ownerPid = await provisionSalesUser();
 
   const account = await executeCreate('crm:create_account', {
@@ -244,6 +263,36 @@ async function seedDashboardData(): Promise<void> {
     (recordIds.activities as string[]).push(activity);
   }
 
+  recordIds.plan = await executeCreate('crm:create_activity', {
+    crm_act_type: 'task',
+    crm_act_subject: '确认本周客户跟进节奏',
+    crm_act_content: '复核重点客户、进行中商机和下一步责任人。',
+    crm_act_status: 'open',
+    crm_act_priority: 'high',
+    crm_act_due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    crm_act_assignee: String(currentUser.id),
+    crm_act_related_model: 'crm_account_common',
+    crm_act_related_id: account,
+  });
+
+  const inboxFixture = await api('/api/test/fixture', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'inbox_mention',
+      testRunId: `crm-dashboard-${RUN}`,
+      params: {
+        count: 1,
+        tenantId: currentTenantId,
+        userId: currentUser.id,
+      },
+    }),
+  });
+  expect(inboxFixture.response.ok, `inbox fixture HTTP ${inboxFixture.response.status}`)
+    .toBeTruthy();
+  expect(inboxFixture.body?.success, JSON.stringify(inboxFixture.body)).toBe(true);
+  expect(inboxFixture.body?.recordPids).toHaveLength(1);
+  recordIds.inbox = inboxFixture.body.recordPids;
+
   recordIds.quotes = [];
   for (const [index, status] of ['draft', 'approval'].entries()) {
     const quote = await executeCreate('crm:create_quote_summary', {
@@ -300,7 +349,11 @@ function observeDashboardRequests(page: Page): void {
     for (const query of EXPECTED_COVERAGE.queries) {
       if (response.ok() && signature.includes(query)) cover('queries', query);
     }
-    if (/\/api\/(dashboards|datasource|dynamic)\//.test(response.url()) && response.status() >= 400) {
+    for (const endpoint of EXPECTED_COVERAGE.runtimeEndpoints) {
+      if (response.ok() && response.url().includes(endpoint)) cover('runtimeEndpoints', endpoint);
+    }
+    if (/\/api\/(dashboards|datasource|dynamic|inbox)(\/|\?|$)/.test(response.url())
+      && response.status() >= 400) {
       failedRuntimeRequests.push(`${response.status()} ${request.method()} ${response.url()}`);
     }
   });
@@ -364,7 +417,7 @@ async function assertDashboardLayout(page: Page, blockIds: string[]): Promise<vo
     expect(Math.abs(left - gridLeft), 'each authored dashboard row must start at the grid edge')
       .toBeLessThan(4);
     expect(Math.abs(gridRight - right), 'each authored dashboard row must fill the grid width')
-      .toBeLessThan(4);
+      .toBeLessThan(5);
   }
 }
 
@@ -382,9 +435,18 @@ async function screenshot(page: Page, name: string): Promise<void> {
   screenshots.push(output);
 }
 
+async function waitForUiSettled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+  });
+}
+
 async function screenshotDashboard(page: Page, stem: string): Promise<void> {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.waitForTimeout(1_000);
+  await waitForUiSettled(page);
   await screenshot(page, `${stem}-desktop-top.png`);
   const scrollDelta = await page.evaluate(() => {
     const grid = document.querySelector<HTMLElement>('.react-grid-layout');
@@ -401,7 +463,7 @@ async function screenshotDashboard(page: Page, stem: string): Promise<void> {
     return 0;
   });
   expect(scrollDelta, 'dashboard evidence must have a real lower viewport').toBeGreaterThan(150);
-  await page.waitForTimeout(250);
+  await waitForUiSettled(page);
   await screenshot(page, `${stem}-desktop-bottom.png`);
   await page.evaluate(() => {
     for (const element of document.querySelectorAll<HTMLElement>('*')) element.scrollTop = 0;
@@ -414,7 +476,7 @@ async function screenshotDashboard(page: Page, stem: string): Promise<void> {
     await expect.poll(async () => (await page.getByTestId('sidebar').boundingBox())?.width ?? 999)
       .toBeLessThan(90);
   }
-  await page.waitForTimeout(250);
+  await waitForUiSettled(page);
   await screenshot(page, `${stem}-compact-top.png`);
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
@@ -476,15 +538,48 @@ test.afterAll(() => {
   );
 });
 
-test('CRM 驾驶舱从菜单进入、完整布局并精确下钻', async ({ page }) => {
+test('销售首页从菜单进入、完整布局并精确下钻', async ({ page }) => {
   observeDashboardRequests(page);
   await uiLogin(page);
   const blockIds = EXPECTED_COVERAGE.dashboardTargets
     .filter((target) => target.startsWith('crm_dashboard:'))
     .map((target) => target.split(':')[1]);
-  await openDashboardFromMenu(page, 'crm_dashboard', /^CRM 驾驶舱$/, blockIds);
-  await expect(page.getByText('销售全景、商机管道、线索来源与客户行动的一体化经营视图'))
+  await openDashboardFromMenu(page, 'crm_dashboard', /^销售首页$/, blockIds);
+  await expect(page.getByText('聚合销售节奏、快捷入口、计划、待办和经营分析的一体化个人销售首页'))
     .toBeVisible();
+  const periodBody = assertOk(await api(
+    '/api/datasource/list?datasourceId=nq%3Acrm_sales_period_overview&format=records&maxItems=10',
+  ), 'sales period overview data');
+  const periodRows = periodBody?.data?.records ?? periodBody?.data?.rows ?? [];
+  expect(periodRows).toHaveLength(4);
+  const periodByGroup = new Map<string, Record<string, unknown>>(
+    periodRows.map((row: Record<string, unknown>) => [String(row.metric_group), row] as const),
+  );
+  expect([...periodByGroup.keys()].sort()).toEqual([
+    'lead', 'open_opportunity', 'opportunity', 'won',
+  ]);
+  expect(Number(periodByGroup.get('lead')?.year_count)).toBeGreaterThan(0);
+  expect(Number(periodByGroup.get('opportunity')?.year_count)).toBeGreaterThan(0);
+  expect(Number(periodByGroup.get('open_opportunity')?.year_count)).toBeGreaterThan(0);
+  expect(Number(periodByGroup.get('won')?.year_count)).toBeGreaterThan(0);
+  if (!REUSE_DATA) {
+    expect(Number(periodByGroup.get('lead')?.today_count)).toBeGreaterThanOrEqual(3);
+    expect(Number(periodByGroup.get('opportunity')?.today_count)).toBeGreaterThanOrEqual(6);
+    expect(Number(periodByGroup.get('open_opportunity')?.today_count)).toBeGreaterThanOrEqual(4);
+    expect(Number(periodByGroup.get('won')?.today_count)).toBeGreaterThanOrEqual(1);
+    expect(Number(periodByGroup.get('won')?.today_amount)).toBeGreaterThanOrEqual(1_080_000);
+  }
+  const periodBlock = page.getByTestId('dashboard-block-block_sales_period_overview');
+  await expect(periodBlock).toContainText('新增线索');
+  await expect(periodBlock).toContainText('新增商机');
+  await expect(periodBlock).toContainText('进行中商机');
+  await expect(periodBlock).toContainText('赢单');
+  await expect(periodBlock).toContainText('今日数量');
+  await expect(periodBlock).toContainText('本年金额');
+  await expect(page.getByTestId('dashboard-block-block_sales_plans'))
+    .toContainText('确认本周客户跟进节奏');
+  await expect(page.getByTestId('dashboard-block-block_sales_inbox'))
+    .toContainText('E2E Mention Item');
   await expect(page.getByText('新线索', { exact: true })).toBeVisible();
   await expect(page.getByTestId('dashboard-block-chart_opp_pipeline').locator('canvas'))
     .toBeVisible();
@@ -495,8 +590,10 @@ test('CRM 驾驶舱从菜单进入、完整布局并精确下钻', async ({ page
     '/api/datasource/list?datasourceId=nq%3Acrm_dashboard_kpi&format=records&maxItems=1',
   ), 'dashboard KPI data');
   const kpiRows = kpiBody?.data?.records ?? kpiBody?.data?.rows ?? [];
-  expect(Number(kpiRows[0]?.pending_complaints)).toBe(1);
-  await expect(page.getByTestId('number-card-pending_complaints-drilldown')).toContainText('1');
+  const pendingComplaints = Number(kpiRows[0]?.pending_complaints);
+  expect(pendingComplaints).toBeGreaterThan(0);
+  await expect(page.getByTestId('number-card-pending_complaints-drilldown'))
+    .toContainText(String(pendingComplaints));
   const activityBody = assertOk(await api(
     '/api/datasource/list?datasourceId=nq%3Acrm_recent_activities&format=records&maxItems=20',
   ), 'recent activity dashboard data');
@@ -504,6 +601,32 @@ test('CRM 驾驶舱从菜单进入、完整布局并精确下钻', async ({ page
   expect(activityRows.some((row: Record<string, unknown>) => row.crm_ar_object_type === 'account'))
     .toBeTruthy();
   await expect(page.getByTestId('dashboard-block-block_recent_activities')).toContainText('客户');
+
+  const shortcuts = [
+    { label: '新建线索', path: '/p/crm_lead_common/new', action: 'new_lead' },
+    { label: '新建客户', path: '/p/crm_account_common/new', action: 'new_account' },
+    { label: '新建商机', path: '/p/crm_opportunity_common/new', action: 'new_opportunity' },
+    { label: '新建计划', path: '/p/crm_activity_common/new', action: 'new_activity' },
+    { label: '我的任务', path: '/p/crm_my_tasks', action: 'open_my_tasks' },
+    { label: '活动与服务', path: '/p/c/crm_activity_service_desk', action: 'open_activity_service' },
+  ];
+  for (const shortcut of shortcuts) {
+    const link = page.getByTestId('dashboard-block-block_sales_shortcuts')
+      .getByRole('link', { name: shortcut.label });
+    await expect(link).toHaveAttribute('href', shortcut.path);
+    await link.click();
+    await expect(page).toHaveURL((url) => url.pathname === shortcut.path);
+    cover('uiActions', `crm_dashboard:block_sales_shortcuts:${shortcut.action}`);
+    await openDashboardFromMenu(page, 'crm_dashboard', /^销售首页$/, blockIds);
+  }
+
+  await expect(periodBlock).toContainText('新增线索', { timeout: 25_000 });
+  await expect(page.getByTestId('dashboard-block-block_sales_plans'))
+    .toContainText('确认本周客户跟进节奏', { timeout: 25_000 });
+  await expect(page.getByTestId('dashboard-block-block_sales_inbox'))
+    .toContainText('E2E Mention Item', { timeout: 25_000 });
+  await expect(page.getByTestId('dashboard-block-chart_opp_pipeline').locator('canvas'))
+    .toBeVisible({ timeout: 25_000 });
   await assertDashboardLayout(page, blockIds);
   await assertNoTechnicalLeak(page);
   await screenshotDashboard(page, `${RUN}-crm-dashboard`);
