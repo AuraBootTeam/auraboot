@@ -28,9 +28,10 @@ const noProxyHttpsAgent = new https.Agent({
  * Whether the backend operation is expected to outlive the default 60-second
  * interactive proxy budget.
  *
- * BOM format exploration performs one bounded LLM call before returning a
- * deterministic patch. Treating it as an ordinary command caused the BFF to
- * return 502 while the backend was still waiting for a valid model response.
+ * BOM conversion start freezes the deterministic ParsePlan and immutable source
+ * evidence before dispatching the worker; format exploration may perform one
+ * bounded LLM call. Treating either as an ordinary command can make the BFF time
+ * out while the backend is still completing an accepted operation.
  */
 export function isLongRunningProxyPath(path: string): boolean {
   const pathname = path.split('?')[0];
@@ -38,6 +39,7 @@ export function isLongRunningProxyPath(path: string): boolean {
     pathname.includes('/plugins/import') ||
     pathname.includes('/plugins/packages') ||
     pathname.includes('/deploy') ||
+    /\/meta\/commands\/execute\/bom:start_conversion(?:\/|$)/.test(pathname) ||
     /\/meta\/commands\/execute\/bom:explore_format(?:\/|$)/.test(pathname)
   );
 }
@@ -947,7 +949,7 @@ export class BffProxyService {
    */
   private handleProxyError(error: any, res: Response): void {
     const errorMessage = error.message || 'Unknown error';
-    const errorCode = error.code || 'unknown';
+    const errorCode = String(error.code || 'unknown').toLowerCase();
     const errorStatus = error.response?.status || 'N/A';
     const errorStatusText = error.response?.statusText || 'N/A';
     const requestUrl = error.config?.url || 'Unknown URL';
@@ -1073,7 +1075,7 @@ export class BffProxyService {
         status,
         timestamp: new Date().toISOString(),
       });
-    } else if (error.code === 'econnrefused') {
+    } else if (errorCode === 'econnrefused') {
       logger.error(`🔌 Connection Refused [${errorCode}] - ${requestMethod} ${requestUrl}`, {
         message: errorMessage,
         suggestion: 'Backend service is not running or not accessible',
@@ -1086,7 +1088,23 @@ export class BffProxyService {
         details: 'Connection refused - please check if the backend service is running',
         timestamp: new Date().toISOString(),
       });
-    } else if (error.code === 'etimedout' || error.code === 'enotfound') {
+    } else if (errorCode === 'econnaborted') {
+      logger.error(`⏰ Backend Request Timeout [${errorCode}] - ${requestMethod} ${requestUrl}`, {
+        message: errorMessage,
+        suggestion: 'The backend may still be processing; check the resulting task before retrying',
+        backendUrl: this.backendUrl,
+      });
+
+      res.status(504).json({
+        error: 'Gateway Timeout',
+        code: 'BACKEND_REQUEST_TIMEOUT',
+        message:
+          'The backend request timed out. The operation may still be processing. Check the task or record list before retrying.',
+        details:
+          'Do not submit the same operation again until you confirm whether it was accepted.',
+        timestamp: new Date().toISOString(),
+      });
+    } else if (errorCode === 'etimedout' || errorCode === 'enotfound') {
       logger.error(`⏰ Network Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
         message: errorMessage,
         suggestion: 'Network connectivity issue or DNS resolution failure',
