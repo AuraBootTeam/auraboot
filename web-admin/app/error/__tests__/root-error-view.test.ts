@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  formatClientReportMessage,
   generateErrorId,
   resolveErrorLocale,
   resolveErrorPresentation,
@@ -101,6 +102,20 @@ describe('rootT', () => {
   it('returns the requested locale text', () => {
     expect(rootT('oops', 'zh-CN')).toBe('出错了！');
     expect(rootT('retry', 'en-US')).toBe('Retry');
+  });
+});
+
+describe('formatClientReportMessage', () => {
+  it('embeds error id and kind for searchability', () => {
+    expect(
+      formatClientReportMessage('ERR-ABC12345', { kind: 'network', retryable: true }, 'fetch failed'),
+    ).toBe('[ERR-ABC12345 kind=network] fetch failed');
+  });
+
+  it('includes the status when present', () => {
+    expect(
+      formatClientReportMessage('ERR-ABC12345', { kind: 'server', status: 500, retryable: true }, 'boom'),
+    ).toBe('[ERR-ABC12345 kind=server status=500] boom');
   });
 });
 

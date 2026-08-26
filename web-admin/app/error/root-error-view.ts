@@ -223,6 +223,21 @@ export function resolveErrorPresentation(
 }
 
 /**
+ * Correlation prefix embedded into the report message so the error id, kind and
+ * status survive the backend's fixed-shape client-error log (which persists
+ * `message` but has no dedicated errorId/kind/status columns yet) and become
+ * searchable in /ops/errors.
+ */
+export function formatClientReportMessage(
+  errorId: string,
+  view: RootErrorView,
+  message: string,
+): string {
+  const statusPart = view.status != null ? ` status=${view.status}` : '';
+  return `[${errorId} kind=${view.kind}${statusPart}] ${message}`;
+}
+
+/**
  * Short, support-friendly correlation id. Unique per boundary render so a user
  * can paste it back to support and the report sent to /api/client-errors can be
  * matched.

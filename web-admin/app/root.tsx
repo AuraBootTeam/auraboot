@@ -64,6 +64,7 @@ import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
 import {
+  formatClientReportMessage,
   generateErrorId,
   resolveErrorLocale,
   resolveErrorPresentation,
@@ -426,7 +427,7 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
       kind: view.kind,
       status: view.status,
       errorId,
-      message: errorMessage || 'unknown boundary error',
+      message: formatClientReportMessage(errorId, view, errorMessage || 'unknown boundary error'),
       stack,
       pageUrl: clientContext.pageUrl,
     });
