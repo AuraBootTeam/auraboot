@@ -1,6 +1,13 @@
 import { createCookieSessionStorage, redirect } from 'react-router';
 
-import { JWT_TOKEN_KEY, TOKEN_EXPIRY_KEY, REFRESH_TOKEN_KEY } from '~/constants/AuthConstant';
+import {
+  JWT_TOKEN_KEY,
+  REMEMBER_KEY,
+  TOKEN_EXPIRY_KEY,
+  REFRESH_TOKEN_KEY,
+} from '~/constants/AuthConstant';
+import { post } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
 
 const processEnv = typeof process !== 'undefined' ? process.env : undefined;
 const NODE_ENV = processEnv?.NODE_ENV ?? 'development';
@@ -21,6 +28,29 @@ export const sessionStorage = createCookieSessionStorage({
   },
 });
 
+/** Renew once the access token has at most this much time left. */
+const RENEW_BEFORE_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Reads the `exp` claim from a JWT payload without verifying the signature.
+ * Server-side only: used to persist the token deadline next to the token so the
+ * loader can decide when to renew. The backend just issued/verified this token,
+ * so reading the expiry from the payload is safe here.
+ */
+export function readJwtExp(token: string): number | null {
+  try {
+    const payloadPart = token.split('.')[1];
+    if (!payloadPart) return null;
+    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8')) as {
+      exp?: number;
+    };
+    return typeof payload.exp === 'number' && Number.isFinite(payload.exp) ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
 // 修改为存储JWT token的函数
 export async function createUserSession({
   request,
@@ -37,6 +67,11 @@ export async function createUserSession({
 }) {
   const session = await getSessionFromRequest(request);
   session.set(JWT_TOKEN_KEY, token);
+  const tokenExp = readJwtExp(token);
+  if (tokenExp != null) {
+    session.set(TOKEN_EXPIRY_KEY, String(tokenExp));
+  }
+  session.set(REMEMBER_KEY, remember ? '1' : '0');
 
   return redirect(redirectTo, {
     headers: {
@@ -49,6 +84,70 @@ export async function createUserSession({
   });
 }
 
+export interface SessionRenewalResult {
+  renewed: boolean;
+  setCookie?: string;
+}
+
+/**
+ * Whether a session is close enough to its token deadline that a renewal should
+ * be attempted. Pure and unit-tested; the default threshold is 12 hours.
+ */
+export function shouldAttemptRenewal(
+  expiryEpochSeconds: number | null,
+  nowMs: number,
+  thresholdMs: number,
+): boolean {
+  if (expiryEpochSeconds == null || !Number.isFinite(expiryEpochSeconds)) return false;
+  const expiryMs = expiryEpochSeconds * 1000;
+  return expiryMs - nowMs <= thresholdMs;
+}
+
+/**
+ * Best-effort sliding-session renewal, called from the root loader after the
+ * authenticated user resolves. When the token is inside the renewal window it
+ * asks the backend for a fresh token, rotates the server-side session, and
+ * returns a Set-Cookie header for the updated httpOnly session cookie.
+ *
+ * Any failure is deliberately non-fatal: the current token remains valid until
+ * its real deadline and the normal 401 → login redirect takes over then.
+ */
+export async function maybeRenewSession(request: Request): Promise<SessionRenewalResult> {
+  const session = await getSessionFromRequest(request);
+  const token = session.get(JWT_TOKEN_KEY) as string | undefined;
+  if (!token) return { renewed: false };
+
+  const expiryRaw = session.get(TOKEN_EXPIRY_KEY);
+  const expiry = expiryRaw == null ? null : Number(expiryRaw);
+  if (!shouldAttemptRenewal(expiry, Date.now(), RENEW_BEFORE_MS)) {
+    return { renewed: false };
+  }
+
+  const result = await post<{ jwt?: string }>(
+    '/api/auth/renew',
+    {},
+    { token, timeout: 10_000 },
+    request,
+  );
+  const renewedJwt = result.data?.jwt;
+  if (!ResultHelper.isSuccess(result) || !renewedJwt) {
+    console.warn('[session] token renewal skipped:', result.code, result.message);
+    return { renewed: false };
+  }
+
+  const renewedExp = readJwtExp(renewedJwt);
+  session.set(JWT_TOKEN_KEY, renewedJwt);
+  if (renewedExp != null) {
+    session.set(TOKEN_EXPIRY_KEY, String(renewedExp));
+  }
+  const remember = session.get(REMEMBER_KEY) === '1';
+  const setCookie = await sessionStorage.commitSession(session, {
+    maxAge: remember ? 60 * 60 * 24 * 7 : undefined,
+  });
+  return { renewed: true, setCookie };
+}
+
+/** Renew once the access token has at most this much time left. */
 export async function logout(request: Request) {
   const session = await getSessionFromRequest(request);
   const token = session.get(JWT_TOKEN_KEY);
@@ -76,6 +175,7 @@ export async function logout(request: Request) {
   session.unset(JWT_TOKEN_KEY);
   session.unset(REFRESH_TOKEN_KEY);
   session.unset(TOKEN_EXPIRY_KEY);
+  session.unset(REMEMBER_KEY);
 
   return redirect('/login', {
     headers: {

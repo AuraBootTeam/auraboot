@@ -84,6 +84,14 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     }
 
     @Override
+    public UserSession findByToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return userSessionMapper.findByTokenHash(hashToken(token));
+    }
+
+    @Override
     @Transactional
     public void revokeSession(Long userId, String sessionPid) {
         List<UserSession> sessions = userSessionMapper.findActiveByUserId(userId);
