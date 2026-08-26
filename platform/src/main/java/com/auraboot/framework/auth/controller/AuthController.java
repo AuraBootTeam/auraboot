@@ -131,9 +131,10 @@ public class AuthController {
     /**
      * Sliding-session renewal. Requires a still-valid bearer token (the endpoint
      * is not whitelisted, so {@code JwtAuthenticationFilter} authenticates it and
-     * checks session validity first). Renewal is a no-op-ish best effort from the
-     * web client's perspective: on any rejection the client keeps the current
-     * token and falls back to the normal login redirect when it finally expires.
+     * checks session validity first). The old token stays usable until its
+     * natural expiry; renewal only adds a fresh session row. On rejection the
+     * client keeps the current token and falls back to the normal login redirect
+     * when it finally expires.
      */
     @PostMapping("/renew")
     @ResponseBody

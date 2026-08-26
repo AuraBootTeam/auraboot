@@ -106,8 +106,9 @@ export function shouldAttemptRenewal(
 /**
  * Best-effort sliding-session renewal, called from the root loader after the
  * authenticated user resolves. When the token is inside the renewal window it
- * asks the backend for a fresh token, rotates the server-side session, and
- * returns a Set-Cookie header for the updated httpOnly session cookie.
+ * asks the backend for a fresh token and returns a Set-Cookie header for the
+ * updated httpOnly session cookie. The previous token remains valid until its
+ * natural expiry, so a dropped Set-Cookie on a redirect cannot strand the user.
  *
  * Any failure is deliberately non-fatal: the current token remains valid until
  * its real deadline and the normal 401 → login redirect takes over then.

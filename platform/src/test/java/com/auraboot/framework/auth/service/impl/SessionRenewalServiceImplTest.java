@@ -99,7 +99,7 @@ class SessionRenewalServiceImplTest {
     }
 
     @Test
-    void renew_insideWindow_rotatesAndReturnsRenewedToken() {
+    void renew_insideWindow_issuesRenewedTokenAndKeepsOldSessionUsable() {
         UserSession session = activeSession(Instant.now().minusSeconds(60));
         when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(session);
         when(jwtUtil.extractIdentifier(OLD_TOKEN)).thenReturn(USER_PID);
@@ -118,7 +118,9 @@ class SessionRenewalServiceImplTest {
 
         assertThat(response.getJwt()).isEqualTo(NEW_TOKEN);
         assertThat(response.getExpiresAt()).isNotNull();
-        verify(sessionManagementService).revokeSessionByToken(OLD_TOKEN);
+        // The old session must stay usable until its natural JWT expiry so a
+        // dropped Set-Cookie (e.g. on a redirect) cannot strand the browser.
+        verify(sessionManagementService, never()).revokeSessionByToken(OLD_TOKEN);
     }
 
     @Test

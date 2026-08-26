@@ -4,8 +4,9 @@ import com.auraboot.framework.auth.dto.TokenRenewResponse;
 
 /**
  * Sliding-session renewal: mints a fresh access token for a still-valid,
- * in-window server-side session and rotates the session record so the old
- * token is invalidated immediately.
+ * in-window server-side session. The old token's session row is deliberately
+ * kept active until the token's natural JWT expiry, because the renewed cookie
+ * is a best-effort response header that an intermediate redirect can drop.
  */
 public interface SessionRenewalService {
 

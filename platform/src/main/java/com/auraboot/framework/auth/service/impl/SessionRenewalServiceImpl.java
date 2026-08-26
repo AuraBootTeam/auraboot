@@ -63,8 +63,11 @@ public class SessionRenewalServiceImpl implements SessionRenewalService {
             throw new BusinessException(ResponseCode.Unauthorized, "Session renewal failed, please login again");
         }
 
-        // Rotate: the old token stops working immediately (its session row is revoked).
-        sessionManagementService.revokeSessionByToken(bearerToken);
+        // Deliberately keep the old session row active: the renewed cookie is a
+        // best-effort header that can be dropped by an intermediate redirect, so
+        // the previous token must keep working until its natural JWT expiry. The
+        // new token has its own session row; old rows expire with the token and
+        // remain covered by revokeAllSessions / password security-version checks.
 
         Long expiresAt = jwtUtil.extractExpiration(auth.getJwt()).toInstant().getEpochSecond();
         log.info("Session renewed for user {}", userPid);
