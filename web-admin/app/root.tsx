@@ -72,6 +72,7 @@ import {
   rootT,
 } from '~/error/root-error-view';
 import { reportClientError } from '~/shared/observability/clientErrorReporter';
+import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -108,7 +109,9 @@ export async function resolveDeploymentBrandingFromBff(
 
   const bffUrl =
     environment.BFF_INTERNAL_URL || `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
-  const response = await fetch(`${bffUrl}/api/runtime/branding`);
+  const response = await fetch(`${bffUrl}/api/runtime/branding`, {
+    signal: fetchTimeoutSignal(),
+  });
   if (!response.ok) {
     throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
   }

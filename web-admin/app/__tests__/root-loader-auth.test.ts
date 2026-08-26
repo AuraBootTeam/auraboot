@@ -235,7 +235,10 @@ describe('root loader authentication guard', () => {
       mode: 'commercial',
       productName: 'Northstar',
     });
-    expect(fetchMock).toHaveBeenCalledWith('http://bff.internal:4000/api/runtime/branding');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://bff.internal:4000/api/runtime/branding',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('fails closed when commercial branding cannot be resolved by the BFF', async () => {
