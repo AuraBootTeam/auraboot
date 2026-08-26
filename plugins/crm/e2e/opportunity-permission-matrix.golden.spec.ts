@@ -10,6 +10,7 @@ const EVIDENCE_DIR = process.env.CRM_OPPORTUNITY_PERMISSION_EVIDENCE_DIR
 const ADMIN_EMAIL = process.env.CRM_OPPORTUNITY_PERMISSION_ADMIN_EMAIL || 'admin@auraboot.com';
 const ADMIN_PASSWORD = process.env.CRM_OPPORTUNITY_PERMISSION_ADMIN_PASSWORD || 'Test2026x';
 const PERSONA_PASSWORD = process.env.CRM_OPPORTUNITY_PERMISSION_PERSONA_PASSWORD || 'AuraBoot2026!';
+const MUTATION = process.env.CRM_OPPORTUNITY_PERMISSION_MUTATION === 'viewer-can-manage';
 
 type Persona = {
   roleCode: string;
@@ -22,7 +23,7 @@ type Persona = {
 const personas: Persona[] = [
   { roleCode: 'crm_sales_manager', label: 'sales-manager', canRead: true, canManage: true, canImport: true },
   { roleCode: 'crm_sales', label: 'sales-representative', canRead: true, canManage: true, canImport: true },
-  { roleCode: 'crm_viewer', label: 'read-only-viewer', canRead: true, canManage: false, canImport: false },
+  { roleCode: 'crm_viewer', label: 'read-only-viewer', canRead: true, canManage: MUTATION, canImport: false },
   { roleCode: 'crm_qdp_release_manager', label: 'qdp-release-manager', canRead: true, canManage: false, canImport: false },
   { roleCode: 'crm_service', label: 'service-agent', canRead: false, canManage: false, canImport: false },
 ];
@@ -114,6 +115,24 @@ async function adminCount(marker: string): Promise<number> {
   return Number(result?.data?.total ?? result?.data?.totalElements ?? 0);
 }
 
+function rowsOf(data: unknown): any[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+    if (Array.isArray(record.records)) return record.records;
+    if (Array.isArray(record.list)) return record.list;
+    if (Array.isArray(record.rows)) return record.rows;
+  }
+  return [];
+}
+
+function activeRoleAssignmentPids(data: unknown): string[] {
+  return rowsOf(data)
+    .filter((row) => String(row?.status ?? 'active') === 'active')
+    .map((row) => String(row?.pid ?? ''))
+    .filter(Boolean);
+}
+
 async function assertApiMatrix(persona: Persona): Promise<void> {
   const session = sessions.get(persona.roleCode)!;
   const list = await request('/api/dynamic/crm_opportunity_common/list?pageNum=1&pageSize=20', session.jwt);
@@ -136,12 +155,45 @@ async function assertApiMatrix(persona: Persona): Promise<void> {
     }),
   });
   if (persona.canManage) {
-    expectAllowed(create, `${persona.label} creates an opportunity`);
+    const created = expectAllowed(create, `${persona.label} creates an opportunity`);
+    const createdPid = findValue(created?.data ?? created, ['recordId', 'recordPid', 'publicRecordId', 'pid']);
+    expect(createdPid, `${persona.label} create returns a record PID`).toBeTruthy();
     expect(await adminCount(marker)).toBe(1);
+    expectAllowed(await request('/api/meta/commands/execute/crm:update_opportunity', session.jwt, {
+      method: 'POST',
+      body: JSON.stringify({
+        targetRecordPid: createdPid,
+        operationType: 'update',
+        payload: { crm_opp_expected_amount: 99000 },
+      }),
+    }), `${persona.label} updates an opportunity`);
+    const updated = expectAllowed(await request(
+      `/api/dynamic/crm_opportunity_common/${encodeURIComponent(String(createdPid))}`,
+    ), `admin reads updated ${persona.label} opportunity`);
+    expect(findValue(updated?.data, ['crm_opp_expected_amount']) ?? null).toBe(99000);
+    expectAllowed(await request('/api/meta/commands/execute/crm:delete_opportunity', session.jwt, {
+      method: 'POST',
+      body: JSON.stringify({ targetRecordPid: createdPid, operationType: 'delete', payload: {} }),
+    }), `${persona.label} deletes an opportunity`);
+    expect(await adminCount(marker)).toBe(0);
   } else {
     expectDenied(create, `${persona.label} cannot create opportunities`);
     expect(await adminCount(marker)).toBe(0);
     checks.push({ label: `${persona.label} denied create has no persistence side effect`, verdict: 'pass' });
+    const forgedPid = `forged-${RUN}-${persona.label}`;
+    expectDenied(await request('/api/meta/commands/execute/crm:update_opportunity', session.jwt, {
+      method: 'POST',
+      body: JSON.stringify({
+        targetRecordPid: forgedPid,
+        operationType: 'update',
+        payload: { crm_opp_expected_amount: 1 },
+      }),
+    }), `${persona.label} cannot update opportunities`);
+    expectDenied(await request('/api/meta/commands/execute/crm:delete_opportunity', session.jwt, {
+      method: 'POST',
+      body: JSON.stringify({ targetRecordPid: forgedPid, operationType: 'delete', payload: {} }),
+    }), `${persona.label} cannot delete opportunities`);
+    checks.push({ label: `${persona.label} denied update/delete has no persistence side effect`, verdict: 'pass' });
   }
 }
 
@@ -229,6 +281,7 @@ test.afterAll(() => {
     frontend: BASE,
     backend: BE,
     database: process.env.PGDATABASE || 'auraboot_55',
+    mutation: MUTATION ? 'viewer-can-manage' : null,
     denominator: personas.map(({ roleCode, label, canRead, canManage, canImport }) => ({
       roleCode, label, canRead, canManage, canImport,
     })),
@@ -246,4 +299,102 @@ test.afterAll(() => {
   };
   writeFileSync(path.join(EVIDENCE_DIR, 'par08-opportunity-permission-matrix.json'),
     `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+});
+
+test('existing sales session loses and regains opportunity access after role revocation', async () => {
+  const label = 'revocation-sales';
+  const email = `${label}.${Date.now()}@example.test`;
+  expectAllowed(await request('/api/admin/users', adminJwt, {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      displayName: `${RUN.slice(-24)} ${label}`.slice(0, 50),
+      initialPassword: PERSONA_PASSWORD,
+      roleCodes: ['crm_sales'],
+      sendInviteEmail: false,
+    }),
+  }), `provision ${label}`);
+  const jwt = await loginApi(email, PERSONA_PASSWORD);
+
+  expectAllowed(await request('/api/dynamic/crm_opportunity_common/list?pageNum=1&pageSize=20', jwt),
+    'revocation-sales reads opportunities while granted');
+  const marker = `${RUN}-${label}`;
+  const created = expectAllowed(await request('/api/meta/commands/execute/crm:create_opportunity', jwt, {
+    method: 'POST',
+    body: JSON.stringify({
+      operationType: 'create',
+      payload: {
+        crm_opp_name: marker,
+        crm_opp_expected_amount: 77000,
+        crm_opp_expected_close_date: '2026-12-31T18:00:00+08:00',
+        crm_opp_probability: 30,
+        crm_opp_forecast_category: 'pipeline',
+      },
+    }),
+  }), 'revocation-sales creates while granted');
+  expect(findValue(created?.data ?? created, ['recordId', 'recordPid', 'publicRecordId', 'pid'])).toBeTruthy();
+  expect(await adminCount(marker)).toBe(1);
+
+  const members = expectAllowed(await request('/api/tenant/members/search', adminJwt, {
+    method: 'POST',
+    body: JSON.stringify({ keyword: email, pageNum: 1, pageSize: 100 }),
+  }), `resolve tenant member ${email}`);
+  const member = rowsOf(members?.data).find(
+    (row) => String((row?.user as Record<string, unknown> | undefined)?.email ?? '') === email,
+  );
+  expect(member?.pid, `tenant member pid for ${email}`).toBeTruthy();
+  const memberPid = String(member.pid);
+
+  const assignments = expectAllowed(await request(
+    `/api/user-roles?memberPid=${encodeURIComponent(memberPid)}&pageNum=1&pageSize=100`,
+    adminJwt,
+  ), `list active role assignments for ${label}`);
+  const assignmentPids = activeRoleAssignmentPids(assignments?.data);
+  expect(assignmentPids.length, `active role assignments for ${label}`).toBeGreaterThan(0);
+
+  expectAllowed(await request('/api/user-roles/batch-remove-by-pid', adminJwt, {
+    method: 'DELETE',
+    body: JSON.stringify(assignmentPids),
+  }), `revoke ${label} role assignments`);
+
+  expectDenied(await request('/api/dynamic/crm_opportunity_common/list?pageNum=1&pageSize=20', jwt),
+    'revocation-sales existing session cannot read after revocation');
+  expectDenied(await request('/api/meta/commands/execute/crm:create_opportunity', jwt, {
+    method: 'POST',
+    body: JSON.stringify({
+      operationType: 'create',
+      payload: {
+        crm_opp_name: `${marker}-after-revoke`,
+        crm_opp_expected_amount: 1,
+        crm_opp_expected_close_date: '2026-12-31T18:00:00+08:00',
+        crm_opp_probability: 10,
+        crm_opp_forecast_category: 'pipeline',
+      },
+    }),
+  }), 'revocation-sales existing session cannot create after revocation');
+  expect(await adminCount(marker)).toBe(1);
+  checks.push({ label: 'revocation-sales denied actions have no persistence side effect', verdict: 'pass' });
+
+  expectAllowed(await request('/api/user-roles/assign-by-code', adminJwt, {
+    method: 'POST',
+    body: JSON.stringify({ memberPid, roleCodes: ['crm_sales'] }),
+  }), `reassign ${label} role`);
+  expectAllowed(await request('/api/dynamic/crm_opportunity_common/list?pageNum=1&pageSize=20', jwt),
+    'revocation-sales reads after reassignment without re-login');
+  const restored = expectAllowed(await request('/api/meta/commands/execute/crm:create_opportunity', jwt, {
+    method: 'POST',
+    body: JSON.stringify({
+      operationType: 'create',
+      payload: {
+        crm_opp_name: `${marker}-restored`,
+        crm_opp_expected_amount: 66000,
+        crm_opp_expected_close_date: '2026-12-31T18:00:00+08:00',
+        crm_opp_probability: 20,
+        crm_opp_forecast_category: 'pipeline',
+      },
+    }),
+  }), 'revocation-sales creates after reassignment without re-login');
+  expect(findValue(restored?.data ?? restored, ['recordId', 'recordPid', 'publicRecordId', 'pid'])).toBeTruthy();
+  expect(await adminCount(`${marker}-restored`)).toBe(1);
+  checks.push({ label: 'revocation lifecycle pass', verdict: 'pass' });
 });
