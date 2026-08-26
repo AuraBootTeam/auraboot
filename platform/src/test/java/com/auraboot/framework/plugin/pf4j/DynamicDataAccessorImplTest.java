@@ -7,9 +7,12 @@ import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.access.AccessDeniedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -38,6 +41,19 @@ class DynamicDataAccessorImplTest {
     void getById_delegates() {
         when(dynamicDataService.getById("m", "1")).thenReturn(Map.of("id", "1"));
         assertThat(accessor.getById("m", "1")).containsEntry("id", "1");
+    }
+
+    @Test
+    void getById_translatesHostPermissionDenialToStablePluginErrorCode() {
+        AccessDeniedException denied = new AccessDeniedException("host-specific detail");
+        when(dynamicDataService.getById("m", "1")).thenThrow(denied);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.getById("m", "1"))
+                .isInstanceOf(DataAccessorException.class)
+                .satisfies(error -> assertThat(((DataAccessorException) error).code())
+                        .isEqualTo(DataAccessErrorCode.PERMISSION_DENIED))
+                .hasCause(denied)
+                .hasMessageNotContaining("host-specific detail");
     }
 
     @Test

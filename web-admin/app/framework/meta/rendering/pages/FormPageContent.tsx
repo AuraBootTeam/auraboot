@@ -1818,7 +1818,7 @@ export function FormPageContent(props: PageContentProps) {
         })
           .then((result) => {
             if (!ResultHelper.isSuccess(result)) {
-              throw new Error(result.desc || result.message || 'Failed to submit form');
+              throw new Error(resolveCommandErrorMessage(result, submitEndpoint.endpoint, t));
             }
             showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
             dirtyFieldsRef.current.clear();
@@ -1873,7 +1873,7 @@ export function FormPageContent(props: PageContentProps) {
               }
               // result.desc / result.message are the generic envelope ("Business error").
               // The reason a command refused the submit lives in context.detail.
-              throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode));
+              throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode, t));
             }
             const asyncDispatch = resolveAsyncCommandDispatch(result.data);
             const responseData = asyncDispatch

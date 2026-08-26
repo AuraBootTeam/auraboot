@@ -283,8 +283,22 @@ function notifyActionToast(
  * ("Business error"), so they must stay last. Shared with the DSL form page so both
  * command execution paths surface the same reason.
  */
-export function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
+export function resolveCommandErrorMessage(
+  result: unknown,
+  commandCode: string,
+  translate?: (key: string) => string,
+): string {
   const body = (result || {}) as Record<string, any>;
+  const stableI18nKey =
+    String(body.code || '').toUpperCase() === 'BACKEND_REQUEST_TIMEOUT'
+      ? 'common.error.backendRequestTimeout'
+      : undefined;
+  if (stableI18nKey && translate) {
+    const localized = translate(stableI18nKey);
+    if (localized && localized !== stableI18nKey) {
+      return localized;
+    }
+  }
   const resolved =
     firstNonBlankString(
       body.context?.detail,
@@ -525,7 +539,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       });
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(resolveCommandErrorMessage(result, commandCode));
+        throw new Error(resolveCommandErrorMessage(result, commandCode, t));
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -710,7 +724,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 { method: 'get', params: { action: offboardingAction }, token },
               );
               if (!ResultHelper.isSuccess(impactResult)) {
-                throw new Error(resolveCommandErrorMessage(impactResult, offboardingAction));
+                throw new Error(resolveCommandErrorMessage(impactResult, offboardingAction, t));
               }
               const impact = impactResult.data as Record<string, any>;
               transferRequired = impact?.transferRequired === true;
