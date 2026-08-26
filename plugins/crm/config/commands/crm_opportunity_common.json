@@ -18,16 +18,19 @@
       "crm_opp_forecast_category",
       "crm_opp_competitor"
     ],
-    "autoSetFields": {
-      "crm_opp_code": {
-        "strategy": "auto_generate",
-        "pattern": "OPP-{yyyyMMdd}-{seq}"
-      },
-      "crm_opp_stage": {
-        "strategy": "fixed_value",
-        "value": "discovery"
-      }
-    },
+ "autoSetFields": {
+  "crm_opp_code": {
+   "strategy": "auto_generate",
+   "pattern": "OPP-{yyyyMMdd}-{seq}"
+  },
+  "crm_opp_owner": {
+   "strategy": "current_user_pid"
+  },
+  "crm_opp_stage": {
+   "strategy": "fixed_value",
+   "value": "discovery"
+  }
+ },
     "permissions": [
       "crm.opportunity.manage"
     ],
