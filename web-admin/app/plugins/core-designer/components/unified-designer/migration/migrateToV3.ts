@@ -118,13 +118,16 @@ function migrateListBlocks(blocks: LegacyDslBlockV2[]): DslBlockV3[] {
 
 function migrateSectionBlock(block: LegacyDslBlockV2, blockType: string): DslBlockV3 {
   const blockId = block.id || toStableBlockId(blockType);
+  // `normalizeProps` strips the structured `columns` key; preserve it so the
+  // flat serializer can restore section column counts on save.
+  const sectionColumns = typeof block.columns === 'number' ? { columns: block.columns } : {};
   return {
     id: blockId,
     blockType,
     region: block.region,
     title: block.title,
     layout: normalizeLayout(block),
-    props: normalizeProps(block),
+    props: { ...normalizeProps(block), ...sectionColumns },
     dataSource: normalizeDataSource(block.dataSource),
     blocks: (block.fields ?? []).map((fieldRef) => migrateFieldRef(blockId, fieldRef, 'field')),
     extension: normalizeExtension(block),
@@ -133,13 +136,19 @@ function migrateSectionBlock(block: LegacyDslBlockV2, blockType: string): DslBlo
 
 function migrateFilterBarBlock(block: LegacyDslBlockV2): DslBlockV3 {
   const blockId = block.id || 'filters';
+  // `normalizeProps` strips the structured array keys, which would silently
+  // drop the filters block's own `actions` / `buttons` shorthand (search /
+  // reset / embedded buttons) — the flat serializer hoists them back from
+  // these keys, so they must survive the migration.
+  const shorthandActions = Array.isArray(block.actions) ? { actions: block.actions } : {};
+  const shorthandButtons = Array.isArray(block.buttons) ? { buttons: block.buttons } : {};
   return {
     id: blockId,
     blockType: 'filter-bar',
     region: 'filters',
     title: block.title,
     layout: normalizeLayout(block),
-    props: normalizeProps(block),
+    props: { ...normalizeProps(block), ...shorthandActions, ...shorthandButtons },
     blocks: (block.fields ?? []).map((fieldRef) => migrateFieldRef(blockId, fieldRef, 'filter-field')),
     extension: normalizeExtension(block),
   };
@@ -155,7 +164,7 @@ function migrateTableBlock(block: LegacyDslBlockV2): DslBlockV3 {
     layout: normalizeLayout(block),
     props: { ...normalizeProps(block), selection: block.selection },
     dataSource: normalizeDataSource(block.dataSource),
-    blocks: (block.columns ?? []).map((columnRef) => migrateColumnRef(blockId, columnRef)),
+    blocks: (Array.isArray(block.columns) ? block.columns : []).map((columnRef) => migrateColumnRef(blockId, columnRef)),
     extension: normalizeExtension(block),
   };
 }
@@ -179,9 +188,13 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   if (block.blockType === 'tabs') return migrateTabsBlock(block, kind);
   if (block.blockType === 'toolbar') return migrateActionBarBlock(block, 'toolbar');
   if (block.blockType === 'form-buttons') return migrateActionBarBlock(block, 'footer');
+  // Sections nested outside the kind roots (e.g. inside tabs) still need their
+  // `fields[]` shorthand expanded — the generic passthrough would strip it.
   if (block.blockType === 'form-section' && kind === 'detail') {
     return migrateSectionBlock(block, 'detail-section');
   }
+  if (block.blockType === 'form-section') return migrateSectionBlock(block, 'form-section');
+  if (block.blockType === 'detail-section') return migrateSectionBlock(block, 'detail-section');
   if (block.blockType === 'chart' || block.blockType === 'stat-card') {
     return migrateWidgetLikeBlock(block);
   }

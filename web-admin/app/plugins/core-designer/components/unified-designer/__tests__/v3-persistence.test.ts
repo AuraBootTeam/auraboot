@@ -2,6 +2,45 @@ import { describe, expect, it, vi } from 'vitest';
 import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { loadPageSchemaV3, savePageSchemaV3 } from '../persistence/pageSchemaV3Repository';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
+import type { PageSchemaV3 } from '../types';
+
+/** A list-kind editor tree whose serialization covers the three main flat containers. */
+const listDocumentV3: PageSchemaV3 = {
+  schemaVersion: 3,
+  kind: 'list',
+  id: 'customer_list',
+  pageKey: 'customer_list',
+  modelCode: 'customer',
+  title: { en: 'Customer List', 'zh-CN': '客户列表' },
+  blocks: [
+    {
+      id: 'list_root',
+      blockType: 'list',
+      dataSource: { model: 'customer' },
+      blocks: [
+        {
+          id: 'list_filters',
+          blockType: 'filter-bar',
+          region: 'filters',
+          blocks: [{ id: 'filter_status', blockType: 'filter-field', field: 'status' }],
+        },
+        {
+          id: 'list_toolbar',
+          blockType: 'action-bar',
+          region: 'toolbar',
+          blocks: [
+            { id: 'action_create', blockType: 'action', actionType: 'create', props: { label: 'Create' } },
+          ],
+        },
+        {
+          id: 'table_customers',
+          blockType: 'table',
+          blocks: [{ id: 'column_name', blockType: 'column', field: 'name' }],
+        },
+      ],
+    },
+  ],
+};
 
 describe('PageSchema V3 validation', () => {
   it('rejects duplicate block ids and invalid parent-child relationships', () => {
@@ -96,7 +135,7 @@ describe('PageSchema V3 repository', () => {
     expect(loaded.source).toEqual({ type: 'page', pid: 'page_1', pageKey: 'customer_workspace' });
   });
 
-  it('does not remigrate recursive V3 blocks when an older backend returns a stale schemaVersion', async () => {
+  it('rejects recursive kind-root blocks stored under a flat schemaVersion label', async () => {
     const recursiveBlocks = [
       {
         id: 'list_customer_workspace',
@@ -130,18 +169,73 @@ describe('PageSchema V3 repository', () => {
       createPage: vi.fn(),
     };
 
-    const loaded = await loadPageSchemaV3({ pageId: 'page_1', api });
-
-    expect(loaded.document.schemaVersion).toBe(3);
-    expect(loaded.document.blocks).toEqual(recursiveBlocks);
-    expect(loaded.document.blocks[0]?.title).toBe('Saved V3 List');
+    // A flat-labelled row carrying recursive kind roots means a corrupt writer;
+    // the repository must refuse to guess the dialect instead of migrating.
+    await expect(loadPageSchemaV3({ pageId: 'page_1', api })).rejects.toThrow(
+      /refusing to guess the dialect/,
+    );
   });
 
-  it('saves valid V3 documents back to existing backend pages', async () => {
+  it('rejects stored pages with unknown schemaVersion labels', async () => {
+    const api = {
+      getPageByPid: vi.fn().mockResolvedValue({
+        code: '0',
+        data: {
+          pid: 'page_1',
+          pageKey: 'customer_workspace',
+          kind: 'list',
+          schemaVersion: 5,
+          blocks: [],
+        },
+      }),
+      getPageByPageKey: vi.fn(),
+      updatePage: vi.fn(),
+      createPage: vi.fn(),
+    };
+
+    await expect(loadPageSchemaV3({ pageId: 'page_1', api })).rejects.toThrow(
+      /unsupported schemaVersion 5/,
+    );
+  });
+
+  it('saves list documents to existing backend pages as flat v4 blocks', async () => {
     const api = {
       getPageByPid: vi.fn(),
       getPageByPageKey: vi.fn(),
       updatePage: vi.fn().mockResolvedValue({ code: '0', data: { pid: 'page_1' } }),
+      createPage: vi.fn(),
+    };
+
+    const result = await savePageSchemaV3({
+      document: listDocumentV3,
+      source: { type: 'page', pid: 'page_1', pageKey: 'customer_list' },
+      api,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(api.updatePage).toHaveBeenCalledWith(
+      'page_1',
+      expect.objectContaining({
+        schemaVersion: 4,
+        kind: 'list',
+        pageKey: 'customer_list',
+      }),
+    );
+    const request = api.updatePage.mock.calls[0][1];
+    // The tree's filter-bar/action-bar/table containers are serialized back to
+    // the flat runtime dialect — the DynamicPageRenderer never sees tree blocks.
+    expect(request.blocks).toEqual([
+      expect.objectContaining({ blockType: 'filters' }),
+      expect.objectContaining({ blockType: 'toolbar' }),
+      expect.objectContaining({ blockType: 'table' }),
+    ]);
+  });
+
+  it('refuses to persist composite documents that have no flat v4 representation', async () => {
+    const api = {
+      getPageByPid: vi.fn(),
+      getPageByPageKey: vi.fn(),
+      updatePage: vi.fn(),
       createPage: vi.fn(),
     };
 
@@ -151,17 +245,9 @@ describe('PageSchema V3 repository', () => {
       api,
     });
 
-    expect(result.ok).toBe(true);
-    expect(api.updatePage).toHaveBeenCalledWith(
-      'page_1',
-      expect.objectContaining({
-        schemaVersion: 3,
-        kind: 'composite',
-        blocks: samplePageSchemaV3.blocks,
-        layout: samplePageSchemaV3.layout,
-        pageKey: 'customer_workspace',
-      }),
-    );
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/flat v4 runtime dialect/);
+    expect(api.updatePage).not.toHaveBeenCalled();
   });
 
   it('does not save invalid V3 documents', async () => {
@@ -183,7 +269,7 @@ describe('PageSchema V3 repository', () => {
     expect(api.updatePage).not.toHaveBeenCalled();
   });
 
-  it('creates new pages with schemaVersion 3', async () => {
+  it('creates new pages with flat v4 blocks', async () => {
     const api = {
       getPageByPid: vi.fn(),
       getPageByPageKey: vi.fn(),
@@ -192,16 +278,16 @@ describe('PageSchema V3 repository', () => {
     };
 
     const result = await savePageSchemaV3({
-      document: samplePageSchemaV3,
-      source: { type: 'local', pageKey: 'customer_workspace' },
+      document: listDocumentV3,
+      source: { type: 'local', pageKey: 'customer_list' },
       api,
     });
 
     expect(result.ok).toBe(true);
     expect(api.createPage).toHaveBeenCalledWith(
       expect.objectContaining({
-        schemaVersion: 3,
-        blocks: samplePageSchemaV3.blocks,
+        schemaVersion: 4,
+        kind: 'list',
       }),
     );
   });

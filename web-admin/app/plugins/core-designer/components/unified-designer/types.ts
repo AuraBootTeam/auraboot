@@ -144,7 +144,8 @@ export interface LegacyDslBlockV2 {
   region?: string;
   title?: LocalizedText;
   fields?: LegacyFieldRefV2[];
-  columns?: LegacyColumnRefV2[];
+  /** Column refs on `table` blocks; `form-section` / `detail-section` carry a numeric column count. */
+  columns?: number | LegacyColumnRefV2[];
   buttons?: Array<string | Record<string, unknown>>;
   actions?: Array<string | Record<string, unknown>>;
   span?: number;
