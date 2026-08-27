@@ -11,11 +11,30 @@ import type { LegacyDslBlockV2, LegacyPageSchemaV2 } from '../types';
  * Fixtures mirror the two producers of stored v4 rows:
  * - `PageSchemaDefaultBlockGenerator` (model publish auto-create), and
  * - the plugin importer (`meta_models_admin`-shaped object field refs).
- * The round-trip contract is deep-equal identity: stored flat blocks →
- * migratePageSchemaV2ToV3 (editor tree) → serializePageTreeToFlat must equal
- * the original blocks, because any drift would silently rewrite stored pages
- * on designer save.
+ * The round-trip contract is deep-equal identity EXCEPT that object action
+ * entries gain a renderer-inert `actionType` stamp: the serializer must always
+ * record the current actionType or a changed action would silently revert on
+ * reload (normalizeActionType falls back to the stored `code`).
  */
+
+function stripActionTypeStamps(blocks: LegacyDslBlockV2[]): LegacyDslBlockV2[] {
+  const visit = (block: LegacyDslBlockV2): LegacyDslBlockV2 => {
+    const next: Record<string, unknown> = { ...block };
+    for (const key of ['buttons', 'actions', 'rowActions'] as const) {
+      if (!Array.isArray(next[key])) continue;
+      next[key] = (next[key] as Array<string | Record<string, unknown>>).map((entry) => {
+        if (typeof entry !== 'object' || entry === null) return entry;
+        const { actionType: _stamp, ...rest } = entry as Record<string, unknown>;
+        return rest;
+      });
+    }
+    if (Array.isArray(next.blocks)) {
+      next.blocks = (next.blocks as LegacyDslBlockV2[]).map(visit);
+    }
+    return next as LegacyDslBlockV2;
+  };
+  return blocks.map(visit);
+}
 
 function roundTrip(kind: string, blocks: LegacyDslBlockV2[], modelCode?: string) {
   const stored: LegacyPageSchemaV2 = {
@@ -30,7 +49,7 @@ function roundTrip(kind: string, blocks: LegacyDslBlockV2[], modelCode?: string)
   const flat = serializePageTreeToFlat(tree);
   expect(flat.schemaVersion).toBe(FLAT_PAGE_SCHEMA_VERSION);
   expect(flat.kind).toBe(kind);
-  expect(flat.blocks).toEqual(blocks);
+  expect(stripActionTypeStamps(flat.blocks)).toEqual(blocks);
 }
 
 describe('flatPageSerializer round-trip (generator-shaped v4 pages)', () => {

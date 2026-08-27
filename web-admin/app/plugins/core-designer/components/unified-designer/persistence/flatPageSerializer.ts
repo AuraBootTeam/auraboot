@@ -368,15 +368,14 @@ function serializeActionEntry(block: DslBlockV3, parentId: string): string | Rec
   if (Object.keys(props).length === 0 && block.title === undefined && idIsCanonical) {
     return actionType;
   }
-  const { code: _code, ...rest } = props;
+  const { code: _code, actionType: _actionType, ...rest } = props;
   const entry: Record<string, unknown> = { ...rest };
   entry.code = code;
-  const hasRendererSemanticKey = ['action', 'navigateTo', 'commandCode', 'to', 'type', 'workflowKey'].some(
-    (key) => key in rest,
-  );
-  if (!hasRendererSemanticKey) {
-    entry.actionType = actionType;
-  }
+  // Always stamp the current actionType: migrateActionRef leaks the stored
+  // entry's `code` into props, and without this stamp a changed actionType
+  // would silently revert on reload because normalizeActionType falls back to
+  // the stale code. The v4 renderers ignore the extra key.
+  entry.actionType = actionType;
   if (!idIsCanonical) entry.id = block.id;
   if (block.title !== undefined) entry.title = block.title;
   const layout = (block.layout ?? {}) as Record<string, unknown>;

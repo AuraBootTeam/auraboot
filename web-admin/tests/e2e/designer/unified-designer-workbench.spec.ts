@@ -945,10 +945,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const persisted = await readPage(page, pagePid);
     const persistedBlock = findBlockById(persisted.blocks ?? [], fieldBlockId);
+    // Saved pages persist as flat v4 blocks: field leaves live inside their
+    // section's `fields` array as object entries carrying the stable id.
     expect(persistedBlock).toMatchObject({
-      blockType: 'field',
       field: fieldCode,
-      props: expect.objectContaining({ label: updatedLabel }),
+      label: updatedLabel,
     });
   });
 
@@ -1008,15 +1009,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const persisted = await readPage(page, listPagePid);
     const persistedColumn = findBlockById(persisted.blocks ?? [], columnBlockId);
     const persistedFilter = findBlockById(persisted.blocks ?? [], filterBlockId);
+    // Flat v4 persistence: column / filter leaves persist as object entries.
     expect(persistedColumn).toMatchObject({
-      blockType: 'column',
       field: fieldCode,
-      props: expect.objectContaining({ label: columnLabel }),
+      label: columnLabel,
     });
     expect(persistedFilter).toMatchObject({
-      blockType: 'filter-field',
       field: fieldCode,
-      props: expect.objectContaining({ label: filterLabel, operator: 'contains' }),
+      label: filterLabel,
+      operator: 'contains',
     });
   });
 
@@ -1024,6 +1025,28 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     page,
   }) => {
     expect(listPagePid).toBeTruthy();
+
+    // Reset the toolbar action to its seeded create verb so the edit below is a
+    // real create → navigate transition, independent of earlier tests' saves.
+    const stored = await readPage(page, listPagePid);
+    for (const block of stored.blocks ?? []) {
+      if (block.blockType !== 'toolbar') continue;
+      block.buttons = (block.buttons ?? []).map((button) =>
+        (button as { id?: string }).id === 'action_seed_create'
+          ? {
+              id: 'action_seed_create',
+              code: 'create',
+              actionType: 'create',
+              label: 'Create mission',
+              openMode: 'drawer',
+            }
+          : button,
+      );
+    }
+    const resetResp = await page.request.put(`/api/pages/${listPagePid}`, {
+      data: stored as unknown as Record<string, unknown>,
+    });
+    expect(resetResp.ok(), await resetResp.text()).toBe(true);
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
@@ -1051,14 +1074,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const persisted = await readPage(page, listPagePid);
     const persistedAction = findBlockById(persisted.blocks ?? [], 'action_seed_create');
+    // Flat v4 persistence: the action persists as a toolbar button entry that
+    // always carries the current actionType stamp next to its business code.
     expect(persistedAction).toMatchObject({
-      blockType: 'action',
+      code: 'navigate',
       actionType: 'navigate',
-      props: expect.objectContaining({
-        label: actionLabel,
-        to: actionRoute,
-        target: 'self',
-      }),
+      label: actionLabel,
+      to: actionRoute,
+      target: 'self',
     });
   });
 
@@ -7045,6 +7068,18 @@ function findBlockById(blocks: DslBlock[], id: string): DslBlock | null {
     if (block.id === id) return block;
     const child = block.blocks ? findBlockById(block.blocks, id) : null;
     if (child) return child;
+    // Pages saved by the unified designer persist as flat v4 blocks, where
+    // field / column / action leaves live in typed arrays as object entries
+    // that keep their stable ids.
+    for (const key of ['fields', 'columns', 'buttons', 'actions', 'rowActions'] as const) {
+      const entries = (block as Record<string, unknown>)[key];
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        if (entry && typeof entry === 'object' && (entry as DslBlock).id === id) {
+          return entry as DslBlock;
+        }
+      }
+    }
   }
   return null;
 }

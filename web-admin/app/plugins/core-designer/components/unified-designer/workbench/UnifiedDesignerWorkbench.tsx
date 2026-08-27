@@ -686,6 +686,20 @@ export function UnifiedDesignerWorkbench({
           }
         }
 
+        // When an action's type changes, keep the flat-`code` echo in sync:
+        // migrateActionRef leaks the stored entry's `code` (often the previous
+        // action verb) into props, and the flat serializer prefers it when the
+        // code differs from the actionType. If the user edits actionType and the
+        // props code still echoes the OLD verb, the saved button would carry the
+        // previous semantics and revert the edit on reload.
+        if (path === 'actionType' && typeof value === 'string') {
+          const props = { ...(updated.props ?? {}) };
+          if (props.code === block.actionType) {
+            props.code = value;
+            return { ...updated, props };
+          }
+        }
+
         return updated;
       }),
     }));
