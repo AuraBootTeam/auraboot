@@ -16,19 +16,18 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.service.UserService;
 import com.auraboot.framework.meta.entity.StateGraphDefinition;
 import com.auraboot.framework.meta.entity.InvariantDefinition;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -52,7 +51,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("CommandExecutor Integration Test - P1-1 Execution Pipeline")
-class CommandExecutorIntegrationTest {
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class CommandExecutorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private CommandExecutor commandExecutor;
@@ -74,15 +74,6 @@ class CommandExecutorIntegrationTest {
 
     @Autowired
     private DynamicDataMapper dynamicDataMapper;
-
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private TenantService tenantService;
-
-    @Autowired
-    private TenantMemberService tenantMemberService;
 
     @Autowired
     private StateGraphService stateGraphService;
@@ -108,8 +99,8 @@ class CommandExecutorIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Setup test user and tenant
-        ensureTestDataExists();
+        testUser = getTestUser();
+        testTenant = getTestTenant();
         
         // Setup MetaContext
         MetaContext.setContext(
@@ -171,37 +162,13 @@ class CommandExecutorIntegrationTest {
         }
     }
 
-    private void ensureTestDataExists() {
-        String testEmail = "cmd-executor-test@auraboot.com";
-        
-        // Find or create test user
-        testUser = userService.findByEmail(testEmail);
-        if (testUser == null) {
-            testUser = userService.signUp(testEmail, "test-password-123");
-        }
-        
-        // Find or create test tenant
-        String testTenantName = "cmd-executor-test-tenant";
-        testTenant = tenantService.findByName(testTenantName);
-        if (testTenant == null) {
-            Tenant tenant = new Tenant();
-            tenant.setPid(UniqueIdGenerator.generate());
-            tenant.setName(testTenantName);
-            tenant.setDisplayName("Command Executor Test Tenant");
-            tenant.setStatus("active");
-            tenant.setContactEmail("admin@cmd-executor-test.com");
-            tenant.setDescription("Test tenant for command executor integration tests");
-            tenant.setDeletedFlag(false);
-            tenant.setCreatedAt(Instant.now());
-            tenant.setUpdatedAt(Instant.now());
-            testTenant = tenantService.createTenant(tenant);
-        }
-        
-        // Ensure tenant member relationship
-        TenantMember member = tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId());
-        if (member == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
-        }
+    private void grantModelReadPermission(String modelCode) {
+        grantCommittedPermissionToTestRole(
+                "model." + modelCode + ".read",
+                "model",
+                modelCode,
+                "read",
+                "Read command executor fixture " + modelCode);
     }
 
     /**
@@ -215,6 +182,7 @@ class CommandExecutorIntegrationTest {
         // 1. Create model
         testModel = buildModel(modelCode);
         metaModelMapper.insert(testModel);
+        grantModelReadPermission(testModel.getCode());
 
         // 2. Create fields with unique names per test
         Field nameField = buildField("name_" + suffix, "string", false, true, 1);
@@ -259,6 +227,7 @@ class CommandExecutorIntegrationTest {
         // 1. Create model
         testModel = buildModel(modelCode);
         metaModelMapper.insert(testModel);
+        grantModelReadPermission(testModel.getCode());
 
         // 2. Create fields - use unique status field name to avoid conflicts
         Field nameField = buildField("name_" + suffix, "string", false, true, 1);
@@ -857,16 +826,18 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("tenant_id", testTenant.getId());
         insertData.put("pid", UniqueIdGenerator.generate());
+        insertData.put("created_by", testUser.getId());
+        insertData.put("updated_by", testUser.getId());
         insertData.put("name_" + suffix, "test_record");
         insertData.put(statusField, "pending");
         dynamicDataMapper.insert(tableName, insertData);
 
-        // Query to get the record ID
-        String selectSql = String.format("SELECT id FROM %s WHERE tenant_id = %d AND name_%s = '%s'",
+        // Commands address dynamic records by their public pid, never the physical table id.
+        String selectSql = String.format("SELECT pid FROM %s WHERE tenant_id = %d AND name_%s = '%s'",
                 tableName, testTenant.getId(), suffix, "test_record");
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(selectSql, Map.of());
         assertFalse(records.isEmpty(), "Record should exist");
-        String recordId = records.get(0).get("id").toString();
+        String recordId = records.get(0).get("pid").toString();
 
         // Execute command with target record (PENDING -> APPROVED)
         CommandExecuteRequest request = new CommandExecuteRequest();
@@ -941,14 +912,16 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("tenant_id", testTenant.getId());
         insertData.put("pid", UniqueIdGenerator.generate());
+        insertData.put("created_by", testUser.getId());
+        insertData.put("updated_by", testUser.getId());
         insertData.put("name_" + suffix, "invalid_transition");
         insertData.put(statusField, "pending");
         dynamicDataMapper.insert(tableName, insertData);
 
-        String selectSql = String.format("SELECT id FROM %s WHERE tenant_id = %d AND name_%s = '%s'",
+        String selectSql = String.format("SELECT pid FROM %s WHERE tenant_id = %d AND name_%s = '%s'",
                 tableName, testTenant.getId(), suffix, "invalid_transition");
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(selectSql, Map.of());
-        String recordId = records.get(0).get("id").toString();
+        String recordId = records.get(0).get("pid").toString();
 
         // Try to complete directly from PENDING (should fail)
         CommandExecuteRequest request = new CommandExecuteRequest();
@@ -1531,6 +1504,7 @@ class CommandExecutorIntegrationTest {
 
         testModel = buildModel(modelCode);
         metaModelMapper.insert(testModel);
+        grantModelReadPermission(testModel.getCode());
 
         Field nameField = buildField(nameFieldCode, "string", false, true, 1);
         Field valueField = buildField(valueFieldCode, "integer", false, false, 2);
@@ -1661,6 +1635,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("pid", recordPid);
         insertData.put("tenant_id", testTenant.getId());
+        insertData.put("created_by", testUser.getId());
+        insertData.put("updated_by", testUser.getId());
         insertData.put(model.nameField(), "original_name");
         insertData.put(model.valueField(), 10);
         insertData.put("created_at", Instant.now());
@@ -1692,6 +1668,8 @@ class CommandExecutorIntegrationTest {
         Map<String, Object> insertData = new HashMap<>();
         insertData.put("pid", recordPid);
         insertData.put("tenant_id", testTenant.getId());
+        insertData.put("created_by", testUser.getId());
+        insertData.put("updated_by", testUser.getId());
         insertData.put(model.nameField(), "keep_this_name");
         insertData.put(model.valueField(), 10);
         insertData.put("created_at", Instant.now());

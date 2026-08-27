@@ -7,6 +7,7 @@ import test from 'node:test';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
 const composeOverride = path.join(here, '..', 'docker-compose.oss-backend-ci.override.yml');
+const gradleBuild = path.join(here, '..', 'platform', 'build.gradle');
 const source = readFileSync(runner, 'utf8');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -50,6 +51,16 @@ test('backend CI runner proves required platform seed rows before Gradle tests',
   assert.match(source, /platform seed verification failed/);
 });
 
+test('backend CI runner provisions the lockfile-pinned Playwright Chromium golden dependency', () => {
+  assert.match(source, /web-admin\/node_modules\/\.bin\/playwright/);
+  assert.match(source, /VERSION_ID:-.*26\.04/);
+  assert.match(source, /PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24\.04-x64"/);
+  assert.match(source, /PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24\.04-arm64"/);
+  assert.match(source, /"\$PLAYWRIGHT_CLI" install chromium/);
+  assert.match(source, /playwright-install\.log/);
+  assert.match(source, /cannot install lockfile-pinned Playwright Chromium/);
+});
+
 test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
   for (const image of [
     'pgvector/pgvector:pg16',
@@ -68,8 +79,16 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform test\s*$/);
+  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
+});
+
+test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
+  const buildSource = readFileSync(gradleBuild, 'utf8');
+  assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
+  assert.match(buildSource, /excludeTags 'destructive-bootstrap'/);
+  assert.match(buildSource, /mustRunAfter tasks\.named\('test'\)/);
+  assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
 });
 
 test('backend CI runner points fixed-stack tests at the isolated host ports', () => {

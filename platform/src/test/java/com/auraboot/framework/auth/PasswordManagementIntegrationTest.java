@@ -4,6 +4,8 @@ import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.integration.SelfRegistrationTestSupport;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.UserService;
@@ -45,12 +47,32 @@ class PasswordManagementIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private SystemConfigService systemConfigService;
+
     private final String testRunId = String.valueOf(System.currentTimeMillis());
 
     // Shared across ordered tests
     private Long testUserId;
     private String testEmail;
     private String currentPassword;
+
+    @BeforeAll
+    void enableSelfRegistration() {
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, true);
+    }
+
+    @AfterAll
+    void restoreClosedRegistrationPolicy() {
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
+    }
+
+    @BeforeEach
+    void configureSingleTenantAdmission() {
+        SelfRegistrationTestSupport.configureSingleTenantAdmission(
+                systemConfigService,
+                getTestTenant().getId());
+    }
 
     // -----------------------------------------------------------------------
     // Test 1: changePassword with correct current password updates successfully

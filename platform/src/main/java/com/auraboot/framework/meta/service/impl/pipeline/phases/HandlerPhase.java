@@ -554,7 +554,7 @@ public class HandlerPhase implements CommandPhase {
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
             }
-            if (StringUtils.hasText(MetaContext.getCurrentUserPid())) {
+            if (MetaContext.exists() && StringUtils.hasText(MetaContext.getCurrentUserPid())) {
                 pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
                         MetaContext.getCurrentUserPid().trim());
             }

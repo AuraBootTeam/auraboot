@@ -38,7 +38,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     private static final Duration THROTTLE_DURATION = Duration.ofMinutes(5);
 
     @Override
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @Transactional
     public UserSession createSession(Long userId, String token, String ipAddress, String userAgent) {
         UserSession session = new UserSession();
         session.setPid(UlidGenerator.generate());
@@ -51,10 +51,13 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         session.setCreatedAt(Instant.now());
         session.setLastActiveAt(Instant.now());
         session.setRevoked(false);
-        try {
-            userSessionMapper.insert(session);
-        } catch (org.springframework.dao.DuplicateKeyException e) {
-            log.debug("Session already exists for token, skipping: {}", e.getMessage());
+        if (userSessionMapper.insertIfAbsent(session) == 0) {
+            UserSession existing = userSessionMapper.findByTokenHash(session.getTokenHash());
+            if (existing == null) {
+                throw new IllegalStateException("Session idempotency conflict did not expose the existing row");
+            }
+            log.debug("Session already exists for token, returning the persisted session");
+            return existing;
         }
         return session;
     }

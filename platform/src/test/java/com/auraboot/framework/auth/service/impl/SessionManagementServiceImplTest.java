@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
@@ -22,11 +21,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -46,6 +46,7 @@ class SessionManagementServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new SessionManagementServiceImpl(userSessionMapper);
+        lenient().when(userSessionMapper.insertIfAbsent(any(UserSession.class))).thenReturn(1);
     }
 
     @Test
@@ -58,7 +59,7 @@ class SessionManagementServiceImplTest {
         assertEquals("Mobile", s.getDeviceInfo());
         assertEquals(512, s.getUserAgent().length());
         assertFalse(Boolean.TRUE.equals(s.getRevoked()));
-        verify(userSessionMapper).insert(any(UserSession.class));
+        verify(userSessionMapper).insertIfAbsent(any(UserSession.class));
     }
 
     @Test
@@ -117,11 +118,16 @@ class SessionManagementServiceImplTest {
     }
 
     @Test
-    @DisplayName("createSession swallows DuplicateKeyException")
-    void createSessionDuplicateKeySwallowed() {
-        doThrow(new DuplicateKeyException("dup")).when(userSessionMapper).insert(any(UserSession.class));
-        UserSession s = service.createSession(1L, "tk", null, null);
-        assertNotNull(s);
+    @DisplayName("createSession returns the persisted row for an idempotent duplicate")
+    void createSessionReturnsPersistedDuplicate() {
+        UserSession existing = new UserSession();
+        existing.setPid("existing-session");
+        when(userSessionMapper.insertIfAbsent(any(UserSession.class))).thenReturn(0);
+        when(userSessionMapper.findByTokenHash(any())).thenReturn(existing);
+
+        UserSession result = service.createSession(1L, "tk", null, null);
+
+        assertSame(existing, result);
     }
 
     @Test

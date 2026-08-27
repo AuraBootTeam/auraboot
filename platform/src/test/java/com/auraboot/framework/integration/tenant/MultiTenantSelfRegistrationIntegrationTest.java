@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.integration.SelfRegistrationTestSupport;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
@@ -82,6 +83,7 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
         // SYSTEM_MODE is readonly once set, so use initialize() (upsert-style) not set().
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, SystemMode.MULTI.getCode(),
                 "system", "string", "System mode (single/multi/hybrid)", true);
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, true);
         // The self-serve register/create-tenant flow runs without an ambient tenant context.
         MetaContext.clear();
     }
@@ -92,6 +94,7 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
         try {
             systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, SystemMode.SINGLE.getCode(),
                     "system", "string", "System mode (single/multi/hybrid)", true);
+            SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
         } catch (Exception ignored) {
             // best-effort restore on the throwaway test DB
         }

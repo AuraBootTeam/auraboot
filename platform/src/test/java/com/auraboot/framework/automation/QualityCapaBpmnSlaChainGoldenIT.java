@@ -92,6 +92,8 @@ class QualityCapaBpmnSlaChainGoldenIT extends BaseIntegrationTest {
     private final String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toLowerCase(Locale.ROOT);
     private final String defectModel = "qcd2_" + suffix;
     private final String defectTable = "mt_" + defectModel;
+    private final String severityField = "qcd_severity_" + suffix;
+    private final String descriptionField = "qcd_description_" + suffix;
     private final String reviewNode = "capa_review_" + suffix;
     private final String processKey = "capaflow_" + suffix;
     private final long escalationRecipientId = 970000000L + Math.floorMod(System.nanoTime(), 1_000_000L);
@@ -122,7 +124,7 @@ class QualityCapaBpmnSlaChainGoldenIT extends BaseIntegrationTest {
 
         dropIfExists(defectTable);
         cleanMeta(defectModel);
-        publishModel(defectModel, "QC Defect (BPMN leg)", new String[]{"qcd_severity", "qcd_description"});
+        publishModel(defectModel, "QC Defect (BPMN leg)", new String[]{severityField, descriptionField});
 
         // Deploy a real BPMN approval process whose single userTask is the SLA-watched node.
         String bpmn = String.format(CAPA_APPROVAL_BPMN, processKey, reviewNode, reviewNode, reviewNode);
@@ -168,8 +170,8 @@ class QualityCapaBpmnSlaChainGoldenIT extends BaseIntegrationTest {
     @DisplayName("defect → automation start_process → real BPMN userTask → SLA record activated with deadline")
     void defectAutomation_startsBpmnProcess_activatesSlaOnUserTask() {
         Map<String, Object> defect = dynamicDataService.create(defectModel, Map.of(
-                "qcd_severity", "critical",
-                "qcd_description", "Cold solder joints — lot L-" + suffix));
+                severityField, "critical",
+                descriptionField, "Cold solder joints — lot L-" + suffix));
         String defectPid = String.valueOf(defect.get("pid"));
 
         Map<String, Object> payload = new HashMap<>();

@@ -60,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Slf4j
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
 
     @Autowired private MetaModelService metaModelService;
@@ -138,6 +139,10 @@ class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
     @BeforeEach
     void ctx() {
         MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+        MetaContext.setMemberId(getTestTenantMember().getId());
+        grantCommittedPermissionToTestRole(
+                "model." + assetModel + ".read", "model", assetModel, "read",
+                "Read command side-effect source records");
     }
 
     @Test

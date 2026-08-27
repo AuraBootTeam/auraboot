@@ -18,6 +18,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -87,7 +88,10 @@ public class BpmSignatureService {
     @SuppressWarnings("unchecked")
     public BpmSignatureRecord sign(Map<String, Object> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        Instant signedAt = Instant.now();
+        // PostgreSQL timestamptz stores microseconds. Sign the canonical value
+        // that will actually be persisted so a later DB read verifies against
+        // the same payload instead of JVM-only nanoseconds.
+        Instant signedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
         String documentId = (String) request.get("documentId");
         String processInstanceId = (String) request.get("processInstanceId");
