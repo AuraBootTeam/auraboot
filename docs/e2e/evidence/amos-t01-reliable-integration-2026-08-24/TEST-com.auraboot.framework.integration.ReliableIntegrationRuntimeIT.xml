@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="AMOS-T01 reliable integration runtime — real PostgreSQL pilot" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:44:05.655Z" hostname="Mac" time="0.18">
+  <properties/>
+  <testcase name="accessorFailsClosedWithoutSourceTransaction()" classname="com.auraboot.framework.integration.ReliableIntegrationRuntimeIT" time="0.095"/>
+  <testcase name="survives rollback, crash/restart, duplicates, ordering, poison, takeover, replay and reconcile" classname="com.auraboot.framework.integration.ReliableIntegrationRuntimeIT" time="0.085"/>
+</testsuite>

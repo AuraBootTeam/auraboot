@@ -1,0 +1,152 @@
+{
+  "run": {
+    "id": "amos-t01-reliable-integration-runtime-v1",
+    "target": "Core reliable integration runtime and versioned public envelope contract",
+    "sot": "docs/system-reference/reliable-integration-runtime-v1.md",
+    "runtime": "amos-t01-reliable-dev-20260823 / PostgreSQL auraboot_6",
+    "fix_rounds": 1
+  },
+  "verdict": {"pass": 11, "untested": 3, "fail": 0, "skipped": 0},
+  "groups": [
+    {
+      "id": "public-contract",
+      "title": "Versioned envelope and external fixture compatibility",
+      "requirement_ref": "docs/system-reference/reliable-integration-runtime-v1.md",
+      "rows": [
+        {
+          "id": "T01-CONTRACT-01",
+          "action": "Validate the versioned envelope and stable event type contract",
+          "surface": "contract", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["TEST-com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest.xml"],
+          "assertion": "Required identity fields are validated and the returned payload cannot be mutated",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-CONTRACT-02",
+          "action": "Load the exact T04 release-v2 fixture with JSON null and take a deep immutable payload snapshot",
+          "surface": "contract", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": [
+            "TEST-com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelopeTest.xml",
+            "platform/platform-plugin-api/src/test/resources/contracts/amos-t04-2280ce79/release-v2.json"
+          ],
+          "assertion": "SHA-256 and JSON tree equal the T04 head fixture; null survives; caller and nested mutations cannot alter the envelope",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "runtime-lifecycle",
+      "title": "Real PostgreSQL delivery lifecycle",
+      "requirement_ref": "docs/system-reference/reliable-integration-runtime-v1.md",
+      "rows": [
+        {
+          "id": "T01-SOURCE-01",
+          "action": "Commit source fact and outbox atomically, and roll both back on source failure",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Source and outbox rows commit together and both are absent after injected rollback",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-SOURCE-02",
+          "action": "Reject enqueue without an active source transaction",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "The accessor throws and persists zero outbox rows without a business transaction",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-LEASE-01",
+          "action": "Recover an expired claim after crash/restart",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Reconcile recovers one expired lease and the consumer projection is eventually applied",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-RECEIPT-01",
+          "action": "Suppress duplicate delivery with one durable consumer receipt",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "A duplicate dispatch leaves exactly one projection row and one receipt",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-ORDER-01",
+          "action": "Fence out-of-order events by tenant, ordering key, and sequence",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Persisted consumer apply order is sequence 1 followed by sequence 2",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-DLQ-01",
+          "action": "Move a poison event to a durable dead letter after bounded retries",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "The outbox is failed and exactly one open DLQ row exists",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-LEASE-02",
+          "action": "Reject a stale worker completion after lease takeover",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Completion with the abandoned token returns false after lease takeover",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-RECOVERY-01",
+          "action": "Replay a dead letter with attribution and reconcile expired leases",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Replay attribution, delivered state, replayed DLQ status, and recovery count are persisted",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "T01-OBS-01",
+          "action": "Expose low-cardinality outcome counters and health alerts",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it",
+          "evidence": ["TEST-com.auraboot.framework.integration.ReliableIntegrationRuntimeIT.xml"],
+          "assertion": "Outcome counters increase and health transitions DOWN for poison state then UP after replay",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "assembled-dependencies",
+      "title": "Cross-lane composition still outside this branch",
+      "rows": [
+        {
+          "id": "T02-PILOT-01",
+          "action": "Run the real Procurement producer through the real Inventory receipt command adapter",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "it",
+          "evidence": [],
+          "assertion": "Real Procurement and Inventory business records plus the runtime receipt",
+          "verdict": "untested", "verdict_by": null
+        },
+        {
+          "id": "T05-CONSUMER-01",
+          "action": "Validate the real T05 Quality Hold consumer against the hash-pinned T04 contract",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "it",
+          "evidence": [],
+          "assertion": "Real quality-hold business effect and runtime receipt commit together",
+          "verdict": "untested", "verdict_by": null
+        },
+        {
+          "id": "T10-COMPOSITION-01",
+          "action": "Re-run the contract and lifecycle suite on the exact ten-lane integration composition",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "it",
+          "evidence": [],
+          "assertion": "Exact composition OIDs and the real-stack suite are recorded by T10",
+          "verdict": "untested", "verdict_by": null
+        }
+      ]
+    }
+  ],
+  "residualGaps": [
+    "The Core PostgreSQL pilot uses a test consumer fixture; the real T02 Procurement producer and Inventory command adapter are not present on this branch.",
+    "The T04 exact fixture is contract-tested, but the real T05 Quality Hold consumer was not composed here.",
+    "T10 must regenerate the schema snapshot and rerun these gates on the exact composed heads."
+  ]
+}
