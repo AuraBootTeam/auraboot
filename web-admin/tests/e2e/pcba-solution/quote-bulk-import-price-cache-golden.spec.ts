@@ -5,6 +5,7 @@ import {
   executeCommand,
   isTransientViteDynamicImportIssue,
   openQuoteDetailFromList,
+  prepareReviewedCorrectedBomUpload,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
@@ -98,6 +99,7 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
         timeout: 20_000,
       });
 
+      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, workbookPath);
       const importResponsePromise = page.waitForResponse(
         (response) =>
           response
@@ -106,9 +108,7 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
           response.request().method() === 'POST',
         { timeout: 60_000 },
       );
-      const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-      await page.getByTestId('toolbar-btn-upload_corrected_bom').click();
-      (await fileChooserPromise).setFiles(workbookPath);
+      await uploadDialog.getByTestId('form-dialog-submit').click();
 
       const importResponse = await importResponsePromise;
       const importBody = (await importResponse.json().catch(() => ({}))) as Record<string, any>;

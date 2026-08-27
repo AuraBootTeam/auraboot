@@ -16,6 +16,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import MemberPicker from '~/ui/smart/picker/MemberPicker';
+import BomUploadReviewField, { type BomUploadReviewValue } from './BomUploadReviewField';
 
 interface VisibilityRule {
   field: string;
@@ -37,7 +38,17 @@ interface FormFieldConfig {
   label?: string | Record<string, string>;
   group?: string | Record<string, string>;
   helpText?: string | Record<string, string>;
-  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file' | 'reference';
+  type?:
+    | 'text'
+    | 'select'
+    | 'number'
+    | 'textarea'
+    | 'multiselect'
+    | 'segmented'
+    | 'checkbox'
+    | 'file'
+    | 'reference'
+    | 'bom-upload-review';
   component?: string;
   props?: Record<string, any>;
   required?: boolean;
@@ -80,11 +91,19 @@ function matchesVisibility(rule: VisibilityRule | undefined, formData: Record<st
     case 'notIn':
       return !values.includes(actual);
     case 'empty':
-      return actual === undefined || actual === null || actual === ''
-        || (Array.isArray(actual) && actual.length === 0);
+      return (
+        actual === undefined ||
+        actual === null ||
+        actual === '' ||
+        (Array.isArray(actual) && actual.length === 0)
+      );
     case 'notEmpty':
-      return actual !== undefined && actual !== null && actual !== ''
-        && (!Array.isArray(actual) || actual.length > 0);
+      return (
+        actual !== undefined &&
+        actual !== null &&
+        actual !== '' &&
+        (!Array.isArray(actual) || actual.length > 0)
+      );
     case 'equals':
     default:
       return actual === rule.value;
@@ -101,19 +120,19 @@ function visibleOptions(
   );
 }
 
-function translatedOrFallback(
-  t: (key: string) => string,
-  key: string,
-  fallback: string,
-): string {
+function translatedOrFallback(t: (key: string) => string, key: string, fallback: string): string {
   const translated = t(key);
   return translated && translated !== key ? translated : fallback;
 }
 
 function isMissing(value: any) {
-  return value === undefined || value === null || value === ''
-    || (Array.isArray(value) && value.length === 0)
-    || value === false;
+  return (
+    value === undefined ||
+    value === null ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0) ||
+    value === false
+  );
 }
 
 export default function FormDialog() {
@@ -202,7 +221,21 @@ export default function FormDialog() {
           });
         }
       }
-      if (['select', 'segmented'].includes(field.type || '') && value !== undefined && value !== '') {
+      if (field.type === 'bom-upload-review') {
+        const review = value as BomUploadReviewValue | undefined;
+        if (review && review.valid !== true) {
+          newErrors[field.field] =
+            review.validationMessage ||
+            (locale.startsWith('zh')
+              ? '请完成 BOM 列选择。'
+              : 'Complete the BOM column selection.');
+        }
+      }
+      if (
+        ['select', 'segmented'].includes(field.type || '') &&
+        value !== undefined &&
+        value !== ''
+      ) {
         const options = visibleOptions(field, state.fieldOptions, formData);
         if (!options.some((option) => option.value === value && !option.disabled)) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
@@ -358,7 +391,11 @@ export default function FormDialog() {
       {/* Dialog */}
       <div
         className={`relative mx-4 flex max-h-[calc(100vh-2rem)] w-full scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800 ${
-          hasBusinessGroups ? 'max-w-2xl' : 'max-w-lg'
+          state.fields.some((field) => field.type === 'bom-upload-review')
+            ? 'max-w-6xl'
+            : hasBusinessGroups
+              ? 'max-w-2xl'
+              : 'max-w-lg'
         }`}
       >
         {/* Header */}
@@ -569,6 +606,15 @@ export default function FormDialog() {
                         {placeholder || label}
                       </span>
                     </label>
+                  ) : fieldType === 'bom-upload-review' ? (
+                    <BomUploadReviewField
+                      fieldName={field.field}
+                      accept={field.accept}
+                      maxBytes={field.maxBytes}
+                      roleOptions={field.props?.roleOptions}
+                      previewRowCount={field.props?.previewRowCount}
+                      onChange={(value) => updateField(field.field, value)}
+                    />
                   ) : fieldType === 'file' ? (
                     <div
                       data-testid={`form-dialog-dropzone-${field.field}`}

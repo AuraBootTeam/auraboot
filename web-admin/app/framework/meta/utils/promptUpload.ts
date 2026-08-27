@@ -164,7 +164,28 @@ export function resolvePromptUploadFile(
   payload: Record<string, unknown> | null | undefined,
 ): File | null {
   const candidate = payload?.[resolvePromptUploadKey(promptUpload)];
-  return typeof File !== 'undefined' && candidate instanceof File ? candidate : null;
+  if (typeof File !== 'undefined' && candidate instanceof File) return candidate;
+  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+    const nested = (candidate as Record<string, unknown>).file;
+    if (typeof File !== 'undefined' && nested instanceof File) return nested;
+  }
+  return null;
+}
+
+/**
+ * Return server payload prepared by an inline upload-review field. The file itself is never
+ * copied into command JSON; only the review's explicit payload projection is merged.
+ */
+export function resolvePromptUploadReviewPayload(
+  promptUpload: unknown,
+  payload: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const candidate = payload?.[resolvePromptUploadKey(promptUpload)];
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return {};
+  const reviewPayload = (candidate as Record<string, unknown>).payload;
+  if (!reviewPayload || typeof reviewPayload !== 'object' || Array.isArray(reviewPayload))
+    return {};
+  return { ...(reviewPayload as Record<string, unknown>) };
 }
 
 export function resolvePromptUploadFeedbackMode(promptUpload: unknown): PromptUploadFeedbackMode {

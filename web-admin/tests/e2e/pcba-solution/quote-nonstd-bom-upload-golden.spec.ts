@@ -13,6 +13,8 @@ import {
 } from './quote-e2e-helpers';
 import { validateQuickCustomerBomWorkbook } from './quote-workbook-assertions';
 
+const QUICK_CONFIRM_COMMAND = 'qo_quote_common:quick_confirm_costs_by_category';
+
 function parseSnapshot(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object') return value as Record<string, unknown>;
   if (typeof value !== 'string') return {};
@@ -88,6 +90,29 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(uploadButton).toBeVisible({ timeout: 20_000 });
     await expect(uploadButton).toHaveAccessibleName(/上传BOM资料|Upload BOM Data/i);
 
+    await uploadButton.click();
+    const uploadDialog = page.getByTestId('form-dialog');
+    await expect(uploadDialog).toBeVisible({ timeout: 15_000 });
+    await page
+      .getByTestId('bom-upload-review-file-corrected_bom_file_id')
+      .setInputFiles(workbookPath);
+    await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('将发送给云汉的列')).toBeVisible();
+    await expect(page.getByText('已选 6 列')).toBeVisible();
+    await expect(page.getByTestId('bom-upload-review-column-0')).not.toBeChecked();
+    await expect(page.getByTestId('bom-upload-review-column-1')).toBeChecked();
+    await expect(page.getByTestId('bom-upload-review-grid')).toContainText('240Ω ±1% 1/20W 0201');
+    await testInfo.attach('nonstd-bom-upload-column-review.png', {
+      body: await uploadDialog.screenshot(),
+      contentType: 'image/png',
+    });
+
+    const commandRequestPromise = page.waitForRequest(
+      (request) =>
+        request.url().includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
+        request.method() === 'POST',
+      { timeout: 60_000 },
+    );
     const commandResponsePromise = page.waitForResponse(
       (response) =>
         response
@@ -96,11 +121,34 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         response.request().method() === 'POST',
       { timeout: 60_000 },
     );
-    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
+    await page.getByTestId('form-dialog-submit').click();
 
-    await uploadButton.click();
-    const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(workbookPath);
+    const commandRequest = await commandRequestPromise;
+    const commandRequestBody = commandRequest.postDataJSON() as {
+      payload?: Record<string, unknown>;
+      params?: { payload?: Record<string, unknown> };
+    };
+    // FetchOptions.params is serialized as the HTTP body; keep the nested fallback
+    // for compatibility with direct request helpers used by older test harnesses.
+    const commandPayload = commandRequestBody.payload ?? commandRequestBody.params?.payload ?? {};
+    const selectedColumns = commandPayload.bom_selected_columns as Array<{
+      index?: unknown;
+      role?: unknown;
+    }>;
+    expect(selectedColumns).toHaveLength(6);
+    expect(selectedColumns.map((column) => Number(column.index))).not.toContain(0);
+    expect(selectedColumns.map((column) => String(column.role))).toEqual([
+      'refdes',
+      'spec',
+      'package',
+      'quantity',
+      'manufacturer',
+      'mpn',
+    ]);
+    await testInfo.attach('nonstd-bom-upload-command-request.json', {
+      body: JSON.stringify(commandRequestBody, null, 2),
+      contentType: 'application/json',
+    });
 
     const commandResponse = await commandResponsePromise;
     const commandBody = await commandResponse.json().catch(() => ({}));
@@ -123,11 +171,24 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
             mode: row.qo_bi_source_mode,
             validRows: row.qo_bi_valid_rows,
             hasRawHead: row.qo_bi_raw_head != null && String(row.qo_bi_raw_head).length > 0,
+            hasColumnMapping:
+              row.qo_bi_column_mapping != null && String(row.qo_bi_column_mapping).length > 0,
+            hasProjectionFingerprint: /^[0-9a-f]{64}$/.test(
+              String(row.qo_bi_projection_fingerprint ?? ''),
+            ),
           }));
         },
         { timeout: 30_000, intervals: [500, 1_000, 2_000] },
       )
-      .toEqual([expect.objectContaining({ mode: 'quick', validRows: 4, hasRawHead: true })]);
+      .toEqual([
+        expect.objectContaining({
+          mode: 'quick',
+          validRows: 4,
+          hasRawHead: true,
+          hasColumnMapping: true,
+          hasProjectionFingerprint: true,
+        }),
+      ]);
 
     const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
       { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: created.quoteId },
@@ -369,6 +430,131 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       path: quoteWorkbookPath,
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
+
+    // Quick confirmation is quote-scoped and category-scoped. It must stay on the current quote,
+    // show live counts before mutation, submit selected categories (not selected row ids), and
+    // leave the non-selected diode untouched.
+    await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+    const quickConfirmAction = page.getByTestId('workbench-action-quick_confirm_prices');
+    await expect(quickConfirmAction).toBeVisible({ timeout: 20_000 });
+    const categoryPreviewResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(`/api/ext/qoe/quotes/${created.quoteId}/price-confirmation-categories`) &&
+        response.request().method() === 'GET',
+      { timeout: 30_000 },
+    );
+    await quickConfirmAction.click();
+    const categoryPreview = await categoryPreviewResponse;
+    expect(categoryPreview.ok(), 'category confirmation preview endpoint').toBe(true);
+    const categoryPreviewBody = (await categoryPreview.json()) as {
+      items?: Array<{
+        value?: string;
+        totalCount?: number;
+        confirmableCount?: number;
+        disabled?: boolean;
+      }>;
+    };
+    const resistorPreview = categoryPreviewBody.items?.find((item) => item.value === 'resistor');
+    const capacitorPreview = categoryPreviewBody.items?.find((item) => item.value === 'capacitor');
+    expect(resistorPreview).toMatchObject({ totalCount: 2, confirmableCount: 2, disabled: false });
+    expect(capacitorPreview).toMatchObject({ totalCount: 1, confirmableCount: 1, disabled: false });
+    await expect(page).toHaveURL(new RegExp(`/p/qo_quote_common/view/${created.quoteId}`));
+
+    const quickConfirmDialog = page.getByTestId('form-dialog');
+    await expect(quickConfirmDialog).toBeVisible();
+    await expect(quickConfirmDialog).toContainText(/按类别快速确认价格|Quick confirm prices/i);
+    await expect(quickConfirmDialog).toContainText(/共 2 行 · 可确认 2/);
+    await expect(quickConfirmDialog).toContainText(/共 1 行 · 可确认 1/);
+    await quickConfirmDialog.getByRole('checkbox', { name: /电阻|Resistor/i }).check();
+    await quickConfirmDialog.getByRole('checkbox', { name: /电容|Capacitor/i }).check();
+    await quickConfirmDialog
+      .getByTestId('form-dialog-field-confirm_scope')
+      .getByRole('checkbox')
+      .check();
+    await testInfo.attach('nonstd-category-quick-confirm-selection.png', {
+      body: await quickConfirmDialog.screenshot(),
+      contentType: 'image/png',
+    });
+
+    const quickConfirmRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes(`/api/meta/commands/execute/${QUICK_CONFIRM_COMMAND}`) &&
+        request.method() === 'POST',
+      { timeout: 30_000 },
+    );
+    const quickConfirmResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/meta/commands/execute/${QUICK_CONFIRM_COMMAND}`) &&
+        response.request().method() === 'POST',
+      { timeout: 30_000 },
+    );
+    await quickConfirmDialog.getByTestId('form-dialog-submit').click();
+    const observedQuickConfirmRequest = await quickConfirmRequest;
+    expect(observedQuickConfirmRequest.postDataJSON()).toMatchObject({
+      targetRecordPid: created.quoteId,
+      operationType: 'UPDATE',
+      payload: {
+        component_categories: ['resistor', 'capacitor'],
+        confirm_scope: true,
+      },
+    });
+    const quickConfirmBody = await (await quickConfirmResponse).json();
+    expect(String(quickConfirmBody.code), JSON.stringify(quickConfirmBody).slice(0, 800)).toBe('0');
+
+    const quickConfirmReceipt = page.getByTestId('workbench-result-receipt');
+    await expect(quickConfirmReceipt).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('workbench-result-receipt-field-confirmed')).toContainText('3');
+    await expect(page.getByTestId('workbench-result-receipt-field-review')).toContainText('0');
+    await expect(page.getByTestId('workbench-result-receipt-field-unpriced')).toContainText('0');
+    await testInfo.attach('nonstd-category-quick-confirm-result.png', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+
+    const quickConfirmedLines = quoteLines.filter((row) =>
+      ['resistor', 'capacitor'].includes(String(row.qo_ql_component_category)),
+    );
+    const excludedDiode = quoteLines.find(
+      (row) => String(row.qo_ql_component_category) === 'diode',
+    );
+    expect(quickConfirmedLines).toHaveLength(3);
+    expect(excludedDiode, 'the non-selected diode category must remain untouched').toBeTruthy();
+    await expect
+      .poll(
+        async () => {
+          const confirmedRows = (
+            await Promise.all(
+              quickConfirmedLines.map((line) =>
+                queryDynamicRecords(page, 'qo_quote_line_common', [
+                  { fieldName: 'pid', operator: 'EQ', value: line.pid },
+                ]),
+              ),
+            )
+          ).flat();
+          const diodeRows = await queryDynamicRecords(page, 'qo_quote_line_common', [
+            { fieldName: 'pid', operator: 'EQ', value: excludedDiode?.pid },
+          ]);
+          return {
+            confirmedCount: confirmedRows.filter(
+              (row) =>
+                String(row.qo_ql_price_decision_id ?? '').length > 0 &&
+                Number(row.qo_ql_unit_cost ?? 0) > 0,
+            ).length,
+            acceptedByCategoryCommand: confirmedRows.every(
+              (row) => row.qo_ql_price_accepted_by === 'category_quick_confirmation',
+            ),
+            diodeDecisionId: String(diodeRows[0]?.qo_ql_price_decision_id ?? ''),
+          };
+        },
+        { timeout: 30_000, intervals: [500, 1_000, 2_000] },
+      )
+      .toEqual({
+        confirmedCount: 3,
+        acceptedByCategoryCommand: true,
+        diodeDecisionId: '',
+      });
 
     await expect(consoleIssues).toEqual([]);
   });

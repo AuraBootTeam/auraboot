@@ -503,6 +503,7 @@ export async function executeSimpleWorkbenchAction(
           args.inputFieldsTitle,
           fetchResult,
           args.inputFieldsSubmitLabel,
+          runtime.getContext(),
         );
       } catch {
         return; // user cancelled the form — abort without executing the command

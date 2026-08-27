@@ -805,16 +805,32 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         const recentCandidateAfterFactor = page.getByTestId(
           `review-drawer-candidate-${recentEvidenceId}`,
         );
-        await expect(recentCandidateAfterFactor).toContainText('原始单价');
-        await expect(recentCandidateAfterFactor).toContainText('系数后单价');
+        await expect(recentCandidateAfterFactor).toContainText('原始');
+        await expect(
+          page.getByTestId(`review-drawer-candidate-${recentEvidenceId}-table-field-quote_total`),
+        ).toContainText('0.02205');
         expect(
           await recentCandidateAfterFactor.evaluate(
             (element) => window.getComputedStyle(element).userSelect,
           ),
           '候选报价文字应允许双击或拖动选择',
         ).toBe('text');
-        const candidateTitle = recentCandidateAfterFactor.locator('div[title]').first();
-        await candidateTitle.dblclick();
+        const candidateModel = page.getByTestId(
+          `review-drawer-candidate-${recentEvidenceId}-table-field-part_no`,
+        );
+        const candidateModelBox = await candidateModel.boundingBox();
+        expect(candidateModelBox).not.toBeNull();
+        await page.mouse.move(
+          candidateModelBox!.x + 3,
+          candidateModelBox!.y + candidateModelBox!.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          candidateModelBox!.x + candidateModelBox!.width - 3,
+          candidateModelBox!.y + candidateModelBox!.height / 2,
+          { steps: 8 },
+        );
+        await page.mouse.up();
         await expect
           .poll(() => page.evaluate(() => window.getSelection()?.toString() || ''))
           .not.toBe('');
@@ -835,7 +851,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await expect(yunhanCandidate).toContainText('0.01554');
         await expect(yunhanCandidate).toContainText('当前');
         await expect(yunhanCandidate).toContainText('0.0126');
-        const yunhanLadder = page.getByTestId(`review-drawer-candidate-${yunhanEvidenceId}-ladder`);
+        const yunhanLadder = page.getByTestId(
+          `review-drawer-candidate-${yunhanEvidenceId}-compact-ladder`,
+        );
         await expect(yunhanLadder).toBeVisible();
         await yunhanLadder.scrollIntoViewIfNeeded();
         await yunhanLadder.screenshot({
@@ -920,33 +938,88 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       );
       await expect(previewPanel).toContainText(REPRICE_MPN);
       await expect(previewPanel).toContainText('YAGEO');
+      await expect(previewPanel).toContainText('KOA Speer');
       await expect(previewPanel).toContainText('10kΩ ±1% 62.5mW 0402 chip resistor');
+      const previewComparison = previewPanel.getByTestId(
+        'review-drawer-edit-preview-candidate-comparison-table',
+      );
+      const previewCandidates = previewComparison.locator('tbody > tr');
+      await expect(previewCandidates).toHaveCount(2);
+      const recommendedCandidate = previewCandidates.filter({ hasText: 'YAGEO' });
+      const alternateCandidate = previewCandidates.filter({ hasText: 'KOA Speer' });
+      await expect(recommendedCandidate).toHaveAttribute('data-selected', 'true');
+      await expect(alternateCandidate).toHaveAttribute('data-selected', 'false');
+      await alternateCandidate.getByRole('radio').check();
+      await expect(alternateCandidate).toHaveAttribute('data-selected', 'true');
+      await expect(recommendedCandidate).toHaveAttribute('data-selected', 'false');
+      await recommendedCandidate.getByRole('radio').check();
+      await expect(recommendedCandidate).toHaveAttribute('data-selected', 'true');
       // Thin compositions keep the page behind the review overlay mounted. Scope
       // this assertion to the active preview so an unrelated background block
       // cannot be mistaken for the supplier ladder rendered in this drawer.
       await expect(previewPanel.getByTestId('review-drawer-price-comparison')).toHaveCount(0);
+      await expect(recommendedCandidate.locator('[data-testid$="-compact-ladder"]')).toBeVisible();
+      await expect(recommendedCandidate).toContainText('1000+');
+      await expect(recommendedCandidate).toContainText('0.01');
+      await expect(recommendedCandidate).toContainText('0.0105');
+      await expect(recommendedCandidate).toContainText('当前');
+      await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
       await expect(
-        previewPanel.getByTestId('review-drawer-candidate-priceLadderRows-ladder'),
-      ).toBeVisible();
-      await expect(previewPanel).toContainText('1000+');
-      await expect(previewPanel).toContainText('0.01');
-      await expect(previewPanel).toContainText('0.0105');
-      await expect(previewPanel).toContainText('当前');
-      await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
-      await expect(page.getByTestId('review-drawer-field-link-detailUrl')).toHaveAttribute(
-        'href',
-        'https://www.ickey.cn/detail/mock/reprice-new.html',
+        recommendedCandidate.locator('[data-testid$="-link-detail_url"]'),
+      ).toHaveAttribute('href', 'https://www.ickey.cn/detail/mock/reprice-new.html');
+
+      const originalViewport = page.viewportSize();
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await page.getByRole('button', { name: /切换最大化|Toggle maximize/ }).click();
+      const editScroll = page.getByTestId('review-drawer-edit-scroll');
+      await editScroll.evaluate((element) => element.scrollTo({ top: 0 }));
+      await expect(previewPanel).toContainText('2 个候选');
+      const scrollBox = await editScroll.boundingBox();
+      const recommendedBox = await recommendedCandidate.boundingBox();
+      const alternateBox = await alternateCandidate.boundingBox();
+      expect(scrollBox).not.toBeNull();
+      expect(recommendedBox).not.toBeNull();
+      expect(alternateBox).not.toBeNull();
+      expect(recommendedBox!.y).toBeGreaterThanOrEqual(scrollBox!.y);
+      expect(recommendedBox!.y + recommendedBox!.height).toBeLessThanOrEqual(
+        scrollBox!.y + scrollBox!.height,
       );
-      await page
-        .getByTestId('review-drawer-edit-scroll')
-        .evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-      await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
+      expect(alternateBox!.y).toBeGreaterThanOrEqual(scrollBox!.y);
+      expect(alternateBox!.y + alternateBox!.height).toBeLessThanOrEqual(
+        scrollBox!.y + scrollBox!.height,
+      );
       await previewPanel.screenshot({
         path: testInfo.outputPath('ordinary-sales-reprice-preview-before-confirm.png'),
       });
       await page.getByTestId('review-drawer').screenshot({
         path: testInfo.outputPath('ordinary-sales-reprice-preview-actions.png'),
       });
+      await page.screenshot({
+        path: testInfo.outputPath('ordinary-sales-reprice-multiple-candidates-full.png'),
+      });
+      const comparisonWrap = previewPanel.getByTestId(
+        'review-drawer-edit-preview-candidate-comparison-table-wrap',
+      );
+      expect(
+        await comparisonWrap.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+        '1920px wide-screen view should show the complete candidate row without horizontal scrolling',
+      ).toBe(true);
+      await page.setViewportSize({ width: 1440, height: 960 });
+      expect(
+        await comparisonWrap.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+        '1440px desktop view should still show the complete candidate row without horizontal scrolling',
+      ).toBe(true);
+      await expect(
+        previewPanel.getByRole('columnheader', { name: /报价 \/ 小计|Quote \/ Subtotal/ }),
+      ).toBeInViewport();
+      await expect(previewPanel.getByRole('button', { name: /已选择|Selected/ })).toBeInViewport();
+      await page.screenshot({
+        path: testInfo.outputPath('ordinary-sales-reprice-multiple-candidates-1440.png'),
+      });
+      await page.getByRole('button', { name: /切换最大化|Toggle maximize/ }).click();
+      if (originalViewport) {
+        await page.setViewportSize(originalViewport);
+      }
 
       const mockRequestsResponse = await page.request.get(`${mockControlUrl}/__control/requests`);
       expect(mockRequestsResponse.ok(), 'Yunhan mock request audit is readable').toBe(true);

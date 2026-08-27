@@ -143,16 +143,23 @@ function drawerLayoutStorageKey(
   return `${DRAWER_STORAGE_PREFIX}:${modelKey}:${pageKey}:${blockKey}`;
 }
 
-function readStoredDrawerLayout(storageKey: string): DrawerLayoutState {
-  if (typeof window === 'undefined') return DEFAULT_DRAWER_LAYOUT;
+function readStoredDrawerLayout(
+  storageKey: string,
+  fallbackLayout: DrawerLayoutState = DEFAULT_DRAWER_LAYOUT,
+  constrainFallbackToViewport = false,
+): DrawerLayoutState {
+  const resolvedFallback = constrainFallbackToViewport
+    ? normalizeDrawerLayout(fallbackLayout)
+    : fallbackLayout;
+  if (typeof window === 'undefined') return resolvedFallback;
   try {
     const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return DEFAULT_DRAWER_LAYOUT;
+    if (!raw) return resolvedFallback;
     const parsed = JSON.parse(raw);
-    if (!isDrawerLayoutState(parsed)) return DEFAULT_DRAWER_LAYOUT;
+    if (!isDrawerLayoutState(parsed)) return resolvedFallback;
     return normalizeDrawerLayout(parsed);
   } catch {
-    return DEFAULT_DRAWER_LAYOUT;
+    return resolvedFallback;
   }
 }
 
@@ -862,6 +869,515 @@ function configuredTone(config: any, rawValue: unknown): Tone {
   return (mappedTone || config?.tone || 'gray') as Tone;
 }
 
+function numericValue(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const numeric = typeof value === 'number' ? value : Number(String(value).replace(/[%,$]/g, ''));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function compactNumber(value: number, maximumFractionDigits = 6): string {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits,
+    useGrouping: true,
+  }).format(value);
+}
+
+function scoreText(value: unknown): string {
+  const numeric = numericValue(value);
+  if (numeric === null) return formatValue(value);
+  const score = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  return compactNumber(score, 2);
+}
+
+function tableFieldValue(candidate: any, field: any, referenceRecord?: any): unknown {
+  if (field?.referenceField) return readPath(referenceRecord, field.referenceField);
+  return readFieldValue(candidate, field, referenceRecord);
+}
+
+function suggestedPurchaseQuantity(requestedValue: unknown, moqValue: unknown): number | null {
+  const requested = numericValue(requestedValue);
+  const moq = numericValue(moqValue);
+  if (requested === null && moq === null) return null;
+  return Math.max(requested || 0, moq || 0);
+}
+
+function ladderUnitPriceAtQuantity(
+  rungs: LadderRung[] | null,
+  quantity: number | null,
+): number | null {
+  if (!rungs || rungs.length === 0 || quantity === null) return null;
+  const pricedRungs = rungs
+    .map((rung) => ({ qty: numericValue(rung.qty), price: numericValue(rung.price) }))
+    .filter(
+      (rung): rung is { qty: number; price: number } => rung.qty !== null && rung.price !== null,
+    )
+    .sort((left, right) => left.qty - right.qty);
+  if (pricedRungs.length === 0) return null;
+  let selected = pricedRungs[0];
+  for (const rung of pricedRungs) {
+    if (rung.qty > quantity) break;
+    selected = rung;
+  }
+  return selected.price;
+}
+
+function CompactPriceLadder({
+  testIdPrefix,
+  rowKey,
+  rungs,
+  factor,
+  locale,
+  t,
+}: {
+  testIdPrefix: string;
+  rowKey: string;
+  rungs: LadderRung[];
+  factor: unknown;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div
+      className="grid gap-0.5 text-[11px] tabular-nums"
+      data-testid={`${testIdPrefix}-${rowKey}-compact-ladder`}
+    >
+      {rungs.map((rung, index) => (
+        <div
+          key={`${String(rung.qty)}-${index}`}
+          data-testid={
+            rung.current ? `${testIdPrefix}-${rowKey}-compact-ladder-current` : undefined
+          }
+          className={`grid grid-cols-[minmax(74px,0.8fr)_minmax(76px,1fr)_auto] items-center gap-1.5 whitespace-nowrap ${
+            rung.current ? 'text-accent font-semibold' : 'text-text-2'
+          }`}
+        >
+          <span>{ladderRangeLabel(rungs, index)}</span>
+          <span className="font-mono">{factoredUnitPrice(rung.price, factor)}</span>
+          {rung.current ? (
+            <span className="rounded-control bg-accent-weak text-accent px-1 py-0.5 text-[10px]">
+              {localized(locale, t, '当前', 'Current')}
+            </span>
+          ) : (
+            <span />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CandidateTableField({
+  candidate,
+  field,
+  referenceRecord,
+  testIdPrefix,
+  rowKey,
+  locale,
+  t,
+}: {
+  candidate: any;
+  field: any;
+  referenceRecord?: any;
+  testIdPrefix: string;
+  rowKey: string;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const key = String(field.key || field.field || field.referenceField || field.label);
+  const label = getLocalizedText(field.label || key, locale, t);
+  const rawValue = tableFieldValue(candidate, field, referenceRecord);
+  if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+  const variantClass =
+    field.variant === 'primary'
+      ? 'text-text font-semibold'
+      : field.variant === 'emphasis'
+        ? 'text-status-red text-base font-semibold tabular-nums'
+        : field.variant === 'success'
+          ? 'text-status-green font-medium'
+          : field.variant === 'warning'
+            ? 'text-status-amber font-medium'
+            : 'text-text-2';
+  const labelNode =
+    field.showLabel === false ? null : <span className="text-text-3 mr-1">{label}：</span>;
+  const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+  const externalUrl = field.format === 'link' ? safeExternalUrl(rawValue) : null;
+
+  if (field.format === 'ladder') {
+    return (
+      <div data-testid={`${testIdPrefix}-${rowKey}-table-field-${key}`}>
+        {ladder ? (
+          <CompactPriceLadder
+            testIdPrefix={testIdPrefix}
+            rowKey={rowKey}
+            rungs={ladder}
+            factor={tableFieldValue(candidate, { field: field.factorField }, referenceRecord)}
+            locale={locale}
+            t={t}
+          />
+        ) : (
+          <span className="text-text-3">-</span>
+        )}
+      </div>
+    );
+  }
+
+  if (field.format === 'purchase-quantity') {
+    const requested = field.requestedQtyField
+      ? readPath(candidate, field.requestedQtyField)
+      : readPath(referenceRecord, field.requestedQtyReferenceField);
+    const requestedNumber = numericValue(requested);
+    const moq = readPath(candidate, field.moqField);
+    const suggested = suggestedPurchaseQuantity(requested, moq);
+    return (
+      <div data-testid={`${testIdPrefix}-${rowKey}-table-field-${key}`} className="grid gap-0.5">
+        <div>
+          <span className="text-text-3">{localized(locale, t, '需求', 'Required')}：</span>
+          <span className="text-text font-medium tabular-nums">{formatValue(requested)}</span>
+        </div>
+        <div>
+          <span className="text-text-3">
+            {localized(locale, t, '建议采购', 'Suggested order')}：
+          </span>
+          <span className="text-text font-semibold tabular-nums">
+            {suggested === null ? '-' : compactNumber(suggested, 3)}
+          </span>
+        </div>
+        {suggested !== null && requestedNumber !== null && suggested > requestedNumber && (
+          <div className="text-status-amber text-[11px]">
+            {localized(locale, t, '补齐 MOQ', 'Raised to MOQ')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (field.format === 'quote-total') {
+    const configuredOriginal = numericValue(rawValue);
+    const factorValue = tableFieldValue(candidate, { field: field.factorField }, referenceRecord);
+    const configuredFactored = numericValue(
+      tableFieldValue(candidate, { field: field.factoredField }, referenceRecord),
+    );
+    const requested = field.requestedQtyField
+      ? readPath(candidate, field.requestedQtyField)
+      : readPath(referenceRecord, field.requestedQtyReferenceField);
+    const suggested = suggestedPurchaseQuantity(requested, readPath(candidate, field.moqField));
+    const ladderOriginal = field.ladderField
+      ? ladderUnitPriceAtQuantity(
+          parseLadderRungs(readPath(candidate, field.ladderField)),
+          suggested,
+        )
+      : null;
+    const original = ladderOriginal ?? configuredOriginal;
+    // The persisted factored price can be rounded to the model field's scale. Derive it from the
+    // supplier price whenever that source value is available so the review surface preserves the
+    // same six-decimal precision used by price adoption and workbook generation.
+    const factored =
+      original !== null ? original * (priceFactorPercent(factorValue) / 100) : configuredFactored;
+    const total = factored !== null && suggested !== null ? factored * suggested : null;
+    return (
+      <div data-testid={`${testIdPrefix}-${rowKey}-table-field-${key}`} className="grid gap-0.5">
+        <div className="text-text-3 text-[11px] tabular-nums">
+          {localized(locale, t, '原始', 'Original')} {formatUnitPrice(original)} ×{' '}
+          {compactNumber(priceFactorPercent(factorValue), 2)}%
+        </div>
+        <div className="text-status-red text-base font-semibold tabular-nums">
+          {factored === null ? '-' : formatUnitPrice(factored)}
+        </div>
+        <div className="text-text-2 text-[11px] tabular-nums">
+          {localized(locale, t, '小计', 'Subtotal')}{' '}
+          {total === null ? '-' : compactNumber(total, 6)}
+        </div>
+      </div>
+    );
+  }
+
+  const formatted =
+    field.format === 'score'
+      ? scoreText(rawValue)
+      : Array.isArray(rawValue)
+        ? rawValue.map(String).join(' · ')
+        : formatConfiguredValue(rawValue, field, locale, t);
+
+  return (
+    <div
+      data-testid={`${testIdPrefix}-${rowKey}-table-field-${key}`}
+      className={`min-w-0 [overflow-wrap:anywhere] ${variantClass}`}
+    >
+      {labelNode}
+      {externalUrl ? (
+        <a
+          href={externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent inline-flex items-center gap-1 underline underline-offset-2"
+          data-testid={`${testIdPrefix}-${rowKey}-link-${key}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {getLocalizedText(
+            field.linkLabel || { 'zh-CN': '商品页 ↗', en: 'Product page ↗' },
+            locale,
+            t,
+          )}
+        </a>
+      ) : (
+        <span className={field.format === 'score' ? 'text-accent text-xl font-semibold' : ''}>
+          {formatted}
+          {field.format === 'score' && field.unit !== false ? (
+            <span className="text-text-3 ml-0.5 text-[11px] font-normal">
+              {localized(locale, t, '分', 'pts')}
+            </span>
+          ) : null}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CandidateComparisonTable({
+  candidates,
+  tableConfig,
+  selectedKey,
+  recommendedKey,
+  referenceRecord,
+  locale,
+  t,
+  testIdPrefix,
+  keyField,
+  confirmableField,
+  onSelect,
+}: {
+  candidates: any[];
+  tableConfig: any;
+  selectedKey: string;
+  recommendedKey?: string;
+  referenceRecord?: any;
+  locale: string;
+  t: (key: string) => string;
+  testIdPrefix: string;
+  keyField?: string;
+  confirmableField?: string;
+  onSelect: (candidate: any, key: string) => void;
+}) {
+  const columns: any[] = Array.isArray(tableConfig?.columns) ? tableConfig.columns : [];
+  const minWidth = Math.max(960, Number(tableConfig?.minWidth) || 1560);
+  const radioName = `${testIdPrefix}-selection`;
+  return (
+    <div
+      className="min-h-0 max-w-full overflow-x-auto"
+      data-testid={`${testIdPrefix}-comparison-table-wrap`}
+    >
+      <table
+        className="w-full table-fixed border-collapse text-xs"
+        style={{ minWidth }}
+        data-testid={`${testIdPrefix}-comparison-table`}
+      >
+        <colgroup>
+          {columns.map((column) => (
+            <col
+              key={String(column.key || column.label)}
+              style={{ width: Math.max(72, Number(column.width) || 140) }}
+            />
+          ))}
+        </colgroup>
+        <thead>
+          <tr className="border-border bg-subtle border-b">
+            {columns.map((column) => (
+              <th
+                key={String(column.key || column.label)}
+                className="text-text-2 px-3 py-2 text-left text-[11px] font-semibold whitespace-nowrap"
+              >
+                {getLocalizedText(column.label || column.key, locale, t)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {candidates.map((candidate, index) => {
+            const rowKey = keyField
+              ? String(readPath(candidate, keyField) ?? index)
+              : candidateKey(candidate, index);
+            const active = rowKey === selectedKey;
+            const confirmable = confirmableField
+              ? Boolean(readPath(candidate, confirmableField))
+              : true;
+            const choose = () => {
+              if (confirmable) onSelect(candidate, rowKey);
+            };
+            return (
+              <tr
+                key={rowKey}
+                data-testid={`${testIdPrefix}-${rowKey}`}
+                data-selected={active ? 'true' : 'false'}
+                aria-disabled={!confirmable}
+                onClick={(event) => {
+                  if ((event.target as HTMLElement).closest('a,button,input')) return;
+                  if (window.getSelection()?.toString().trim()) return;
+                  choose();
+                }}
+                className={`border-border border-b transition-colors select-text last:border-b-0 ${
+                  active ? 'bg-accent-weak' : 'bg-panel hover:bg-hover'
+                } ${confirmable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+              >
+                {columns.map((column) => {
+                  const columnKey = String(column.key || column.label);
+                  if (column.kind === 'selection') {
+                    const badges: any[] = Array.isArray(column.badges) ? column.badges : [];
+                    return (
+                      <td key={columnKey} className="px-3 py-3 align-middle">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name={radioName}
+                            checked={active}
+                            disabled={!confirmable}
+                            aria-label={localized(
+                              locale,
+                              t,
+                              `选择候选 ${index + 1}`,
+                              `Select candidate ${index + 1}`,
+                            )}
+                            onChange={choose}
+                            className="accent-accent h-4 w-4"
+                          />
+                          {recommendedKey && rowKey === recommendedKey && (
+                            <span className="rounded-pill bg-accent-weak text-accent px-1.5 py-0.5 text-[10px] font-semibold">
+                              {getLocalizedText(
+                                column.recommendedLabel || { 'zh-CN': '推荐', en: 'Recommended' },
+                                locale,
+                                t,
+                              )}
+                            </span>
+                          )}
+                          {badges.map((badge) => {
+                            const badgeKey = String(badge.key || badge.field || badge.label);
+                            const rawValue = tableFieldValue(candidate, badge, referenceRecord);
+                            if (badge.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                            const value = formatConfiguredValue(rawValue, badge, locale, t);
+                            const tone = configuredTone(badge, rawValue);
+                            return (
+                              <span
+                                key={badgeKey}
+                                className={`rounded-pill border px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  toneClass[tone] || toneClass.gray
+                                }`}
+                              >
+                                {value}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    );
+                  }
+                  if (column.kind === 'action') {
+                    return (
+                      <td key={columnKey} className="px-3 py-3 text-center align-middle">
+                        <button
+                          type="button"
+                          disabled={!confirmable}
+                          onClick={choose}
+                          className={`rounded-control border px-2.5 py-1.5 text-xs font-medium ${
+                            active
+                              ? 'border-accent bg-accent text-white'
+                              : 'border-accent bg-panel text-accent hover:bg-accent-weak'
+                          } disabled:border-border disabled:text-text-3 disabled:bg-subtle`}
+                        >
+                          {active
+                            ? getLocalizedText(
+                                column.selectedLabel || { 'zh-CN': '已选择', en: 'Selected' },
+                                locale,
+                                t,
+                              )
+                            : getLocalizedText(
+                                confirmable
+                                  ? column.selectLabel || { 'zh-CN': '选择', en: 'Select' }
+                                  : column.disabledLabel || {
+                                      'zh-CN': '不可采用',
+                                      en: 'Unavailable',
+                                    },
+                                locale,
+                                t,
+                              )}
+                        </button>
+                      </td>
+                    );
+                  }
+                  const fields: any[] = Array.isArray(column.fields) ? column.fields : [];
+                  return (
+                    <td key={columnKey} className="px-3 py-3 align-middle">
+                      <div className="grid min-w-0 gap-0.5">
+                        {fields.map((field) => (
+                          <CandidateTableField
+                            key={String(
+                              field.key || field.field || field.referenceField || field.label,
+                            )}
+                            candidate={candidate}
+                            field={field}
+                            referenceRecord={referenceRecord}
+                            testIdPrefix={testIdPrefix}
+                            rowKey={rowKey}
+                            locale={locale}
+                            t={t}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CandidateSelectionSummary({
+  candidate,
+  config,
+  referenceRecord,
+  locale,
+  t,
+}: {
+  candidate: any;
+  config: any;
+  referenceRecord?: any;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  if (!candidate || !config) return null;
+  const title = formatValue(readPath(candidate, config.titleField));
+  const fields: any[] = Array.isArray(config.fields) ? config.fields : [];
+  return (
+    <div data-testid="review-drawer-selection-summary" className="min-w-0 flex-1">
+      <div className="text-text truncate text-sm font-semibold">
+        {getLocalizedText(config.label || { 'zh-CN': '已选择', en: 'Selected' }, locale, t)}：
+        {title}
+      </div>
+      {fields.length > 0 && (
+        <div className="text-text-2 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          {fields.map((field) => {
+            const key = String(field.key || field.field || field.referenceField || field.label);
+            const label = getLocalizedText(field.label || key, locale, t);
+            const value = formatConfiguredValue(
+              tableFieldValue(candidate, field, referenceRecord),
+              field,
+              locale,
+              t,
+            );
+            return (
+              <span key={key}>
+                {label} {value}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CandidateFieldTable({
   rowKey,
   candidate,
@@ -1245,6 +1761,7 @@ function DrawerEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Record<string, any> | null>(null);
+  const [selectedPreviewId, setSelectedPreviewId] = useState('');
 
   const isTwoPhase = Boolean(config?.previewCommand && config?.confirmCommand);
   if (fields.length === 0 || (!config?.command && !isTwoPhase))
@@ -1280,6 +1797,7 @@ function DrawerEditForm({
     setValues(seed);
     setError(null);
     setPreview(null);
+    setSelectedPreviewId('');
     setOpen(true);
     onOpenChange?.(true);
   }
@@ -1325,7 +1843,25 @@ function DrawerEditForm({
             ),
           );
         }
-        setPreview(result as Record<string, any>);
+        const resultRecord = result as Record<string, any>;
+        setPreview(resultRecord);
+        const candidateConfig = config?.preview || {};
+        const candidateRows = Array.isArray(readPath(resultRecord, candidateConfig.candidatesField))
+          ? readPath(resultRecord, candidateConfig.candidatesField)
+          : [];
+        const idField = candidateConfig.previewIdField || 'previewId';
+        const recommendedId = readPath(
+          resultRecord,
+          candidateConfig.recommendedIdField || 'recommendedPreviewId',
+        );
+        const recommended = candidateRows.find(
+          (candidate: any) => String(readPath(candidate, idField)) === String(recommendedId || ''),
+        );
+        const firstConfirmable = candidateRows.find((candidate: any) =>
+          Boolean(readPath(candidate, candidateConfig.confirmableField || 'confirmable')),
+        );
+        const initial = recommended || firstConfirmable || candidateRows[0];
+        setSelectedPreviewId(initial ? String(readPath(initial, idField) || '') : '');
       } else {
         setOpen(false);
         onOpenChange?.(false);
@@ -1340,7 +1876,13 @@ function DrawerEditForm({
   async function confirmPreview() {
     if (!preview || !isTwoPhase) return;
     const previewIdField = config.preview?.previewIdField || 'previewId';
-    const previewId = readPath(preview, previewIdField);
+    const candidateRows = Array.isArray(readPath(preview, config.preview?.candidatesField))
+      ? readPath(preview, config.preview?.candidatesField)
+      : [];
+    const selectedPreview = candidateRows.find(
+      (candidate: any) => String(readPath(candidate, previewIdField)) === selectedPreviewId,
+    );
+    const previewId = readPath(selectedPreview || preview, previewIdField);
     if (!previewId) {
       setError(
         getLocalizedText(
@@ -1374,6 +1916,7 @@ function DrawerEditForm({
         if (row && selection.bind) writeRuntimeState(runtime, selection.bind, row);
       }
       setPreview(null);
+      setSelectedPreviewId('');
       setOpen(false);
       onOpenChange?.(false);
     } catch (e: any) {
@@ -1385,6 +1928,7 @@ function DrawerEditForm({
 
   function cancel() {
     setPreview(null);
+    setSelectedPreviewId('');
     setError(null);
     setOpen(false);
     onOpenChange?.(false);
@@ -1409,8 +1953,22 @@ function DrawerEditForm({
 
   const previewConfig = config?.preview || {};
   const previewFields: any[] = Array.isArray(previewConfig.fields) ? previewConfig.fields : [];
+  const previewCandidates: any[] =
+    preview && Array.isArray(readPath(preview, previewConfig.candidatesField))
+      ? readPath(preview, previewConfig.candidatesField)
+      : [];
+  const selectedPreviewCandidate = previewCandidates.find(
+    (candidate: any) =>
+      String(readPath(candidate, previewConfig.previewIdField || 'previewId')) ===
+      selectedPreviewId,
+  );
   const confirmable = preview
-    ? Boolean(readPath(preview, previewConfig.confirmableField || 'confirmable'))
+    ? Boolean(
+        readPath(
+          selectedPreviewCandidate || preview,
+          previewConfig.confirmableField || 'confirmable',
+        ),
+      )
     : false;
 
   const openButton = (
@@ -1480,6 +2038,214 @@ function DrawerEditForm({
                   layout={previewConfig.layout}
                 />
               )}
+              {previewCandidates.length > 0 && (
+                <div
+                  className="border-border border-t p-3"
+                  data-testid="review-drawer-edit-preview-candidates"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h4 className="text-text text-sm font-semibold">
+                      {getLocalizedText(
+                        previewConfig.candidatesTitle || {
+                          'zh-CN': '产品与报价候选',
+                          en: 'Product and price candidates',
+                        },
+                        locale,
+                        t,
+                      )}
+                    </h4>
+                    <span className="text-text-3 text-xs">
+                      {previewCandidates.length}{' '}
+                      {locale.toLowerCase().startsWith('zh') ? '个候选' : 'candidates'}
+                    </span>
+                  </div>
+                  {previewConfig.candidateLayout === 'comparisonTable' ? (
+                    <CandidateComparisonTable
+                      candidates={previewCandidates}
+                      tableConfig={previewConfig.candidateTable || {}}
+                      selectedKey={selectedPreviewId}
+                      recommendedKey={String(
+                        readPath(
+                          preview,
+                          previewConfig.recommendedIdField || 'recommendedPreviewId',
+                        ) || '',
+                      )}
+                      referenceRecord={preview}
+                      locale={locale}
+                      t={t}
+                      testIdPrefix="review-drawer-edit-preview-candidate"
+                      keyField={previewConfig.previewIdField || 'previewId'}
+                      confirmableField={previewConfig.confirmableField || 'confirmable'}
+                      onSelect={(_candidate, candidateId) => setSelectedPreviewId(candidateId)}
+                    />
+                  ) : (
+                    <div className="grid gap-2" role="radiogroup">
+                      {previewCandidates.map((candidate: any, index: number) => {
+                        const candidateId = String(
+                          readPath(candidate, previewConfig.previewIdField || 'previewId') || index,
+                        );
+                        const selected = candidateId === selectedPreviewId;
+                        const candidateConfirmable = Boolean(
+                          readPath(candidate, previewConfig.confirmableField || 'confirmable'),
+                        );
+                        const matchScore = readPath(
+                          candidate,
+                          previewConfig.candidateMatchScoreField || 'matchScore',
+                        );
+                        const procurementScore = readPath(
+                          candidate,
+                          previewConfig.candidateProcurementScoreField || 'procurementScore',
+                        );
+                        const reasons = readPath(
+                          candidate,
+                          previewConfig.candidateReasonsField || 'matchReasons',
+                        );
+                        const candidateFields = Array.isArray(previewConfig.candidateFields)
+                          ? previewConfig.candidateFields
+                          : [];
+                        const hasUsableLadder = candidateFields.some((field: any) => {
+                          if (field.format !== 'ladder') return false;
+                          const rungs = parseLadderRungs(readPath(candidate, field.field));
+                          return Boolean(rungs && rungs.length >= 2);
+                        });
+                        return (
+                          <div
+                            key={candidateId}
+                            role="radio"
+                            tabIndex={candidateConfirmable ? 0 : -1}
+                            aria-checked={selected}
+                            aria-disabled={!candidateConfirmable}
+                            onClick={() => {
+                              if (candidateConfirmable) setSelectedPreviewId(candidateId);
+                            }}
+                            onKeyDown={(event) => {
+                              if (
+                                candidateConfirmable &&
+                                (event.key === 'Enter' || event.key === ' ')
+                              ) {
+                                event.preventDefault();
+                                setSelectedPreviewId(candidateId);
+                              }
+                            }}
+                            data-testid={`review-drawer-edit-preview-candidate-${candidateId}`}
+                            className={`rounded-card border p-3 text-left transition-colors ${
+                              selected
+                                ? 'border-accent bg-accent-weak ring-accent ring-1'
+                                : 'border-border bg-panel hover:bg-hover'
+                            } ${candidateConfirmable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-text font-semibold [overflow-wrap:anywhere]">
+                                  {String(
+                                    readPath(
+                                      candidate,
+                                      previewConfig.candidateTitleField || 'productModel',
+                                    ) || '—',
+                                  )}
+                                </div>
+                                <div className="text-text-2 mt-0.5 text-xs [overflow-wrap:anywhere]">
+                                  {String(
+                                    readPath(
+                                      candidate,
+                                      previewConfig.candidateSubtitleField || 'description',
+                                    ) || '—',
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 flex-wrap gap-1.5 text-xs">
+                                {matchScore !== undefined && matchScore !== null && (
+                                  <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                                    {locale.toLowerCase().startsWith('zh') ? '匹配' : 'Match'}{' '}
+                                    {String(matchScore)}
+                                  </span>
+                                )}
+                                {procurementScore !== undefined && procurementScore !== null && (
+                                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                                    {locale.toLowerCase().startsWith('zh') ? '采购' : 'Buy'}{' '}
+                                    {String(procurementScore)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                              {candidateFields.map((field: any) => {
+                                const key = String(field.key || field.field || field.label);
+                                const value = readPath(candidate, field.field);
+                                const ladder =
+                                  field.format === 'ladder' ? parseLadderRungs(value) : null;
+                                if (field.format === 'price-comparison' && hasUsableLadder)
+                                  return null;
+                                if (field.format === 'ladder' && (!ladder || ladder.length < 2))
+                                  return null;
+                                if (field.hideWhenEmpty && isEmptyValue(value)) return null;
+                                const externalUrl =
+                                  field.format === 'link' ? safeExternalUrl(value) : null;
+                                const spansFullWidth =
+                                  field.format === 'price-comparison' || field.format === 'ladder';
+                                return (
+                                  <div
+                                    key={key}
+                                    className={`text-xs ${spansFullWidth ? 'sm:col-span-2' : ''}`}
+                                  >
+                                    <div className="text-text-3 mb-0.5">
+                                      {getLocalizedText(field.label || key, locale, t)}：
+                                    </div>
+                                    <div className="text-text-2 [overflow-wrap:anywhere]">
+                                      {field.format === 'price-comparison' ? (
+                                        <PriceComparison
+                                          original={value}
+                                          factored={readPath(candidate, field.factoredField)}
+                                          factor={readPath(candidate, field.factorField)}
+                                          locale={locale}
+                                          t={t}
+                                        />
+                                      ) : field.format === 'ladder' && ladder ? (
+                                        <PriceLadder
+                                          rowKey={`preview-${candidateId}-${key}`}
+                                          rungs={ladder}
+                                          factor={readPath(candidate, field.factorField)}
+                                          locale={locale}
+                                          t={t}
+                                        />
+                                      ) : externalUrl ? (
+                                        <a
+                                          href={externalUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-accent underline underline-offset-2"
+                                          data-testid={`review-drawer-edit-preview-candidate-${candidateId}-link-${key}`}
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          {getLocalizedText(
+                                            field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
+                                            locale,
+                                            t,
+                                          )}
+                                        </a>
+                                      ) : (
+                                        formatConfiguredValue(value, field, locale, t)
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {Array.isArray(reasons) && reasons.length > 0 && (
+                              <div
+                                className="text-text-2 mt-2 text-xs"
+                                data-testid={`review-drawer-edit-preview-candidate-${candidateId}-reasons`}
+                              >
+                                {reasons.map(String).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
               {readPath(preview, previewConfig.messageField || 'message') && (
                 <div
                   data-testid="review-drawer-edit-preview-message"
@@ -1497,48 +2263,65 @@ function DrawerEditForm({
           </div>
           <div
             data-testid="review-drawer-edit-actions"
-            className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-4 py-2.5"
+            className="border-border bg-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5"
           >
-            <button
-              type="button"
-              data-testid="review-drawer-edit-cancel"
-              onClick={cancel}
-              className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
-            >
-              {t('common.cancel') || 'Cancel'}
-            </button>
-            <button
-              type="button"
-              data-testid="review-drawer-edit-back"
-              onClick={() => {
-                setPreview(null);
-                setError(null);
-              }}
-              className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
-            >
-              {getLocalizedText(
-                config.backLabel || { 'zh-CN': '返回修改', en: 'Edit search' },
-                locale,
-                t,
-              )}
-            </button>
-            {confirmable && (
+            {previewConfig.candidateLayout === 'comparisonTable' && selectedPreviewCandidate ? (
+              <CandidateSelectionSummary
+                candidate={selectedPreviewCandidate}
+                config={previewConfig.candidateTable?.selectionSummary}
+                referenceRecord={preview}
+                locale={locale}
+                t={t}
+              />
+            ) : (
+              <span />
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                data-testid="review-drawer-edit-confirm"
-                disabled={saving}
-                onClick={() => void confirmPreview()}
-                className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                data-testid="review-drawer-edit-cancel"
+                onClick={cancel}
+                className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
               >
-                {saving
-                  ? t('common.loading')
-                  : getLocalizedText(
-                      config.confirmLabel || { 'zh-CN': '确认并采用', en: 'Confirm and adopt' },
-                      locale,
-                      t,
-                    )}
+                {t('common.cancel') || 'Cancel'}
               </button>
-            )}
+              <button
+                type="button"
+                data-testid="review-drawer-edit-back"
+                onClick={() => {
+                  setPreview(null);
+                  setSelectedPreviewId('');
+                  setError(null);
+                }}
+                className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
+              >
+                {getLocalizedText(
+                  config.backLabel || { 'zh-CN': '返回修改', en: 'Edit search' },
+                  locale,
+                  t,
+                )}
+              </button>
+              {confirmable && (
+                <button
+                  type="button"
+                  data-testid="review-drawer-edit-confirm"
+                  disabled={saving}
+                  onClick={() => void confirmPreview()}
+                  className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving
+                    ? t('common.loading')
+                    : getLocalizedText(
+                        config.confirmLabel || {
+                          'zh-CN': '确认并采用',
+                          en: 'Confirm and adopt',
+                        },
+                        locale,
+                        t,
+                      )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -1658,6 +2441,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const compareConfig = (block as any).compare || {};
   const candidatesConfig = (block as any).candidates || {};
   const hasCandidatesConfig = Boolean((block as any).candidates);
+  const usesCandidateComparisonTable = candidatesConfig.layout === 'comparisonTable';
+  const candidateTableConfig = candidatesConfig.table || {};
   const editFormConfig = (block as any).editForm;
   const renderEditTriggerInCandidatesHeader =
     hasCandidatesConfig && editFormConfig?.openPlacement === 'candidates-header';
@@ -1684,15 +2469,26 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       ? candidatesConfig.groups
       : [];
   const shouldShowDecisionStatus = candidatesConfig.showDecisionStatus !== false;
+  const shouldShowSelectedCandidateDetail = candidatesConfig.showSelectedDetail !== false;
   const usesSummaryEvidence = candidatesConfig.selectedEvidenceMode === 'summary';
   const blockLayoutMode = String((block as any).layoutMode || '');
   const compareLayoutMode = String(compareConfig.layoutMode || '');
+  const contextSummaryConfig = (block as any).contextSummary;
+  const usesLightChrome = (block as any).chrome === 'light';
   const isCompactReview = blockLayoutMode === 'compact-review';
   const isStackedCompare = isCompactReview || compareLayoutMode === 'stacked';
   const layoutStorageKey = drawerLayoutStorageKey(runtime, block, context);
+  const configuredDefaultLayout: DrawerLayoutState = {
+    ...DEFAULT_DRAWER_LAYOUT,
+    ...((block as any).defaultLayout || {}),
+  };
   const initialLayoutRef = useRef<DrawerLayoutState | null>(null);
   if (initialLayoutRef.current === null) {
-    initialLayoutRef.current = readStoredDrawerLayout(layoutStorageKey);
+    initialLayoutRef.current = readStoredDrawerLayout(
+      layoutStorageKey,
+      configuredDefaultLayout,
+      Boolean((block as any).defaultLayout),
+    );
   }
   const initialLayout = initialLayoutRef.current;
 
@@ -1739,7 +2535,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const candidates = readDataSourceRows(runtime, candidateDataSource);
   const exportRows = readDataSourceRows(runtime, exportDataSource);
   const selectedCandidate = candidates.find((row: any, index: number) => {
-    return candidateKey(row, index) === selectedCandidateKey;
+    const key = candidateTableConfig.keyField
+      ? String(readPath(row, candidateTableConfig.keyField) ?? index)
+      : candidateKey(row, index);
+    return key === selectedCandidateKey;
   });
 
   useEffect(() => {
@@ -2006,7 +2805,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       }`}
     >
       <div
-        className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
+        className={`flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden border-b px-4 ${
+          usesLightChrome
+            ? 'border-border bg-panel text-text'
+            : 'border-accent bg-accent text-white'
+        }`}
         onMouseDown={(event) => {
           if ((event.target as HTMLElement).closest('button') || isMaximized) return;
           dragRef.current = {
@@ -2026,7 +2829,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '上一行', 'Previous row')}
             onClick={() => jumpRow(-1)}
-            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
+            className={`rounded-control inline-flex h-7 w-7 items-center justify-center text-sm ${
+              usesLightChrome ? 'text-text-2 hover:bg-hover' : 'text-white hover:bg-white/15'
+            }`}
           >
             ↑
           </button>
@@ -2034,7 +2839,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '下一行', 'Next row')}
             onClick={() => jumpRow(1)}
-            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
+            className={`rounded-control inline-flex h-7 w-7 items-center justify-center text-sm ${
+              usesLightChrome ? 'text-text-2 hover:bg-hover' : 'text-white hover:bg-white/15'
+            }`}
           >
             ↓
           </button>
@@ -2042,7 +2849,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '切换最大化', 'Toggle maximize')}
             onClick={() => setIsMaximized((value) => !value)}
-            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
+            className={`rounded-control inline-flex h-7 w-7 items-center justify-center text-sm ${
+              usesLightChrome ? 'text-text-2 hover:bg-hover' : 'text-white hover:bg-white/15'
+            }`}
           >
             □
           </button>
@@ -2050,24 +2859,72 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             type="button"
             aria-label={localized(locale, t, '关闭复核浮层', 'Close review drawer')}
             onClick={closeDrawer}
-            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
+            className={`rounded-control inline-flex h-7 w-7 items-center justify-center text-sm ${
+              usesLightChrome ? 'text-text-2 hover:bg-hover' : 'text-white hover:bg-white/15'
+            }`}
           >
             ×
           </button>
         </div>
       </div>
 
-      <div className="border-border bg-panel flex max-w-full flex-wrap items-center gap-2 overflow-x-auto border-b px-4 py-3">
-        {summaryBadges.map((badge: any) => (
-          <Badge
-            key={String(badge.key || badge.valueField || badge.label)}
-            badge={badge}
-            record={record}
-            locale={locale}
-            t={t}
-          />
-        ))}
-      </div>
+      {contextSummaryConfig ? (
+        <div
+          data-testid="review-drawer-context-summary"
+          className="border-border bg-panel border-b px-4 py-3"
+        >
+          <div className="rounded-control border-border bg-subtle flex min-w-0 flex-wrap items-center gap-x-6 gap-y-1 border px-3 py-2 text-sm">
+            <div className="min-w-[240px] flex-1 [overflow-wrap:anywhere]">
+              <span className="text-text-2">
+                {getLocalizedText(
+                  contextSummaryConfig.label || { 'zh-CN': '原始需求', en: 'Original request' },
+                  locale,
+                  t,
+                )}
+                ：
+              </span>
+              <span className="text-text font-semibold">
+                {formatConfiguredValue(
+                  readPath(record, contextSummaryConfig.valueField),
+                  contextSummaryConfig,
+                  locale,
+                  t,
+                )}
+              </span>
+            </div>
+            {contextSummaryConfig.quantityField && (
+              <div className="shrink-0 whitespace-nowrap">
+                <span className="text-text-2">
+                  {getLocalizedText(
+                    contextSummaryConfig.quantityLabel || {
+                      'zh-CN': '需求数量',
+                      en: 'Required quantity',
+                    },
+                    locale,
+                    t,
+                  )}
+                  ：
+                </span>
+                <span className="text-text font-semibold tabular-nums">
+                  {formatValue(readPath(record, contextSummaryConfig.quantityField))}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="border-border bg-panel flex max-w-full flex-wrap items-center gap-2 overflow-x-auto border-b px-4 py-3">
+          {summaryBadges.map((badge: any) => (
+            <Badge
+              key={String(badge.key || badge.valueField || badge.label)}
+              badge={badge}
+              record={record}
+              locale={locale}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
 
       <DrawerEditForm
         key={selectedRecordKey}
@@ -2473,7 +3330,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               </header>
               <div
                 data-testid="review-drawer-candidate-list"
-                className="min-h-0 flex-1 space-y-1.5 overflow-auto p-2"
+                className={`min-h-0 flex-1 overflow-auto ${
+                  usesCandidateComparisonTable ? 'p-0' : 'space-y-1.5 p-2'
+                }`}
               >
                 {candidates.length === 0 ? (
                   <div
@@ -2486,6 +3345,29 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       t,
                     )}
                   </div>
+                ) : usesCandidateComparisonTable ? (
+                  <CandidateComparisonTable
+                    candidates={candidates}
+                    tableConfig={candidateTableConfig}
+                    selectedKey={selectedCandidateKey}
+                    recommendedKey={
+                      candidateTableConfig.recommendedKeyField
+                        ? String(readPath(record, candidateTableConfig.recommendedKeyField) || '')
+                        : undefined
+                    }
+                    referenceRecord={record}
+                    locale={locale}
+                    t={t}
+                    testIdPrefix="review-drawer-candidate"
+                    keyField={candidateTableConfig.keyField}
+                    confirmableField={candidateTableConfig.confirmableField}
+                    onSelect={(candidate, rowKey) => {
+                      setSelectedCandidateKey(rowKey);
+                      if (candidatesConfig.selection?.bind) {
+                        writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
+                      }
+                    }}
+                  />
                 ) : (
                   candidates.map((candidate: any, index: number) => {
                     const rowKey = candidateKey(candidate, index);
@@ -2659,7 +3541,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 )}
               </div>
               {(shouldShowDecisionStatus ||
-                (selectedCandidate &&
+                (shouldShowSelectedCandidateDetail &&
+                  selectedCandidate &&
                   (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0))) && (
                 <section
                   data-testid="review-drawer-decision-panel"
@@ -2723,7 +3606,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       </dl>
                     </section>
                   )}
-                  {selectedCandidate &&
+                  {shouldShowSelectedCandidateDetail &&
+                    selectedCandidate &&
                     (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
                       <section
                         className={`rounded-control border-border bg-panel border ${
@@ -2772,37 +3656,52 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               {(candidatesConfig.actions || []).length > 0 && (
                 <footer
                   data-testid="review-drawer-actions"
-                  className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-2.5 py-2"
+                  className="border-border bg-panel flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-3 py-2.5"
                 >
-                  {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
-                    const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
-                    const requiresSelection =
-                      actionConfig.requiresSelection !== false &&
-                      actionConfig.code !== 'undo_decision';
-                    const disabled = Boolean(
-                      (requiresSelection && !selectedCandidate) ||
-                      isActionDisabledByCondition(actionConfig) ||
-                      runningAction,
-                    );
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        data-testid={`review-drawer-candidate-action-${code}`}
-                        disabled={disabled}
-                        onClick={() => {
-                          void runAction(actionConfig, 'candidate');
-                        }}
-                        className={`rounded-control px-3 py-2 text-sm font-medium ${
-                          buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {runningAction === `candidate:${code}`
-                          ? t('common.loading')
-                          : getLocalizedText(actionConfig.label || code, locale, t)}
-                      </button>
-                    );
-                  })}
+                  {usesCandidateComparisonTable && selectedCandidate ? (
+                    <CandidateSelectionSummary
+                      candidate={selectedCandidate}
+                      config={candidateTableConfig.selectionSummary}
+                      referenceRecord={record}
+                      locale={locale}
+                      t={t}
+                    />
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
+                      const code = String(
+                        actionConfig.code || actionConfig.id || actionConfig.label,
+                      );
+                      const requiresSelection =
+                        actionConfig.requiresSelection !== false &&
+                        actionConfig.code !== 'undo_decision';
+                      const disabled = Boolean(
+                        (requiresSelection && !selectedCandidate) ||
+                        isActionDisabledByCondition(actionConfig) ||
+                        runningAction,
+                      );
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          data-testid={`review-drawer-candidate-action-${code}`}
+                          disabled={disabled}
+                          onClick={() => {
+                            void runAction(actionConfig, 'candidate');
+                          }}
+                          className={`rounded-control px-3 py-2 text-sm font-medium ${
+                            buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
+                        >
+                          {runningAction === `candidate:${code}`
+                            ? t('common.loading')
+                            : getLocalizedText(actionConfig.label || code, locale, t)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </footer>
               )}
             </aside>

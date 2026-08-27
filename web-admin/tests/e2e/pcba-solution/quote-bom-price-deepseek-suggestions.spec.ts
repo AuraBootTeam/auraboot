@@ -67,7 +67,6 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
       {
         crm_acc_name: `E2E DeepSeek Customer ${suffix}`,
         crm_acc_industry: 'electronics',
-        crm_acc_status: 'active',
       },
       undefined,
       'create',
@@ -89,7 +88,7 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
       created.rows,
     );
 
-    const requestResult = await executeCommand(
+    const customerRequestResult = await executeCommand(
       page,
       'crm:create_customer_request',
       {
@@ -103,7 +102,7 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
       'create',
     );
     const customerRequestId = String(
-      requestResult.recordId ?? requestResult.pid ?? requestResult.id ?? '',
+      customerRequestResult.recordId ?? customerRequestResult.pid ?? customerRequestResult.id ?? '',
     );
     expect(customerRequestId, 'crm:create_customer_request should return request id').toBeTruthy();
     created.rows.push({ model: 'crm_customer_request_common', pid: customerRequestId });

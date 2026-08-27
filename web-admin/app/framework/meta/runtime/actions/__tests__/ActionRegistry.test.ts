@@ -311,6 +311,79 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
     );
   });
 
+  it('preserves localized labels, descriptions, and disabled state from raw plugin option APIs', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      quoteId: 'Q-1',
+      items: [
+        {
+          value: 'resistor',
+          label: { 'zh-CN': '电阻', en: 'Resistor' },
+          description: { 'zh-CN': '共 2 行 · 可确认 2', en: '2 lines · 2 confirmable' },
+          disabled: false,
+        },
+        {
+          value: 'unknown',
+          label: { 'zh-CN': '未分类', en: 'Unclassified' },
+          description: {
+            'zh-CN': '共 1 行 · 该类别不开放快速确认',
+            en: '1 line · not eligible for quick confirmation',
+          },
+          disabled: true,
+        },
+      ],
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fieldOptions.categories).toEqual([
+          {
+            value: 'resistor',
+            label: { 'zh-CN': '电阻', en: 'Resistor' },
+            description: { 'zh-CN': '共 2 行 · 可确认 2', en: '2 lines · 2 confirmable' },
+          },
+          {
+            value: 'unknown',
+            label: { 'zh-CN': '未分类', en: 'Unclassified' },
+            description: {
+              'zh-CN': '共 1 行 · 该类别不开放快速确认',
+              en: '1 line · not eligible for quick confirmation',
+            },
+            disabled: true,
+          },
+        ]);
+        detail.onSubmit({ categories: ['resistor'] });
+      },
+      { once: true },
+    );
+
+    await expect(
+      promptInputForm(
+        [
+          {
+            field: 'categories',
+            type: 'multiselect',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/ext/qoe/quotes/${form.pid}/price-confirmation-categories',
+              valueField: 'value',
+              labelField: 'label',
+              descriptionField: 'description',
+            },
+          },
+        ],
+        '价格快速确认',
+        fetchResult,
+        undefined,
+        { form: { pid: 'Q-1' } },
+      ),
+    ).resolves.toEqual({ categories: ['resistor'] });
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/ext/qoe/quotes/Q-1/price-confirmation-categories',
+      { method: 'get' },
+    );
+  });
+
   it('preserves API option descriptions and normalizes choice defaults', async () => {
     const fetchResult = vi.fn().mockResolvedValue({
       code: '0',

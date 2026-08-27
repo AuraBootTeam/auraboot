@@ -8,13 +8,13 @@ import {
 
 /**
  * Yunhan (云汉芯城 / ickey.cn) volume pricing — the review drawer's 阶梯价 (price ladder) and
- * 起订提醒 (MOQ over-buy warning) columns.
+ * 一行式阶梯价、需求/建议采购量和 MOQ 补齐提醒。
  *
  * Both are computed columns on the `qo_quote_line_price_evidence_details` named query (surfaced
- * as drawer detailFields), so a static config/audit gate cannot prove they render — this golden
+ * as comparison-table fields), so a static config/audit gate cannot prove they render — this golden
  * seeds captured yunhan evidence deterministically and reads the real drawer:
- * - Ladder line: 5-tier ladder over demand qty 1000 -> the full tier table shows, no MOQ warning.
- * - MOQ line: demand qty 2 below MOQ 5000 -> the over-buy warning shows, with the effective spend
+ * - Ladder line: 5-tier ladder over demand qty 1000 -> all tiers show inline, no MOQ warning.
+ * - MOQ line: demand qty 2 below MOQ 5000 -> suggested quantity and warning show, with subtotal
  *   computed from the MOQ-tier ladder price (5000 x 0.0039 = 19.50), not the low-qty unit price.
  */
 test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
@@ -43,25 +43,23 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
         `review-drawer-candidate-${created.ladderEvidenceId}`,
       );
       await expect(ladderCandidate).toBeVisible({ timeout: 20_000 });
-      // 阶梯价: full tier table, only shown because there is more than one tier.
-      await expect(ladderCandidate).toContainText('阶梯价');
-      const ladder = page.getByTestId(`review-drawer-candidate-${created.ladderEvidenceId}-ladder`);
+      await expect(drawer.getByRole('columnheader', { name: /阶梯价|Price Ladder/ })).toBeVisible();
+      const ladder = page.getByTestId(
+        `review-drawer-candidate-${created.ladderEvidenceId}-compact-ladder`,
+      );
       const ladderRows = (await ladder.locator(':scope > div').allInnerTexts()).map((text) =>
         text.replace(/\s+/g, ' ').trim(),
       );
       expect(ladderRows).toEqual(
-        expect.arrayContaining([
-          '当前数量区间 1000–2999 0.009 × 100% → 0.009',
-          '100–999 0.0092 0.0092',
-          '1000–2999 当前 0.009 0.009',
-          '50000+ 0.0082 0.0082',
-        ]),
+        expect.arrayContaining(['100–999 0.0092', '1000–2999 0.009 当前', '50000+ 0.0082']),
       );
       await expect(
-        page.getByTestId(`review-drawer-ladder-current-${created.ladderEvidenceId}`),
-      ).toHaveText(/1000–2999\s*(?:当前)?\s*0\.009(?:0)?/);
+        page.getByTestId(
+          `review-drawer-candidate-${created.ladderEvidenceId}-compact-ladder-current`,
+        ),
+      ).toHaveText(/1000–2999\s*0\.009(?:0)?\s*(?:当前)?/);
       // 起订提醒: none — demand qty (1000) is at/above MOQ (100).
-      await expect(ladderCandidate).not.toContainText('需按 MOQ');
+      await expect(ladderCandidate).not.toContainText('补齐 MOQ');
 
       // Close the drawer before switching rows (it overlays the table).
       await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
@@ -76,22 +74,21 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
       await expect(drawer).toBeVisible({ timeout: 10_000 });
       const moqCandidate = page.getByTestId(`review-drawer-candidate-${created.moqEvidenceId}`);
       await expect(moqCandidate).toBeVisible({ timeout: 20_000 });
-      // 起订提醒: must order MOQ 5000 for a demand of 2; effective spend uses the 5000-tier price
+      // The suggested order must raise demand 2 to MOQ 5000; subtotal uses the 5000-tier price
       // (0.0039), i.e. 5000 x 0.0039 = 19.50 — NOT the low-qty unit price (0.0051).
-      await expect(moqCandidate).toContainText('起订提醒');
-      await expect(moqCandidate).toContainText('需按 MOQ 5000 起订');
-      await expect(moqCandidate).toContainText('需求 2');
-      await expect(moqCandidate).toContainText('19.50');
+      await expect(moqCandidate).toContainText('补齐 MOQ');
+      await expect(moqCandidate).toContainText(/需求[：:]\s*2/);
+      await expect(moqCandidate).toContainText(/建议采购[：:]\s*5,000/);
+      await expect(moqCandidate).toContainText(/小计\s*19\.5/);
       // and its own ladder still renders (3 tiers).
-      await expect(moqCandidate).toContainText('阶梯价');
       const moqLadderRows = (
         await page
-          .getByTestId(`review-drawer-candidate-${created.moqEvidenceId}-ladder`)
+          .getByTestId(`review-drawer-candidate-${created.moqEvidenceId}-compact-ladder`)
           .locator(':scope > div')
           .allInnerTexts()
       ).map((text) => text.replace(/\s+/g, ' ').trim());
       expect(moqLadderRows).toEqual(
-        expect.arrayContaining(['100–999 当前 0.0051 0.0051', '5000+ 0.0039 0.0039']),
+        expect.arrayContaining(['100–999 0.0051 当前', '5000+ 0.0039']),
       );
     } finally {
       await cleanupRows(page, created);
