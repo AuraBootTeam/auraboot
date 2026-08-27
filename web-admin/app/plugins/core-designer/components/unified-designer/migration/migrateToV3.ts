@@ -12,6 +12,7 @@ import type {
 import { createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
 
 interface NormalizedRef {
+  id?: string;
   field: string;
   props: Record<string, unknown>;
   layout: Record<string, unknown>;
@@ -269,7 +270,9 @@ function migrateWidgetLikeBlock(block: LegacyDslBlockV2): DslBlockV3 {
 function migrateFieldRef(parentId: string, ref: LegacyFieldRefV2, blockType: 'field' | 'filter-field'): DslBlockV3 {
   const parsed = parseFieldLikeRef(ref);
   return {
-    id: toStableBlockId(parentId, parsed.field),
+    // Object refs may carry the stable id persisted by the flat serializer;
+    // honoring it keeps block identity stable across a load → save cycle.
+    id: parsed.id ?? toStableBlockId(parentId, parsed.field),
     blockType,
     field: parsed.field,
     layout: Object.keys(parsed.layout).length ? parsed.layout : undefined,
@@ -280,7 +283,7 @@ function migrateFieldRef(parentId: string, ref: LegacyFieldRefV2, blockType: 'fi
 function migrateColumnRef(parentId: string, ref: LegacyColumnRefV2): DslBlockV3 {
   const parsed = parseFieldLikeRef(ref);
   return {
-    id: toStableBlockId(parentId, parsed.field),
+    id: parsed.id ?? toStableBlockId(parentId, parsed.field),
     blockType: 'column',
     field: parsed.field,
     layout: Object.keys(parsed.layout).length ? parsed.layout : undefined,
@@ -376,12 +379,17 @@ function normalizeWidgetId(widget: LegacyDashboardWidget, parentId: string, inde
 function parseFieldLikeRef(ref: LegacyFieldRefV2 | LegacyColumnRefV2): NormalizedRef {
   if (typeof ref !== 'string') {
     const field = String(ref.field || ref.code || ref.name || 'field');
-    const { span, colSpan, width, field: _field, code: _code, name: _name, ...rest } = ref;
+    const { span, colSpan, width, field: _field, code: _code, name: _name, id, ...rest } = ref;
     const layout: Record<string, unknown> = {};
     if (typeof span === 'number') layout.span = span;
     if (typeof colSpan === 'number') layout.span = colSpan;
     if (typeof width === 'number') layout.width = width;
-    return { field, props: { ...rest }, layout };
+    return {
+      id: typeof id === 'string' && id ? id : undefined,
+      field,
+      props: rest,
+      layout,
+    };
   }
 
   const [field, ...segments] = ref.split('|');

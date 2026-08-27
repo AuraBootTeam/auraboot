@@ -245,8 +245,8 @@ describe('flatPageSerializer designer-authored trees', () => {
         id: 'list_filters',
         blockType: 'filters',
         fields: [
-          { field: 'status', component: 'select' },
-          'name',
+          { id: 'filter_status', field: 'status', component: 'select' },
+          { field: 'name', id: 'filter_name' },
         ],
         actions: ['search', 'reset'],
       },
@@ -254,16 +254,16 @@ describe('flatPageSerializer designer-authored trees', () => {
         id: 'list_toolbar',
         blockType: 'toolbar',
         buttons: [
-          { label: 'Create', code: 'create', actionType: 'create' },
-          { label: 'Export', command: 'customer.export', code: 'command', actionType: 'command' },
+          { label: 'Create', code: 'create', actionType: 'create', id: 'action_create' },
+          { label: 'Export', command: 'customer.export', code: 'command', actionType: 'command', id: 'action_export' },
         ],
       },
       {
         id: 'table_customers',
         blockType: 'table',
         columns: [
-          { field: 'name', label: 'Name', width: 220 },
-          'status',
+          { label: 'Name', field: 'name', id: 'column_name', width: 220 },
+          { field: 'status', id: 'column_status' },
         ],
         dataSource: 'tableData',
         props: { pageSize: 20 },
@@ -304,8 +304,8 @@ describe('flatPageSerializer designer-authored trees', () => {
       {
         id: 'table_customers',
         blockType: 'table',
-        columns: ['name'],
-        rowActions: [{ label: 'Open', command: 'customer.open', code: 'command', actionType: 'command' }],
+        columns: [{ field: 'name', id: 'column_name' }],
+        rowActions: [{ label: 'Open', command: 'customer.open', code: 'command', actionType: 'command', id: 'action_open_row' }],
       },
     ]);
   });
@@ -350,7 +350,7 @@ describe('flatPageSerializer designer-authored trees', () => {
               {
                 id: 'section_overview',
                 blockType: 'detail-section',
-                fields: ['name'],
+                fields: [{ id: 'field_name', field: 'name' }],
               },
             ],
           },

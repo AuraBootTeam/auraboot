@@ -172,7 +172,7 @@ function serializeFilterBar(block: DslBlockV3): LegacyDslBlockV2 {
   const flat: LegacyDslBlockV2 = {
     id: block.id,
     blockType: 'filters',
-    fields: serializeFieldEntries(block.blocks ?? []),
+    fields: serializeFieldEntries(block.blocks ?? [], block.id),
   };
   if (block.title !== undefined) flat.title = block.title;
   if (Array.isArray(actions)) flat.actions = actions as Array<string | Record<string, unknown>>;
@@ -192,7 +192,7 @@ function serializeActionBar(block: DslBlockV3): LegacyDslBlockV2 {
   const flat: LegacyDslBlockV2 = {
     id: block.id,
     blockType: flatType,
-    buttons: serializeActionEntries(block.blocks ?? []),
+    buttons: serializeActionEntries(block.blocks ?? [], block.id),
   };
   if (block.title !== undefined) flat.title = block.title;
   applyCommonShape(block, flat);
@@ -205,7 +205,7 @@ function serializeSection(block: DslBlockV3): LegacyDslBlockV2 {
   const flat: LegacyDslBlockV2 = {
     id: block.id,
     blockType: block.blockType,
-    fields: serializeFieldEntries(block.blocks ?? []),
+    fields: serializeFieldEntries(block.blocks ?? [], block.id),
   };
   if (block.title !== undefined) flat.title = block.title;
   if (block.region !== undefined) flat.region = block.region;
@@ -223,9 +223,9 @@ function serializeTable(block: DslBlockV3): LegacyDslBlockV2 {
   const serializedRowActions: Array<string | Record<string, unknown>> = [];
   for (const child of block.blocks ?? []) {
     if (child.blockType === 'column') {
-      columns.push(serializeColumnEntry(child));
+      columns.push(serializeColumnEntry(child, block.id));
     } else if (child.blockType === 'action') {
-      serializedRowActions.push(serializeActionEntry(child));
+      serializedRowActions.push(serializeActionEntry(child, block.id));
     } else {
       // Not reachable through migratePageSchemaV2ToV3; keep the guard loud.
       columns.push(child as unknown as Record<string, unknown>);
@@ -316,23 +316,31 @@ function applyCommonShape(
   if (Object.keys(props).length > 0) flat.props = props;
 }
 
-/** field / filter-field → `fields[]` entry; plain references collapse back to strings. */
-function serializeFieldEntries(children: DslBlockV3[]): LegacyDslBlockV2['fields'] {
-  return children.map((child) => serializeFieldLikeEntry(child));
+/**
+ * field / filter-field → `fields[]` entry; plain references collapse back to
+ * strings. Object entries keep the tree block's stable id — except when it
+ * equals the canonical id `migrateFieldRef` would synthesize on reload, so
+ * generator-shaped stored pages round-trip deep-equal.
+ */
+function serializeFieldEntries(children: DslBlockV3[], parentId: string): LegacyDslBlockV2['fields'] {
+  return children.map((child) => serializeFieldLikeEntry(child, parentId));
 }
 
-function serializeColumnEntry(child: DslBlockV3): string | Record<string, unknown> {
-  return serializeFieldLikeEntry(child);
+function serializeColumnEntry(child: DslBlockV3, parentId: string): string | Record<string, unknown> {
+  return serializeFieldLikeEntry(child, parentId);
 }
 
-function serializeFieldLikeEntry(block: DslBlockV3): string | Record<string, unknown> {
+function serializeFieldLikeEntry(block: DslBlockV3, parentId: string): string | Record<string, unknown> {
   const field = block.field ?? 'field';
   const layout = (block.layout ?? {}) as Record<string, unknown>;
   const props = { ...stripNone(block.props) };
-  if (Object.keys(props).length === 0 && Object.keys(layout).length === 0) {
+  const idIsCanonical = !block.id || block.id === toStableBlockId(parentId, field);
+  if (Object.keys(props).length === 0 && Object.keys(layout).length === 0 && idIsCanonical) {
     return field;
   }
-  const entry: Record<string, unknown> = { field, ...props };
+  const entry: Record<string, unknown> = { ...props };
+  entry.field = field;
+  if (!idIsCanonical) entry.id = block.id;
   if (typeof layout.span === 'number') entry.span = layout.span;
   if (typeof layout.width === 'number') entry.width = layout.width;
   return entry;
@@ -345,25 +353,31 @@ function serializeFieldLikeEntry(block: DslBlockV3): string | Record<string, unk
  * actions that carry none of those keys, so generator-shaped pages round-trip
  * deep-equal.
  */
-function serializeActionEntries(children: DslBlockV3[]): Array<string | Record<string, unknown>> {
-  return children.map((child) => serializeActionEntry(child));
+function serializeActionEntries(
+  children: DslBlockV3[],
+  parentId: string,
+): Array<string | Record<string, unknown>> {
+  return children.map((child) => serializeActionEntry(child, parentId));
 }
 
-function serializeActionEntry(block: DslBlockV3): string | Record<string, unknown> {
+function serializeActionEntry(block: DslBlockV3, parentId: string): string | Record<string, unknown> {
   const actionType = block.actionType ?? 'custom';
   const props = stripNone(block.props);
-  if (Object.keys(props).length === 0 && block.title === undefined) {
+  const code = typeof props.code === 'string' ? props.code : actionType;
+  const idIsCanonical = !block.id || block.id === toStableBlockId(parentId, code);
+  if (Object.keys(props).length === 0 && block.title === undefined && idIsCanonical) {
     return actionType;
   }
-  const { code, ...rest } = props;
+  const { code: _code, ...rest } = props;
   const entry: Record<string, unknown> = { ...rest };
-  entry.code = typeof code === 'string' ? code : actionType;
+  entry.code = code;
   const hasRendererSemanticKey = ['action', 'navigateTo', 'commandCode', 'to', 'type', 'workflowKey'].some(
     (key) => key in rest,
   );
   if (!hasRendererSemanticKey) {
     entry.actionType = actionType;
   }
+  if (!idIsCanonical) entry.id = block.id;
   if (block.title !== undefined) entry.title = block.title;
   const layout = (block.layout ?? {}) as Record<string, unknown>;
   if (typeof layout.span === 'number') entry.span = layout.span;
