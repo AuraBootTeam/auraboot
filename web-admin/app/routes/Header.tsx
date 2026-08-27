@@ -338,9 +338,11 @@ export default function Header({
         </div>
       </header>
 
-      {/* Account entry (avatar + profile/workspace/logout menu) —
-          pinned to the bottom-start corner of the viewport */}
-      <UserMenuWidget simplified={simplified} />
+      {/* Account entry (avatar + profile/workspace/logout menu) — docked in
+          the sidebar footer when the navigation sidebar is present; the
+          floating bottom-start widget is the fallback for sidebar-less
+          surfaces (e.g. tenant selection, accounts without menus) */}
+      {!(showSidebar && hasMenus) && <UserMenuWidget simplified={simplified} />}
     </>
   );
 }

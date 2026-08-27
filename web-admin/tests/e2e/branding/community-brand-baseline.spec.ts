@@ -40,7 +40,9 @@ test.describe('Community branding baseline', () => {
     });
   });
 
-  test('@smoke @viewer opens About from the authenticated account menu', async ({ page }, testInfo) => {
+  test('@smoke @viewer opens About from the authenticated account menu', async ({
+    page,
+  }, testInfo) => {
     await page.goto('/');
     await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
 
@@ -55,7 +57,10 @@ test.describe('Community branding baseline', () => {
     await page.screenshot({ path: testInfo.outputPath('about-desktop.png'), fullPage: true });
   });
 
-  test('keeps fixed attribution on a real anonymous shared view', async ({ browser, page }, testInfo) => {
+  test('keeps fixed attribution on a real anonymous shared view', async ({
+    browser,
+    page,
+  }, testInfo) => {
     await acquireSavedViewLock('community-branding-share');
     let viewPid = '';
     try {
@@ -118,6 +123,9 @@ test.describe('Community branding baseline', () => {
     await page.goto('/');
     await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
 
+    // The account entry is docked at the sidebar footer; on mobile the
+    // navigation sidebar is an off-canvas drawer, so open it first.
+    await page.getByTestId('header-sidebar-toggle').click();
     await page.getByTestId('user-menu').getByRole('button', { name: 'User avatar' }).click();
     await page.getByTestId('about-link').click();
 
