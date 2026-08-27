@@ -18,10 +18,13 @@ interface NormalizedRef {
   layout: Record<string, unknown>;
 }
 
-export function migratePageSchemaV2ToV3(schema: LegacyPageSchemaV2): PageSchemaV3 {
+export function migratePageSchemaV2ToV3(
+  schema: LegacyPageSchemaV2,
+  options?: { rootBlockId?: string },
+): PageSchemaV3 {
   const kind = normalizeKind(schema.kind);
   const rootBlock: DslBlockV3 = {
-    id: toStableBlockId(kind, schema.id),
+    id: options?.rootBlockId || toStableBlockId(kind, schema.id),
     blockType: kind,
     title: schema.title,
     dataSource: schema.modelCode ? { model: schema.modelCode } : undefined,
@@ -157,6 +160,11 @@ function migrateFilterBarBlock(block: LegacyDslBlockV2): DslBlockV3 {
 
 function migrateTableBlock(block: LegacyDslBlockV2): DslBlockV3 {
   const blockId = block.id || 'table';
+  // Row actions persist in the flat table's `rowActions` array; restore them as
+  // attached action children so the outline keeps them editable under the table.
+  const rowActionRefs = Array.isArray(block.rowActions)
+    ? (block.rowActions as Array<string | Record<string, unknown>>)
+    : [];
   return {
     id: blockId,
     blockType: 'table',
@@ -165,7 +173,15 @@ function migrateTableBlock(block: LegacyDslBlockV2): DslBlockV3 {
     layout: normalizeLayout(block),
     props: { ...normalizeProps(block), selection: block.selection },
     dataSource: normalizeDataSource(block.dataSource),
-    blocks: (Array.isArray(block.columns) ? block.columns : []).map((columnRef) => migrateColumnRef(blockId, columnRef)),
+    blocks: [
+      ...(Array.isArray(block.columns) ? block.columns : []).map((columnRef) =>
+        migrateColumnRef(blockId, columnRef),
+      ),
+      ...migrateActionRefs(blockId, rowActionRefs).map((action) => ({
+        ...action,
+        region: action.region ?? 'row-actions',
+      })),
+    ],
     extension: normalizeExtension(block),
   };
 }
@@ -189,8 +205,13 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   if (block.blockType === 'tabs') return migrateTabsBlock(block, kind);
   if (block.blockType === 'toolbar') return migrateActionBarBlock(block, 'toolbar');
   if (block.blockType === 'form-buttons') return migrateActionBarBlock(block, 'footer');
-  // Sections nested outside the kind roots (e.g. inside tabs) still need their
-  // `fields[]` shorthand expanded — the generic passthrough would strip it.
+  // Sections / filter bars nested outside the kind roots (e.g. inside tabs)
+  // still need their `fields[]` shorthand expanded — the generic passthrough
+  // would strip it.
+  if (block.blockType === 'filter-bar' || block.blockType === 'filters') {
+    return migrateFilterBarBlock(block);
+  }
+  if (block.blockType === 'table') return migrateTableBlock(block);
   if (block.blockType === 'form-section' && kind === 'detail') {
     return migrateSectionBlock(block, 'detail-section');
   }
@@ -243,7 +264,8 @@ function migrateTabRef(
   const { blocks: _blocks, key: _key, id: _id, label: _label, ...props } = tab;
 
   return {
-    id: toStableBlockId(parentId, key),
+    // Honor a persisted tab id so the outline node survives a save/reload cycle.
+    id: typeof _id === 'string' && _id ? _id : toStableBlockId(parentId, key),
     blockType: 'tab',
     title: label,
     props,

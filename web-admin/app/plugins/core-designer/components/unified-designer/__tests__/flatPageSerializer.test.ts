@@ -5,6 +5,7 @@ import {
   serializePageTreeToFlat,
 } from '../persistence/flatPageSerializer';
 import { migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
+import { toStableBlockId } from '../utils/blockIds';
 import type { LegacyDslBlockV2, LegacyPageSchemaV2 } from '../types';
 
 /**
@@ -53,6 +54,38 @@ function roundTrip(kind: string, blocks: LegacyDslBlockV2[], modelCode?: string)
 }
 
 describe('flatPageSerializer round-trip (generator-shaped v4 pages)', () => {
+  it('carries the editor root block id through the flat document for identity stability', () => {
+    const tree = migratePageSchemaV2ToV3({
+      schemaVersion: 4,
+      kind: 'list',
+      id: 'customer_list',
+      blocks: [{ id: 'table_default', blockType: 'table', columns: ['name'] }],
+    });
+    // migrate synthesizes the root; the serializer reports its id so the
+    // repository can persist it in the page extension.
+    const flat = serializePageTreeToFlat(tree);
+    expect(flat.rootBlockId).toBe(toStableBlockId('list', 'customer_list'));
+  });
+
+  it('round-trips a table whose row actions persist in the rowActions array', () => {
+    roundTrip('list', [
+      {
+        id: 'table_default',
+        blockType: 'table',
+        columns: ['name', 'actions'],
+        rowActions: [
+          {
+            id: 'action_seed_row_open',
+            code: 'command',
+            label: 'Open',
+            executionMode: 'live',
+          },
+        ],
+        dataSource: 'tableData',
+      },
+    ]);
+  });
+
   it('round-trips a generated list page (filters + toolbar + table)', () => {
     roundTrip('list', [
       {
@@ -363,6 +396,7 @@ describe('flatPageSerializer designer-authored trees', () => {
         blockType: 'tabs',
         tabs: [
           {
+            id: 'detail_tabs_overview',
             key: 'overview',
             label: { 'zh-CN': '概览', 'en-US': 'Overview' },
             blocks: [
@@ -441,6 +475,31 @@ describe('flatPageSerializer fail-fast boundaries', () => {
         ],
       }),
     ).toThrow(/repeater_rows/);
+  });
+
+  it('rejects container blocks nested inside a section (would be silently dropped)', () => {
+    expect(() =>
+      serializePageTreeToFlat({
+        schemaVersion: 3,
+        kind: 'form',
+        id: 'my_form',
+        blocks: [
+          {
+            id: 'form_root',
+            blockType: 'form',
+            blocks: [
+              {
+                id: 'section_basic',
+                blockType: 'form-section',
+                blocks: [
+                  { id: 'sub_table_tasks', blockType: 'sub-table', props: { model: 'tasks' } },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/sub_table_tasks/);
   });
 
   it('rejects leaf blocks misplaced at the top level', () => {

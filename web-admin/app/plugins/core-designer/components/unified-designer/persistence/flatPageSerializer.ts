@@ -35,6 +35,7 @@ const DESIGNER_ONLY_BLOCK_TYPES = new Set([
 
 /** Block types serialized generically: props + nested blocks pass through unchanged. */
 const PASSTHROUGH_BLOCK_TYPES = new Set([
+  'ai-fill-banner',
   'sub-table',
   'embedded-list',
   'activity-timeline',
@@ -81,6 +82,13 @@ export interface FlatPageDocument {
   schemaVersion: typeof FLAT_PAGE_SCHEMA_VERSION;
   kind: PageSchemaV3Kind;
   blocks: LegacyDslBlockV2[];
+  /**
+   * The editor tree's synthetic kind-root id, when the document had one. Flat
+   * storage has no root block; persisting the id in the page extension lets
+   * the load path rebuild the same root so outline ids, audit block paths and
+   * undo history stay stable across a save/reload cycle.
+   */
+  rootBlockId?: string;
 }
 
 export function serializePageTreeToFlat(document: PageSchemaV3): FlatPageDocument {
@@ -92,7 +100,7 @@ export function serializePageTreeToFlat(document: PageSchemaV3): FlatPageDocumen
     ]);
   }
 
-  const topLevel = resolveTopLevelBlocks(document);
+  const { topLevel, rootBlockId } = resolveTopLevelBlocks(document);
   const blocks: LegacyDslBlockV2[] = [];
   for (const block of topLevel) {
     const flat = serializeBlock(block, issues);
@@ -101,19 +109,22 @@ export function serializePageTreeToFlat(document: PageSchemaV3): FlatPageDocumen
   if (issues.length > 0) {
     throw new FlatSerializationError(issues);
   }
-  return { schemaVersion: FLAT_PAGE_SCHEMA_VERSION, kind, blocks };
+  return { schemaVersion: FLAT_PAGE_SCHEMA_VERSION, kind, blocks, rootBlockId };
 }
 
-function resolveTopLevelBlocks(document: PageSchemaV3): DslBlockV3[] {
+function resolveTopLevelBlocks(document: PageSchemaV3): {
+  topLevel: DslBlockV3[];
+  rootBlockId?: string;
+} {
   const blocks = document.blocks ?? [];
   if (blocks.length === 1 && blocks[0].blockType === document.kind) {
     // Documents loaded from stored v4 rows are wrapped in a synthetic kind
     // root by migratePageSchemaV2ToV3; the wrapper is an editor artifact and
     // is dropped here. Its dataSource {model} is already mirrored on the page.
     const children = blocks[0].blocks ?? [];
-    if (children.length > 0) return children;
+    if (children.length > 0) return { topLevel: children, rootBlockId: blocks[0].id };
   }
-  return blocks;
+  return { topLevel: blocks, rootBlockId: undefined };
 }
 
 function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 | null {
@@ -124,12 +135,12 @@ function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 |
 
   switch (block.blockType) {
     case 'filter-bar':
-      return serializeFilterBar(block);
+      return serializeFilterBar(block, issues);
     case 'action-bar':
       return serializeActionBar(block);
     case 'form-section':
     case 'detail-section':
-      return serializeSection(block);
+      return serializeSection(block, issues);
     case 'table':
       return serializeTable(block);
     case 'tabs':
@@ -167,12 +178,12 @@ function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 |
  * filter-bar's `props`, so hoisting them back restores the original shape.
  * The `filters` flat block carries no `region` — that key is editor-side only.
  */
-function serializeFilterBar(block: DslBlockV3): LegacyDslBlockV2 {
+function serializeFilterBar(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 {
   const { actions, buttons, ...residualProps } = stripNone(block.props);
   const flat: LegacyDslBlockV2 = {
     id: block.id,
     blockType: 'filters',
-    fields: serializeFieldEntries(block.blocks ?? [], block.id),
+    fields: serializeFieldEntries(block.blocks ?? [], block.id, ['filter-field'], issues),
   };
   if (block.title !== undefined) flat.title = block.title;
   if (Array.isArray(actions)) flat.actions = actions as Array<string | Record<string, unknown>>;
@@ -200,12 +211,12 @@ function serializeActionBar(block: DslBlockV3): LegacyDslBlockV2 {
 }
 
 /** form-section / detail-section → same-named flat block with its `fields` array restored. */
-function serializeSection(block: DslBlockV3): LegacyDslBlockV2 {
+function serializeSection(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 {
   const { columns, collapsible, defaultCollapsed, ...residualProps } = stripNone(block.props);
   const flat: LegacyDslBlockV2 = {
     id: block.id,
     blockType: block.blockType,
-    fields: serializeFieldEntries(block.blocks ?? [], block.id),
+    fields: serializeFieldEntries(block.blocks ?? [], block.id, ['field'], issues),
   };
   if (block.title !== undefined) flat.title = block.title;
   if (block.region !== undefined) flat.region = block.region;
@@ -277,6 +288,8 @@ function serializeTabEntry(
   };
   if (tab.title !== undefined) entry.label = tab.title;
   entry.key = recoverTabKey(tab, parentId, index);
+  // Keep the tree child id so a reload rebuilds the identical outline node.
+  if (tab.id) entry.id = tab.id;
   return entry;
 }
 
@@ -322,8 +335,26 @@ function applyCommonShape(
  * equals the canonical id `migrateFieldRef` would synthesize on reload, so
  * generator-shaped stored pages round-trip deep-equal.
  */
-function serializeFieldEntries(children: DslBlockV3[], parentId: string): LegacyDslBlockV2['fields'] {
-  return children.map((child) => serializeFieldLikeEntry(child, parentId));
+function serializeFieldEntries(
+  children: DslBlockV3[],
+  parentId: string,
+  allowedLeafTypes: readonly string[],
+  issues: string[],
+): LegacyDslBlockV2['fields'] {
+  return children
+    .map((child) => {
+      if (!allowedLeafTypes.includes(child.blockType)) {
+        // A container nested inside a section / filter-bar has no flat fields[]
+        // representation; recording it as a field entry would silently drop its
+        // whole subtree, so it must fail the save instead.
+        issues.push(
+          `${describeBlock(child)} cannot live inside a section / filter-bar: it has no flat fields[] representation and would be silently dropped`,
+        );
+        return null;
+      }
+      return serializeFieldLikeEntry(child, parentId);
+    })
+    .filter((entry): entry is string | Record<string, unknown> => entry !== null);
 }
 
 function serializeColumnEntry(child: DslBlockV3, parentId: string): string | Record<string, unknown> {

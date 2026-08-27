@@ -135,7 +135,7 @@ describe('PageSchema V3 repository', () => {
     expect(loaded.source).toEqual({ type: 'page', pid: 'page_1', pageKey: 'customer_workspace' });
   });
 
-  it('rejects recursive kind-root blocks stored under a flat schemaVersion label', async () => {
+  it('loads recursive kind-root rows under a flat label as editor trees (rollback restoration)', async () => {
     const recursiveBlocks = [
       {
         id: 'list_customer_workspace',
@@ -169,11 +169,12 @@ describe('PageSchema V3 repository', () => {
       createPage: vi.fn(),
     };
 
-    // A flat-labelled row carrying recursive kind roots means a corrupt writer;
-    // the repository must refuse to guess the dialect instead of migrating.
-    await expect(loadPageSchemaV3({ pageId: 'page_1', api })).rejects.toThrow(
-      /refusing to guess the dialect/,
-    );
+    // A top-level kind root is an unambiguous tree signature (the flat dialect
+    // never places kind containers at the top level), so the row loads as the
+    // editor tree — version rollback can legitimately produce this shape.
+    const loaded = await loadPageSchemaV3({ pageId: 'page_1', api });
+    expect(loaded.document.schemaVersion).toBe(3);
+    expect(loaded.document.blocks).toEqual(recursiveBlocks);
   });
 
   it('rejects stored pages with unknown schemaVersion labels', async () => {
@@ -229,6 +230,9 @@ describe('PageSchema V3 repository', () => {
       expect.objectContaining({ blockType: 'toolbar' }),
       expect.objectContaining({ blockType: 'table' }),
     ]);
+    // The editor's synthetic kind-root id rides in the page extension so a
+    // reload rebuilds the identical root (outline / audit paths stay stable).
+    expect(request.extension).toMatchObject({ designerRootId: 'list_root' });
   });
 
   it('refuses to persist composite documents that have no flat v4 representation', async () => {
