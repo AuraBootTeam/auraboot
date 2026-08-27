@@ -1,3 +1,5 @@
+import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
+
 export type BootstrapStatus = {
   initialized: boolean;
   inProgress: boolean;
@@ -13,7 +15,9 @@ const BFF_URL =
 
 export async function fetchBootstrapStatus(): Promise<BootstrapStatus | null> {
   try {
-    const res = await fetch(`${BFF_URL}/api/bootstrap/status`);
+    const res = await fetch(`${BFF_URL}/api/bootstrap/status`, {
+      signal: fetchTimeoutSignal(),
+    });
     if (!res.ok) return null;
     const json = await res.json();
     if (json?.code !== '0' || !json?.data) return null;

@@ -1,5 +1,6 @@
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
 import { getTokenFromRequest } from '~/shared/services/session.js';
 
 export async function getFormSchema(id: string, request: Request) {
@@ -126,6 +127,7 @@ export async function getI18nData(locale: string, request: Request) {
     const url = new URL(`/api/i18n/${finalLocale}`, baseUrl).toString();
 
     const response = await fetch(url, {
+      signal: fetchTimeoutSignal(),
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         'Content-Type': 'application/json',

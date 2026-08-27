@@ -1,3 +1,5 @@
+import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
+
 export interface AccessPolicy {
   deploymentMode: 'single' | 'multi' | 'hybrid';
   userRegistrationPolicy: 'open' | 'invite_only' | 'closed';
@@ -20,7 +22,9 @@ export async function fetchAccessPolicy(): Promise<AccessPolicy> {
   try {
     const apiUrl =
       process.env.BFF_INTERNAL_URL || process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
-    const response = await fetch(`${apiUrl}/api/auth/access-policy`);
+    const response = await fetch(`${apiUrl}/api/auth/access-policy`, {
+      signal: fetchTimeoutSignal(),
+    });
     if (!response.ok) return CLOSED_ACCESS_POLICY;
     const result = await response.json();
     return result?.data ? (result.data as AccessPolicy) : CLOSED_ACCESS_POLICY;
