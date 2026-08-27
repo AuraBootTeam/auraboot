@@ -91,8 +91,9 @@ export async function performLogin(
  * @param page - Playwright page
  */
 export async function performLogout(page: Page): Promise<void> {
-  // Click user avatar to open dropdown
-  const userAvatar = page.locator('header img[alt="User avatar"]');
+  // Click user avatar to open dropdown (avatar lives in the bottom-left
+  // UserMenuWidget, outside the header)
+  const userAvatar = page.locator('img[alt="User avatar"]');
   await userAvatar.click();
 
   // Click logout link
