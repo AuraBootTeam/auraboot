@@ -67,6 +67,7 @@ import {
   resolvePromptUploadAccept,
   resolvePromptUploadFeedbackMode,
   resolvePromptUploadFile,
+  resolvePromptUploadReviewPayload,
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
@@ -717,6 +718,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 : [];
             let inputFieldsTitle =
               (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle;
+            const inputFieldsSubmitLabel =
+              (actionDef as any).inputFieldsSubmitLabel ??
+              (normalizedButton as any).inputFieldsSubmitLabel;
             let transferRequired = false;
             if (offboardingAction && targetRecordPid) {
               const impactResult = await fetchResult(
@@ -763,7 +767,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   inputFields,
                   inputFieldsTitle,
                   fetchResult,
-                  undefined,
+                  inputFieldsSubmitLabel,
                   actionRuntimeContext,
                 );
               } catch {
@@ -807,6 +811,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               }
               payload = {
                 ...payload,
+                ...resolvePromptUploadReviewPayload(promptUpload, payload),
                 [resolvePromptUploadKey(promptUpload)]: fileId,
                 [resolvePromptUploadFilenameKey(promptUpload)]: file.name,
               };

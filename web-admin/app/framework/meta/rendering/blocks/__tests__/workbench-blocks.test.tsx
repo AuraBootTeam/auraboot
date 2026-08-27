@@ -829,6 +829,8 @@ describe('WorkbenchActionBarBlockRenderer', () => {
         success: true,
         accountId: 'ACC-1',
         opportunityId: 'OPP-1',
+        accountCount: 1,
+        skippedCount: 2,
       },
     } as any);
     const navigateTo = vi.fn();
@@ -842,6 +844,20 @@ describe('WorkbenchActionBarBlockRenderer', () => {
           label: 'Convert',
           resultReceipt: {
             title: 'Conversion completed',
+            fields: [
+              {
+                key: 'accounts',
+                label: 'Accounts created',
+                resultField: 'accountCount',
+                tone: 'green',
+              },
+              {
+                key: 'skipped',
+                label: 'Skipped',
+                resultField: 'skippedCount',
+                tone: 'amber',
+              },
+            ],
             links: [
               {
                 key: 'account',
@@ -876,6 +892,12 @@ describe('WorkbenchActionBarBlockRenderer', () => {
         'Conversion completed',
       );
     });
+    expect(screen.getByTestId('workbench-result-receipt-field-accounts')).toHaveTextContent(
+      'Accounts created1',
+    );
+    expect(screen.getByTestId('workbench-result-receipt-field-skipped')).toHaveTextContent(
+      'Skipped2',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Open opportunity' }));
     expect(navigateTo).toHaveBeenCalledWith('/p/crm_opportunity_common/view/OPP-1');
   });

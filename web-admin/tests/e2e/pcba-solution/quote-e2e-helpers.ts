@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Locator, Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { utils as XLSXUtils, write } from 'xlsx';
@@ -204,6 +204,22 @@ export async function openQuoteCreateFormFromList(page: Page): Promise<void> {
     createButton.click(),
   ]);
   await waitForDynamicPageLoad(page, 20_000);
+}
+
+export async function prepareReviewedCorrectedBomUpload(
+  page: Page,
+  filePath: string,
+): Promise<Locator> {
+  const uploadButton = page.getByTestId('toolbar-btn-upload_corrected_bom');
+  await expect(uploadButton).toBeVisible({ timeout: 20_000 });
+  await uploadButton.click();
+
+  const uploadDialog = page.getByTestId('form-dialog');
+  await expect(uploadDialog).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('bom-upload-review-file-corrected_bom_file_id').setInputFiles(filePath);
+  await expect(page.getByTestId('bom-upload-review-grid')).toBeVisible({ timeout: 15_000 });
+  await expect(uploadDialog.getByTestId('form-dialog-submit')).toBeEnabled();
+  return uploadDialog;
 }
 
 const BOM_INTERNAL_FIXTURE_MODELS = [

@@ -677,7 +677,8 @@ export async function promptInputForm(
           `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
           { method: 'get' },
         );
-        const data = result.data as
+        const resultPayload = (result as any)?.data ?? result;
+        const data = resultPayload as
           | { items?: Array<Record<string, any>> }
           | Array<Record<string, any>>;
         const rawOptions = Array.isArray(data)
@@ -722,12 +723,13 @@ export async function promptInputForm(
         const valueField = field.dataSource.valueField || 'value';
         const labelField = field.dataSource.labelField || 'label';
         const descriptionField = field.dataSource.descriptionField;
-        const rawOptions = Array.isArray(result.data)
-          ? result.data
-          : Array.isArray(result.data?.records)
-            ? result.data.records
-            : Array.isArray(result.data?.items)
-              ? result.data.items
+        const resultPayload = (result as any)?.data ?? result;
+        const rawOptions = Array.isArray(resultPayload)
+          ? resultPayload
+          : Array.isArray(resultPayload?.records)
+            ? resultPayload.records
+            : Array.isArray(resultPayload?.items)
+              ? resultPayload.items
               : [];
         fieldOptions[field.field] = rawOptions
           .map((option: any) => {
@@ -738,16 +740,27 @@ export async function promptInputForm(
               const description = descriptionField ? option[descriptionField] : option.description;
               return {
                 value: String(value),
-                label: String(label ?? value),
+                label: label && typeof label === 'object' ? label : String(label ?? value),
                 ...(description === undefined || description === null || description === ''
                   ? {}
-                  : { description: String(description) }),
+                  : {
+                      description:
+                        description && typeof description === 'object'
+                          ? description
+                          : String(description),
+                    }),
+                ...(option.disabled === true ? { disabled: true } : {}),
               };
             }
             if (option === undefined || option === null) return null;
             return { value: String(option), label: String(option) };
           })
-          .filter(Boolean) as Array<{ label: string; value: string; description?: string }>;
+          .filter(Boolean) as Array<{
+          label: any;
+          value: string;
+          description?: any;
+          disabled?: boolean;
+        }>;
       } catch (e) {
         console.error(`[promptInputForm] Failed to fetch options for ${field.field}:`, e);
         fieldOptions[field.field] = [];

@@ -1021,6 +1021,88 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
   });
 
+  it('uploads a reviewed BOM once and merges its selected-column projection into the command', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-2' } });
+    const file = new File(['mpn,qty\nRC0603FR-0710KL,2'], 'reviewed-bom.xlsx');
+    let dialogSubmitLabel: unknown;
+    const formListener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      dialogSubmitLabel = detail.submitLabel;
+      detail.onSubmit({
+        corrected_bom_file_id: {
+          file,
+          valid: true,
+          payload: {
+            bom_sheet_name: 'Sheet1',
+            bom_header_row_index: 0,
+            bom_selected_columns: [
+              { index: 0, header: 'mpn', role: 'mpn' },
+              { index: 1, header: 'qty', role: 'quantity' },
+            ],
+          },
+        },
+      });
+    });
+    window.addEventListener('dialog:form', formListener);
+    const pickFileSpy = vi.spyOn(promptUpload, 'pickFile');
+    pickFileSpy.mockClear();
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-BOM-2');
+
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime({ form: { pid: 'QUOTE-2' } }),
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'import_corrected_bom',
+        promptUpload: { key: 'corrected_bom_file_id', accept: '.xlsx,.xls,.csv' },
+        action: {
+          type: 'command',
+          command: 'qo_quote_common:import_corrected_bom',
+          targetRecordPid: '${form.pid}',
+          inputFieldsSubmitLabel: '按所选列上传并查价',
+          inputFields: [
+            {
+              field: 'corrected_bom_file_id',
+              type: 'bom-upload-review',
+              required: true,
+            },
+          ],
+        },
+      } as unknown as ButtonConfig);
+    });
+    window.removeEventListener('dialog:form', formListener);
+
+    expect(dialogSubmitLabel).toBe('按所选列上传并查价');
+    expect(pickFileSpy).not.toHaveBeenCalled();
+    expect(promptUpload.uploadCommandFile).toHaveBeenCalledWith(file, undefined);
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_quote_common:import_corrected_bom',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          targetRecordPid: 'QUOTE-2',
+          payload: expect.objectContaining({
+            corrected_bom_file_id: 'FILE-BOM-2',
+            corrected_bom_filename: 'reviewed-bom.xlsx',
+            bom_sheet_name: 'Sheet1',
+            bom_header_row_index: 0,
+            bom_selected_columns: [
+              { index: 0, header: 'mpn', role: 'mpn' },
+              { index: 1, header: 'qty', role: 'quantity' },
+            ],
+          }),
+        }),
+      }),
+    );
+  });
+
   it('refreshes detail data sources and shows completion feedback after promptUpload commands', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
     vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(

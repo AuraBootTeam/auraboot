@@ -31,6 +31,14 @@ const activeVariantClass: Record<string, string> = {
   ghost: 'bg-accent-weak text-accent ring-2 ring-accent ring-offset-1',
 };
 
+const receiptToneClass: Record<string, string> = {
+  green: 'border-status-green bg-panel text-status-green',
+  amber: 'border-status-amber bg-panel text-status-amber',
+  red: 'border-status-red bg-panel text-status-red',
+  blue: 'border-accent bg-panel text-accent',
+  gray: 'border-border bg-panel text-text-2',
+};
+
 export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRendererProps> = ({
   block,
   runtime,
@@ -165,6 +173,23 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
         })
         .filter(Boolean)
     : [];
+  const receiptFields = resultReceipt
+    ? (Array.isArray(resultReceipt.config?.fields) ? resultReceipt.config.fields : [])
+        .map((field: any) => {
+          const value = readPath(
+            resultReceipt.data,
+            String(field.resultField || field.field || ''),
+          );
+          if (value === undefined || value === null || value === '') return null;
+          return {
+            key: String(field.key || field.resultField || field.field),
+            label: getLocalizedText(field.label || field.key || field.resultField, locale, t),
+            value: `${String(value)}${field.suffix ? getLocalizedText(field.suffix, locale, t) : ''}`,
+            tone: String(field.tone || 'gray'),
+          };
+        })
+        .filter(Boolean)
+    : [];
 
   return (
     <>
@@ -196,6 +221,22 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
               ×
             </button>
           </div>
+          {receiptFields.length > 0 ? (
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {receiptFields.map((field: any) => (
+                <div
+                  key={field.key}
+                  data-testid={`workbench-result-receipt-field-${field.key}`}
+                  className={`rounded-control border px-3 py-2 ${
+                    receiptToneClass[field.tone] || receiptToneClass.gray
+                  }`}
+                >
+                  <dt className="text-[11px] font-medium opacity-75">{field.label}</dt>
+                  <dd className="mt-0.5 text-lg font-semibold tabular-nums">{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           {receiptLinks.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {receiptLinks.map((link: any) => (

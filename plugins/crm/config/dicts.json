@@ -2843,6 +2843,13 @@
         "status": "enabled"
       },
       {
+        "value": "quote_auto",
+        "label": "QuoteOps",
+        "label:zh-CN": "报价自动创建",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
         "value": "other",
         "label": "Other",
         "label:zh-CN": "其他",

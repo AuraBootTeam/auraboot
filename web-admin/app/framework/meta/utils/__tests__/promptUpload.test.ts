@@ -5,6 +5,7 @@ import {
   resolvePromptUploadFile,
   resolvePromptUploadFilenameKey,
   resolvePromptUploadKey,
+  resolvePromptUploadReviewPayload,
   uploadCommandFile,
 } from '../promptUpload';
 
@@ -82,6 +83,17 @@ describe('resolvePromptUploadFeedbackMode', () => {
 });
 
 describe('resolvePromptUploadFile', () => {
+  it('unwraps a File collected by the BOM review field', () => {
+    const file = new File(['xlsx'], 'customers.xlsx');
+
+    expect(
+      resolvePromptUploadFile(
+        { key: 'corrected_bom_file_id' },
+        { corrected_bom_file_id: { file, valid: true, payload: {} } },
+      ),
+    ).toBe(file);
+  });
+
   it('returns a File already collected under the configured upload key', () => {
     const file = new File(['xlsx'], 'customers.xlsx');
 
@@ -92,6 +104,37 @@ describe('resolvePromptUploadFile', () => {
     expect(
       resolvePromptUploadFile({ key: 'importFileId' }, { importFileId: 'FILE-123' }),
     ).toBeNull();
+  });
+});
+
+describe('resolvePromptUploadReviewPayload', () => {
+  it('returns only the server-validated review payload beside the uploaded file id', () => {
+    expect(
+      resolvePromptUploadReviewPayload(
+        { key: 'corrected_bom_file_id' },
+        {
+          corrected_bom_file_id: {
+            file: new File(['csv'], 'bom.csv'),
+            valid: true,
+            payload: {
+              bom_sheet_name: 'Sheet1',
+              bom_header_row_index: 1,
+              bom_selected_columns: [
+                { index: 0, header: '型号', role: 'mpn' },
+                { index: 2, header: '数量', role: 'quantity' },
+              ],
+            },
+          },
+        },
+      ),
+    ).toEqual({
+      bom_sheet_name: 'Sheet1',
+      bom_header_row_index: 1,
+      bom_selected_columns: [
+        { index: 0, header: '型号', role: 'mpn' },
+        { index: 2, header: '数量', role: 'quantity' },
+      ],
+    });
   });
 });
 

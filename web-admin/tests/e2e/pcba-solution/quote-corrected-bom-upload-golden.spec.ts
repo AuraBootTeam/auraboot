@@ -4,6 +4,7 @@ import {
   createCorrectedBomWorkbook,
   isTransientViteDynamicImportIssue,
   openQuoteDetailFromList,
+  prepareReviewedCorrectedBomUpload,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   type CreatedRows,
@@ -23,7 +24,9 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
     page.on('console', (message) => {
       const text = message.text();
       if (isTransientViteDynamicImportIssue(text)) return;
-      if (/Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)) {
+      if (
+        /Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)
+      ) {
         consoleIssues.push(`${message.type()}: ${text}`);
       }
     });
@@ -43,28 +46,29 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       });
       await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toHaveCount(0);
 
+      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, workbookPath);
       const uploadResponsePromise = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/file/upload') &&
-          response.request().method() === 'POST',
+          response.url().includes('/api/file/upload') && response.request().method() === 'POST',
         { timeout: 30_000 },
       );
       const commandResponsePromise = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
           response.request().method() === 'POST',
         { timeout: 60_000 },
       );
-      const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-
-      await page.getByTestId('toolbar-btn-upload_corrected_bom').click();
-      const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(workbookPath);
+      await uploadDialog.getByTestId('form-dialog-submit').click();
 
       const uploadResponse = await uploadResponsePromise;
       expect(uploadResponse.ok(), `file upload HTTP ${uploadResponse.status()}`).toBe(true);
       await expect(
-        page.getByRole('alert').filter({ hasText: /customer-corrected-bom-e2e/ }).first(),
+        page
+          .getByRole('alert')
+          .filter({ hasText: /customer-corrected-bom-e2e/ })
+          .first(),
       ).toBeVisible({ timeout: 10_000 });
 
       const commandResponse = await commandResponsePromise;
@@ -75,7 +79,10 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       ).toBe('0');
 
       await expect(
-        page.getByRole('alert').filter({ hasText: /completed|完成|导入|Imported/i }).first(),
+        page
+          .getByRole('alert')
+          .filter({ hasText: /completed|完成|导入|Imported/i })
+          .first(),
       ).toBeVisible({ timeout: 20_000 });
       await expect(
         page.getByText(/上传修正BOM已完成|任务已成功完成|Completed/i).first(),

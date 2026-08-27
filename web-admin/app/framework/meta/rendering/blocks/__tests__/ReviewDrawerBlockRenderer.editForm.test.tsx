@@ -113,6 +113,17 @@ function twoPhaseBlock(): BlockConfig {
       notice: { 'zh-CN': '确认并采用后才会更新报价' },
       confirmableField: 'confirmable',
       previewIdField: 'previewId',
+      candidatesField: 'candidates',
+      recommendedIdField: 'recommendedPreviewId',
+      candidateTitleField: 'productModel',
+      candidateSubtitleField: 'description',
+      candidateMatchScoreField: 'matchScore',
+      candidateProcurementScoreField: 'procurementScore',
+      candidateReasonsField: 'matchReasons',
+      candidateFields: [
+        { field: 'manufacturer', label: { 'zh-CN': '制造商' } },
+        { field: 'unitPrice', label: { 'zh-CN': '单价' } },
+      ],
       layout: 'compact-grid',
       fields: [
         { field: 'productModel', label: { 'zh-CN': '返回型号' }, gridSpan: 2 },
@@ -137,6 +148,139 @@ function twoPhaseBlock(): BlockConfig {
         },
       ],
     },
+  };
+  return value;
+}
+
+function comparisonTable() {
+  return {
+    keyField: 'previewId',
+    minWidth: 1180,
+    columns: [
+      {
+        key: 'selection',
+        kind: 'selection',
+        label: { 'zh-CN': '选择' },
+        width: 100,
+        badges: [
+          {
+            field: 'status',
+            label: { 'zh-CN': '状态' },
+            hideWhenEmpty: true,
+          },
+        ],
+      },
+      {
+        key: 'material',
+        label: { 'zh-CN': '型号 / 品牌 / 参数' },
+        width: 230,
+        fields: [
+          { field: 'productModel', showLabel: false, variant: 'primary' },
+          { field: 'manufacturer', showLabel: false },
+          { field: 'description', showLabel: false },
+        ],
+      },
+      {
+        key: 'match',
+        label: { 'zh-CN': '匹配度' },
+        width: 170,
+        fields: [
+          { field: 'matchScore', label: { 'zh-CN': '匹配' }, format: 'score' },
+          { field: 'matchReasons', label: { 'zh-CN': '依据' } },
+        ],
+      },
+      {
+        key: 'channel',
+        label: { 'zh-CN': '渠道 / 链接' },
+        width: 150,
+        fields: [
+          { field: 'channel', showLabel: false },
+          { field: 'detailUrl', showLabel: false, format: 'link' },
+        ],
+      },
+      {
+        key: 'ladder',
+        label: { 'zh-CN': '阶梯价' },
+        width: 210,
+        fields: [
+          {
+            field: 'priceLadderRows',
+            showLabel: false,
+            format: 'ladder',
+            factorField: 'priceFactor',
+          },
+        ],
+      },
+      {
+        key: 'quantity',
+        label: { 'zh-CN': '采购数量' },
+        width: 140,
+        fields: [
+          {
+            key: 'purchaseQuantity',
+            format: 'purchase-quantity',
+            requestedQtyField: 'requestedQty',
+            moqField: 'moq',
+          },
+        ],
+      },
+      {
+        key: 'price',
+        label: { 'zh-CN': '报价 / 小计' },
+        width: 150,
+        fields: [
+          {
+            key: 'quoteTotal',
+            field: 'unitPrice',
+            format: 'quote-total',
+            factoredField: 'factoredUnitPrice',
+            factorField: 'priceFactor',
+            ladderField: 'priceLadderRows',
+            requestedQtyField: 'requestedQty',
+            moqField: 'moq',
+          },
+        ],
+      },
+      {
+        key: 'action',
+        kind: 'action',
+        label: { 'zh-CN': '操作' },
+        width: 90,
+      },
+    ],
+    selectionSummary: {
+      titleField: 'productModel',
+      fields: [
+        { field: 'factoredUnitPrice', label: { 'zh-CN': '采用单价' } },
+        { field: 'manufacturer', label: { 'zh-CN': '品牌' } },
+      ],
+    },
+  };
+}
+
+function comparisonTwoPhaseBlock(): BlockConfig {
+  const value = twoPhaseBlock();
+  (value as any).editForm.preview.candidateLayout = 'comparisonTable';
+  (value as any).editForm.preview.candidateTable = comparisonTable();
+  return value;
+}
+
+function evidenceComparisonBlock(): BlockConfig {
+  const value = block();
+  delete (value as any).editForm;
+  (value as any).contextSummary = {
+    valueField: 'material_label',
+    quantityField: 'bom_qty',
+  };
+  (value as any).candidates = {
+    dataSource: 'evidence',
+    layout: 'comparisonTable',
+    showDecisionStatus: false,
+    showSelectedDetail: false,
+    title: { 'zh-CN': '查价候选' },
+    table: { ...comparisonTable(), keyField: 'pid' },
+    selection: { bind: 'selectedEvidence' },
+    actions: [{ code: 'confirm', label: { 'zh-CN': '确认此报价' } }],
   };
   return value;
 }
@@ -193,6 +337,98 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     fireEvent.click(trigger);
     expect(screen.getByTestId('review-drawer-content-grid')).toHaveClass('hidden');
     expect(screen.getByTestId('review-drawer-edit-form')).toBeInTheDocument();
+  });
+
+  it('shows dense one-row evidence candidates with an inline ladder and supplier URL', () => {
+    const candidates = [
+      {
+        pid: 'EV-1',
+        status: 'current',
+        productModel: 'GRM188R71H104KA93D',
+        manufacturer: 'Murata',
+        description: '100nF 50V X7R 0603',
+        matchScore: 96,
+        matchReasons: ['容量匹配', '封装匹配'],
+        channel: '云汉',
+        detailUrl: 'https://www.ickey.cn/detail/grm188',
+        priceLadderRows: [
+          { qty: 100, price: 0.0051, current: true },
+          { qty: 5000, price: 0.0039, current: false },
+        ],
+        requestedQty: 2,
+        moq: 5000,
+        unitPrice: 0.0051,
+        factoredUnitPrice: 0.0051,
+        priceFactor: 100,
+      },
+      {
+        pid: 'EV-2',
+        status: 'candidate',
+        productModel: 'CL10B104KB8NNNC',
+        manufacturer: 'Samsung',
+        description: '100nF 50V X7R 0603',
+        matchScore: 94,
+        matchReasons: ['规格匹配', '价格更优'],
+        channel: '云汉',
+        detailUrl: 'https://www.ickey.cn/detail/cl10b',
+        priceLadderRows: [],
+        requestedQty: 120,
+        moq: 100,
+        unitPrice: 0.021,
+        factoredUnitPrice: 0.0221,
+        priceFactor: 105,
+      },
+    ];
+    const { container } = render(
+      <ReviewDrawerBlockRenderer
+        block={evidenceComparisonBlock()}
+        runtime={makeRuntime({ ...LINE, bom_qty: 120 }, { evidence: candidates })}
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: '型号 / 品牌 / 参数' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '阶梯价' })).toBeInTheDocument();
+    expect(screen.getByText('GRM188R71H104KA93D')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('review-drawer-candidate-EV-1-compact-ladder-current'),
+    ).toHaveTextContent('0.0051');
+    expect(
+      screen.getByTestId('review-drawer-candidate-EV-1-table-field-purchaseQuantity'),
+    ).toHaveTextContent('补齐 MOQ');
+    expect(
+      screen.getByTestId('review-drawer-candidate-EV-1-table-field-quoteTotal'),
+    ).toHaveTextContent('小计 19.5');
+    expect(screen.getByTestId('review-drawer-candidate-EV-1-link-detailUrl')).toHaveAttribute(
+      'href',
+      'https://www.ickey.cn/detail/grm188',
+    );
+    expect(
+      screen.getByTestId('review-drawer-candidate-EV-2-table-field-quoteTotal'),
+    ).toHaveTextContent('0.02205');
+    expect(container.querySelector('[title*="price"]')).toBeNull();
+
+    const firstRow = screen.getByTestId('review-drawer-candidate-EV-1');
+    expect(firstRow).toHaveAttribute('data-selected', 'false');
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-EV-1-link-detailUrl'));
+    expect(firstRow).toHaveAttribute('data-selected', 'false');
+
+    const selection = vi
+      .spyOn(window, 'getSelection')
+      .mockReturnValue({ toString: () => 'GRM188R71H104KA93D' } as Selection);
+    fireEvent.click(firstRow);
+    expect(firstRow).toHaveAttribute('data-selected', 'false');
+    selection.mockRestore();
+
+    fireEvent.click(screen.getByTestId('review-drawer-candidate-EV-2'));
+    expect(screen.getByTestId('review-drawer-candidate-EV-2')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    expect(screen.getByTestId('review-drawer-selection-summary')).toHaveTextContent(
+      'CL10B104KB8NNNC',
+    );
+    expect(screen.getByTestId('review-drawer-candidate-action-confirm')).toBeEnabled();
+    expect(screen.queryByTestId('review-drawer-selected-panel')).toBeNull();
   });
 
   it('omits a field the user cleared, so blank means keep the current value', async () => {
@@ -377,6 +613,69 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     expect(confirmCall.args.payload).toEqual({ previewId: 'RP2' });
     expect(confirmCall.args.payload).not.toHaveProperty('unitPrice');
     expect(confirmCall.args.reload).toEqual(['lines', 'evidence']);
+  });
+
+  it('selects one of multiple independent product candidates before confirming', async () => {
+    executeSimpleWorkbenchAction
+      .mockResolvedValueOnce({
+        previewId: 'RP-1',
+        recommendedPreviewId: 'RP-1',
+        status: 'ready',
+        confirmable: true,
+        candidates: [
+          {
+            previewId: 'RP-1',
+            confirmable: true,
+            productModel: 'GRM188R71H104KA93D',
+            description: '100nF 50V X7R 0603',
+            manufacturer: 'Murata',
+            unitPrice: 0.08,
+            matchScore: 96,
+            procurementScore: 88,
+            matchReasons: ['容量、电压、封装匹配'],
+          },
+          {
+            previewId: 'RP-2',
+            confirmable: true,
+            productModel: 'CL10B104KB8NNNC',
+            description: '100nF 50V X7R 0603',
+            manufacturer: 'Samsung',
+            unitPrice: 0.06,
+            matchScore: 94,
+            procurementScore: 92,
+            matchReasons: ['规格匹配', '库存与价格更优'],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ confirmed: true, lineId: 'L1', evidenceId: 'E-NEW' });
+    render(
+      <ReviewDrawerBlockRenderer block={comparisonTwoPhaseBlock()} runtime={makeRuntime(LINE)} />,
+    );
+
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+    await waitFor(() =>
+      expect(screen.getByTestId('review-drawer-edit-preview-candidates')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText('GRM188R71H104KA93D')).toBeInTheDocument();
+    expect(screen.getByText('CL10B104KB8NNNC')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('review-drawer-edit-preview-candidate-RP-1-table-field-matchReasons'),
+    ).toHaveTextContent('容量、电压、封装匹配');
+    expect(screen.getByTestId('review-drawer-edit-preview-candidate-RP-1')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    expect(screen.getByText('推荐')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('review-drawer-edit-preview-candidate-RP-2'));
+    fireEvent.click(screen.getByTestId('review-drawer-edit-confirm'));
+    await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2));
+
+    expect(executeSimpleWorkbenchAction.mock.calls[1][1].args.payload).toEqual({
+      previewId: 'RP-2',
+    });
   });
 
   it('shows misses without a confirm action and lets the user return to edit', async () => {

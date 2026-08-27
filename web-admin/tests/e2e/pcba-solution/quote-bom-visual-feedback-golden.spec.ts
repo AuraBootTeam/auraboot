@@ -7,6 +7,7 @@ import {
   cleanupRows,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
+  prepareReviewedCorrectedBomUpload,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
@@ -46,8 +47,8 @@ async function waitForAsyncTaskTerminal(page: Page, taskCode: string): Promise<a
 function createInvalidCorrectedBomWorkbook(filePath: string): string {
   const workbook = XLSXUtils.book_new();
   const worksheet = XLSXUtils.aoa_to_sheet([
-    ['Notes', 'Owner'],
-    ['opaque-row-value', 'e2e-owner'],
+    ['描述', '数量'],
+    ['opaque-row-value', 'unknown'],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'Invalid BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
@@ -112,6 +113,7 @@ test.describe('QuoteOps visual feedback golden', () => {
         timeout: 20_000,
       });
 
+      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, invalidWorkbookPath);
       const commandResponsePromise = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
@@ -120,10 +122,7 @@ test.describe('QuoteOps visual feedback golden', () => {
             .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom'),
         { timeout: 60_000 },
       );
-      const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-      await page.getByTestId('toolbar-btn-upload_corrected_bom').click();
-      const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(invalidWorkbookPath);
+      await uploadDialog.getByTestId('form-dialog-submit').click();
 
       const commandResponse = await commandResponsePromise;
       const commandBody = await commandResponse.json();

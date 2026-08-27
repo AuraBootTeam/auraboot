@@ -6,6 +6,7 @@ const readJson = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.
 const fields = readJson('config/fields/crm_customer_request_common.json');
 const bindings = readJson('config/bindings/crm_customer_request_common.json');
 const commands = readJson('config/commands/crm_customer_request_common.json');
+const dicts = readJson('config/dicts.json');
 const detail = readJson('config/pages/crm_customer_request_common_detail.json');
 const plugin = readJson('plugin.json');
 const byCode = new Map(fields.map((field) => [field.code, field]));
@@ -75,6 +76,13 @@ test('source channel is immutable and only declared creation flows may write it'
     .includes('crm_cr_source_channel'));
   assert.ok(!commandByCode.get('crm:update_customer_request')?.inputFields
     .includes('crm_cr_source_channel'));
+});
+
+test('QuoteOps auto-created requests use an authorized localized source channel', () => {
+  const sourceChannel = dicts.find((dict) => dict.code === 'crm_customer_request_source_channel');
+  const quoteAuto = sourceChannel?.items?.find((item) => item.value === 'quote_auto');
+  assert.equal(quoteAuto?.label, 'QuoteOps');
+  assert.equal(quoteAuto?.['label:zh-CN'], '报价自动创建');
 });
 
 test('Customer Request detail exposes a localized read-only evidence summary without raw JSON', () => {

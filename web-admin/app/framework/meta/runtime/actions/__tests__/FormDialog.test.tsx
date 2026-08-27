@@ -398,4 +398,101 @@ describe('FormDialog choice fields', () => {
       importFilename: 'customer-pool.xlsx',
     });
   });
+
+  it('previews the first BOM rows and submits the selected provider projection', async () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      title: '上传并确认 BOM 识别列',
+      submitLabel: '按所选列上传并查价',
+      fields: [
+        {
+          field: 'corrected_bom_file_id',
+          label: 'BOM 文件与渠道识别列',
+          type: 'bom-upload-review',
+          required: true,
+          accept: '.xlsx,.xls,.csv',
+          props: { previewRowCount: 1 },
+        },
+      ],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+
+    const csv = 'Customer Note,Specification,Quantity,Brand\nDo not upload,100nF 50V 0603,4,Murata';
+    const bytes = new TextEncoder().encode(csv);
+    const file = new File([bytes], 'customer-bom.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(bytes.buffer),
+    });
+
+    fireEvent.change(screen.getByTestId('bom-upload-review-file-corrected_bom_file_id'), {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => expect(screen.getByText('100nF 50V 0603')).toBeInTheDocument());
+    expect(screen.getByText('原始 BOM 前 1 行')).toBeInTheDocument();
+    expect(screen.getByText('将发送给云汉的列')).toBeInTheDocument();
+    expect(screen.getByText('已选 3 列')).toBeInTheDocument();
+    expect(screen.getByTestId('form-dialog').firstElementChild?.nextElementSibling).toHaveClass(
+      'max-w-6xl',
+    );
+
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      corrected_bom_file_id: expect.objectContaining({
+        file,
+        valid: true,
+        payload: {
+          bom_sheet_name: 'Sheet1',
+          bom_header_row_index: 0,
+          bom_selected_columns: [
+            { index: 1, header: 'Specification', role: 'spec' },
+            { index: 2, header: 'Quantity', role: 'quantity' },
+            { index: 3, header: 'Brand', role: 'manufacturer' },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('blocks a reviewed BOM until exactly one quantity column is selected', async () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      title: '上传并确认 BOM 识别列',
+      fields: [
+        {
+          field: 'corrected_bom_file_id',
+          label: 'BOM 文件与渠道识别列',
+          type: 'bom-upload-review',
+          required: true,
+          accept: '.csv',
+        },
+      ],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+
+    const bytes = new TextEncoder().encode('MPN,Brand\nRC0603FR-0710KL,Yageo');
+    const file = new File([bytes], 'bom-without-quantity.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(bytes.buffer),
+    });
+
+    fireEvent.change(screen.getByTestId('bom-upload-review-file-corrected_bom_file_id'), {
+      target: { files: [file] },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('bom-upload-review-validation')).toHaveTextContent(
+        '必须且只能选择一个“单套用量”列。',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getAllByText('必须且只能选择一个“单套用量”列。')).toHaveLength(2);
+  });
 });
