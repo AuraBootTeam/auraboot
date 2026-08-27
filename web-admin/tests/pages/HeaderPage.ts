@@ -4,7 +4,8 @@
  * present on all authenticated pages.
  *
  * Provides access to theme toggle, language switch, notifications,
- * and user menu (including logout).
+ * and user menu (including logout). The user menu (avatar) itself lives
+ * in the bottom-left UserMenuWidget, outside the <header> element.
  *
  * @since 4.0.0
  */
@@ -231,15 +232,16 @@ export class HeaderPage {
   /** The user menu button (contains the avatar) */
   get userMenuButton(): Locator {
     return this.page
-      .locator(
-        '[data-testid="user-menu"] > button, header button:has(img[alt="User avatar"])',
-      )
+      .locator('[data-testid="user-menu"] > button, button:has(img[alt="User avatar"])')
       .first();
   }
 
-  /** The user avatar image */
+  /**
+   * The user avatar image. The avatar lives in the bottom-left
+   * UserMenuWidget, outside the <header> element.
+   */
   get userAvatar(): Locator {
-    return this.page.locator('header img[alt="User avatar"]').first();
+    return this.page.locator('img[alt="User avatar"]').first();
   }
 
   /** The logout link inside the user dropdown */
@@ -327,18 +329,24 @@ export class HeaderPage {
       await Promise.all([
         this.page.waitForURL(/\/login/, { timeout: 10000 }),
         logoutButton.click().catch(async () => {
-          await this.page.locator('form').first().evaluate((form) => {
+          await this.page
+            .locator('form')
+            .first()
+            .evaluate((form) => {
+              if (form instanceof HTMLFormElement) {
+                form.requestSubmit();
+              }
+            });
+        }),
+      ]).catch(async () => {
+        await this.page
+          .locator('form')
+          .first()
+          .evaluate((form) => {
             if (form instanceof HTMLFormElement) {
               form.requestSubmit();
             }
           });
-        }),
-      ]).catch(async () => {
-        await this.page.locator('form').first().evaluate((form) => {
-          if (form instanceof HTMLFormElement) {
-            form.requestSubmit();
-          }
-        });
         await this.page.waitForURL(/\/login/, { timeout: 10000 });
       });
     }
