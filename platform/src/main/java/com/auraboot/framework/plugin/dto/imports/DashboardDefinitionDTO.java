@@ -112,6 +112,14 @@ public class DashboardDefinitionDTO {
     private Integer sortOrder = 0;
 
     /**
+     * Optional platform extension metadata persisted with the dashboard.
+     *
+     * <p>The {@code workbenchContribution.enabled} flag makes a published global dashboard
+     * contribute its widgets to each tenant member's personal workbench response.</p>
+     */
+    private Map<String, Object> extension;
+
+    /**
      * Captures unknown JSON fields for forward-compatibility warning.
      */
     @JsonIgnore

@@ -19,6 +19,7 @@ import com.auraboot.framework.versioning.service.VersionHistoryService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -546,6 +547,7 @@ public class DashboardServiceImpl implements DashboardService {
     // ==================== Workbench ====================
 
     private static final String WORKBENCH_SCOPE = "workbench";
+    private static final String WORKBENCH_CONTRIBUTION_ID_PREFIX = "workbench-contribution-";
 
     @Override
     @Transactional
@@ -556,7 +558,7 @@ public class DashboardServiceImpl implements DashboardService {
         // Try to find existing workbench
         Dashboard existing = dashboardMapper.findWorkbench(tenantId, currentUserPid);
         if (existing != null) {
-            return toDTO(existing);
+            return composeWorkbenchContributions(toDTO(existing), tenantId);
         }
 
         // Create from template
@@ -584,7 +586,56 @@ public class DashboardServiceImpl implements DashboardService {
         dashboardMapper.insertDashboard(workbench);
 
         log.info("Workbench created: pid={}", workbench.getPid());
-        return toDTO(workbench);
+        return composeWorkbenchContributions(toDTO(workbench), tenantId);
+    }
+
+    private DashboardDTO composeWorkbenchContributions(DashboardDTO workbench, Long tenantId) {
+        List<Dashboard> contributions = dashboardMapper.findWorkbenchContributions(tenantId);
+        if (contributions == null || contributions.isEmpty()) {
+            return workbench;
+        }
+
+        ArrayNode composedWidgets = objectMapper.createArrayNode();
+        JsonNode personalWidgets = workbench.getWidgets();
+        if (personalWidgets != null && personalWidgets.isArray()) {
+            personalWidgets.forEach(widget -> composedWidgets.add(widget.deepCopy()));
+        }
+
+        int nextRow = maxWidgetBottom(composedWidgets);
+        for (Dashboard contribution : contributions) {
+            JsonNode widgets = contribution.getWidgets();
+            if (widgets == null || !widgets.isArray() || widgets.isEmpty()
+                    || !StringUtils.hasText(contribution.getCode())) {
+                continue;
+            }
+
+            int contributionOffset = nextRow;
+            for (JsonNode widget : widgets) {
+                if (!widget.isObject()) {
+                    continue;
+                }
+                ObjectNode composedWidget = widget.deepCopy();
+                String sourceWidgetId = composedWidget.path("id").asText("widget");
+                composedWidget.put("id", WORKBENCH_CONTRIBUTION_ID_PREFIX
+                        + contribution.getCode() + "-" + sourceWidgetId);
+                composedWidget.put("y", contributionOffset + Math.max(0, composedWidget.path("y").asInt(0)));
+                composedWidgets.add(composedWidget);
+            }
+            nextRow = maxWidgetBottom(composedWidgets);
+        }
+
+        workbench.setWidgets(composedWidgets);
+        return workbench;
+    }
+
+    private int maxWidgetBottom(ArrayNode widgets) {
+        int maxBottom = 0;
+        for (JsonNode widget : widgets) {
+            int y = Math.max(0, widget.path("y").asInt(0));
+            int height = Math.max(1, widget.path("h").asInt(1));
+            maxBottom = Math.max(maxBottom, y + height);
+        }
+        return maxBottom;
     }
 
     // ==================== Private Helper Methods ====================

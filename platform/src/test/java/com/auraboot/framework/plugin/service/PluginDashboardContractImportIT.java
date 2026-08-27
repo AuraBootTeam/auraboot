@@ -71,6 +71,7 @@ class PluginDashboardContractImportIT extends BaseIntegrationTest {
                 .scope("global")
                 .status("published")
                 .layoutConfig(Map.of("columns", 12, "rowHeight", 100, "gap", 16))
+                .extension(Map.of("workbenchContribution", Map.of("enabled", true)))
                 .widgets(widgets)
                 .build();
     }
@@ -130,6 +131,22 @@ class PluginDashboardContractImportIT extends BaseIntegrationTest {
                 "SELECT jsonb_array_length(widgets) FROM ab_dashboard WHERE code = ? AND tenant_id = ? AND deleted_flag = FALSE",
                 Integer.class, code, tenantId);
         assertThat(widgetCount).as("widgets JSONB array must contain all 3 widgets").isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("importDashboard stores workbench contribution extension")
+    void importDashboard_storesWorkbenchContributionExtension() {
+        String code = uniqueCode();
+        Long tenantId = getTestTenant().getId();
+
+        importer.importDashboard(buildDto(code, 1), "test-pid", "test-import-id",
+                tenantId, ImportRequest.ConflictStrategy.OVERWRITE);
+
+        Boolean enabled = jdbc.queryForObject(
+                "SELECT (extension #>> '{workbenchContribution,enabled}')::boolean "
+                        + "FROM ab_dashboard WHERE code = ? AND tenant_id = ? AND deleted_flag = FALSE",
+                Boolean.class, code, tenantId);
+        assertThat(enabled).isTrue();
     }
 
     @Test
