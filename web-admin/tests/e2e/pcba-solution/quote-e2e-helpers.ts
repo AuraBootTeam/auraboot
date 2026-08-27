@@ -530,6 +530,24 @@ export async function dynamicCreate(
   return pid;
 }
 
+async function createCustomerRequest(
+  page: Page,
+  data: Record<string, unknown>,
+  rows: CreatedRows['rows'],
+): Promise<string> {
+  const result = await executeCommand(
+    page,
+    'crm:create_customer_request',
+    data,
+    undefined,
+    'create',
+  );
+  const pid = String(result.recordId ?? result.recordPid ?? result.pid ?? result.id ?? '');
+  expect(pid, 'crm:create_customer_request should return customer request id').toBeTruthy();
+  rows.push({ model: 'crm_customer_request_common', pid });
+  return pid;
+}
+
 function extractRecords(body: unknown): Record<string, unknown>[] {
   const root = body as any;
   const data = root?.data?.data ?? root?.data ?? root;
@@ -839,17 +857,14 @@ async function seedQuoteScaffold(
       created.rows,
     );
 
-    const customerRequestId = await dynamicCreate(
+    const customerRequestId = await createCustomerRequest(
       page,
-      'crm_customer_request_common',
       {
-        crm_cr_code: `CR-E2E-${marker}-${suffix}`,
         crm_cr_title: `E2E ${marker} request ${suffix}`,
         crm_cr_account_id: accountId,
         crm_cr_type: 'pcba_quote',
-        crm_cr_status: 'draft',
         crm_cr_priority: 'normal',
-        crm_cr_source_channel: `quote_${marker.toLowerCase()}_e2e`,
+        crm_cr_source_channel: 'other',
       },
       created.rows,
     );

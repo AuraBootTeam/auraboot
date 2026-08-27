@@ -27,9 +27,13 @@ public class SystemTaskInitializer {
 
     private static final List<TaskDef> SYSTEM_TASKS = List.of(
             new TaskDef("sys-outbox-poll", "Outbox Poll & Dispatch",
-                    "interval", null, 500000L,
+                    "interval", null, 5000L,
                     "outboxWorkerImpl", "pollAndDispatch",
                     "Polls outbox table for pending events and dispatches them"),
+            new TaskDef("sys-outbox-reconcile", "Outbox Lease & DLQ Reconcile",
+                    "interval", null, 60000L,
+                    "outboxWorkerImpl", "reconcile",
+                    "Recovers expired dispatcher leases and materializes missing DLQ rows"),
             new TaskDef("sys-outbox-cleanup", "Outbox Cleanup Delivered",
                     "interval", null, 3600000L,
                     "outboxWorkerImpl", "cleanupDelivered",

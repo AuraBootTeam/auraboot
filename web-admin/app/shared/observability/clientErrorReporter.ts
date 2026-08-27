@@ -20,6 +20,16 @@ let installed = false;
 let reportCount = 0;
 const recentSignatures = new Map<string, number>();
 
+export interface ClientErrorReport {
+  errorType: string;
+  message: string;
+  stack?: string;
+  errorId?: string;
+  kind?: string;
+  status?: number;
+  pageUrl: string;
+}
+
 function sessionId(): string {
   try {
     const KEY = 'ab_client_session_id';
@@ -59,6 +69,24 @@ function send(payload: Record<string, unknown>): void {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Best-effort report from non-window sources (e.g. the React Router root error
+ * boundary). Shares the reporter's session id, throttling and de-duplication so
+ * boundary errors surface in /ops/errors with the same correlation context.
+ */
+export function reportClientError(details: ClientErrorReport): void {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  const signature = `boundary:${details.errorType}:${details.kind ?? ''}:${details.message}`;
+  if (!shouldReport(signature, now)) return;
+  send({
+    ...details,
+    userAgent: navigator.userAgent,
+    sessionId: sessionId(),
+    clientTimestamp: new Date(now).toISOString(),
+  });
 }
 
 export function installClientErrorReporter(): void {

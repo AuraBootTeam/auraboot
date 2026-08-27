@@ -3,6 +3,7 @@ import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
   dynamicCreate,
+  executeCommand,
   openQuoteDetailFromList,
   queryDynamicRecords,
   queryNamedDataSourceRecords,
@@ -60,17 +61,20 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
   const created: DeepSeekQuoteSeed = { quoteId: '', quoteCode, rows: [], lineId: '', mpn };
 
   try {
-    const accountId = await dynamicCreate(
+    const accountResult = await executeCommand(
       page,
-      'crm_account_common',
+      'crm:create_account',
       {
-        crm_acc_code: `ACC-E2E-DS-${suffix}`,
         crm_acc_name: `E2E DeepSeek Customer ${suffix}`,
         crm_acc_industry: 'electronics',
         crm_acc_status: 'active',
       },
-      created.rows,
+      undefined,
+      'create',
     );
+    const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+    expect(accountId, 'crm:create_account should return account id').toBeTruthy();
+    created.rows.push({ model: 'crm_account_common', pid: accountId });
 
     const projectId = await dynamicCreate(
       page,
@@ -85,20 +89,24 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
       created.rows,
     );
 
-    const customerRequestId = await dynamicCreate(
+    const requestResult = await executeCommand(
       page,
-      'crm_customer_request_common',
+      'crm:create_customer_request',
       {
-        crm_cr_code: `CR-E2E-DS-${suffix}`,
         crm_cr_title: `E2E DeepSeek request ${suffix}`,
         crm_cr_account_id: accountId,
         crm_cr_type: 'pcba_quote',
-        crm_cr_status: 'draft',
         crm_cr_priority: 'normal',
-        crm_cr_source_channel: 'quote_deepseek_e2e',
+        crm_cr_source_channel: 'other',
       },
-      created.rows,
+      undefined,
+      'create',
     );
+    const customerRequestId = String(
+      requestResult.recordId ?? requestResult.pid ?? requestResult.id ?? '',
+    );
+    expect(customerRequestId, 'crm:create_customer_request should return request id').toBeTruthy();
+    created.rows.push({ model: 'crm_customer_request_common', pid: customerRequestId });
 
     created.quoteId = await dynamicCreate(
       page,

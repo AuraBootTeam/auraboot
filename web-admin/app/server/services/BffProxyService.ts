@@ -11,26 +11,29 @@ import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 // Explicit HTTP agents that bypass system proxy (http_proxy/https_proxy env vars).
 // Without this, axios respects the proxy env vars and routes localhost requests
 // through the system proxy (e.g. Clash at 127.0.0.1:7891), causing 502 errors.
-const noProxyHttpAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: 100,
-  maxFreeSockets: 20,
-  keepAliveMsecs: 30000,
-});
-const noProxyHttpsAgent = new https.Agent({
-  keepAlive: true,
-  maxSockets: 100,
-  maxFreeSockets: 20,
-  keepAliveMsecs: 30000,
-});
+//
+// keepAlive is intentionally OFF. Every proxied hop targets Spring Boot on the
+// loopback, where a fresh TCP connection costs fractions of a millisecond, so
+// pooling buys nothing measurable. Reuse, on the other hand, owns an entire
+// failure class: Tomcat closes idle kept-alive sockets at its connection-timeout
+// (and after its max-keep-alive-requests count), and a request that grabs a
+// socket in that closing window dies with ECONNRESET — surfaced to the admin UI
+// as "Failed to connect to backend service" (two occurrences of exactly that on
+// GET /api/auth/me, 2026-08-27 12:58 / 13:21). Node's agent cannot cull free
+// sockets independently of active ones without also arming an inactivity timeout
+// against long-running proxied operations, so the race is eliminated by not
+// reusing sockets rather than papered over with retries.
+const noProxyHttpAgent = new http.Agent({ keepAlive: false });
+const noProxyHttpsAgent = new https.Agent({ keepAlive: false });
 
 /**
  * Whether the backend operation is expected to outlive the default 60-second
  * interactive proxy budget.
  *
- * BOM format exploration performs one bounded LLM call before returning a
- * deterministic patch. Treating it as an ordinary command caused the BFF to
- * return 502 while the backend was still waiting for a valid model response.
+ * BOM conversion start freezes the deterministic ParsePlan and immutable source
+ * evidence before dispatching the worker; format exploration may perform one
+ * bounded LLM call. Treating either as an ordinary command can make the BFF time
+ * out while the backend is still completing an accepted operation.
  */
 export function isLongRunningProxyPath(path: string): boolean {
   const pathname = path.split('?')[0];
@@ -38,6 +41,7 @@ export function isLongRunningProxyPath(path: string): boolean {
     pathname.includes('/plugins/import') ||
     pathname.includes('/plugins/packages') ||
     pathname.includes('/deploy') ||
+    /\/meta\/commands\/execute\/bom:start_conversion(?:\/|$)/.test(pathname) ||
     /\/meta\/commands\/execute\/bom:explore_format(?:\/|$)/.test(pathname)
   );
 }
@@ -367,6 +371,10 @@ export class BffProxyService {
             path: parsedUrl.pathname + parsedUrl.search,
             method: req.method,
             headers,
+            // Same no-proxy + fresh-connection policy as the axios branch above;
+            // the global agent would silently re-enable system-proxy detection
+            // and connection reuse for this path.
+            agent: isHttps ? noProxyHttpsAgent : noProxyHttpAgent,
           },
           (proxyRes: http.IncomingMessage) => {
             logger.info(`[${requestId}] Multipart proxy response: ${proxyRes.statusCode}`);
@@ -947,7 +955,7 @@ export class BffProxyService {
    */
   private handleProxyError(error: any, res: Response): void {
     const errorMessage = error.message || 'Unknown error';
-    const errorCode = error.code || 'unknown';
+    const errorCode = String(error.code || 'unknown').toLowerCase();
     const errorStatus = error.response?.status || 'N/A';
     const errorStatusText = error.response?.statusText || 'N/A';
     const requestUrl = error.config?.url || 'Unknown URL';
@@ -1073,7 +1081,7 @@ export class BffProxyService {
         status,
         timestamp: new Date().toISOString(),
       });
-    } else if (error.code === 'econnrefused') {
+    } else if (errorCode === 'econnrefused') {
       logger.error(`🔌 Connection Refused [${errorCode}] - ${requestMethod} ${requestUrl}`, {
         message: errorMessage,
         suggestion: 'Backend service is not running or not accessible',
@@ -1086,7 +1094,23 @@ export class BffProxyService {
         details: 'Connection refused - please check if the backend service is running',
         timestamp: new Date().toISOString(),
       });
-    } else if (error.code === 'etimedout' || error.code === 'enotfound') {
+    } else if (errorCode === 'econnaborted') {
+      logger.error(`⏰ Backend Request Timeout [${errorCode}] - ${requestMethod} ${requestUrl}`, {
+        message: errorMessage,
+        suggestion: 'The backend may still be processing; check the resulting task before retrying',
+        backendUrl: this.backendUrl,
+      });
+
+      res.status(504).json({
+        error: 'Gateway Timeout',
+        code: 'BACKEND_REQUEST_TIMEOUT',
+        message:
+          'The backend request timed out. The operation may still be processing. Check the task or record list before retrying.',
+        details:
+          'Do not submit the same operation again until you confirm whether it was accepted.',
+        timestamp: new Date().toISOString(),
+      });
+    } else if (errorCode === 'etimedout' || errorCode === 'enotfound') {
       logger.error(`⏰ Network Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
         message: errorMessage,
         suggestion: 'Network connectivity issue or DNS resolution failure',

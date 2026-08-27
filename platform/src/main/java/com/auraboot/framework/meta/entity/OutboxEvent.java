@@ -1,6 +1,10 @@
 package com.auraboot.framework.meta.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.ibatis.type.JdbcType;
@@ -35,6 +39,34 @@ public class OutboxEvent {
     @TableField("command_code")
     private String commandCode;
 
+    @TableField("schema_version")
+    private String schemaVersion;
+
+    @TableField("event_source")
+    private String eventSource;
+
+    @TableField("subject")
+    private String subject;
+
+    @TableField("occurred_at")
+    private Instant occurredAt;
+
+    @TableField("correlation_id")
+    private String correlationId;
+
+    @TableField("causation_id")
+    private String causationId;
+
+    @TableField("ordering_key")
+    private String orderingKey;
+
+    @TableField("event_sequence")
+    private Long eventSequence;
+
+    @TableField(value = "headers", jdbcType = JdbcType.OTHER,
+            typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
+    private String headers;
+
     @TableField(value = "payload", jdbcType = JdbcType.OTHER,
             typeHandler = com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler.class)
     private String payload;
@@ -53,6 +85,21 @@ public class OutboxEvent {
 
     @TableField("last_error")
     private String lastError;
+
+    @TableField("lease_owner")
+    private String leaseOwner;
+
+    @TableField("lease_token")
+    private String leaseToken;
+
+    @TableField("lease_until")
+    private Instant leaseUntil;
+
+    @TableField("claimed_at")
+    private Instant claimedAt;
+
+    @TableField("replay_count")
+    private Integer replayCount;
 
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Instant createdAt;

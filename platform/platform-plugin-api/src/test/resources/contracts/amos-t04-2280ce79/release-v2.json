@@ -1,0 +1,25 @@
+{
+  "contractVersion": "amos.quality-hold.consumer.v1",
+  "eventId": "qhr_222222222222222222222222",
+  "eventType": "quality.hold.released.v1",
+  "tenantId": "42",
+  "decisionId": "INS-QUALITY-001",
+  "decisionVersion": 2,
+  "factType": "RELEASE",
+  "inspectionId": "INS-QUALITY-001",
+  "sourceFactType": "MRB_DISPOSITION",
+  "sourceFactId": "mrb-disposition-001",
+  "sourceSequence": 1,
+  "reasonCode": "CONCESSION",
+  "specificationVersion": null,
+  "actorId": "mrb-chair-001",
+  "occurredAt": "2026-08-23T05:06:07Z",
+  "evidenceIds": ["NCR-001"],
+  "identities": [
+    {"type": "LOT", "value": "LOT-20260823-A"},
+    {"type": "SERIAL", "value": "SN-0001"},
+    {"type": "CONTAINER", "value": "HU-0009"}
+  ],
+  "quantity": "4",
+  "uom": "EA"
+}

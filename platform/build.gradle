@@ -571,6 +571,9 @@ test {
         if (!project.hasProperty('includeLiveEvals')) {
             excludeTags 'agent-eval-live'
         }
+        // Full bootstrap intentionally replaces the platform root data. Keep it in a
+        // terminal, single-test task so it cannot erase fixtures beneath the shared suite.
+        excludeTags 'destructive-bootstrap'
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
@@ -633,6 +636,34 @@ test {
     }
 
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+}
+
+tasks.register('bootstrapBillingAccountTest', Test) {
+    group = 'verification'
+    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    useJUnitPlatform {
+        includeTags 'destructive-bootstrap'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    mustRunAfter tasks.named('test')
+    // The database is recreated outside Gradle, so task outputs cannot prove the external
+    // bootstrap contract was re-executed for this run.
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+
+    def bootstrapTestTmpDir = file("${buildDir}/tmp/bootstrapBillingAccountTest")
+    bootstrapTestTmpDir.mkdirs()
+    systemProperty 'java.io.tmpdir', bootstrapTestTmpDir.absolutePath
+    systemProperty 'spring.test.context.cache.maxSize', '1'
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
 }
 
 // Dedicated task for running BPM tests (excluded from the default test task)

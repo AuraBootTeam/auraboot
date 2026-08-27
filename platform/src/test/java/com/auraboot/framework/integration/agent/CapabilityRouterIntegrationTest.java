@@ -1,7 +1,9 @@
 package com.auraboot.framework.integration.agent;
 
 import com.auraboot.framework.agent.service.CapabilityRouter;
+import com.auraboot.framework.agent.service.SkillAutoGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CapabilityRouterIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private CapabilityRouter router;
+    @Autowired private SkillAutoGenerator skillAutoGenerator;
+
+    @BeforeEach
+    void seedBuiltinSkillsForTestTenant() {
+        // The application bootstrap runs before BaseIntegrationTest creates its
+        // tenant. Make this late-created fixture explicit instead of relying on
+        // data left by another test or a pre-seeded database.
+        skillAutoGenerator.syncSkills(testTenant.getId());
+    }
 
     @Test
     @DisplayName("query intent on crm_* model routes to dsl.query")

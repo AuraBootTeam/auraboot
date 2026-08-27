@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.service.CommandExecutor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * called {@code effectExecutor.saveAuditLog(...)} unconditionally.
  */
 @DisplayName("CommandExecutor — dry-run suppresses failure-path audit log (PR-56 C4)")
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AuditTrailDryRunIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private CommandExecutor commandExecutor;

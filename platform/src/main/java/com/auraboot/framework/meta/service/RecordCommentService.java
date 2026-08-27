@@ -129,30 +129,39 @@ public class RecordCommentService {
     /** Backward-compatible entry used by automation and event-policy actions. */
     @Transactional
     public Map<String, Object> addComment(String modelCode, String recordPid, String content, String mentions) {
-        return insertComment(modelCode, recordPid, content, parseLegacyMentions(mentions), null, false);
+        return insertComment(modelCode, recordPid, content, parseLegacyMentions(mentions), mentions, null, false);
     }
 
     /** Interactive UI entry: supports replies, validated user mentions, and notifications. */
     @Transactional
     public Map<String, Object> addInteractiveComment(String modelCode, String recordPid, String content,
                                                       List<String> mentionUserPids, String requestedParentPid) {
-        return insertComment(modelCode, recordPid, content, mentionUserPids, requestedParentPid, true);
+        return insertComment(modelCode, recordPid, content, mentionUserPids, null, requestedParentPid, true);
     }
 
     private Map<String, Object> insertComment(String modelCode, String recordPid, String content,
-                                              List<String> mentionUserPids, String requestedParentPid,
+                                              List<String> mentionUserPids, String legacyMentions,
+                                              String requestedParentPid,
                                               boolean notifyRecipients) {
         String normalizedContent = validateContent(content);
         VisibleRecord visibleRecord = assertRecordVisible(modelCode, recordPid);
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
-        List<String> mentions = validateMentionPids(tenantId, mentionUserPids);
+        List<String> mentions = notifyRecipients
+                ? validateMentionPids(tenantId, mentionUserPids)
+                : List.copyOf(mentionUserPids);
         ReplyTarget replyTarget = resolveReplyTarget(
                 tenantId, modelCode, recordPid, requestedParentPid);
         String commentPid = UniqueIdGenerator.generate();
         String actorName = resolveActorName(userId);
-        String mentionsJson = writeMentionPids(mentions);
+        // Automation/event-policy callers historically persist opaque targets
+        // such as ROLE:wd_manager. Interactive comments use validated user-PID
+        // JSON, but the legacy non-notifying path must not silently erase its
+        // established expression contract.
+        String mentionsJson = legacyMentions != null && !legacyMentions.isBlank()
+                ? legacyMentions
+                : writeMentionPids(mentions);
 
         List<Map<String, Object>> result = jdbcTemplate.queryForList(
                 "INSERT INTO " + TABLE

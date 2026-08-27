@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.dto.ResetPasswordRequest;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.LoginRateLimiter;
 import com.auraboot.framework.auth.service.PasswordManagementService;
+import com.auraboot.framework.auth.service.SessionRenewalService;
 import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -37,6 +38,8 @@ class AuthControllerSelfServicePasswordTest {
     private PasswordManagementService passwordManagementService;
     @Mock
     private LoginRateLimiter loginRateLimiter;
+    @Mock
+    private SessionRenewalService sessionRenewalService;
     @Mock
     private SystemModeService systemModeService;
 
@@ -108,7 +111,8 @@ class AuthControllerSelfServicePasswordTest {
                 authService,
                 userInfoService,
                 passwordManagementService,
-                loginRateLimiter);
+                loginRateLimiter,
+                sessionRenewalService);
         ReflectionTestUtils.setField(controller, "passwordSelfServiceEnabled", selfServiceEnabled);
         return controller;
     }

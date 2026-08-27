@@ -20,6 +20,12 @@ public interface SessionManagementService {
     boolean isSessionValid(String token);
 
     /**
+     * Resolve the session row behind a bearer token, or null when no session
+     * matches. Used by sliding renewal to enforce the absolute session window.
+     */
+    UserSession findByToken(String token);
+
+    /**
      * Revoke a specific session by PID.
      */
     void revokeSession(Long userId, String sessionPid);

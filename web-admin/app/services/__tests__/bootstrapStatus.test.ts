@@ -20,6 +20,9 @@ describe('bootstrapStatus', () => {
 
     const { fetchBootstrapStatus } = await import('../bootstrapStatus');
     await expect(fetchBootstrapStatus()).resolves.toMatchObject({ initialized: true });
-    expect(fetchMock).toHaveBeenCalledWith('/api/bootstrap/status');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/bootstrap/status',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });

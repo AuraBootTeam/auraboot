@@ -53,7 +53,7 @@ let S: { bom?: string; coord?: string; gerber?: string } = {};
 async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
   const data: any = { payload, operationType: op };
   if (target) data.targetRecordPid = target;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
+  const r = await page.context().request.post(`/api/meta/commands/execute/${code}`, { data });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.data?.recordId || b?.data?.data?.quote?.pid || b?.data?.recordPid || b?.data?.recordId;
@@ -65,14 +65,14 @@ function mimeFor(name: string): string {
 }
 async function upload(page: Page, filePath: string, name: string) {
   const buf = fs.readFileSync(filePath);
-  const r = await page.request.post('/api/file/upload', {
+  const r = await page.context().request.post('/api/file/upload', {
     multipart: { file: { name, mimeType: mimeFor(name), buffer: buf } },
   });
   return (await r.json())?.data?.fileId;
 }
 
 async function countQuoteLines(page: Page, quoteId: string): Promise<number> {
-  const r = await page.request.get('/api/dynamic/qo_quote_line_common/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc');
+  const r = await page.context().request.get('/api/dynamic/qo_quote_line_common/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc');
   const b = await r.json().catch(() => ({} as any));
   const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
   return (Array.isArray(recs) ? recs : []).filter((line: any) => String(line.qo_ql_quote_id || '') === String(quoteId)).length;

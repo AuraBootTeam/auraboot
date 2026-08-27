@@ -26,7 +26,7 @@ let created: BomWorkbenchSeed | undefined;
 async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
   const data: any = { payload, operationType: op };
   if (target) data.targetRecordPid = target;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, {
+  const r = await page.context().request.post(`/api/meta/commands/execute/${code}`, {
     data,
     timeout: 150_000,
   });
@@ -34,7 +34,7 @@ async function post(page: Page, code: string, payload: any, op = 'create', targe
 }
 async function listLines(page: Page): Promise<any[]> {
   // server-side {field:value} filters are rejected (code 40000); fetch a recent page + filter client-side
-  const r = await page.request.get(
+  const r = await page.context().request.get(
     `/api/dynamic/bom_standard_line_pcba/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc`,
   );
   const b = await r.json().catch(() => ({}) as any);
@@ -256,7 +256,7 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
           )?.[1]) ||
         '';
       expect(exportFileId, 'BOM-07: regenerate response exposes export file id').toBeTruthy();
-      const download = await page.request.get(`/api/file/download/${exportFileId}`);
+      const download = await page.context().request.get(`/api/file/download/${exportFileId}`);
       expect(download.status(), 'BOM-07: regenerated export is downloadable').toBe(200);
       const workbook = XLSX.read(await download.body(), { type: 'buffer' });
       const bomText = XLSX.utils

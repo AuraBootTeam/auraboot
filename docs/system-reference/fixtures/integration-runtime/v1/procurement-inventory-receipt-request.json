@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "evt-procurement-receipt-request-001",
+  "eventType": "procurement.purchase-order.receipt-requested.v1",
+  "source": "procurement",
+  "subject": "purchase-order/PO-20260823-001",
+  "occurredAt": "2026-08-23T12:00:00Z",
+  "tenantId": 420001,
+  "correlationId": "corr-po-20260823-001",
+  "causationId": "pr:receive_purchase_order/RR-20260823-001",
+  "orderingKey": "purchase-order/PO-20260823-001",
+  "sequence": 1,
+  "payload": {
+    "purchaseOrderPid": "PO-20260823-001",
+    "receiptRequestPid": "RR-20260823-001",
+    "sourceVersion": 7,
+    "warehousePid": "WH-001",
+    "lines": [
+      {
+        "linePid": "POL-001",
+        "materialPid": "MAT-001",
+        "quantity": "12.500",
+        "uom": "EA"
+      }
+    ]
+  },
+  "headers": {
+    "contentType": "application/json",
+    "contractOwner": "AMOS-T01"
+  }
+}

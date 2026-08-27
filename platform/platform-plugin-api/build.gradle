@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'jacoco'
     id 'maven-publish'
 }
 
@@ -35,6 +36,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.21.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -45,6 +47,14 @@ compileJava {
 
 test {
     useJUnitPlatform()
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 javadoc {

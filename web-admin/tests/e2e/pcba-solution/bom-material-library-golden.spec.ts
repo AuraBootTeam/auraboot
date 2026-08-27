@@ -21,6 +21,41 @@ import { test, expect } from '../../fixtures';
 
 const LIST = '/p/bom_material_master';
 
+async function openMaterialLibraryFromSidebar(page: Page): Promise<void> {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const link = page.getByTestId('sidebar').locator(`a[href="${LIST}"]`).first();
+  await expect(link, 'sidebar carries a link to the material library').toBeVisible({
+    timeout: 60_000,
+  });
+  await link.click();
+  await expect
+    .poll(async () => new URL(page.url()).pathname, { timeout: 30_000 })
+    .toBe(LIST);
+}
+
+async function openMaterialForEdit(page: Page, pid: string, code: string): Promise<void> {
+  await openMaterialLibraryFromSidebar(page);
+  const search = page.locator('main input[type="search"], main input[placeholder*="搜索"]').first();
+  if (await search.count()) {
+    await search.fill(code);
+    await search.press('Enter');
+  }
+  const row = page.locator('main tbody tr').filter({ hasText: code }).first();
+  await expect(row, `seeded material ${code} is visible in the list`).toBeVisible({
+    timeout: 30_000,
+  });
+  const edit = row.getByTestId('row-action-edit');
+  if (await edit.isVisible().catch(() => false)) {
+    await edit.click();
+  } else {
+    await row.getByTestId('row-action-more').click();
+    await page.getByTestId('row-action-edit').click();
+  }
+  await expect
+    .poll(async () => new URL(page.url()).pathname, { timeout: 30_000 })
+    .toContain(`/edit/${pid}`);
+}
+
 /** Seeds through the command layer: the page has no create entry point. */
 async function seedMaterial(page: Page, code: string): Promise<string> {
   const created = await page.request.post('/api/meta/commands/execute/bom:create_material', {
@@ -65,10 +100,7 @@ test.describe('BOM material library page @smoke', () => {
     const code = `UIGOLD-L${uid}`;
     await seedMaterial(page, code);
 
-    await page.goto(LIST, { waitUntil: 'domcontentloaded' });
-
-    // Reached by URL here; the sidebar route is asserted separately below so a
-    // navigation regression cannot hide behind a direct link.
+    await openMaterialLibraryFromSidebar(page);
     const table = page.locator('main table tbody tr');
     await expect
       .poll(async () => table.count(), { timeout: 60_000, intervals: [1_000, 2_000] })
@@ -96,9 +128,7 @@ test.describe('BOM material library page @smoke', () => {
       'seeded row already carries a match text',
     ).not.toBe('');
 
-    await page.goto(`/p/bom_material_master/edit/${seededPid}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await openMaterialForEdit(page, seededPid, code);
 
     const spec = page.locator('input[name="bom_mm_spec_model"], textarea[name="bom_mm_spec_model"]').first();
     await expect(spec, 'spec field is editable on the form page').toBeVisible({ timeout: 45_000 });
@@ -137,9 +167,7 @@ test.describe('BOM material library page @smoke', () => {
   test('the form refuses a save that would leave a required field empty', async ({ page }) => {
     const code = `UIGOLD-R${uid}`;
     const seededPid = await seedMaterial(page, code);
-    await page.goto(`/p/bom_material_master/edit/${seededPid}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await openMaterialForEdit(page, seededPid, code);
 
     const spec = page.locator('input[name="bom_mm_spec_model"], textarea[name="bom_mm_spec_model"]').first();
     await expect(spec).toBeVisible({ timeout: 45_000 });
@@ -167,7 +195,7 @@ test.describe('BOM material library page @smoke', () => {
   test('the page offers no way to create a material, which is why the command is unreachable', async ({
     page,
   }) => {
-    await page.goto(LIST, { waitUntil: 'domcontentloaded' });
+    await openMaterialLibraryFromSidebar(page);
     await expect
       .poll(async () => page.locator('main table tbody tr').count(), { timeout: 60_000 })
       .toBeGreaterThan(0);
@@ -204,14 +232,7 @@ test.describe('BOM material library page @smoke', () => {
 
 test.describe('BOM material library navigation @smoke', () => {
   test('the library is reachable from the sidebar, not only by URL', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    const link = page.locator(`nav a[href="${LIST}"], aside a[href="${LIST}"]`).first();
-    await expect(link, 'sidebar carries a link to the material library').toBeVisible({
-      timeout: 60_000,
-    });
-    await link.click();
-    await expect
-      .poll(async () => new URL(page.url()).pathname, { timeout: 30_000 })
-      .toContain(path.posix.basename(LIST));
+    await openMaterialLibraryFromSidebar(page);
+    expect(new URL(page.url()).pathname).toContain(path.posix.basename(LIST));
   });
 });

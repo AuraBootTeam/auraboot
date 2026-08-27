@@ -181,7 +181,7 @@ stage_requested_backend_jars() {
       | tr -d '\r' | awk '$1 == "Plugin-Class:" { print $2; exit }')"
     [ "$jar_entry_class" = "$entry_class" ] \
       || die "plugin backend entryClass mismatch for $plugin_name: declared=$entry_class jar=${jar_entry_class:-missing}"
-    entry_class_path="${entry_class//./\/}.class"
+    entry_class_path="$(printf '%s' "$entry_class" | tr '.' '/').class"
     jar tf "$jar_path" | grep -Fxq "$entry_class_path" \
       || die "plugin backend entryClass is missing from jar for $plugin_name: $entry_class_path"
     staged_path="$sd/pf4j-plugins/$(basename "$jar_path")"

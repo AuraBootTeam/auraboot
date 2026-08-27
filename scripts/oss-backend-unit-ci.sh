@@ -58,6 +58,31 @@ for image in \
   fi
 done
 
+PLAYWRIGHT_CLI="$PROJECT_ROOT/web-admin/node_modules/.bin/playwright"
+[[ -x "$PLAYWRIGHT_CLI" ]] \
+  || environment_invalid 'web-admin lockfile dependencies do not provide Playwright'
+
+# Playwright 1.60 predates Ubuntu 26.04 and otherwise refuses to resolve a browser archive for
+# that host label. Ubuntu 26.04 is forward-compatible with the pinned Ubuntu 24.04 browser build;
+# keep using Playwright's lockfile revision instead of drifting to an ambient system browser.
+if [[ -r /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  if [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "26.04" ]]; then
+    case "$(uname -m)" in
+      x86_64) export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24.04-x64" ;;
+      aarch64|arm64) export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE="ubuntu24.04-arm64" ;;
+      *) environment_invalid "unsupported Ubuntu 26.04 architecture for Playwright: $(uname -m)" ;;
+    esac
+  fi
+fi
+
+if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
+    timeout 10m "$PLAYWRIGHT_CLI" install chromium \
+    > "$ARTIFACTS/playwright-install.log" 2>&1; then
+  environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
+fi
+
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
   environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
 fi
@@ -140,4 +165,4 @@ SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
 SPRING_DATA_REDIS_PORT='26389' \
 SPRING_DATA_REDIS_URL='redis://127.0.0.1:26389' \
-platform/gradlew -p platform test
+platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest

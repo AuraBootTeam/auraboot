@@ -3,26 +3,21 @@ import { useSSE } from '~/hooks/useSSE';
 import { Link } from 'react-router';
 import {
   Bars3Icon,
-  BuildingOffice2Icon,
-  Cog6ToothIcon,
-  PowerIcon,
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
   GlobeAltIcon,
-  InformationCircleIcon,
   SparklesIcon,
-  IdentificationIcon,
 } from '@heroicons/react/24/outline';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
-import { useSmartText } from '~/utils/i18n';
 import { useHydrated } from '~/hooks/useHydrated';
 import { InboxHeaderWidget } from '~/ui/inbox/InboxDropdown';
 import { NotificationHeaderWidget } from '~/ui/notification/NotificationHeaderWidget';
 import { CommandPalette } from '~/ui/CommandPalette';
+import { UserMenuWidget } from '~/ui/user/UserMenuWidget';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
 interface HeaderProps {
@@ -33,16 +28,6 @@ interface HeaderProps {
   showNotifications?: boolean;
   showLanguageSwitch?: boolean;
   simplified?: boolean;
-}
-
-interface PartyActorOption {
-  partyId: string;
-  partyMembershipId: string;
-  displayName: string;
-  partyType: string;
-  lifecycleStatus: string;
-  membershipStatus: string;
-  current: boolean;
 }
 
 export default function Header({
@@ -56,38 +41,23 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
-  const showBusinessWorkspaceSwitcher = rootData?.accessPolicy?.deploymentMode !== 'single';
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   const hasMenus = (rootData?.menus?.length ?? 0) > 0;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
-  const st = useSmartText();
   const isHydrated = useHydrated();
 
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
-  const [spaces, setSpaces] = useState<
-    Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>
-  >([]);
-  const [actors, setActors] = useState<PartyActorOption[]>([]);
   // Hydration marker (same pattern as Login.tsx): the SSR header renders the
   // avatar long before React attaches its click handlers, so E2E must be able
   // to wait for interactivity instead of clicking a dead button.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const userDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
-  const workspaceLabel = st('$i18n:header.workspaces', 'Workspaces');
-  const platformConsoleLabel = st('$i18n:header.platform_console', 'Platform Console');
-  const aboutLabel = t(
-    'about.menuLabel',
-    { productName: branding.productName },
-    locale === 'zh-CN' ? `关于 ${branding.productName}` : `About ${branding.productName}`,
-  );
   const sidebarToggleLabel = sidebarOpen
     ? t('sidebar.closeMenu', undefined, 'Close navigation menu')
     : t('sidebar.openMenu', undefined, 'Open navigation menu');
@@ -110,27 +80,6 @@ export default function Header({
     !!envChipLabel &&
     !!user?.tenantName &&
     user.tenantName.toLowerCase().endsWith(envChipLabel.toLowerCase());
-
-  // Lazy-load spaces for tenant switching in avatar menu
-  useEffect(() => {
-    if (!user || simplified) return;
-    fetch('/api/tenant-selection/my-spaces')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((result) => {
-        if (result?.data) setSpaces(result.data);
-      })
-      .catch(() => {});
-  }, [user, simplified]);
-
-  useEffect(() => {
-    if (!user || simplified || !rootData?.accessPolicy?.actorSwitchEnabled) return;
-    fetch('/api/actors')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((result) => {
-        if (Array.isArray(result?.data)) setActors(result.data);
-      })
-      .catch(() => {});
-  }, [user, simplified, rootData?.accessPolicy?.actorSwitchEnabled]);
 
   // Connect to SSE for real-time data sync via useSSE hook
   // (provides exponential backoff, tab visibility pause, and proper cleanup)
@@ -160,12 +109,9 @@ export default function Header({
     ],
   });
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
-        setShowUserDropdown(false);
-      }
       if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
         setShowThemeDropdown(false);
       }
@@ -176,7 +122,6 @@ export default function Header({
 
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setShowUserDropdown(false);
         setShowThemeDropdown(false);
         setShowLangDropdown(false);
       }
@@ -204,389 +149,198 @@ export default function Header({
   ];
 
   return (
-    <header
-      className="print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
-      data-print="hide"
-      data-hydrated={hydrated ? 'true' : 'false'}
-    >
-      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-2 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
-        {/* Left: logo and menu button */}
-        <div className="flex min-w-0 items-center">
-          {showSidebar && hasMenus && (
-            <button
-              type="button"
-              aria-controls="app-sidebar"
-              aria-expanded={Boolean(sidebarOpen)}
-              aria-label={sidebarToggleLabel}
-              data-testid="header-sidebar-toggle"
-              className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-600 shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none lg:hidden dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:focus:ring-offset-gray-800"
-              onClick={() => setSidebarOpen?.(!sidebarOpen)}
-            >
-              <Bars3Icon className="h-6 w-6" />
-            </button>
-          )}
-
-          <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
-            <img
-              className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
-              src={branding.logoUrl}
-              alt={branding.productName}
-            />
-            <span
-              data-testid="header-brand-name"
-              className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
-            >
-              {branding.productName}
-            </span>
-            {envChipLabel && (
-              <span
-                data-testid="header-env-chip"
-                className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
-              >
-                {envChipLabel}
-              </span>
-            )}
-          </Link>
-
-          {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
-          {!simplified && user?.tenantName && !tenantDuplicatesChip && (
-            <span className="ms-3 hidden items-center text-sm text-gray-400 2xl:flex dark:text-gray-500">
-              <span className="mx-2">·</span>
-              <span data-testid="current-tenant-name">{user.tenantName}</span>
-            </span>
-          )}
-        </div>
-
-        {/* Right: toolbar */}
-        <div className="flex shrink-0 items-center gap-1">
-          {/* Global search Cmd+K */}
-          {!simplified && <CommandPalette />}
-
-          {/* AuraBot toggle */}
-          {!simplified && (
-            <button
-              onClick={toggleAI}
-              data-testid="ai-panel-toggle"
-              className={`hidden h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md sm:flex ${
-                aiState.panelState === 'expanded'
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-              }`}
-              title="AuraBot (⌘J)"
-            >
-              <SparklesIcon className="h-5 w-5" />
-            </button>
-          )}
-
-          {/* Unified inbox entry point */}
-          {!simplified && showNotifications && <InboxHeaderWidget />}
-
-          {/* Notification centre bell (unread badge + SSE live updates) */}
-          {!simplified && showNotifications && <NotificationHeaderWidget />}
-
-          {/* Language switch — only shown in non-compact mode */}
-          {!simplified && showLanguageSwitch && (
-            <div
-              className="relative hidden sm:block"
-              ref={langDropdownRef}
-              data-testid="lang-toggle"
-            >
+    <>
+      <header
+        className="print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
+        data-print="hide"
+        data-hydrated={hydrated ? 'true' : 'false'}
+      >
+        <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-2 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
+          {/* Left: logo and menu button */}
+          <div className="flex min-w-0 items-center">
+            {showSidebar && hasMenus && (
               <button
-                onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                type="button"
+                aria-controls="app-sidebar"
+                aria-expanded={Boolean(sidebarOpen)}
+                aria-label={sidebarToggleLabel}
+                data-testid="header-sidebar-toggle"
+                className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-600 shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none lg:hidden dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:focus:ring-offset-gray-800"
+                onClick={() => setSidebarOpen?.(!sidebarOpen)}
               >
-                <GlobeAltIcon className="h-5 w-5" />
+                <Bars3Icon className="h-6 w-6" />
               </button>
+            )}
 
-              {showLangDropdown && (
-                <div
-                  data-testid="lang-dropdown"
-                  className="absolute end-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                >
-                  {languageOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setLocale(option.value);
-                        setShowLangDropdown(false);
-                      }}
-                      className={`flex w-full items-center px-4 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        locale === option.value
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                          : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      <span className="me-2.5">{option.flag}</span>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Theme switch */}
-          <div
-            className="relative hidden sm:block"
-            ref={themeDropdownRef}
-            data-testid="theme-toggle"
-          >
-            <button
-              onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-            >
-              {isHydrated && isDark ? (
-                <MoonIcon className="h-6 w-6" />
-              ) : (
-                <SunIcon className="h-6 w-6" />
-              )}
-            </button>
-
-            {showThemeDropdown && (
-              <div
-                data-testid="theme-dropdown"
-                className="absolute end-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+            <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
+              <img
+                className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
+                src={branding.logoUrl}
+                alt={branding.productName}
+              />
+              <span
+                data-testid="header-brand-name"
+                className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
               >
-                {themeOptions.map((option) => {
-                  const IconComponent = option.icon;
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setTheme(option.value as any);
-                        setShowThemeDropdown(false);
-                      }}
-                      className={`flex w-full items-center px-4 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        theme === option.value
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                          : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      <IconComponent className="me-3 h-4 w-4" />
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
+                {branding.productName}
+              </span>
+              {envChipLabel && (
+                <span
+                  data-testid="header-env-chip"
+                  className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
+                >
+                  {envChipLabel}
+                </span>
+              )}
+            </Link>
+
+            {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
+            {!simplified && user?.tenantName && !tenantDuplicatesChip && (
+              <span className="ms-3 hidden items-center text-sm text-gray-400 2xl:flex dark:text-gray-500">
+                <span className="mx-2">·</span>
+                <span data-testid="current-tenant-name">{user.tenantName}</span>
+              </span>
             )}
           </div>
 
-          {/* Divider */}
-          {user && <span className="mx-1.5 h-5 w-px bg-[#e3e8ee] dark:bg-gray-700" aria-hidden />}
+          {/* Right: toolbar */}
+          <div className="flex shrink-0 items-center gap-1">
+            {/* Global search Cmd+K */}
+            {!simplified && <CommandPalette />}
 
-          {/* User menu */}
-          {user ? (
-            <div className="relative" ref={userDropdownRef} data-testid="user-menu">
+            {/* AuraBot toggle */}
+            {!simplified && (
               <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
+                onClick={toggleAI}
+                data-testid="ai-panel-toggle"
+                className={`hidden h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md sm:flex ${
+                  aiState.panelState === 'expanded'
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+                }`}
+                title="AuraBot (⌘J)"
               >
-                <img
-                  className="h-[30px] w-[30px] rounded-full border border-[#e3e8ee] object-cover shadow-sm dark:border-gray-700"
-                  src="/avatar.jpeg"
-                  alt="User avatar"
-                />
+                <SparklesIcon className="h-5 w-5" />
+              </button>
+            )}
+
+            {/* Unified inbox entry point */}
+            {!simplified && showNotifications && <InboxHeaderWidget />}
+
+            {/* Notification centre bell (unread badge + SSE live updates) */}
+            {!simplified && showNotifications && <NotificationHeaderWidget />}
+
+            {/* Language switch — only shown in non-compact mode */}
+            {!simplified && showLanguageSwitch && (
+              <div
+                className="relative hidden sm:block"
+                ref={langDropdownRef}
+                data-testid="lang-toggle"
+              >
+                <button
+                  onClick={() => setShowLangDropdown(!showLangDropdown)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                >
+                  <GlobeAltIcon className="h-5 w-5" />
+                </button>
+
+                {showLangDropdown && (
+                  <div
+                    data-testid="lang-dropdown"
+                    className="absolute end-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                  >
+                    {languageOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setLocale(option.value);
+                          setShowLangDropdown(false);
+                        }}
+                        className={`flex w-full items-center px-4 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                          locale === option.value
+                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span className="me-2.5">{option.flag}</span>
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Theme switch */}
+            <div
+              className="relative hidden sm:block"
+              ref={themeDropdownRef}
+              data-testid="theme-toggle"
+            >
+              <button
+                onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              >
+                {isHydrated && isDark ? (
+                  <MoonIcon className="h-6 w-6" />
+                ) : (
+                  <SunIcon className="h-6 w-6" />
+                )}
               </button>
 
-              {showUserDropdown && (
+              {showThemeDropdown && (
                 <div
-                  data-testid="user-dropdown"
-                  className="absolute end-0 z-[70] mt-2 w-64 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                  data-testid="theme-dropdown"
+                  className="absolute end-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
                 >
-                  {/* User info */}
-                  <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user.name || t('user.defaultName')}
-                    </p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                      {user.email}
-                    </p>
-                  </div>
-
-                  {actors.length > 0 && (
-                    <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-                      <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        Business identity
-                      </p>
-                      {actors.map((actor) => {
-                        const selectable =
-                          actor.lifecycleStatus === 'active' && actor.membershipStatus === 'active';
-                        return (
-                          <button
-                            key={actor.partyMembershipId}
-                            type="button"
-                            disabled={!selectable || actor.current}
-                            data-testid={`actor-switch-${actor.partyId}`}
-                            onClick={() => {
-                              if (!selectable || actor.current) return;
-                              setShowUserDropdown(false);
-                              const form = document.createElement('form');
-                              form.method = 'POST';
-                              form.action = '/_action/switch-actor';
-                              const party = document.createElement('input');
-                              party.type = 'hidden';
-                              party.name = 'partyId';
-                              party.value = actor.partyId;
-                              form.appendChild(party);
-                              const redir = document.createElement('input');
-                              redir.type = 'hidden';
-                              redir.name = 'redirectTo';
-                              redir.value = '/';
-                              form.appendChild(redir);
-                              document.body.appendChild(form);
-                              form.submit();
-                            }}
-                            className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                              actor.current
-                                ? 'bg-violet-50 font-medium text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
-                                : selectable
-                                  ? 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                                  : 'cursor-not-allowed text-gray-400'
-                            }`}
-                          >
-                            <IdentificationIcon className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{actor.displayName}</span>
-                            {actor.current ? (
-                              <span className="ms-auto text-xs">&#10003;</span>
-                            ) : !selectable ? (
-                              <span className="ms-auto text-xs">{actor.lifecycleStatus}</span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Tenant list */}
-                  {showBusinessWorkspaceSwitcher &&
-                    spaces.filter((s) => s.spaceType === 'business').length > 0 && (
-                      <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-                        <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                          {workspaceLabel}
-                        </p>
-                        {spaces
-                          .filter((s) => s.spaceType === 'business')
-                          .map((space) => {
-                            const isCurrent = String(user.tenantId) === String(space.tenantId);
-                            return (
-                              <button
-                                key={space.tenantId}
-                                data-testid={`tenant-switch-${space.tenantId}`}
-                                onClick={() => {
-                                  if (isCurrent) return;
-                                  setShowUserDropdown(false);
-                                  const form = document.createElement('form');
-                                  form.method = 'POST';
-                                  form.action = '/_action/switch-space';
-                                  const tid = document.createElement('input');
-                                  tid.type = 'hidden';
-                                  tid.name = 'tenantId';
-                                  tid.value = space.tenantId;
-                                  form.appendChild(tid);
-                                  const redir = document.createElement('input');
-                                  redir.type = 'hidden';
-                                  redir.name = 'redirectTo';
-                                  redir.value = '/';
-                                  form.appendChild(redir);
-                                  document.body.appendChild(form);
-                                  form.submit();
-                                }}
-                                className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                                  isCurrent
-                                    ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                                }`}
-                              >
-                                <BuildingOffice2Icon
-                                  className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`}
-                                />
-                                <span className="truncate">
-                                  {space.tenantDisplayName || space.tenantName}
-                                </span>
-                                {isCurrent && (
-                                  <span className="ms-auto text-xs text-blue-500">&#10003;</span>
-                                )}
-                              </button>
-                            );
-                          })}
-                      </div>
-                    )}
-
-                  {/* Platform Console — only for platform_admin users */}
-                  {spaces.some((s) => s.spaceType === 'platform') && (
-                    <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                  {themeOptions.map((option) => {
+                    const IconComponent = option.icon;
+                    return (
                       <button
-                        data-testid="platform-console-link"
+                        key={option.value}
                         onClick={() => {
-                          setShowUserDropdown(false);
-                          const platformSpace = spaces.find((s) => s.spaceType === 'platform');
-                          if (!platformSpace) return;
-                          const form = document.createElement('form');
-                          form.method = 'POST';
-                          form.action = '/_action/switch-space';
-                          const tid = document.createElement('input');
-                          tid.type = 'hidden';
-                          tid.name = 'tenantId';
-                          tid.value = platformSpace.tenantId;
-                          form.appendChild(tid);
-                          const redir = document.createElement('input');
-                          redir.type = 'hidden';
-                          redir.name = 'redirectTo';
-                          redir.value = '/platform/plugins';
-                          form.appendChild(redir);
-                          document.body.appendChild(form);
-                          form.submit();
+                          setTheme(option.value as any);
+                          setShowThemeDropdown(false);
                         }}
-                        className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className={`flex w-full items-center px-4 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                          theme === option.value
+                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
                       >
-                        <Cog6ToothIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                        <span>{platformConsoleLabel}</span>
+                        <IconComponent className="me-3 h-4 w-4" />
+                        {option.label}
                       </button>
-                    </div>
-                  )}
-
-                  <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-                    <Link
-                      to="/about"
-                      data-testid="about-link"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                      onClick={() => setShowUserDropdown(false)}
-                    >
-                      <InformationCircleIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                      <span>{aboutLabel}</span>
-                    </Link>
-                  </div>
-
-                  {/* Logout */}
-                  <Link
-                    to="/logout"
-                    className="flex items-center px-4 py-2 text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"
-                    onClick={() => setShowUserDropdown(false)}
-                  >
-                    <PowerIcon className="me-3 h-4 w-4" />
-                    {t('user.logout')}
-                  </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center space-x-3">
-              <Link
-                to="/login"
-                className="font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-              >
-                {t('auth.login')}
-              </Link>
-              <Link
-                to="/signup"
-                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
-              >
-                {t('auth.register')}
-              </Link>
-            </div>
-          )}
+
+            {/* Account menu lives in UserMenuWidget (bottom-start corner) */}
+            {!user && (
+              <div className="flex items-center space-x-3">
+                <Link
+                  to="/login"
+                  className="font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                >
+                  {t('auth.login')}
+                </Link>
+                <Link
+                  to="/signup"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+                >
+                  {t('auth.register')}
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Account entry (avatar + profile/workspace/logout menu) —
+          pinned to the bottom-start corner of the viewport */}
+      <UserMenuWidget simplified={simplified} />
+    </>
   );
 }

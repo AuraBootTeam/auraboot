@@ -16,6 +16,7 @@
           "allow": [
             "meta.model.read",
             "page.page.read",
+            "party.party.read",
             "dashboard.saved_view.read",
             "bpm.process.read",
             "notification.view"
