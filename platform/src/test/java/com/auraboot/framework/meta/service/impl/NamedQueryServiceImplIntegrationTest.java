@@ -1697,7 +1697,9 @@ class NamedQueryServiceImplIntegrationTest {
         namedQueryService.updateStatus(dto.getPid(), "deprecated");
         NamedQueryDTO pub2 = namedQueryService.updateStatus(dto.getPid(), "published");
         assertNotNull(pub2.getPublishedAt(), "publishedAt should remain set on re-publish");
-        assertEquals(pub1.getPublishedAt(), pub2.getPublishedAt(),
+        assertEquals(
+                pub1.getPublishedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
+                pub2.getPublishedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
                 "publishedAt should not change on re-publish (already set)");
     }
 

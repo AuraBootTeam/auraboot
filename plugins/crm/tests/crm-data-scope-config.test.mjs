@@ -71,6 +71,15 @@ test('sales role can read every core model governed by its self scope', async ()
   }
 });
 
+test('opportunity create command auto-sets owner to the authenticated user', async () => {
+  const commands = await readJson('commands/crm_opportunity_common.json');
+  const create = commands.find((command) => command.code === 'crm:create_opportunity');
+  assert.ok(create, 'crm:create_opportunity must exist');
+  assert.deepEqual(create.autoSetFields?.crm_opp_owner, {
+    strategy: 'current_user_pid',
+  }, 'create must fill crm_opp_owner so self/dept scoped creators can reopen their own records');
+});
+
 test('explicit model permissions retain the resource/action metadata used by data scopes', async () => {
   const permissions = await readJson('permissions.json');
   const modelPermissions = permissions.filter((permission) => permission.code?.startsWith('model.'));

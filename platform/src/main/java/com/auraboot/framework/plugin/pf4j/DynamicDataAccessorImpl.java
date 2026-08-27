@@ -4,9 +4,12 @@ import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
 import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -212,7 +215,13 @@ public class DynamicDataAccessorImpl implements DataAccessor {
 
     /** The authoritative permit context is installed outside this adapter. */
     private <T> T withCommandAuthority(java.util.function.Supplier<T> operation) {
-        return operation.get();
+        try {
+            return operation.get();
+        } catch (AccessDeniedException | com.auraboot.framework.exception.PermissionDeniedException denied) {
+            // CATCH: public plugin boundary — translate host authorization types
+            // into the stable, transport-neutral DataAccessor contract.
+            throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, denied);
+        }
     }
 
     private static Map<String, Object> mutableCopy(Map<String, Object> data) {

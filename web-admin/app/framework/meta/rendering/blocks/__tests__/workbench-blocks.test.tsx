@@ -1142,6 +1142,34 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('localizes an i18n-backed failure message from the task record', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().locale = 'zh-CN';
+    runtime.getContext().t = (key: string) =>
+      key === 'bom.error.auto_continue_permission_denied'
+        ? '当前账号缺少完成 BOM 转换所需的数据权限'
+        : key;
+    runtime.getContext().state.task = {
+      status: 'failed',
+      error_message: '$i18n:bom.error.auto_continue_permission_denied',
+    };
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      context: '${state.task}',
+      statusField: 'status',
+      errorField: 'error_message',
+      failedStatuses: ['failed'],
+      titleMap: { failed: 'Conversion failed' },
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    const banner = screen.getByTestId('status-banner-task_status');
+    expect(banner).toHaveTextContent('当前账号缺少完成 BOM 转换所需的数据权限');
+    expect(banner).not.toHaveTextContent('$i18n:');
+  });
+
   it('formats datetime summary values instead of exposing raw transport timestamps', () => {
     const releasedAt = '2026-08-20T05:13:40.519+00:00';
     const runtime = makeRuntime() as any;

@@ -2,10 +2,13 @@ package com.auraboot.framework.auth;
 
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,9 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private SessionManagementService sessionManagementService;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     private final String testRunId = String.valueOf(System.currentTimeMillis());
 
     // Shared across ordered tests
@@ -41,7 +47,7 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("createSession_storesSessionInDatabase")
     void createSession_storesSessionInDatabase() {
         Long userId = getTestUser().getId();
-        sessionToken1 = "tok-" + testRunId + "-a";
+        sessionToken1 = newSessionToken("a");
 
         UserSession session = sessionManagementService.createSession(
                 userId, sessionToken1, "127.0.0.1", "TestBrowser/1.0");
@@ -65,7 +71,7 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
         // Ensure test 1 ran; if not, create session here
         if (sessionToken1 == null) {
             Long userId = getTestUser().getId();
-            sessionToken1 = "tok-" + testRunId + "-a";
+            sessionToken1 = newSessionToken("a");
             UserSession session = sessionManagementService.createSession(
                     userId, sessionToken1, "127.0.0.1", "TestBrowser/1.0");
             sessionPid1 = session.getPid();
@@ -86,7 +92,7 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
 
         // Ensure session exists
         if (sessionToken1 == null || sessionPid1 == null) {
-            sessionToken1 = "tok-" + testRunId + "-a";
+            sessionToken1 = newSessionToken("a");
             UserSession session = sessionManagementService.createSession(
                     userId, sessionToken1, "127.0.0.1", "TestBrowser/1.0");
             sessionPid1 = session.getPid();
@@ -120,8 +126,8 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
     void revokeAllSessions_invalidatesAllDevices() {
         Long userId = getTestUser().getId();
 
-        String token2 = "tok-" + testRunId + "-b";
-        String token3 = "tok-" + testRunId + "-c";
+        String token2 = newSessionToken("b");
+        String token3 = newSessionToken("c");
 
         sessionManagementService.createSession(userId, token2, "10.0.0.1", "BrowserB/2.0");
         sessionManagementService.createSession(userId, token3, "10.0.0.2", "BrowserC/3.0");
@@ -152,7 +158,7 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
         sessionManagementService.revokeAllSessions(userId);
 
         // Create a fresh active session
-        String freshToken = "tok-" + testRunId + "-fresh";
+        String freshToken = newSessionToken("fresh");
         sessionManagementService.createSession(userId, freshToken, "192.168.1.1", "FreshBrowser/1.0");
 
         List<UserSession> activeSessions = sessionManagementService.getActiveSessions(userId);
@@ -174,7 +180,7 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("updateLastActive_throttledTo5Minutes")
     void updateLastActive_throttledTo5Minutes() {
         Long userId = getTestUser().getId();
-        String throttleToken = "tok-" + testRunId + "-throttle";
+        String throttleToken = newSessionToken("throttle");
 
         sessionManagementService.createSession(userId, throttleToken, "127.0.0.1", "ThrottleBrowser/1.0");
 
@@ -185,5 +191,19 @@ class SessionManagementIntegrationTest extends BaseIntegrationTest {
         // Second call within 5 minutes should be silently throttled (no exception)
         assertDoesNotThrow(() -> sessionManagementService.updateLastActive(throttleToken),
                 "Second updateLastActive within throttle window should not throw");
+    }
+
+    private String newSessionToken(String suffix) {
+        UserDetails principal = User.withUsername("session-" + testRunId + "-" + suffix)
+                .password("unused")
+                .authorities("ROLE_USER")
+                .build();
+        Integer securityVersion = getTestUser().getSecurityVersion();
+        return jwtUtil.generateTokenWithTenantId(
+                principal,
+                getTestUser().getPid(),
+                getTestTenant().getId(),
+                getTestTenantMember().getId(),
+                securityVersion != null ? securityVersion : 0);
     }
 }

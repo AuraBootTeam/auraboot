@@ -7,6 +7,8 @@ import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.integration.SelfRegistrationTestSupport;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.*;
@@ -37,11 +39,31 @@ class AuthServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PasswordManagementService passwordManagementService;
 
+    @Autowired
+    private SystemConfigService systemConfigService;
+
     private final String testRunId = String.valueOf(System.currentTimeMillis());
 
     // Shared across ordered tests
     private String registeredEmail;
     private String registeredPassword;
+
+    @BeforeAll
+    void enableSelfRegistration() {
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, true);
+    }
+
+    @AfterAll
+    void restoreClosedRegistrationPolicy() {
+        SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
+    }
+
+    @BeforeEach
+    void configureSingleTenantAdmission() {
+        SelfRegistrationTestSupport.configureSingleTenantAdmission(
+                systemConfigService,
+                getTestTenant().getId());
+    }
 
     // -----------------------------------------------------------------------
     // Test 1: Register with valid data

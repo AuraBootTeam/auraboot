@@ -40,6 +40,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -401,6 +403,7 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void evaluate_persistsFactMetadataSnapshotForBusinessReferenceModelFields() {
         String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
         String supplierModel = "drt_supplier_" + suffix;
@@ -408,6 +411,18 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         String ticketModel = "drt_ticket_" + suffix;
         String supplierRefField = "supplier_ref_" + suffix;
         saveBusinessReferenceModels(supplierModel, supplierNameField, ticketModel, supplierRefField);
+        grantCommittedPermissionToTestRole(
+                "model." + supplierModel + ".read",
+                "model",
+                supplierModel,
+                "read",
+                "Read decision reference fixture " + supplierModel);
+        grantCommittedPermissionToTestRole(
+                "model." + ticketModel + ".read",
+                "model",
+                ticketModel,
+                "read",
+                "Read decision reference fixture " + ticketModel);
 
         String supplierName = "华东审批供应商 " + suffix;
         Map<String, Object> supplier = MetaContext.runWithCommandPermitScope("ALL", () ->
@@ -428,8 +443,9 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> ticket = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.create(ticketModel, Map.of(supplierRefField, supplierPid)));
         String ticketPid = String.valueOf(ticket.get("pid"));
-        Map<String, Object> reloadedTicket = MetaContext.runWithCommandPermitScope("ALL", () ->
-                dynamicDataService.getById(ticketModel, ticketPid));
+        // Read through the ordinary user boundary so reference display enrichment is exercised;
+        // command permit reads intentionally return canonical stored values without UI projections.
+        Map<String, Object> reloadedTicket = dynamicDataService.getById(ticketModel, ticketPid);
         assertThat(reloadedTicket.get(supplierRefField)).isEqualTo(supplierPid);
         assertThat(reloadedTicket.get(supplierRefField + "_display")).isEqualTo(supplierName);
 

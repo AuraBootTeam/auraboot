@@ -6,9 +6,12 @@ import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.auth.service.AuthService;
 import com.auraboot.framework.auth.service.LoginRateLimiter;
 import com.auraboot.framework.auth.service.PasswordManagementService;
+import com.auraboot.framework.auth.service.SessionRenewalService;
 import com.auraboot.framework.auth.service.UserInfoService;
+import com.auraboot.framework.auth.dto.TokenRenewResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +33,7 @@ public class AuthController {
     private final UserInfoService userInfoService;
     private final PasswordManagementService passwordManagementService;
     private final LoginRateLimiter loginRateLimiter;
+    private final SessionRenewalService sessionRenewalService;
 
     @Autowired
     private ApiRateLimiter apiRateLimiter;
@@ -122,6 +126,40 @@ public class AuthController {
         request.setIpAddress(ip);
         request.setUserAgent(httpRequest.getHeader("User-Agent"));
         return ApiResponse.success(authService.authenticateByChannel(request));
+    }
+
+    /**
+     * Sliding-session renewal. Requires a still-valid bearer token (the endpoint
+     * is not whitelisted, so {@code JwtAuthenticationFilter} authenticates it and
+     * checks session validity first). The old token stays usable until its
+     * natural expiry; renewal only adds a fresh session row. On rejection the
+     * client keeps the current token and falls back to the normal login redirect
+     * when it finally expires.
+     */
+    @PostMapping("/renew")
+    @ResponseBody
+    @Operation(summary = "Renew access token", description = "Mints a fresh access token for a valid, in-window server-side session and rotates the old one.")
+    public ApiResponse<TokenRenewResponse> renew(HttpServletRequest request) {
+        String token = extractBearerToken(request.getHeader("Authorization"));
+        if (token == null) {
+            return ApiResponse.error(ResponseCode.MissingAuthorizationHeader, "Missing authorization header", null);
+        }
+        try {
+            return ApiResponse.success(sessionRenewalService.renew(
+                    token,
+                    extractIp(request),
+                    request.getHeader("User-Agent")));
+        } catch (BusinessException e) {
+            log.warn("Token renewal rejected: {}", e.getMessage());
+            return ApiResponse.error(ResponseCode.Unauthorized, e.getMessage(), null);
+        }
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authorizationHeader.substring(7).trim();
     }
 
     private String extractIp(HttpServletRequest httpRequest) {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.integration.IntegrationBackoffPolicyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:43:47.237Z" hostname="Mac" time="0.027">
+  <properties/>
+  <testcase name="growsExponentiallyAndCapsWithoutOverflow()" classname="com.auraboot.framework.integration.IntegrationBackoffPolicyTest" time="0.024"/>
+  <testcase name="rejectsInvalidConfigurationAndRetryIndex()" classname="com.auraboot.framework.integration.IntegrationBackoffPolicyTest" time="0.002"/>
+</testsuite>

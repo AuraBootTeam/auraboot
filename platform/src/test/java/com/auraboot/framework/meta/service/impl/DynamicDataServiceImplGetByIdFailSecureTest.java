@@ -192,8 +192,8 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     }
 
     @Test
-    @DisplayName("row-ACL engine returns false → getById throws MetaServiceException (access denied)")
-    void getById_rowAclDenied_throwsMetaServiceException() {
+    @DisplayName("row-ACL engine returns false → getById throws coded access denial")
+    void getById_rowAclDenied_throwsAccessDeniedException() {
         wireHappyPathDbStubs();
         wireRuleCenterPermissionAllows();
 
@@ -202,7 +202,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
                 .thenReturn(false);
 
         assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }
 
@@ -357,7 +357,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
                         List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
 
         assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
@@ -377,7 +377,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
                         List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
 
         assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(permissionFacade).canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap());
@@ -400,7 +400,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
                         List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
 
         assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
 
         verify(permissionFacade).canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap());

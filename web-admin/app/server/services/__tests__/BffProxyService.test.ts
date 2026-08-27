@@ -49,6 +49,12 @@ function createResponseRecorder() {
 
 describe('isLongRunningProxyPath', () => {
   it('gives bounded BOM format exploration the long-running proxy budget', () => {
+    expect(isLongRunningProxyPath('/api/meta/commands/execute/bom:start_conversion')).toBe(true);
+    expect(
+      isLongRunningProxyPath(
+        '/api/meta/commands/execute/bom:start_conversion?sourceRecordId=01ABC',
+      ),
+    ).toBe(true);
     expect(isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format')).toBe(true);
     expect(
       isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format?taskId=01ABC'),
@@ -68,6 +74,44 @@ describe('BffProxyService', () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it('reports an aborted backend request as an uncertain timeout instead of a disconnect', async () => {
+    vi.stubEnv('BFF_LONG_RUNNING_TIMEOUT_MS', '123456');
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    vi.mocked(axios).mockRejectedValueOnce({
+      message: 'timeout of 30000ms exceeded',
+      code: 'ECONNABORTED',
+      config: { method: 'post', url: '/api/meta/commands/execute/bom:start_conversion' },
+    });
+    const { response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'POST',
+        originalUrl: '/api/meta/commands/execute/bom:start_conversion',
+        url: '/api/meta/commands/execute/bom:start_conversion',
+        headers: { 'content-type': 'application/json' },
+        body: { rawFileId: 'file-1' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(axios).toHaveBeenCalledWith(expect.objectContaining({ timeout: 123456 }));
+    expect(response.statusCode).toBe(504);
+    expect(response.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Gateway Timeout',
+        code: 'BACKEND_REQUEST_TIMEOUT',
+        message: expect.stringContaining('may still be processing'),
+        details: expect.stringContaining('Do not submit the same operation again'),
+      }),
+    );
+    expect(response.json).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Failed to connect to backend service' }),
+    );
   });
 
   it('requests and forwards arbitrary XLSX responses as opaque bytes', async () => {

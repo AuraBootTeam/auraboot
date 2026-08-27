@@ -257,6 +257,10 @@ public class JwtUtil {
                 .header().keyId(kid).and()
                 .claims(claims)
                 .subject(subjectByUserPid)
+                // Unique per issuance so two tokens minted in the same second
+                // still differ — session rotation (renewal) must be able to
+                // invalidate the old token without touching the new one.
+                .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(Instant.now().plusSeconds(expiration)))
                 .signWith(currentKey)

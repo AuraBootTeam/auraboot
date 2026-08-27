@@ -69,6 +69,18 @@ class JwtUtilKeyRotationTest {
     }
 
     @Test
+    void twoTokensIssuedInSameSecondAreDistinct() {
+        JwtUtil util = createUtil(SECRET_A, KID_A, null, null);
+        CustomUserDetails user = mockUser("pid-1");
+
+        String first = util.generateTokenWithTenantId(user, "pid-1", 1L);
+        String second = util.generateTokenWithTenantId(user, "pid-1", 1L);
+
+        assertThat(second).isNotEqualTo(first);
+        assertThat(util.validateToken(second, user)).isTrue();
+    }
+
+    @Test
     void actorContextClaimsRoundTripIndependentlyFromSecurityVersion() {
         JwtUtil util = createUtil(SECRET_A, KID_A, null, null);
         CustomUserDetails user = mockUser("pid-actor");

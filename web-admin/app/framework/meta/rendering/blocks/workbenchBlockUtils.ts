@@ -309,7 +309,7 @@ async function pollWorkbenchAsyncTask(
       // B-002 (DR-20260715-B-002): prefer localized context.detail over the generic
       // message/desc envelope — the third command path (workbench) must extract the
       // reason the same way useActionHandler / FormPageContent do (OSS #1212).
-      throw new Error(resolveCommandErrorMessage(result, taskCode));
+      throw new Error(resolveCommandErrorMessage(result, taskCode, runtime.getContext().t));
     }
 
     const task: AsyncTaskStatus = result?.data ?? {};
@@ -533,7 +533,7 @@ export async function executeSimpleWorkbenchAction(
         // localized reason in context.detail; message/desc are the generic envelope.
         // Use the shared extractor so the workbench toast shows the reason (not
         // "Business error"), matching useActionHandler / FormPageContent (OSS #1212).
-        throw new Error(resolveCommandErrorMessage(result, command));
+        throw new Error(resolveCommandErrorMessage(result, command, runtime.getContext().t));
       }
 
       const reloadIds = resolveReloadIds(args.reload);

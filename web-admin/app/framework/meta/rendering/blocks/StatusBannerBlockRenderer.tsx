@@ -349,8 +349,14 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
     readLocalizedMapValue((block as any).descriptionMap, '__default', locale, t) ||
     '';
   const errorMessage = readPath(record, errorField);
+  const localizedErrorMessage =
+    errorMessage === undefined || errorMessage === null
+      ? ''
+      : getLocalizedText(String(errorMessage), locale, t);
   const description = interpolateTemplate(
-    failedStatuses.has(status) && errorMessage ? String(errorMessage) : descriptionTemplate,
+    failedStatuses.has(status) && localizedErrorMessage
+      ? localizedErrorMessage
+      : descriptionTemplate,
     record,
   );
   const summaryFields = Array.isArray((block as any).summaryFields)

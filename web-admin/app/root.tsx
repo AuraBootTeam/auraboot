@@ -5,12 +5,12 @@ import {
   Scripts,
   ScrollRestoration,
   redirect,
+  Link,
   useRouteLoaderData,
   useLoaderData,
-  isRouteErrorResponse,
   type LoaderFunctionArgs,
 } from 'react-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
@@ -51,6 +51,7 @@ import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
 import {
   getSessionFromRequest,
   getTokenFromRequest,
+  maybeRenewSession,
   sessionStorage,
 } from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
@@ -63,6 +64,16 @@ import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
+import {
+  formatClientReportMessage,
+  generateErrorId,
+  resolveErrorLocale,
+  resolveErrorPresentation,
+  resolveRootErrorView,
+  rootT,
+} from '~/error/root-error-view';
+import { reportClientError } from '~/shared/observability/clientErrorReporter';
+import { fetchTimeoutSignal } from '~/utils/fetchTimeout';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -99,7 +110,9 @@ export async function resolveDeploymentBrandingFromBff(
 
   const bffUrl =
     environment.BFF_INTERNAL_URL || `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
-  const response = await fetch(`${bffUrl}/api/runtime/branding`);
+  const response = await fetch(`${bffUrl}/api/runtime/branding`, {
+    signal: fetchTimeoutSignal(),
+  });
   if (!response.ok) {
     throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
   }
@@ -219,7 +232,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
-  return {
+  const rootData: RootLoaderData = {
     runtimeProfile,
     user,
     permissions,
@@ -238,6 +251,25 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     buildIdentity,
     accessPolicy,
   };
+
+  // Sliding-session renewal: when the access token is inside its renewal window,
+  // swap it for a fresh one and update the httpOnly session cookie. The renewed
+  // cookie is attached to this response so every subsequent request carries the
+  // new token; failures are non-fatal (the current token stays valid until its
+  // real deadline, then the normal 401 → login redirect applies).
+  if (user) {
+    const renewal = await maybeRenewSession(request);
+    if (renewal.renewed && renewal.setCookie) {
+      return new Response(JSON.stringify(rootData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': renewal.setCookie,
+        },
+      });
+    }
+  }
+
+  return rootData;
 }
 
 export const meta = ({ data }: { data?: RootLoaderData }) => [
@@ -384,94 +416,168 @@ export default function App() {
 
 type ErrorBoundaryProps = { error: unknown };
 
-const ROOT_ERROR_TEXTS = {
-  oops: {
-    'zh-CN': '出错了！',
-    'en-US': 'Oops!',
-    'ja-JP': 'エラーが発生しました！',
-    'ko-KR': '오류가 발생했습니다!',
-  },
-  error: { 'zh-CN': '错误', 'en-US': 'Error', 'ja-JP': 'エラー', 'ko-KR': '오류' },
-  unexpected: {
-    'zh-CN': '发生了意外错误。',
-    'en-US': 'An unexpected error occurred.',
-    'ja-JP': '予期しないエラーが発生しました。',
-    'ko-KR': '예기치 않은 오류가 발생했습니다.',
-  },
-  notFound: {
-    'zh-CN': '请求的页面不存在。',
-    'en-US': 'The requested page could not be found.',
-    'ja-JP': 'リクエストされたページが見つかりません。',
-    'ko-KR': '요청한 페이지를 찾을 수 없습니다.',
-  },
-  techDetails: {
-    'zh-CN': '技术详情',
-    'en-US': 'Technical Details',
-    'ja-JP': '技術的な詳細',
-    'ko-KR': '기술 세부 정보',
-  },
-  backHome: {
-    'zh-CN': '返回首页',
-    'en-US': 'Back to Home',
-    'ja-JP': 'ホームに戻る',
-    'ko-KR': '홈으로 돌아가기',
-  },
-} as const;
-
-type RootErrorTextKey = keyof typeof ROOT_ERROR_TEXTS;
-type SupportedErrorLocale = 'zh-CN' | 'en-US' | 'ja-JP' | 'ko-KR';
-
-function rootT(key: RootErrorTextKey): string {
-  let lang: SupportedErrorLocale = 'en-US';
-  if (typeof navigator !== 'undefined') {
-    const navLang = navigator.language;
-    if (navLang?.startsWith('zh')) lang = 'zh-CN';
-    else if (navLang?.startsWith('ja')) lang = 'ja-JP';
-    else if (navLang?.startsWith('ko')) lang = 'ko-KR';
-  }
-  return ROOT_ERROR_TEXTS[key][lang];
-}
-
 export function ErrorBoundary({ error }: ErrorBoundaryProps) {
   const rootData = useRouteLoaderData('root') as RootLoaderData | undefined;
+  const locale = resolveErrorLocale(rootData?.locale);
+  const view = resolveRootErrorView(error);
+  const { title, detail } = resolveErrorPresentation(view, locale);
+  const [errorId, setErrorId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [clientContext, setClientContext] = useState<{ pageUrl: string; occurredAt: string } | null>(
+    null,
+  );
+  const t = (key: Parameters<typeof rootT>[0]) => rootT(key, locale);
+  const errorMessage = error instanceof Error ? error.message : String(error ?? '');
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  useEffect(() => {
+    // Generate client-side only: a random id must not differ between the SSR
+    // tree and the first client render (hydration).
+    setErrorId(generateErrorId());
+    setClientContext({
+      pageUrl: window.location.href,
+      occurredAt: new Date().toISOString(),
+    });
+  }, [error]);
+
+  useEffect(() => {
+    if (!errorId || !clientContext) return;
+    if (typeof document !== 'undefined') {
+      document.title = `${title} · AuraBoot`;
+    }
+    reportClientError({
+      errorType: 'boundary',
+      kind: view.kind,
+      status: view.status,
+      errorId,
+      message: formatClientReportMessage(errorId, view, errorMessage || 'unknown boundary error'),
+      stack,
+      pageUrl: clientContext.pageUrl,
+    });
+    // Report once per boundary render; the id is stable for the same error.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errorId, clientContext]);
+
+  const handleCopyErrorId = async () => {
+    if (!errorId) return;
+    try {
+      await navigator.clipboard.writeText(errorId);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (e.g. non-secure context) — leave the id visible.
+    }
+  };
+
   if (rootData?.bootstrapStatus && !rootData.bootstrapStatus.initialized) {
     return <BootstrapNotReady />;
   }
 
-  let message = rootT('oops');
-  let details = rootT('unexpected');
-  let stack: string | undefined;
-
-  if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? '404' : rootT('error');
-    details = error.status === 404 ? rootT('notFound') : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg dark:bg-gray-800">
-        <div className="text-center">
-          <h1 className="mb-4 text-6xl font-bold text-gray-900 dark:text-white">{message}</h1>
-          <p className="mb-8 text-lg text-gray-600 dark:text-gray-300">{details}</p>
-          {stack && (
-            <details className="text-left">
-              <summary className="mb-2 cursor-pointer text-sm text-gray-500 dark:text-gray-400">
-                {rootT('techDetails')}
-              </summary>
-              <pre className="overflow-auto rounded bg-gray-100 p-4 text-xs dark:bg-gray-700">
+    <main
+      role="alert"
+      aria-live="assertive"
+      className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900"
+    >
+      <div className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-lg dark:bg-gray-800">
+        <svg
+          className={`mx-auto mb-4 h-12 w-12 ${
+            view.kind === 'not-found' || view.kind === 'forbidden'
+              ? 'text-amber-400'
+              : 'text-red-400'
+          }`}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2V7zm0 8h2v2h-2v-2z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">{title}</h1>
+        <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">{detail}</p>
+
+        <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700">
+          <span className="text-gray-500 dark:text-gray-400">{t('errorId')}</span>
+          <code className="font-mono font-medium text-gray-900 dark:text-white">
+            {errorId ?? 'ERR-……'}
+          </code>
+          <button
+            type="button"
+            onClick={handleCopyErrorId}
+            disabled={!errorId}
+            className="rounded px-1.5 py-0.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-700"
+          >
+            {copied ? t('copied') : t('copy')}
+          </button>
+        </div>
+
+        <details className="mb-6 text-left">
+          <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400">
+            {t('techDetails')}
+          </summary>
+          <dl className="mt-2 space-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <div className="flex justify-between gap-3">
+              <dt>{t('errorKind')}</dt>
+              <dd className="font-mono">{view.kind}</dd>
+            </div>
+            {view.status != null && (
+              <div className="flex justify-between gap-3">
+                <dt>{t('error')}</dt>
+                <dd className="font-mono">{view.status}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-3">
+              <dt>{t('pageUrl')}</dt>
+              <dd className="max-w-[15rem] truncate font-mono">
+                {clientContext?.pageUrl ?? '—'}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>{t('occurredAt')}</dt>
+              <dd className="font-mono">{clientContext?.occurredAt ?? '—'}</dd>
+            </div>
+            {import.meta.env.DEV && errorMessage && (
+              <div className="flex justify-between gap-3">
+                <dt>{t('errorMessage')}</dt>
+                <dd className="max-w-[15rem] truncate font-mono">{errorMessage}</dd>
+              </div>
+            )}
+            {import.meta.env.DEV && stack && (
+              <pre className="mt-2 max-h-40 overflow-auto rounded bg-gray-100 p-2 text-[10px] leading-relaxed dark:bg-gray-700">
                 <code>{stack}</code>
               </pre>
-            </details>
-          )}
-          <button
-            onClick={() => (window.location.href = '/')}
-            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            {rootT('backHome')}
-          </button>
+            )}
+          </dl>
+        </details>
+
+        <div className="text-center">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            {view.retryable && (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                {t('retry')}
+              </button>
+            )}
+            <Link
+              to="/"
+              className="rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            >
+              {t('backHome')}
+            </Link>
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="rounded-lg px-4 py-2 font-medium text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              {t('backPrevious')}
+            </button>
+          </div>
         </div>
       </div>
     </main>

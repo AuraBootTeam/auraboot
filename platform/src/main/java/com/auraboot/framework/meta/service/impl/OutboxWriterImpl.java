@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Locale;
 
 /**
  * Outbox writer implementation.
@@ -52,7 +53,7 @@ public class OutboxWriterImpl implements OutboxWriter {
             outboxEvent.setEventType(eventType);
             outboxEvent.setCommandCode(commandCode);
             outboxEvent.setPayload(payload);
-            outboxEvent.setStatus(OutboxStatus.PENDING.name());
+            outboxEvent.setStatus(OutboxStatus.PENDING.name().toLowerCase(Locale.ROOT));
             outboxEvent.setRetryCount(0);
             outboxEvent.setMaxRetries(maxRetries);
             outboxEvent.setNextRetryAt(Instant.now());
