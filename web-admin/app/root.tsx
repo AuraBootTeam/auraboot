@@ -51,6 +51,7 @@ import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
 import {
   getSessionFromRequest,
   getTokenFromRequest,
+  maybeRenewSession,
   sessionStorage,
 } from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
@@ -231,7 +232,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
-  return {
+  const rootData: RootLoaderData = {
     runtimeProfile,
     user,
     permissions,
@@ -250,6 +251,25 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     buildIdentity,
     accessPolicy,
   };
+
+  // Sliding-session renewal: when the access token is inside its renewal window,
+  // swap it for a fresh one and update the httpOnly session cookie. The renewed
+  // cookie is attached to this response so every subsequent request carries the
+  // new token; failures are non-fatal (the current token stays valid until its
+  // real deadline, then the normal 401 → login redirect applies).
+  if (user) {
+    const renewal = await maybeRenewSession(request);
+    if (renewal.renewed && renewal.setCookie) {
+      return new Response(JSON.stringify(rootData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': renewal.setCookie,
+        },
+      });
+    }
+  }
+
+  return rootData;
 }
 
 export const meta = ({ data }: { data?: RootLoaderData }) => [

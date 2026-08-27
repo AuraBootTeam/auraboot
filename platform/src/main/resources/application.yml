@@ -80,6 +80,13 @@ security:
     expiration: ${JWT_EXPIRATION:86400}
     previous-secret: ${JWT_PREVIOUS_SECRET:}
     previous-kid: ${JWT_PREVIOUS_KID:}
+  session:
+    # Absolute lifetime of a login session for sliding renewal. The access token
+    # itself stays short (security.jwt.expiration, default 24h); renewals are
+    # only accepted while the session row is younger than this window, so a
+    # "remember me" session can stay alive for at most this long without
+    # re-authentication. Defaults to the 7-day remember-me cookie.
+    renew-window-seconds: ${SESSION_RENEW_WINDOW_SECONDS:604800}
   field-encryption:
     key: ${FIELD_ENCRYPTION_KEY:}  # Production: openssl rand -base64 32
   password:
