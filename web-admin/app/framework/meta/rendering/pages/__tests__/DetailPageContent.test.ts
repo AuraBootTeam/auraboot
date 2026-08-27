@@ -22,6 +22,7 @@ import {
   resolveVisibleDetailTabs,
   resolveVisibleDetailTabsFromBlocks,
   resolveVisibleTopLevelDetailBlocks,
+  resolveDetailHeaderLayoutClasses,
   shouldRenderDefaultDetailEditAction,
   canRenderDetailToolbarButton,
   unwrapDetailRecord,
@@ -789,5 +790,16 @@ describe('extractBlockDataRows', () => {
     expect(extractBlockDataRows({ priceComponents: 'x' }, 'priceComponents')).toEqual([]);
     expect(extractBlockDataRows({ a: [] }, undefined)).toEqual([]);
     expect(extractBlockDataRows(null, 'a')).toEqual([]);
+  });
+});
+
+describe('resolveDetailHeaderLayoutClasses', () => {
+  it('drops the action cluster as a whole row instead of wrapping per button', () => {
+    const { container, actions } = resolveDetailHeaderLayoutClasses();
+    expect(container).toContain('sm:flex-wrap');
+    expect(container).toContain('sm:justify-between');
+    expect(actions).toContain('flex-wrap');
+    expect(actions).toContain('sm:justify-end');
+    expect(actions).toContain('min-w-0');
   });
 });

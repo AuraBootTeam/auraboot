@@ -548,6 +548,19 @@ export function canRenderDetailToolbarButton(
   return !button.permissionCode || hasPermission(button.permissionCode);
 }
 
+/**
+ * Header layout classes for detail pages. The action cluster drops to its own
+ * full-width, right-aligned row when title + actions cannot share one line
+ * (e.g. 1280px viewports with the sidebar open), instead of wrapping button by
+ * button and squeezing the title block.
+ */
+export function resolveDetailHeaderLayoutClasses(): { container: string; actions: string } {
+  return {
+    container: 'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-6',
+    actions: 'print-hide flex min-w-0 max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end',
+  };
+}
+
 export function resolveHiddenSystemTabKeys(
   schema: { extension?: Record<string, any> } | undefined | null,
 ): Set<string> {
@@ -996,6 +1009,7 @@ function DetailPageContentInner(props: PageContentProps) {
     [allBlocks],
   );
   const effectiveHeaderToolbar = headerToolbar || null;
+  const headerLayout = resolveDetailHeaderLayoutClasses();
 
   // For simple detail pages without tabs, find field-display blocks directly.
   // Page Designer exposes both form-section and detail-section; both render
@@ -1189,7 +1203,7 @@ function DetailPageContentInner(props: PageContentProps) {
       <div className="rounded-card bg-panel shadow-sm">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div className="print-hide border-border border-b px-4 py-4 sm:px-6" data-print="hide">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className={headerLayout.container}>
             <div className="flex min-w-0 items-start gap-3">
               {schema.extension?.showBack !== false &&
                 (preserveListContext && (preservedReturnTarget || location.key !== 'default') ? (
@@ -1228,7 +1242,7 @@ function DetailPageContentInner(props: PageContentProps) {
 
             {/* Header toolbar buttons */}
             <div
-              className="print-hide flex max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end"
+              className={headerLayout.actions}
               data-print="hide"
             >
               {schema.extension?.showShare !== false && canManageRecordShares && (
