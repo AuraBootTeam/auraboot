@@ -38,6 +38,7 @@
       "forecast-variance.golden": "Selected by the dedicated forecast-variance.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "opportunity-department-scope.golden": "Selected by the dedicated opportunity-department-scope.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "opportunity-efficiency.golden": "Selected by the dedicated opportunity-efficiency.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "opportunity-permission-matrix.golden": "Selected by the dedicated opportunity-permission-matrix.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "opportunity-bulk-operations.golden": "Selected by the dedicated opportunity-bulk-operations.playwright.config.ts project; intentionally excluded from the QDP-only project.",
       "order-commitment.golden": "Selected by the dedicated order-commitment.playwright.config.ts project; intentionally excluded from the QDP-only project."
     }
