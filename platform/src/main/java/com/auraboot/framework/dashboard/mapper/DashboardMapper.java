@@ -189,6 +189,21 @@ public interface DashboardMapper extends BaseMapper<Dashboard> {
     Dashboard findWorkbench(@Param("tenantId") Long tenantId, @Param("ownerPid") String ownerPid);
 
     /**
+     * Find published global dashboards that opt into personal workbench composition.
+     */
+    @ResultMap(RESULT_MAP_ID)
+    @Select("""
+        SELECT * FROM ab_dashboard
+        WHERE tenant_id = #{tenantId}
+          AND scope = 'global'
+          AND status = 'published'
+          AND deleted_flag = false
+          AND jsonb_extract_path_text(extension, 'workbenchContribution', 'enabled') = 'true'
+        ORDER BY sort_order, code
+        """)
+    List<Dashboard> findWorkbenchContributions(@Param("tenantId") Long tenantId);
+
+    /**
      * Clear default flag for personal dashboards of a user
      */
     @Update("""

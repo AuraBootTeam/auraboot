@@ -1949,6 +1949,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         // Build widgets JsonNode from the raw List<Object>
         com.fasterxml.jackson.databind.JsonNode widgetsNode = objectMapper.valueToTree(dto.getWidgets());
         com.fasterxml.jackson.databind.JsonNode layoutConfigNode = buildDashboardLayoutConfig(dto.getLayoutConfig());
+        com.fasterxml.jackson.databind.JsonNode extensionNode = objectMapper.valueToTree(
+                dto.getExtension() != null ? dto.getExtension() : Map.of());
 
         DashboardDTO existing = dashboardService.findByCode(dto.getCode());
 
@@ -1972,6 +1974,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             updateReq.setIsDefault(Boolean.TRUE.equals(dto.getIsDefault()));
             updateReq.setLayoutConfig(layoutConfigNode);
             updateReq.setWidgets(widgetsNode);
+            updateReq.setExtension(extensionNode);
             dashboardService.update(existing.getPid(), updateReq);
             log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
                     logSafe(dto.getCode()), logSafe(existing.getPid()));
@@ -1988,6 +1991,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             createReq.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
             createReq.setLayoutConfig(layoutConfigNode);
             createReq.setWidgets(widgetsNode);
+            createReq.setExtension(extensionNode);
             DashboardDTO created = dashboardService.create(createReq);
             // Plugin dashboards are published immediately unless status=draft
             if (!"draft".equals(dto.getEffectiveStatus())) {

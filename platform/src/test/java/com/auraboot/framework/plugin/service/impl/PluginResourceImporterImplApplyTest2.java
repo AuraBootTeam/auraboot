@@ -775,7 +775,8 @@ class PluginResourceImporterImplApplyTest2 {
         DashboardDefinitionDTO dto = DashboardDefinitionDTO.builder()
                 .code("d1").title("Dash").widgets(List.of("w1")).build();
         ObjectMapper realMapper = new ObjectMapper();
-        when(objectMapper.valueToTree(any())).thenReturn(realMapper.valueToTree(List.of("w1")));
+        when(objectMapper.valueToTree(any())).thenAnswer(invocation ->
+                realMapper.valueToTree(invocation.getArgument(0)));
         when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
 
         DashboardDTO existing = new DashboardDTO();
@@ -792,9 +793,11 @@ class PluginResourceImporterImplApplyTest2 {
     @DisplayName("importDashboard CREATE branch: no existing -> dashboardService.create + publish")
     void importDashboard_create_happyPath() {
         DashboardDefinitionDTO dto = DashboardDefinitionDTO.builder()
-                .code("d1").title("Dash").widgets(List.of("w1")).isDefault(true).build();
+                .code("d1").title("Dash").widgets(List.of("w1")).isDefault(true)
+                .extension(Map.of("workbenchContribution", Map.of("enabled", true))).build();
         ObjectMapper realMapper = new ObjectMapper();
-        when(objectMapper.valueToTree(any())).thenReturn(realMapper.valueToTree(List.of("w1")));
+        when(objectMapper.valueToTree(any())).thenAnswer(invocation ->
+                realMapper.valueToTree(invocation.getArgument(0)));
         when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
         when(dashboardService.findByCode("d1")).thenReturn(null);
 
@@ -807,7 +810,8 @@ class PluginResourceImporterImplApplyTest2 {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         assertThat(result.getResourcePid()).isEqualTo("dash-pid-new");
-        verify(dashboardService).create(argThat(request -> Boolean.TRUE.equals(request.getIsDefault())));
+        verify(dashboardService).create(argThat(request -> Boolean.TRUE.equals(request.getIsDefault())
+                && request.getExtension().path("workbenchContribution").path("enabled").asBoolean()));
         // status default = "published" -> publish should be called
         verify(dashboardService).publish("dash-pid-new");
     }
@@ -833,9 +837,11 @@ class PluginResourceImporterImplApplyTest2 {
     @DisplayName("importDashboard UPDATE branch: existing -> dashboardService.update")
     void importDashboard_update_happyPath() {
         DashboardDefinitionDTO dto = DashboardDefinitionDTO.builder()
-                .code("d1").title("Dash Upd").widgets(List.of("w1")).isDefault(true).build();
+                .code("d1").title("Dash Upd").widgets(List.of("w1")).isDefault(true)
+                .extension(Map.of("workbenchContribution", Map.of("enabled", true))).build();
         ObjectMapper realMapper = new ObjectMapper();
-        when(objectMapper.valueToTree(any())).thenReturn(realMapper.valueToTree(List.of("w1")));
+        when(objectMapper.valueToTree(any())).thenAnswer(invocation ->
+                realMapper.valueToTree(invocation.getArgument(0)));
         when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
 
         DashboardDTO existing = new DashboardDTO();
@@ -848,7 +854,8 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         assertThat(result.getResourcePid()).isEqualTo("dash-pid-exist");
         verify(dashboardService).update(eq("dash-pid-exist"),
-                argThat(request -> Boolean.TRUE.equals(request.getIsDefault())));
+                argThat(request -> Boolean.TRUE.equals(request.getIsDefault())
+                        && request.getExtension().path("workbenchContribution").path("enabled").asBoolean()));
         verify(dashboardService, never()).create(any());
     }
 

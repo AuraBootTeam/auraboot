@@ -18,6 +18,7 @@ import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.versioning.service.VersionHistoryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.AfterEach;
@@ -493,11 +494,56 @@ class DashboardServiceImplTest {
     }
 
     @Test
+    @DisplayName("getOrCreateWorkbench appends published dashboard contributions without persisting the composition")
+    void workbenchAppendsDashboardContributions() {
+        Dashboard wb = fixture("wb", "workbench", "u-1");
+        wb.setLayoutConfig(objectMapper.createObjectNode().put("columns", 12));
+        ArrayNode baseWidgets = objectMapper.createArrayNode();
+        baseWidgets.add(widget("wb-base", 0, 2));
+        wb.setWidgets(baseWidgets);
+
+        Dashboard contribution = fixture("ops", "global", "u-1");
+        contribution.setCode("operations_overview");
+        contribution.setStatus(StatusConstants.PUBLISHED);
+        ArrayNode contributionWidgets = objectMapper.createArrayNode();
+        contributionWidgets.add(widget("trend", 0, 3));
+        contributionWidgets.add(widget("people", 3, 2));
+        contribution.setWidgets(contributionWidgets);
+
+        when(dashboardMapper.findWorkbench(10L, "u-1")).thenReturn(wb);
+        when(dashboardMapper.findWorkbenchContributions(10L)).thenReturn(List.of(contribution));
+
+        DashboardDTO result = service.getOrCreateWorkbench();
+
+        assertEquals(3, result.getWidgets().size());
+        assertEquals("workbench-contribution-operations_overview-trend",
+                result.getWidgets().get(1).path("id").asText());
+        assertEquals(2, result.getWidgets().get(1).path("y").asInt());
+        assertEquals("workbench-contribution-operations_overview-people",
+                result.getWidgets().get(2).path("id").asText());
+        assertEquals(5, result.getWidgets().get(2).path("y").asInt());
+        assertEquals(1, wb.getWidgets().size(), "stored personal workbench must remain unchanged");
+        verify(dashboardMapper, never()).updateDashboard(any());
+    }
+
+    @Test
     @DisplayName("getOrCreateWorkbench creates new when missing")
     void workbenchCreated() {
         when(dashboardMapper.findWorkbench(10L, "u-1")).thenReturn(null);
         DashboardDTO dto = service.getOrCreateWorkbench();
         assertEquals("My Workbench", dto.getTitle());
         verify(dashboardMapper).insertDashboard(any(Dashboard.class));
+    }
+
+    private ObjectNode widget(String id, int y, int height) {
+        ObjectNode widget = objectMapper.createObjectNode();
+        widget.put("id", id);
+        widget.put("type", "smart-line-chart");
+        widget.put("x", 0);
+        widget.put("y", y);
+        widget.put("w", 12);
+        widget.put("h", height);
+        widget.set("config", objectMapper.createObjectNode().put("title", id));
+        return widget;
     }
 }

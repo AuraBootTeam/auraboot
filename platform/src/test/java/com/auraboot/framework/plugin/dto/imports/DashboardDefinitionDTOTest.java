@@ -36,4 +36,24 @@ class DashboardDefinitionDTOTest {
         assertThat(dto.getTitle()).isEqualTo("质量仪表盘");
         assertThat(dto.isValid()).isTrue();
     }
+
+    @Test
+    void deserializesWorkbenchContributionExtension() throws Exception {
+        DashboardDefinitionDTO dto = objectMapper.readValue("""
+                {
+                  "code": "workbench_dashboard",
+                  "title": "Workbench Dashboard",
+                  "extension": {
+                    "workbenchContribution": {
+                      "enabled": true
+                    }
+                  },
+                  "widgets": [{"id": "w1"}]
+                }
+                """, DashboardDefinitionDTO.class);
+
+        assertThat(dto.getExtension())
+                .containsEntry("workbenchContribution", java.util.Map.of("enabled", true));
+        assertThat(dto.getUnknownFields()).isNull();
+    }
 }

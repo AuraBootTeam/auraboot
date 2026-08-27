@@ -48,6 +48,24 @@
       "default": 0,
       "description": "Sort weight for ordering dashboards in the list."
     },
+    "extension": {
+      "type": "object",
+      "description": "Optional platform extension metadata for the dashboard.",
+      "properties": {
+        "workbenchContribution": {
+          "type": "object",
+          "description": "Contributes this published global dashboard's widgets to tenant members' personal workbenches.",
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "layoutConfig": {
       "type": "object",
       "description": "Grid layout parameters. Defaults are applied when omitted.",

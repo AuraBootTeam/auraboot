@@ -54,6 +54,7 @@ const deepSpecPattern = /.*-deep\.spec\.ts$/;
 const quoteOpsCurrentSpecNames = [
   'enterprise-info-profile',
   'quote-bom-focused-menu-and-permissions',
+  'quote-bom-operations-dashboard',
   'bom-workbench-golden',
   'quote-minimal-create-regression',
   'quote-bom-visual-feedback-golden',
