@@ -72,28 +72,56 @@ test('PAR-17 customer invoice: create, stats list, viewer create deny', async ({
   expect(account.ok, 'account create').toBe(true);
   const accountPid = account.recordId;
 
+  // prereq: create a sales order for this account (invoices require one)
+  const order = await matrixApi(adminJwt, '/api/meta/commands/execute/sl:create_sales_order', 'POST', {
+    payload: { sl_so_account_id: accountPid, sl_so_date: '2026-09-28', sl_so_delivery_date: '2026-10-15' },
+    operationType: 'create',
+  });
+  expect(order.ok, `order create: ${JSON.stringify(order.body).slice(0, 200)}`).toBe(true);
+  const orderPid = order.recordId;
+
   // ---- create invoice via the real UI form ----
-  await page.goto('/p/sl_customer_invoice_common/new', { waitUntil: 'domcontentloaded' });
+  await page.goto('/p/sl_customer_invoice_common', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2200);
   await page.setViewportSize(DESKTOP);
-  // account select
+  await page.getByRole('button', { name: /新建客户发票/ }).first().click();
+  await page.waitForTimeout(2000);
+  // account select by testid
   await page.getByTestId('select-trigger-sl_inv_account_id').click();
   await page.waitForTimeout(900);
   const acctOpt = page.locator('[role=option]:visible').filter({ hasText: ACCOUNT }).first();
   if ((await acctOpt.count()) > 0) await acctOpt.click();
   await page.waitForTimeout(400);
-  // issue date + due date
+  // dates
   const dateInputs = page.locator('input[type=date]:visible');
   const dCount = await dateInputs.count();
   for (let i = 0; i < dCount; i++) {
     await dateInputs.nth(i).fill('2026-09-28').catch(() => {});
   }
+  // sales order select
+  await page.getByTestId('select-trigger-sl_inv_order_id').click();
+  await page.waitForTimeout(900);
+  const ordOpt = page.locator('[role=option]:visible').first();
+  if ((await ordOpt.count()) > 0) await ordOpt.click();
+  await page.waitForTimeout(400);
+  // currency select
+  await page.getByTestId('select-trigger-sl_inv_currency_code').click();
+  await page.waitForTimeout(800);
+  const curOpt = page.locator('[role=option]:visible').first();
+  if ((await curOpt.count()) > 0) await curOpt.click();
+  await page.waitForTimeout(400);
   // amount
   const amountInput = page.locator('.controlled-field-renderer, .n-form-item').filter({ hasText: '金额' }).first().locator('input').first();
   if ((await amountInput.count()) > 0) await amountInput.fill('85000');
   await page.screenshot({ path: 'test-results/artifacts/par17-invoice-filled.png' });
   await page.getByRole('button', { name: /保存|创建/ }).first().click();
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: 'test-results/artifacts/par17-after-save.png' });
+  const saveErrors = await page.evaluate(() => {
+    return [...document.querySelectorAll('.text-status-red, [class*=error]')]
+      .filter(e => e.offsetWidth > 0).map(e => e.textContent.trim().slice(0, 80)).filter(Boolean);
+  });
+  if (saveErrors.length > 0) console.log('SAVE_ERRORS:', JSON.stringify(saveErrors));
 
   // ---- list stats + screenshots ----
   await page.goto('/p/sl_customer_invoice_common', { waitUntil: 'domcontentloaded' });
