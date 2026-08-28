@@ -7,6 +7,7 @@ import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { resolveIcon } from '~/utils/icon-resolver';
 import { useDirection } from '~/hooks/useDirection';
+import { UserMenuWidget } from '~/ui/user/UserMenuWidget';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -106,6 +107,15 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
         >
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
+      </div>
+
+      {/* Account entry — full-width footer row (moved out of the header toolbar) */}
+      <div
+        className={`flex-shrink-0 border-t border-gray-200 dark:border-gray-700 ${
+          collapsed ? 'px-2 py-2' : 'px-3 py-2'
+        }`}
+      >
+        <UserMenuWidget variant="sidebar" collapsed={collapsed} />
       </div>
 
       {/* Navigation */}

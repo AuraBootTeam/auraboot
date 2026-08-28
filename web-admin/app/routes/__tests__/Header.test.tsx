@@ -136,7 +136,16 @@ describe('Header — polish', () => {
     );
   });
 
-  it('exposes the About page from the account menu', () => {
+  it('exposes the About page from the floating account menu on sidebar-less surfaces', () => {
+    rootLoaderData.value = {
+      user: { username: 'cat', tenantName: 'AcmeCo' },
+      menus: [],
+      branding: {
+        productName: 'AuraBoot',
+        logoUrl: '/android-chrome-192x192.png',
+      },
+    };
+
     render(
       <MemoryRouter>
         <Header />
@@ -148,6 +157,16 @@ describe('Header — polish', () => {
     const aboutLink = screen.getByTestId('about-link');
     expect(aboutLink).toHaveAttribute('href', '/about');
     expect(aboutLink).toHaveTextContent('About AuraBoot');
+  });
+
+  it('leaves the account entry to the sidebar footer when the navigation sidebar is present', () => {
+    render(
+      <MemoryRouter>
+        <Header sidebarOpen={false} setSidebarOpen={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId('user-menu')).not.toBeInTheDocument();
   });
 
   it('hides the sidebar toggle when the user has no available menus', () => {

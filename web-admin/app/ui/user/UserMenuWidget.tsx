@@ -15,6 +15,14 @@ import { useSmartText } from '~/utils/i18n';
 interface UserMenuWidgetProps {
   /** Skip identity/workspace lookups (compact surfaces like tenant selection). */
   simplified?: boolean;
+  /**
+   * 'floating' pins a compact avatar to the viewport bottom-start corner
+   * (sidebar-less surfaces); 'sidebar' renders a full-width row docked at
+   * the sidebar footer.
+   */
+  variant?: 'floating' | 'sidebar';
+  /** Sidebar collapsed state (sidebar variant): icon-only row, wider popover. */
+  collapsed?: boolean;
 }
 
 interface PartyActorOption {
@@ -30,11 +38,16 @@ interface PartyActorOption {
 /**
  * Account entry point (avatar + profile / workspace / logout menu).
  *
- * Lives outside the <header> toolbar: the widget is pinned to the
- * bottom-start corner of the viewport (bottom-left in LTR, bottom-right in
- * RTL) and its menu opens upward from the corner.
+ * Lives outside the <header> toolbar. In the sidebar variant it is a
+ * full-width footer row of the navigation sidebar; in the floating variant
+ * it is pinned to the bottom-start corner of the viewport (bottom-left in
+ * LTR, bottom-right in RTL). The menu opens upward in both variants.
  */
-export function UserMenuWidget({ simplified = false }: UserMenuWidgetProps) {
+export function UserMenuWidget({
+  simplified = false,
+  variant = 'floating',
+  collapsed = false,
+}: UserMenuWidgetProps) {
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
   const showBusinessWorkspaceSwitcher = rootData?.accessPolicy?.deploymentMode !== 'single';
@@ -103,28 +116,52 @@ export function UserMenuWidget({ simplified = false }: UserMenuWidgetProps) {
 
   if (!user) return null;
 
+  const isSidebar = variant === 'sidebar';
+
   return (
     <div
-      className="print-hide fixed bottom-4 z-[60] ltr:left-4 rtl:right-4"
+      className={
+        isSidebar
+          ? 'print-hide relative w-full'
+          : 'print-hide fixed bottom-4 z-[60] ltr:left-4 rtl:right-4'
+      }
       data-print="hide"
       data-testid="user-menu"
       ref={userDropdownRef}
     >
       <button
         onClick={() => setShowUserDropdown(!showUserDropdown)}
-        className="flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
+        className={
+          isSidebar
+            ? `flex w-full items-center rounded-lg p-2 text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                collapsed ? 'justify-center' : 'gap-3'
+              }`
+            : 'flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600'
+        }
       >
         <img
-          className="h-[30px] w-[30px] rounded-full border border-[#e3e8ee] object-cover shadow-sm dark:border-gray-700"
+          className="h-[30px] w-[30px] flex-shrink-0 rounded-full border border-[#e3e8ee] object-cover shadow-sm dark:border-gray-700"
           src="/avatar.jpeg"
           alt="User avatar"
         />
+        {isSidebar && !collapsed && (
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+              {user.name || t('user.defaultName')}
+            </span>
+            <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+              {user.email}
+            </span>
+          </span>
+        )}
       </button>
 
       {showUserDropdown && (
         <div
           data-testid="user-dropdown"
-          className="absolute start-0 bottom-full z-[70] mb-2 w-64 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+          className={`absolute start-0 bottom-full z-[70] mb-2 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${
+            isSidebar ? (collapsed ? 'w-64' : 'w-full min-w-56') : 'w-64'
+          }`}
         >
           {/* User info */}
           <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">

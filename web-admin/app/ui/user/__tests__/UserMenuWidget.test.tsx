@@ -90,4 +90,52 @@ describe('UserMenuWidget', () => {
     expect(fetch).not.toHaveBeenCalledWith('/api/tenant-selection/my-spaces');
     expect(fetch).not.toHaveBeenCalledWith('/api/actors');
   });
+
+  it('renders a full-width identity row in the sidebar variant', () => {
+    render(
+      <MemoryRouter>
+        <UserMenuWidget variant="sidebar" />
+      </MemoryRouter>,
+    );
+
+    const menu = screen.getByTestId('user-menu');
+    expect(menu.className).toMatch(/w-full/);
+    expect(menu.className).not.toMatch(/\bfixed\b/);
+
+    const trigger = screen.getByRole('button', { name: /User avatar/ });
+    expect(trigger.className).toMatch(/w-full/);
+    // Identity text is part of the row itself, not hidden behind the popover
+    expect(trigger).toHaveTextContent('Admin User');
+    expect(trigger).toHaveTextContent('admin@auraboot.com');
+  });
+
+  it('collapses the sidebar row to the avatar only and widens the popover', () => {
+    render(
+      <MemoryRouter>
+        <UserMenuWidget variant="sidebar" collapsed />
+      </MemoryRouter>,
+    );
+
+    const trigger = screen.getByRole('button', { name: /User avatar/ });
+    expect(trigger.className).toMatch(/justify-center/);
+    expect(trigger).not.toHaveTextContent('admin@auraboot.com');
+
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('user-dropdown').className).toMatch(/\bw-64\b/);
+  });
+
+  it('opens the sidebar-variant menu upward across the full row width', () => {
+    render(
+      <MemoryRouter>
+        <UserMenuWidget variant="sidebar" />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /User avatar/ }));
+
+    const dropdown = screen.getByTestId('user-dropdown');
+    expect(dropdown.className).toMatch(/\bbottom-full\b/);
+    expect(dropdown.className).toMatch(/w-full/);
+    expect(screen.getByTestId('about-link')).toHaveAttribute('href', '/about');
+  });
 });
