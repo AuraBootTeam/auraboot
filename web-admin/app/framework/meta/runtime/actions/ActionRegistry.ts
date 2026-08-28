@@ -659,7 +659,7 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  * payload). Pre-fetches options for choice fields with dictCode or api/static dataSources.
  */
 export async function promptInputForm(
-  fields: Array<Record<string, any>>,
+  fields: Array<Record<string, any> | string>,
   title: any,
   fetchResult?: (url: string, opts: any) => Promise<any>,
   submitLabel?: any,
@@ -818,7 +818,12 @@ export async function promptInputForm(
   });
 }
 
-function normalizePromptInputField(field: Record<string, any>): Record<string, any> {
+function normalizePromptInputField(field: Record<string, any> | string): Record<string, any> {
+  // DSL sugar allows plain strings in action.inputFields ("sl_cpp_name");
+  // promote them to field objects so the form dialog can bind values.
+  if (typeof field === 'string') {
+    return { field, label: field, type: 'text' };
+  }
   const declaredType = String(field.type || 'text').toLowerCase();
   const type = ['string', 'varchar', 'char'].includes(declaredType)
     ? 'text'

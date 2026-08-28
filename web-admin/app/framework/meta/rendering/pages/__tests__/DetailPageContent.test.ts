@@ -23,6 +23,7 @@ import {
   resolveVisibleDetailTabsFromBlocks,
   resolveVisibleTopLevelDetailBlocks,
   resolveDetailHeaderLayoutClasses,
+  resolveDetailPdfFileName,
   shouldRenderDefaultDetailEditAction,
   canRenderDetailToolbarButton,
   unwrapDetailRecord,
@@ -801,5 +802,39 @@ describe('resolveDetailHeaderLayoutClasses', () => {
     expect(actions).toContain('flex-wrap');
     expect(actions).toContain('sm:justify-end');
     expect(actions).toContain('min-w-0');
+  });
+});
+
+describe('resolveDetailPdfFileName', () => {
+  const t = (key: string, _vars?: Record<string, unknown>) => key;
+
+  it('prefers the business code for the export file name', () => {
+    expect(
+      resolveDetailPdfFileName(
+        { title: { 'zh-CN': '销售合同详情', en: 'Sales Order Detail' } } as any,
+        { sl_ctr_code: 'CTR-20260829-001' } as any,
+        'sl_sales_contract_common',
+        'zh-CN',
+        t as any,
+      ),
+    ).toBe('销售合同详情-CTR-20260829-001');
+  });
+
+  it('falls back to the page title without a business code', () => {
+    expect(
+      resolveDetailPdfFileName(
+        { title: { 'zh-CN': '客户详情', en: 'Account Detail' } } as any,
+        {} as any,
+        'crm_account_common',
+        'zh-CN',
+        t as any,
+      ),
+    ).toBe('客户详情');
+  });
+
+  it('falls back to the table name when neither title nor code resolve', () => {
+    expect(
+      resolveDetailPdfFileName({} as any, {} as any, 'sl_sales_order_common', 'en', t as any),
+    ).toBe('sl_sales_order_common');
   });
 });

@@ -15,7 +15,8 @@
  * - summary aggregation rows
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import type { TranslateFunction } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-router';
 import {
   FileText,
@@ -26,6 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
+import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
@@ -688,6 +690,7 @@ export function resolveActiveDetailTab(
  */
 function DetailPageContentInner(props: PageContentProps) {
   const { schema, tableName, recordPid, token } = props;
+  const pdfExportTargetRef = useRef<HTMLDivElement | null>(null);
   const { hasPermission } = useAuth();
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
@@ -1263,6 +1266,13 @@ function DetailPageContentInner(props: PageContentProps) {
               {schema.extension?.showPrint !== false && (
                 <PrintButton title={getLocalizedText(schema.title, locale, t)} />
               )}
+              {schema.extension?.showPdfExport !== false && (
+                <ExportPdfButton
+                  targetRef={pdfExportTargetRef}
+                  fileName={resolveDetailPdfFileName(schema, recordData, tableName, locale, t)}
+                  orientation="portrait"
+                />
+              )}
               {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
                 <>
                   {effectiveHeaderToolbar.buttons
@@ -1298,6 +1308,7 @@ function DetailPageContentInner(props: PageContentProps) {
           </div>
         </div>
 
+        <div ref={pdfExportTargetRef} data-testid="detail-pdf-target">
         {/* Print-only header — visible only during print */}
         <div className="print-header">{getLocalizedText(schema.title, locale, t)}</div>
         <div className="print-meta">
@@ -1638,6 +1649,7 @@ function DetailPageContentInner(props: PageContentProps) {
           </div>
         )}
       </div>
+      </div>
 
       {/* Record Share Dialog */}
       {shareDialogOpen && recordPid && (
@@ -1653,6 +1665,21 @@ function DetailPageContentInner(props: PageContentProps) {
       <FormDialog />
     </div>
   );
+}
+
+export function resolveDetailPdfFileName(
+  schema: PageContentProps['schema'],
+  recordData: RecordData,
+  tableName: string,
+  locale: string,
+  t: TranslateFunction,
+): string {
+  const title = getLocalizedText(schema.title, locale, t) || tableName;
+  const code = readDetailRecordField(recordData, 'sl_ctr_code')
+    ?? readDetailRecordField(recordData, 'sl_so_code')
+    ?? readDetailRecordField(recordData, 'crm_acc_code');
+  const recordCode = code === undefined || code === null || code === '' ? '' : String(code);
+  return recordCode ? `${title}-${recordCode}` : title;
 }
 
 export function DetailPageContent(props: PageContentProps) {
