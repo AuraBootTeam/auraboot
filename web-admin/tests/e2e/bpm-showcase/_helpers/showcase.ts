@@ -16,7 +16,7 @@
  * (single canonical `json.data?.field` parsing — no silent fallback).
  */
 
-import { expect, type APIRequestContext, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { loginViaUI } from '../../../helpers/wd-fixtures';
 
 export const SHOWCASE_PASSWORD = 'Test2026x';
@@ -289,7 +289,7 @@ export async function evidenceShot(
   page: Page,
   testInfo: { outputPath: (...parts: string[]) => string },
   name: string,
-  target?: { scrollIntoViewIfNeeded(): Promise<void>; screenshot(opts: { path: string }): Promise<void> },
+  target?: Locator,
 ): Promise<string> {
   const path = testInfo.outputPath('screenshots', `${name}.png`);
   if (target) {
