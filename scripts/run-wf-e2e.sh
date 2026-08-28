@@ -59,6 +59,8 @@ esac
 SKIP_RESET="${SKIP_RESET:-false}"
 if [[ "$SKIP_RESET" != "true" ]]; then
   echo "=== Running oss-reset-and-init.sh ==="
+  # Target designation (shared-host safety): name the env this script resets.
+  export AURA_RESET_ALLOW_TARGETS="${AURA_RESET_ALLOW_TARGETS:-${PG_DB:-aura_boot},${BE_PORT:-6443}}"
   bash "$SCRIPT_DIR/oss-reset-and-init.sh"
   echo ""
 fi

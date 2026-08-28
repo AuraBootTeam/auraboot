@@ -71,6 +71,7 @@ for arg in "$@"; do
             echo "Env vars:"
             echo "  SKIP_SEED=1     Skip Playwright showcase seed (step 8)"
             echo "  PLUGIN_IMPORT_PROFILE=core|demo|e2e  Override plugin import profile"
+            echo "  AURA_RESET_ALLOW_TARGETS=\"<pg_db>,<be_port>\"  REQUIRED allow-list: reset only proceeds when both the target PG_DB and BE_PORT appear in it (\"@any\" overrides)"
             echo "  AURABOOT_DEMO_SEED=false  Backward-compatible alias for PLUGIN_IMPORT_PROFILE=core"
             echo "  SHOWCASE_COMMERCIAL_SEED=auto|required|skip  Control full-CRM commercial seed"
             echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard  Override demo default dashboard"
@@ -133,6 +134,39 @@ export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
 export PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-}"
 export SHOWCASE_COMMERCIAL_SEED="${SHOWCASE_COMMERCIAL_SEED:-auto}"
 export AURA_PSQL_BASE="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}"
+
+# ── Target designation gate (fail-closed) ────────────────────────────────────
+# Reset is destructive: it stops whatever process owns the target service
+# ports and drops the target database. On a shared host several isolated slot
+# stacks coexist, so a reset must NAME the environment it is allowed to touch.
+# AURA_RESET_ALLOW_TARGETS is a comma/space separated token list; this
+# invocation proceeds only when BOTH the target database name (PG_DB) and the
+# target backend port (BE_PORT) appear in the list. The literal "@any" restores
+# the legacy untargeted behavior and is NOT recommended on shared hosts.
+aura_reset_allow_targets="${AURA_RESET_ALLOW_TARGETS:-}"
+if [ -z "$(printf '%s' "$aura_reset_allow_targets" | tr -d '[:space:]')" ]; then
+    echo "REFUSED: untargeted reset is not allowed (shared-host safety)." >&2
+    echo "Export AURA_RESET_ALLOW_TARGETS naming the environment you intend to reset," >&2
+    echo "e.g. AURA_RESET_ALLOW_TARGETS=\"${PG_DB},${BE_PORT}\" — both PG_DB and BE_PORT" >&2
+    echo "must appear in the list. Use \"@any\" to override at your own risk." >&2
+    exit 1
+fi
+if [ "$aura_reset_allow_targets" != "@any" ]; then
+    aura_reset_allow_db=0
+    aura_reset_allow_be=0
+    for aura_reset_token in $(printf '%s' "$aura_reset_allow_targets" | tr ', ' '  '); do
+        [ "$aura_reset_token" = "$PG_DB" ] && aura_reset_allow_db=1
+        [ "$aura_reset_token" = "$BE_PORT" ] && aura_reset_allow_be=1
+    done
+    if [ "$aura_reset_allow_db" = 0 ] || [ "$aura_reset_allow_be" = 0 ]; then
+        echo "REFUSED: reset target (PG_DB=${PG_DB}, BE_PORT=${BE_PORT}) is not designated" >&2
+        echo "in AURA_RESET_ALLOW_TARGETS=\"${aura_reset_allow_targets}\". Add both tokens (or point" >&2
+        echo "the invocation at a designated environment) before resetting." >&2
+        exit 1
+    fi
+    echo "Target designation OK: PG_DB=${PG_DB}, BE_PORT=${BE_PORT} (allow-list matched)"
+fi
+# ── end target designation gate ──────────────────────────────────────────────
 
 if [ -z "$PLUGIN_IMPORT_PROFILE" ]; then
     case "$AURABOOT_DEMO_SEED" in

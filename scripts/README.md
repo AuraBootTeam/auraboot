@@ -184,7 +184,7 @@
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
 | `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
-| `oss-reset-and-init.sh` | 22 | 2026-07-13 | AuraBoot OSS Environment Reset and Initialization Script |
+| `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `oss-test.sh` | 7 | 2026-06-22 | Run Playwright E2E tests restricted to the OSS scope defined in oss-scope.json. |
 | `perf-ci/compare-baseline.sh` | 2 | 2026-03-26 | compare-baseline.sh — Compare k6 summary JSON files against a baseline. |
 | `perf-ci/notify.sh` | 1 | 2026-03-26 | notify.sh — Send performance regression result notifications. |
