@@ -21,8 +21,18 @@ import type {
   PageSchemaVersionDTO,
 } from '../../studio/services/page-manager/api-types';
 import type { Result } from '~/shared/services/http-client';
-import type { LegacyPageSchemaV2, PageSchemaV3, PageSchemaV3Kind } from '../types';
+import type {
+  LegacyDslBlockV2,
+  LegacyPageSchemaV2,
+  PageSchemaV3,
+  PageSchemaV3Kind,
+} from '../types';
 import { migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
+import {
+  FLAT_PAGE_SCHEMA_VERSION,
+  FlatSerializationError,
+  serializePageTreeToFlat,
+} from './flatPageSerializer';
 import {
   validatePageSchemaV3,
   type PageSchemaV3ValidationResult,
@@ -177,8 +187,28 @@ export async function savePageSchemaV3({
     return { ok: false, validation };
   }
 
+  // Serialize before touching the API so unmappable content (composite/dashboard
+  // kinds, designer-only blocks) fails fast with a precise reason instead of
+  // writing a dialect the runtime cannot render.
+  let flatRequestBlocks: LegacyDslBlockV2[];
+  let flatKind: PageSchemaV3Kind;
+  let flatRootBlockId: string | undefined;
+  let flatExtension: PageSchemaV3['extension'];
+  try {
+    const flat = serializePageTreeToFlat(document);
+    flatRequestBlocks = flat.blocks;
+    flatKind = flat.kind;
+    flatRootBlockId = flat.rootBlockId;
+    flatExtension = withDesignerRootId(document.extension, flat.rootBlockId);
+  } catch (error) {
+    if (error instanceof FlatSerializationError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+
   if (source.type === 'page' && source.pid) {
-    const request = toUpdateRequest(document, source);
+    const request = toUpdateRequest(document, source, flatKind, flatRequestBlocks, flatExtension);
     const result = await api.updatePage(source.pid, request);
     if (result.code !== '0') {
       return { ok: false, error: result.message || result.desc || 'Failed to save page schema.' };
@@ -194,7 +224,7 @@ export async function savePageSchemaV3({
     };
   }
 
-  const request = toCreateRequest(document, source);
+  const request = toCreateRequest(document, source, flatKind, flatRequestBlocks, flatExtension);
   const result = await api.createPage(request);
   if (result.code !== '0') {
     return { ok: false, error: result.message || result.desc || 'Failed to create page schema.' };
@@ -367,8 +397,42 @@ export async function comparePageVersions(
   return { ok: true, data: result.data ?? undefined };
 }
 
+/**
+ * Stored-page → editor-tree materialization, dispatched explicitly on the
+ * stored `schemaVersion`:
+ *
+ * - `3` — the page was stored as a recursive designer tree (legacy designer
+ *   saves). Pass through unchanged; the next save re-serializes it to v4.
+ * - `2` / `4` — the flat runtime dialect (`4` is
+ *   `DslRegistry.PAGE_SCHEMA_CURRENT_VERSION`; stored `2` rows predate the
+ *   2026-06 label bump and are structurally identical). Migrated into the
+ *   editor tree by `migratePageSchemaV2ToV3`.
+ * - anything else — fail fast. There is no guessing: a row labelled with an
+ *   unknown version is either corrupt or newer than this client understands,
+ *   and silently treating it as flat risks data loss on the next save.
+ *
+ * A flat-labelled row whose top-level blocks are recursive kind roots is
+ * rejected loudly instead of being "migrated" — that combination means a
+ * corrupt writer, and migrating it would duplicate the whole page under a
+ * synthetic root.
+ */
+/**
+ * Public entry point for stored-page materialization (explicit version
+ * dispatch + flat→tree migration). Exposed so non-editor consumers — E2E
+ * helpers, local-document tooling — turn a stored DTO into exactly the same
+ * editor tree the designer itself would load.
+ */
+export function materializeStoredPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {
+  return toPageSchemaV3(dto);
+}
+
 function toPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {
-  if (dto.schemaVersion === 3 || hasRecursiveV3Blocks(dto.blocks)) {
+  const version = dto.schemaVersion;
+  // A top-level kind-root container is an unambiguous tree signature: the flat
+  // v4 dialect never places list/form/detail/dashboard containers at the top
+  // level. Version rollback can legitimately restore such rows under a flat
+  // label (pre-migration snapshots), so shape decides before the label does.
+  if (version === 3 || hasTopLevelKindRoot(dto)) {
     return {
       schemaVersion: 3,
       kind: normalizeKind(dto.kind),
@@ -381,71 +445,55 @@ function toPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {
       extension: dto.extension,
     };
   }
-
-function hasRecursiveV3Blocks(blocks: PageSchemaDTO['blocks']): blocks is PageSchemaV3['blocks'] {
-  if (!Array.isArray(blocks) || blocks.length === 0) return false;
-  return blocks.some((block) => {
-    if (!block || typeof block !== 'object') return false;
-    const candidate = block as Record<string, unknown>;
-    return (
-      typeof candidate.id === 'string' &&
-      typeof candidate.blockType === 'string' &&
-      Array.isArray(candidate.blocks) &&
-      ['list', 'detail', 'form', 'dashboard'].includes(candidate.blockType)
+  if (version === 2 || version === 4) {
+    return migratePageSchemaV2ToV3(
+      {
+        schemaVersion: version,
+        kind: dto.kind,
+        id: dto.pageKey || dto.name || dto.pid,
+        pageKey: dto.pageKey,
+        modelCode: dto.modelCode,
+        title: dto.title,
+        layout: dto.layout,
+        blocks: dto.blocks as LegacyPageSchemaV2['blocks'],
+        extension: dto.extension,
+      },
+      { rootBlockId: readDesignerRootId(dto.extension) },
     );
-  });
-}
-
-  return migratePageSchemaV2ToV3({
-    schemaVersion: dto.schemaVersion,
-    kind: dto.kind,
-    id: dto.pageKey || dto.name || dto.pid,
-    pageKey: dto.pageKey,
-    modelCode: dto.modelCode,
-    title: dto.title,
-    layout: dto.layout,
-    blocks: dto.blocks as LegacyPageSchemaV2['blocks'],
-    extension: dto.extension,
-  });
-}
-
-function toUpdateRequest(
-  document: PageSchemaV3,
-  source: PageSchemaV3Source,
-): PageSchemaUpdateRequest {
-  return {
-    name: document.pageKey || source.pageKey || document.id,
-    pageKey: document.pageKey || source.pageKey || document.id,
-    title: document.title,
-    kind: toApiKind(document.kind),
-    blocks: document.blocks,
-    layout: document.layout,
-    schemaVersion: 3,
-    extension: document.extension,
-  };
-}
-
-function toCreateRequest(
-  document: PageSchemaV3,
-  source: PageSchemaV3Source,
-): PageSchemaCreateRequest {
-  const pageKey = document.pageKey || source.pageKey || document.id;
-  return {
-    name: pageKey,
-    pageKey,
-    title: resolveTitle(document.title, document.id),
-    kind: toApiKind(document.kind),
-    blocks: document.blocks,
-    schemaVersion: 3,
-    extension: document.extension,
-  };
-}
-
-function unwrapResult<T>(result: ResultLike<T>, fallbackMessage: string): T {
-  if (result.code !== '0' || !result.data) {
-    throw new Error(result.message || result.desc || fallbackMessage);
   }
-  return result.data;
+  throw new Error(
+    `Page "${dto.pageKey || dto.pid}" has unsupported schemaVersion ${String(
+      version,
+    )}; the designer understands stored versions 2, 3 and 4.`,
+  );
+}
+
+const FLAT_KIND_ROOT_BLOCK_TYPES = new Set(['list', 'detail', 'form', 'dashboard']);
+
+/** Extension key carrying the editor's synthetic kind-root id across flat storage. */
+const DESIGNER_ROOT_ID_EXTENSION_KEY = 'designerRootId';
+
+function readDesignerRootId(extension: PageSchemaDTO['extension']): string | undefined {
+  const value = (extension as Record<string, unknown> | undefined)?.[DESIGNER_ROOT_ID_EXTENSION_KEY];
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+function withDesignerRootId(
+  extension: PageSchemaV3['extension'],
+  rootBlockId: string | undefined,
+): PageSchemaV3['extension'] {
+  if (!rootBlockId) return extension;
+  return { ...(extension ?? {}), [DESIGNER_ROOT_ID_EXTENSION_KEY]: rootBlockId };
+}
+
+function hasTopLevelKindRoot(dto: PageSchemaDTO): boolean {
+  return (dto.blocks ?? []).some(
+    (block) =>
+      block &&
+      typeof block === 'object' &&
+      FLAT_KIND_ROOT_BLOCK_TYPES.has(String(block.blockType)) &&
+      Array.isArray(block.blocks),
+  );
 }
 
 function normalizeKind(kind: string): PageSchemaV3Kind {
@@ -463,6 +511,51 @@ function normalizeKind(kind: string): PageSchemaV3Kind {
 
 function toApiKind(kind: PageSchemaV3Kind): ApiPageType {
   return kind;
+}
+
+function toUpdateRequest(
+  document: PageSchemaV3,
+  source: PageSchemaV3Source,
+  flatKind: PageSchemaV3Kind,
+  flatBlocks: LegacyDslBlockV2[],
+  flatExtension: PageSchemaV3['extension'],
+): PageSchemaUpdateRequest {
+  return {
+    name: document.pageKey || source.pageKey || document.id,
+    pageKey: document.pageKey || source.pageKey || document.id,
+    title: document.title,
+    kind: toApiKind(flatKind),
+    blocks: flatBlocks,
+    layout: document.layout,
+    schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
+    extension: flatExtension,
+  };
+}
+
+function toCreateRequest(
+  document: PageSchemaV3,
+  source: PageSchemaV3Source,
+  flatKind: PageSchemaV3Kind,
+  flatBlocks: LegacyDslBlockV2[],
+  flatExtension: PageSchemaV3['extension'],
+): PageSchemaCreateRequest {
+  const pageKey = document.pageKey || source.pageKey || document.id;
+  return {
+    name: pageKey,
+    pageKey,
+    title: resolveTitle(document.title, document.id),
+    kind: toApiKind(flatKind),
+    blocks: flatBlocks,
+    schemaVersion: FLAT_PAGE_SCHEMA_VERSION,
+    extension: flatExtension,
+  };
+}
+
+function unwrapResult<T>(result: ResultLike<T>, fallbackMessage: string): T {
+  if (result.code !== '0' || !result.data) {
+    throw new Error(result.message || result.desc || fallbackMessage);
+  }
+  return result.data;
 }
 
 function resolveTitle(title: PageSchemaV3['title'], fallback: string): string {

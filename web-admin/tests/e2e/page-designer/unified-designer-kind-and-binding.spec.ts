@@ -1072,7 +1072,9 @@ function expectListBlockChildren(
 
   if (blockType === 'widget') {
     expect(movedBlock?.blocks ?? []).toEqual([]);
-    expect(movedBlock?.widgetType).toBe('number-card');
+    // The flat v4 metric card IS the stat-card block; the designer's
+    // number-card widget converges to it on save.
+    expect(movedBlock?.widgetType).toBe('stat-card');
     expect(movedBlock?.props?.title).toBe('Candidate metric');
     expect(movedBlock?.props?.value).toBe('42');
     expect(movedBlock?.props?.suffix).toBe('widgets');
@@ -3673,11 +3675,44 @@ async function isBeforeInDom(
     });
 }
 
+// Pages saved by the unified designer persist as flat v4 blocks: field /
+// column / action / tab leaves live in typed arrays that carry their stable
+// ids. Present those entries as a synthesized `blocks` view so the tree-shaped
+// child-order assertions keep working against both dialects.
+function flatChildrenView(flat: Record<string, unknown>): TestBlock[] {
+  const children: TestBlock[] = [];
+  for (const key of ['fields', 'columns', 'buttons', 'actions', 'rowActions'] as const) {
+    for (const entry of ((flat[key] as Array<string | Record<string, unknown>>) ?? [])) {
+      if (entry && typeof entry === 'object') children.push(entry as TestBlock);
+    }
+  }
+  for (const tab of ((flat.tabs as Array<Record<string, unknown>>) ?? [])) {
+    if (tab && typeof tab === 'object') children.push({ ...(tab as TestBlock), blockType: 'tab' });
+  }
+  return children;
+}
+
 function findBlock(blocks: TestBlock[], blockId: string): TestBlock | null {
   for (const block of blocks) {
-    if (block.id === blockId) return block;
-    const child = block.blocks ? findBlock(block.blocks, blockId) : null;
+    const flat = block as Record<string, unknown>;
+    const treeChildren = Array.isArray(flat.blocks) ? (flat.blocks as TestBlock[]) : [];
+    if (block.id === blockId) {
+      const view = flatChildrenView(flat);
+      return { ...block, blocks: treeChildren.length ? treeChildren : view };
+    }
+    const child = treeChildren.length ? findBlock(treeChildren, blockId) : null;
     if (child) return child;
+    for (const key of ['fields', 'columns', 'buttons', 'actions', 'rowActions', 'tabs'] as const) {
+      for (const entry of ((flat[key] as Array<Record<string, unknown>>) ?? [])) {
+        if (!entry || typeof entry !== 'object') continue;
+        const entryBlocks = Array.isArray(entry.blocks) ? (entry.blocks as TestBlock[]) : [];
+        if ((entry as TestBlock).id === blockId) {
+          return { ...(entry as TestBlock), blocks: entryBlocks };
+        }
+        const nested = entryBlocks.length ? findBlock(entryBlocks, blockId) : null;
+        if (nested) return nested;
+      }
+    }
   }
   return null;
 }

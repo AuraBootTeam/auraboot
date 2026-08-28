@@ -12,15 +12,19 @@ import type {
 import { createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
 
 interface NormalizedRef {
+  id?: string;
   field: string;
   props: Record<string, unknown>;
   layout: Record<string, unknown>;
 }
 
-export function migratePageSchemaV2ToV3(schema: LegacyPageSchemaV2): PageSchemaV3 {
+export function migratePageSchemaV2ToV3(
+  schema: LegacyPageSchemaV2,
+  options?: { rootBlockId?: string },
+): PageSchemaV3 {
   const kind = normalizeKind(schema.kind);
   const rootBlock: DslBlockV3 = {
-    id: toStableBlockId(kind, schema.id),
+    id: options?.rootBlockId || toStableBlockId(kind, schema.id),
     blockType: kind,
     title: schema.title,
     dataSource: schema.modelCode ? { model: schema.modelCode } : undefined,
@@ -118,13 +122,16 @@ function migrateListBlocks(blocks: LegacyDslBlockV2[]): DslBlockV3[] {
 
 function migrateSectionBlock(block: LegacyDslBlockV2, blockType: string): DslBlockV3 {
   const blockId = block.id || toStableBlockId(blockType);
+  // `normalizeProps` strips the structured `columns` key; preserve it so the
+  // flat serializer can restore section column counts on save.
+  const sectionColumns = typeof block.columns === 'number' ? { columns: block.columns } : {};
   return {
     id: blockId,
     blockType,
     region: block.region,
     title: block.title,
     layout: normalizeLayout(block),
-    props: normalizeProps(block),
+    props: { ...normalizeProps(block), ...sectionColumns },
     dataSource: normalizeDataSource(block.dataSource),
     blocks: (block.fields ?? []).map((fieldRef) => migrateFieldRef(blockId, fieldRef, 'field')),
     extension: normalizeExtension(block),
@@ -133,13 +140,19 @@ function migrateSectionBlock(block: LegacyDslBlockV2, blockType: string): DslBlo
 
 function migrateFilterBarBlock(block: LegacyDslBlockV2): DslBlockV3 {
   const blockId = block.id || 'filters';
+  // `normalizeProps` strips the structured array keys, which would silently
+  // drop the filters block's own `actions` / `buttons` shorthand (search /
+  // reset / embedded buttons) — the flat serializer hoists them back from
+  // these keys, so they must survive the migration.
+  const shorthandActions = Array.isArray(block.actions) ? { actions: block.actions } : {};
+  const shorthandButtons = Array.isArray(block.buttons) ? { buttons: block.buttons } : {};
   return {
     id: blockId,
     blockType: 'filter-bar',
     region: 'filters',
     title: block.title,
     layout: normalizeLayout(block),
-    props: normalizeProps(block),
+    props: { ...normalizeProps(block), ...shorthandActions, ...shorthandButtons },
     blocks: (block.fields ?? []).map((fieldRef) => migrateFieldRef(blockId, fieldRef, 'filter-field')),
     extension: normalizeExtension(block),
   };
@@ -147,6 +160,11 @@ function migrateFilterBarBlock(block: LegacyDslBlockV2): DslBlockV3 {
 
 function migrateTableBlock(block: LegacyDslBlockV2): DslBlockV3 {
   const blockId = block.id || 'table';
+  // Row actions persist in the flat table's `rowActions` array; restore them as
+  // attached action children so the outline keeps them editable under the table.
+  const rowActionRefs = Array.isArray(block.rowActions)
+    ? (block.rowActions as Array<string | Record<string, unknown>>)
+    : [];
   return {
     id: blockId,
     blockType: 'table',
@@ -155,7 +173,15 @@ function migrateTableBlock(block: LegacyDslBlockV2): DslBlockV3 {
     layout: normalizeLayout(block),
     props: { ...normalizeProps(block), selection: block.selection },
     dataSource: normalizeDataSource(block.dataSource),
-    blocks: (block.columns ?? []).map((columnRef) => migrateColumnRef(blockId, columnRef)),
+    blocks: [
+      ...(Array.isArray(block.columns) ? block.columns : []).map((columnRef) =>
+        migrateColumnRef(blockId, columnRef),
+      ),
+      ...migrateActionRefs(blockId, rowActionRefs).map((action) => ({
+        ...action,
+        region: action.region ?? 'row-actions',
+      })),
+    ],
     extension: normalizeExtension(block),
   };
 }
@@ -179,9 +205,18 @@ function migrateGenericBlock(block: LegacyDslBlockV2, kind?: PageSchemaV3Kind): 
   if (block.blockType === 'tabs') return migrateTabsBlock(block, kind);
   if (block.blockType === 'toolbar') return migrateActionBarBlock(block, 'toolbar');
   if (block.blockType === 'form-buttons') return migrateActionBarBlock(block, 'footer');
+  // Sections / filter bars nested outside the kind roots (e.g. inside tabs)
+  // still need their `fields[]` shorthand expanded — the generic passthrough
+  // would strip it.
+  if (block.blockType === 'filter-bar' || block.blockType === 'filters') {
+    return migrateFilterBarBlock(block);
+  }
+  if (block.blockType === 'table') return migrateTableBlock(block);
   if (block.blockType === 'form-section' && kind === 'detail') {
     return migrateSectionBlock(block, 'detail-section');
   }
+  if (block.blockType === 'form-section') return migrateSectionBlock(block, 'form-section');
+  if (block.blockType === 'detail-section') return migrateSectionBlock(block, 'detail-section');
   if (block.blockType === 'chart' || block.blockType === 'stat-card') {
     return migrateWidgetLikeBlock(block);
   }
@@ -229,7 +264,8 @@ function migrateTabRef(
   const { blocks: _blocks, key: _key, id: _id, label: _label, ...props } = tab;
 
   return {
-    id: toStableBlockId(parentId, key),
+    // Honor a persisted tab id so the outline node survives a save/reload cycle.
+    id: typeof _id === 'string' && _id ? _id : toStableBlockId(parentId, key),
     blockType: 'tab',
     title: label,
     props,
@@ -256,7 +292,9 @@ function migrateWidgetLikeBlock(block: LegacyDslBlockV2): DslBlockV3 {
 function migrateFieldRef(parentId: string, ref: LegacyFieldRefV2, blockType: 'field' | 'filter-field'): DslBlockV3 {
   const parsed = parseFieldLikeRef(ref);
   return {
-    id: toStableBlockId(parentId, parsed.field),
+    // Object refs may carry the stable id persisted by the flat serializer;
+    // honoring it keeps block identity stable across a load → save cycle.
+    id: parsed.id ?? toStableBlockId(parentId, parsed.field),
     blockType,
     field: parsed.field,
     layout: Object.keys(parsed.layout).length ? parsed.layout : undefined,
@@ -267,7 +305,7 @@ function migrateFieldRef(parentId: string, ref: LegacyFieldRefV2, blockType: 'fi
 function migrateColumnRef(parentId: string, ref: LegacyColumnRefV2): DslBlockV3 {
   const parsed = parseFieldLikeRef(ref);
   return {
-    id: toStableBlockId(parentId, parsed.field),
+    id: parsed.id ?? toStableBlockId(parentId, parsed.field),
     blockType: 'column',
     field: parsed.field,
     layout: Object.keys(parsed.layout).length ? parsed.layout : undefined,
@@ -363,12 +401,17 @@ function normalizeWidgetId(widget: LegacyDashboardWidget, parentId: string, inde
 function parseFieldLikeRef(ref: LegacyFieldRefV2 | LegacyColumnRefV2): NormalizedRef {
   if (typeof ref !== 'string') {
     const field = String(ref.field || ref.code || ref.name || 'field');
-    const { span, colSpan, width, field: _field, code: _code, name: _name, ...rest } = ref;
+    const { span, colSpan, width, field: _field, code: _code, name: _name, id, ...rest } = ref;
     const layout: Record<string, unknown> = {};
     if (typeof span === 'number') layout.span = span;
     if (typeof colSpan === 'number') layout.span = colSpan;
     if (typeof width === 'number') layout.width = width;
-    return { field, props: { ...rest }, layout };
+    return {
+      id: typeof id === 'string' && id ? id : undefined,
+      field,
+      props: rest,
+      layout,
+    };
   }
 
   const [field, ...segments] = ref.split('|');
