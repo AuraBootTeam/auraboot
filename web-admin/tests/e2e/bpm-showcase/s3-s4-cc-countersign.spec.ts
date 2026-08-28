@@ -258,6 +258,10 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     const option = dialog.locator('[data-testid^="member-picker-option-"]').first();
     await expect(option).toBeVisible({ timeout: 10_000 });
     await option.click();
+    // 抄送内容 anchors the inbox assertion (NotifyPanel renders content text,
+    // not a business-key column).
+    const ccContent = `S3.1 manual cc ${businessKey}`;
+    await dialog.locator('textarea').fill(ccContent);
     await evidenceShot(bobPage, testInfo, 's3-1-cc-dialog', dialog);
 
     // Manual cc works end-to-end (fixed 2026-08-28): the frontend sends user
@@ -270,22 +274,26 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     await dialog.getByRole('button', { name: '确认抄送' }).click();
     const ccResp = await ccRespPromise;
     expect(ccResp.status(), `manual cc HTTP ${ccResp.status()}`).toBeLessThan(400);
-    await evidenceShot(bobPage, testInfo, 's3-1-cc-success', dialog);
+    // Success closes the dialog by design — capture the page-level evidence.
+    await evidenceShot(bobPage, testInfo, 's3-1-cc-success');
     await bobCtx.close();
 
-    // dave's cc inbox via real UI: task center 抄送给我 tab
+    // dave's cc inbox via real UI: task center 抄送给我 tab (NotifyPanel
+    // renders notification cards with content text, not the business-key
+    // column, so the entry is matched by our cc comment text).
     const { context: daveCtx, page: davePage } = await openUserSession(browser, SHOWCASE_USERS.dave);
     await navigateToTaskCenter(davePage);
     await expectContentReady(davePage, /任务中心/);
     await davePage.getByRole('button', { name: /抄送给我/ }).first().click();
     await expectContentReady(davePage);
-    const ccRow = davePage.locator('table tbody tr').filter({ hasText: businessKey }).first();
-    await expect(ccRow, 'dave cc inbox must list the cc entry').toBeVisible({ timeout: 15_000 });
-    await evidenceShot(davePage, testInfo, 's3-1-dave-cc-inbox', ccRow);
+    const ccEntry = davePage.locator('main, [role="main"]')
+      .getByText(ccContent).first();
+    await expect(ccEntry, 'dave cc inbox must list the cc entry').toBeVisible({ timeout: 15_000 });
+    await evidenceShot(davePage, testInfo, 's3-1-dave-cc-inbox', ccEntry);
 
-    // read-only: the cc row must not offer approve/reject actions
-    const approveAction = ccRow.locator('[data-testid="task-action-approve"]');
-    await expect(approveAction, 'cc entry must be read-only (no approve action)').toHaveCount(0);
+    // read-only: the cc inbox must not offer approve/reject actions
+    const approveAction = davePage.locator('[data-testid="task-action-approve"]');
+    await expect(approveAction, 'cc inbox must be read-only (no approve action)').toHaveCount(0);
     await daveCtx.close();
 
     // backend evidence: notify received list contains the CC record

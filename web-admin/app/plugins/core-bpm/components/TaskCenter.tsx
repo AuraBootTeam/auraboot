@@ -66,7 +66,9 @@ export function TaskCenter() {
   const navigate = useNavigate();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { user } = useAuth();
-  const currentUserId = Number(user?.pid) || 0;
+  // user.id is the numeric ab_user id; pid is a ULID string and Number(pid)
+  // yields NaN -> 0, which broke cc-inbox/urge recipient lookups (showcase S3).
+  const currentUserId = Number(user?.id) || 0;
 
   const tc = useTaskCenter();
 
