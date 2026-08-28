@@ -805,6 +805,16 @@ export function UnifiedDesignerWorkbench({
     setMultiSelectedIds(new Set());
   };
 
+  // The page's single kind-root container (e.g. the `list` root of a list
+  // page). When the current selection cannot accept a block, the palette falls
+  // back to this container so it stays usable without requiring the user to
+  // know they must select the container first.
+  const kindRootContainer = (() => {
+    const rootBlockType = getKindPolicy(document.kind).rootBlockType;
+    if (!rootBlockType) return undefined;
+    return document.blocks.find((block) => block.blockType === rootBlockType);
+  })();
+
   const canAddBlock = (blockType: string) => {
     if (contextualReadOnly) return false;
     if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
@@ -813,6 +823,9 @@ export function UnifiedDesignerWorkbench({
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     if (selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) return true;
     if (selectedBlockId && resolveBlockDropBeforeTarget(selectedBlockId, blockType)) return true;
+    if (kindRootContainer && blockRegistry.canContain(kindRootContainer.blockType, blockType)) {
+      return true;
+    }
     return canAddBlockToRoot(blockType);
   };
 
@@ -823,6 +836,29 @@ export function UnifiedDesignerWorkbench({
     if (!nextBlock) return;
 
     const beforeTarget = selectedBlockId ? resolveBlockDropBeforeTarget(selectedBlockId, blockType) : null;
+
+    // Fall back to the kind-root container when the current selection cannot
+    // accept the block but the root container can — keeps the palette usable
+    // with the page root selected (the default state after opening a page).
+    if (
+      (!selectedBlockId ||
+        !(selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType))) &&
+      kindRootContainer &&
+      blockRegistry.canContain(kindRootContainer.blockType, blockType)
+    ) {
+      const preparedBlock = prepareCreatedBlock(
+        applyParentPlacementDefaults(nextBlock, kindRootContainer),
+      );
+      updateDocument((current) => ({
+        ...current,
+        blocks: updateBlockById(current.blocks, kindRootContainer.id, (block) => ({
+          ...block,
+          blocks: [...(block.blocks ?? []), preparedBlock],
+        })),
+      }));
+      setSelectedBlockId(nextBlock.id);
+      return;
+    }
 
     if (selectedBlockId && selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) {
       const preparedBlock = prepareCreatedBlock(

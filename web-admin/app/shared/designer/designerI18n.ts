@@ -290,6 +290,16 @@ export const DESIGNER_I18N = {
       composite: { 'zh-CN': '组合页面', 'en-US': 'Composite' } as L,
     },
     mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
+    paletteDisabledHint: {
+      'zh-CN':
+        '当前选中位置不能添加该块：请先在画布或大纲中选择列表、分区等容器，再从这里添加',
+      'en-US':
+        'This block cannot be added to the current selection: select a container (list, section, …) on the canvas or outline first',
+    } as L,
+    modelMissingHint: {
+      'zh-CN': '绑定的模型不存在或暂无字段元数据，画布以结构预览展示',
+      'en-US': 'The bound model is missing or has no field metadata; the canvas shows a structural preview',
+    } as L,
     untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
     deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
     duplicateBlock: { 'zh-CN': '复制区块', 'en-US': 'Duplicate block' } as L,
