@@ -56,6 +56,7 @@ public class AiSearchServiceImpl implements AiSearchService {
     private static final Set<String> SKIP_MODEL_TYPES = Set.of("view", "meta");
 
     private final MetaModelMapper metaModelMapper;
+    private final GlobalSearchService globalSearchService;
     private final MetaModelService metaModelService;
     private final DynamicDataService dynamicDataService;
     private final LlmProviderFactory llmProviderFactory;
@@ -93,8 +94,10 @@ public class AiSearchServiceImpl implements AiSearchService {
     // =========================================================================
 
     private AiSearchResult llmSearch(Long tenantId, AiSearchRequest request) throws Exception {
-        // 1. Build model catalog for the prompt
-        List<Model> models = metaModelMapper.findCurrentByTenant();
+        // 1. Build model catalog for the prompt — readable models only, so the
+        // LLM is never offered a model the caller cannot query.
+        Long userId = MetaContext.getCurrentUserId();
+        List<Model> models = globalSearchService.readableCandidateModels(userId);
         Map<String, ModelSummary> catalog = buildModelCatalog(models);
 
         if (catalog.isEmpty()) {
@@ -136,6 +139,13 @@ public class AiSearchServiceImpl implements AiSearchService {
         String modelCode = (String) parsed.get("modelCode");
         if (modelCode == null || modelCode.isBlank()) {
             log.warn("LLM did not identify a model from query: {}", request.getQuery());
+            return keywordFallbackSearch(request);
+        }
+        // Fail-closed: the LLM must never select a model outside the caller's
+        // readable candidate set.
+        boolean readable = models.stream().anyMatch(m -> modelCode.equals(m.getCode()));
+        if (!readable) {
+            log.warn("LLM proposed non-readable model {} — denying", modelCode);
             return keywordFallbackSearch(request);
         }
 
@@ -243,7 +253,11 @@ public class AiSearchServiceImpl implements AiSearchService {
         String keyword = request.getQuery();
         int maxResults = Math.min(Math.max(request.getMaxResults(), 1), 100);
 
-        List<Model> models = metaModelMapper.findCurrentByTenant();
+        Long userId = MetaContext.getCurrentUserId();
+        // Candidates converge to models the caller may read (model.<code>.read);
+        // without this the fallback would disclose records from models the
+        // user cannot see in any list page.
+        List<Model> models = globalSearchService.readableCandidateModels(userId);
         List<Map<String, Object>> allRecords = new ArrayList<>();
         String matchedModelCode = null;
         String matchedModelLabel = null;
@@ -251,11 +265,6 @@ public class AiSearchServiceImpl implements AiSearchService {
 
         for (Model model : models) {
             if (allRecords.size() >= maxResults) break;
-
-            String modelType = model.getModelType();
-            if (modelType != null && SKIP_MODEL_TYPES.contains(modelType.toLowerCase())) {
-                continue;
-            }
 
             String code = model.getCode();
             try {
@@ -292,7 +301,7 @@ public class AiSearchServiceImpl implements AiSearchService {
                 .records(allRecords)
                 .totalCount(totalCount)
                 .llmUsed(false)
-                .explanation("Keyword search across all models for: " + keyword)
+                .explanation("Keyword search across readable models for: " + keyword)
                 .build();
     }
 

@@ -212,37 +212,25 @@ export function CommandPalette() {
 
       setSearching(true);
       try {
-        // Get searchable models from menu items that use /p/ paths
-        const searchableModels = flatItems
-          .filter((m) => m.path.startsWith('/p/'))
-          .map((m) => ({
-            code: m.path.replace('/p/', '').split('/')[0],
-            name: m.name,
-          }))
-          .filter((m, i, arr) => arr.findIndex((a) => a.code === m.code) === i)
-          .slice(0, 8); // Limit to 8 models to avoid too many parallel requests
-
-        const results = await Promise.all(
-          searchableModels.map(async (model) => {
-            try {
-              const resp = await fetchResult<any>(`/api/dynamic/${model.code}/list`, {
-                method: 'get',
-                params: { keyword: query, pageSize: '3', pageNum: '1' },
-              });
-              if (ResultHelper.isSuccess(resp) && resp.data?.records?.length > 0) {
-                return resp.data.records
-                  .map((record: unknown) => toRecordHit(record, model.code, model.name))
-                  .filter((hit: RecordHit | null): hit is RecordHit => hit !== null);
-              }
-            } catch {
-              // Ignore individual model search failures
-            }
-            return [];
-          }),
-        );
-
+        // Unified server-side global search: the backend converges candidates
+        // to models the caller may read and executes grouped keyword queries
+        // in one request (permission enforcement lives server-side).
+        const resp = await fetchResult<any>('/api/search/global', {
+          method: 'get',
+          params: { keyword: query, perModelLimit: '3', maxModels: '12' },
+        });
         if (!controller.signal.aborted) {
-          setRecordResults(results.flat().slice(0, 15));
+          if (ResultHelper.isSuccess(resp) && Array.isArray(resp.data?.groups)) {
+            const hits = (resp.data.groups as Array<{ modelCode: string; modelLabel: string; records?: unknown[] }>)
+              .flatMap((group) =>
+                (group.records ?? [])
+                  .map((record) => toRecordHit(record, group.modelCode, group.modelLabel))
+                  .filter((hit: RecordHit | null): hit is RecordHit => hit !== null),
+              );
+            setRecordResults(hits.slice(0, 15));
+          } else {
+            setRecordResults([]);
+          }
         }
       } catch {
         // Search was aborted or failed
@@ -254,7 +242,7 @@ export function CommandPalette() {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [query, flatItems]);
+  }, [query]);
 
   // ---------------------------------------------------------------------------
   // Doc search via RAG API (debounced)
