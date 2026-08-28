@@ -416,6 +416,16 @@ export async function comparePageVersions(
  * corrupt writer, and migrating it would duplicate the whole page under a
  * synthetic root.
  */
+/**
+ * Public entry point for stored-page materialization (explicit version
+ * dispatch + flat→tree migration). Exposed so non-editor consumers — E2E
+ * helpers, local-document tooling — turn a stored DTO into exactly the same
+ * editor tree the designer itself would load.
+ */
+export function materializeStoredPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {
+  return toPageSchemaV3(dto);
+}
+
 function toPageSchemaV3(dto: PageSchemaDTO): PageSchemaV3 {
   const version = dto.schemaVersion;
   // A top-level kind-root container is an unambiguous tree signature: the flat

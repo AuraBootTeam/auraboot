@@ -9,6 +9,7 @@ import { expect, test } from '../../fixtures';
 import { createCookieSessionStorage } from 'react-router';
 import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { materializeStoredPageSchemaV3 } from '../../../app/plugins/core-designer/components/unified-designer/persistence/pageSchemaV3Repository';
 import { uniqueId } from '../helpers';
 
 // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let React
@@ -4444,11 +4445,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // FIXME(designer-v4): cross-role grant derivation still assumes the legacy
-  // tree-shaped stored page. Pages now persist as flat v4 blocks, so the
-  // backend permission collector must also walk fields/columns/buttons/
-  // actions/rowActions arrays before this role-matrix journey can pass.
-  test.fixme('UDW-036: applies action permission code across operator and viewer roles', async ({
+  test('UDW-036: applies action permission code across operator and viewer roles', async ({
     page,
     browser,
     baseURL,
@@ -4485,6 +4482,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         permissionCode: ROLE_MATRIX_PERMISSION_CODE,
       }),
     });
+
+    // The fixture roles carry only e2et.* codes; opening the designer as
+    // operator/viewer additionally requires meta.designer.read, which no
+    // setup phase grants. Grant it to both fixture roles here so the journey
+    // exercises exactly the action-permission difference under test.
+    await grantRolePermissionByCode(page, 'e2et_operator', 'meta.designer.read');
+    await grantRolePermissionByCode(page, 'e2et_viewer', 'meta.designer.read');
 
     const appBaseUrl = baseURL ?? new URL(page.url()).origin;
     const operatorContext = await createAuthenticatedRoleContext(browser, appBaseUrl, 'operator');
@@ -6796,6 +6800,48 @@ async function pickCurrentPermissionCode(page: Page): Promise<string> {
   return codes[0];
 }
 
+/**
+ * Grant a permission code to a role through the permission-matrix API:
+ * resolve the permission id from the full matrix, the role pid from /api/roles,
+ * then PUT the batch grant. Used by journeys whose fixture roles need platform
+ * permissions (e.g. meta.designer.read) that no setup phase assigns.
+ */
+async function grantRolePermissionByCode(
+  page: Page,
+  roleCode: string,
+  permissionCode: string,
+): Promise<void> {
+  const matrixResp = await page.request.get('/api/permissions/matrix');
+  expect(matrixResp.ok(), 'permission matrix fetch failed').toBeTruthy();
+  const matrixBody = await matrixResp.json();
+  let permissionId: number | undefined;
+  for (const module of matrixBody?.data?.modules ?? []) {
+    for (const resource of module?.resources ?? []) {
+      for (const action of resource?.actions ?? []) {
+        if (action?.code === permissionCode) {
+          permissionId = action.permissionId;
+          break;
+        }
+      }
+      if (permissionId !== undefined) break;
+    }
+    if (permissionId !== undefined) break;
+  }
+  expect(permissionId, `permission not found in matrix: ${permissionCode}`).toBeTruthy();
+
+  const rolesResp = await page.request.get('/api/roles');
+  expect(rolesResp.ok(), 'roles fetch failed').toBeTruthy();
+  const rolesBody = await rolesResp.json();
+  const records = rolesBody?.data?.records ?? [];
+  const role = records.find((entry: { code?: string }) => entry?.code === roleCode);
+  expect(role?.pid, `role not found: ${roleCode}`).toBeTruthy();
+
+  const grantResp = await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {
+    data: [{ permissionId, granted: true }],
+  });
+  expect(grantResp.ok(), `grant failed for ${roleCode}: ${grantResp.status()}`).toBeTruthy();
+}
+
 async function expectCurrentUserPermission(
   page: Page,
   permissionCode: string,
@@ -6873,17 +6919,12 @@ function toLocalDesignerDocument(
   dto: PageSchemaDto,
   fallbackKind: string,
 ): Record<string, unknown> {
-  return {
-    schemaVersion: 3,
-    kind: dto.kind || fallbackKind,
-    id: dto.pageKey || dto.pid,
-    pageKey: dto.pageKey,
-    modelCode: dto.modelCode,
-    title: dto.title,
-    layout: dto.layout,
-    blocks: dto.blocks ?? [],
-    extension: dto.extension,
-  };
+  // Stored rows are flat v4; reuse the app's own materialization so the local
+  // document is the exact editor tree the designer would load from the backend
+  // (root id, field/column/action entries expanded, stable ids honored).
+  void fallbackKind;
+  const materialized = materializeStoredPageSchemaV3(dto as never);
+  return materialized as unknown as Record<string, unknown>;
 }
 
 async function createAuthenticatedRoleContext(
