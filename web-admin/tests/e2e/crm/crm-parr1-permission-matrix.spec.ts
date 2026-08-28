@@ -392,6 +392,12 @@ test('PARR1 object matrix: lead / opportunity / activity CRUD deny-allow', async
       del: 'crm:delete_opportunity',
     },
     {
+      label: 'activity-record',
+      create: { code: 'crm:create_activity', payload: { crm_act_type: 'visit', crm_act_subject: `${RUN} 跟进记录`, crm_act_content: '对象矩阵跟进内容', crm_act_source: 'manual' } },
+      update: { code: 'crm:update_activity', payload: { crm_act_content: `${RUN} 跟进内容更新` } },
+      del: 'crm:delete_follow_record',
+    },
+    {
       label: 'activity-plan',
       create: { code: 'crm:create_activity', payload: { crm_act_type: 'task', crm_act_subject: `${RUN} 计划`, crm_act_content: '对象矩阵计划', crm_act_source: 'manual', crm_act_status: 'open', crm_act_priority: 'high', crm_act_related_model: 'crm_opportunity_common', crm_act_related_id: holder.oppPid } },
       update: { code: 'crm:update_activity', payload: { crm_act_content: `${RUN} 计划内容更新` } },
