@@ -9,7 +9,7 @@ import { expect, test } from '../../fixtures';
 import { createCookieSessionStorage } from 'react-router';
 import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { materializeStoredPageSchemaV3 } from '../../../app/plugins/core-designer/components/unified-designer/persistence/pageSchemaV3Repository';
+import { migratePageSchemaV2ToV3 } from '../../../app/plugins/core-designer/components/unified-designer/migration/migrateToV3';
 import { uniqueId } from '../helpers';
 
 // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let React
@@ -247,6 +247,7 @@ const authSessionStorage = createCookieSessionStorage({
 
 interface PageSchemaDto {
   pid: string;
+  schemaVersion?: number;
   pageKey: string;
   kind?: string;
   title?: unknown;
@@ -6919,13 +6920,54 @@ function toLocalDesignerDocument(
   dto: PageSchemaDto,
   fallbackKind: string,
 ): Record<string, unknown> {
-  // Stored rows are flat v4; reuse the app's own materialization so the local
-  // document is the exact editor tree the designer would load from the backend
-  // (root id, field/column/action entries expanded, stable ids honored).
-  void fallbackKind;
-  const materialized = materializeStoredPageSchemaV3(dto as never);
-  return materialized as unknown as Record<string, unknown>;
+  // Stored rows are flat v4. Mirror the repository's load dispatch inline
+  // (kept import-light: pulling the repository module into the playwright
+  // process drags in the whole app HTTP graph and slows every test). A
+  // top-level kind root is an unambiguous tree signature; otherwise the flat
+  // row migrates through the app's own migrator with the persisted root id.
+  const blocks = (dto.blocks ?? []) as Array<Record<string, unknown>>;
+  const hasTreeRoot = blocks.some(
+    (block) =>
+      block &&
+      FLAT_KIND_ROOT_BLOCK_TYPES.has(String(block.blockType)) &&
+      Array.isArray(block.blocks),
+  );
+  if (dto.schemaVersion === 3 || hasTreeRoot) {
+    return {
+      schemaVersion: 3,
+      kind: dto.kind || fallbackKind,
+      id: dto.pageKey || dto.pid,
+      pageKey: dto.pageKey,
+      modelCode: dto.modelCode,
+      title: dto.title,
+      layout: dto.layout,
+      blocks: dto.blocks ?? [],
+      extension: dto.extension,
+    };
+  }
+  const extension = (dto.extension ?? {}) as Record<string, unknown>;
+  const rootBlockId =
+    typeof extension.designerRootId === 'string' && extension.designerRootId
+      ? extension.designerRootId
+      : undefined;
+  const migrated = migratePageSchemaV2ToV3(
+    {
+      schemaVersion: (dto.schemaVersion ?? 4) as 4,
+      kind: dto.kind || 'list',
+      id: dto.pageKey || dto.pid || 'page',
+      pageKey: dto.pageKey,
+      modelCode: dto.modelCode,
+      title: dto.title as never,
+      layout: dto.layout,
+      blocks: dto.blocks as never,
+      extension: dto.extension,
+    },
+    { rootBlockId },
+  );
+  return migrated as unknown as Record<string, unknown>;
 }
+
+const FLAT_KIND_ROOT_BLOCK_TYPES = new Set(['list', 'detail', 'form', 'dashboard']);
 
 async function createAuthenticatedRoleContext(
   browser: Browser,
