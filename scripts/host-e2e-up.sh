@@ -39,4 +39,6 @@ echo "[host-e2e-up] AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE  AURA_SSRF_ALLOWED_
 # The multi-worktree guard remains authoritative.  An operator may still export
 # FORCE_HOST=1 explicitly, but this wrapper must never opt into shared-host
 # mutation on their behalf.
+# Target designation (shared-host safety): only this stack's env may be reset.
+export AURA_RESET_ALLOW_TARGETS="${AURA_RESET_ALLOW_TARGETS:-${PG_DB:-aura_boot},${BE_PORT:-6443}}"
 exec bash scripts/oss-reset-and-init.sh "$@"
