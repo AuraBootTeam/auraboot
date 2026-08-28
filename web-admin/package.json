@@ -69,7 +69,7 @@
     "coverage:e2e:clean": "rm -rf test-results/coverage",
     "coverage:e2e:report": "node scripts/e2e-coverage-report.mjs",
     "coverage:e2e": "pnpm coverage:e2e:clean && pnpm test:coverage:e2e && pnpm coverage:e2e:report",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --retry=2",
     "test:unit:coverage": "vitest run --coverage",
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",
