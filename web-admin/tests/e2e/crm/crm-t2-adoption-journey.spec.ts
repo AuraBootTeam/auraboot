@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,7 +12,6 @@ import path from 'node:path';
  */
 
 const RUN_ID = `adopt-${Date.now()}`;
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5161';
 const EVIDENCE_ROOT = process.env.AURA_EVIDENCE_ROOT
   ? path.join(process.env.AURA_EVIDENCE_ROOT, 'adoption-journey')
   : path.resolve(process.cwd(), '..', '.workspace', 'evidence', 'crm-parr1-parity-20260828-s61', 'adoption-journey');
