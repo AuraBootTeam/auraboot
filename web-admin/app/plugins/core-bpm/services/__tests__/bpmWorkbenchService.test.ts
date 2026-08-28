@@ -167,20 +167,24 @@ describe('bpmWorkbenchService task detail + mutations', () => {
     expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-3/claim');
   });
 
-  it('delegateTask POSTs userId + comment to the delegate endpoint', async () => {
+  it('delegateTask POSTs targetUserId + comment to the delegate endpoint', async () => {
     mockedPost.mockResolvedValue({ code: '0' } as any);
     await delegateTask('t-4', 'u-9', 'please handle');
+    // Backend DelegateTaskRequest declares targetUserId; the legacy `userId`
+    // key deserialized to null and delegates silently no-opped.
     expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-4/delegate', {
-      userId: 'u-9',
+      targetUserId: 'u-9',
       comment: 'please handle',
     });
   });
 
-  it('transferTask POSTs userId + comment to the transfer endpoint', async () => {
+  it('transferTask POSTs targetUserId + comment to the transfer endpoint', async () => {
     mockedPost.mockResolvedValue({ code: '0' } as any);
     await transferTask('t-5', 'u-10', 'reassign');
+    // Backend TransferTaskRequest declares targetUserId; the legacy `userId`
+    // key deserialized to null and transfers silently no-opped.
     expect(mockedPost).toHaveBeenCalledWith('/api/bpm/tasks/t-5/transfer', {
-      userId: 'u-10',
+      targetUserId: 'u-10',
       comment: 'reassign',
     });
   });
