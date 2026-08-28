@@ -414,29 +414,23 @@ test.describe('BPM Showcase S2: task redistribution (@bpm-showcase)', () => {
     await evidenceShot(bobPage, testInfo, 's2-3-after-claim');
     await bobCtx.close();
 
-    // PRODUCT FINDING (2026-08-28, deferred — fixing needs owner authorization):
-    // after bob claims the shared role-assigned task, carol (another role
-    // member) can STILL complete it — the backend does not enforce claim
-    // exclusivity on complete. We pin the current behavior here so any future
-    // engine hardening flips this assertion deliberately. See showcase
-    // coverage matrix, "已知缺口" column.
+    // Claim exclusivity (fixed 2026-08-28): after bob claims the shared
+    // role-assigned task, carol (another role member) must be refused on
+    // complete — the claim is the task owner.
+    const claimTaskId = carolSeesIt.taskId;
+    const carolComplete = await request.post(`/api/bpm/tasks/${claimTaskId}/complete`, {
+      headers: { Authorization: `Bearer ${carolToken}`, 'Content-Type': 'application/json' },
+      data: { comment: 'carol must not complete a claimed task' },
+    });
+    const completeBody = (await carolComplete.json().catch(() => ({}))) as { code?: string | number };
+    const refused = carolComplete.status() >= 400 || String(completeBody.code ?? '0') !== '0';
+    expect(refused, 'carol must not be able to complete bob’s claimed task').toBe(true);
+
+    // instance still pending on review
     const status = await queryInstanceStatus(request, adminToken, {
       processKey: candidateKey,
       businessKey,
     });
-    expect(
-      status.currentNodes.map((n) => n.nodeId),
-      'task must still be pending before carol completes',
-    ).toContain('review');
-
-    const claimTaskId = carolSeesIt.taskId;
-    const carolComplete = await request.post(`/api/bpm/tasks/${claimTaskId}/complete`, {
-      headers: { Authorization: `Bearer ${carolToken}`, 'Content-Type': 'application/json' },
-      data: { comment: 'pin current behavior: claim exclusivity not enforced' },
-    });
-    expect(
-      carolComplete.status(),
-      'documenting current product behavior: carol complete of claimed task',
-    ).toBeLessThan(400);
+    expect(status.currentNodes.map((n) => n.nodeId)).toContain('review');
   });
 });

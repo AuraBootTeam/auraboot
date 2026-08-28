@@ -499,9 +499,11 @@ public class TaskService {
      * 验证用户是否可以完成任务
      */
     private boolean canCompleteTask(TaskInstance task, String userId) {
-        // 检查任务是否分配给当前用户
-        if (task.getClaimUserId() != null && task.getClaimUserId().equals(userId)) {
-            return true;
+        // Claim exclusivity: once a candidate claims the task, only the claimer
+        // may complete it. Other candidates stay in the assignee list but must
+        // be refused — otherwise the claim is merely cosmetic (showcase S2.3).
+        if (task.getClaimUserId() != null) {
+            return task.getClaimUserId().equals(userId);
         }
 
         List<String> assigneeGroupIds = currentAssigneeGroupIds();

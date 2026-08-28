@@ -484,8 +484,9 @@ export async function withdrawTask(taskId: string, reason?: string): Promise<voi
  *
  * Posts to {@code POST /api/bpm/tasks/{taskId}/cc}. Backend
  * {@link com.auraboot.framework.bpm.controller.TaskController.CcRequest} is a
- * record of {@code (receiverUserIds: List<Long>, comment: String)}. Receiver
- * ids are sent as numbers so JSON deserialization lines up with the Java type.
+ * record of {@code (receiverUserIds: List<String>, comment: String)} where
+ * receiver ids are ab_user pid strings; the backend resolves pids to numeric
+ * ids before the notification fan-out.
  *
  * The backend enforces the process-level {@code CcPolicy}
  * (initiator / assignee / all); a policy violation surfaces as a non-success
@@ -502,22 +503,8 @@ export async function ccTask(
   if (!Array.isArray(receiverUserIds) || receiverUserIds.length === 0) {
     throw new Error('ccTask: receiverUserIds must be a non-empty array');
   }
-  // Backend expects Long ids. We parse strictly: any non-numeric token is an
-  // error (caller should have validated upstream), so we avoid silently
-  // dropping values.
-  const numericIds = receiverUserIds.map((raw) => {
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) {
-      throw new Error('ccTask: blank receiver id');
-    }
-    const n = Number(trimmed);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) {
-      throw new Error(`ccTask: non-integer receiver id ${raw}`);
-    }
-    return n;
-  });
   const result = await post(`/api/bpm/tasks/${taskId}/cc`, {
-    receiverUserIds: numericIds,
+    receiverUserIds,
     comment,
   });
   if (!isSuccess(result.code)) {

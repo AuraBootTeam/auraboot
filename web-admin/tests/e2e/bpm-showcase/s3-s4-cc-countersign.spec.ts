@@ -258,42 +258,55 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     const option = dialog.locator('[data-testid^="member-picker-option-"]').first();
     await expect(option).toBeVisible({ timeout: 10_000 });
     await option.click();
+    // 抄送内容 anchors the inbox assertion (NotifyPanel renders content text,
+    // not a business-key column).
+    const ccContent = `S3.1 manual cc ${businessKey}`;
+    await dialog.locator('textarea').fill(ccContent);
     await evidenceShot(bobPage, testInfo, 's3-1-cc-dialog', dialog);
 
-    // PRODUCT FAILURE (2026-08-28, deferred — fixing needs owner authorization):
-    // the manual-CC chain is broken end-to-end. MemberPicker option ids are
-    // user pid strings; TaskCenter sends recipientUserIds via Number(pid) →
-    // NaN → JSON null → BpmNotifyController.sendCarbonCopy NPEs (HTTP 500)
-    // and the UI toasts 抄送失败. We pin the broken behavior with evidence so
-    // the future fix flips this test deliberately. See coverage matrix
-    // "已知缺口": manual cc dialog + backend NPE.
+    // Manual cc works end-to-end (fixed 2026-08-28): the frontend sends user
+    // pid strings and the backend resolves pids to numeric ids (previously
+    // Number(pid) → NaN → null → NPE in BpmNotifyController).
     const ccRespPromise = bobPage.waitForResponse(
       (resp) => resp.request().method() === 'POST' && resp.url().includes('/cc'),
       { timeout: 20_000 },
     );
     await dialog.getByRole('button', { name: '确认抄送' }).click();
     const ccResp = await ccRespPromise;
-    expect(
-      ccResp.status(),
-      'documenting current product behavior: manual cc request fails',
-    ).toBeGreaterThanOrEqual(400);
-    await evidenceShot(bobPage, testInfo, 's3-1-cc-failure', dialog);
-
-    // bob's own task must remain actionable so the process can still proceed
-    await expect(
-      findTaskRowByBusinessKey(bobPage, businessKey, /复核|review/i),
-      'bob review task must be untouched by the failed cc',
-    ).toBeVisible({ timeout: 10_000 });
+    expect(ccResp.status(), `manual cc HTTP ${ccResp.status()}`).toBeLessThan(400);
+    // Success closes the dialog by design — capture the page-level evidence.
+    await evidenceShot(bobPage, testInfo, 's3-1-cc-success');
     await bobCtx.close();
 
-    // Because manual cc cannot succeed, the downstream read-only inbox
-    // assertions are BLOCKED on the product fix (did-not-run in the matrix).
-    test.info().annotations.push({
-      type: 'issue',
-      description:
-        'BLOCKED: manual cc chain broken (MemberPicker pid ids + Number() → NPE in BpmNotifyController). ' +
-        'Read-only cc inbox assertions deferred until the id-contract fix.',
+    // dave's cc inbox via real UI: task center 抄送给我 tab (NotifyPanel
+    // renders notification cards with content text, not the business-key
+    // column, so the entry is matched by our cc comment text).
+    const { context: daveCtx, page: davePage } = await openUserSession(browser, SHOWCASE_USERS.dave);
+    await navigateToTaskCenter(davePage);
+    await expectContentReady(davePage, /任务中心/);
+    await davePage.getByRole('button', { name: /抄送给我/ }).first().click();
+    await expectContentReady(davePage);
+    const ccEntry = davePage.locator('main, [role="main"]')
+      .getByText(ccContent).first();
+    await expect(ccEntry, 'dave cc inbox must list the cc entry').toBeVisible({ timeout: 15_000 });
+    await evidenceShot(davePage, testInfo, 's3-1-dave-cc-inbox', ccEntry);
+
+    // read-only: the cc inbox must not offer approve/reject actions
+    const approveAction = davePage.locator('[data-testid="task-action-approve"]');
+    await expect(approveAction, 'cc inbox must be read-only (no approve action)').toHaveCount(0);
+    await daveCtx.close();
+
+    // backend evidence: notify received list contains the CC record
+    const received = await request.get('/api/bpm/notify/received?type=CC', {
+      headers: { Authorization: `Bearer ${daveToken}` },
     });
+    expect(received.ok(), `notify received: ${received.status()}`).toBe(true);
+    const body = await received.json();
+    const records = (body?.data ?? []) as Array<Record<string, unknown>>;
+    expect(
+      records.length,
+      `dave must have CC records: ${JSON.stringify(records).slice(0, 300)}`,
+    ).toBeGreaterThan(0);
     
 
   });

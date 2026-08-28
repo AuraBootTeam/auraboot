@@ -25,7 +25,7 @@ export interface SendCarbonCopyRequest {
   taskId: string;
   processInstanceId: string;
   senderUserId: number;
-  recipientUserIds: number[];
+  recipientUserIds: string[];
   content?: string;
 }
 

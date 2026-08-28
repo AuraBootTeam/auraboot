@@ -132,7 +132,7 @@ class CcTaskActionHandlerTest {
                 .containsEntry("taskId", "TASK-1")
                 .containsEntry("ccCount", 2);
         assertThat((List<Long>) result.get("targetUserIds")).containsExactly(51L, 52L);
-        verify(ccService).cc("TASK-1", List.of(51L, 52L), "审批超时请关注");
+        verify(ccService).ccForUserIds("TASK-1", List.of(51L, 52L), "审批超时请关注");
         verifyNoInteractions(inboxService);
     }
 
@@ -260,7 +260,7 @@ class CcTaskActionHandlerTest {
 
         when(userRoleMapper.findUserIdsByRoleCode("wd_hr", 7L)).thenReturn(List.of(51L));
         org.mockito.Mockito.doThrow(new IllegalStateException("bpm cc down"))
-                .when(ccService).cc("TASK-1", List.of(51L), "消息");
+                .when(ccService).ccForUserIds("TASK-1", List.of(51L), "消息");
         ResolvedActionPlan bpmFailure = new ResolvedActionPlan(
                 "R", "CC_TASK", "ROLE:wd_hr", 10, Map.of("taskId", "TASK-1", "message", "消息"), "key");
         ActionExecutionException bpmError = assertThrows(ActionExecutionException.class,

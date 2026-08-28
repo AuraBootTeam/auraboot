@@ -97,7 +97,7 @@ public class CcTaskActionHandler implements ActionHandler {
         List<Long> targetUserIds = resolveUserTargets(plan, target, tenantId, modelCode, recordPid);
         if (taskId != null && !taskId.isBlank()) {
             try {
-                ccService.cc(taskId, targetUserIds, message);
+                ccService.ccForUserIds(taskId, targetUserIds, message);
             } catch (RuntimeException e) {
                 throw ccFailure(plan, "cc_task_write_failed", target, targetUserIds, null,
                         modelCode, recordPid, taskId, "CC_TASK failed: " + ActionFailurePayload.messageOf(e), e);

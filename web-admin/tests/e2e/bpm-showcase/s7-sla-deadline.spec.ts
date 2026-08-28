@@ -249,13 +249,9 @@ test.describe('BPM Showcase S7: SLA deadline & escalation (@bpm-showcase)', () =
       'escalation must produce a notification for the recipient',
     ).toBeGreaterThan(0);
 
-    // S7.3: bob approves the task.
-    // PRODUCT FINDING (2026-08-28, deferred — fixing needs owner authorization):
-    // after approval the NODE-level SLA record stays warning/overdue forever.
-    // SlaRecordService.completeByTaskId exists but has NO callers — nothing
-    // hooks task completion to close NODE records (RECORD-level records are
-    // completed by MetaModelServiceImpl, NODE-level ones are orphaned). We pin
-    // the current behavior so the future lifecycle fix flips this deliberately.
+    // S7.3: bob approves → task_completed event closes the NODE SLA record
+    // (fixed 2026-08-28: SlaActivationListener now completes records on
+    // task_completed; previously completeByTaskId had no callers).
     const task = await waitForTodoTask(
       request,
       bobToken,
@@ -264,22 +260,18 @@ test.describe('BPM Showcase S7: SLA deadline & escalation (@bpm-showcase)', () =
     );
     const approve = await request.post(`/api/bpm/tasks/${task.taskId}/approve`, {
       headers: { Authorization: `Bearer ${bobToken}`, 'Content-Type': 'application/json' },
-      data: { comment: 'S7 approve (pin SLA lifecycle behavior)' },
+      data: { comment: 'S7 approve closes SLA' },
     });
     expect(approve.ok(), `approve: ${approve.status()}`).toBe(true);
 
-    const afterApproval = (await fetchSlaRecords(request)).find(
-      (r) => r.processInstanceId === String(instanceId),
-    );
-    expect(
-      (afterApproval?.status ?? '').toLowerCase(),
-      'documenting current behavior: record stays active (not completed) after approval',
-    ).toMatch(/warning|overdue/);
-    test.info().annotations.push({
-      type: 'issue',
-      description:
-        'PRODUCT FINDING: NODE-level SLA record is never completed after task approval ' +
-        '(SlaRecordService.completeByTaskId has no callers).',
-    });
+    await expect
+      .poll(
+        async () => {
+          const records = await fetchSlaRecords(request);
+          return (records.find((r) => r.processInstanceId === String(instanceId))?.status ?? '').toLowerCase();
+        },
+        { timeout: 30_000, message: 'SLA record must COMPLETE after task approval' },
+      )
+      .toBe('completed');
   });
 });

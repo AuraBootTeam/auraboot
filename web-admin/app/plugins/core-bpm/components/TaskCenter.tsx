@@ -66,7 +66,9 @@ export function TaskCenter() {
   const navigate = useNavigate();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { user } = useAuth();
-  const currentUserId = Number(user?.pid) || 0;
+  // user.id is the numeric ab_user id; pid is a ULID string and Number(pid)
+  // yields NaN -> 0, which broke cc-inbox/urge recipient lookups (showcase S3).
+  const currentUserId = Number(user?.id) || 0;
 
   const tc = useTaskCenter();
 
@@ -132,7 +134,10 @@ export function TaskCenter() {
           taskId: tc.dialog.task.taskId,
           processInstanceId: tc.dialog.task.processInstanceId,
           senderUserId: currentUserId,
-          recipientUserIds: userIds.map(Number),
+          // Recipients are user pid strings (MemberPicker identity); the
+          // backend resolves pids to numeric ids. The legacy Number(pid)
+          // produced NaN → null → backend NPE.
+          recipientUserIds: userIds,
           content,
         });
         showSuccessToast('抄送成功');

@@ -7,6 +7,8 @@ import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.util.BpmSecurityUtil;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.constant.NotificationConstant;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
@@ -46,6 +48,7 @@ public class CcService {
     private final SmartEngine smartEngine;
     private final BpmExtensionAccessor extensionAccessor;
     private final BpmAuditService auditService;
+    private final UserService userService;
 
     /**
      * Send a CC for the given task to the specified receiver user IDs.
@@ -57,7 +60,32 @@ public class CcService {
      * @throws BusinessException        if the current user does not satisfy the CC policy
      */
     @Transactional
-    public void cc(String taskId, List<Long> receiverUserIds, String comment) {
+    public void cc(String taskId, List<String> receiverUserPids, String comment) {
+        // Receivers are addressed by ab_user.pid (ULID) — the identity the
+        // frontend MemberPicker carries. Pids resolve to numeric ids here so
+        // the notification fan-out keeps its numeric contract (previously the
+        // frontend's Number(pid) produced NaN/null and callers 500'd).
+        if (receiverUserPids == null || receiverUserPids.isEmpty()) {
+            throw new IllegalArgumentException("receiverUserIds must not be empty");
+        }
+        if (receiverUserPids.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new IllegalArgumentException("receiverUserIds must not contain null entries");
+        }
+        List<Long> receiverUserIds = receiverUserPids.stream().map(pid -> {
+            User user = userService.findByPid(pid);
+            if (user == null) {
+                throw new BusinessException("Unknown receiver user pid: " + pid);
+            }
+            return user.getId();
+        }).toList();
+        ccForUserIds(taskId, receiverUserIds, comment);
+    }
+
+    /**
+     * CC with already-resolved numeric user ids (automation / event-policy
+     * callers whose {@code resolveUserTargets} produces numeric ids).
+     */
+    public void ccForUserIds(String taskId, List<Long> receiverUserIds, String comment) {
         if (receiverUserIds == null || receiverUserIds.isEmpty()) {
             throw new IllegalArgumentException("receiverUserIds must not be empty");
         }
