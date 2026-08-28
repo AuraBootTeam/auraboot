@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../../fixtures';
+import { BACKEND_URL, BASE_URL } from '../../helpers/environments';
 
 /**
  * PAR-14 first slice (W2 chain): quote summary create -> edit -> record
@@ -8,8 +9,6 @@ import { expect, test, type Page } from '../../fixtures';
  */
 
 const RUN_ID = `par14-${Date.now()}`;
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5161';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:6461';
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const PERSONA_PASSWORD = 'AuraBoot2026!';
