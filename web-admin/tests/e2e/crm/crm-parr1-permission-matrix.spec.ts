@@ -340,7 +340,7 @@ test('PARR1 object matrix: lead / opportunity / activity CRUD deny-allow', async
     deptPid: string,
     positionPid: string,
     roleCode: string,
-  ): Promise<{ jwt: Jwt; userPid: string }> {
+  ): Promise<{ jwt: string; userPid: string }> {
     const resp = await fetch(`${BACKEND_URL}/api/org/employees`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
