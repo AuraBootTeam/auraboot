@@ -524,12 +524,12 @@ describe('flatPageSerializer fail-fast boundaries', () => {
             id: 'list_root',
             blockType: 'list',
             blocks: [
-              { id: 'widget_revenue', blockType: 'widget', widgetType: 'number-card', props: {} },
+              { id: 'widget_gauge', blockType: 'widget', widgetType: 'gauge', props: {} },
             ],
           },
         ],
       }),
-    ).toThrow(/widget_revenue/);
+    ).toThrow(/widget_gauge/);
   });
 
   it('maps chart/stat-card widgets to their flat block types', () => {

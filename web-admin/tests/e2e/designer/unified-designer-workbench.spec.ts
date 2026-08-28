@@ -5575,10 +5575,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(switchControl).toBeChecked();
   });
 
-  // FIXME(designer-v4): this journey authors blocks that have no flat v4
-  // representation in their current placement, so persistence now fails fast
-  // by design (see flatPageSerializer.ts). Needs a product decision: extend
-  // the v4 dialect or restrict the designer placement.
+  // FIXME(designer-v4): this journey authors a table-typed widget
+  // (widgetType='table'), which has no flat v4 counterpart — persistence
+  // refuses it by design. Needs either a v4 composition contract or a
+  // designer placement restriction. (number-card list widgets DO converge to
+  // flat stat-card now — see flatPageSerializer.ts.)
   test.fixme('UDW-046: adds and renders a list-level widget with table properties', async ({ page }) => {
     const widgetListPageKey = `udw_v3_list_widget_${uid}`;
     const widgetListPid = await createPageResource(page, {

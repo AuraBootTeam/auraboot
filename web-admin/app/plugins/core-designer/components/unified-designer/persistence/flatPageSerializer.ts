@@ -147,10 +147,14 @@ function serializeBlock(block: DslBlockV3, issues: string[]): LegacyDslBlockV2 |
       return serializeTabs(block, issues);
     case 'widget': {
       // migrateWidgetLikeBlock maps flat `chart` / `stat-card` rows to editor
-      // widgets; other widget types belong to the dashboard designer and have
-      // no page-side flat counterpart.
-      if (block.widgetType === 'chart' || block.widgetType === 'stat-card') {
-        return serializePassthrough({ ...block, blockType: block.widgetType }, issues);
+      // widgets. `number-card` converges to the flat stat-card vocabulary (the
+      // list renderer dispatches stat-card via the BlockRenderer fallback);
+      // other widget types belong to the dashboard designer and have no
+      // page-side flat counterpart.
+      const widgetType = block.widgetType ?? '';
+      if (widgetType === 'chart' || widgetType === 'stat-card' || widgetType === 'number-card') {
+        const flatType = widgetType === 'number-card' ? 'stat-card' : widgetType;
+        return serializePassthrough({ ...block, blockType: flatType }, issues);
       }
       issues.push(describeUnsupported(block));
       return null;
