@@ -235,7 +235,9 @@ export async function delegateTask(
   userId: string,
   comment?: string,
 ): Promise<void> {
-  const result = await post(`/api/bpm/tasks/${taskId}/delegate`, { userId, comment });
+  // Backend DelegateTaskRequest declares targetUserId — sending `userId`
+  // deserialized to null and the delegate silently no-opped (showcase S2.2).
+  const result = await post(`/api/bpm/tasks/${taskId}/delegate`, { targetUserId: userId, comment });
   if (!isSuccess(result.code)) {
     throw new Error(result.desc || 'Failed to delegate task');
   }
@@ -249,7 +251,9 @@ export async function transferTask(
   userId: string,
   comment?: string,
 ): Promise<void> {
-  const result = await post(`/api/bpm/tasks/${taskId}/transfer`, { userId, comment });
+  // Backend TransferTaskRequest declares targetUserId — sending `userId`
+  // deserialized to null and the transfer silently no-opped (showcase S2.1).
+  const result = await post(`/api/bpm/tasks/${taskId}/transfer`, { targetUserId: userId, comment });
   if (!isSuccess(result.code)) {
     throw new Error(result.desc || 'Failed to transfer task');
   }

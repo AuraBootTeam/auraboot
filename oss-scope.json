@@ -102,6 +102,7 @@
     "tests/e2e/crm/crm-ownership-sharing.spec.ts",
     "tests/e2e/cross-module/**",
     "tests/e2e/bpm-smoke/**",
+    "tests/e2e/bpm-showcase/**",
     "tests/e2e/bpm-designer/**",
     "tests/e2e/workflow-demo/**",
     "tests/e2e/setup/**",

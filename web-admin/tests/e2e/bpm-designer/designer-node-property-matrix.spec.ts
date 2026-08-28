@@ -30,7 +30,12 @@ import { BACKEND_URL } from '../../helpers/environments';
 // behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
 // palette/canvas/nodes directly, so run them at the wide layout the designer targets.
 // See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
-test.use({ viewport: { width: 1680, height: 1050 } });
+// 2026-08-28: BPMNDesigner also flips to compact when the CANVAS CONTAINER is
+// narrower than 1440px (BPMNDesigner.tsx WIDE_WORKSPACE_MIN_WIDTH + ResizeObserver).
+// At 1680px the app sidebar/chrome pushed the workspace under that threshold, so
+// the inspector drawer backdrop intercepted node clicks. 1920px keeps the
+// container above the wide-layout threshold.
+test.use({ viewport: { width: 1920, height: 1080 } });
 
 const BACKEND = BACKEND_URL;
 

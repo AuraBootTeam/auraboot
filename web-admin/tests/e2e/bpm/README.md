@@ -50,19 +50,24 @@ NO_PROXY=localhost npx playwright test \
 Each gap is reproduced by the regression suite; specs document the workaround
 inline where invoked.
 
-### Gap #8 — `approveTask` does not inject task result variables
+### Gap #8 — RESOLVED (2026-08-28): `approveTask` result-variable injection
 
-- **Where**: `bpmWorkbenchService.approveTask` / `POST /api/bpm/tasks/{taskId}/approve`
-- **Symptom**: Gateway `conditionExpression` like `${taskResult == 'approved'}` throws
-  `MVEL null pointer or function not found: taskResult` at runtime, producing
-  HTTP 500 on the approve call.
-- **Expected fix**: the approve endpoint should read the userTask's DSL
-  `taskActions[].resultVariable` / `resultValue` and inject the corresponding
-  variables on complete.
-- **Spec workaround**: `workflow-demo-leave-flow.spec.ts` opens the approve
-  action menu via UI (proving the action is exposed) and then fires the
-  completion call via API with `variables: { taskResult: 'approved' }` so the
-  downstream chain can proceed. See inline comment around line 371.
+This gap is fixed in two parts; the API-injection workaround below is obsolete.
+
+- **Part 1 (frontend)**: the approve/reject dialogs forward the DSL
+  `taskActions[].resultVariable`/`resultValue` in the request body.
+  `workflow-demo-leave-flow.spec.ts` now *asserts* the injection
+  (`approveVariables.taskResult === 'approved'`) instead of working around it.
+- **Part 2 (backend)**: `TaskService.approveTask`/`rejectTask` inject a
+  fallback `resultVariable → resultValue` pair resolved from designerJson
+  `taskActions` via `BpmTaskActionsResolver` (commit `c5721588a`), so
+  non-frontend callers (legacy clients, approval chains, external API) route
+  gateways correctly. Caller-supplied values win; malformed designerJson
+  fails fast. Backend coverage: `BpmTaskActionsFallbackTest` (apf01–apf14).
+
+The `MVEL null pointer` symptom no longer reproduces on main: gateway
+`conditionExpression` like `${taskResult == 'approved'}` resolves after a
+plain UI approve with no explicit variables.
 
 ### Gap #10 — Plugin `formPageKey` transform in designer import
 
