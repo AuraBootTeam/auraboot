@@ -16,6 +16,7 @@ import java.util.Map;
 public class BpmNotifyController {
 
     private final BpmNotifyService notifyService;
+    private final com.auraboot.framework.user.service.UserService userService;
 
     @PostMapping("/cc")
     public ApiResponse<Void> sendCarbonCopy(@RequestBody Map<String, Object> request) {
@@ -24,9 +25,23 @@ public class BpmNotifyController {
         // Sender is the authenticated caller — never trust a body-supplied senderUserId
         // (that let any user impersonate another when sending CC notifications).
         Long senderUserId = MetaContext.getCurrentUserId();
-        @SuppressWarnings("unchecked")
-        List<Long> recipientUserIds = ((List<Number>) request.get("recipientUserIds"))
-                .stream().map(Number::longValue).toList();
+        // Recipients arrive as ab_user pid strings (the MemberPicker identity).
+        // The legacy `Number(pid)`-on-the-frontend contract produced NaN → JSON
+        // null → NPE here; resolve pids server-side and fail fast on unknown ones.
+        Object rawRecipients = request.get("recipientUserIds");
+        if (!(rawRecipients instanceof List<?> rawList) || rawList.isEmpty()) {
+            throw new IllegalArgumentException("recipientUserIds must be a non-empty list of user pids");
+        }
+        List<Long> recipientUserIds = rawList.stream()
+                .map(String::valueOf)
+                .map(pid -> {
+                    com.auraboot.framework.user.dao.entity.User user = userService.findByPid(pid);
+                    if (user == null || user.getId() == null) {
+                        throw new IllegalArgumentException("Unknown recipient user pid: " + pid);
+                    }
+                    return user.getId();
+                })
+                .toList();
         String content = (String) request.getOrDefault("content", "");
 
         notifyService.sendCarbonCopy(taskId, processInstanceId, senderUserId, recipientUserIds, content);

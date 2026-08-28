@@ -59,6 +59,34 @@ public class SlaActivationListener {
 
     @EventListener
     public void onBpmEvent(BpmEvent event) {
+        // Lifecycle closure: when the task completes, its node-level SLA
+        // records must transition to COMPLETED. Previously completeByTaskId
+        // had no callers and records stayed warning/overdue forever
+        // (showcase S7.3 finding).
+        if ("task_completed".equals(event.getBpmEventType())) {
+            String completedTaskId = extractTaskId(event);
+            Long completedTenantId = event.getTenantId();
+            if (completedTaskId == null || completedTenantId == null || completedTenantId == 0L) {
+                log.debug("SlaActivationListener: task_completed event missing taskId/tenantId, skipping");
+                return;
+            }
+            boolean completedContextOwner = false;
+            try {
+                MetaContext.getCurrentTenantId();
+            } catch (Exception e) {
+                MetaContext.setContext(completedTenantId, 0L, null, "system");
+                completedContextOwner = true;
+            }
+            try {
+                slaRecordService.completeByTaskId(completedTaskId);
+                log.info("SLA records completed for taskId={}", completedTaskId);
+            } finally {
+                if (completedContextOwner) {
+                    MetaContext.clear();
+                }
+            }
+            return;
+        }
         if (!"task_assigned".equals(event.getBpmEventType())) {
             return;
         }

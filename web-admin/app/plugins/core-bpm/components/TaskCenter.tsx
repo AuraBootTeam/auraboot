@@ -132,7 +132,10 @@ export function TaskCenter() {
           taskId: tc.dialog.task.taskId,
           processInstanceId: tc.dialog.task.processInstanceId,
           senderUserId: currentUserId,
-          recipientUserIds: userIds.map(Number),
+          // Recipients are user pid strings (MemberPicker identity); the
+          // backend resolves pids to numeric ids. The legacy Number(pid)
+          // produced NaN → null → backend NPE.
+          recipientUserIds: userIds,
           content,
         });
         showSuccessToast('抄送成功');

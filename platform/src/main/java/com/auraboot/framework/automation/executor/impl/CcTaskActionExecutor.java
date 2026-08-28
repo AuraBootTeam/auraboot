@@ -63,7 +63,7 @@ public class CcTaskActionExecutor implements ActionExecutor {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> targetUserIds = resolveUserTargets(target, tenantId);
         if (taskId != null) {
-            ccService.cc(taskId, targetUserIds, message);
+            ccService.ccForUserIds(taskId, targetUserIds, message);
             return bpmResult(taskId, targetUserIds, modelCode, recordPid);
         }
         return inboxResult(targetUserIds, tenantId, title, message, automationPid, modelCode, recordPid);

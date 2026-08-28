@@ -22,7 +22,9 @@ import static org.mockito.Mockito.verify;
 class BpmNotifyControllerSenderIdentityTest {
 
     private final BpmNotifyService notifyService = mock(BpmNotifyService.class);
-    private final BpmNotifyController controller = new BpmNotifyController(notifyService);
+    private final com.auraboot.framework.user.service.UserService userService =
+            mock(com.auraboot.framework.user.service.UserService.class);
+    private final BpmNotifyController controller = new BpmNotifyController(notifyService, userService);
 
     @AfterEach
     void tearDown() {
@@ -33,15 +35,20 @@ class BpmNotifyControllerSenderIdentityTest {
     @DisplayName("sendCarbonCopy ignores a body-supplied senderUserId and uses the authenticated user")
     void ccUsesAuthenticatedSender() {
         MetaContext.setContext(1L, 42L, "pid-42", "alice");
+        com.auraboot.framework.user.dao.entity.User receiver = new com.auraboot.framework.user.dao.entity.User();
+        receiver.setId(7L);
+        receiver.setPid("pid-7");
+        org.mockito.Mockito.when(userService.findByPid("pid-7")).thenReturn(receiver);
 
         controller.sendCarbonCopy(Map.of(
                 "taskId", "t1",
                 "processInstanceId", "p1",
                 "senderUserId", 999,                 // forged — must be ignored
-                "recipientUserIds", List.of(7),
+                "recipientUserIds", List.of("pid-7"), // pid strings (MemberPicker identity)
                 "content", "hi"));
 
-        // 42 (authenticated) is passed through, NOT 999 (forged body value).
+        // 42 (authenticated) is passed through, NOT 999 (forged body value);
+        // recipient pid resolved to the numeric id for the notification fan-out.
         verify(notifyService).sendCarbonCopy("t1", "p1", 42L, List.of(7L), "hi");
     }
 

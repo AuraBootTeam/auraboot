@@ -29,7 +29,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
     void allPolicyInitiatorCc() {
         var setup = fixture.startProcess("cc-all-initiator", CcPolicy.ALL);
 
-        ccService.cc(setup.taskId(), List.of(501L, 502L), "please be aware");
+        ccService.ccForUserIds(setup.taskId(), List.of(501L, 502L), "please be aware");
 
         List<NotificationInstance> r501 = smartEngine.createNotificationQuery()
                 .receiverUserId("501")
@@ -59,7 +59,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         // Switch current user to the task assignee
         fixture.switchCurrentUserTo(setup.assigneeId());
 
-        ccService.cc(setup.taskId(), List.of(777L), "assignee-sends-cc");
+        ccService.ccForUserIds(setup.taskId(), List.of(777L), "assignee-sends-cc");
 
         List<NotificationInstance> r777 = smartEngine.createNotificationQuery()
                 .receiverUserId("777")
@@ -77,7 +77,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         var setup = fixture.startProcess("cc-initiator-only", CcPolicy.INITIATOR);
         fixture.switchCurrentUserTo(setup.assigneeId());
 
-        assertThatThrownBy(() -> ccService.cc(setup.taskId(), List.of(501L), "assignee cc attempt"))
+        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), List.of(501L), "assignee cc attempt"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("policy");
     }
@@ -87,7 +87,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
     void assigneePolicyRejectsInitiator() {
         var setup = fixture.startProcess("cc-assignee-only", CcPolicy.ASSIGNEE);
         // current user is initiator by default in fixture
-        assertThatThrownBy(() -> ccService.cc(setup.taskId(), List.of(501L), "initiator cc attempt"))
+        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), List.of(501L), "initiator cc attempt"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("policy");
     }
@@ -107,7 +107,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         var receivers = new java.util.ArrayList<Long>();
         receivers.add(501L);
         receivers.add(null);
-        assertThatThrownBy(() -> ccService.cc(setup.taskId(), receivers, "x"))
+        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), receivers, "x"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("null");
     }

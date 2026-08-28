@@ -366,5 +366,5 @@ public class TaskController {
     public record AddSignRequest(String userId, String reason) {}
     public record RemoveSignRequest(String userId, String reason) {}
     public record WithdrawRequest(String reason) {}
-    public record CcRequest(List<Long> receiverUserIds, String comment) {}
+    public record CcRequest(java.util.List<String> receiverUserIds, String comment) {}
 }
