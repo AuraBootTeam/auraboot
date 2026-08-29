@@ -143,8 +143,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('任务已完成');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('完成任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '完成任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -163,8 +166,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('任务已通过');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('通过任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '通过任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -183,8 +189,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('任务已驳回');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('驳回任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '驳回任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -196,8 +205,11 @@ export function useTaskCenter() {
         await workbenchService.claimTask(task.taskId);
         toastRef.current.showSuccessToast('任务已认领');
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('认领任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '认领任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [fetchData],
@@ -211,8 +223,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('任务已委托');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('委托任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '委托任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -226,8 +241,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('任务已转办');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('转办任务失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '转办任务失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -241,8 +259,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('加签成功');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('加签失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '加签失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -256,8 +277,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('减签成功');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('减签失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '减签失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -271,8 +295,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('回退成功');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('回退失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '回退失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.task, closeDialog, fetchData],
@@ -294,8 +321,11 @@ export function useTaskCenter() {
         content: `请尽快处理任务「${task.taskName || task.title || ''}」`,
       });
       toastRef.current.showSuccessToast('催办已发送');
-    } catch {
-      toastRef.current.showErrorToast('催办发送失败');
+    } catch (e) {
+      // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+      // failure copy hides the actionable cause from the approver.
+      const message = e instanceof Error && e.message ? e.message : '催办发送失败';
+      toastRef.current.showErrorToast(message);
     }
   }, []);
 
@@ -306,8 +336,11 @@ export function useTaskCenter() {
         await workbenchService.suspendProcess(process.instanceId);
         toastRef.current.showSuccessToast('流程已暂停');
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('暂停流程失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '暂停流程失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [fetchData],
@@ -319,8 +352,11 @@ export function useTaskCenter() {
         await workbenchService.resumeProcess(process.instanceId);
         toastRef.current.showSuccessToast('流程已恢复');
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('恢复流程失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '恢复流程失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [fetchData],
@@ -334,8 +370,11 @@ export function useTaskCenter() {
         toastRef.current.showSuccessToast('流程已终止');
         closeDialog();
         fetchData();
-      } catch {
-        toastRef.current.showErrorToast('终止流程失败');
+      } catch (e) {
+        // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+        // failure copy hides the actionable cause from the approver.
+        const message = e instanceof Error && e.message ? e.message : '终止流程失败';
+        toastRef.current.showErrorToast(message);
       }
     },
     [dialog.process, closeDialog, fetchData],
@@ -356,8 +395,11 @@ export function useTaskCenter() {
       toastRef.current.showSuccessToast(`已批量通过 ${selectedTasks.size} 个任务`);
       setSelectedTasks(new Set());
       fetchData();
-    } catch {
-      toastRef.current.showErrorToast('批量通过失败');
+    } catch (e) {
+      // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+      // failure copy hides the actionable cause from the approver.
+      const message = e instanceof Error && e.message ? e.message : '批量通过失败';
+      toastRef.current.showErrorToast(message);
     }
   }, [selectedTasks, fetchData]);
 
@@ -375,8 +417,11 @@ export function useTaskCenter() {
       toastRef.current.showSuccessToast(`已批量驳回 ${selectedTasks.size} 个任务`);
       setSelectedTasks(new Set());
       fetchData();
-    } catch {
-      toastRef.current.showErrorToast('批量驳回失败');
+    } catch (e) {
+      // Surface the backend reason (e.g. 驳回意见不能为空) — a generic
+      // failure copy hides the actionable cause from the approver.
+      const message = e instanceof Error && e.message ? e.message : '批量驳回失败';
+      toastRef.current.showErrorToast(message);
     }
   }, [selectedTasks, fetchData]);
 

@@ -220,6 +220,16 @@ test.describe('BPM Showcase S7: SLA deadline & escalation (@bpm-showcase)', () =
         content,
         'strategy chain must list our S7 config (no empty-state)',
       ).not.toContain('暂无已启用的 SLA 策略');
+      // scoped capture: our own SLA config card only — neighbouring seeded
+      // strategies carry their own historical action logs which are not this
+      // scenario's evidence (review finding 2026-08-29).
+      const cardTitle = page.getByTestId('sla-strategy-chain')
+        .getByText(`S7 review SLA ${S7_KEY}`).first();
+      await expect(cardTitle).toBeVisible({ timeout: 10_000 });
+      // scoped capture: the strategy chain container (our config card is in
+      // it; excludes the surrounding page chrome and stats)
+      const chain = page.getByTestId('sla-strategy-chain');
+      await evidenceShot(page, testInfo, 's7-sla-card-scoped', chain);
       await evidenceShot(page, testInfo, 's7-sla-monitor-running');
       void businessKey;
       await context.close();

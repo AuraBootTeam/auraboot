@@ -63,6 +63,10 @@ public class TaskController {
 
         List<TaskInstance> tasks = taskService.getTodoTasks(userId);
 
+        // Enrich titles with designer node labels (raw activity ids are not
+        // user-visible copy — page-golden red line).
+        taskService.enrichTitlesWithNodeLabels(tasks);
+
         // Enrich each task with the business key from its parent process instance.
         // The SmartEngine TaskInstance interface does not carry this field, but the
         // frontend task-center table needs it to correlate tasks with business records.

@@ -40,6 +40,7 @@ import {
   openUserSession,
   evidenceShot,
   expectContentReady,
+  waitTaskCenterSettled,
 } from './_helpers/showcase';
 
 const BUSINESS_PREFIX = `SC2-${Date.now()}`;
@@ -253,6 +254,7 @@ test.describe('BPM Showcase S2: task redistribution (@bpm-showcase)', () => {
       's2-1-transfer-dialog',
       testInfo,
     );
+    await waitTaskCenterSettled(bobPage);
     expect(transferResp.status(), `transfer HTTP ${transferResp.status()}`).toBeLessThan(400);
     await bobCtx.close();
 
@@ -337,6 +339,7 @@ test.describe('BPM Showcase S2: task redistribution (@bpm-showcase)', () => {
     await dialog.getByRole('button', { name: '确认委托' }).click();
     const delegateResp = await delegateRespPromise;
     expect(delegateResp.status(), `delegate HTTP ${delegateResp.status()}`).toBeLessThan(400);
+    await waitTaskCenterSettled(bobPage);
     await evidenceShot(bobPage, testInfo, 's2-2-after-delegate');
     await bobCtx.close();
 
@@ -411,6 +414,7 @@ test.describe('BPM Showcase S2: task redistribution (@bpm-showcase)', () => {
     );
     await claimItem.click();
     expect((await claimRespPromise).status()).toBeLessThan(400);
+    await waitTaskCenterSettled(bobPage);
     await evidenceShot(bobPage, testInfo, 's2-3-after-claim');
     await bobCtx.close();
 

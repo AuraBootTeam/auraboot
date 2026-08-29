@@ -46,6 +46,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 mock(RoleMapper.class),
                 mock(BpmTaskCandidateMapper.class)
         );
@@ -80,6 +81,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 roleMapper,
                 taskCandidateMapper
         );
@@ -123,6 +125,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 roleMapper,
                 taskCandidateMapper
         );
@@ -162,6 +165,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 roleMapper,
                 taskCandidateMapper
         );
@@ -188,6 +192,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 roleMapper,
                 mock(BpmTaskCandidateMapper.class)
         );
@@ -230,6 +235,7 @@ class TaskServiceTest {
                 smartEngine,
                 mock(BpmAuditService.class),
                 mock(BpmTaskActionsResolver.class),
+                mock(com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper.class),
                 roleMapper,
                 mock(BpmTaskCandidateMapper.class)
         );
