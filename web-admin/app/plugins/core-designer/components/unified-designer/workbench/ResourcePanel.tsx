@@ -225,6 +225,11 @@ function PaletteBlockButton({
       type="button"
       data-testid={`palette-add-${definition.blockType}`}
       disabled={!enabled}
+      title={
+        enabled
+          ? undefined
+          : resolveDesignerText(DESIGNER_I18N.unified.paletteDisabledHint, locale)
+      }
       onClick={() => onAddBlock(definition.blockType)}
       {...attributes}
       {...listeners}
@@ -269,6 +274,11 @@ function ModelFieldItem({
       data-used={used ? 'true' : 'false'}
       data-virtual={field.virtual ? 'true' : 'false'}
       disabled={!enabled}
+      title={
+        enabled
+          ? undefined
+          : resolveDesignerText(DESIGNER_I18N.unified.paletteDisabledHint, locale)
+      }
       onDoubleClick={() => {
         if (enabled) onAddModelField(field);
       }}

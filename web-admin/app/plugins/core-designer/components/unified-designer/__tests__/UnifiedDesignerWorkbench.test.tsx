@@ -96,6 +96,31 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('canvas-block-dashboard_sales')).toBeInTheDocument();
   });
 
+  it('keeps the palette usable with the page root selected by falling back to the kind-root container', () => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'list_page',
+      blocks: [
+        {
+          id: 'list_root',
+          blockType: 'list',
+          blocks: [{ id: 'table_customers', blockType: 'table', blocks: [] }],
+        },
+      ],
+    };
+    render(<UnifiedDesignerWorkbench initialDocument={document} />);
+
+    // The page root is selected by default; palette items that the root
+    // container accepts (filter-bar) stay enabled even though the root itself
+    // cannot take siblings.
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    const filterBar = screen.getByTestId('palette-add-filter-bar');
+    expect(filterBar).toBeEnabled();
+    fireEvent.click(filterBar);
+    expect(screen.getByTestId('canvas-block-filter_bar_new_filter_bar')).toBeInTheDocument();
+  });
+
   it('fills its parent when embedded in the governed Studio shell', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} embedded />);
 
