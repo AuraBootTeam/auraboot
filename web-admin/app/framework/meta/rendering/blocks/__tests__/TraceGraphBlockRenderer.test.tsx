@@ -295,3 +295,73 @@ describe('TraceGraphBlockRenderer — render smoke', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('DB connection failed');
   });
 });
+
+describe('buildTraceGraph — mn-trace mode', () => {
+  const edgeRow = (overrides: Record<string, unknown>) => ({
+    src_unit_pid: 'TU-SRC',
+    src_kind: 'batch',
+    src_material_ref: 'MAT-SRC',
+    dst_unit_pid: 'TU-DST',
+    dst_kind: 'serial',
+    dst_material_ref: 'MAT-DST',
+    edge_pid: 'edge-1',
+    edge_type: 'split',
+    ...overrides,
+  });
+
+  it('happy: maps M:N pairing rows to unit nodes typed by kind with edge_type labels', () => {
+    const rows = [
+      edgeRow({}),
+      edgeRow({ dst_unit_pid: 'TU-DST2', dst_kind: 'container', dst_material_ref: 'MAT-DST2' }),
+    ];
+
+    const { nodes, edges } = buildTraceGraph(rows, 'mn-trace');
+
+    expect(nodes).toHaveLength(3);
+    const src = nodes.find((n) => n.id === 'TU-SRC');
+    expect(src?.nodeType).toBe('LOT');
+    expect(src?.label).toBe('MAT-SRC');
+    expect(nodes.find((n) => n.id === 'TU-DST')?.nodeType).toBe('SN');
+    expect(nodes.find((n) => n.id === 'TU-DST2')?.nodeType).toBe('COMPONENT');
+    expect(edges).toHaveLength(2);
+    expect(edges[0]).toMatchObject({ source: 'TU-SRC', target: 'TU-DST', label: 'split' });
+  });
+
+  it('happy: isolated unit rows render as nodes without edges', () => {
+    const rows = [{ unit_pid: 'TU-SOLO', kind: 'container', material_ref: 'MAT-SOLO' }];
+
+    const { nodes, edges } = buildTraceGraph(rows, 'mn-trace');
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ id: 'TU-SOLO', label: 'MAT-SOLO', nodeType: 'COMPONENT' });
+    expect(edges).toHaveLength(0);
+  });
+
+  it('edge: rows missing src or dst pid are skipped', () => {
+    const rows = [
+      edgeRow({ src_unit_pid: null }),
+      edgeRow({ dst_unit_pid: null }),
+      edgeRow({}),
+    ];
+
+    const { nodes, edges } = buildTraceGraph(rows, 'mn-trace');
+
+    expect(edges).toHaveLength(1);
+    expect(nodes).toHaveLength(2);
+  });
+
+  it('corner: unknown unit kind falls back to uppercased node type', () => {
+    const rows = [edgeRow({ src_kind: 'pallet' })];
+
+    const { nodes } = buildTraceGraph(rows, 'mn-trace');
+
+    expect(nodes.find((n) => n.id === 'TU-SRC')?.nodeType).toBe('PALLET');
+  });
+
+  it('corner: mode inferred from unit_pid row shape when mode omitted', () => {
+    const rows = [edgeRow({})];
+    const { nodes } = buildTraceGraph(rows);
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(nodes.some((n) => n.nodeType === 'LOT')).toBe(true);
+  });
+});
