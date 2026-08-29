@@ -302,6 +302,40 @@ export async function evidenceShot(
 }
 
 /**
+ * Wait for the task-center table refresh to settle: after an action the UI
+ * shows 加载中 while fetchData refetches — an after-action screenshot taken
+ * mid-refresh captures a loading spinner instead of the reviewed state
+ * (review finding 2026-08-29).
+ */
+export async function waitTaskCenterSettled(page: Page, timeoutMs = 10_000): Promise<void> {
+  const spinner = page.locator('text=加载中');
+  if (await spinner.count()) {
+    await spinner.first().waitFor({ state: 'hidden', timeout: timeoutMs }).catch(() => undefined);
+  }
+  await page.waitForLoadState('domcontentloaded');
+}
+
+/**
+ * Dismiss all visible toast notifications (stacked toasts from an earlier
+ * refused submit otherwise linger next to the success toast in evidence
+ * shots and read as contradictory).
+ */
+export async function dismissToasts(page: Page, timeoutMs = 8_000): Promise<void> {
+  try {
+    const closeButtons = page
+      .locator('[data-testid="toast-stack"] button[aria-label="Close notification"]');
+    const count = await closeButtons.count();
+    for (let i = count - 1; i >= 0; i -= 1) {
+      await closeButtons.nth(i).click({ timeout: 1_000 }).catch(() => undefined);
+    }
+    // Toast removal runs a 300ms leave animation — settle before callers shoot.
+    await page.waitForTimeout(400);
+  } catch {
+    void timeoutMs;
+  }
+}
+
+/**
  * Assert the main content area (never `body` — the sidebar menu text would
  * mask a "Page not found" content area) shows the expected text and no
  * load-failure marker. Every navigation assertion goes through this.

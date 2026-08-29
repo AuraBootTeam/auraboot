@@ -98,6 +98,11 @@ public class BpmIntegrationService {
         // 获取待办任务
         List<TaskInstance> todoTasks = taskService.getTodoTasks(userId);
 
+        // Enrich titles with designer node labels — the task-center table and
+        // action dialogs otherwise fall back to the raw activity id
+        // (e.g. "manager_approve"), a user-visible raw-code leak.
+        taskService.enrichTitlesWithNodeLabels(todoTasks);
+
         // Enrich todo tasks with business key from parent process instance.
         // SmartEngine TaskInstance does not carry bizUniqueId (businessKey); we look it
         // up from the ProcessInstance so the frontend task-center table can show it.

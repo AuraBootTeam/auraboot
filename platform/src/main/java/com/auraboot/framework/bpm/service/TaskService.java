@@ -41,6 +41,7 @@ public class TaskService {
     private final SmartEngine smartEngine;
     private final BpmAuditService bpmAuditService;
     private final BpmTaskActionsResolver taskActionsResolver;
+    private final com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper processDefinitionMapper;
     private final RoleMapper roleMapper;
     private final BpmTaskCandidateMapper taskCandidateMapper;
 
@@ -498,6 +499,73 @@ public class TaskService {
     /**
      * 验证用户是否可以完成任务
      */
+    /**
+     * Enrich each task title with the designer node label. SmartEngine leaves
+     * the title null for plain tasks, so the task-center list and action
+     * dialogs fell back to the raw activity id (e.g. "manager_approve") — a
+     * user-visible raw-code leak (page-golden red line). One designerJson
+     * parse per referenced process definition per call.
+     */
+    public void enrichTitlesWithNodeLabels(List<TaskInstance> tasks) {
+        if (tasks == null || tasks.isEmpty()) return;
+        String tenantId = MetaContext.getCurrentTenantIdAsString();
+        java.util.Map<String, String> labels = new java.util.HashMap<>();
+        java.util.Set<String> visitedDefs = new java.util.HashSet<>();
+        for (TaskInstance t : tasks) {
+            String defAndVersion = t.getProcessDefinitionIdAndVersion();
+            if (defAndVersion == null || !visitedDefs.add(defAndVersion)) continue;
+            try {
+                collectLabelsForDefinition(defAndVersion, tenantId, labels);
+            } catch (Exception e) {
+                log.debug("node label lookup failed for {}: {}", defAndVersion, e.getMessage());
+            }
+        }
+        for (TaskInstance t : tasks) {
+            if (t.getTitle() == null || t.getTitle().isBlank()) {
+                String activityId = t.getProcessDefinitionActivityId();
+                String label = activityId != null ? labels.get(activityId) : null;
+                if (label != null) {
+                    t.setTitle(label);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void collectLabelsForDefinition(String defAndVersion, String tenantId,
+                                            java.util.Map<String, String> labels) {
+        String processKey = defAndVersion.lastIndexOf(':') > 0
+                ? defAndVersion.substring(0, defAndVersion.lastIndexOf(':'))
+                : defAndVersion;
+        com.auraboot.framework.plugin.entity.BpmProcessDefinition definition =
+                processDefinitionMapper.selectOne(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.auraboot.framework.plugin.entity.BpmProcessDefinition>()
+                                .eq("tenant_id", MetaContext.getCurrentTenantId())
+                                .eq("process_key", processKey)
+                                .eq("is_current", true)
+                                .eq("deleted_flag", false)
+                                .last("LIMIT 1"));
+        if (definition == null || definition.getExtension() == null) return;
+        Object designerObj = definition.getExtension().get("designerJson");
+        if (!(designerObj instanceof String designerStr) || designerStr.isBlank()) return;
+        com.fasterxml.jackson.databind.JsonNode designer;
+        try {
+            designer = new com.fasterxml.jackson.databind.ObjectMapper().readTree(designerStr);
+        } catch (Exception e) {
+            log.debug("designerJson parse failed for {}: {}", processKey, e.getMessage());
+            return;
+        }
+        com.fasterxml.jackson.databind.JsonNode nodes = designer.path("nodes");
+        if (!nodes.isArray()) return;
+        for (com.fasterxml.jackson.databind.JsonNode node : nodes) {
+            String id = node.path("id").asText(null);
+            String label = node.path("data").path("label").asText(null);
+            if (id != null && label != null && !label.isBlank()) {
+                labels.putIfAbsent(id, label);
+            }
+        }
+    }
+
     private boolean canCompleteTask(TaskInstance task, String userId) {
         // Claim exclusivity: once a candidate claims the task, only the claimer
         // may complete it. Other candidates stay in the assignee list but must

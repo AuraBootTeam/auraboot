@@ -32,6 +32,7 @@ import {
   deployProcess,
   openUserSession,
   evidenceShot,
+  waitTaskCenterSettled,
 } from './_helpers/showcase';
 
 const S8_KEY = `sc8_grand_${Date.now()}`;
@@ -196,6 +197,7 @@ test.describe('BPM Showcase S8: grand tour (@bpm-showcase)', () => {
     );
     await dialog.getByRole('button', { name: '确认完成' }).click();
     expect((await completeRespPromise).status()).toBeLessThan(400);
+    await waitTaskCenterSettled(carolPage);
     await evidenceShot(carolPage, testInfo, 's8-after-carol-complete');
     await carolCtx.close();
 

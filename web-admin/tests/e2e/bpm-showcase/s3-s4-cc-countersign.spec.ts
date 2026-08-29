@@ -39,6 +39,7 @@ import {
   openUserSession,
   evidenceShot,
   expectContentReady,
+  waitTaskCenterSettled,
 } from './_helpers/showcase';
 
 const S3_KEY = `sc3_cc_${Date.now()}`;
@@ -289,7 +290,8 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     const ccEntry = davePage.locator('main, [role="main"]')
       .getByText(ccContent).first();
     await expect(ccEntry, 'dave cc inbox must list the cc entry').toBeVisible({ timeout: 15_000 });
-    await evidenceShot(davePage, testInfo, 's3-1-dave-cc-inbox', ccEntry);
+    // page-level capture: the NotifyPanel card list is the reviewed object
+    await evidenceShot(davePage, testInfo, 's3-1-dave-cc-inbox');
 
     // read-only: the cc inbox must not offer approve/reject actions
     const approveAction = davePage.locator('[data-testid="task-action-approve"]');

@@ -49,6 +49,8 @@ import {
   openUserSession,
   evidenceShot,
   expectContentReady,
+  waitTaskCenterSettled,
+  dismissToasts,
 } from './_helpers/showcase';
 
 // Unique key per run: draft DELETE is a soft delete and the
@@ -223,12 +225,20 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
     await evidenceShot(bobPage, testInfo, 's1-1-bob-task-center');
     await bobCtx.close();
 
-    // carol via real UI: no such row for this business key
+    // carol via real UI: filter by the business key — the searched list must
+    // be empty, proving bob's task is invisible to her
     const { context: carolCtx, page: carolPage } = await openUserSession(browser, SHOWCASE_USERS.carol);
     await navigateToTaskCenter(carolPage);
+    await expectContentReady(carolPage, /任务中心/);
+    await carolPage.getByPlaceholder('搜索任务...').fill(businessKey);
+    await waitTaskCenterSettled(carolPage);
     await expectContentReady(carolPage);
     const carolRow = findTaskRowByBusinessKey(carolPage, businessKey, /主管审批|manager_approve/i);
     await expect(carolRow, 'carol must NOT see the task').toHaveCount(0);
+    await expect(
+      carolPage.locator('main, [role="main"]').first(),
+      'searched list must be empty (no matching row rendered)',
+    ).not.toContainText(businessKey);
     await evidenceShot(carolPage, testInfo, 's1-1-carol-no-todo');
     await carolCtx.close();
   });
@@ -274,6 +284,8 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
     const audits = await listAuditEvents(request, adminToken, instanceId);
     expect(audits.map((a) => a.operation)).toContain('task_approve');
     await expectTaskGone(request, bobToken, instanceId);
+    await waitTaskCenterSettled(bobPage);
+    await dismissToasts(bobPage);
     await evidenceShot(bobPage, testInfo, 's1-2-after-approve');
     await bobCtx.close();
   });
@@ -307,6 +319,10 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
         String(rejectBody.code ?? '0') === '0',
         'blank-comment reject must be refused by the backend',
       ).toBe(false);
+    // Dismiss the refusal toast NOW — it outlives the success toast of the
+    // follow-up valid reject and would otherwise stack confusingly in the
+    // after-reject evidence shot.
+    await dismissToasts(bobPage);
     await expect(rejectDialog, 'dialog must stay open after refused submit').toBeVisible({ timeout: 5_000 });
     await evidenceShot(bobPage, testInfo, 's1-3-reject-blank-refused', rejectDialog);
 
@@ -323,6 +339,8 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
     const audits = await listAuditEvents(request, adminToken, instanceId);
     expect(audits.map((a) => a.operation)).toContain('task_reject');
     await expectTaskGone(request, bobToken, instanceId);
+    await waitTaskCenterSettled(bobPage);
+    await dismissToasts(bobPage);
     await evidenceShot(bobPage, testInfo, 's1-3-after-reject');
     await bobCtx.close();
   });
