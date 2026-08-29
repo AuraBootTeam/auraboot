@@ -4,16 +4,24 @@
   "title": "AuraBoot Plugin Manifest",
   "description": "Schema for AuraBoot unified plugin package manifest (plugin.json)",
   "type": "object",
-  "required": ["pluginId", "namespace", "version"],
+  "required": [
+    "pluginId",
+    "namespace",
+    "version"
+  ],
   "allOf": [
     {
       "not": {
-        "required": ["entryPoint"]
+        "required": [
+          "entryPoint"
+        ]
       }
     },
     {
       "not": {
-        "required": ["clientConfig"]
+        "required": [
+          "clientConfig"
+        ]
       }
     }
   ],
@@ -23,20 +31,29 @@
       "description": "Unique plugin identifier in reverse domain name format",
       "pattern": "^[a-z][a-z0-9.-]*$",
       "maxLength": 128,
-      "examples": ["com.auraboot.asset-management"]
+      "examples": [
+        "com.auraboot.asset-management"
+      ]
     },
     "namespace": {
       "type": "string",
       "description": "Resource isolation namespace, unique within tenant",
       "pattern": "^[a-z][a-z0-9_-]*$",
       "maxLength": 64,
-      "examples": ["asset", "workflow", "core-bpm"]
+      "examples": [
+        "asset",
+        "workflow",
+        "core-bpm"
+      ]
     },
     "version": {
       "type": "string",
       "description": "Semantic version number",
       "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$",
-      "examples": ["1.0.0", "2.1.3-beta.1"]
+      "examples": [
+        "1.0.0",
+        "2.1.3-beta.1"
+      ]
     },
     "displayName": {
       "type": "string",
@@ -82,7 +99,11 @@
     "pluginType": {
       "type": "string",
       "description": "Plugin type classification",
-      "enum": ["config", "hybrid", "solution"],
+      "enum": [
+        "config",
+        "hybrid",
+        "solution"
+      ],
       "default": "config"
     },
     "dependencies": {
@@ -96,7 +117,9 @@
           },
           {
             "type": "object",
-            "required": ["pluginId"],
+            "required": [
+              "pluginId"
+            ],
             "properties": {
               "pluginId": {
                 "type": "string",
@@ -117,11 +140,24 @@
       "description": "Capabilities this plugin provides to others",
       "items": {
         "type": "object",
-        "required": ["type", "code"],
+        "required": [
+          "type",
+          "code"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "field", "dict", "command", "page", "process", "query", "automation", "api"],
+            "enum": [
+              "model",
+              "field",
+              "dict",
+              "command",
+              "page",
+              "process",
+              "query",
+              "automation",
+              "api"
+            ],
             "description": "Capability type"
           },
           "code": {
@@ -137,11 +173,24 @@
       "description": "Capabilities this plugin requires from other plugins",
       "items": {
         "type": "object",
-        "required": ["type", "code"],
+        "required": [
+          "type",
+          "code"
+        ],
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "field", "dict", "command", "page", "process", "query", "automation", "api"],
+            "enum": [
+              "model",
+              "field",
+              "dict",
+              "command",
+              "page",
+              "process",
+              "query",
+              "automation",
+              "api"
+            ],
             "description": "Required capability type"
           },
           "code": {
@@ -194,98 +243,183 @@
       "type": "object",
       "description": "Paths to resource configuration files",
       "properties": {
-        "dicts": { "type": "string" },
-        "fields": { "type": "string" },
-        "models": { "type": "string" },
-        "modelFieldBindings": { "type": "string" },
-        "bindings": { "type": "string" },
-        "commands": { "type": "string" },
-        "bindingRules": { "type": "string" },
-        "processes": { "type": "string" },
-        "permissions": { "type": "string" },
-        "roles": { "type": "string" },
-        "menus": { "type": "string" },
-        "pages": { "type": "string" },
-        "pageContributions": { "type": "string" },
-        "dashboards": { "type": "string" },
-        "reports": { "type": "string" },
-        "namedQueries": { "type": "string" },
-        "rules": { "type": "string" },
-        "capabilities": { "type": "string" },
-        "decisionDefinitions": { "type": "string" },
-        "conditionFragments": { "type": "string" },
-        "eventPolicies": { "type": "string" },
-        "automations": { "type": "string" },
-        "sla": { "type": "string" },
-        "savedViews": { "type": "string" },
-        "fieldMasks": { "type": "string" },
-        "capabilities": { "type": "string" },
-        "i18n": { "type": "string" },
-        "semantic": { "type": "string" },
-        "defaultBootstrap": { "type": "string" },
-        "data": { "type": "string" }
+        "agentDefinitions": {
+          "type": "string",
+          "description": "Path to agent definition resources"
+        },
+        "automations": {
+          "type": "string"
+        },
+        "bindingRules": {
+          "type": "string"
+        },
+        "bindings": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "string"
+        },
+        "commands": {
+          "type": "string"
+        },
+        "conditionFragments": {
+          "type": "string"
+        },
+        "dashboards": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        },
+        "decisionDefinitions": {
+          "type": "string"
+        },
+        "defaultBootstrap": {
+          "type": "string"
+        },
+        "dicts": {
+          "type": "string"
+        },
+        "eventPolicies": {
+          "type": "string"
+        },
+        "fieldMasks": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "string"
+        },
+        "i18n": {
+          "type": "string"
+        },
+        "menus": {
+          "type": "string"
+        },
+        "modelFieldBindings": {
+          "type": "string"
+        },
+        "models": {
+          "type": "string"
+        },
+        "namedQueries": {
+          "type": "string"
+        },
+        "pageContributions": {
+          "type": "string"
+        },
+        "pages": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "string"
+        },
+        "processes": {
+          "type": "string"
+        },
+        "reports": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "string"
+        },
+        "savedViews": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "string"
+        },
+        "sla": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "dicts": {
       "type": "array",
       "description": "Inline dictionary definitions",
-      "items": { "$ref": "#/$defs/dictDefinition" }
+      "items": {
+        "$ref": "#/$defs/dictDefinition"
+      }
     },
     "fields": {
       "type": "array",
       "description": "Inline field definitions",
-      "items": { "$ref": "#/$defs/fieldDefinition" }
+      "items": {
+        "$ref": "#/$defs/fieldDefinition"
+      }
     },
     "models": {
       "type": "array",
       "description": "Inline model definitions",
-      "items": { "$ref": "#/$defs/modelDefinition" }
+      "items": {
+        "$ref": "#/$defs/modelDefinition"
+      }
     },
     "modelFieldBindings": {
       "type": "array",
       "description": "Inline model-field binding definitions",
-      "items": { "$ref": "#/$defs/bindingDefinition" }
+      "items": {
+        "$ref": "#/$defs/bindingDefinition"
+      }
     },
     "commands": {
       "type": "array",
       "description": "Inline command definitions",
-      "items": { "$ref": "#/$defs/commandDefinition" }
+      "items": {
+        "$ref": "#/$defs/commandDefinition"
+      }
     },
     "bindingRules": {
       "type": "array",
       "description": "Standalone binding rule definitions",
-      "items": { "$ref": "#/$defs/bindingRuleDefinition" }
+      "items": {
+        "$ref": "#/$defs/bindingRuleDefinition"
+      }
     },
     "permissions": {
       "type": "array",
       "description": "Inline permission definitions",
-      "items": { "$ref": "#/$defs/permissionDefinition" }
+      "items": {
+        "$ref": "#/$defs/permissionDefinition"
+      }
     },
     "roles": {
       "type": "array",
       "description": "Inline role definitions",
-      "items": { "$ref": "#/$defs/roleDefinition" }
+      "items": {
+        "$ref": "#/$defs/roleDefinition"
+      }
     },
     "menus": {
       "type": "array",
       "description": "Inline menu definitions",
-      "items": { "$ref": "#/$defs/menuDefinition" }
+      "items": {
+        "$ref": "#/$defs/menuDefinition"
+      }
     },
     "pages": {
       "type": "array",
       "description": "Inline page definitions",
-      "items": { "$ref": "#/$defs/pageDefinition" }
+      "items": {
+        "$ref": "#/$defs/pageDefinition"
+      }
     },
     "processes": {
       "type": "array",
       "description": "Inline BPM process definitions",
-      "items": { "$ref": "#/$defs/processDefinition" }
+      "items": {
+        "$ref": "#/$defs/processDefinition"
+      }
     },
     "namedQueries": {
       "type": "array",
       "description": "Inline named query definitions",
-      "items": { "$ref": "#/$defs/namedQueryDefinition" }
+      "items": {
+        "$ref": "#/$defs/namedQueryDefinition"
+      }
     },
     "client": {
       "type": "object",
@@ -327,7 +461,10 @@
     "backend": {
       "type": "object",
       "description": "Backend plugin configuration",
-      "required": ["jarPath", "entryClass"],
+      "required": [
+        "jarPath",
+        "entryClass"
+      ],
       "properties": {
         "jarPath": {
           "type": "string",
@@ -346,7 +483,11 @@
       "properties": {
         "conflictStrategy": {
           "type": "string",
-          "enum": ["error", "skip", "overwrite"],
+          "enum": [
+            "error",
+            "skip",
+            "overwrite"
+          ],
           "default": "error",
           "description": "How to handle conflicts with existing resources"
         },
@@ -391,7 +532,11 @@
     "licenseMode": {
       "type": "string",
       "description": "License mode governing how entitlements are managed",
-      "enum": ["free", "platform", "vendor"],
+      "enum": [
+        "free",
+        "platform",
+        "vendor"
+      ],
       "default": "free"
     },
     "plans": {
@@ -399,7 +544,9 @@
       "description": "Available subscription/pricing plans for this plugin",
       "items": {
         "type": "object",
-        "required": ["code"],
+        "required": [
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "string",
@@ -425,7 +572,11 @@
           "billingType": {
             "type": "string",
             "description": "Billing model for this plan",
-            "enum": ["free", "subscription", "one_time"]
+            "enum": [
+              "free",
+              "subscription",
+              "one_time"
+            ]
           }
         },
         "additionalProperties": false
@@ -436,7 +587,9 @@
       "description": "Entitlement feature flags that can be gated per plan",
       "items": {
         "type": "object",
-        "required": ["key"],
+        "required": [
+          "key"
+        ],
         "properties": {
           "key": {
             "type": "string",
@@ -477,7 +630,9 @@
     "dictDefinition": {
       "type": "object",
       "description": "Dictionary definition for enumerated value sets",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -498,7 +653,11 @@
         "dictType": {
           "type": "string",
           "description": "Dictionary type",
-          "enum": ["static", "dynamic", "tree"],
+          "enum": [
+            "static",
+            "dynamic",
+            "tree"
+          ],
           "default": "static"
         },
         "description": {
@@ -512,7 +671,9 @@
         "items": {
           "type": "array",
           "description": "Dictionary items",
-          "items": { "$ref": "#/$defs/dictItemDefinition" }
+          "items": {
+            "$ref": "#/$defs/dictItemDefinition"
+          }
         }
       },
       "additionalProperties": false
@@ -520,7 +681,9 @@
     "dictItemDefinition": {
       "type": "object",
       "description": "Dictionary item definition",
-      "required": ["value"],
+      "required": [
+        "value"
+      ],
       "properties": {
         "value": {
           "type": "string",
@@ -570,7 +733,10 @@
     "fieldDefinition": {
       "type": "object",
       "description": "Meta field definition",
-      "required": ["code", "dataType"],
+      "required": [
+        "code",
+        "dataType"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -592,19 +758,49 @@
           "type": "string",
           "description": "Data type of the field",
           "enum": [
-            "string", "text", "integer", "decimal", "boolean",
-            "date", "datetime", "json", "reference", "enum",
-            "dict", "relation", "computed", "file", "jsonb", "long", "money"
+            "string",
+            "text",
+            "integer",
+            "decimal",
+            "boolean",
+            "date",
+            "datetime",
+            "json",
+            "reference",
+            "enum",
+            "dict",
+            "relation",
+            "computed",
+            "file",
+            "jsonb",
+            "long",
+            "money"
           ]
         },
         "fieldType": {
           "type": "string",
           "description": "Canonical or imported field type alias",
           "enum": [
-            "string", "text", "integer", "decimal", "boolean",
-            "date", "datetime", "json", "reference", "enum",
-            "dict", "relation", "computed", "file", "jsonb", "long", "money",
-            "input", "select", "textarea"
+            "string",
+            "text",
+            "integer",
+            "decimal",
+            "boolean",
+            "date",
+            "datetime",
+            "json",
+            "reference",
+            "enum",
+            "dict",
+            "relation",
+            "computed",
+            "file",
+            "jsonb",
+            "long",
+            "money",
+            "input",
+            "select",
+            "textarea"
           ]
         },
         "dictCode": {
@@ -616,10 +812,14 @@
           "description": "Inline enum values for simple field scaffolds",
           "items": {
             "anyOf": [
-              { "type": "string" },
+              {
+                "type": "string"
+              },
               {
                 "type": "object",
-                "required": ["code"],
+                "required": [
+                  "code"
+                ],
                 "properties": {
                   "code": {
                     "type": "string",
@@ -736,14 +936,23 @@
         "immutableWhen": {
           "type": "object",
           "description": "Freeze the field while another stored field holds one of the declared states.",
-          "required": ["field", "in"],
+          "required": [
+            "field",
+            "in"
+          ],
           "properties": {
-            "field": { "type": "string", "minLength": 1 },
+            "field": {
+              "type": "string",
+              "minLength": 1
+            },
             "in": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "additionalProperties": false
@@ -753,7 +962,10 @@
           "description": "Exact authorized command codes allowed to create or change this field.",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "extension": {
           "type": "object",
@@ -773,7 +985,9 @@
     "modelDefinition": {
       "type": "object",
       "description": "Meta model definition",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -794,11 +1008,26 @@
         "modelType": {
           "type": "string",
           "description": "Model type",
-          "enum": ["entity", "view", "virtual", "aggregate", "value_object"]
+          "enum": [
+            "entity",
+            "view",
+            "virtual",
+            "aggregate",
+            "value_object"
+          ]
         },
         "modelCategory": {
           "type": "string",
-          "enum": ["document", "master", "transaction", "activity", "reference", "entity", "basic", "business"],
+          "enum": [
+            "document",
+            "master",
+            "transaction",
+            "activity",
+            "reference",
+            "entity",
+            "basic",
+            "business"
+          ],
           "description": "Business object classification"
         },
         "semantic_description": {
@@ -853,15 +1082,40 @@
               "description": "Cross-field validation rules (model-level baseline)",
               "items": {
                 "type": "object",
-                "required": ["id", "assert", "message"],
+                "required": [
+                  "id",
+                  "assert",
+                  "message"
+                ],
                 "properties": {
-                  "id": { "type": "string" },
-                  "when": { "type": "object" },
-                  "assert": { "type": "object" },
-                  "message": { "type": "string" },
-                  "severity": { "type": "string", "enum": ["error", "warning"] },
-                  "targetField": { "type": "string" },
-                  "dependsOn": { "type": "array", "items": { "type": "string" } }
+                  "id": {
+                    "type": "string"
+                  },
+                  "when": {
+                    "type": "object"
+                  },
+                  "assert": {
+                    "type": "object"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "error",
+                      "warning"
+                    ]
+                  },
+                  "targetField": {
+                    "type": "string"
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             },
@@ -877,7 +1131,10 @@
     "bindingDefinition": {
       "type": "object",
       "description": "Model-field binding definition",
-      "required": ["modelCode", "fieldCode"],
+      "required": [
+        "modelCode",
+        "fieldCode"
+      ],
       "properties": {
         "modelCode": {
           "type": "string",
@@ -954,7 +1211,10 @@
     "commandDefinition": {
       "type": "object",
       "description": "Command definition for CRUD and business operations",
-      "required": ["code", "modelCode"],
+      "required": [
+        "code",
+        "modelCode"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -984,9 +1244,17 @@
           "type": "string",
           "description": "Command type",
           "enum": [
-            "create", "update", "delete", "state_transition",
-            "query", "action", "batch_create", "batch_update",
-            "batch_delete", "import", "custom"
+            "create",
+            "update",
+            "delete",
+            "state_transition",
+            "query",
+            "action",
+            "batch_create",
+            "batch_update",
+            "batch_delete",
+            "import",
+            "custom"
           ]
         },
         "agent_hint": {
@@ -1014,7 +1282,10 @@
           "description": "Human-readable precondition summary"
         },
         "side_effect_description": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Human-readable side effect summary"
         },
         "output_description": {
@@ -1024,7 +1295,9 @@
         "inputFields": {
           "type": "array",
           "description": "Input field codes accepted by this command",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "inputSchema": {
           "type": "object",
@@ -1047,7 +1320,9 @@
         "targetModels": {
           "type": "array",
           "description": "Target models affected by this command",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "handler": {
           "type": "string",
@@ -1091,7 +1366,9 @@
         "bindingRules": {
           "type": "array",
           "description": "Binding rules for this command",
-          "items": { "$ref": "#/$defs/bindingRuleDefinition" }
+          "items": {
+            "$ref": "#/$defs/bindingRuleDefinition"
+          }
         },
         "extension": {
           "type": "object",
@@ -1102,15 +1379,23 @@
           "description": "Auto-set fields on execution. Map of fieldCode to {strategy, value?}",
           "additionalProperties": {
             "type": "object",
-            "required": ["strategy"],
+            "required": [
+              "strategy"
+            ],
             "properties": {
               "strategy": {
                 "type": "string",
                 "description": "Strategy for auto-setting field value",
                 "enum": [
-                  "auto_generate", "current_user", "current_user_pid",
-                  "current_datetime", "current_date", "fixed_value",
-                  "default_value", "current_username", "copy_field"
+                  "auto_generate",
+                  "current_user",
+                  "current_user_pid",
+                  "current_datetime",
+                  "current_date",
+                  "fixed_value",
+                  "default_value",
+                  "current_username",
+                  "copy_field"
                 ]
               },
               "value": {
@@ -1159,7 +1444,10 @@
                 "description": "Context lookup configuration",
                 "items": {
                   "type": "object",
-                  "required": ["modelCode", "exposeAs"],
+                  "required": [
+                    "modelCode",
+                    "exposeAs"
+                  ],
                   "properties": {
                     "modelCode": {
                       "type": "string",
@@ -1170,7 +1458,11 @@
                       "description": "Lookup filters",
                       "items": {
                         "type": "object",
-                        "required": ["field", "op", "value"],
+                        "required": [
+                          "field",
+                          "op",
+                          "value"
+                        ],
                         "properties": {
                           "field": {
                             "type": "string",
@@ -1236,7 +1528,9 @@
               "actions": {
                 "type": "array",
                 "description": "List of actions to execute",
-                "items": { "type": "object" }
+                "items": {
+                  "type": "object"
+                }
               }
             },
             "additionalProperties": false
@@ -1267,7 +1561,9 @@
         "fromStates": {
           "type": "array",
           "description": "Valid source states for state transitions",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "toState": {
           "type": "string",
@@ -1280,14 +1576,19 @@
         "permissions": {
           "type": "array",
           "description": "Required permission codes",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "cascadeDelete": {
           "type": "array",
           "description": "Cascade delete configuration for child models",
           "items": {
             "type": "object",
-            "required": ["childModel", "parentField"],
+            "required": [
+              "childModel",
+              "parentField"
+            ],
             "properties": {
               "childModel": {
                 "type": "string",
@@ -1304,7 +1605,9 @@
         "computedFields": {
           "type": "object",
           "description": "Computed fields using SpEL expressions. Map of fieldCode to SpEL expression string",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "postActions": {
           "type": "array",
@@ -1339,7 +1642,9 @@
               "records": {
                 "type": "array",
                 "description": "Predefined records to create",
-                "items": { "type": "object" }
+                "items": {
+                  "type": "object"
+                }
               },
               "count": {
                 "type": "integer",
@@ -1390,7 +1695,9 @@
               "description": "List of validation rules",
               "items": {
                 "type": "object",
-                "required": ["type"],
+                "required": [
+                  "type"
+                ],
                 "properties": {
                   "type": {
                     "type": "string",
@@ -1399,7 +1706,9 @@
                   "fields": {
                     "type": "array",
                     "description": "Fields involved in the validation",
-                    "items": { "type": "string" }
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "message:zh-CN": {
                     "type": "string",
@@ -1422,11 +1731,19 @@
           "items": {
             "type": "object",
             "properties": {
-              "field": { "type": "string" },
-              "operator": { "type": "string" },
+              "field": {
+                "type": "string"
+              },
+              "operator": {
+                "type": "string"
+              },
               "value": {},
-              "message:zh-CN": { "type": "string" },
-              "message:en": { "type": "string" }
+              "message:zh-CN": {
+                "type": "string"
+              },
+              "message:en": {
+                "type": "string"
+              }
             },
             "additionalProperties": false
           }
@@ -1506,7 +1823,9 @@
     "permissionDefinition": {
       "type": "object",
       "description": "Permission definition for access control",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -1583,11 +1902,9 @@
         "tags": {
           "type": "array",
           "description": "Tags for filtering",
-          "items": { "type": "string" }
-        },
-        "policySchema": {
-          "type": "object",
-          "description": "Policy schema for configurable permission policies and dynamic ABAC"
+          "items": {
+            "type": "string"
+          }
         },
         "extension": {
           "type": "object",
@@ -1599,7 +1916,9 @@
     "roleDefinition": {
       "type": "object",
       "description": "Role definition for RBAC",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -1629,14 +1948,19 @@
         "permissions": {
           "type": "array",
           "description": "Permission codes assigned to this role",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "permissionPolicies": {
           "type": "array",
           "description": "Policy values attached to specific role-permission bindings",
           "items": {
             "type": "object",
-            "required": ["permissionCode", "conditions"],
+            "required": [
+              "permissionCode",
+              "conditions"
+            ],
             "properties": {
               "permissionCode": {
                 "type": "string",
@@ -1655,7 +1979,10 @@
           "description": "Explicit per-permission data-scope overrides materialized during role import",
           "items": {
             "type": "object",
-            "required": ["permissionCode", "scopeType"],
+            "required": [
+              "permissionCode",
+              "scopeType"
+            ],
             "properties": {
               "permissionCode": {
                 "type": "string",
@@ -1663,11 +1990,20 @@
               },
               "scopeType": {
                 "type": "string",
-                "enum": ["none", "self", "dept", "dept_and_sub", "all"]
+                "enum": [
+                  "none",
+                  "self",
+                  "dept",
+                  "dept_and_sub",
+                  "all"
+                ]
               },
               "mergeStrategy": {
                 "type": "string",
-                "enum": ["MIN", "MAX"],
+                "enum": [
+                  "MIN",
+                  "MAX"
+                ],
                 "default": "MAX"
               }
             },
@@ -1679,7 +2015,9 @@
           "description": "Optional seed member refs assigned during plugin import. Supported value: CURRENT_MEMBER.",
           "items": {
             "type": "string",
-            "enum": ["CURRENT_MEMBER"]
+            "enum": [
+              "CURRENT_MEMBER"
+            ]
           }
         },
         "priority": {
@@ -1708,7 +2046,13 @@
         "defaultDataScopeType": {
           "type": "string",
           "description": "Default data scope inherited by newly granted permissions",
-          "enum": ["none", "self", "dept", "dept_and_sub", "all"]
+          "enum": [
+            "none",
+            "self",
+            "dept",
+            "dept_and_sub",
+            "all"
+          ]
         }
       },
       "additionalProperties": false
@@ -1716,7 +2060,9 @@
     "menuDefinition": {
       "type": "object",
       "description": "Menu definition for navigation",
-      "required": ["code"],
+      "required": [
+        "code"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -1735,28 +2081,48 @@
           "description": "English menu name"
         },
         "path": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Route path"
         },
         "component": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Component path for frontend routing"
         },
         "icon": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Menu icon name"
         },
         "type": {
           "type": "integer",
           "description": "Menu type: 0=directory (has children), 1=menu (leaf node)",
-          "enum": [0, 1, 2, 3]
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ]
         },
         "parentCode": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Parent menu code (null for top-level menus)"
         },
         "permissionCode": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Permission code required to see this menu"
         },
         "visible": {
@@ -1797,7 +2163,9 @@
         "children": {
           "type": "array",
           "description": "Child menu definitions (recursive)",
-          "items": { "$ref": "#/$defs/menuDefinition" }
+          "items": {
+            "$ref": "#/$defs/menuDefinition"
+          }
         },
         "extension": {
           "type": "object",
@@ -1812,7 +2180,13 @@
     "pageDefinition": {
       "type": "object",
       "description": "Page schema definition for DSL-driven UI",
-      "required": ["pageKey", "kind", "schemaVersion", "layout", "blocks"],
+      "required": [
+        "pageKey",
+        "kind",
+        "schemaVersion",
+        "layout",
+        "blocks"
+      ],
       "properties": {
         "pageKey": {
           "type": "string",
@@ -1831,7 +2205,10 @@
           "description": "English page name"
         },
         "title": {
-          "type": ["string", "object"],
+          "type": [
+            "string",
+            "object"
+          ],
           "description": "Page title"
         },
         "description": {
@@ -1841,7 +2218,11 @@
         "kind": {
           "type": "string",
           "description": "Importable v4 page kind",
-          "enum": ["list", "form", "detail"]
+          "enum": [
+            "list",
+            "form",
+            "detail"
+          ]
         },
         "pageCategory": {
           "type": "string",
@@ -1863,11 +2244,16 @@
         "layout": {
           "type": "object",
           "description": "V4 page layout",
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["grid", "stack"]
+              "enum": [
+                "grid",
+                "stack"
+              ]
             }
           },
           "additionalProperties": true
@@ -1878,7 +2264,10 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["id", "blockType"],
+            "required": [
+              "id",
+              "blockType"
+            ],
             "properties": {
               "id": {
                 "type": "string",
@@ -1934,7 +2323,9 @@
         "dataSources": {
           "type": "object",
           "description": "Page data sources",
-          "additionalProperties": { "type": "object" }
+          "additionalProperties": {
+            "type": "object"
+          }
         },
         "recordSource": {
           "type": "object",
@@ -1991,7 +2382,9 @@
     "processDefinition": {
       "type": "object",
       "description": "BPM process definition for workflow automation",
-      "required": ["key"],
+      "required": [
+        "key"
+      ],
       "properties": {
         "key": {
           "type": "string",
@@ -2046,12 +2439,16 @@
               "fields": {
                 "type": "array",
                 "description": "Fields to display/edit",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
               "readOnlyFields": {
                 "type": "array",
                 "description": "Read-only fields",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
               "validation": {
                 "type": "object",
@@ -2100,25 +2497,42 @@
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["id", "type"],
+                "required": [
+                  "id",
+                  "type"
+                ],
                 "properties": {
-                  "id": { "type": "string" },
+                  "id": {
+                    "type": "string"
+                  },
                   "type": {
                     "type": "string",
                     "enum": [
-                      "startEvent", "endEvent", "userTask", "serviceTask",
-                      "receiveTask", "exclusiveGateway", "parallelGateway",
-                      "inclusiveGateway", "callActivity"
+                      "startEvent",
+                      "endEvent",
+                      "userTask",
+                      "serviceTask",
+                      "receiveTask",
+                      "exclusiveGateway",
+                      "parallelGateway",
+                      "inclusiveGateway",
+                      "callActivity"
                     ]
                   },
                   "position": {
                     "type": "object",
                     "properties": {
-                      "x": { "type": "number" },
-                      "y": { "type": "number" }
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
                     }
                   },
-                  "data": { "type": "object" }
+                  "data": {
+                    "type": "object"
+                  }
                 }
               }
             },
@@ -2127,19 +2541,41 @@
               "description": "Sequence flows. For exclusive-gateway outgoing edges, every edge MUST carry a non-empty data.condition.content — SmartEngine does not honor the BPMN default= attribute alone. The isDefault flag is still allowed alongside a condition for spec compliance / interop with other BPMN tools.",
               "items": {
                 "type": "object",
-                "required": ["id", "source", "target"],
+                "required": [
+                  "id",
+                  "source",
+                  "target"
+                ],
                 "properties": {
-                  "id": { "type": "string" },
-                  "source": { "type": "string", "description": "Source node id" },
-                  "target": { "type": "string", "description": "Target node id" },
-                  "type": { "type": "string", "description": "React Flow edge type, e.g. smoothstep" },
+                  "id": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Source node id"
+                  },
+                  "target": {
+                    "type": "string",
+                    "description": "Target node id"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "React Flow edge type, e.g. smoothstep"
+                  },
                   "data": {
                     "type": "object",
                     "description": "Edge data. DO NOT use top-level conditionExpression or data.conditionExpression — those field names are ignored by the BPMN converter and will cause deploy to fail with 'missing a condition expression'.",
                     "properties": {
-                      "label": { "type": "string", "description": "Display label on the edge" },
-                      "label:zh-CN": { "type": "string" },
-                      "label:en": { "type": "string" },
+                      "label": {
+                        "type": "string",
+                        "description": "Display label on the edge"
+                      },
+                      "label:zh-CN": {
+                        "type": "string"
+                      },
+                      "label:en": {
+                        "type": "string"
+                      },
                       "isDefault": {
                         "type": "boolean",
                         "description": "Marks this edge as the gateway's default flow (emits BPMN default= attribute). Does NOT exempt the edge from the condition requirement — still must provide a non-empty condition (e.g. 'true' or an explicit inverse)."
@@ -2147,11 +2583,16 @@
                       "condition": {
                         "type": "object",
                         "description": "Condition expression. Required on every outgoing edge of an exclusiveGateway.",
-                        "required": ["content"],
+                        "required": [
+                          "content"
+                        ],
                         "properties": {
                           "type": {
                             "type": "string",
-                            "enum": ["expression", "script"],
+                            "enum": [
+                              "expression",
+                              "script"
+                            ],
                             "default": "expression"
                           },
                           "content": {
@@ -2161,7 +2602,10 @@
                           },
                           "language": {
                             "type": "string",
-                            "enum": ["mvel", "juel"],
+                            "enum": [
+                              "mvel",
+                              "juel"
+                            ],
                             "description": "Required when type=script. SmartEngine primarily supports MVEL."
                           },
                           "ruleCode": {
@@ -2187,7 +2631,10 @@
     "namedQueryDefinition": {
       "type": "object",
       "description": "Named query definition",
-      "required": ["code", "fromSql"],
+      "required": [
+        "code",
+        "fromSql"
+      ],
       "properties": {
         "code": {
           "type": "string",
@@ -2224,47 +2671,125 @@
         "status": {
           "type": "string",
           "description": "Named query lifecycle status",
-          "enum": ["draft", "testing", "published", "deprecated", "archived", "enabled", "disabled"]
+          "enum": [
+            "draft",
+            "testing",
+            "published",
+            "deprecated",
+            "archived",
+            "enabled",
+            "disabled"
+          ]
         },
         "fields": {
           "type": "array",
           "description": "Named query field definitions",
           "items": {
             "type": "object",
-            "required": ["fieldCode", "columnExpr", "dataType"],
+            "required": [
+              "fieldCode",
+              "columnExpr",
+              "dataType"
+            ],
             "properties": {
-              "fieldCode": { "type": "string" },
-              "columnExpr": { "type": "string" },
-              "dataType": { "type": "string", "enum": ["string", "number", "date", "boolean", "json", "array"] },
-              "operators": { "type": "array", "items": { "type": "string" } },
-              "dictCode": { "type": "string" },
-              "sortable": { "type": "boolean" },
-              "searchable": { "type": "boolean" },
-              "displayName": { "type": "string" },
-              "description": { "type": "string" },
-              "sortOrder": { "type": "integer" },
-              "required": { "type": "boolean" },
-              "fieldGroup": { "type": "string" },
-              "uiComponent": { "type": "string" },
-              "placeholder": { "type": "string" },
-              "defaultValue": { "type": "string" },
-              "linkedField": { "type": "string" },
-              "uiConfig": { "type": "object" },
-              "tags": { "type": "array", "items": { "type": "string" } },
-              "validationRules": { "type": "string" },
-              "formatRules": { "type": "string" },
-              "weight": { "type": "integer" },
-              "sensitive": { "type": "boolean" },
-              "maskingRule": { "type": "string" },
-              "useDefaultOperators": { "type": "boolean" },
-              "validateOperators": { "type": "boolean" }
+              "fieldCode": {
+                "type": "string"
+              },
+              "columnExpr": {
+                "type": "string"
+              },
+              "dataType": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "number",
+                  "date",
+                  "boolean",
+                  "json",
+                  "array"
+                ]
+              },
+              "operators": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "dictCode": {
+                "type": "string"
+              },
+              "sortable": {
+                "type": "boolean"
+              },
+              "searchable": {
+                "type": "boolean"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "sortOrder": {
+                "type": "integer"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "fieldGroup": {
+                "type": "string"
+              },
+              "uiComponent": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              },
+              "defaultValue": {
+                "type": "string"
+              },
+              "linkedField": {
+                "type": "string"
+              },
+              "uiConfig": {
+                "type": "object"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "validationRules": {
+                "type": "string"
+              },
+              "formatRules": {
+                "type": "string"
+              },
+              "weight": {
+                "type": "integer"
+              },
+              "sensitive": {
+                "type": "boolean"
+              },
+              "maskingRule": {
+                "type": "string"
+              },
+              "useDefaultOperators": {
+                "type": "boolean"
+              },
+              "validateOperators": {
+                "type": "boolean"
+              }
             },
             "additionalProperties": false
           }
         },
         "tags": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "metadata": {
           "type": "object",
