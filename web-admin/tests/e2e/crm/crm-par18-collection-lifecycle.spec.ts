@@ -137,7 +137,7 @@ test('PAR-18 collection: payment plan lifecycle, collection create + confirm, st
       sl_cpp_name: planName,
       sl_cpp_contract_id: contractPid,
       sl_cpp_sequence: 1,
-      sl_cpp_owner: '01M125M2YDY3NQDA9TKHYFCVD8',
+      sl_cpp_owner: (await (await fetch(`${BACKEND_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${adminJwt}` } })).json()).data.user.pid,
       sl_cpp_due_date: '2026-10-10',
       sl_cpp_amount: 100000,
     },
