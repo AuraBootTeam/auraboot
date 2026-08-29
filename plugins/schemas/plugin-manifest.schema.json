@@ -646,6 +646,14 @@
           "type": "string",
           "description": "Chinese dictionary name"
         },
+        "displayName:zh-CN": {
+          "type": "string",
+          "description": "Chinese display name override"
+        },
+        "displayName:en": {
+          "type": "string",
+          "description": "English display name override"
+        },
         "name:en": {
           "type": "string",
           "description": "English dictionary name"
