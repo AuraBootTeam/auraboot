@@ -25,6 +25,13 @@
  *            component_material_id?, component_material_name? }
  *   graph: SN node (finished_sn) → COMPONENT node (component_sn),
  *          edge labeled "contains"
+ *
+ * mn-trace  (/api/ext/mo/trace/graph — manufacturing-operations M:N graph)
+ *   rows: { src_unit_pid?, src_kind?, src_material_ref?,
+ *           dst_unit_pid?, dst_kind?, dst_material_ref?,
+ *           edge_pid?, edge_type? }
+ *   plus isolated-unit rows { unit_pid, kind?, material_ref? } (no edge fields)
+ *   graph: source-unit node → target-unit node, edge labeled with edge_type
  */
 
 import React from 'react';
@@ -65,7 +72,22 @@ export interface GenealogyTraceRow {
   [key: string]: unknown;
 }
 
-export type TraceMode = 'consumption' | 'genealogy';
+export interface MnTraceRow {
+  unit_pid?: string | null;
+  kind?: string | null;
+  material_ref?: string | null;
+  src_unit_pid?: string | null;
+  src_kind?: string | null;
+  src_material_ref?: string | null;
+  dst_unit_pid?: string | null;
+  dst_kind?: string | null;
+  dst_material_ref?: string | null;
+  edge_pid?: string | null;
+  edge_type?: string | null;
+  [key: string]: unknown;
+}
+
+export type TraceMode = 'consumption' | 'genealogy' | 'mn-trace';
 
 export interface TraceGraph {
   nodes: TraceNode[];
@@ -80,6 +102,7 @@ function inferMode(rows: unknown[]): TraceMode {
   if (rows.length === 0) return 'consumption';
   const first = rows[0] as Record<string, unknown>;
   if ('finished_sn' in first || 'component_sn' in first) return 'genealogy';
+  if ('src_unit_pid' in first || 'dst_unit_pid' in first || 'unit_pid' in first) return 'mn-trace';
   return 'consumption';
 }
 
@@ -133,8 +156,42 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
         label: qty,
       });
     }
+  } else if (resolvedMode === 'mn-trace') {
+    const nodeTypeForKind = (kind: unknown): string => {
+      const value = String(kind ?? '').toLowerCase();
+      if (value === 'batch') return 'LOT';
+      if (value === 'serial') return 'SN';
+      if (value === 'container') return 'COMPONENT';
+      return value ? value.toUpperCase() : 'COMPONENT';
+    };
+    const labelFor = (kind: unknown, materialRef: unknown, pid: string): string =>
+      materialRef != null && String(materialRef).length > 0
+        ? `${String(materialRef)}`
+        : pid;
+    const putNode = (pid: string, kind: unknown, materialRef: unknown) => {
+      if (!pid || nodeMap.has(pid)) return;
+      nodeMap.set(pid, {
+        id: pid,
+        label: labelFor(kind, materialRef, pid),
+        nodeType: nodeTypeForKind(kind),
+      });
+    };
+    for (const raw of rows) {
+      const row = raw as MnTraceRow;
+      if (row.src_unit_pid && row.dst_unit_pid) {
+        putNode(row.src_unit_pid, row.src_kind, row.src_material_ref);
+        putNode(row.dst_unit_pid, row.dst_kind, row.dst_material_ref);
+        edges.push({
+          id: `e-${row.edge_pid ?? `${row.src_unit_pid}->${row.dst_unit_pid}`}-${edges.length}`,
+          source: row.src_unit_pid,
+          target: row.dst_unit_pid,
+          label: row.edge_type ?? undefined,
+        });
+      } else if (row.unit_pid) {
+        putNode(row.unit_pid, row.kind, row.material_ref);
+      }
+    }
   } else {
-    // genealogy mode
     for (const raw of rows) {
       const row = raw as GenealogyTraceRow;
       const finishedSn = row.finished_sn;
