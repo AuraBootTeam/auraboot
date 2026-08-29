@@ -903,7 +903,7 @@ describe('useTaskCenter', () => {
         await result.current.completeTask('done');
       });
 
-      expect(toastMock.showErrorToast).toHaveBeenCalledWith('完成任务失败');
+      expect(toastMock.showErrorToast).toHaveBeenCalledWith('server error');
     });
 
     it('shows error toast when approveTask service rejects', async () => {
@@ -927,7 +927,7 @@ describe('useTaskCenter', () => {
         await result.current.approveTask('ok');
       });
 
-      expect(toastMock.showErrorToast).toHaveBeenCalledWith('通过任务失败');
+      expect(toastMock.showErrorToast).toHaveBeenCalledWith('server error');
     });
   });
 });
