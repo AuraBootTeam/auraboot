@@ -96,10 +96,22 @@
         "en": "Order Commitment and Release Evidence"
       },
       "fields": [
-        { "field": "crm_qs_committed_qdp_revision_id", "colSpan": 6 },
-        { "field": "crm_qs_customer_confirmation_id", "colSpan": 6 },
-        { "field": "crm_qs_order_committed_at", "colSpan": 6 },
-        { "field": "crm_qs_order_committed_by", "colSpan": 6 }
+        {
+          "field": "crm_qs_committed_qdp_revision_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_customer_confirmation_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_order_committed_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_order_committed_by",
+          "colSpan": 6
+        }
       ]
     },
     {
@@ -135,7 +147,10 @@
             "inputFields": [
               {
                 "field": "crm_qdp_revision_id",
-                "label": { "zh-CN": "已发布 QDP", "en-US": "Released QDP" },
+                "label": {
+                  "zh-CN": "已发布 QDP",
+                  "en-US": "Released QDP"
+                },
                 "type": "select",
                 "required": true,
                 "searchable": true,
@@ -146,7 +161,11 @@
                     "pageNum": 1,
                     "pageSize": 100,
                     "filters": [
-                      { "fieldName": "crm_qdp_status", "operator": "EQ", "value": "released" }
+                      {
+                        "fieldName": "crm_qdp_status",
+                        "operator": "EQ",
+                        "value": "released"
+                      }
                     ]
                   },
                   "valueField": "pid",
@@ -193,6 +212,99 @@
           }
         }
       ]
+    },
+    {
+      "id": "block_qs_related_contracts",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "转化合同",
+        "en": "Converted Contracts"
+      },
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "subTable": {
+        "childModel": "sl_sales_contract_common",
+        "parentField": "sl_ctr_source_qo_quote_id",
+        "readOnly": true,
+        "columns": [
+          {
+            "field": "sl_ctr_code",
+            "width": 160,
+            "label": {
+              "zh-CN": "合同编号",
+              "en": "Contract Code"
+            }
+          },
+          {
+            "field": "sl_ctr_name",
+            "width": 240,
+            "label": {
+              "zh-CN": "合同名称",
+              "en": "Contract Name"
+            }
+          },
+          {
+            "field": "sl_ctr_amount",
+            "width": 140,
+            "align": "right",
+            "label": {
+              "zh-CN": "合同金额",
+              "en": "Contract Amount"
+            }
+          },
+          {
+            "field": "sl_ctr_status",
+            "width": 120,
+            "renderType": "tag",
+            "dictCode": "sl_contract_status",
+            "label": {
+              "zh-CN": "合同状态",
+              "en": "Contract Status"
+            }
+          },
+          {
+            "field": "sl_ctr_start_date",
+            "width": 130,
+            "valueType": "date",
+            "label": {
+              "zh-CN": "开始日期",
+              "en": "Start Date"
+            }
+          },
+          {
+            "field": "sl_ctr_end_date",
+            "width": 130,
+            "valueType": "date",
+            "label": {
+              "zh-CN": "结束日期",
+              "en": "End Date"
+            }
+          }
+        ],
+        "toolbarActions": [
+          {
+            "code": "convert",
+            "label": {
+              "zh-CN": "转化为合同",
+              "en": "Convert to Contract"
+            },
+            "action": {
+              "type": "command",
+              "command": "sl:convert_quote_to_contract",
+              "payload": {
+                "sl_ctr_source_qo_quote_id": "${record.pid}",
+                "sl_ctr_account_id": "${record.crm_qs_account_id}",
+                "sl_ctr_amount": "${record.crm_qs_quote_amount}",
+                "sl_ctr_currency_code": "${record.crm_qs_currency}",
+                "sl_ctr_name": "${record.crm_qs_code} 转化合同",
+                "sl_ctr_owner": "${record.crm_qs_owner}"
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }
