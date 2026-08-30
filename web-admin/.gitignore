@@ -69,3 +69,4 @@ tests/storage/local-auth-*/
 tests/storage/*/admin.json
 tests/storage/2026*/
 tests/storage/evidence-*/
+tests/storage/followups/

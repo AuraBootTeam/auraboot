@@ -17,12 +17,14 @@
  */
 
 import { test, expect, type APIRequestContext } from '../../fixtures';
+import { PSQL_BASE } from '../../helpers/environments';
 import {
   loginAsAdmin,
   startProcessInstance,
   queryInstanceStatus,
   waitForTodoTask,
   listTodoTasks,
+  listAuditEvents,
   undeployProcess,
 } from '../bpm/_helpers/bpm-lifecycle';
 import {
@@ -311,6 +313,87 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     ).toBeGreaterThan(0);
     
 
+  });
+
+  test('S3.2 task-level cc endpoint resolves receiver pids (API-backed) + unknown pid fail-fast', async ({ request }) => {
+    const businessKey = `SC3B-${Date.now()}`;
+    const aliceToken = await loginJwt(request, SHOWCASE_USERS.alice.email);
+    const { instanceId } = await startProcessInstance(request, aliceToken, {
+      processDefinitionId: S3_KEY,
+      businessKey,
+      variables: {},
+    });
+    const task = await waitForTodoTask(
+      request,
+      bobToken,
+      (t) => t.processInstanceId === instanceId,
+      { timeout: 20_000 },
+    );
+
+    // CcPolicy gate: a directly-assigned (unclaimed) task yields
+    // claimUserId=null, so the assignee arm of policy ALL does not match —
+    // claim first so bob becomes the policy-recognised handler. Noted as an
+    // observation: the UI dialog path (notify/cc) bypasses this policy gate.
+    const claimResp = await request.post(`/api/bpm/tasks/${task.taskId}/claim`, {
+      headers: { Authorization: `Bearer ${bobToken}` },
+    });
+    expect(claimResp.ok(), `claim: ${claimResp.status()}`).toBe(true);
+
+    // dave's numeric ab_user id (engine notification rows store numeric ids)
+    const daveMe = await request.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${daveToken}` },
+    });
+    const daveUserId = String((await daveMe.json())?.data?.user?.id ?? '');
+    expect(daveUserId, 'dave numeric userId').toBeTruthy();
+
+    // happy path: receiverUserIds are ab_user pid strings; the backend
+    // resolves pids to numeric ids before the notification fan-out
+    const davePid = pids.dave;
+    const resp = await request.post(`/api/bpm/tasks/${task.taskId}/cc`, {
+      headers: { Authorization: `Bearer ${bobToken}`, 'Content-Type': 'application/json' },
+      data: { receiverUserIds: [davePid], comment: `S3.2 pid-path cc ${businessKey}` },
+    });
+    expect(resp.ok(), `pid-path cc: ${resp.status()} ${await resp.text()}`).toBe(true);
+
+    const received = await request.get('/api/bpm/notify/received?type=CC', {
+      headers: { Authorization: `Bearer ${daveToken}` },
+    });
+    expect(received.ok()).toBe(true);
+    // FINDING #6 (storage split-brain, needs product decision): the task-level
+    // cc endpoint and automation/eventpolicy cc write SmartEngine's
+    // se_notification_instance, while the UI dialog path writes
+    // ab_bpm_notify_record — and the 抄送给我 inbox reads only the latter, so
+    // task-level/automation cc receivers never see the entry in the UI.
+    // This test asserts the task-level path's actual stores (audit row with
+    // resolved numeric receivers + engine notification row); unifying the
+    // stores so the inbox shows these entries is the pending product fix.
+    const audits = await listAuditEvents(request, adminToken, instanceId);
+    const ccAudit = audits.find((a) => a.operation === 'cc');
+    expect(ccAudit, 'audit must record the cc execution').toBeTruthy();
+    const receiverIds = (ccAudit?.details?.receiverIds ?? []) as Array<unknown>;
+    // snowflake ids exceed 2^53: JSON round-trip rounds the last digits, so
+    // compare on the precision-safe 15-digit prefix (rules: 前缀比较)
+    expect(
+      receiverIds.some((id) => String(id).slice(0, 15) === daveUserId.slice(0, 15)),
+      'cc audit must list the resolved numeric receiver id',
+    ).toBe(true);
+
+    const { execSync } = await import('node:child_process');
+    const engineRow = execSync(
+      `${PSQL_BASE} -t -c "SELECT count(*) FROM se_notification_instance ` +
+        `WHERE process_instance_id='${instanceId}' AND notification_type='cc'"`,
+    ).toString().trim();
+    expect(Number(engineRow), 'engine notification row must exist for the cc').toBeGreaterThan(0);
+    void received;
+
+    // fail-fast: an unknown pid must be refused, not silently dropped
+    const bad = await request.post(`/api/bpm/tasks/${task.taskId}/cc`, {
+      headers: { Authorization: `Bearer ${bobToken}`, 'Content-Type': 'application/json' },
+      data: { receiverUserIds: ['01UNKNOWNUNKNOWNUNKNOWNUNKNOWN'], comment: 'unknown pid' },
+    });
+    const badBody = (await bad.json().catch(() => ({}))) as { code?: string | number };
+    const refused = bad.status() >= 400 || String(badBody.code ?? '0') !== '0';
+    expect(refused, 'unknown receiver pid must be refused (fail-fast)').toBe(true);
   });
 
   test('S4.1+S4.2 parallel countersign: three todos, partial keep running, all complete → end', async ({ browser, request }, testInfo) => {

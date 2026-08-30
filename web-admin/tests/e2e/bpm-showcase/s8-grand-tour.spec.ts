@@ -35,6 +35,8 @@ import {
   waitTaskCenterSettled,
 } from './_helpers/showcase';
 
+interface SlaRecord { pid: string; status: string; processInstanceId: string | null; }
+
 const S8_KEY = `sc8_grand_${Date.now()}`;
 let adminToken = '';
 let bobToken = '';
@@ -130,6 +132,23 @@ test.describe('BPM Showcase S8: grand tour (@bpm-showcase)', () => {
       designerJson: grandTourGraph(),
     });
     deployed = true;
+
+    // SLA dimension: node-level config on the legal branch; the record must
+    // complete when the branch approves (deadline 30s, tour finishes faster
+    // or not — completion is driven by task completion either way).
+    const sla = await request.post('/api/bpm/sla-configs', {
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      data: {
+        name: `S8 legal SLA ${S8_KEY}`,
+        targetType: 'NODE',
+        targetKey: 'legal_review',
+        deadlineMode: 'FIXED',
+        deadlineValue: 'PT30S',
+        warningRules: [],
+      },
+    });
+    const slaBody = await sla.json().catch(() => ({}) as Record<string, unknown>);
+    expect(sla.ok(), `S8 sla config: ${sla.status()} ${JSON.stringify(slaBody).slice(0, 200)}`).toBe(true);
   });
 
   test.afterAll(async ({ request }) => {
@@ -231,5 +250,21 @@ test.describe('BPM Showcase S8: grand tour (@bpm-showcase)', () => {
       );
       expect(remaining, 'no todos may remain after grand tour completion').toHaveLength(0);
     }
+
+    // SLA dimension: the node record must close as COMPLETED once the branch
+    // task was approved (SlaActivationListener task_completed closure, #1713)
+    await expect
+      .poll(
+        async () => {
+          const resp = await request.get('/api/bpm/monitor/sla-records', {
+            headers: { Authorization: `Bearer ${adminToken}` },
+          });
+          const records = (((await resp.json())?.data ?? []) as SlaRecord[])
+            .filter((r) => r.processInstanceId === String(instanceId));
+          return records.map((r) => (r.status ?? '').toLowerCase()).join(',');
+        },
+        { timeout: 20_000, message: 'grand-tour SLA record must COMPLETE' },
+      )
+      .toContain('completed');
   });
 });
