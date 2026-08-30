@@ -2169,6 +2169,15 @@ export function UnifiedDesignerWorkbench({
               onAddBlock={handleAddBlock}
               onAddModelField={handleAddModelField}
             />
+            {document.modelCode && Object.keys(modelFieldsByModel).length > 0 && !modelFieldsByModel[document.modelCode]?.length ? (
+              <div
+                className="mx-3 mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                data-testid="designer-model-missing-hint"
+              >
+                {resolveDesignerText(DESIGNER_I18N.unified.modelMissingHint, locale)
+                  .replace('{modelCode}', document.modelCode)}
+              </div>
+            ) : null}
             <CanvasHost
               document={document}
               mode={mode}
