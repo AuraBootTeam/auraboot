@@ -1843,6 +1843,20 @@ describe('UnifiedDesignerWorkbench', () => {
     );
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
+
+  it('wires outline rows into the dnd kernel and marks draggable canvas bodies', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
+
+    // Outline rows carry the same dnd payload wiring as canvas frames: dnd-kit
+    // draggable attributes (shared activators) plus the drop-intent marker the
+    // kernel flips while a drag hovers the row.
+    const outlineRow = screen.getByTestId('outline-item-section_basic');
+    expect(outlineRow).toHaveAttribute('aria-roledescription', 'draggable');
+    expect(outlineRow).toHaveAttribute('data-drop-intent', 'none');
+
+    // Non-dashboard canvas bodies expose the whole-body drag affordance.
+    expect(screen.getByTestId('canvas-block-section_basic')).toHaveClass('cursor-grab');
+  });
 });
 
 function isBefore(firstTestId: string, secondTestId: string) {
