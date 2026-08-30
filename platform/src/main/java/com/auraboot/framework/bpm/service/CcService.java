@@ -129,8 +129,14 @@ public class CcService {
         }
         boolean isInitiator = currentUserId.equals(initiatorId);
 
+        // Assignee arm matches BOTH id domains: legacy numeric claim ids and
+        // the canonical ab_user.pid (ULID) — parseLongSafely on a ULID yields
+        // null, which made the assignee arm unmatchable for pid-claimed tasks
+        // (showcase S3.2).
         Long assigneeIdLong = parseLongSafely(task.getClaimUserId());
-        boolean isAssignee = assigneeIdLong != null && assigneeIdLong.equals(currentUserIdLong);
+        boolean isAssignee =
+                (task.getClaimUserId() != null && task.getClaimUserId().equals(currentUserId))
+                        || (assigneeIdLong != null && assigneeIdLong.equals(currentUserIdLong));
 
         boolean allowed = switch (policy) {
             case INITIATOR -> isInitiator;

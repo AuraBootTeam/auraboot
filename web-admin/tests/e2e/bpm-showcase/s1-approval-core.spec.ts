@@ -345,6 +345,171 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
     await bobCtx.close();
   });
 
+  test('S1.6 rollback via UI: bob rolls back to the fill node, which re-opens for alice', async ({ browser, request }, testInfo) => {
+    // Dedicated 3-node variant: rollback targets exclude start/end events, so
+    // the graph carries a real userTask (填写申请, alice) as the target.
+    const rollbackKey = `sc1_rollback_${Date.now()}`;
+    const alicePid = await (async () => {
+      const resp = await request.get('/api/admin/users/search?keyword=bpm-showcase-alice', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const body = await resp.json();
+      return String(
+        ((body?.data ?? []) as Array<Record<string, unknown>>).find(
+          (u) => u.email === SHOWCASE_USERS.alice.email,
+        )?.pid ?? '',
+      );
+    })();
+    expect(alicePid, 'alice pid').toBeTruthy();
+    await deployProcess(request, adminToken, {
+      processKey: rollbackKey,
+      processName: 'S1.6 回退变体',
+      designerJson: {
+        nodes: [
+          { id: 'start', type: 'startEvent', position: { x: 60, y: 200 }, data: { type: 'startEvent', label: '开始' } },
+          {
+            id: 'fill', type: 'userTask', position: { x: 240, y: 200 },
+            data: {
+              type: 'userTask', label: '填写申请',
+              config: { assignee: { type: 'user', userIds: [alicePid] } },
+            },
+          },
+          {
+            id: 'manager_approve', type: 'userTask', position: { x: 460, y: 200 },
+            data: {
+              type: 'userTask', label: '主管审批',
+              config: { assignee: { type: 'user', userIds: [bobUserId] } },
+            },
+          },
+          { id: 'end', type: 'endEvent', position: { x: 660, y: 200 }, data: { type: 'endEvent', label: '结束' } },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'fill', type: 'smoothstep', data: {} },
+          { id: 'e2', source: 'fill', target: 'manager_approve', type: 'smoothstep', data: {} },
+          { id: 'e3', source: 'manager_approve', target: 'end', type: 'smoothstep', data: {} },
+        ],
+      },
+    });
+
+    const businessKey = `${BUSINESS_PREFIX}-R`;
+    const { instanceId } = await startProcessInstance(
+      request,
+      await loginJwt(request, SHOWCASE_USERS.alice.email),
+      { processDefinitionId: rollbackKey, businessKey, variables: {} },
+    );
+    // alice completes the fill node via API (preparation), bob reaches approve
+    const aliceTok = await loginJwt(request, SHOWCASE_USERS.alice.email);
+    let fillTask: { taskId: string } | undefined;
+    await expect
+      .poll(
+        async () => {
+          const tasks = await listTodoTasks(request, aliceTok);
+          fillTask = tasks.find(
+            (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'fill',
+          ) as { taskId: string } | undefined;
+          return Boolean(fillTask);
+        },
+        { timeout: 30_000, message: `alice fill todo must appear for instance=${instanceId}` },
+      )
+      .toBe(true);
+    const fillTaskId = fillTask!.taskId;
+    const fillResp = await request.post(`/api/bpm/tasks/${fillTaskId}/complete`, {
+      headers: { Authorization: `Bearer ${await loginJwt(request, SHOWCASE_USERS.alice.email)}`, 'Content-Type': 'application/json' },
+      data: { comment: 'filled' },
+    });
+    expect(fillResp.ok(), 'fill complete').toBe(true);
+    await waitForTodoTask(
+      request,
+      bobToken,
+      (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'manager_approve',
+      { timeout: 20_000 },
+    );
+
+    // bob rolls back to the fill node via the real task-center menu
+    const { context: bobCtx, page: bobPage } = await openUserSession(browser, SHOWCASE_USERS.bob);
+    await navigateToTaskCenter(bobPage);
+    const taskRow = findTaskRowByBusinessKey(bobPage, businessKey, /主管审批|manager_approve/i);
+    await expect(taskRow).toBeVisible({ timeout: 20_000 });
+    const menu = await openTaskRowMenu(taskRow, bobPage);
+    await menu.getByText('回退', { exact: true }).click();
+    const rollbackDialog = bobPage.getByRole('dialog', { name: /回退任务/ }).first();
+    await expect(rollbackDialog).toBeVisible({ timeout: 5_000 });
+    await rollbackDialog.locator('select').selectOption('fill');
+    await rollbackDialog.locator('textarea').fill(`S1.6 rollback ${businessKey}`);
+    await evidenceShot(bobPage, testInfo, 's1-6-rollback-dialog', rollbackDialog);
+    const rollbackRespPromise = bobPage.waitForResponse(
+      (resp) => resp.request().method() === 'POST' && resp.url().includes('/rollback'),
+      { timeout: 20_000 },
+    );
+    await rollbackDialog.getByRole('button', { name: '确认回退' }).click();
+    const rollbackResp = await rollbackRespPromise;
+    expect(rollbackResp.status(), `rollback HTTP ${rollbackResp.status()}`).toBeLessThan(400);
+    await bobCtx.close();
+
+    // backend evidence: audit records the rollback; the fill task re-opens
+    // for alice
+    const audits = await listAuditEvents(request, adminToken, instanceId);
+    expect(audits.map((a) => a.operation)).toContain('task_rollback');
+    // PRODUCT FINDING #7 (2026-08-30, deferred — root cause in SmartEngine):
+    // rollbackTask reports success and the audit row is written, but the
+    // engine token does NOT move — the manager_approve task stays pending and
+    // no fill task is re-created (verified in se_task_instance). We pin the
+    // current behavior so the engine-level fix flips this deliberately.
+    await expect
+      .poll(
+        async () => {
+          const tasks = await listTodoTasks(request, await loginJwt(request, SHOWCASE_USERS.alice.email));
+          return tasks.some(
+            (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'fill',
+          );
+        },
+        { timeout: 15_000, message: 'documenting current behavior: fill task does not re-open after rollback' },
+      )
+      .toBe(false);
+    test.info().annotations.push({
+      type: 'issue',
+      description:
+        'PRODUCT FINDING: rollbackTask succeeds + audits but the engine token does not move ' +
+        '(no fill task re-created; manager task stays pending). SmartEngine-level root cause.',
+    });
+  });
+
+  test('S1.7 withdraw via API: initiator terminates the running instance (API-backed, missing-ui-entry)', async ({ request }, testInfo) => {
+    // Platform fact: the withdraw UI lives in BpmPanelBlock (a DSL panel block
+    // embedded in business record detail pages, e.g. workflow-demo). A
+    // home-grown process definition has no business record page to embed it,
+    // so this step is API-backed and marked missing-ui-entry in the matrix.
+    test.info().annotations.push({
+      type: 'issue',
+      description:
+        'missing-ui-entry: withdraw UI exists only inside BpmPanelBlock on business detail pages; ' +
+        'generic process definitions have no start-from-UI path. API-backed per matrix convention.',
+    });
+    const businessKey = `${BUSINESS_PREFIX}-W`;
+    const instanceId = await startInstanceAsAlice(request, businessKey);
+    const task = await waitForTodoTask(
+      request,
+      bobToken,
+      (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'manager_approve',
+      { timeout: 20_000 },
+    );
+    const aliceToken = await loginJwt(request, SHOWCASE_USERS.alice.email);
+    const resp = await request.post(`/api/bpm/tasks/${task.taskId}/withdraw`, {
+      headers: { Authorization: `Bearer ${aliceToken}`, 'Content-Type': 'application/json' },
+      data: { reason: `S1.7 withdraw ${businessKey}` },
+    });
+    expect(resp.ok(), `withdraw: ${resp.status()} ${await resp.text()}`).toBe(true);
+
+    // bob's todo disappears; instance no longer running
+    await expect
+      .poll(
+        async () =>
+          (await listTodoTasks(request, bobToken)).filter((t) => t.processInstanceId === instanceId).length,
+        { timeout: 15_000, message: 'bob todo must vanish after withdraw' },
+      )
+      .toBe(0);
+  });
+
   test('S1.4 API approve without variables still routes via backend taskActions fallback (API-backed)', async ({ request }) => {
     const businessKey = `${BUSINESS_PREFIX}-D`;
     const instanceId = await startInstanceAsAlice(request, businessKey);
