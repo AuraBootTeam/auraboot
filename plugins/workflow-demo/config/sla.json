@@ -52,7 +52,7 @@
           "target": "ROLE:wd_manager",
           "order": 30,
           "payload": {
-            "taskTitle": "处理超时请假审批",
+            "title": "处理超时请假审批",
             "priority": "HIGH",
             "dueInMinutes": 15
           },
@@ -165,21 +165,11 @@
           "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:NOTIFY"
         },
         {
-          "type": "SEND_SMS",
-          "target": "ROLE:wd_hr",
-          "order": 20,
-          "payload": {
-            "template": "sla_timeout",
-            "content": "请假流程 HR 审批已超过 SLA。"
-          },
-          "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:SEND_SMS"
-        },
-        {
           "type": "CC_TASK",
-          "target": "ROLE:wd_hr_lead",
+          "target": "ROLE:wd_hr",
           "order": 30,
           "payload": {
-            "taskTitle": "抄送 HR 审批超时",
+            "title": "抄送 HR 审批超时",
             "reason": "SLA_TIMEOUT"
           },
           "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:CC_TASK"
