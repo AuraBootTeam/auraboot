@@ -123,6 +123,23 @@ describe('createSessionMiddleware', () => {
     expect(await response.text()).toBe('qr-generator');
   });
 
+  it('allows anonymous AuraQR scenario landing routes', async () => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+
+    const { createSessionMiddleware } = await import('~/middleware/sessionMiddlewareFactory');
+    const middleware = createSessionMiddleware();
+
+    const response = (await middleware(
+      {
+        request: new Request('http://localhost/qr-scenarios/fire-inspection'),
+      } as any,
+      async () => new Response('qr-scenario', { status: 200 }),
+    )) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('qr-scenario');
+  });
+
   it('keeps theme preview protected by admin authentication', async () => {
     getSessionMock.mockResolvedValue({ get: vi.fn() });
 
