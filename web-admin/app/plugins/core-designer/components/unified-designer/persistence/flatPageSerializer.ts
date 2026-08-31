@@ -122,7 +122,10 @@ function resolveTopLevelBlocks(document: PageSchemaV3): {
     // root by migratePageSchemaV2ToV3; the wrapper is an editor artifact and
     // is dropped here. Its dataSource {model} is already mirrored on the page.
     const children = blocks[0].blocks ?? [];
-    if (children.length > 0) return { topLevel: children, rootBlockId: blocks[0].id };
+    // Children may be empty after the author deletes every block from the
+    // canvas — still recognize the synthetic root so the flat output is
+    // an empty blocks list (not a stray kind-root row).
+    return { topLevel: children, rootBlockId: blocks[0].id };
   }
   return { topLevel: blocks, rootBlockId: undefined };
 }
