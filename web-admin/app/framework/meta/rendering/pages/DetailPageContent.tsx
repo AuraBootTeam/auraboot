@@ -597,6 +597,7 @@ export function resolveVisibleDetailTabs(
 export function resolveVisibleDetailTabsFromBlocks(
   blocks: BlockConfig[],
   isVisible: (visibleWhen: string | undefined) => boolean,
+  hasPermission?: (permissionCode: string) => boolean,
 ): DetailTabConfig[] {
   return blocks
     .map((block, sourceIndex) => ({
@@ -613,7 +614,14 @@ export function resolveVisibleDetailTabsFromBlocks(
       const rightOrder = Number.isFinite(right.order) ? right.order : right.sourceIndex;
       return leftOrder - rightOrder || left.sourceIndex - right.sourceIndex;
     })
-    .flatMap(({ block }) => (block.tabs || []) as DetailTabConfig[]);
+    // A permission declared on the group is not sufficient for a tab: every tab is an
+    // independently addressable hash target and may expose a different business surface.
+    .flatMap(({ block }) =>
+      ((block.tabs || []) as DetailTabConfig[]).filter((tab) => {
+        if (!tab.permissionCode) return true;
+        return Boolean(hasPermission?.(tab.permissionCode));
+      }),
+    );
 }
 
 export function resolveVisibleTopLevelDetailBlocks(
@@ -1081,7 +1089,11 @@ function DetailPageContentInner(props: PageContentProps) {
 
   // A detail page may expose multiple phase-specific tab groups. Compose every
   // visible group instead of silently dropping all but the first one.
-  const allTabs = resolveVisibleDetailTabsFromBlocks(allBlocks, evaluateVisibleWhen);
+  const allTabs = resolveVisibleDetailTabsFromBlocks(
+    allBlocks,
+    evaluateVisibleWhen,
+    hasPermission,
+  );
   const tabs = resolveVisibleDetailTabs(allTabs, recordPid, schema);
   const topLevelDetailBlocks = resolveVisibleTopLevelDetailBlocks(allBlocks, evaluateVisibleWhen);
   const [activeTab, setActiveTab] = useState(0);

@@ -49,4 +49,17 @@ class RolePermissionEvaluatorTest {
         verify(userPermissionService).hasPermission(1L, "wd_leave_request.read");
         verify(userPermissionService).hasPermission(1L, "model.wd_leave_request.read");
     }
+
+    @Test
+    void allowsDottedBusinessSurfacePermissionCandidate() {
+        when(userPermissionService.hasPermission(1L, "qo.quote.process_fee:read")).thenReturn(false);
+        when(userPermissionService.hasPermission(1L, "qo.quote.process_fee.read")).thenReturn(true);
+
+        EvaluationStep step = evaluator.evaluate(1L, "qo.quote.process_fee", "read");
+
+        assertEquals(EvaluationVerdict.ALLOW, step.verdict());
+        assertTrue(step.reason().contains("qo.quote.process_fee.read"));
+        verify(userPermissionService).hasPermission(1L, "qo.quote.process_fee:read");
+        verify(userPermissionService).hasPermission(1L, "qo.quote.process_fee.read");
+    }
 }

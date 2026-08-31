@@ -647,6 +647,8 @@ export interface DetailTabConfig {
   label: string | LocalizedText;
   blocks: BlockConfig[];
   layout?: LayoutConfig;
+  /** Permission required to render this tab. Absent means the tab is not permission-gated. */
+  permissionCode?: string;
   system?: boolean;
   /** List tab filter (present only when tab is a ListTabConfig in a union context) */
   filter?: TabFilterExpression | null;
