@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, StarIcon } from '@heroicons/react/24/outline';
 import { WelcomeGuide } from '~/ui/onboarding/WelcomeGuide';
 import { QuickStartCards } from '~/ui/onboarding/QuickStartCards';
 import {
@@ -39,6 +39,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { userPreferenceService } from '~/shared/services/userPreferenceService';
 
 const PREF_KEY = 'dashboard_tab_order';
+const FAVORITE_KEY = 'dashboard_favorites';
 const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';
 const DASHBOARD_LIST_PAGE_SIZE = 200;
 const HIDDEN_DEFAULT_TAB_CODES = new Set([
@@ -162,6 +163,8 @@ export default function DashboardViewerPage() {
   const [activeCode, setActiveCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [favoriteCodes, setFavoriteCodes] = useState<string[]>([]);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const dashboardRef = useRef<HTMLDivElement>(null);
 
@@ -169,11 +172,12 @@ export default function DashboardViewerPage() {
     () =>
       publishedList.filter(
         (dashboard) =>
-          !dashboard.code ||
-          !HIDDEN_DEFAULT_TAB_CODES.has(dashboard.code) ||
-          dashboard.code === activeCode,
+          (!dashboard.code ||
+            !HIDDEN_DEFAULT_TAB_CODES.has(dashboard.code) ||
+            dashboard.code === activeCode) &&
+          (!favoritesOnly || (dashboard.code && favoriteCodes.includes(dashboard.code))),
       ),
-    [activeCode, publishedList],
+    [activeCode, favoriteCodes, favoritesOnly, publishedList],
   );
 
   // Merge saved order with fetched list (new dashboards appended, removed ones filtered)
@@ -222,9 +226,10 @@ export default function DashboardViewerPage() {
       setLoading(true);
       setError(null);
       try {
-        const [baseList, savedOrder] = await Promise.all([
+        const [baseList, savedOrder, savedFavorites] = await Promise.all([
           dashboardService.list({ status: 'published', pageSize: DASHBOARD_LIST_PAGE_SIZE }),
           userPreferenceService.get<string[]>(PREF_KEY).catch(() => null),
+          userPreferenceService.get<string[]>(FAVORITE_KEY).catch(() => null),
         ]);
         const list =
           codeParam && !baseList.some((d) => d.code === codeParam)
@@ -238,6 +243,9 @@ export default function DashboardViewerPage() {
         setPublishedList(list);
         if (savedOrder && Array.isArray(savedOrder)) {
           setOrderedCodes(savedOrder);
+        }
+        if (Array.isArray(savedFavorites)) {
+          setFavoriteCodes(savedFavorites.map(String));
         }
 
         if (list.length === 0) {
@@ -301,6 +309,18 @@ export default function DashboardViewerPage() {
     },
     [sortedList],
   );
+
+  const handleToggleFavorite = useCallback((code: string) => {
+    setFavoriteCodes((current) => {
+      const next = current.includes(code)
+        ? current.filter((favoriteCode) => favoriteCode !== code)
+        : [...current, code];
+
+      // Dashboard favorites follow the same tenant-scoped preference contract as tab order.
+      userPreferenceService.set(FAVORITE_KEY, next).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
@@ -392,6 +412,42 @@ export default function DashboardViewerPage() {
 
         {/* Actions */}
         <div className="ml-4 flex shrink-0 items-center space-x-2 py-2">
+          <button
+            type="button"
+            onClick={() => setFavoritesOnly((value) => !value)}
+            aria-pressed={favoritesOnly}
+            data-testid="dashboard-favorites-filter"
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors disabled:opacity-50 ${
+              favoritesOnly
+                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <StarIcon className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`} />
+            {favoritesOnly ? t('dashboard.favorites.all', undefined, 'All dashboards') : t('dashboard.favorites.only', undefined, 'Favorites only')}
+          </button>
+          {activeDashboard?.code && (
+            <button
+              type="button"
+              onClick={() => handleToggleFavorite(activeDashboard.code!)}
+              aria-pressed={favoriteCodes.includes(activeDashboard.code!)}
+              data-testid="dashboard-favorite-toggle"
+              className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors ${
+                favoriteCodes.includes(activeDashboard.code!)
+                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <StarIcon
+                className={`mr-1.5 h-4 w-4 ${
+                  favoriteCodes.includes(activeDashboard.code!) ? 'fill-current' : ''
+                }`}
+              />
+              {favoriteCodes.includes(activeDashboard.code!)
+                ? t('dashboard.favorites.remove', undefined, 'Remove favorite')
+                : t('dashboard.favorites.add', undefined, 'Add favorite')}
+            </button>
+          )}
           <button
             onClick={handleRefresh}
             disabled={loading}
