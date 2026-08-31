@@ -97,6 +97,7 @@ import {
   decodeSorts,
   encodeFilters,
   encodeSorts,
+  resolveListSortState,
 } from './list/useListUrlState';
 import {
   type QuickFilterPresetKey,
@@ -1103,13 +1104,21 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
+  const initialUrlSortsRef = useRef(urlSorts);
+  const hasLocalSortChangeRef = useRef(false);
   const pendingSortUrlSyncRef = useRef<string | null | undefined>(undefined);
   const setLocalActiveSorts = useCallback(
     (update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[])) => {
+      hasLocalSortChangeRef.current = true;
       setActiveSorts((previous) => applyLocalSortUpdate(previous, update, pendingSortUrlSyncRef));
     },
     [],
   );
+  const clearSortOverrides = useCallback(() => {
+    initialUrlSortsRef.current = [];
+    hasLocalSortChangeRef.current = false;
+    pendingSortUrlSyncRef.current = undefined;
+  }, []);
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
   const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
@@ -1790,7 +1799,15 @@ function ListPageContentInner(props: PageContentProps) {
       );
 
       const restoredSorts = vc.sorts ?? [];
-      setLocalActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+      const sortOwnership = resolveListSortState({
+        initialUrlSorts: initialUrlSortsRef.current,
+        hasLocalSortChange: hasLocalSortChangeRef.current,
+      });
+      if (sortOwnership.applySavedViewSorts) {
+        // SavedView hydration is not a user sort edit, so it must not enqueue a
+        // URL write. Clean list URLs therefore remain clean after hydration.
+        setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+      }
 
       if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
         setPagination((prev: typeof pagination) => ({
@@ -1801,7 +1818,7 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setLocalActiveSorts, setLocalChipFilters, setPagination, user?.pid],
+    [setFilters, setLocalChipFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
@@ -2188,6 +2205,7 @@ function ListPageContentInner(props: PageContentProps) {
   }, [loadData]);
 
   const handleSelectDefaultView = useCallback(() => {
+    clearSortOverrides();
     const implicitDefaultView =
       savedViews.find((view) => view.scope === 'personal' && isImplicitSavedView(view)) ?? null;
     const implicitViewConfig = implicitDefaultView?.viewConfig;
@@ -2215,6 +2233,7 @@ function ListPageContentInner(props: PageContentProps) {
     });
   }, [
     applyViewConfigToListState,
+    clearSortOverrides,
     clearKeyword,
     loadData,
     pagination.pageSize,
@@ -2227,13 +2246,14 @@ function ListPageContentInner(props: PageContentProps) {
     const restoredFilters = pendingSavedViewFiltersRef.current;
     if (!restoredFilters) return;
     pendingSavedViewFiltersRef.current = null;
-    loadData({
+    // The latest loadData closure already reads the effective active sorts. Do
+    // not bypass a URL override with the selected SavedView's baseline sorts.
+    loadDataRef.current?.({
       page: 0,
       size: pagination.pageSize,
       filters: restoredFilters,
-      sorts: currentView?.viewConfig?.sorts ?? [],
     });
-  }, [currentView?.pid, currentView?.viewConfig?.sorts, loadData, pagination.pageSize]);
+  }, [loadData, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
@@ -2661,7 +2681,11 @@ function ListPageContentInner(props: PageContentProps) {
     if (!schema || skipListData) return;
     const encoded = encodeSorts(activeSorts);
     const currentEncoded = searchParams.get('sort');
-    if ((encoded ?? null) !== (currentEncoded ?? null)) {
+    const sortOwnership = resolveListSortState({
+      initialUrlSorts: initialUrlSortsRef.current,
+      hasLocalSortChange: hasLocalSortChangeRef.current,
+    });
+    if ((encoded ?? null) !== (currentEncoded ?? null) && sortOwnership.syncUrlSorts) {
       pendingSortUrlSyncRef.current = encoded;
       setSearchParams(
         (prev) => {
@@ -2677,6 +2701,9 @@ function ListPageContentInner(props: PageContentProps) {
       );
     }
     if (viewsLoading) return;
+    if (!sortOwnership.autoSaveSorts) {
+      return;
+    }
     if (areSortsEqual(effectiveViewConfig?.sorts ?? [], activeSorts)) {
       return;
     }
@@ -4339,6 +4366,7 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
       if (currentView && !isImplicitSavedView(currentView)) {
+        clearSortOverrides();
         selectDefaultView();
         setPendingViewConfig(null);
         setActiveViewType('table');
@@ -4353,6 +4381,7 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [
       clearKeyword,
+      clearSortOverrides,
       currentView,
       loadData,
       pagination.pageSize,
@@ -4383,6 +4412,7 @@ function ListPageContentInner(props: PageContentProps) {
   // the toolbar view chips so both take the exact same path.
   const handleSelectView = useCallback(
     (pid: string) => {
+      clearSortOverrides();
       activeQuickFilterRef.current = null;
       setActiveQuickFilter(null);
       selectView(pid);
@@ -4400,7 +4430,14 @@ function ListPageContentInner(props: PageContentProps) {
         setActiveViewType(view.viewType as ViewType);
       }
     },
-    [selectView, setSearchParams, savedViews, setActiveViewType, setActiveQuickFilter],
+    [
+      clearSortOverrides,
+      selectView,
+      setSearchParams,
+      savedViews,
+      setActiveViewType,
+      setActiveQuickFilter,
+    ],
   );
 
   // Activate a chip: a filter-preset chip toggles its preset; a view chip
@@ -4418,6 +4455,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   const handleSaveActivePreset = useCallback(async () => {
     if (!activeQuickFilter) return;
+    clearSortOverrides();
 
     const existingPresetView = findPersonalPresetSavedView(savedViews, activeQuickFilter);
     if (existingPresetView) {
@@ -4481,6 +4519,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
   }, [
     activeQuickFilter,
+    clearSortOverrides,
     createView,
     modelCode,
     pageKey,
@@ -5409,6 +5448,7 @@ function ListPageContentInner(props: PageContentProps) {
             onCreateView={async (req: SavedViewCreateRequest) => createView(req)}
             onCreateViewSuccess={(view) => {
               const newType = (view.viewType as ViewType) || 'table';
+              clearSortOverrides();
               activeQuickFilterRef.current = null;
               setActiveQuickFilter(null);
               setActiveViewType(newType);
@@ -5436,6 +5476,7 @@ function ListPageContentInner(props: PageContentProps) {
               await setDefaultView(pid);
             }}
             onSelectView={(pid) => {
+              clearSortOverrides();
               activeQuickFilterRef.current = null;
               setActiveQuickFilter(null);
               selectView(pid);

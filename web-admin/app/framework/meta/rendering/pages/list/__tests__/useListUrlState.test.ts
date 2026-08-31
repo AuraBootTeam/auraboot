@@ -6,6 +6,7 @@ import {
   areFiltersEqual,
   encodeFilters,
   decodeFilters,
+  resolveListSortState,
 } from '../useListUrlState';
 import type { SortConfig, ViewFilterConfig } from '~/framework/smart/types/savedView';
 
@@ -92,6 +93,59 @@ describe('areSortsEqual', () => {
         [{ fieldCode: 'page_key', direction: 'desc', priority: 1 }],
       ),
     ).toBe(false);
+  });
+});
+
+describe('resolveListSortState', () => {
+  const savedViewSort: SortConfig[] = [
+    { fieldCode: 'updated_at', direction: 'desc', priority: 1 },
+  ];
+
+  it('lets SavedView hydration own a clean list URL', () => {
+    expect(
+      resolveListSortState({ initialUrlSorts: [], hasLocalSortChange: false }),
+    ).toEqual({
+      hasInitialUrlOverride: false,
+      applySavedViewSorts: true,
+      syncUrlSorts: false,
+      autoSaveSorts: false,
+    });
+  });
+
+  it('keeps an initial URL sort as an override over SavedView hydration', () => {
+    expect(
+      resolveListSortState({
+        initialUrlSorts: [{ fieldCode: 'created_at', direction: 'desc', priority: 1 }],
+        hasLocalSortChange: false,
+      }),
+    ).toEqual({
+      hasInitialUrlOverride: true,
+      applySavedViewSorts: false,
+      syncUrlSorts: true,
+      autoSaveSorts: false,
+    });
+  });
+
+  it('treats a user sort as user-owned state that may sync and draft', () => {
+    expect(resolveListSortState({ initialUrlSorts: [], hasLocalSortChange: true })).toEqual({
+      hasInitialUrlOverride: false,
+      applySavedViewSorts: false,
+      syncUrlSorts: true,
+      autoSaveSorts: true,
+    });
+  });
+
+  it('does not stage a SavedView draft merely because the URL deep link differs', () => {
+    const state = resolveListSortState({
+      initialUrlSorts: [{ fieldCode: 'created_at', direction: 'desc', priority: 1 }],
+      hasLocalSortChange: false,
+    });
+
+    expect(state.applySavedViewSorts).toBe(false);
+    expect(state.autoSaveSorts).toBe(false);
+    expect(areSortsEqual(savedViewSort, [{ fieldCode: 'updated_at', direction: 'desc' }])).toBe(
+      true,
+    );
   });
 });
 

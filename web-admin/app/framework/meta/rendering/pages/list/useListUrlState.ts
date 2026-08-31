@@ -30,6 +30,43 @@ export function areSortsEqual(
   return encodeSorts(a) === encodeSorts(b);
 }
 
+export interface ListSortStateOwnershipInput {
+  /** Sorts decoded from the URL at list mount time. */
+  initialUrlSorts: SortConfig[];
+  /** Whether the current user changed sorts after hydration. */
+  hasLocalSortChange: boolean;
+}
+
+export interface ListSortStateOwnership {
+  /** A URL sort provided on mount remains an override across SavedView hydration. */
+  hasInitialUrlOverride: boolean;
+  /** SavedView sorts may replace runtime sorts during hydration. */
+  applySavedViewSorts: boolean;
+  /** A change may be projected into the URL. */
+  syncUrlSorts: boolean;
+  /** The change is user-owned and may be staged on the selected SavedView. */
+  autoSaveSorts: boolean;
+}
+
+/**
+ * Resolve ownership between a list URL deep link, SavedView hydration and
+ * user edits. Hydration itself never owns a sort: a clean URL must stay clean,
+ * while an explicit initial URL sort remains a deep-link override.
+ */
+export function resolveListSortState(
+  input: ListSortStateOwnershipInput,
+): ListSortStateOwnership {
+  const hasInitialUrlOverride = input.initialUrlSorts.length > 0;
+  const applySavedViewSorts = !hasInitialUrlOverride && !input.hasLocalSortChange;
+
+  return {
+    hasInitialUrlOverride,
+    applySavedViewSorts,
+    syncUrlSorts: hasInitialUrlOverride || input.hasLocalSortChange,
+    autoSaveSorts: input.hasLocalSortChange,
+  };
+}
+
 /**
  * Decode a sort string back to SortConfig[].
  * Returns empty array for falsy / malformed input.
