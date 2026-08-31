@@ -62,15 +62,17 @@ export function InclusiveGatewayEditor({
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
           data-testid="gateway-default-flow"
         >
-          <option value="">{t('bpmn.gateway.noDefaultFlow')}</option>
+          <option value="" disabled hidden>
+            {t('bpmn.gateway.requiredDefaultFlow')}
+          </option>
           {outgoingEdges.map((edge) => (
             <option key={edge.id} value={edge.id}>
               {edge.label || edge.id}
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-gray-500">
-          {t('bpmn.gateway.defaultFlowHint')}
+        <p className="mt-1 text-xs text-amber-600">
+          {t('bpmn.gateway.requiredDefaultFlowHint')}
         </p>
       </div>
 
