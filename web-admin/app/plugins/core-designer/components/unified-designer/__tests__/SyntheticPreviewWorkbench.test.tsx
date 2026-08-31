@@ -18,6 +18,23 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   startAuthoringIdentitySimulation: vi.fn(),
 }));
 
+vi.mock('~/framework/meta/rendering/ControlledFieldRenderer', () => ({
+  ControlledFieldRenderer: ({
+    field,
+    value,
+  }: {
+    field: { field: string };
+    value?: unknown;
+  }) => (
+    <input
+      data-testid={`controlled-input-${field.field}`}
+      value={typeof value === 'string' ? value : ''}
+      onChange={() => {}}
+      readOnly
+    />
+  ),
+}));
+
 describe('UnifiedDesignerWorkbench synthetic preview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,7 +107,7 @@ describe('UnifiedDesignerWorkbench synthetic preview', () => {
     );
     expect(screen.getByTestId('synthetic-preview-banner')).toHaveTextContent('合成值不保存');
     expect(screen.getByTestId('synthetic-preview-record-count')).toHaveTextContent('3 条合成记录');
-    expect(screen.getByTestId('runtime-input-field_customer_name')).toHaveValue(
+    expect(screen.getByTestId('controlled-input-name')).toHaveValue(
       'Sample customer 01',
     );
     expect(screen.getByTestId('runtime-table-table_customers')).toHaveTextContent(

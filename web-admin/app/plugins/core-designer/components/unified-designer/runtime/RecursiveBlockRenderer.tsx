@@ -2511,14 +2511,18 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
     );
   }
 
-  // True WYSIWYG: when the page's model metadata is available (workbench preview),
-  // render the real platform control for `field` blocks instead of the generic input.
-  const previewModelField =
-    block.blockType === 'field' && block.field
+  // True WYSIWYG: render the real platform control for `field` blocks when model
+  // metadata resolves the field OR the block has an explicit component configured.
+  // The generic HTML fallback remains for unconfigured `field` blocks without either —
+  // these are progressively replaced as more blocks get bound in M4.
+  if (block.blockType === 'field' && !isDesignerRuntimeOnlyComponent(block)) {
+    const modelField = block.field
       ? modelFields.find((candidate) => candidate.code === block.field)
       : undefined;
-  if (previewModelField && !isDesignerRuntimeOnlyComponent(block)) {
-    return <RuntimePlatformField block={block} modelField={previewModelField} />;
+    const hasExplicitComponent = Boolean(block.props?.component);
+    if (modelField || hasExplicitComponent) {
+      return <RuntimePlatformField block={block} modelField={modelField} />;
+    }
   }
 
   const fieldKey = block.field || block.id;
@@ -2602,7 +2606,7 @@ function RuntimePlatformField({
   modelField,
 }: {
   block: DslBlockV3;
-  modelField: ModelFieldDefinition;
+  modelField?: ModelFieldDefinition;
 }) {
   const locale = React.useContext(RuntimeLocaleContext);
   const formContext = React.useContext(RuntimeFormValueContext);
