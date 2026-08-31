@@ -36,10 +36,12 @@ test.describe('mo trace graph page — forward and backward graphical exploratio
     await expect(page.locator(`${BACKWARD_BLOCK} [data-testid="trace-node-${SEED_UNIT}"]`)).toBeVisible();
   });
 
-  test('edge: unknown unit pid renders the block error state, not raw arrays', async ({ page }) => {
+  test('edge: unknown unit pid fails closed at the record boundary without raw arrays', async ({ page }) => {
     await page.goto(pageUrl('tu_does_not_exist'));
-    await expect(page.locator(`${FORWARD_BLOCK} [data-testid="trace-graph-error"]`)).toBeVisible({
-      timeout: 20000,
-    });
+    await expect(page.getByRole('heading', { name: /记录不存在|Record not found/i })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Business error|业务错误/i)).toBeVisible();
+    await expect(page.locator(`${FORWARD_BLOCK}`)).toHaveCount(0);
+    await expect(page.locator(`${BACKWARD_BLOCK}`)).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   });
 });
