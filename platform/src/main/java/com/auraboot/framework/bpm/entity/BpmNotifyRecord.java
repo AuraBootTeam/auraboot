@@ -25,7 +25,11 @@ public class BpmNotifyRecord {
     private String notifyType;      // CC or URGE
     private Long senderUserId;
     private Long recipientUserId;
+    private String title;
     private String content;
+    private String sourceType;
+    private String sourceRef;
+    private String dedupKey;
     private Boolean isRead;
     private Instant readAt;
     private Instant createdAt;

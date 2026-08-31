@@ -63,7 +63,8 @@ public class CcTaskActionExecutor implements ActionExecutor {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> targetUserIds = resolveUserTargets(target, tenantId);
         if (taskId != null) {
-            ccService.ccForUserIds(taskId, targetUserIds, message);
+            String dedupKey = bpmDedupKey(automationPid, recordPid, taskId);
+            ccService.ccForUserIds(taskId, targetUserIds, message, "AUTOMATION", dedupKey);
             return bpmResult(taskId, targetUserIds, modelCode, recordPid);
         }
         return inboxResult(targetUserIds, tenantId, title, message, automationPid, modelCode, recordPid);
@@ -184,6 +185,12 @@ public class CcTaskActionExecutor implements ActionExecutor {
     private static String clientItemId(String automationPid, String recordPid, Long userId, String title) {
         return "automation_cc_" + safe(automationPid) + "_" + safe(recordPid) + "_" + userId + "_"
                 + Integer.toHexString(title.hashCode());
+    }
+
+    private static String bpmDedupKey(String automationPid, String recordPid, String taskId) {
+        String key = "automation_cc_" + safe(automationPid) + "_" + safe(recordPid)
+                + "_" + safe(taskId);
+        return key.length() > 160 ? key.substring(0, 160) : key;
     }
 
     private static String deepLink(String modelCode, String recordPid) {

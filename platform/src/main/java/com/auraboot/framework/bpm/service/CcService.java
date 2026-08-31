@@ -10,7 +10,6 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.auraboot.smart.framework.engine.SmartEngine;
-import com.auraboot.smart.framework.engine.constant.NotificationConstant;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import lombok.RequiredArgsConstructor;
@@ -28,17 +27,17 @@ import java.util.Map;
  * &lt;smart:properties&gt; under aura.ccPolicy (initiator | assignee | all),
  * with an optional per-activity override under aura.ccPolicyOverride.
  *
- * <p>Storage and per-receiver fan-out is delegated to SmartEngine's
- * NotificationCommandService (table {@code se_notification_instance},
- * notification_type={@code cc}). AuraBoot only writes a business-semantic
- * audit record ("I executed cc to N receivers") to {@code ab_bpm_audit_record}.
+ * <p>Storage and per-receiver fan-out is owned by AuraBoot's business notify
+ * store ({@code ab_bpm_notify_record}). SmartEngine does not own the BPM CC
+ * inbox. AuraBoot also writes a business-semantic audit record ("I executed cc
+ * to N receivers") to {@code ab_bpm_audit_record}.
  *
  * <p><strong>Transactional semantics:</strong> the per-receiver loop and the
  * audit write run inside a single Spring {@code @Transactional} boundary.
- * SmartEngine's notification writes participate in the same transaction, so a
+ * Product notification writes participate in the same transaction, so a
  * failure mid-loop rolls back any notifications already written together with
  * the audit record (all-or-nothing). Bad-input failures (null receiver entry,
- * empty list) are rejected before any SmartEngine call.
+ * empty list) are rejected before any notify write.
  */
 @Slf4j
 @Service
@@ -49,6 +48,8 @@ public class CcService {
     private final BpmExtensionAccessor extensionAccessor;
     private final BpmAuditService auditService;
     private final UserService userService;
+    private final TaskService taskService;
+    private final BpmNotifyService notifyService;
 
     /**
      * Send a CC for the given task to the specified receiver user IDs.
@@ -61,6 +62,11 @@ public class CcService {
      */
     @Transactional
     public void cc(String taskId, List<String> receiverUserPids, String comment) {
+        cc(taskId, receiverUserPids, comment, "TASK_API");
+    }
+
+    @Transactional
+    public void cc(String taskId, List<String> receiverUserPids, String comment, String sourceType) {
         // Receivers are addressed by ab_user.pid (ULID) — the identity the
         // frontend MemberPicker carries. Pids resolve to numeric ids here so
         // the notification fan-out keeps its numeric contract (previously the
@@ -78,7 +84,7 @@ public class CcService {
             }
             return user.getId();
         }).toList();
-        ccForUserIds(taskId, receiverUserIds, comment);
+        ccForUserIds(taskId, receiverUserIds, comment, sourceType, null);
     }
 
     /**
@@ -86,6 +92,16 @@ public class CcService {
      * callers whose {@code resolveUserTargets} produces numeric ids).
      */
     public void ccForUserIds(String taskId, List<Long> receiverUserIds, String comment) {
+        ccForUserIds(taskId, receiverUserIds, comment, "AUTOMATION", null);
+    }
+
+    @Transactional
+    public void ccForUserIds(
+            String taskId,
+            List<Long> receiverUserIds,
+            String comment,
+            String sourceType,
+            String dedupKey) {
         if (receiverUserIds == null || receiverUserIds.isEmpty()) {
             throw new IllegalArgumentException("receiverUserIds must not be empty");
         }
@@ -93,8 +109,8 @@ public class CcService {
             throw new IllegalArgumentException("receiverUserIds must not contain null entries");
         }
 
-        String currentUserId = BpmSecurityUtil.getCurrentUserId();
         Long currentUserIdLong = MetaContext.getCurrentUserId();
+        String currentUserId = BpmSecurityUtil.getCurrentUserId();
         String tenantIdStr = MetaContext.getCurrentTenantIdAsString();
 
         // 1. Resolve task → process instance + activity id
@@ -127,41 +143,45 @@ public class CcService {
                     .findFirst()
                     .orElse(null);
         }
-        boolean isInitiator = currentUserId.equals(initiatorId);
+        if (currentUserIdLong != null) {
+            boolean isInitiator = initiatorId != null
+                    && (initiatorId.equals(String.valueOf(currentUserIdLong))
+                            || initiatorId.equals(currentUserId));
 
-        // Assignee arm matches BOTH id domains: legacy numeric claim ids and
-        // the canonical ab_user.pid (ULID) — parseLongSafely on a ULID yields
-        // null, which made the assignee arm unmatchable for pid-claimed tasks
-        // (showcase S3.2).
-        Long assigneeIdLong = parseLongSafely(task.getClaimUserId());
-        boolean isAssignee =
-                (task.getClaimUserId() != null && task.getClaimUserId().equals(currentUserId))
-                        || (assigneeIdLong != null && assigneeIdLong.equals(currentUserIdLong));
+            // TaskService owns completion identity: claimed exclusivity, direct
+            // assignees, candidates, and role/group visibility. CC must not use
+            // a narrower claim-only check.
+            boolean isAssignee = taskService.canCompleteTask(
+                    task, currentUserId);
+            if (!isAssignee) {
+                Long claimIdLong = parseLongSafely(task.getClaimUserId());
+                isAssignee = claimIdLong != null && claimIdLong.equals(currentUserIdLong);
+            }
 
-        boolean allowed = switch (policy) {
-            case INITIATOR -> isInitiator;
-            case ASSIGNEE  -> isAssignee;
-            case ALL       -> isInitiator || isAssignee;
-        };
-        if (!allowed) {
-            throw new BusinessException(
-                    "Current user does not satisfy cc policy: " + policy.code());
+            boolean allowed = switch (policy) {
+                case INITIATOR -> isInitiator;
+                case ASSIGNEE  -> isAssignee;
+                case ALL       -> isInitiator || isAssignee;
+            };
+            if (!allowed) {
+                throw new BusinessException(
+                        "Current user does not satisfy cc policy: " + policy.code());
+            }
+        } else if (!"AUTOMATION".equals(sourceType) && !"EVENT_POLICY".equals(sourceType)) {
+            throw new BusinessException("Authenticated user required for cc policy");
         }
 
-        // 4. Delegate fan-out + storage + read tracking to SmartEngine.
-        //    Use sendSingleNotification per receiver so we can set notification_type=cc
-        //    (the bulk sendNotification overload does not accept a type parameter).
-        for (Long receiverId : receiverUserIds) {
-            smartEngine.getNotificationCommandService().sendSingleNotification(
-                    processInstanceId,
-                    taskId,
-                    String.valueOf(currentUserIdLong),
-                    String.valueOf(receiverId),
-                    "$i18n:bpm.cc.inbox.title",
-                    comment != null ? comment : "",
-                    NotificationConstant.NotificationType.CC,
-                    tenantIdStr);
-        }
+        // 4. Fan out to the product-owned BPM notify store. Read state and the
+        //    TaskCenter inbox use this same table.
+        notifyService.sendCarbonCopy(
+                taskId,
+                processInstanceId,
+                currentUserIdLong,
+                receiverUserIds,
+                comment != null ? comment : "",
+                "$i18n:bpm.cc.inbox.title",
+                sourceType,
+                dedupKey);
 
         // 5. Audit (AuraBoot business semantic)
         auditService.auditProcessOperation(
@@ -176,7 +196,7 @@ public class CcService {
         );
 
         log.info("CC sent: instance={}, sender={}, receivers={}",
-                processInstanceId, currentUserId, receiverUserIds);
+                processInstanceId, currentUserIdLong, receiverUserIds);
     }
 
     private Long parseLongSafely(String s) {

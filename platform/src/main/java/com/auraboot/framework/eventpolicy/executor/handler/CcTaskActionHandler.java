@@ -97,7 +97,8 @@ public class CcTaskActionHandler implements ActionHandler {
         List<Long> targetUserIds = resolveUserTargets(plan, target, tenantId, modelCode, recordPid);
         if (taskId != null && !taskId.isBlank()) {
             try {
-                ccService.ccForUserIds(taskId, targetUserIds, message);
+                ccService.ccForUserIds(taskId, targetUserIds, message, "EVENT_POLICY",
+                        bpmDedupKey(plan, taskId, recordPid));
             } catch (RuntimeException e) {
                 throw ccFailure(plan, "cc_task_write_failed", target, targetUserIds, null,
                         modelCode, recordPid, taskId, "CC_TASK failed: " + ActionFailurePayload.messageOf(e), e);
@@ -319,6 +320,15 @@ public class CcTaskActionHandler implements ActionHandler {
                 "event_policy_cc_" + safe(plan.ruleCode()) + "_" + safe(recordPid) + "_"
                         + Integer.toHexString(title.hashCode()));
         return ActionClientIdSupport.fit(base + ":" + userId, CLIENT_ITEM_ID_MAX_LENGTH);
+    }
+
+    private static String bpmDedupKey(
+            ResolvedActionPlan plan, String taskId, String recordPid) {
+        String base = firstNonBlank(
+                plan.idempotencyKey(),
+                "event_policy_cc_" + safe(plan.ruleCode()) + "_" + safe(recordPid)
+                        + "_" + safe(taskId) + "_" + plan.order());
+        return base.length() > 160 ? base.substring(0, 160) : base;
     }
 
     private static String render(Object value, DecisionContext context) {

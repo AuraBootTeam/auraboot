@@ -21,8 +21,29 @@ public class BpmNotifyService {
 
     @Transactional
     public void sendCarbonCopy(String taskId, String processInstanceId, Long senderUserId, List<Long> recipientUserIds, String content) {
+        sendCarbonCopy(taskId, processInstanceId, senderUserId, recipientUserIds, content,
+                "$i18n:bpm.cc.inbox.title", "LEGACY", null);
+    }
+
+    @Transactional
+    public void sendCarbonCopy(
+            String taskId,
+            String processInstanceId,
+            Long senderUserId,
+            List<Long> recipientUserIds,
+            String content,
+            String title,
+            String sourceType,
+            String dedupKey) {
         Long tenantId = MetaContext.getCurrentTenantId();
         for (Long recipientId : recipientUserIds) {
+            String rowDedupKey = dedupKey == null || dedupKey.isBlank()
+                    ? null
+                    : dedupKey + ":" + recipientId;
+            if (rowDedupKey != null
+                    && notifyRecordMapper.findByDedupKey(tenantId, rowDedupKey) != null) {
+                continue;
+            }
             BpmNotifyRecord record = BpmNotifyRecord.builder()
                     .pid(UlidGenerator.generate())
                     .tenantId(tenantId)
@@ -31,7 +52,11 @@ public class BpmNotifyService {
                     .notifyType("CC")
                     .senderUserId(senderUserId)
                     .recipientUserId(recipientId)
+                    .title(title == null || title.isBlank() ? "$i18n:bpm.cc.inbox.title" : title)
                     .content(content)
+                    .sourceType(sourceType == null || sourceType.isBlank() ? "LEGACY" : sourceType)
+                    .sourceRef(processInstanceId)
+                    .dedupKey(rowDedupKey)
                     .isRead(false)
                     .deletedFlag(false)
                     .createdAt(Instant.now())

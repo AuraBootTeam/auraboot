@@ -2,6 +2,7 @@ package com.auraboot.framework.bpm.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.service.BpmNotifyService;
+import com.auraboot.framework.bpm.service.CcService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,20 +12,19 @@ import java.util.Map;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Deep-review finding (BpmNotify senderUserId spoofing, from the perm-004 triage).
  *
- * <p>cc/urge previously read {@code senderUserId} from the request body, so any authenticated
- * user could impersonate another as the notification sender. The sender must be the
- * authenticated caller ({@code MetaContext.getCurrentUserId()}).
+ * <p>CC must use the same policy-guarded application service as task API and
+ * automation CC. A body-supplied sender/process identity is never trusted.
  */
 class BpmNotifyControllerSenderIdentityTest {
 
     private final BpmNotifyService notifyService = mock(BpmNotifyService.class);
-    private final com.auraboot.framework.user.service.UserService userService =
-            mock(com.auraboot.framework.user.service.UserService.class);
-    private final BpmNotifyController controller = new BpmNotifyController(notifyService, userService);
+    private final CcService ccService = mock(CcService.class);
+    private final BpmNotifyController controller = new BpmNotifyController(notifyService, ccService);
 
     @AfterEach
     void tearDown() {
@@ -32,13 +32,9 @@ class BpmNotifyControllerSenderIdentityTest {
     }
 
     @Test
-    @DisplayName("sendCarbonCopy ignores a body-supplied senderUserId and uses the authenticated user")
-    void ccUsesAuthenticatedSender() {
+    @DisplayName("sendCarbonCopy delegates receiver pids to the guarded CC service")
+    void ccUsesPolicyGuardedCommandService() {
         MetaContext.setContext(1L, 42L, "pid-42", "alice");
-        com.auraboot.framework.user.dao.entity.User receiver = new com.auraboot.framework.user.dao.entity.User();
-        receiver.setId(7L);
-        receiver.setPid("pid-7");
-        org.mockito.Mockito.when(userService.findByPid("pid-7")).thenReturn(receiver);
 
         controller.sendCarbonCopy(Map.of(
                 "taskId", "t1",
@@ -47,9 +43,8 @@ class BpmNotifyControllerSenderIdentityTest {
                 "recipientUserIds", List.of("pid-7"), // pid strings (MemberPicker identity)
                 "content", "hi"));
 
-        // 42 (authenticated) is passed through, NOT 999 (forged body value);
-        // recipient pid resolved to the numeric id for the notification fan-out.
-        verify(notifyService).sendCarbonCopy("t1", "p1", 42L, List.of(7L), "hi");
+        verify(ccService).cc("t1", List.of("pid-7"), "hi", "UI");
+        verifyNoInteractions(notifyService);
     }
 
     @Test

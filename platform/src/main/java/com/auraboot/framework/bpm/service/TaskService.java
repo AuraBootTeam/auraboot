@@ -566,7 +566,7 @@ public class TaskService {
         }
     }
 
-    private boolean canCompleteTask(TaskInstance task, String userId) {
+    public boolean canCompleteTask(TaskInstance task, String userId) {
         // Claim exclusivity: once a candidate claims the task, only the claimer
         // may complete it. Other candidates stay in the assignee list but must
         // be refused — otherwise the claim is merely cosmetic (showcase S2.3).

@@ -16,4 +16,7 @@ public interface BpmNotifyRecordMapper extends BaseMapper<BpmNotifyRecord> {
 
     @Select("SELECT * FROM ab_bpm_notify_record WHERE pid = #{pid} AND deleted_flag = false")
     BpmNotifyRecord findByPid(@Param("pid") String pid);
+
+    @Select("SELECT * FROM ab_bpm_notify_record WHERE tenant_id = #{tenantId} AND dedup_key = #{dedupKey} AND deleted_flag = false")
+    BpmNotifyRecord findByDedupKey(@Param("tenantId") Long tenantId, @Param("dedupKey") String dedupKey);
 }

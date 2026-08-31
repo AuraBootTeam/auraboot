@@ -129,7 +129,8 @@ class CcTaskActionExecutorTest {
                 .containsEntry("taskId", "TASK-1")
                 .containsEntry("ccCount", 2);
         assertThat((List<Long>) result.get("targetUserIds")).containsExactly(51L, 52L);
-        verify(ccService).ccForUserIds("TASK-1", List.of(51L, 52L), "审批超时请关注");
+        verify(ccService).ccForUserIds("TASK-1", List.of(51L, 52L), "审批超时请关注",
+                "AUTOMATION", "automation_cc_AUTO-CC-TASK_REQ-2_TASK-1");
         verifyNoInteractions(inboxService);
     }
 

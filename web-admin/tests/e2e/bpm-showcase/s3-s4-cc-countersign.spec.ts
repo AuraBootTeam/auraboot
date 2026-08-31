@@ -17,7 +17,6 @@
  */
 
 import { test, expect, type APIRequestContext } from '../../fixtures';
-import { PSQL_BASE } from '../../helpers/environments';
 import {
   loginAsAdmin,
   startProcessInstance,
@@ -330,16 +329,10 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
       { timeout: 20_000 },
     );
 
-    // CcPolicy gate: a directly-assigned (unclaimed) task yields
-    // claimUserId=null, so the assignee arm of policy ALL does not match —
-    // claim first so bob becomes the policy-recognised handler. Noted as an
-    // observation: the UI dialog path (notify/cc) bypasses this policy gate.
-    const claimResp = await request.post(`/api/bpm/tasks/${task.taskId}/claim`, {
-      headers: { Authorization: `Bearer ${bobToken}` },
-    });
-    expect(claimResp.ok(), `claim: ${claimResp.status()}`).toBe(true);
+    // A directly-assigned but unclaimed task is recognized by the same task
+    // actor policy used for completion. No claim is required before CC.
 
-    // dave's numeric ab_user id (engine notification rows store numeric ids)
+    // dave's numeric ab_user id (business audit stores resolved numeric ids)
     const daveMe = await request.get('/api/auth/me', {
       headers: { Authorization: `Bearer ${daveToken}` },
     });
@@ -359,14 +352,8 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
       headers: { Authorization: `Bearer ${daveToken}` },
     });
     expect(received.ok()).toBe(true);
-    // FINDING #6 (storage split-brain, needs product decision): the task-level
-    // cc endpoint and automation/eventpolicy cc write SmartEngine's
-    // se_notification_instance, while the UI dialog path writes
-    // ab_bpm_notify_record — and the 抄送给我 inbox reads only the latter, so
-    // task-level/automation cc receivers never see the entry in the UI.
-    // This test asserts the task-level path's actual stores (audit row with
-    // resolved numeric receivers + engine notification row); unifying the
-    // stores so the inbox shows these entries is the pending product fix.
+    // Task-level CC now writes the same product store as UI/automation CC, so
+    // the received inbox is the authoritative storage assertion.
     const audits = await listAuditEvents(request, adminToken, instanceId);
     const ccAudit = audits.find((a) => a.operation === 'cc');
     expect(ccAudit, 'audit must record the cc execution').toBeTruthy();
@@ -378,13 +365,13 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
       'cc audit must list the resolved numeric receiver id',
     ).toBe(true);
 
-    const { execSync } = await import('node:child_process');
-    const engineRow = execSync(
-      `${PSQL_BASE} -t -c "SELECT count(*) FROM se_notification_instance ` +
-        `WHERE process_instance_id='${instanceId}' AND notification_type='cc'"`,
-    ).toString().trim();
-    expect(Number(engineRow), 'engine notification row must exist for the cc').toBeGreaterThan(0);
-    void received;
+    const receivedBody = await received.json();
+    const receivedRecords = (receivedBody?.data ?? []) as Array<Record<string, unknown>>;
+    const ccContent = `S3.2 pid-path cc ${businessKey}`;
+    expect(
+      receivedRecords.some((record) => record.content === ccContent),
+      `task-level cc must be visible in the product inbox: ${JSON.stringify(receivedRecords).slice(0, 300)}`,
+    ).toBe(true);
 
     // fail-fast: an unknown pid must be refused, not silently dropped
     const bad = await request.post(`/api/bpm/tasks/${task.taskId}/cc`, {
