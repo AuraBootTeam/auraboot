@@ -29,12 +29,12 @@ export const FLAT_PAGE_SCHEMA_VERSION = 4;
 const DESIGNER_ONLY_BLOCK_TYPES = new Set([
   'form',
   'dashboard',
-  'repeater',
-  'subform',
 ]);
 
 /** Block types serialized generically: props + nested blocks pass through unchanged. */
 const PASSTHROUGH_BLOCK_TYPES = new Set([
+  'repeater',
+  'subform',
   'ai-fill-banner',
   'sub-table',
   'embedded-list',
