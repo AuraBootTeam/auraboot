@@ -72,8 +72,9 @@ class WorkbenchIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void getOrCreateWorkbench_composesPublishedGlobalContributionsWithoutPersistingThem() {
-        String code = "workbench_it_" + UUID.randomUUID().toString().replace("-", "");
+    void getOrCreateWorkbench_composesOnlyPublishedGlobalContributionsWithoutPersistingThem() {
+        String code = "workbench_it_"
+                + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         String expectedWidgetId = "workbench-contribution-" + code + "-trend";
         jdbc.update("""
                 INSERT INTO ab_dashboard (
@@ -88,11 +89,15 @@ class WorkbenchIntegrationTest extends BaseIntegrationTest {
                     '{"workbenchContribution":{"enabled":true}}'::jsonb,
                     FALSE, NOW(), NOW(), ?, ?
                 )
-                """, UUID.randomUUID().toString(), getTestTenant().getId(), code,
-                getTestUser().getPid(), getTestUser().getPid());
+                """, UUID.randomUUID().toString().replace("-", "").substring(0, 26),
+                getTestTenant().getId(), code,
+                getTestUser().getPid().substring(0, 26), getTestUser().getPid().substring(0, 26));
 
         DashboardDTO composed = dashboardService.getOrCreateWorkbench();
 
+        assertThat(composed.getWidgets())
+                .noneSatisfy(widget -> assertThat(widget.path("type").asText())
+                        .isIn("StatsRowWidget", "InboxWidget", "ShortcutsWidget", "RecentWidget"));
         assertThat(composed.getWidgets())
                 .anySatisfy(widget -> assertThat(widget.path("id").asText()).isEqualTo(expectedWidgetId));
 

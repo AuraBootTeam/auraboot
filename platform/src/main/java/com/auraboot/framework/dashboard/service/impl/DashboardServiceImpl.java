@@ -558,7 +558,8 @@ public class DashboardServiceImpl implements DashboardService {
         // Try to find existing workbench
         Dashboard existing = dashboardMapper.findWorkbench(tenantId, currentUserPid);
         if (existing != null) {
-            return composeWorkbenchContributions(toDTO(existing), tenantId);
+            return composeWorkbenchContributions(toDTO(existing),
+                    dashboardMapper.findWorkbenchContributions(tenantId));
         }
 
         // Create from template
@@ -573,7 +574,11 @@ public class DashboardServiceImpl implements DashboardService {
         workbench.setScope(WORKBENCH_SCOPE);
         workbench.setOwnerId(currentUserPid);
         workbench.setLayoutConfig(WorkbenchTemplateProvider.getDefaultLayoutConfig(objectMapper));
-        workbench.setWidgets(WorkbenchTemplateProvider.getDefaultWidgets(objectMapper));
+        List<Dashboard> contributions = dashboardMapper.findWorkbenchContributions(tenantId);
+        boolean hasContributions = contributions != null && !contributions.isEmpty();
+        workbench.setWidgets(hasContributions
+                ? objectMapper.createArrayNode()
+                : WorkbenchTemplateProvider.getDefaultWidgets(objectMapper));
         workbench.setStatus(StatusConstants.PUBLISHED);
         workbench.setIsDefault(false);
         workbench.setSortOrder(0);
@@ -586,11 +591,12 @@ public class DashboardServiceImpl implements DashboardService {
         dashboardMapper.insertDashboard(workbench);
 
         log.info("Workbench created: pid={}", workbench.getPid());
-        return composeWorkbenchContributions(toDTO(workbench), tenantId);
+        return composeWorkbenchContributions(toDTO(workbench), contributions);
     }
 
-    private DashboardDTO composeWorkbenchContributions(DashboardDTO workbench, Long tenantId) {
-        List<Dashboard> contributions = dashboardMapper.findWorkbenchContributions(tenantId);
+    private DashboardDTO composeWorkbenchContributions(
+            DashboardDTO workbench,
+            List<Dashboard> contributions) {
         if (contributions == null || contributions.isEmpty()) {
             return workbench;
         }
