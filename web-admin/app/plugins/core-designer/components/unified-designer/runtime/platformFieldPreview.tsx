@@ -141,12 +141,12 @@ function normalizeCode(value: unknown): string {
  */
 export function resolvePickerPlatformComponent(
   props: Record<string, unknown>,
-  modelField: ModelFieldDefinition,
+  modelField?: ModelFieldDefinition,
 ): string {
-  const extension = (modelField.extensionProps ?? {}) as Record<string, unknown>;
+  const extension = (modelField?.extensionProps ?? {}) as Record<string, unknown>;
   const refTarget = {
     ...((extension.refTarget as Record<string, unknown> | undefined) ?? {}),
-    ...((modelField.refTarget as Record<string, unknown> | undefined) ?? {}),
+    ...((modelField?.refTarget as Record<string, unknown> | undefined) ?? {}),
   };
   const targetModel = normalizeCode(
     refTarget.modelCode ?? refTarget.targetModel ?? props.pickerSource,
@@ -197,13 +197,13 @@ export const DesignerModelFieldsContext = React.createContext<ModelFieldDefiniti
 /** Build a platform {@link FieldConfig} from a designer block + resolved model field. */
 export function buildPreviewFieldConfig(
   block: DslBlockV3,
-  modelField: ModelFieldDefinition,
+  modelField?: ModelFieldDefinition,
 ): FieldConfig {
   const blockProps = (block.props ?? {}) as Record<string, unknown>;
-  const extensionProps = modelField.extensionProps ?? {};
+  const extensionProps = (modelField?.extensionProps ?? {}) as Record<string, unknown>;
   const merged: Record<string, unknown> = {
     ...extensionProps,
-    ...(modelField.refTarget ? { refTarget: modelField.refTarget } : {}),
+    ...(modelField?.refTarget ? { refTarget: modelField.refTarget } : {}),
     ...blockProps,
   };
   // Component-facing props only: strip FieldConfig top-level keys so they are not spread
@@ -224,16 +224,16 @@ export function buildPreviewFieldConfig(
   const required =
     typeof blockProps.required === 'boolean'
       ? (blockProps.required as boolean)
-      : Boolean(modelField.required);
+      : Boolean(modelField?.required);
   const visibleWhen = blockProps.visibleWhen ?? extensionProps.visibleWhen;
-  const rawDataType = (blockProps.dataType as string | undefined) ?? modelField.type;
+  const rawDataType = (blockProps.dataType as string | undefined) ?? modelField?.type;
   // Relation-ish dataTypes are normalized to `reference` so the platform's reference
   // option data source engages (see REFERENCE_LIKE_DATA_TYPES).
   const dataType =
     rawDataType && REFERENCE_LIKE_DATA_TYPES.has(rawDataType.toLowerCase())
       ? 'reference'
       : rawDataType;
-  const explicitComponent = (blockProps.component as string | undefined) ?? modelField.component;
+  const explicitComponent = (blockProps.component as string | undefined) ?? modelField?.component;
   const designerComponent = normalizeCode(explicitComponent);
   const component =
     designerComponent === 'picker'
@@ -242,11 +242,11 @@ export function buildPreviewFieldConfig(
         explicitComponent ??
         (dataType ? PREVIEW_DATA_TYPE_COMPONENT[dataType.toLowerCase()] : undefined));
   return {
-    field: block.field ?? modelField.code,
-    label: (blockProps.label ?? block.title ?? modelField.label) as FieldConfig['label'],
+    field: block.field ?? modelField?.code ?? block.id,
+    label: (blockProps.label ?? block.title ?? modelField?.label) as FieldConfig['label'],
     component,
     type: dataType,
-    dictCode: (blockProps.dictCode as string | undefined) ?? modelField.dictCode,
+    dictCode: (blockProps.dictCode as string | undefined) ?? modelField?.dictCode,
     required,
     ...(visibleWhen != null ? { visibleWhen } : {}),
     props: componentProps,
