@@ -73,6 +73,7 @@ const quoteOpsCurrentSpecNames = [
   // gate went green WITHOUT running them — they must be in this list to actually run.
   'role-capability-closed-loop',
   'quote-bom-role-menu-smoke',
+  'quote-surface-permission-release',
   'bom-workbench-role-eng-golden',
   'quote-role-sales-golden',
   'quote-role-proc-golden',
