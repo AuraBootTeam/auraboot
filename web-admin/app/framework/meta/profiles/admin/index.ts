@@ -96,6 +96,16 @@ const CustomBlockRenderer = ({ block, runtime }: BlockRendererProps) => {
     props: { block, runtime },
   });
 };
+const RepeaterBlockRenderer = React.lazy(() =>
+  import('~/framework/meta/rendering/blocks/RepeaterBlockRenderer').then((m) => ({
+    default: m.RepeaterBlockRenderer,
+  })),
+);
+const SubformBlockRenderer = React.lazy(() =>
+  import('~/framework/meta/rendering/blocks/SubformBlockRenderer').then((m) => ({
+    default: m.SubformBlockRenderer,
+  })),
+);
 // Skeletons stay static — they're tiny and shown during lazy loading
 import { ListPageSkeleton } from '~/framework/meta/rendering/skeletons/ListPageSkeleton';
 import { FormPageSkeleton } from '~/framework/meta/rendering/skeletons/FormPageSkeleton';
@@ -124,6 +134,8 @@ const adminProfile: RenderProfile = {
     'stat-card',
     'selection-info',
     'custom',
+    'repeater',
+    'subform',
   ],
 
   blockRenderers: new Map<string, any>([
@@ -143,6 +155,8 @@ const adminProfile: RenderProfile = {
     ['selection-info', SelectionInfoBlockRenderer],
     ['tabs', TabsBlockRenderer],
     ['custom', CustomBlockRenderer],
+    ['repeater', RepeaterBlockRenderer],
+    ['subform', SubformBlockRenderer],
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 
