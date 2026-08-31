@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Converts frontend BPMN designer JSON to BPMN 2.0 XML for SmartEngine deployment.
@@ -155,13 +156,17 @@ public class JsonToBpmnConverter {
         // emits nothing so existing BPMN stays byte-identical for processes without policies.
         writeProcessAuraExtensionElements(writer, processAura);
 
-        // Validate exclusive gateway outgoing flows (each must have a condition or be marked default;
-        // at most one default per gateway). Fail fast before writing invalid BPMN.
+        // Validate gateway outgoing flows. Exclusive flows each need a condition
+        // (SmartEngine's engine-level safety contract); inclusive forks must always
+        // declare exactly one default so zero conditional matches remains defined.
         validateExclusiveGatewayFlows(nodes, edges);
+        validateInclusiveGatewayDefaultFlow(nodes, edges);
 
         // Collect default flow IDs for gateways to set the "default" attribute later.
         // We need to pre-process to find which gateway has which default flow.
         Map<String, String> gatewayDefaultFlows = collectGatewayDefaultFlows(nodes, edges);
+        Set<String> inclusiveDefaultFlowIds =
+                collectInclusiveGatewayDefaultFlowIds(nodes, gatewayDefaultFlows);
 
         // Write all nodes
         if (nodes.isArray()) {
@@ -173,7 +178,7 @@ public class JsonToBpmnConverter {
         // Write all edges (sequence flows)
         if (edges.isArray()) {
             for (JsonNode edge : edges) {
-                writeSequenceFlow(writer, edge);
+                writeSequenceFlow(writer, edge, inclusiveDefaultFlowIds);
             }
         }
 
@@ -232,6 +237,27 @@ public class JsonToBpmnConverter {
     }
 
     /**
+     * SmartEngine 4.0.x evaluates every outgoing transition before falling back
+     * to the {@code default=} property. A default edge without a condition would
+     * therefore fail sequence-flow matching before the fallback is reached. Give
+     * designer-authored inclusive defaults an always-false expression so the
+     * fallback remains authoritative while retaining a natural no-condition UI.
+     */
+    private Set<String> collectInclusiveGatewayDefaultFlowIds(
+            JsonNode nodes, Map<String, String> gatewayDefaultFlows) {
+        Set<String> result = new java.util.HashSet<>();
+        if (!nodes.isArray()) return result;
+        for (JsonNode node : nodes) {
+            if (!"inclusiveGateway".equals(getNodeType(node))) continue;
+            String defaultFlowId = gatewayDefaultFlows.get(node.path("id").asText());
+            if (defaultFlowId != null && !defaultFlowId.isBlank()) {
+                result.add(defaultFlowId);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Validate that every exclusive gateway's outgoing sequence flows satisfy:
      * (a) at most one flow marked as default (via edge.data.isDefault or gateway config defaultFlow/Id);
      * (b) <strong>every</strong> outgoing flow has a non-empty conditionExpression content,
@@ -282,6 +308,77 @@ public class JsonToBpmnConverter {
                                     + "carry an evaluable expression — SmartEngine does not honor BPMN "
                                     + "default-flow fallback)");
                 }
+            }
+        }
+    }
+
+    /**
+     * Validate that every inclusive fork (an inclusive gateway with more than one
+     * outgoing flow) has exactly one resolvable default flow. Inclusive joins have
+     * one outgoing flow and therefore do not select a fallback.
+     *
+     * <p>The default may be declared by gateway config or by edge {@code isDefault}.
+     * Its condition, if any, is still emitted for round-trip fidelity, but runtime
+     * treats it as the fallback when no conditional flow matches.
+     */
+    private void validateInclusiveGatewayDefaultFlow(JsonNode nodes, JsonNode edges) {
+        if (!nodes.isArray() || !edges.isArray()) return;
+
+        for (JsonNode node : nodes) {
+            if (!"inclusiveGateway".equals(getNodeType(node))) continue;
+
+            List<JsonNode> outgoing = new ArrayList<>();
+            for (JsonNode edge : edges) {
+                if (node.path("id").asText().equals(edge.path("source").asText())) {
+                    outgoing.add(edge);
+                }
+            }
+            if (outgoing.size() <= 1) continue;
+
+            String gatewayId = node.path("id").asText();
+            JsonNode config = node.path("data").path("config");
+            String configuredDefault = getTextOrNull(config, "defaultFlow");
+            if (configuredDefault == null) {
+                configuredDefault = getTextOrNull(config, "defaultFlowId");
+            }
+
+            List<String> flaggedDefaults = outgoing.stream()
+                    .filter(edge -> edge.path("data").path("isDefault").asBoolean(false))
+                    .map(edge -> edge.path("id").asText())
+                    .toList();
+
+            if (configuredDefault != null
+                    && !flaggedDefaults.isEmpty()
+                    && !List.of(flaggedDefaults).contains(configuredDefault)) {
+                throw new BpmnConversionException(
+                        "Inclusive gateway '" + gatewayId + "' has conflicting default flows: '"
+                                + configuredDefault + "' and " + flaggedDefaults);
+            }
+            if (configuredDefault != null && flaggedDefaults.size() > 1) {
+                throw new BpmnConversionException(
+                        "Inclusive gateway '" + gatewayId + "' has multiple default flows: "
+                                + flaggedDefaults);
+            }
+            if (configuredDefault == null && flaggedDefaults.size() > 1) {
+                throw new BpmnConversionException(
+                        "Inclusive gateway '" + gatewayId + "' has multiple default flows: "
+                                + flaggedDefaults);
+            }
+            String defaultFlowId = configuredDefault != null
+                    ? configuredDefault
+                    : flaggedDefaults.isEmpty() ? null : flaggedDefaults.getFirst();
+            if (defaultFlowId == null) {
+                throw new BpmnConversionException(
+                        "Inclusive gateway '" + gatewayId + "' must declare exactly one default "
+                                + "sequence flow; no default fallback exists when all conditional "
+                                + "flows evaluate false");
+            }
+            boolean defaultIsOutgoing = outgoing.stream()
+                    .anyMatch(edge -> defaultFlowId.equals(edge.path("id").asText()));
+            if (!defaultIsOutgoing) {
+                throw new BpmnConversionException(
+                        "Inclusive gateway '" + gatewayId + "' references missing outgoing "
+                                + "default flow '" + defaultFlowId + "'");
             }
         }
     }
@@ -1273,11 +1370,29 @@ public class JsonToBpmnConverter {
 
     // ==================== Sequence Flow Writer ====================
 
-    private void writeSequenceFlow(XMLStreamWriter writer, JsonNode edge) throws XMLStreamException {
+    private void writeSequenceFlow(
+            XMLStreamWriter writer,
+            JsonNode edge,
+            Set<String> inclusiveDefaultFlowIds) throws XMLStreamException {
         String edgeId = edge.path("id").asText();
         String sourceRef = edge.path("source").asText();
         String targetRef = edge.path("target").asText();
         JsonNode edgeData = edge.path("data");
+        if (inclusiveDefaultFlowIds.contains(edgeId)
+                && (edgeData.path("condition").isMissingNode()
+                        || edgeData.path("condition").isNull())
+                && getTextOrNull(edgeData, "conditionExpression") == null) {
+            com.fasterxml.jackson.databind.node.ObjectNode editableData =
+                    edgeData instanceof com.fasterxml.jackson.databind.node.ObjectNode objectNode
+                            ? objectNode
+                            : edgeData.deepCopy();
+            if (!editableData.has("condition")) {
+                editableData.putObject("condition")
+                        .put("type", "expression")
+                        .put("content", "false");
+            }
+            edgeData = editableData;
+        }
         String label = getTextOrNull(edgeData, "label");
 
         // Check if this edge has a condition expression

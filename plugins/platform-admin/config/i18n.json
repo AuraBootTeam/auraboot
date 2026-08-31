@@ -687,6 +687,8 @@
   { "key": "bpmn.gateway.defaultFlow", "zh-CN": "默认流向", "en-US": "Default Flow", "source": "import", "refType": "ui" },
   { "key": "bpmn.gateway.noDefaultFlow", "zh-CN": "-- 无默认流向 --", "en-US": "-- No default flow --", "source": "import", "refType": "ui" },
   { "key": "bpmn.gateway.defaultFlowHint", "zh-CN": "当所有条件均不满足时，流程将沿默认流向继续", "en-US": "When no condition is met, the process continues along the default flow", "source": "import", "refType": "ui" },
+  { "key": "bpmn.gateway.requiredDefaultFlow", "zh-CN": "-- 请选择必选默认流向 --", "en-US": "-- Select required default flow --", "source": "import", "refType": "ui" },
+  { "key": "bpmn.gateway.requiredDefaultFlowHint", "zh-CN": "包容网关必须设置默认流向；所有条件都不满足时走此流向", "en-US": "Inclusive gateways require a default flow; it is used when no condition matches", "source": "import", "refType": "ui" },
   { "key": "bpmn.gateway.defaultFlowTag", "zh-CN": "(默认流向)", "en-US": "(Default flow)", "source": "import", "refType": "ui" },
   { "key": "bpmn.gateway.outgoingConditions", "zh-CN": "出口条件", "en-US": "Outgoing Conditions", "source": "import", "refType": "ui" },
   { "key": "bpmn.gateway.noConditionSet", "zh-CN": "未设置条件", "en-US": "No condition set", "source": "import", "refType": "ui" },

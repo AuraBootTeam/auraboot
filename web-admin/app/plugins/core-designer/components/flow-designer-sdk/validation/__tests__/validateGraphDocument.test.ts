@@ -36,6 +36,69 @@ function makeValidAutomationDoc() {
   };
 }
 
+function makeInclusiveDoc(edgeData: Array<Record<string, unknown> | undefined>) {
+  return {
+    schemaVersion: '1.0',
+    kind: 'bpmn',
+    meta: { key: 'inclusive-001', name: 'Inclusive Process' },
+    nodes: [
+      {
+        id: 's1',
+        type: 'startEvent',
+        position: { x: 0, y: 0 },
+        data: { label: 'Start', config: {} },
+      },
+      {
+        id: 'ig1',
+        type: 'inclusiveGateway',
+        position: { x: 100, y: 0 },
+        data: { label: 'Route', config: {} },
+      },
+      {
+        id: 'u1',
+        type: 'userTask',
+        position: { x: 200, y: -50 },
+        data: { label: 'High', config: {} },
+      },
+      {
+        id: 'u2',
+        type: 'userTask',
+        position: { x: 200, y: 50 },
+        data: { label: 'Fallback', config: {} },
+      },
+      {
+        id: 'end1',
+        type: 'endEvent',
+        position: { x: 300, y: 0 },
+        data: { label: 'End', config: {} },
+      },
+    ],
+    edges: [
+      { id: 'e0', source: 's1', target: 'ig1' },
+      {
+        id: 'e1',
+        source: 'ig1',
+        target: 'u1',
+        data: {
+          condition: { type: 'expression', content: 'amount > 100' },
+          ...edgeData[0],
+        },
+      },
+      {
+        id: 'e2',
+        source: 'ig1',
+        target: 'u2',
+        data: {
+          condition: { type: 'expression', content: 'amount < 0' },
+          ...edgeData[1],
+        },
+      },
+      { id: 'e3', source: 'u1', target: 'end1' },
+      { id: 'e4', source: 'u2', target: 'end1' },
+    ],
+  };
+}
+
 describe('validateGraphDocument — happy path', () => {
   it('accepts a minimal valid automation document', () => {
     const result = validateGraphDocument(makeValidAutomationDoc());
@@ -230,6 +293,36 @@ describe('validateGraphDocument — semantic rules (spec §6)', () => {
     expect(result.valid).toBe(false);
     expect(
       result.errors.some((e) => e.code === 'GRAPH-SEMANTIC.GATEWAY_MULTIPLE_DEFAULTS'),
+    ).toBe(true);
+  });
+
+  it('requires an inclusive fork to declare a default flow', () => {
+    const result = validateGraphDocument(makeInclusiveDoc([undefined, undefined]));
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some(
+        (e) => e.code === 'GRAPH-SEMANTIC.INCLUSIVE_GATEWAY_REQUIRES_DEFAULT',
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts an inclusive fork with exactly one default flow', () => {
+    const result = validateGraphDocument(
+      makeInclusiveDoc([undefined, { isDefault: true }]),
+    );
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects an inclusive configured default that is not outgoing', () => {
+    const doc = makeInclusiveDoc([undefined, { isDefault: true }]);
+    (doc.nodes[1].data.config as any).defaultFlow = 'missing';
+    const result = validateGraphDocument(doc);
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some(
+        (e) => e.code === 'GRAPH-SEMANTIC.INCLUSIVE_GATEWAY_DEFAULT_NOT_FOUND',
+      ),
     ).toBe(true);
   });
 });

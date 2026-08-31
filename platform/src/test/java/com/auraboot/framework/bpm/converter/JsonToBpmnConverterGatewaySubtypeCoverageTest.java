@@ -134,7 +134,7 @@ class JsonToBpmnConverterGatewaySubtypeCoverageTest {
                   "edges": [
                     {"id": "e1", "source": "start", "target": "fork", "data": {}},
                     {"id": "e2", "source": "fork", "target": "taskA", "data": {"conditionExpression": "${amount > 100}"}},
-                    {"id": "e3", "source": "fork", "target": "taskB", "data": {"conditionExpression": "${urgent == true}"}},
+                    {"id": "e3", "source": "fork", "target": "taskB", "data": {"conditionExpression": "${urgent == true}", "isDefault": true}},
                     {"id": "e4", "source": "taskA", "target": "join", "data": {}},
                     {"id": "e5", "source": "taskB", "target": "join", "data": {}},
                     {"id": "e6", "source": "join", "target": "end", "data": {}}
@@ -149,6 +149,65 @@ class JsonToBpmnConverterGatewaySubtypeCoverageTest {
             assertTrue(xml.contains("id=\"join\""), "Should contain join gateway id. XML: " + xml);
             assertTrue(xml.contains("name=\"Fork\""));
             assertTrue(xml.contains("name=\"Join\""));
+        }
+
+        @Test
+        @DisplayName("missing default on an inclusive fork should fail conversion")
+        void shouldRejectInclusiveForkWithoutDefault() {
+            String json = """
+                {
+                  "key": "inclusive-missing-default",
+                  "name": "Inclusive Missing Default",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "data": {"type": "startEvent"}},
+                    {"id": "ig", "type": "inclusiveGateway", "data": {"type": "inclusiveGateway", "config": {}}},
+                    {"id": "t1", "type": "userTask", "data": {"type": "userTask", "label": "T1", "config": {}}},
+                    {"id": "t2", "type": "userTask", "data": {"type": "userTask", "label": "T2", "config": {}}},
+                    {"id": "end", "type": "endEvent", "data": {"type": "endEvent"}}
+                  ],
+                  "edges": [
+                    {"id": "in1", "source": "start", "target": "ig", "data": {}},
+                    {"id": "out1", "source": "ig", "target": "t1", "data": {"conditionExpression": "${score > 80}"}},
+                    {"id": "out2", "source": "ig", "target": "t2", "data": {"conditionExpression": "${score < 20}"}},
+                    {"id": "f1", "source": "t1", "target": "end", "data": {}},
+                    {"id": "f2", "source": "t2", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            BpmnConversionException ex = assertThrows(
+                    BpmnConversionException.class, () -> jsonToBpmn.convert(json));
+            assertTrue(ex.getMessage().contains("Inclusive gateway"), ex.getMessage());
+            assertTrue(ex.getMessage().contains("exactly one default"), ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("configured default must reference an outgoing edge")
+        void shouldRejectUnknownConfiguredDefault() {
+            String json = """
+                {
+                  "key": "inclusive-bad-default",
+                  "name": "Inclusive Bad Default",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "data": {"type": "startEvent"}},
+                    {"id": "ig", "type": "inclusiveGateway", "data": {"type": "inclusiveGateway", "config": {"defaultFlow": "missing"}}},
+                    {"id": "t1", "type": "userTask", "data": {"type": "userTask", "label": "T1", "config": {}}},
+                    {"id": "t2", "type": "userTask", "data": {"type": "userTask", "label": "T2", "config": {}}},
+                    {"id": "end", "type": "endEvent", "data": {"type": "endEvent"}}
+                  ],
+                  "edges": [
+                    {"id": "in1", "source": "start", "target": "ig", "data": {}},
+                    {"id": "out1", "source": "ig", "target": "t1", "data": {"conditionExpression": "${score > 80}"}},
+                    {"id": "out2", "source": "ig", "target": "t2", "data": {}},
+                    {"id": "f1", "source": "t1", "target": "end", "data": {}},
+                    {"id": "f2", "source": "t2", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            BpmnConversionException ex = assertThrows(
+                    BpmnConversionException.class, () -> jsonToBpmn.convert(json));
+            assertTrue(ex.getMessage().contains("missing outgoing default flow"), ex.getMessage());
         }
 
         @Test
@@ -179,6 +238,9 @@ class JsonToBpmnConverterGatewaySubtypeCoverageTest {
 
             assertTrue(xml.contains("inclusiveGateway"), "XML: " + xml);
             assertTrue(xml.contains("default=\"out2\""), "Should emit default flow attribute from edge flag. XML: " + xml);
+            assertTrue(
+                    xml.contains("<![CDATA[false]]>") || xml.contains(">false<"),
+                    "Engine-compatible inclusive default should have an always-false condition. XML: " + xml);
         }
     }
 

@@ -89,6 +89,7 @@ function ajvErrorToMessage(err: ErrorObject): string {
 interface NodeShape {
   id: string;
   type: string;
+  data?: { config?: { defaultFlow?: unknown; defaultFlowId?: unknown } };
 }
 interface EdgeShape {
   id: string;
@@ -182,11 +183,18 @@ function runSemanticChecks(
   for (const g of gateways) {
     const outs = edges.filter((e) => e.source === g.id);
     if (outs.length === 0) continue;
-    let defaultCount = 0;
+    const defaultIds = new Set<string>();
+    const configuredDefault =
+      g.data?.config && typeof g.data.config.defaultFlow === 'string'
+        ? g.data.config.defaultFlow
+        : g.data?.config && typeof g.data.config.defaultFlowId === 'string'
+          ? g.data.config.defaultFlowId
+          : undefined;
+    if (configuredDefault) defaultIds.add(configuredDefault);
     for (const out of outs) {
       const hasCondition = !!(out.data && out.data.condition);
       const isDefault = !!(out.data && out.data.isDefault);
-      if (isDefault) defaultCount += 1;
+      if (isDefault) defaultIds.add(out.id);
       if (!hasCondition && !isDefault) {
         errors.push({
           code: 'GRAPH-SEMANTIC.GATEWAY_EDGE_MISSING_CONDITION',
@@ -196,10 +204,37 @@ function runSemanticChecks(
         });
       }
     }
-    if (defaultCount > 1) {
+    if (defaultIds.size > 1) {
       errors.push({
         code: 'GRAPH-SEMANTIC.GATEWAY_MULTIPLE_DEFAULTS',
-        message: `Gateway ${g.id} has ${defaultCount} default out-edges; at most 1 allowed (spec §6.4)`,
+        message: `Gateway ${g.id} has ${defaultIds.size} default out-edges; at most 1 allowed (spec §6.4)`,
+        nodeId: g.id,
+      });
+    }
+
+    // Inclusive forks must define the zero-match outcome. A join (one outgoing
+    // edge) does not choose a fallback and is intentionally excluded.
+    if (
+      kind === 'bpmn' &&
+      g.type === 'inclusiveGateway' &&
+      outs.length > 1 &&
+      defaultIds.size === 0
+    ) {
+      errors.push({
+        code: 'GRAPH-SEMANTIC.INCLUSIVE_GATEWAY_REQUIRES_DEFAULT',
+        message: `Inclusive gateway ${g.id} must declare exactly one default flow (zero-match fallback)`,
+        nodeId: g.id,
+      });
+    }
+    if (
+      kind === 'bpmn' &&
+      g.type === 'inclusiveGateway' &&
+      configuredDefault &&
+      !outs.some((out) => out.id === configuredDefault)
+    ) {
+      errors.push({
+        code: 'GRAPH-SEMANTIC.INCLUSIVE_GATEWAY_DEFAULT_NOT_FOUND',
+        message: `Gateway ${g.id} default flow ${configuredDefault} is not an outgoing edge`,
         nodeId: g.id,
       });
     }
