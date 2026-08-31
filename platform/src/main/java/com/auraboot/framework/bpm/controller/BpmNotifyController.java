@@ -16,15 +16,11 @@ import java.util.Map;
 public class BpmNotifyController {
 
     private final BpmNotifyService notifyService;
-    private final com.auraboot.framework.user.service.UserService userService;
+    private final com.auraboot.framework.bpm.service.CcService ccService;
 
     @PostMapping("/cc")
     public ApiResponse<Void> sendCarbonCopy(@RequestBody Map<String, Object> request) {
         String taskId = (String) request.get("taskId");
-        String processInstanceId = (String) request.get("processInstanceId");
-        // Sender is the authenticated caller — never trust a body-supplied senderUserId
-        // (that let any user impersonate another when sending CC notifications).
-        Long senderUserId = MetaContext.getCurrentUserId();
         // Recipients arrive as ab_user pid strings (the MemberPicker identity).
         // The legacy `Number(pid)`-on-the-frontend contract produced NaN → JSON
         // null → NPE here; resolve pids server-side and fail fast on unknown ones.
@@ -32,19 +28,12 @@ public class BpmNotifyController {
         if (!(rawRecipients instanceof List<?> rawList) || rawList.isEmpty()) {
             throw new IllegalArgumentException("recipientUserIds must be a non-empty list of user pids");
         }
-        List<Long> recipientUserIds = rawList.stream()
-                .map(String::valueOf)
-                .map(pid -> {
-                    com.auraboot.framework.user.dao.entity.User user = userService.findByPid(pid);
-                    if (user == null || user.getId() == null) {
-                        throw new IllegalArgumentException("Unknown recipient user pid: " + pid);
-                    }
-                    return user.getId();
-                })
-                .toList();
         String content = (String) request.getOrDefault("content", "");
 
-        notifyService.sendCarbonCopy(taskId, processInstanceId, senderUserId, recipientUserIds, content);
+        // UI CC goes through the same policy-guarded command service as task
+        // API and automation CC. Resolve the process instance from the task;
+        // a body-supplied instance ID is never trusted.
+        ccService.cc(taskId, rawList.stream().map(String::valueOf).toList(), content, "UI");
         return ApiResponse.ok();
     }
 

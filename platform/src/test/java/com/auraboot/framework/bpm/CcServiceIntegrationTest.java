@@ -1,114 +1,123 @@
 package com.auraboot.framework.bpm;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.entity.BpmNotifyRecord;
+import com.auraboot.framework.bpm.mapper.BpmNotifyRecordMapper;
 import com.auraboot.framework.bpm.model.CcPolicy;
 import com.auraboot.framework.bpm.service.CcService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.smart.framework.engine.SmartEngine;
-import com.auraboot.smart.framework.engine.constant.NotificationConstant;
-import com.auraboot.smart.framework.engine.model.instance.NotificationInstance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DisplayName("CcService (SmartEngine notification backend)")
+@DisplayName("CcService (AuraBoot BPM notify store)")
 class CcServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private CcService ccService;
     @Autowired private TestBpmFixture fixture;
     @Autowired private SmartEngine smartEngine;
+    @Autowired private BpmNotifyRecordMapper notifyRecordMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("Policy=all, initiator sends cc: SmartEngine stores 2 notifications with type=cc")
+    @DisplayName("Policy=all, initiator sends cc: AuraBoot stores one notify row per receiver")
     void allPolicyInitiatorCc() {
         var setup = fixture.startProcess("cc-all-initiator", CcPolicy.ALL);
 
         ccService.ccForUserIds(setup.taskId(), List.of(501L, 502L), "please be aware");
 
-        List<NotificationInstance> r501 = smartEngine.createNotificationQuery()
-                .receiverUserId("501")
-                .notificationType(NotificationConstant.NotificationType.CC)
-                .listPage(0, 10);
-        List<NotificationInstance> r502 = smartEngine.createNotificationQuery()
-                .receiverUserId("502")
-                .notificationType(NotificationConstant.NotificationType.CC)
-                .listPage(0, 10);
-
+        List<BpmNotifyRecord> r501 = notifyRecords(setup, 501L);
+        List<BpmNotifyRecord> r502 = notifyRecords(setup, 502L);
         assertThat(r501).hasSize(1);
-        assertThat(r501.get(0).getProcessInstanceId()).isEqualTo(setup.instanceId());
-        assertThat(r501.get(0).getContent()).isEqualTo("please be aware");
-        assertThat(r501.get(0).getReadStatus()).isEqualTo(NotificationConstant.ReadStatus.UNREAD);
+        assertThat(r501.getFirst().getProcessInstanceId()).isEqualTo(setup.instanceId());
+        assertThat(r501.getFirst().getContent()).isEqualTo("please be aware");
+        assertThat(r501.getFirst().getIsRead()).isFalse();
+        assertThat(r501.getFirst().getSourceType()).isEqualTo("AUTOMATION");
         assertThat(r502).hasSize(1);
     }
 
     @Test
-    @DisplayName("Policy=all, assignee sends cc: accepted")
+    @DisplayName("Policy=all, claimed assignee sends cc: accepted")
     void allPolicyAssigneeCc() {
         var setup = fixture.startProcess("cc-all-assignee-pos", CcPolicy.ALL);
-
-        // Claim the task as user 888 so task.claimUserId == "888"
         smartEngine.getTaskCommandService().claim(
                 setup.taskId(), "888", MetaContext.getCurrentTenantIdAsString());
-
-        // Switch current user to the task assignee
         fixture.switchCurrentUserTo(setup.assigneeId());
 
         ccService.ccForUserIds(setup.taskId(), List.of(777L), "assignee-sends-cc");
 
-        List<NotificationInstance> r777 = smartEngine.createNotificationQuery()
-                .receiverUserId("777")
-                .notificationType(NotificationConstant.NotificationType.CC)
-                .listPage(0, 10);
+        List<BpmNotifyRecord> r777 = notifyRecords(setup, 777L);
         assertThat(r777).hasSize(1);
-        // Sender id is the assignee (888L)
-        assertThat(r777.get(0).getSenderUserId()).isEqualTo(String.valueOf(setup.assigneeId()));
-        assertThat(r777.get(0).getTitle()).isEqualTo("$i18n:bpm.cc.inbox.title");
+        assertThat(r777.getFirst().getSenderUserId()).isEqualTo(setup.assigneeId());
+        assertThat(r777.getFirst().getTitle()).isEqualTo("$i18n:bpm.cc.inbox.title");
     }
 
     @Test
-    @DisplayName("Policy=initiator, assignee attempts cc: rejected")
-    void initiatorPolicyRejectsAssignee() {
-        var setup = fixture.startProcess("cc-initiator-only", CcPolicy.INITIATOR);
-        fixture.switchCurrentUserTo(setup.assigneeId());
+    @DisplayName("Explicit dedup key is idempotent per receiver")
+    void explicitDedupKeyPreventsDuplicateFanOut() {
+        var setup = fixture.startProcess("cc-dedup", CcPolicy.ALL);
 
-        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), List.of(501L), "assignee cc attempt"))
+        ccService.ccForUserIds(setup.taskId(), List.of(503L), "once", "AUTOMATION", "cc-dedup-key");
+        ccService.ccForUserIds(setup.taskId(), List.of(503L), "retry", "AUTOMATION", "cc-dedup-key");
+
+        assertThat(notifyRecords(setup, 503L)).hasSize(1);
+        assertThat(notifyRecords(setup, 503L).getFirst().getContent()).isEqualTo("once");
+    }
+
+    @Test
+    @DisplayName("Policy=initiator rejects assignee; policy=assignee rejects initiator")
+    void policyGatesRemainEnforced() {
+        var initiatorOnly = fixture.startProcess("cc-initiator-only", CcPolicy.INITIATOR);
+        fixture.switchCurrentUserTo(initiatorOnly.assigneeId());
+        assertThatThrownBy(() -> ccService.ccForUserIds(
+                initiatorOnly.taskId(), List.of(501L), "assignee cc attempt"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("policy");
+
+        var assigneeOnly = fixture.startProcess("cc-assignee-only", CcPolicy.ASSIGNEE);
+        assertThatThrownBy(() -> ccService.ccForUserIds(
+                assigneeOnly.taskId(), List.of(501L), "initiator cc attempt"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("policy");
     }
 
     @Test
-    @DisplayName("Policy=assignee, initiator attempts cc: rejected")
-    void assigneePolicyRejectsInitiator() {
-        var setup = fixture.startProcess("cc-assignee-only", CcPolicy.ASSIGNEE);
-        // current user is initiator by default in fixture
-        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), List.of(501L), "initiator cc attempt"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("policy");
-    }
-
-    @Test
-    @DisplayName("Empty receivers rejected with IllegalArgumentException")
-    void emptyReceiversRejected() {
-        var setup = fixture.startProcess("cc-empty", CcPolicy.ALL);
+    @DisplayName("Bad receiver input is rejected before fan-out")
+    void badReceiverInputRejected() {
+        var setup = fixture.startProcess("cc-bad-input", CcPolicy.ALL);
         assertThatThrownBy(() -> ccService.cc(setup.taskId(), List.of(), "nobody"))
+                .isInstanceOf(IllegalArgumentException.class);
+        var receivers = new java.util.ArrayList<Long>();
+        receivers.add(501L);
+        receivers.add(null);
+        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), receivers, "null entry"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("Receivers list with null entry rejected")
-    void nullReceiverEntryRejected() {
-        var setup = fixture.startProcess("cc-null-entry", CcPolicy.ALL);
-        var receivers = new java.util.ArrayList<Long>();
-        receivers.add(501L);
-        receivers.add(null);
-        assertThatThrownBy(() -> ccService.ccForUserIds(setup.taskId(), receivers, "x"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("null");
+    @DisplayName("SmartEngine notification storage is removed")
+    void engineNotificationStorageIsRemoved() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_schema = current_schema() AND table_name = 'se_notification_instance'",
+                Integer.class);
+        assertThat(count).isZero();
+    }
+
+    private List<BpmNotifyRecord> notifyRecords(
+            TestBpmFixture.ProcessSetup setup, Long recipientId) {
+        return notifyRecordMapper.findByRecipient(
+                        MetaContext.getCurrentTenantId(), recipientId, "CC")
+                .stream()
+                .filter(record -> setup.instanceId().equals(record.getProcessInstanceId()))
+                .toList();
     }
 }
