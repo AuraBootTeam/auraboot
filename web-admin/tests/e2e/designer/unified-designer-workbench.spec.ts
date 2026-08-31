@@ -6532,6 +6532,34 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     ).toBeVisible();
     expect(blockedRequests).toEqual([]);
   });
+
+  test('UDW-062: reorders blocks by dragging outline rows through the shared dnd kernel', async ({
+    page,
+  }) => {
+    expect(listPagePid).toBeTruthy();
+
+    await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+
+    // The toolbar order reflects whatever earlier scenarios persisted; a
+    // swap-shaped assertion keeps this self-contained. Dragging the LATER
+    // toolbar row before the FIRST row must swap them — the outline row is a
+    // `canvas-block` drag source and a `block` drop target with the same
+    // payloads as the canvas, so the same move-before resolution applies.
+    const createFirst = await isCanvasBlockBefore(page, 'action_seed_create', 'action_seed_export');
+    const movingBlockId = createFirst ? 'action_seed_export' : 'action_seed_create';
+    const targetBlockId = createFirst ? 'action_seed_create' : 'action_seed_export';
+    await expectBlockBefore(page, targetBlockId, movingBlockId);
+
+    await dragOutlineRowBefore(page, movingBlockId, targetBlockId);
+
+    await expectBlockBefore(page, movingBlockId, targetBlockId);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+    await saveDesignerPage(page, listPagePid);
+
+    const persisted = await readPage(page, listPagePid);
+    expectChildOrder(persisted.blocks ?? [], 'list_toolbar', [movingBlockId, targetBlockId]);
+  });
 });
 
 /**
@@ -6608,25 +6636,66 @@ async function dragCanvasBlockBefore(
   movingBlockId: string,
   targetBlockId: string,
 ): Promise<void> {
-  // @dnd-kit attaches the drag activators to the block's grip handle, not the
-  // block body, so the gesture must start on the handle. Drop onto the target
-  // block; the workbench resolves a canvas-block drop onto another block as a
-  // move-before. Use a multi-step pointer move so @dnd-kit measures + collides.
-  const handle = page.getByTestId(`block-drag-handle-${movingBlockId}`);
+  // The gesture starts on the block BODY (its header label area — never the
+  // grip button, which is an interactive control, and never the preview body,
+  // which holds real WYSIWYG inputs) to lock in the whole-body-drag contract:
+  // any non-interactive part of a block frame starts a reorder drag. Drop onto
+  // the target block; the workbench resolves a canvas-block drop onto another
+  // block as a move-before. Use a multi-step pointer move so @dnd-kit measures
+  // + collides.
+  const sourceBlock = page.getByTestId(`canvas-block-${movingBlockId}`);
   const targetBlock = page.getByTestId(`canvas-block-${targetBlockId}`);
-  await expect(handle).toBeVisible();
+  await expect(sourceBlock).toBeVisible();
   await expect(targetBlock).toBeVisible();
   await targetBlock.scrollIntoViewIfNeeded();
-  await handle.scrollIntoViewIfNeeded();
+  await sourceBlock.scrollIntoViewIfNeeded();
 
-  const handleBox = await handle.boundingBox();
-  const targetBox = await targetBlock.boundingBox();
-  expect(handleBox).not.toBeNull();
+  const sourceBox = await sourceBlock.boundingBox();
+  let targetBox = await targetBlock.boundingBox();
+  expect(sourceBox).not.toBeNull();
   expect(targetBox).not.toBeNull();
 
-  const startX = handleBox!.x + handleBox!.width / 2;
-  const startY = handleBox!.y + handleBox!.height / 2;
-  const endX = targetBox!.x + targetBox!.width / 2;
+  // Body-start coordinates must land on the VISIBLE part of each frame.
+  // Two clipping layers matter: the viewport (right dock overlays it) and the
+  // canvas pane itself — `scrollIntoViewIfNeeded` on the source can push the
+  // target out of the pane (adjacent table columns share a ~390px pane), and a
+  // drop pressed outside the pane resolves against whatever surface is under
+  // the pointer instead. Clamp both ends into (frame ∩ canvas pane); if the
+  // target has no visible intersection, nudge the pane's scroll to reveal a
+  // slice of it and re-measure.
+  const paneRect = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="unified-canvas-host"]');
+    const rect = el?.getBoundingClientRect();
+    return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+  });
+  if (paneRect && targetBox!.x + targetBox!.width <= paneRect.left + 12) {
+    // Target scrolled out to the LEFT of the pane: decrease scrollLeft so a
+    // slice of it re-enters the visible pane.
+    await page.evaluate(
+      ([revealBy]) => {
+        const el = document.querySelector('[data-testid="unified-canvas-host"]');
+        if (el) el.scrollLeft -= revealBy;
+      },
+      [Math.ceil(paneRect.left + 40 - (targetBox!.x + targetBox!.width))],
+    );
+    const remeasured = await targetBlock.boundingBox();
+    if (remeasured) targetBox = remeasured;
+  }
+  const viewportWidth = page.viewportSize()?.width ?? 1280;
+  const paneRight = paneRect?.right ?? viewportWidth;
+  const sourceVisibleRight = Math.min(sourceBox!.x + sourceBox!.width, viewportWidth, paneRight);
+  const startX = Math.max(
+    sourceBox!.x + 30,
+    Math.min(sourceBox!.x + 44, sourceVisibleRight - 16),
+  );
+  const startY = sourceBox!.y + 14;
+  const targetVisibleLeft = Math.max(targetBox!.x, paneRect?.left ?? 0);
+  const targetVisibleRight = Math.min(targetBox!.x + targetBox!.width, viewportWidth, paneRight);
+  const targetCenterX = targetBox!.x + targetBox!.width / 2;
+  const endX =
+    targetVisibleRight - targetVisibleLeft >= 40
+      ? Math.max(targetVisibleLeft + 16, Math.min(targetCenterX, targetVisibleRight - 16))
+      : (targetVisibleLeft + targetVisibleRight) / 2;
   const endY = targetBox!.y + Math.min(12, targetBox!.height / 4);
 
   await page.mouse.move(startX, startY);
@@ -6658,6 +6727,47 @@ async function swapCanvasBlocksByPointerDrag(
   await expectBlockBefore(page, movingBlockId, targetBlockId);
 
   return [movingBlockId, targetBlockId];
+}
+
+/**
+ * Drag one outline row before another. The outline row is both a dnd-kit drag
+ * source and drop target (same `canvas-block` / `block` payloads as the canvas
+ * frames), so the gesture exercises the outline surface of the shared dnd
+ * kernel — outline→outline and (via the registered droppables) outline→canvas.
+ */
+async function dragOutlineRowBefore(
+  page: Page,
+  movingBlockId: string,
+  targetBlockId: string,
+): Promise<void> {
+  const sourceRow = page.getByTestId(`outline-item-${movingBlockId}`);
+  const targetRow = page.getByTestId(`outline-item-${targetBlockId}`);
+  await expect(sourceRow).toBeVisible();
+  await expect(targetRow).toBeVisible();
+
+  const sourceBox = await sourceRow.boundingBox();
+  const targetBox = await targetRow.boundingBox();
+  expect(sourceBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+
+  const startX = sourceBox!.x + sourceBox!.width / 2;
+  const startY = sourceBox!.y + sourceBox!.height / 2;
+  const endX = targetBox!.x + targetBox!.width / 2;
+  const endY = targetBox!.y + targetBox!.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 8, startY + 8, { steps: 6 });
+  await page.mouse.move(endX, endY, { steps: 14 });
+  await page.mouse.move(endX + 2, endY + 2, { steps: 4 });
+  await page.mouse.up();
+  await page
+    .locator('[data-testid="drag-overlay-ghost"]')
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {});
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
 }
 
 async function pickModelField(

@@ -57,6 +57,7 @@ import {
 } from '../registry/createBlockTemplate';
 import { collectBlockIds, createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
 import { buildDesignerCollisionCandidates, type DragData } from '../dnd/dndShared';
+import { resolveInsertTarget } from '../dnd/insertTarget';
 import {
   canMoveExistingBlockBeforeTarget,
   canMoveExistingBlockToParent,
@@ -815,18 +816,32 @@ export function UnifiedDesignerWorkbench({
     return document.blocks.find((block) => block.blockType === rootBlockType);
   })();
 
+  // Shared click-insert resolution: `canAddBlock` (palette button enabled?) and
+  // `handleAddBlock` (where the block lands?) derive from the SAME resolver so
+  // they cannot drift — see dnd/insertTarget for the priority chain.
+  const resolveBlockInsertTarget = (blockType: string) =>
+    resolveInsertTarget(
+      {
+        selectedBlockId: selectedBlockId ?? null,
+        selectedBlockType: selectedBlock?.blockType ?? null,
+        kindRootContainerId: kindRootContainer?.id ?? null,
+        kindRootContainerType: kindRootContainer?.blockType ?? null,
+        canContain: (parentBlockType, type) => blockRegistry.canContain(parentBlockType, type),
+        canInsertBeforeSelected: Boolean(
+          selectedBlockId && resolveBlockDropBeforeTarget(selectedBlockId, blockType),
+        ),
+        canAddBlockToRoot: canAddBlockToRoot(blockType),
+      },
+      blockType,
+    );
+
   const canAddBlock = (blockType: string) => {
     if (contextualReadOnly) return false;
     if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
-    if (selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) return true;
-    if (selectedBlockId && resolveBlockDropBeforeTarget(selectedBlockId, blockType)) return true;
-    if (kindRootContainer && blockRegistry.canContain(kindRootContainer.blockType, blockType)) {
-      return true;
-    }
-    return canAddBlockToRoot(blockType);
+    return resolveBlockInsertTarget(blockType) !== null;
   };
 
   const handleAddBlock = (blockType: string) => {
@@ -835,43 +850,25 @@ export function UnifiedDesignerWorkbench({
     const nextBlock = createBlockTemplate(blockType, collectBlockIds(document.blocks));
     if (!nextBlock) return;
 
-    const beforeTarget = selectedBlockId ? resolveBlockDropBeforeTarget(selectedBlockId, blockType) : null;
+    const resolution = resolveBlockInsertTarget(blockType);
+    if (!resolution) return;
 
-    // Fall back to the kind-root container when the current selection cannot
-    // accept the block but the root container can — keeps the palette usable
-    // with the page root selected (the default state after opening a page).
-    if (
-      (!selectedBlockId ||
-        !(selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType))) &&
-      kindRootContainer &&
-      blockRegistry.canContain(kindRootContainer.blockType, blockType)
-    ) {
+    if (resolution.placement === 'inside-selected' || resolution.placement === 'inside-kind-root') {
+      const parentBlock = findBlockById(document.blocks, resolution.parentBlockId ?? '')?.block;
+      if (!parentBlock) return;
       const preparedBlock = prepareCreatedBlock(
-        applyParentPlacementDefaults(nextBlock, kindRootContainer),
+        applyParentPlacementDefaults(nextBlock, parentBlock),
       );
       updateDocument((current) => ({
         ...current,
-        blocks: updateBlockById(current.blocks, kindRootContainer.id, (block) => ({
+        blocks: updateBlockById(current.blocks, parentBlock.id, (block) => ({
           ...block,
           blocks: [...(block.blocks ?? []), preparedBlock],
         })),
       }));
-      setSelectedBlockId(nextBlock.id);
-      return;
-    }
-
-    if (selectedBlockId && selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) {
-      const preparedBlock = prepareCreatedBlock(
-        applyParentPlacementDefaults(nextBlock, selectedBlock),
-      );
-      updateDocument((current) => ({
-        ...current,
-        blocks: updateBlockById(current.blocks, selectedBlockId, (block) => ({
-          ...block,
-          blocks: [...(block.blocks ?? []), preparedBlock],
-        })),
-      }));
-    } else if (selectedBlockId && beforeTarget) {
+    } else if (resolution.placement === 'before-selected' && resolution.targetBlockId) {
+      const beforeTarget = resolveBlockDropBeforeTarget(resolution.targetBlockId, blockType);
+      if (!beforeTarget) return;
       const preparedBlock = prepareCreatedBlock(beforeTarget.parentBlock
         ? applyParentPlacementDefaults(nextBlock, beforeTarget.parentBlock)
         : nextBlock);
@@ -879,7 +876,7 @@ export function UnifiedDesignerWorkbench({
         ...current,
         blocks: insertBlockBeforeTarget(
           current.blocks,
-          selectedBlockId,
+          resolution.targetBlockId!,
           preparedBlock,
           beforeTarget.parentBlockId,
         ),
@@ -951,6 +948,24 @@ export function UnifiedDesignerWorkbench({
     const block = findBlockById(document.blocks, blockId)?.block;
     if (!block) return false;
     return contextualEditablePropertyPaths?.[block.blockType]?.includes('/layout/span') ?? false;
+  };
+
+  // One reorder probe shared by every drag source (canvas frames + outline
+  // rows), so a block draggable from the outline is exactly the set draggable
+  // on the canvas. Dashboard widgets are excluded on both surfaces: their
+  // order/position is owned by the dashboard grid gesture, not tree reordering.
+  const canReorderBlockFromOutline = (blockId: string): boolean => {
+    const found = findBlockById(document.blocks, blockId);
+    if (!found) return false;
+    const parentBlock = found.path[found.path.length - 2]?.block;
+    if (parentBlock?.blockType === 'dashboard') return false;
+    if (contextualRestricted) {
+      return Boolean(
+        contextualReorderableTypes.has(found.block.blockType)
+          || contextualRelocatableTypes.has(found.block.blockType),
+      );
+    }
+    return true;
   };
 
   const canAddBlockToRoot = (blockType: string) => {
@@ -2168,7 +2183,18 @@ export function UnifiedDesignerWorkbench({
               onSelect={setSelectedBlockId}
               onAddBlock={handleAddBlock}
               onAddModelField={handleAddModelField}
+              canReorderBlock={canReorderBlockFromOutline}
+              activeDropIntent={activeDropIntent}
             />
+            {document.modelCode && Object.keys(modelFieldsByModel).length > 0 && !modelFieldsByModel[document.modelCode]?.length ? (
+              <div
+                className="mx-3 mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                data-testid="designer-model-missing-hint"
+              >
+                {resolveDesignerText(DESIGNER_I18N.unified.modelMissingHint, locale)
+                  .replace('{modelCode}', document.modelCode)}
+              </div>
+            ) : null}
             <CanvasHost
               document={document}
               mode={mode}
@@ -2178,18 +2204,7 @@ export function UnifiedDesignerWorkbench({
               activeDropIntent={activeDropIntent}
               rootAccepts={Boolean(rootAccepts)}
               structuralReadOnly={contextualRestricted}
-              canReorderBlock={
-                contextualRestricted
-                  ? (blockId) => {
-                      const block = findBlockById(document.blocks, blockId)?.block;
-                      return Boolean(
-                        block
-                        && (contextualReorderableTypes.has(block.blockType)
-                          || contextualRelocatableTypes.has(block.blockType)),
-                      );
-                    }
-                  : undefined
-              }
+              canReorderBlock={canReorderBlockFromOutline}
               canResizeSpan={contextualRestricted ? canContextualResizeSpan : undefined}
               onSelect={handleCanvasSelect}
               onMoveBefore={handleMoveBefore}

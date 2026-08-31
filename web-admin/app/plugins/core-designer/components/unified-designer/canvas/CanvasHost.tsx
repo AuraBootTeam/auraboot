@@ -496,16 +496,25 @@ function BlockFrame(props: BlockFrameProps) {
         onSelect(block.id, { additive });
       }}
       onPointerDown={(event) => {
-        if (structuralReadOnly) return;
-        if (!isDashboardWidget) return;
-        if (mode !== 'layout') return;
-        handleWidgetMovePointerDown(
-          event,
-          block,
-          dashboardSiblings ?? [block],
-          onSelect,
-          onMoveWidget,
-        );
+        if (isDashboardWidget) {
+          if (structuralReadOnly) return;
+          if (mode !== 'layout') return;
+          handleWidgetMovePointerDown(
+            event,
+            block,
+            dashboardSiblings ?? [block],
+            onSelect,
+            onMoveWidget,
+          );
+          return;
+        }
+        // Whole-body drag: pressing any non-interactive part of the block starts
+        // a reorder drag (the grip stays as the visible affordance and keeps its
+        // own activators). Interactive controls — buttons, inputs, quick controls
+        // — keep their own pointer behaviour and never start a drag.
+        if (structuralReadOnly || !reorderAllowed) return;
+        if (isInteractivePointerTarget(event.target)) return;
+        listeners?.onPointerDown?.(event);
       }}
       className={`group relative rounded-lg border bg-white transition ${
         currentDropIntent === 'inside'
@@ -513,7 +522,9 @@ function BlockFrame(props: BlockFrameProps) {
           : selected || multiSelected
           ? 'border-blue-500 ring-2 ring-blue-100'
           : 'border-slate-200 hover:border-blue-300'
-      } ${isDragging ? 'opacity-50' : ''}`}
+      } ${isDragging ? 'opacity-50' : ''} ${
+        !isDashboardWidget && reorderAllowed && !structuralReadOnly ? 'cursor-grab' : ''
+      }`}
       style={{ gridColumn, gridRow, minHeight }}
     >
       {currentDropIntent === 'before' ? (

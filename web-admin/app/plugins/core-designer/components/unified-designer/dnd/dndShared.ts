@@ -24,6 +24,16 @@ export const fieldDraggableId = (field: ModelFieldDefinition) =>
   `model-field:${field.modelCode}.${field.code}`;
 export const canvasDraggableId = (blockId: string) => `canvas:${blockId}`;
 export const blockDroppableId = (blockId: string) => `drop-block:${blockId}`;
+/**
+ * Outline-panel variants of the canvas ids. Payloads are IDENTICAL to their
+ * canvas counterparts (`canvas-block` drag, `block` drop) so every resolver —
+ * drop intent, drag-end action, ancestor walking — behaves the same no matter
+ * which surface the gesture started or ended on. The ids must differ because
+ * @dnd-kit registers draggables/droppables by id: the outline row and the
+ * canvas frame of the same block are two live registrations.
+ */
+export const outlineDraggableId = (blockId: string) => `outline:${blockId}`;
+export const outlineDroppableId = (blockId: string) => `outline-drop:${blockId}`;
 export const ROOT_DROPPABLE_ID = 'drop-root';
 
 type CollisionIdentifier = string | number;

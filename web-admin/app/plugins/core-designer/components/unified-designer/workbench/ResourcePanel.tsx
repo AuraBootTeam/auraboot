@@ -1,10 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { Plus, Sparkles } from 'lucide-react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { GripVertical, Plus, Sparkles } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { BlockDefinitionV3, DslBlockV3, LocalizedText, ModelFieldDefinition, PageSchemaV3 } from '../types';
-import { fieldDraggableId, paletteDraggableId } from '../dnd/dndShared';
+import {
+  fieldDraggableId,
+  outlineDraggableId,
+  outlineDroppableId,
+  paletteDraggableId,
+} from '../dnd/dndShared';
+import type { ActiveDropIntent } from '../canvas/CanvasHost';
 import { groupModelFields } from '../utils/fieldGrouping';
 
 /**
@@ -28,6 +34,10 @@ interface ResourcePanelProps {
   onSelect: (blockId: string) => void;
   onAddBlock: (blockType: string) => void;
   onAddModelField: (field: ModelFieldDefinition) => void;
+  /** Whether an outline row may start a reorder drag (same probe as the canvas). */
+  canReorderBlock?: (blockId: string) => boolean;
+  /** Shared drop-intent state so outline rows highlight like canvas frames. */
+  activeDropIntent?: ActiveDropIntent;
 }
 
 type ResourcePanelTab = 'outline' | 'blocks' | 'fields';
@@ -46,6 +56,8 @@ export function ResourcePanel({
   onSelect,
   onAddBlock,
   onAddModelField,
+  canReorderBlock,
+  activeDropIntent,
 }: ResourcePanelProps) {
   const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<ResourcePanelTab>('outline');
@@ -90,6 +102,8 @@ export function ResourcePanel({
               selectedBlockId={selectedBlockId}
               onSelect={onSelect}
               locale={locale}
+              canReorderBlock={canReorderBlock}
+              activeDropIntent={activeDropIntent}
             />
           </>
         ) : null}
@@ -452,46 +466,129 @@ function OutlineList({
   selectedBlockId,
   onSelect,
   locale,
+  canReorderBlock,
+  activeDropIntent,
   depth = 0,
 }: {
   blocks: DslBlockV3[];
   selectedBlockId: string | null;
   onSelect: (blockId: string) => void;
   locale: string;
+  canReorderBlock?: (blockId: string) => boolean;
+  activeDropIntent?: ActiveDropIntent;
   depth?: number;
 }) {
   return (
     <ul className="space-y-1">
       {blocks.map((block) => (
         <li key={block.id}>
-          <button
-            type="button"
-            data-testid={`outline-item-${block.id}`}
-            onClick={() => onSelect(block.id)}
-            className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${
-              selectedBlockId === block.id
-                ? 'bg-blue-50 font-semibold text-blue-700'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-            style={{ paddingLeft: `${8 + depth * 14}px` }}
-          >
-            <span className="truncate">{getBlockLabel(block, locale)}</span>
-            <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
-              {block.blockType}
-            </span>
-          </button>
+          <OutlineItem
+            block={block}
+            selectedBlockId={selectedBlockId}
+            onSelect={onSelect}
+            locale={locale}
+            canReorderBlock={canReorderBlock}
+            activeDropIntent={activeDropIntent}
+            depth={depth}
+          />
           {block.blocks?.length ? (
             <OutlineList
               blocks={block.blocks}
               selectedBlockId={selectedBlockId}
               onSelect={onSelect}
               locale={locale}
+              canReorderBlock={canReorderBlock}
+              activeDropIntent={activeDropIntent}
               depth={depth + 1}
             />
           ) : null}
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * One outline row. Every row is ALSO a drop target and (when reorder is
+ * allowed) a drag source using the same `canvas-block` / `block` payloads as
+ * the canvas — so outline→outline, outline→canvas and canvas→outline all
+ * resolve through the shared dnd kernel. The workbench keeps one DndContext;
+ * only the registered ids differ (see `outlineDraggableId`).
+ */
+function OutlineItem({
+  block,
+  selectedBlockId,
+  onSelect,
+  locale,
+  canReorderBlock,
+  activeDropIntent,
+  depth = 0,
+}: {
+  block: DslBlockV3;
+  selectedBlockId: string | null;
+  onSelect: (blockId: string) => void;
+  locale: string;
+  canReorderBlock?: (blockId: string) => boolean;
+  activeDropIntent?: ActiveDropIntent;
+  depth?: number;
+}) {
+  const dragAllowed = canReorderBlock ? canReorderBlock(block.id) : true;
+  // dnd-kit stamps `aria-disabled` on a disabled draggable, but the row itself
+  // stays clickable (selection): a drag-disabled row is not a disabled control,
+  // and the attribute would block pointer-interaction assertions.
+  const {
+    attributes: { 'aria-disabled': _dragDisabled, ...dragAttributes },
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: outlineDraggableId(block.id),
+    data: { kind: 'canvas-block', blockId: block.id },
+    disabled: !dragAllowed,
+  });
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: outlineDroppableId(block.id),
+    data: { kind: 'block', blockId: block.id },
+  });
+  const dropIntent = activeDropIntent?.blockId === block.id ? activeDropIntent.intent : null;
+  const setRefs = (node: HTMLElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
+
+  return (
+    <button
+      ref={setRefs}
+      type="button"
+      data-testid={`outline-item-${block.id}`}
+      data-drop-intent={dropIntent ?? 'none'}
+      onClick={() => onSelect(block.id)}
+      {...dragAttributes}
+      {...listeners}
+      className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs ${
+        selectedBlockId === block.id
+          ? 'bg-blue-50 font-semibold text-blue-700'
+          : 'text-slate-600 hover:bg-slate-50'
+      } ${
+        dropIntent === 'before'
+          ? 'ring-2 ring-blue-300'
+          : dropIntent === 'inside'
+          ? 'ring-2 ring-blue-400 bg-blue-50/60'
+          : ''
+      } ${isDragging ? 'opacity-50' : ''} ${dragAllowed ? 'cursor-grab' : ''}`}
+      style={{ paddingLeft: `${8 + depth * 14}px` }}
+    >
+      {dragAllowed ? (
+        <GripVertical
+          className="mr-1 h-3 w-3 shrink-0 text-slate-300"
+          aria-hidden="true"
+        />
+      ) : null}
+      <span className="min-w-0 flex-1 truncate">{getBlockLabel(block, locale)}</span>
+      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+        {block.blockType}
+      </span>
+    </button>
   );
 }
 
