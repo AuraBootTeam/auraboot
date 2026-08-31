@@ -190,6 +190,86 @@ const uploadFieldFields: PropertySchema<string>[] = [
   { key: 'props.maxFiles', label: 'Max files', type: 'number' },
 ];
 
+const textareaFieldFields: PropertySchema<string>[] = [
+  { key: 'props.rows', label: 'Visible rows', type: 'number', min: 2, max: 40 },
+];
+
+const dateFieldFields: PropertySchema<string>[] = [
+  {
+    key: 'props.format',
+    label: 'Date format',
+    type: 'select',
+    options: [
+      { label: 'yyyy-MM-dd', value: 'yyyy-MM-dd' },
+      { label: 'yyyy/MM/dd', value: 'yyyy/MM/dd' },
+      { label: 'MM/dd/yyyy', value: 'MM/dd/yyyy' },
+      { label: 'dd MMM yyyy', value: 'dd MMM yyyy' },
+    ],
+  },
+  { key: 'props.defaultValue', label: 'Default value', type: 'text' },
+];
+
+const datetimeFieldFields: PropertySchema<string>[] = [
+  {
+    key: 'props.format',
+    label: 'Datetime format',
+    type: 'select',
+    options: [
+      { label: 'yyyy-MM-dd HH:mm', value: 'yyyy-MM-dd HH:mm' },
+      { label: 'yyyy-MM-dd HH:mm:ss', value: 'yyyy-MM-dd HH:mm:ss' },
+      { label: 'yyyy/MM/dd HH:mm', value: 'yyyy/MM/dd HH:mm' },
+    ],
+  },
+  { key: 'props.defaultValue', label: 'Default value', type: 'text' },
+];
+
+const daterangeFieldFields: PropertySchema<string>[] = [
+  {
+    key: 'props.format',
+    label: 'Date format',
+    type: 'select',
+    options: [
+      { label: 'yyyy-MM-dd', value: 'yyyy-MM-dd' },
+      { label: 'yyyy/MM/dd', value: 'yyyy/MM/dd' },
+    ],
+  },
+];
+
+const timeFieldFields: PropertySchema<string>[] = [
+  {
+    key: 'props.format',
+    label: 'Time format',
+    type: 'select',
+    options: [
+      { label: 'HH:mm', value: 'HH:mm' },
+      { label: 'HH:mm:ss', value: 'HH:mm:ss' },
+    ],
+  },
+];
+
+const numberFieldFields: PropertySchema<string>[] = [
+  { key: 'props.min', label: 'Minimum', type: 'number' },
+  { key: 'props.max', label: 'Maximum', type: 'number' },
+  { key: 'props.step', label: 'Step', type: 'number', min: 0 },
+  { key: 'props.precision', label: 'Decimal places', type: 'number', min: 0, max: 10 },
+];
+
+const moneyFieldFields: PropertySchema<string>[] = [
+  {
+    key: 'props.currency',
+    label: 'Currency',
+    type: 'select',
+    options: [
+      { label: 'CNY ¥', value: 'CNY' },
+      { label: 'USD $', value: 'USD' },
+      { label: 'EUR €', value: 'EUR' },
+      { label: 'JPY ¥', value: 'JPY' },
+    ],
+  },
+  { key: 'props.precision', label: 'Decimal places', type: 'number', min: 0, max: 10 },
+];
+
+
 // The component-specific inspector field schemas for a `field` block, keyed by the
 // (lower-cased) `props.component` value. This is the SINGLE source of truth consumed
 // by both getFieldInspectorFields (to render the right controls for the current
@@ -202,6 +282,18 @@ const componentSpecificFieldSchemas: Record<string, PropertySchema<string>[]> = 
   upload: uploadFieldFields,
   'rich-text': richTextFieldFields,
   richtext: richTextFieldFields,
+  textarea: textareaFieldFields,
+  smarttextarea: textareaFieldFields,
+  date: dateFieldFields,
+  smartdatepicker: datetimeFieldFields,
+  datetime: datetimeFieldFields,
+  daterange: daterangeFieldFields,
+  timepicker: timeFieldFields,
+  timerangepicker: timeFieldFields,
+  number: numberFieldFields,
+  numberinput: numberFieldFields,
+  smartnumberinput: numberFieldFields,
+  moneyinput: moneyFieldFields,
 };
 
 /** The component-specific inspector fields for one component (or `[]` if none). */
