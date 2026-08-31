@@ -1,5 +1,8 @@
 package com.auraboot.framework.aisearch.controller;
 
+import com.auraboot.framework.aisearch.dto.GlobalSearchCandidates;
+import com.auraboot.framework.aisearch.dto.GlobalSearchPreference;
+import com.auraboot.framework.aisearch.dto.GlobalSearchPreferenceRequest;
 import com.auraboot.framework.aisearch.dto.GlobalSearchResult;
 import com.auraboot.framework.aisearch.service.GlobalSearchService;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -12,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,8 +58,40 @@ public class GlobalSearchController {
             @Parameter(description = "Max model groups (1-40, default 12)")
             @RequestParam(required = false) Integer maxModels) {
 
-        Long userId = MetaContext.getCurrentUserId();
-        GlobalSearchResult result = globalSearchService.search(userId, keyword, perModelLimit, maxModels);
+        GlobalSearchResult result = globalSearchService.search(
+                MetaContext.getCurrentUserId(),
+                MetaContext.getCurrentTenantId(),
+                keyword,
+                perModelLimit,
+                maxModels);
         return ApiResponse.success(result);
+    }
+
+    @GetMapping("/global/candidates")
+    @Operation(
+            summary = "List personal global-search candidates",
+            description = "Returns only models the caller may read, with the current personal selection."
+    )
+    public ApiResponse<GlobalSearchCandidates> candidates() {
+        return ApiResponse.success(globalSearchService.listCandidates(
+                MetaContext.getCurrentUserId(), MetaContext.getCurrentTenantId()));
+    }
+
+    @GetMapping("/global/preferences")
+    @Operation(summary = "Get personal global-search preference")
+    public ApiResponse<GlobalSearchPreference> getPreference() {
+        return ApiResponse.success(globalSearchService.getSearchPreference(
+                MetaContext.getCurrentUserId(), MetaContext.getCurrentTenantId()));
+    }
+
+    @PutMapping("/global/preferences")
+    @Operation(
+            summary = "Save personal global-search preference",
+            description = "Stores an ordered enabled-model selection after normalizing it to the live readable set."
+    )
+    public ApiResponse<GlobalSearchPreference> savePreference(
+            @RequestBody GlobalSearchPreferenceRequest request) {
+        return ApiResponse.success(globalSearchService.saveSearchPreference(
+                MetaContext.getCurrentUserId(), MetaContext.getCurrentTenantId(), request.getModelCodes()));
     }
 }

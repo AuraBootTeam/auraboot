@@ -49,6 +49,17 @@ interface DocHit {
   similarity: number;
 }
 
+interface SearchModelCandidate {
+  modelCode: string;
+  modelLabel: string;
+  enabled: boolean;
+}
+
+interface SearchPreference {
+  configured: boolean;
+  enabledModelCodes?: string[];
+}
+
 type SearchResult =
   | { kind: 'menu'; item: FlatMenuItem }
   | { kind: 'record'; hit: RecordHit }
@@ -130,6 +141,12 @@ export function CommandPalette() {
   const [recordResults, setRecordResults] = useState<RecordHit[]>([]);
   const [docResults, setDocResults] = useState<DocHit[]>([]);
   const [searching, setSearching] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [candidateModels, setCandidateModels] = useState<SearchModelCandidate[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -221,12 +238,17 @@ export function CommandPalette() {
         });
         if (!controller.signal.aborted) {
           if (ResultHelper.isSuccess(resp) && Array.isArray(resp.data?.groups)) {
-            const hits = (resp.data.groups as Array<{ modelCode: string; modelLabel: string; records?: unknown[] }>)
-              .flatMap((group) =>
-                (group.records ?? [])
-                  .map((record) => toRecordHit(record, group.modelCode, group.modelLabel))
-                  .filter((hit: RecordHit | null): hit is RecordHit => hit !== null),
-              );
+            const hits = (
+              resp.data.groups as Array<{
+                modelCode: string;
+                modelLabel: string;
+                records?: unknown[];
+              }>
+            ).flatMap((group) =>
+              (group.records ?? [])
+                .map((record) => toRecordHit(record, group.modelCode, group.modelLabel))
+                .filter((hit: RecordHit | null): hit is RecordHit => hit !== null),
+            );
             setRecordResults(hits.slice(0, 15));
           } else {
             setRecordResults([]);
@@ -279,6 +301,78 @@ export function CommandPalette() {
 
     return () => clearTimeout(timer);
   }, [query]);
+
+  // ---------------------------------------------------------------------------
+  // Personal search model selection
+  // ---------------------------------------------------------------------------
+  const loadSearchSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    setSettingsMessage('');
+    try {
+      const resp = await fetchResult<{
+        models?: SearchModelCandidate[];
+        preference?: SearchPreference;
+      }>('/api/search/global/candidates', { method: 'get' });
+      if (!ResultHelper.isSuccess(resp) || !Array.isArray(resp.data?.models)) {
+        throw new Error(resp?.desc || resp?.message || 'Unable to load search models');
+      }
+      const models = resp.data.models;
+      const validCodes = new Set(models.map((model) => model.modelCode));
+      const preference = resp.data.preference;
+      const selected = preference?.configured
+        ? (preference.enabledModelCodes ?? []).filter((code) => validCodes.has(code))
+        : models.map((model) => model.modelCode);
+      setCandidateModels(models);
+      setSelectedModels(selected);
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : 'Unable to load search models');
+      setCandidateModels([]);
+      setSelectedModels([]);
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  const openSearchSettings = useCallback(() => {
+    setSettingsOpen(true);
+    void loadSearchSettings();
+  }, [loadSearchSettings]);
+
+  const toggleSearchModel = useCallback((modelCode: string, enabled: boolean) => {
+    setSelectedModels((current) =>
+      enabled ? [...current, modelCode] : current.filter((code) => code !== modelCode),
+    );
+  }, []);
+
+  const moveSearchModel = useCallback((modelCode: string, direction: -1 | 1) => {
+    setSelectedModels((current) => {
+      const index = current.indexOf(modelCode);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
+  const saveSearchSettings = useCallback(async () => {
+    setSettingsSaving(true);
+    setSettingsMessage('');
+    try {
+      const resp = await fetchResult('/api/search/global/preferences', {
+        method: 'put',
+        params: { modelCodes: selectedModels },
+      });
+      if (!ResultHelper.isSuccess(resp)) {
+        throw new Error(resp?.desc || resp?.message || 'Unable to save search settings');
+      }
+      setSettingsMessage('Search settings saved');
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : 'Unable to save search settings');
+    } finally {
+      setSettingsSaving(false);
+    }
+  }, [selectedModels]);
 
   // ---------------------------------------------------------------------------
   // Build combined results list
@@ -348,6 +442,7 @@ export function CommandPalette() {
   // ---------------------------------------------------------------------------
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (settingsOpen) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex((i) => Math.min(i + 1, allResults.length - 1));
@@ -359,7 +454,7 @@ export function CommandPalette() {
         handleSelect(allResults[activeIndex]);
       }
     },
-    [allResults, activeIndex, handleSelect],
+    [allResults, activeIndex, handleSelect, settingsOpen],
   );
 
   // Scroll active item into view
@@ -437,208 +532,348 @@ export function CommandPalette() {
               {searching && (
                 <div className="rounded-pill border-accent h-4 w-4 animate-spin border-2 border-t-transparent" />
               )}
+              <button
+                type="button"
+                onClick={openSearchSettings}
+                title={t('search.settings', 'Search settings')}
+                aria-label={t('search.settings', 'Search settings')}
+                className="text-text-3 hover:bg-subtle hover:text-text-2 rounded-control h-7 w-7 shrink-0 transition-colors dark:hover:bg-gray-800"
+                data-testid="command-palette-settings"
+              >
+                <svg
+                  className="mx-auto h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </button>
               <kbd className="border-border bg-hover text-text-3 rounded border px-1.5 py-0.5 font-mono text-[10px] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500">
                 Esc
               </kbd>
             </div>
 
-            {/* Results */}
-            <div
-              ref={listRef}
-              className="max-h-[50vh] overflow-y-auto px-2 py-2"
-              data-testid="command-palette-results"
-            >
-              {allResults.length === 0 && query.trim() && !searching && (
-                <div className="text-text-3 px-4 py-8 text-center text-sm dark:text-gray-500">
-                  {t('search.noResults', 'No results found')}
-                </div>
-              )}
-
-              {allResults.length === 0 && !query.trim() && (
-                <div className="text-text-3 px-4 py-6 text-center text-sm dark:text-gray-500">
-                  {t('search.hint', 'Type to search pages, records and docs')}
-                </div>
-              )}
-
-              {/* Group: Recent */}
-              {allResults.some((r) => r.kind === 'recent') && (
-                <div className="mb-1">
-                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
-                    {t('search.recent', 'Recent')}
+            {settingsOpen ? (
+              <div
+                className="max-h-[50vh] overflow-y-auto px-4 py-3"
+                data-testid="command-palette-settings-panel"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-text text-sm font-semibold">
+                      {t('search.settings', 'Search settings')}
+                    </div>
+                    <div className="text-text-3 mt-0.5 text-xs dark:text-gray-500">
+                      {t('search.settingsHint', 'Choose and order the record models searched.')}
+                    </div>
                   </div>
-                  {allResults
-                    .filter(
-                      (r): r is Extract<SearchResult, { kind: 'recent' }> => r.kind === 'recent',
-                    )
-                    .map((r, idx) => {
-                      const globalIdx = allResults.indexOf(r);
-                      return (
-                        <ResultRow
-                          key={`recent-${idx}`}
-                          active={activeIndex === globalIdx}
-                          dataIndex={globalIdx}
-                          onClick={() => handleSelect(r)}
-                          onMouseEnter={() => setActiveIndex(globalIdx)}
-                        >
-                          <svg
-                            className="text-text-3 h-4 w-4 shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          <span className="truncate">{r.keyword}</span>
-                        </ResultRow>
-                      );
-                    })}
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(false)}
+                    className="rounded-control border-border bg-panel text-text-2 hover:bg-subtle h-8 border px-3 text-xs"
+                    data-testid="command-palette-settings-close"
+                  >
+                    {t('common.back', 'Back')}
+                  </button>
                 </div>
-              )}
 
-              {/* Group: Pages */}
-              {menuMatches.length > 0 && (
-                <div className="mb-1">
-                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
-                    {t('search.pages', 'Pages')}
+                {settingsLoading ? (
+                  <div className="text-text-3 py-8 text-center text-sm">Loading...</div>
+                ) : candidateModels.length === 0 ? (
+                  <div className="text-text-3 py-8 text-center text-sm">
+                    {t('search.noReadableModels', 'No readable search models')}
                   </div>
-                  {allResults
-                    .filter((r): r is Extract<SearchResult, { kind: 'menu' }> => r.kind === 'menu')
-                    .map((r, idx) => {
-                      const globalIdx = allResults.indexOf(r);
+                ) : (
+                  <div className="space-y-1">
+                    {candidateModels.map((model) => {
+                      const enabled = selectedModels.includes(model.modelCode);
                       return (
-                        <ResultRow
-                          key={`menu-${idx}`}
-                          active={activeIndex === globalIdx}
-                          dataIndex={globalIdx}
-                          onClick={() => handleSelect(r)}
-                          onMouseEnter={() => setActiveIndex(globalIdx)}
+                        <div
+                          key={model.modelCode}
+                          className="border-border hover:bg-subtle rounded-card flex items-center gap-2 border px-3 py-2"
+                          data-testid={`search-model-${model.modelCode}`}
                         >
-                          <svg
-                            className="text-text-3 h-4 w-4 shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                          <input
+                            id={`search-model-checkbox-${model.modelCode}`}
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(event) =>
+                              toggleSearchModel(model.modelCode, event.target.checked)
+                            }
+                            className="accent-accent h-4 w-4"
+                            data-testid={`search-model-checkbox-${model.modelCode}`}
+                          />
+                          <label
+                            htmlFor={`search-model-checkbox-${model.modelCode}`}
+                            className="text-text-2 min-w-0 flex-1 cursor-pointer truncate text-sm"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                          <div className="min-w-0 flex-1">
-                            <span className="truncate">{r.item.name}</span>
-                            {r.item.parentName && (
-                              <span className="text-text-3 ml-2 text-xs">{r.item.parentName}</span>
-                            )}
-                          </div>
-                          <span className="text-text-3 shrink-0 text-xs">{r.item.path}</span>
-                        </ResultRow>
-                      );
-                    })}
-                </div>
-              )}
-
-              {/* Group: Records */}
-              {recordResults.length > 0 && (
-                <div className="mb-1">
-                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
-                    {t('search.records', 'Records')}
-                  </div>
-                  {allResults
-                    .filter(
-                      (r): r is Extract<SearchResult, { kind: 'record' }> => r.kind === 'record',
-                    )
-                    .map((r, idx) => {
-                      const globalIdx = allResults.indexOf(r);
-                      return (
-                        <ResultRow
-                          key={`record-${idx}`}
-                          active={activeIndex === globalIdx}
-                          dataIndex={globalIdx}
-                          onClick={() => handleSelect(r)}
-                          onMouseEnter={() => setActiveIndex(globalIdx)}
-                        >
-                          <svg
-                            className="text-accent h-4 w-4 shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-                            />
-                          </svg>
-                          <div className="min-w-0 flex-1">
-                            <span className="truncate">{r.hit.displayText}</span>
-                          </div>
-                          <span className="bg-hover text-text-3 shrink-0 rounded px-1.5 py-0.5 text-xs dark:bg-gray-800">
-                            {r.hit.modelName}
-                          </span>
-                        </ResultRow>
-                      );
-                    })}
-                </div>
-              )}
-
-              {/* Group: Docs (RAG) */}
-              {docResults.length > 0 && (
-                <div className="mb-1">
-                  <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
-                    {t('search.docs', 'Docs')}
-                  </div>
-                  {allResults
-                    .filter((r): r is Extract<SearchResult, { kind: 'doc' }> => r.kind === 'doc')
-                    .map((r, idx) => {
-                      const globalIdx = allResults.indexOf(r);
-                      const snippet =
-                        r.hit.content.length > 120
-                          ? r.hit.content.substring(0, 120) + '...'
-                          : r.hit.content;
-                      return (
-                        <ResultRow
-                          key={`doc-${idx}`}
-                          active={activeIndex === globalIdx}
-                          dataIndex={globalIdx}
-                          onClick={() => handleSelect(r)}
-                          onMouseEnter={() => setActiveIndex(globalIdx)}
-                        >
-                          <svg
-                            className="h-4 w-4 shrink-0 text-emerald-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            />
-                          </svg>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-medium">{r.hit.docName}</div>
-                            <div className="text-text-3 truncate text-xs dark:text-gray-500">
-                              {snippet}
+                            {model.modelLabel}
+                          </label>
+                          {enabled && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveSearchModel(model.modelCode, -1)}
+                                disabled={selectedModels[0] === model.modelCode}
+                                className="rounded-control border-border text-text-3 hover:text-text-2 h-6 w-6 border disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={`${t('common.moveUp', 'Move up')} ${model.modelLabel}`}
+                                data-testid={`search-model-up-${model.modelCode}`}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveSearchModel(model.modelCode, 1)}
+                                disabled={
+                                  selectedModels[selectedModels.length - 1] === model.modelCode
+                                }
+                                className="rounded-control border-border text-text-3 hover:text-text-2 h-6 w-6 border disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={`${t('common.moveDown', 'Move down')} ${model.modelLabel}`}
+                                data-testid={`search-model-down-${model.modelCode}`}
+                              >
+                                ↓
+                              </button>
                             </div>
-                          </div>
-                          <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                            {Math.round(r.hit.similarity * 100)}%
-                          </span>
-                        </ResultRow>
+                          )}
+                        </div>
                       );
                     })}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+
+                {settingsMessage && (
+                  <div
+                    className="text-text-3 mt-3 text-xs"
+                    data-testid="command-palette-settings-message"
+                  >
+                    {settingsMessage}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={saveSearchSettings}
+                  disabled={settingsSaving || settingsLoading}
+                  className="accent-accent rounded-card bg-accent mt-3 h-8 w-full px-3 text-xs font-medium text-white disabled:opacity-60"
+                  data-testid="command-palette-settings-save"
+                >
+                  {settingsSaving ? 'Saving...' : t('common.save', 'Save')}
+                </button>
+              </div>
+            ) : (
+              <div
+                ref={listRef}
+                className="max-h-[50vh] overflow-y-auto px-2 py-2"
+                data-testid="command-palette-results"
+              >
+                {allResults.length === 0 && query.trim() && !searching && (
+                  <div className="text-text-3 px-4 py-8 text-center text-sm dark:text-gray-500">
+                    {t('search.noResults', 'No results found')}
+                  </div>
+                )}
+
+                {allResults.length === 0 && !query.trim() && (
+                  <div className="text-text-3 px-4 py-6 text-center text-sm dark:text-gray-500">
+                    {t('search.hint', 'Type to search pages, records and docs')}
+                  </div>
+                )}
+
+                {/* Group: Recent */}
+                {allResults.some((r) => r.kind === 'recent') && (
+                  <div className="mb-1">
+                    <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
+                      {t('search.recent', 'Recent')}
+                    </div>
+                    {allResults
+                      .filter(
+                        (r): r is Extract<SearchResult, { kind: 'recent' }> => r.kind === 'recent',
+                      )
+                      .map((r, idx) => {
+                        const globalIdx = allResults.indexOf(r);
+                        return (
+                          <ResultRow
+                            key={`recent-${idx}`}
+                            active={activeIndex === globalIdx}
+                            dataIndex={globalIdx}
+                            onClick={() => handleSelect(r)}
+                            onMouseEnter={() => setActiveIndex(globalIdx)}
+                          >
+                            <svg
+                              className="text-text-3 h-4 w-4 shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span className="truncate">{r.keyword}</span>
+                          </ResultRow>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Group: Pages */}
+                {menuMatches.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
+                      {t('search.pages', 'Pages')}
+                    </div>
+                    {allResults
+                      .filter(
+                        (r): r is Extract<SearchResult, { kind: 'menu' }> => r.kind === 'menu',
+                      )
+                      .map((r, idx) => {
+                        const globalIdx = allResults.indexOf(r);
+                        return (
+                          <ResultRow
+                            key={`menu-${idx}`}
+                            active={activeIndex === globalIdx}
+                            dataIndex={globalIdx}
+                            onClick={() => handleSelect(r)}
+                            onMouseEnter={() => setActiveIndex(globalIdx)}
+                          >
+                            <svg
+                              className="text-text-3 h-4 w-4 shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate">{r.item.name}</span>
+                              {r.item.parentName && (
+                                <span className="text-text-3 ml-2 text-xs">
+                                  {r.item.parentName}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-text-3 shrink-0 text-xs">{r.item.path}</span>
+                          </ResultRow>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Group: Records */}
+                {recordResults.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
+                      {t('search.records', 'Records')}
+                    </div>
+                    {allResults
+                      .filter(
+                        (r): r is Extract<SearchResult, { kind: 'record' }> => r.kind === 'record',
+                      )
+                      .map((r, idx) => {
+                        const globalIdx = allResults.indexOf(r);
+                        return (
+                          <ResultRow
+                            key={`record-${idx}`}
+                            active={activeIndex === globalIdx}
+                            dataIndex={globalIdx}
+                            onClick={() => handleSelect(r)}
+                            onMouseEnter={() => setActiveIndex(globalIdx)}
+                          >
+                            <svg
+                              className="text-accent h-4 w-4 shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+                              />
+                            </svg>
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate">{r.hit.displayText}</span>
+                            </div>
+                            <span className="bg-hover text-text-3 shrink-0 rounded px-1.5 py-0.5 text-xs dark:bg-gray-800">
+                              {r.hit.modelName}
+                            </span>
+                          </ResultRow>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Group: Docs (RAG) */}
+                {docResults.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-text-3 px-3 py-1.5 text-[11px] font-medium tracking-wider uppercase dark:text-gray-500">
+                      {t('search.docs', 'Docs')}
+                    </div>
+                    {allResults
+                      .filter((r): r is Extract<SearchResult, { kind: 'doc' }> => r.kind === 'doc')
+                      .map((r, idx) => {
+                        const globalIdx = allResults.indexOf(r);
+                        const snippet =
+                          r.hit.content.length > 120
+                            ? r.hit.content.substring(0, 120) + '...'
+                            : r.hit.content;
+                        return (
+                          <ResultRow
+                            key={`doc-${idx}`}
+                            active={activeIndex === globalIdx}
+                            dataIndex={globalIdx}
+                            onClick={() => handleSelect(r)}
+                            onMouseEnter={() => setActiveIndex(globalIdx)}
+                          >
+                            <svg
+                              className="h-4 w-4 shrink-0 text-emerald-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                              />
+                            </svg>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-medium">{r.hit.docName}</div>
+                              <div className="text-text-3 truncate text-xs dark:text-gray-500">
+                                {snippet}
+                              </div>
+                            </div>
+                            <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              {Math.round(r.hit.similarity * 100)}%
+                            </span>
+                          </ResultRow>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Footer */}
             <div className="border-border text-text-3 flex items-center justify-between border-t px-4 py-2 text-[11px] dark:border-gray-700 dark:text-gray-500">
