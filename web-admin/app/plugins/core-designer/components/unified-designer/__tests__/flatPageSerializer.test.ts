@@ -458,23 +458,25 @@ describe('flatPageSerializer fail-fast boundaries', () => {
     ).toThrow(FlatSerializationError);
   });
 
-  it('rejects designer-only blocks with the offending block id', () => {
-    expect(() =>
-      serializePageTreeToFlat({
-        schemaVersion: 3,
-        kind: 'form',
-        id: 'my_form',
-        blocks: [
-          {
-            id: 'form_root',
-            blockType: 'form',
-            blocks: [
-              { id: 'repeater_rows', blockType: 'repeater', props: { model: 'items' } },
-            ],
-          },
-        ],
-      }),
-    ).toThrow(/repeater_rows/);
+  it('serializes repeater and subform as passthrough blocks (D2)', () => {
+    const result = serializePageTreeToFlat({
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'my_form',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            { id: 'repeater_rows', blockType: 'repeater', props: { model: 'items' } },
+            { id: 'subform_detail', blockType: 'subform', props: { model: 'detail' } },
+          ],
+        },
+      ],
+    });
+    expect(result.blocks.map((b) => b.id)).toEqual(['repeater_rows', 'subform_detail']);
+    expect(result.blocks[0].blockType).toBe('repeater');
+    expect(result.blocks[1].blockType).toBe('subform');
   });
 
   it('rejects container blocks nested inside a section (would be silently dropped)', () => {
