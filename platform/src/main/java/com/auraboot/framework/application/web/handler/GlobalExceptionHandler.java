@@ -241,7 +241,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleConflictException(ConflictException ex) {
         log.warn("Optimistic lock conflict: {}", ex.getMessage());
 
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BUSINESS_ERROR, ex.getMessage());
+        Map<String, Object> context = new java.util.HashMap<>(ex.getDetails());
+        context.put("errorCode", ex.getConflictCode());
+        ApiResponse<Object> response = ex.getConflictCode()
+                .equals(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED)
+                ? ApiResponse.error(ResponseCode.CasVersionRequired, ex.getMessage(), context)
+                : ex.getConflictCode()
+                .equals(ConflictException.ConflictCodes.CAS_VERSION_CONFLICT)
+                ? ApiResponse.error(ResponseCode.CasVersionConflict, ex.getMessage(), context)
+                : ex.getConflictCode()
+                .equals(ConflictException.ConflictCodes.REQUEST_INTENT_CONFLICT)
+                ? ApiResponse.error(ResponseCode.RequestIntentConflict, ex.getMessage(), context)
+                : ApiResponse.errorWithContext(ResponseCode.BUSINESS_ERROR, context);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
@@ -577,6 +588,7 @@ public class GlobalExceptionHandler {
             case BUSINESS_ERROR, PageDefinitionCantBeEmpty -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PluginConflictDetected, PluginImportFailed -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PluginNotFound -> HttpStatus.NOT_FOUND;
+            case CasVersionRequired, CasVersionConflict, RequestIntentConflict -> HttpStatus.CONFLICT;
             case SystemError, UnreachableCodePathException, UnsupportedFeature, OK -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }

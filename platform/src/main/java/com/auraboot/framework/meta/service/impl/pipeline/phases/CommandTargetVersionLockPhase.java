@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.exception.CasVersionConflictException;
+import com.auraboot.framework.exception.CasVersionRequiredException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -39,15 +41,34 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
 
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
-        return ctx.getRequest() == null
-                || ctx.getRequest().getExpectedVersion() == null
+        if (ctx.getRequest() == null
                 || ctx.getCommand() == null
                 || !StringUtils.hasText(ctx.getCommand().getModelCode())
-                || !StringUtils.hasText(ctx.getRequest().getTargetRecordId());
+                || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())) {
+            return true;
+        }
+        if (ctx.getRequest().getExpectedVersion() == null) {
+            // Strict legacy update/delete mutations enter execute to fail closed with the
+            // platform conflict code instead of silently skipping the concurrency boundary.
+            return !isStrictLegacyMutation(ctx.getRequest());
+        }
+        return false;
     }
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        if (ctx.getRequest().getExpectedVersion() == null) {
+            if (isStrictLegacyMutation(ctx.getRequest())) {
+                throw new CasVersionRequiredException(
+                        "Strict existing-target mutation requires expectedVersion",
+                        Map.of(
+                                "modelCode", ctx.getCommand().getModelCode(),
+                                "recordPid", ctx.getRequest().getTargetRecordId(),
+                                "errorCode", ConflictException.ConflictCodes.CAS_VERSION_REQUIRED
+                        ));
+            }
+            return;
+        }
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException(
                     "Command target version lock requires an active transaction");
@@ -77,12 +98,24 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
         if (authoritative == null || requested.longValue() != authoritative) {
-            throw new ConflictException(
+            throw new CasVersionConflictException(
                     "Command target version conflict (expected " + requested
                             + ", current " + (authoritative == null ? "unavailable" : authoritative)
-                            + ")");
+                            + ")",
+                    Map.of(
+                            "modelCode", ctx.getCommand().getModelCode(),
+                            "recordPid", ctx.getRequest().getTargetRecordId(),
+                            "expectedVersion", requested,
+                            "currentVersion", authoritative == null ? "unavailable" : authoritative,
+                            "errorCode", ConflictException.ConflictCodes.CAS_VERSION_CONFLICT
+                    ));
         }
         ctx.setTargetRecordVersion(authoritative);
+    }
+
+    private boolean isStrictLegacyMutation(com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
+        return "UPDATE".equalsIgnoreCase(request.getOperationType())
+                || "DELETE".equalsIgnoreCase(request.getOperationType());
     }
 
     private Long resolveVersion(List<Map<String, Object>> rows) {

@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.exception.CasVersionConflictException;
+import com.auraboot.framework.exception.CasVersionRequiredException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
@@ -69,7 +71,7 @@ class CommandTargetVersionLockPhaseTest {
                 .thenReturn(List.of(Map.of("row_version", 8L)));
 
         assertThatThrownBy(() -> phase.execute(context(7)))
-                .isInstanceOf(ConflictException.class)
+                .isInstanceOf(CasVersionConflictException.class)
                 .hasMessageContaining("expected 7")
                 .hasMessageContaining("current 8");
     }
@@ -100,6 +102,22 @@ class CommandTargetVersionLockPhaseTest {
         CommandPipelineContext ctx = context(null);
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void strictUpdateWithoutExpectedVersionFailsClosedBeforeLocking() {
+        CommandPipelineContext ctx = context(null);
+        ctx.getRequest().setOperationType("UPDATE");
+
+        assertThat(phase.shouldSkip(ctx)).isFalse();
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(CasVersionRequiredException.class)
+                .hasMessageContaining("requires expectedVersion")
+                .satisfies(error -> assertThat(error)
+                        .isInstanceOf(CasVersionRequiredException.class)
+                        .extracting(item -> ((CasVersionRequiredException) item).getConflictCode())
+                        .isEqualTo(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED));
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 

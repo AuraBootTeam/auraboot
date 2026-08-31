@@ -300,6 +300,16 @@ export function resolveCommandErrorMessage(
       return localized;
     }
   }
+  const conflictCode = String(body.context?.errorCode || '').toUpperCase();
+  if (conflictCode === 'CAS_VERSION_CONFLICT') {
+    return 'This record was updated by someone else. Refresh to review the latest data before saving.';
+  }
+  if (conflictCode === 'REQUEST_INTENT_CONFLICT') {
+    return 'This request does not match the original request. Refresh and start the operation again.';
+  }
+  if (conflictCode === 'CAS_VERSION_REQUIRED') {
+    return 'This form is stale and cannot prove the record is unchanged. Refresh and try again.';
+  }
   const resolved =
     firstNonBlankString(
       body.context?.detail,

@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.exception.RequestIntentConflictException;
 import com.auraboot.framework.meta.entity.IdempotencyRecord;
 import com.auraboot.framework.meta.exception.IdempotentException;
 import com.auraboot.framework.meta.mapper.IdempotencyRecordMapper;
@@ -241,8 +243,12 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             IdempotencyRecord record, String operationCode, String requestHash) {
         if (!operationCode.equals(record.getCommandCode())
                 || !requestHash.equals(record.getRequestHash())) {
-            throw new IdempotentException(
-                    "Idempotency key was already used with a different request");
+            throw new RequestIntentConflictException(
+                    "Idempotency key was already used with a different request",
+                    Map.of(
+                            "operationCode", operationCode == null ? "" : operationCode.trim(),
+                            "errorCode", ConflictException.ConflictCodes.REQUEST_INTENT_CONFLICT
+                    ));
         }
     }
 
