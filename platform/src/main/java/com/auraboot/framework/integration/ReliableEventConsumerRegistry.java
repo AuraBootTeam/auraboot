@@ -33,7 +33,7 @@ public class ReliableEventConsumerRegistry {
                         throw new IllegalStateException("Reliable event consumer code must not be blank");
                     }
                     ReliableEventConsumerExtension collision = unique.putIfAbsent(code, consumer);
-                    if (collision != null && collision != consumer) {
+                    if (collision != null && collision.getClass() != consumer.getClass()) {
                         throw new IllegalStateException("Duplicate reliable event consumer owner: " + code);
                     }
                 });
