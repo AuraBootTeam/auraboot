@@ -147,20 +147,12 @@ async function seedPage(page: Page, label: string): Promise<string> {
       title: `Box-select golden ${label} ${uid}`,
       kind: 'detail',
       modelCode: MODEL_CODE,
-      schemaVersion: 3,
+      schemaVersion: 4,
+      layout: { type: 'stack', gap: 12 },
       blocks: [
-        {
-          id: ROOT_BLOCK,
-          blockType: 'detail',
-          title: 'Box-select root',
-          dataSource: { model: MODEL_CODE },
-          layout: { span: 12 },
-          blocks: [
-            { id: SECTION_A, blockType: 'detail-section', title: 'Section A', layout: { columns: 12 }, blocks: [] },
-            { id: SECTION_B, blockType: 'detail-section', title: 'Section B', layout: { columns: 12 }, blocks: [] },
-            { id: SECTION_C, blockType: 'detail-section', title: 'Section C', layout: { columns: 12 }, blocks: [] },
-          ],
-        },
+        { id: SECTION_A, blockType: 'detail-section', title: 'Section A', columns: 12, fields: [] },
+        { id: SECTION_B, blockType: 'detail-section', title: 'Section B', columns: 12, fields: [] },
+        { id: SECTION_C, blockType: 'detail-section', title: 'Section C', columns: 12, fields: [] },
       ],
       extension: { e2e: true, scenario: 'canvas-box-select-golden' },
     },
@@ -207,9 +199,8 @@ test.describe('Unified Designer canvas box-select (marquee) golden', () => {
     await expect(page.getByTestId(`canvas-block-${SECTION_A}`)).toHaveAttribute('data-multi-selected', 'true');
     await expect(page.getByTestId(`canvas-block-${SECTION_B}`)).toHaveAttribute('data-multi-selected', 'true');
     await expect(page.getByTestId(`canvas-block-${SECTION_C}`)).toHaveAttribute('data-multi-selected', 'false');
-    // The page-root container that wraps both sections is NOT in the selection
-    // (ancestor-drop), so the count is 2 and the root survives a batch delete.
-    await expect(page.getByTestId(`canvas-block-${ROOT_BLOCK}`)).toHaveAttribute('data-multi-selected', 'false');
+    // In flat v4 there is no root container block — the page canvas directly
+    // renders top-level blocks. The ancestor-drop concept doesn't apply.
     await shot(page, '02-marquee-two-selected');
 
     // Batch delete -> the two covered sections vanish; C + root remain.
@@ -217,7 +208,6 @@ test.describe('Unified Designer canvas box-select (marquee) golden', () => {
     await expect(page.getByTestId(`canvas-block-${SECTION_A}`)).toHaveCount(0);
     await expect(page.getByTestId(`canvas-block-${SECTION_B}`)).toHaveCount(0);
     await expect(page.getByTestId(`canvas-block-${SECTION_C}`)).toBeVisible();
-    await expect(page.getByTestId(`canvas-block-${ROOT_BLOCK}`)).toBeVisible();
     await expect(page.getByTestId('multi-select-bar')).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await shot(page, '03-after-delete');
@@ -228,7 +218,6 @@ test.describe('Unified Designer canvas box-select (marquee) golden', () => {
     expect(findBlockById(persisted.blocks, SECTION_A), 'A removed').toBeNull();
     expect(findBlockById(persisted.blocks, SECTION_B), 'B removed').toBeNull();
     expect(findBlockById(persisted.blocks, SECTION_C), 'C kept (not covered)').not.toBeNull();
-    expect(findBlockById(persisted.blocks, ROOT_BLOCK), 'root kept').not.toBeNull();
   });
 
   test('happy: a marquee enclosing all three sections selects all three', async ({ page }) => {
