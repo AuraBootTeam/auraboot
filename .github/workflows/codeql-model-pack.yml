@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialize CodeQL CLI
-        uses: github/codeql-action/init@v4.37.3
+        uses: github/codeql-action/init@v4.37.9
         with:
           languages: java-kotlin
 
