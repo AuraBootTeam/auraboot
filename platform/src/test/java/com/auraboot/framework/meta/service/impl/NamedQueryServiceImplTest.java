@@ -9,16 +9,19 @@ import com.auraboot.framework.meta.dto.NamedQueryFieldRequest;
 import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
@@ -40,11 +43,15 @@ class NamedQueryServiceImplTest {
     private final NamedQueryFieldMapper namedQueryFieldMapper = mock(NamedQueryFieldMapper.class);
     private final NamedQueryVersionMapper namedQueryVersionMapper = mock(NamedQueryVersionMapper.class);
     private final DynamicDataMapper dynamicDataMapper = mock(DynamicDataMapper.class);
+    private final DynamicDataService dynamicDataService = mock(DynamicDataService.class);
     private final NamedQueryRateLimiter rateLimiter = mock(NamedQueryRateLimiter.class);
     private final ApiConnectorService apiConnectorService = mock(ApiConnectorService.class);
     private final DecisionUsageIndexService usageIndexService = mock(DecisionUsageIndexService.class);
     private final DataPermissionEngine dataPermissionEngine = mock(DataPermissionEngine.class);
     private final PermissionEvaluator permissionEvaluator = mock(PermissionEvaluator.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider =
+            mock(ObjectProvider.class);
 
     private final NamedQueryServiceImpl service = new NamedQueryServiceImpl(
             namedQueryMapper,
@@ -55,7 +62,8 @@ class NamedQueryServiceImplTest {
             apiConnectorService,
             usageIndexService,
             dataPermissionEngine,
-            permissionEvaluator);
+            permissionEvaluator,
+            dynamicDataServiceProvider);
 
     @AfterEach
     void clearContext() {
@@ -148,6 +156,70 @@ class NamedQueryServiceImplTest {
 
         verify(namedQueryFieldMapper, never()).findByQueryCode(any(), anyString());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void executeQueryRejectsWhenDeclaredRootRecordIsNotVisible() {
+        MetaContext.setContext(10L, 30L, "tester", "Tester");
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("qo.quote.bom_price");
+        query.setActionCode("read");
+        NamedQueryPolicy policy = new NamedQueryPolicy();
+        NamedQueryPolicy.RootAccess rootAccess = new NamedQueryPolicy.RootAccess();
+        rootAccess.setModelCode("qo_quote_common");
+        rootAccess.setPidParam("quoteId");
+        policy.setRootAccess(rootAccess);
+        query.setPolicy(policy);
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "qo.quote.bom_price", "read")).thenReturn(true);
+        when(permissionEvaluator.canAction(30L, "qo_quote_common", "read")).thenReturn(true);
+        when(dynamicDataServiceProvider.getObject()).thenReturn(dynamicDataService);
+        when(dynamicDataService.getById("qo_quote_common", "quote-1"))
+                .thenThrow(new AccessDeniedException("Access denied"));
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+
+        com.auraboot.framework.meta.dto.NamedQueryTestRequest request =
+                new com.auraboot.framework.meta.dto.NamedQueryTestRequest();
+        request.setParameters(Map.of("quoteId", "quote-1"));
+
+        assertThatThrownBy(() -> service.executeQuery("order_summary", request))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Access denied");
+
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void executeQueryRequiresRootRecordBeforeRunningSurfaceQuery() {
+        MetaContext.setContext(10L, 30L, "tester", "Tester");
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("qo.quote.bom_price");
+        query.setActionCode("read");
+        NamedQueryPolicy policy = new NamedQueryPolicy();
+        NamedQueryPolicy.RootAccess rootAccess = new NamedQueryPolicy.RootAccess();
+        rootAccess.setModelCode("qo_quote_common");
+        rootAccess.setPidParam("quoteId");
+        policy.setRootAccess(rootAccess);
+        query.setPolicy(policy);
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "qo.quote.bom_price", "read")).thenReturn(true);
+        when(permissionEvaluator.canAction(30L, "qo_quote_common", "read")).thenReturn(true);
+        when(dynamicDataServiceProvider.getObject()).thenReturn(dynamicDataService);
+        when(dynamicDataService.getById("qo_quote_common", "quote-1"))
+                .thenReturn(Map.of("pid", "quote-1"));
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(1L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "line-1")));
+
+        com.auraboot.framework.meta.dto.NamedQueryTestRequest request =
+                new com.auraboot.framework.meta.dto.NamedQueryTestRequest();
+        request.setParameters(Map.of("quoteId", "quote-1"));
+
+        service.executeQuery("order_summary", request);
+
+        verify(dynamicDataService).getById("qo_quote_common", "quote-1");
     }
 
     @Test

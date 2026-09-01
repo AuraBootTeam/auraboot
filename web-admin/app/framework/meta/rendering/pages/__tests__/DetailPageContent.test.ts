@@ -541,13 +541,19 @@ describe('resolveVisibleDetailTabs', () => {
 });
 
 describe('resolveVisibleDetailTabsFromBlocks', () => {
-  const tabBlock = (id: string, key: string, visibleWhen?: string, detailTabOrder?: number) =>
+  const tabBlock = (
+    id: string,
+    key: string,
+    visibleWhen?: string,
+    detailTabOrder?: number,
+    permissionCode?: string,
+  ) =>
     ({
       id,
       blockType: 'tabs',
       visibleWhen,
       detailTabOrder,
-      tabs: [{ key, label: key, blocks: [] }],
+      tabs: [{ key, label: key, blocks: [], permissionCode }],
     }) as any;
 
   it('composes all visible tab groups and does not let a hidden first group mask later groups', () => {
@@ -576,6 +582,33 @@ describe('resolveVisibleDetailTabsFromBlocks', () => {
       'overview',
       'exports',
       'field-sources',
+    ]);
+  });
+
+  it('filters individual permission-gated tabs while preserving visible groups', () => {
+    const blocks = [
+      tabBlock('public-tabs', 'overview'),
+      tabBlock('price-tabs', 'bom_price', undefined, undefined, 'qo.quote.bom_price.read'),
+      tabBlock('fee-tabs', 'process_fee', undefined, undefined, 'qo.quote.process_fee.read'),
+    ] as any;
+
+    expect(
+      resolveVisibleDetailTabsFromBlocks(
+        blocks,
+        () => true,
+        (code) => code !== 'qo.quote.process_fee.read',
+      ).map((tab) => tab.key),
+    ).toEqual(['overview', 'bom_price']);
+  });
+
+  it('fails closed when a tab declares a permission but no permission checker is supplied', () => {
+    const blocks = [
+      tabBlock('public-tabs', 'overview'),
+      tabBlock('price-tabs', 'bom_price', undefined, undefined, 'qo.quote.bom_price.read'),
+    ] as any;
+
+    expect(resolveVisibleDetailTabsFromBlocks(blocks, () => true).map((tab) => tab.key)).toEqual([
+      'overview',
     ]);
   });
 });

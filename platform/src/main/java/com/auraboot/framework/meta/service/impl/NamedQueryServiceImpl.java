@@ -17,6 +17,7 @@ import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
@@ -62,6 +64,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private final DecisionUsageIndexService usageIndexService;
     private final DataPermissionEngine dataPermissionEngine;
     private final PermissionEvaluator permissionEvaluator;
+    /**
+     * Lazy proxy avoids the natural DynamicData -> NamedQuery -> DynamicData service cycle.
+     * It is only resolved when a query explicitly declares an aggregate-root guard.
+     */
+    private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
 
     // DANGEROUS_SQL_PATTERN removed — replaced by SqlSafetyUtils.validateSelectOnlySql()
 
@@ -703,6 +710,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         params.put("currentUserId", userId != null ? userId.toString() : null);
         params.put("currentUserPid", MetaContext.getCurrentUserPid());
 
+        authorizeRootRecord(query, policy, params);
+
         appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
 
         if (!whereClauses.isEmpty()) {
@@ -762,6 +771,55 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (!permissionEvaluator.canAction(memberId, resourceCode, actionCode)) {
             throw new AccessDeniedException("Access denied for named query resource: " + resourceCode);
         }
+    }
+
+    /**
+     * Section queries are projections of a business aggregate. A caller with the surface
+     * permission still cannot read another owner's quote unless the root record itself is
+     * visible through the normal DynamicData ACL (owner/self, data scope, or record share).
+     */
+    private void authorizeRootRecord(
+            NamedQuery query,
+            NamedQueryPolicy policy,
+            Map<String, Object> params) {
+        NamedQueryPolicy.RootAccess rootAccess = policy.getRootAccess();
+        if (rootAccess == null) {
+            return;
+        }
+
+        String modelCode = trimToNull(rootAccess.getModelCode());
+        String pidParam = trimToNull(rootAccess.getPidParam());
+        if (modelCode == null || pidParam == null) {
+            throw new MetaServiceException(
+                    "Named query root access requires modelCode and pidParam: " + query.getCode());
+        }
+        SqlSafetyUtils.validateIdentifier(modelCode, "named query root model code");
+        Object rawRecordPid = params.get(pidParam);
+        String recordPid = rawRecordPid == null ? null : String.valueOf(rawRecordPid).trim();
+        if (recordPid == null || recordPid.isBlank()) {
+            throw new MetaServiceException(
+                    "Named query root record pid parameter is required: " + pidParam);
+        }
+
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) {
+            memberId = getCurrentUserId();
+        }
+        String action = trimToNull(rootAccess.getActionCode());
+        if (action == null) {
+            action = "read";
+        }
+        if (!permissionEvaluator.canAction(memberId, modelCode, action)) {
+            throw new AccessDeniedException("Access denied for named query root: " + modelCode);
+        }
+
+        DynamicDataService dynamicDataService = dynamicDataServiceProvider.getObject();
+        // getById applies the complete record ACL (tenant, row scope, record share) and
+        // fails closed. It is deliberately called even though its result is not returned:
+        // this is the aggregate authorization, not a data prefetch.
+        dynamicDataService.getById(modelCode, recordPid);
+        log.debug("Named query root access allowed: query={}, model={}, pid={}",
+                query.getCode(), modelCode, recordPid);
     }
 
     // ==================== Export ====================

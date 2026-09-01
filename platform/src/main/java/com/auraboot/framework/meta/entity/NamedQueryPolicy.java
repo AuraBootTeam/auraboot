@@ -11,6 +11,9 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class NamedQueryPolicy {
 
+    /** Optional aggregate-root authorization required before reading a section query. */
+    private RootAccess rootAccess;
+
     /** Max rows returned per query (default 5000) */
     private Integer maxRows = 5000;
 
@@ -45,6 +48,18 @@ public class NamedQueryPolicy {
     @com.fasterxml.jackson.annotation.JsonIgnore
     public int getEffectiveTimeoutMs() {
         return timeoutMs != null && timeoutMs > 0 ? timeoutMs : 30000;
+    }
+
+    @Data
+    public static class RootAccess {
+        /** Business aggregate model, e.g. {@code qo_quote_common}. */
+        private String modelCode;
+
+        /** Caller parameter containing the stable public record PID of the aggregate root. */
+        private String pidParam;
+
+        /** Root action to evaluate; defaults to {@code read}. */
+        private String actionCode = "read";
     }
 
     /**
