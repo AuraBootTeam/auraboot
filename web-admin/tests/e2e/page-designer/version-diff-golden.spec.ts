@@ -45,17 +45,7 @@ import { uniqueId } from '../helpers';
 // ab_announcement is a published platform meta-model present in every OSS stack;
 // it satisfies the detail-page contract for the root detail block.
 const MODEL_CODE = 'ab_announcement';
-const ROOT_BLOCK = 'detail_root';
 const SECTION_BLOCK = 'pd_diff_section';
-
-interface DslBlock {
-  id?: string;
-  blockType?: string;
-  title?: unknown;
-  dataSource?: Record<string, unknown>;
-  layout?: Record<string, unknown>;
-  blocks?: DslBlock[];
-}
 
 interface PageVersionDto {
   id: number;
@@ -109,28 +99,20 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 
 function detailDoc(pageKey: string, sectionId: string, sectionTitle: string, title: string) {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     kind: 'detail',
     id: pageKey,
     pageKey,
     modelCode: MODEL_CODE,
     title,
+    layout: { type: 'stack', gap: 12 },
     blocks: [
       {
-        id: ROOT_BLOCK,
-        blockType: 'detail',
-        title: 'Diff golden root',
-        dataSource: { model: MODEL_CODE },
-        layout: { span: 12 },
-        blocks: [
-          {
-            id: sectionId,
-            blockType: 'detail-section',
-            title: sectionTitle,
-            layout: { columns: 12 },
-            blocks: [],
-          },
-        ],
+        id: sectionId,
+        blockType: 'detail-section',
+        title: sectionTitle,
+        columns: 12,
+        fields: [],
       },
     ],
   };
