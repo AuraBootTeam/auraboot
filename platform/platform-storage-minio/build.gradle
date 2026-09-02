@@ -30,7 +30,7 @@ dependencies {
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
 
     // MinIO SDK
-    implementation 'io.minio:minio:8.5.7'
+    implementation 'io.minio:minio:8.6.0'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.40'
