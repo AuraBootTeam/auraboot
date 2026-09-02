@@ -107,6 +107,42 @@ class OrgEmployeeServiceImplTest {
     }
 
     @Test
+    @DisplayName("getUnlinkedMembers filters linked, inactive, missing-user, and keyword-mismatched members")
+    void getUnlinkedMembersFiltersAndProjectsUsers() {
+        TenantMember matching = member(1L, "member-1", null, "active");
+        TenantMember linked = member(2L, "member-2", 200L, "active");
+        TenantMember inactive = member(3L, "member-3", null, "inactive");
+        TenantMember missingUser = member(4L, "member-4", null, "active");
+        when(tenantMemberService.findByTenantId(1L))
+                .thenReturn(List.of(matching, linked, inactive, missingUser));
+
+        User user = new User();
+        user.setId(1L);
+        user.setNickName("Alice Example");
+        user.setEmail("alice@example.com");
+        user.setMobile("13800000000");
+        when(userService.findByUserId(1L)).thenReturn(user);
+        when(userService.findByUserId(4L)).thenReturn(null);
+
+        List<Map<String, Object>> result = service.getUnlinkedMembers("EXAMPLE");
+
+        assertEquals(1, result.size());
+        assertEquals("member-1", result.getFirst().get("memberPid"));
+        assertEquals("Alice Example", result.getFirst().get("name"));
+        verify(userService, never()).findByUserId(2L);
+        verify(userService, never()).findByUserId(3L);
+    }
+
+    private TenantMember member(Long userId, String pid, Long employeeId, String status) {
+        TenantMember member = new TenantMember();
+        member.setUserId(userId);
+        member.setPid(pid);
+        member.setEmployeeId(employeeId);
+        member.setStatus(status);
+        return member;
+    }
+
+    @Test
     @DisplayName("openAccount creates a username-only account when employee email is absent")
     void openAccountCreatesUserWithoutEmail() {
         Map<String, Object> employee = new HashMap<>();

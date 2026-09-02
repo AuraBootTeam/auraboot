@@ -13,17 +13,12 @@ import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.organization.service.PermittedDepartmentTreeService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
-import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.mapper.UserMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
@@ -43,8 +38,6 @@ public class OrgController {
     private final PermittedDepartmentTreeService permittedDepartmentTreeService;
     private final OrgEmployeeService orgEmployeeService;
     private final DynamicDataService dynamicDataService;
-    private final TenantMemberMapper tenantMemberMapper;
-    private final UserMapper userMapper;
 
     // ==================== Department Endpoints ====================
 
@@ -209,44 +202,6 @@ public class OrgController {
     @GetMapping("/members/unlinked")
     public ApiResponse<List<Map<String, Object>>> getUnlinkedMembers(
             @RequestParam(required = false) String keyword) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-
-        // Query active members without employee_id
-        List<TenantMember> allMembers = tenantMemberMapper.findByTenantId(tenantId);
-        List<TenantMember> unlinked = allMembers.stream()
-            .filter(m -> m.getEmployeeId() == null)
-            .filter(m -> "active".equalsIgnoreCase(m.getStatus()))
-            .collect(Collectors.toList());
-
-        // Enrich with user info and apply keyword filter
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (TenantMember member : unlinked) {
-            User user = userMapper.selectById(member.getUserId());
-            if (user == null) {
-                continue;
-            }
-
-            // Apply keyword filter on name, email, phone
-            if (keyword != null && !keyword.isBlank()) {
-                String lowerKeyword = keyword.toLowerCase();
-                boolean matches = (user.getNickName() != null && user.getNickName().toLowerCase().contains(lowerKeyword))
-                    || (user.getEmail() != null && user.getEmail().toLowerCase().contains(lowerKeyword))
-                    || (user.getMobile() != null && user.getMobile().toLowerCase().contains(lowerKeyword));
-                if (!matches) {
-                    continue;
-                }
-            }
-
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("memberPid", member.getPid());
-            item.put("userId", member.getUserId());
-            item.put("name", user.getNickName());
-            item.put("email", user.getEmail());
-            item.put("phone", user.getMobile());
-            item.put("status", member.getStatus());
-            result.add(item);
-        }
-
-        return ApiResponse.success(result);
+        return ApiResponse.success(orgEmployeeService.getUnlinkedMembers(keyword));
     }
 }

@@ -7,6 +7,7 @@ import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.dto.TransferRequest;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Employee CRUD service with bidirectional member-employee linking.
@@ -71,4 +72,12 @@ public interface OrgEmployeeService {
      * @param request      transfer details
      */
     void batchTransfer(List<String> employeePids, TransferRequest request);
+
+    /**
+     * List active tenant members that are not linked to an employee.
+     *
+     * @param keyword optional case-insensitive name, email, or phone filter
+     * @return member and user projections for the employee-link picker
+     */
+    List<Map<String, Object>> getUnlinkedMembers(String keyword);
 }

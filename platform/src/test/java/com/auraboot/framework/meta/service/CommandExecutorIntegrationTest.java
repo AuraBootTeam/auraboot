@@ -844,6 +844,7 @@ class CommandExecutorIntegrationTest extends BaseIntegrationTest {
         request.setPayload(Map.of("name", "approved_name"));
         request.setOperationType("update");
         request.setTargetRecordId(recordId);
+        request.setExpectedVersion(1);
         request.setClientRequestId("req_state_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, request);
@@ -928,6 +929,7 @@ class CommandExecutorIntegrationTest extends BaseIntegrationTest {
         request.setPayload(Map.of());
         request.setOperationType("update");
         request.setTargetRecordId(recordId);
+        request.setExpectedVersion(1);
         request.setClientRequestId("req_invalid_" + UUID.randomUUID());
 
         // Should throw ValidationException for invalid transition
@@ -1432,6 +1434,7 @@ class CommandExecutorIntegrationTest extends BaseIntegrationTest {
         updateRequest.setPayload(Map.of("name", "updated_name", "value", 200));
         updateRequest.setOperationType("update");
         updateRequest.setTargetRecordId(recordPid);
+        updateRequest.setExpectedVersion(1);
         updateRequest.setClientRequestId("req_ct_update_" + UUID.randomUUID());
 
         try {
@@ -1647,6 +1650,7 @@ class CommandExecutorIntegrationTest extends BaseIntegrationTest {
         updateReq.setPayload(Map.of(model.nameField(), "", model.valueField(), 20));
         updateReq.setOperationType("update");
         updateReq.setTargetRecordId(recordPid);
+        updateReq.setExpectedVersion(1);
         updateReq.setClientRequestId("req_val_update_" + UUID.randomUUID());
 
         ValidationException ex = assertThrows(ValidationException.class,
@@ -1680,6 +1684,7 @@ class CommandExecutorIntegrationTest extends BaseIntegrationTest {
         updateReq.setPayload(Map.of(model.valueField(), 99));
         updateReq.setOperationType("update");
         updateReq.setTargetRecordId(recordPid);
+        updateReq.setExpectedVersion(1);
         updateReq.setClientRequestId("req_val_update2_" + UUID.randomUUID());
 
         CommandExecuteResult updateResult = commandExecutor.execute(commandCode, updateReq);

@@ -29,6 +29,7 @@ import com.auraboot.framework.exception.ConflictException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -224,7 +225,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
                 assertThat(dynamicDataService.getById(model, ownRecordPid))
                         .containsEntry("pid", ownRecordPid);
                 assertThatThrownBy(() -> dynamicDataService.getById(model, otherRecordPid))
-                        .isInstanceOf(MetaServiceException.class)
+                        .isInstanceOf(AccessDeniedException.class)
                         .hasMessageContaining("command permit scope");
             });
 

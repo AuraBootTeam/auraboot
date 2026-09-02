@@ -3,7 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.IdempotencyService;
-import com.auraboot.framework.meta.exception.IdempotentException;
+import com.auraboot.framework.exception.RequestIntentConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,7 +115,7 @@ class IdempotencyServiceImplCoverageIT {
                 Map.of("name", "widget", "nested", Map.of("a", 1, "b", 2)),
                 TENANT_ID);
         assertEquals("r1", String.valueOf(replayed.get("pid")));
-        assertThrows(IdempotentException.class, () -> idempotencyService.checkScopedIdempotency(
+        assertThrows(RequestIntentConflictException.class, () -> idempotencyService.checkScopedIdempotency(
                 reqId, "demo:release", Map.of("name", "changed"), TENANT_ID));
         assertNull(idempotencyService.checkScopedIdempotency(
                 reqId, "demo:other", firstPayload, TENANT_ID));
