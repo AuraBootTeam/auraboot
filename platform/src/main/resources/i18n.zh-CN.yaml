@@ -1,5 +1,7 @@
 common:
   type: 类型
+  title: 标题
+  notice: 提示
   status: 状态
   date: 日期
   id: 编号
@@ -809,6 +811,31 @@ dashboard:
   retry: 重试
   error:
     access_forbidden: 无权访问仪表盘
+  designer:
+    defaultTitle: 未命名仪表盘
+    settings: 仪表盘设置
+    titlePlaceholder: 请输入仪表盘标题
+    descriptionPlaceholder: 请输入描述
+    visibilityScope: 可见范围
+    team: 团队
+    selectTeam: 选择团队
+    enterTeamId: 输入团队 ID
+    titleRequired: 请输入标题
+    teamRequired: 团队可见范围必须选择团队
+    settingsUpdated: 设置已更新
+    saveFailed: 保存失败
+    saveFailedRetry: 保存失败，请重试
+    saveFirst: 请先保存
+    autoSaveSuccess: 已自动保存
+    publishSuccess: 发布成功
+    publishFailed: 发布失败
+    publishFailedRetry: 发布失败，请重试
+    unpublishSuccess: 已取消发布
+    unpublishFailed: 取消发布失败
+  scope:
+    personal: 个人
+    team: 团队
+    global: 全局
 
 # AI Center — Colleagues & Settings
 ai:
