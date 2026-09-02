@@ -48,9 +48,12 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
             return true;
         }
         if (ctx.getRequest().getExpectedVersion() == null) {
-            // Strict legacy update/delete mutations enter execute to fail closed with the
-            // platform conflict code instead of silently skipping the concurrency boundary.
-            return !isStrictLegacyMutation(ctx.getRequest());
+            // Only commands that declare casRequired in their executionConfig are strict
+            // legacy mutations; entering execute fail-closes with the platform conflict
+            // code instead of silently skipping the concurrency boundary. All other
+            // update/delete commands proceed without a version (broad policy: the
+            // owner opts individual value-editing commands into CAS).
+            return !isStrictLegacyMutation(ctx.getRequest(), ctx.getCommand());
         }
         return false;
     }
@@ -58,7 +61,7 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         if (ctx.getRequest().getExpectedVersion() == null) {
-            if (isStrictLegacyMutation(ctx.getRequest())) {
+            if (isStrictLegacyMutation(ctx.getRequest(), ctx.getCommand())) {
                 throw new CasVersionRequiredException(
                         "Strict existing-target mutation requires expectedVersion",
                         Map.of(
@@ -113,9 +116,31 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         ctx.setTargetRecordVersion(authoritative);
     }
 
-    private boolean isStrictLegacyMutation(com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
-        return "UPDATE".equalsIgnoreCase(request.getOperationType())
-                || "DELETE".equalsIgnoreCase(request.getOperationType());
+    /**
+     * CAS is opt-in per command: an update/delete only requires expectedVersion when the
+     * command's executionConfig declares {@code "casRequired": true}. Intent-style commands
+     * (recompute, publish, delete) and background writers stay version-free unless the
+     * owner opts them in; a missing or malformed executionConfig defaults to opt-out.
+     */
+    private boolean isStrictLegacyMutation(
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request,
+            com.auraboot.framework.meta.entity.CommandDefinition command) {
+        if (!"UPDATE".equalsIgnoreCase(request.getOperationType())
+                && !"DELETE".equalsIgnoreCase(request.getOperationType())) {
+            return false;
+        }
+        String executionConfig = command == null ? null : command.getExecutionConfig();
+        if (!StringUtils.hasText(executionConfig)) {
+            return false;
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(executionConfig)
+                    .path("casRequired")
+                    .asBoolean(false);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+            return false;
+        }
     }
 
     private Long resolveVersion(List<Map<String, Object>> rows) {
