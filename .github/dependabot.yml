@@ -48,6 +48,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # 3.5.17 no longer exposes the extension API through the current starter
+      # classpath. Keep later versions eligible for a dedicated migration.
+      - dependency-name: "com.baomidou:*"
+        versions: ["3.5.17"]
 
   # Frontend (pnpm)
   - package-ecosystem: "npm"
