@@ -1,5 +1,7 @@
 common:
   type: タイプ
+  title: タイトル
+  notice: お知らせ
   status: ステータス
   date: 日付
   id: ID
@@ -351,6 +353,31 @@ dashboard:
   retry: リトライ
   error:
     access_forbidden: ダッシュボードにアクセスする権限がありません
+  designer:
+    defaultTitle: 名前のないダッシュボード
+    settings: ダッシュボード設定
+    titlePlaceholder: ダッシュボードタイトルを入力
+    descriptionPlaceholder: 説明を入力
+    visibilityScope: 公開範囲
+    team: チーム
+    selectTeam: チームを選択
+    enterTeamId: チームIDを入力
+    titleRequired: タイトルを入力してください
+    teamRequired: チーム範囲にはチームの選択が必要です
+    settingsUpdated: 設定を更新しました
+    saveFailed: 保存に失敗しました
+    saveFailedRetry: 保存に失敗しました。再試行してください
+    saveFirst: 先に保存してください
+    autoSaveSuccess: 自動保存しました
+    publishSuccess: 公開しました
+    publishFailed: 公開に失敗しました
+    publishFailedRetry: 公開に失敗しました。再試行してください
+    unpublishSuccess: 公開を取り消しました
+    unpublishFailed: 公開取消に失敗しました
+  scope:
+    personal: 個人
+    team: チーム
+    global: グローバル
 search:
   placeholder: 検索...
   title: グローバル検索

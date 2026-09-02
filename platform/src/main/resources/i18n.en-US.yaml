@@ -506,6 +506,31 @@ dashboard:
   retry: Retry
   error:
     access_forbidden: You do not have permission to access dashboards
+  designer:
+    defaultTitle: Untitled Dashboard
+    settings: Dashboard Settings
+    titlePlaceholder: Enter a dashboard title
+    descriptionPlaceholder: Enter a description
+    visibilityScope: Visibility Scope
+    team: Team
+    selectTeam: Select a team
+    enterTeamId: Enter a team ID
+    titleRequired: Title is required
+    teamRequired: Team scope requires selecting a team
+    settingsUpdated: Settings updated
+    saveFailed: Save failed
+    saveFailedRetry: Save failed, please retry
+    saveFirst: Save first
+    autoSaveSuccess: Auto-saved
+    publishSuccess: Published
+    publishFailed: Publish failed
+    publishFailedRetry: Publish failed, please retry
+    unpublishSuccess: Unpublished
+    unpublishFailed: Unpublish failed
+  scope:
+    personal: Personal
+    team: Team
+    global: Global
 
 # AI Center — Colleagues & Settings
 ai:
@@ -973,6 +998,8 @@ search:
   close: Close
 common:
   collaborative_records: Collaborative records
+  title: Title
+  notice: Notice
   field:
     status: Status
   status:
