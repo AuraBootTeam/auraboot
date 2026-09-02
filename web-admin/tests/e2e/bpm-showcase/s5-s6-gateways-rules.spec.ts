@@ -8,6 +8,9 @@
  *         实例仍挂起, 双双完成后实例到达 end。
  * - S5.2  包容网关: 金额大 → 法务+财务两分支同时激活(join 等待); 金额中等 →
  *         仅财务分支。条件经 UI 无关的 API 发起后由网关表达式判定。
+ * - S5.3  包容网关 default 兜底: 所有条件均为 false 时走声明的 default flow
+ *         (converter 把无条件的 default 编译为 false 条件 + BPMN default= 属性,
+ *         引擎确认零命中后回退 default), 其余分支不激活。
  *
  * S6 规则驱动 (Drools): 复用 workflow-demo 种子的 wd_leave_approval
  * (svc_rule_route rule-task + Drools wd_leave_routing + 互斥网关按 approverRole
@@ -96,6 +99,10 @@ function inclusiveGatewayGraph(bobPid: string, carolPid: string, davePid: string
         data: { type: 'userTask', label: '法务复核', config: { assignee: { type: 'user', userIds: [bobPid] } } },
       },
       {
+        id: 'default_review', type: 'userTask', position: { x: 460, y: 220 },
+        data: { type: 'userTask', label: '默认复核', config: { assignee: { type: 'user', userIds: [carolPid] } } },
+      },
+      {
         id: 'finance_review', type: 'userTask', position: { x: 460, y: 340 },
         data: { type: 'userTask', label: '财务复核', config: { assignee: { type: 'user', userIds: [davePid] } } },
       },
@@ -109,10 +116,15 @@ function inclusiveGatewayGraph(bobPid: string, carolPid: string, davePid: string
         data: { label: '大额', condition: { type: 'expression', content: '${amount >= 10000}' } },
       },
       {
+        id: 'e_default', source: 'gw_incl', target: 'default_review', type: 'smoothstep',
+        data: { label: '兜底', isDefault: true },
+      },
+      {
         id: 'e_finance', source: 'gw_incl', target: 'finance_review', type: 'conditional',
         data: { label: '需财务', condition: { type: 'expression', content: '${needFinance == true}' } },
       },
       { id: 'e4', source: 'legal_review', target: 'join', type: 'smoothstep', data: {} },
+      { id: 'e7', source: 'default_review', target: 'join', type: 'smoothstep', data: {} },
       { id: 'e5', source: 'finance_review', target: 'join', type: 'smoothstep', data: {} },
       { id: 'e6', source: 'join', target: 'end', type: 'smoothstep', data: {} },
     ],
@@ -336,6 +348,49 @@ test.describe('BPM Showcase S5+S6: gateways & rule routing (@bpm-showcase)', () 
           return status.completedNodes.some((n) => n.nodeId === 'end');
         },
         { timeout: 20_000 },
+      )
+      .toBe(true);
+  });
+
+  test('S5.3 inclusive gateway: zero conditional match walks the declared default flow', async ({ request }) => {
+    // Own deployment so S5.3 stays green independently of S5.2's deploy.
+    const inclDefaultKey = `${S5_KEY}_incl_default`;
+    await deployProcess(request, adminToken, {
+      processKey: inclDefaultKey,
+      processName: 'S5 包容网关 default 兜底',
+      designerJson: inclusiveGatewayGraph(pids.bob, pids.carol, pids.dave),
+    });
+
+    // amount < 10000 且 needFinance=false → 全部条件分支为 false → default 兜底(carol)
+    const aliceToken = await loginJwt(request, SHOWCASE_USERS.alice.email);
+    const bizKey = `SC5I-C-${Date.now()}`;
+    const inst = await startProcessInstance(request, aliceToken, {
+      processDefinitionId: inclDefaultKey,
+      businessKey: bizKey,
+      variables: { amount: 100, needFinance: false },
+    });
+
+    await waitForTodoTask(
+      request,
+      carolToken,
+      (t) => t.processInstanceId === inst.instanceId && t.processDefinitionActivityId === 'default_review',
+      { timeout: 20_000, message: 'default-flow todo must appear when no conditional branch matches' },
+    );
+    for (const token of [bobToken, daveToken]) {
+      const others = (await listTodoTasks(request, token)).filter(
+        (t) => t.processInstanceId === inst.instanceId,
+      );
+      expect(others, 'conditional branches must NOT activate on zero match').toHaveLength(0);
+    }
+
+    await completeViaApproveApi(request, carolToken, inst.instanceId, 'default_review');
+    await expect
+      .poll(
+        async () => {
+          const status = await queryInstanceStatus(request, adminToken, { processKey: inclDefaultKey, businessKey: bizKey });
+          return status.completedNodes.some((n) => n.nodeId === 'end');
+        },
+        { timeout: 20_000, message: 'default-only instance must reach end through the inclusive join' },
       )
       .toBe(true);
   });

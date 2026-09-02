@@ -28,7 +28,7 @@ PW_SKIP_WEBSERVER=1 NO_PROXY=127.0.0.1,localhost
 | `s1-approval-core.spec.ts` | S1 审批基本盘 | 待办多角色可见性、UI approve 注入 taskResult(Gap #8 Part 1)、空驳回理由拒绝、后端 taskActions fallback(Part 2, API-backed)、无权限反例 |
 | `s2-task-redistribution.spec.ts` | S2 任务再分配 | 转办(bob→carol, UI picker)、委托(bob→dave)、候选认领(role 展开, claim, 认领后互斥缺口 pin) |
 | `s3-s4-cc-countersign.spec.ts` | S3 抄送 + S4 会签 | 手动抄送链路(产品缺口 pin, 见下)、并行会签三实例、完成条件、加签/减签 |
-| `s5-s6-gateways-rules.spec.ts` | S5 网关 + S6 规则 | 并行网关 fork/join 等待、包容网关单/双分支、Drools `wd_leave_routing` 按天数分流 + 流程状态页规则 trace UI |
+| `s5-s6-gateways-rules.spec.ts` | S5 网关 + S6 规则 | 并行网关 fork/join 等待、包容网关单/双分支、包容网关零条件命中走 default 兜底(S5.3, 其余分支不激活)、Drools `wd_leave_routing` 按天数分流 + 流程状态页规则 trace UI |
 | `s7-sla-deadline.spec.ts` | S7 SLA | NODE 级 SLA record 激活 → 15s 调度推进 warning/overdue → escalate 通知(urge 类型)→ 办结不闭环缺口 pin |
 | `s8-grand-tour.spec.ts` | S8 大串联 | 包容双分支 + 财务会签(MI)+ join 收束;carol 走真实 UI 办结 |
 
@@ -69,4 +69,6 @@ S6 另补 `wd-showcase-manager/hr@test.com` 进种子的 `wd_manager`/`wd_hr` �
 - S3 只读抄送箱断言:BLOCKED(见发现 2)。
 - S1 rollback/withdraw 步骤未单独落用例(控制器/权限已由后端 IT 覆盖,
   UI 路径待后续批次;见 plan §4 S1.5/S1.6 预留行)。
-- 包容网关 0 分支命中(所有条件为 false)行为未覆盖(需产品语义决策)。
+- ~~包容网关 0 分支命中(所有条件为 false)行为未覆盖(需产品语义决策)。~~
+  已覆盖:语义定为 default fallback(#1745, 无 default 的 inclusive fork 在
+  converter fail-fast),S5.3 以真实引擎验证零命中走 default。

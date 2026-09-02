@@ -71,6 +71,13 @@ function grandTourGraph() {
         },
       },
       {
+        id: 'default_review', type: 'userTask', position: { x: 420, y: 220 },
+        data: {
+          type: 'userTask', label: '默认复核',
+          config: { assignee: { type: 'user', userIds: [pids.carol] } },
+        },
+      },
+      {
         id: 'finance_signoff', type: 'userTask', position: { x: 420, y: 340 },
         data: {
           type: 'userTask', label: '财务会签',
@@ -99,7 +106,12 @@ function grandTourGraph() {
         id: 'e_finance', source: 'gw_incl', target: 'finance_signoff', type: 'conditional',
         data: { label: '需财务', condition: { type: 'expression', content: '${needFinance == true}' } },
       },
+      {
+        id: 'e_default', source: 'gw_incl', target: 'default_review', type: 'smoothstep',
+        data: { label: '兜底', isDefault: true },
+      },
       { id: 'e4', source: 'legal_review', target: 'join', type: 'smoothstep', data: {} },
+      { id: 'e7', source: 'default_review', target: 'join', type: 'smoothstep', data: {} },
       { id: 'e5', source: 'finance_signoff', target: 'join', type: 'smoothstep', data: {} },
       { id: 'e6', source: 'join', target: 'end', type: 'smoothstep', data: {} },
     ],
