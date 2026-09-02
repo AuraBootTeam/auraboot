@@ -53,7 +53,12 @@ public enum ResponseCode implements Serializable {
 
     PluginConflictDetected("40001","Plugin resource conflict detected"),
     PluginImportFailed("40002","Plugin import failed"),
-    PluginNotFound("40003","Plugin import log not found");
+    PluginNotFound("40003","Plugin import log not found"),
+
+    // ── Concurrent request contract ──
+    CasVersionRequired("41000", "Optimistic concurrency version required"),
+    CasVersionConflict("41001", "Data was updated by another request"),
+    RequestIntentConflict("41002", "Request intent does not match the original request");
 
     @Getter
     private final String code;

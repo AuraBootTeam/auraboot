@@ -31,6 +31,38 @@ describe('resolveCommandErrorMessage', () => {
     ).toBe('量产基线校验未通过：制造定义包尚未达到量产就绪');
   });
 
+  it('maps platform CAS version conflicts to customer-safe guidance', () => {
+    expect(
+      resolveCommandErrorMessage(
+        {
+          context: {
+            errorCode: 'CAS_VERSION_CONFLICT',
+            detail: 'Command target version conflict (expected 7, current 8)',
+          },
+        },
+        'inv:update_material_return',
+      ),
+    ).toBe(
+      'This record was updated by someone else. Refresh to review the latest data before saving.',
+    );
+  });
+
+  it('maps platform request intent conflicts to customer-safe guidance', () => {
+    expect(
+      resolveCommandErrorMessage(
+        {
+          context: {
+            errorCode: 'REQUEST_INTENT_CONFLICT',
+            detail: 'Idempotency key was already used with a different request',
+          },
+        },
+        'inv:submit_material_return',
+      ),
+    ).toBe(
+      'This request does not match the original request. Refresh and start the operation again.',
+    );
+  });
+
   it('does not rewrite ordinary business validation messages', () => {
     expect(
       resolveCommandErrorMessage(
