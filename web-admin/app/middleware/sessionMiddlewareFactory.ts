@@ -22,6 +22,8 @@ const PUBLIC_ROUTES = [
   '/qr-scenarios', // anonymous AuraQR SEO scenario landing pages — pure frontend, no session required
   '/qr-batch', // anonymous AuraQR batch generator — pure frontend, no session required
   '/qr-decode', // anonymous AuraQR QR decoder tool — pure frontend, no session required
+  '/sitemap.xml', // anonymous AuraQR SEO route contract — exact path only
+  '/robots.txt', // anonymous AuraQR crawler policy — exact path only
   ...PLUGIN_PUBLIC_ROUTES,
 ];
 

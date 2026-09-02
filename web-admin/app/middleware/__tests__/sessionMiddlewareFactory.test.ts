@@ -174,6 +174,48 @@ describe('createSessionMiddleware', () => {
     expect(await response.text()).toBe('qr-decode');
   });
 
+  it.each([
+    ['/sitemap.xml', 'seo-sitemap'],
+    ['/robots.txt', 'seo-robots'],
+  ])('allows anonymous AuraQR SEO route %s', async (pathname, body) => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+
+    const { createSessionMiddleware } = await import('~/middleware/sessionMiddlewareFactory');
+    const middleware = createSessionMiddleware();
+
+    const response = (await middleware(
+      {
+        request: new Request(`http://localhost${pathname}`),
+      } as any,
+      async () => new Response(body, { status: 200 }),
+    )) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(body);
+  });
+
+  it.each([
+    '/sitemapxml',
+    '/robotstxt',
+  ])('keeps SEO lookalike path %s protected', async (pathname) => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+
+    const { createSessionMiddleware } = await import('~/middleware/sessionMiddlewareFactory');
+    const middleware = createSessionMiddleware();
+
+    await expect(
+      middleware(
+        {
+          request: new Request(`http://localhost${pathname}`),
+        } as any,
+        async () => new Response('should not reach next', { status: 200 }),
+      ),
+    ).rejects.toMatchObject({
+      url: `/login?redirectTo=${encodeURIComponent(pathname)}`,
+      status: 302,
+    });
+  });
+
   it('keeps theme preview protected by admin authentication', async () => {
     getSessionMock.mockResolvedValue({ get: vi.fn() });
 
