@@ -69,7 +69,9 @@ class SpringContextLoadsSmokeTest {
             .withUsername("auraboot")
             .withPassword("auraboot")
             .withCopyFileToContainer(
-                    MountableFile.forClasspathResource("db/snapshots/schema-current.sql"),
+                    // Dedicated CI runs with a restrictive umask, so Gradle's copied resource can
+                    // otherwise arrive as 0600 and be unreadable by the postgres container user.
+                    MountableFile.forClasspathResource("db/snapshots/schema-current.sql", 0644),
                     "/docker-entrypoint-initdb.d/00-schema.sql")
             // The full schema takes ~60-90s to apply via the entrypoint init script;
             // bump TC's default 60s startup window so the wait strategy doesn't time
