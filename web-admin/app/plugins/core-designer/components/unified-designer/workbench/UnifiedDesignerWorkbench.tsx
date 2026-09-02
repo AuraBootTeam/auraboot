@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core';
 import type {
   DslBlockV3,
+  LegacyPageSchemaV2,
   ModelFieldDefinition,
   ModelFieldsByModel,
   PageSchemaV3,
@@ -24,6 +25,7 @@ import {
 } from '../utils/recursiveBlockWalker';
 import { getByPath, setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
+import { migratePageSchemaV2ToV3 } from '../migration/migrateToV3';
 import {
   parseDocumentSnapshot,
   serializeDocument,
@@ -2317,15 +2319,30 @@ function parseImportedDocument(raw: FileReader['result']): PageSchemaV3 | null {
     candidate.kind === 'detail' ||
     candidate.kind === 'dashboard' ||
     candidate.kind === 'composite';
+  const isV3 = candidate.schemaVersion === 3;
+  const isV4 = candidate.schemaVersion === 4;
   if (
-    candidate.schemaVersion !== 3 ||
+    (!isV3 && !isV4) ||
     typeof candidate.id !== 'string' ||
     !validKind ||
     !Array.isArray(candidate.blocks)
   ) {
     return null;
   }
-  return parsed as PageSchemaV3;
+  if (isV3) return parsed as PageSchemaV3;
+  // Flat v4 import: wrap in a synthetic kind-root so the editor tree matches
+  // the internal representation the designer uses after loading stored v4.
+  return migratePageSchemaV2ToV3({
+    schemaVersion: 4,
+    kind: candidate.kind as LegacyPageSchemaV2['kind'],
+    id: candidate.id as string,
+    pageKey: (candidate as any).pageKey,
+    modelCode: (candidate as any).modelCode,
+    title: (candidate as any).title,
+    layout: candidate.layout as LegacyPageSchemaV2['layout'],
+    blocks: candidate.blocks as LegacyPageSchemaV2['blocks'],
+    extension: candidate.extension as LegacyPageSchemaV2['extension'],
+  });
 }
 
 function projectTemplateIntoGovernedRoot(
