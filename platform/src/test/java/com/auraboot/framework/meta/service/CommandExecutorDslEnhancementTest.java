@@ -482,6 +482,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         )));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -530,6 +531,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("sales_qty_" + suffix, 200)));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -601,6 +603,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>());
         req.setOperationType("delete");
         req.setTargetRecordId(parentId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -651,6 +654,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "no_action")));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -695,6 +699,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "need_rectify")));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -739,6 +744,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "no_action")));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         assertThrows(Exception.class, () -> commandExecutor.execute(commandCode, req),
@@ -778,6 +784,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "unknown_value")));
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         assertThrows(Exception.class, () -> commandExecutor.execute(commandCode, req),
@@ -812,6 +819,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>());
         req.setOperationType("update");
         req.setTargetRecordId(recordId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -883,6 +891,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "need_rectify")));
         req.setOperationType("update");
         req.setTargetRecordId(issueId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -947,6 +956,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "no_action")));
         req.setOperationType("update");
         req.setTargetRecordId(issueId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -1013,6 +1023,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("plan_name_" + suffix, "Updated plan")));
         req.setOperationType("update");
         req.setTargetRecordId(parentId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -1064,6 +1075,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>());
         req.setOperationType("update");
         req.setTargetRecordId(parentId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -1146,6 +1158,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("decision_" + suffix, "need_rectify")));
         req.setOperationType("update");
         req.setTargetRecordId(issueId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);
@@ -1216,6 +1229,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         req.setPayload(new HashMap<>(Map.of("rect_remark_" + suffix, "Looks good")));
         req.setOperationType("update");
         req.setTargetRecordId(rectId);
+        req.setExpectedVersion(1);
         req.setClientRequestId("req_" + UUID.randomUUID());
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, req);

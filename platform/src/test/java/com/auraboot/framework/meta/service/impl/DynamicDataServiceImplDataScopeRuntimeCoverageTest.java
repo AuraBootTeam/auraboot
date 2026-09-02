@@ -44,6 +44,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Map;
@@ -455,7 +456,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                 .thenReturn(List.of(Map.of("pid", RECORD_ID, "created_by", 999L)));
 
         assertThatThrownBy(() -> service.getRelationData(MODEL_CODE, RECORD_ID, "items", Map.of()))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Access denied");
     }
 

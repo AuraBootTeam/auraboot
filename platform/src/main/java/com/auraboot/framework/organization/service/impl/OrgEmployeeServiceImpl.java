@@ -75,6 +75,49 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     private JdbcTemplate jdbcTemplate;
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getUnlinkedMembers(String keyword) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String normalizedKeyword = normalizeBlankToNull(keyword);
+        if (normalizedKeyword != null) {
+            normalizedKeyword = normalizedKeyword.toLowerCase(java.util.Locale.ROOT);
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (TenantMember member : tenantMemberService.findByTenantId(tenantId)) {
+            if (member.getEmployeeId() != null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())) {
+                continue;
+            }
+            User user = userService.findByUserId(member.getUserId());
+            if (user == null || !matchesUser(user, normalizedKeyword)) {
+                continue;
+            }
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("memberPid", member.getPid());
+            item.put("userId", member.getUserId());
+            item.put("name", user.getNickName());
+            item.put("email", user.getEmail());
+            item.put("phone", user.getMobile());
+            item.put("status", member.getStatus());
+            result.add(item);
+        }
+        return result;
+    }
+
+    private boolean matchesUser(User user, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return containsIgnoreCase(user.getNickName(), keyword)
+                || containsIgnoreCase(user.getEmail(), keyword)
+                || containsIgnoreCase(user.getMobile(), keyword);
+    }
+
+    private boolean containsIgnoreCase(String value, String normalizedKeyword) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).contains(normalizedKeyword);
+    }
+
+    @Override
     @Transactional
     public OrgEmployeeDTO createWithUser(CreateEmployeeRequest request) {
         log.info("Creating employee with user: email={}", request.getEmail());
