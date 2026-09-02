@@ -60,7 +60,10 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 2
+    # Pause aggregate npm version-update PRs until runtime and development
+    # dependencies are split into independently testable framework families.
+    # Dependabot security alerts and security updates remain enabled separately.
+    open-pull-requests-limit: 0
     groups:
       frontend-runtime:
         dependency-type: "production"
