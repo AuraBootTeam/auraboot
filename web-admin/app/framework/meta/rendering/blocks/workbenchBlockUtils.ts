@@ -511,13 +511,38 @@ export async function executeSimpleWorkbenchAction(
     }
 
     const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
+    const operationType = args.operationType ? String(args.operationType).toUpperCase() : undefined;
     const params: Record<string, any> = {
       targetRecordPid,
-      operationType: args.operationType ? String(args.operationType).toUpperCase() : undefined,
+      operationType,
       payload: { ...(args.payload || {}), ...collectedInputs },
     };
     if (targetRecordPid) {
       params.targetRecordPid = targetRecordPid;
+    }
+    // Strict CAS contract (#1752): existing-target mutations must carry the
+    // expectedVersion observed by the caller. Workbench drawers confirm rows
+    // resolved from list data, so fetch the target's current row_version when
+    // the caller did not pass one explicitly.
+    if (
+      params.expectedVersion === undefined &&
+      targetRecordPid &&
+      (operationType === 'UPDATE' || operationType === 'DELETE')
+    ) {
+      const modelCode = runtime.getSchema?.()?.commands?.[command]?.modelCode;
+      if (modelCode) {
+        const recordResult = await fetchResult(
+          `/api/dynamic/${encodeURIComponent(modelCode)}/${encodeURIComponent(targetRecordPid)}`,
+          { method: 'get' },
+        );
+        if (isSuccessResult(recordResult)) {
+          const record = (recordResult as any)?.data?.data ?? (recordResult as any)?.data;
+          const version = Number(record?.row_version ?? record?.rowVersion);
+          if (Number.isFinite(version)) {
+            params.expectedVersion = version;
+          }
+        }
+      }
     }
     Object.keys(params).forEach((key) => {
       if (params[key] === undefined) delete params[key];

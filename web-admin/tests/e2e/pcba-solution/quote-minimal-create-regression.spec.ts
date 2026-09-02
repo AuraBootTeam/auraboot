@@ -297,6 +297,20 @@ test.describe('PCBA quote minimal create regression', () => {
         workbookPath,
         'create-quote-converted-bom.xlsx',
       );
+      // Gerber and CPL are mandatory at create (DSL required + server-side
+      // CreateQuoteHandler validation); the fixture files satisfy the slots.
+      await uploadSmartUploadFile(
+        page,
+        'form-field-gerber_source_file',
+        workbookPath,
+        'create-quote-gerber.zip',
+      );
+      await uploadSmartUploadFile(
+        page,
+        'form-field-cpl_source_file',
+        workbookPath,
+        'create-quote-cpl.csv',
+      );
       await page
         .getByTestId('form-field-qo_quote_notes')
         .locator('textarea, input')
