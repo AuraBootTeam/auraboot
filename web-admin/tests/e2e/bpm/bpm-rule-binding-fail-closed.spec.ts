@@ -865,7 +865,7 @@ test.beforeAll(async ({ request }) => {
   const me = await readApi<{ user?: { id?: string; pid?: string } }>(
     await request.get('/api/auth/me', { headers: authHeaders(adminToken) }),
   );
-  currentUserId = String(me?.user?.pid ?? me?.user?.id ?? '');
+  currentUserId = String(me?.user?.id ?? me?.user?.pid ?? '');
   currentBpmActorId = String(me?.user?.pid ?? '');
   expect(currentUserId, `current numeric user id must be available: ${JSON.stringify(me)}`).toMatch(/^\d+$/);
   expect(currentBpmActorId, `current BPM actor id must be available: ${JSON.stringify(me)}`)

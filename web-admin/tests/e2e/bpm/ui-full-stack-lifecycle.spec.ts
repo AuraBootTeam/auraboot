@@ -458,7 +458,7 @@ test.describe(
       // Deselect via the pane at its geometric center: the canvas corners
       // host floating widgets (palette toggle top-left, zoom controls
       // bottom-left) whose subtrees intercept corner clicks.
-      const paneBox = await page.locator('.react-flow__pane').boundingBox();
+      const paneBox = (await page.locator('.react-flow__pane').boundingBox())!;
       await page.locator('.react-flow__pane').click({
         position: { x: paneBox.width / 2, y: paneBox.height / 2 },
       });
