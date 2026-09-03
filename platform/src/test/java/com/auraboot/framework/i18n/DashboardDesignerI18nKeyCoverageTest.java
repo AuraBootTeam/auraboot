@@ -40,6 +40,9 @@ class DashboardDesignerI18nKeyCoverageTest {
 
     private static final List<String> SCOPE_KEYS = List.of("personal", "team", "global");
 
+    /** Keys referenced by web-admin app/plugins/core-dashboard/pages/dashboards/index.tsx. */
+    private static final List<String> ORDER_KEYS = List.of("saved", "save_failed");
+
     /** Keys referenced by web-admin app/ui/smart/dashboard/DashboardModuleTree.tsx. */
     private static final List<String> MODULE_KEYS = List.of(
             "title", "newFolder", "newFolderPlaceholder", "under", "rootHint", "empty",
@@ -93,6 +96,8 @@ class DashboardDesignerI18nKeyCoverageTest {
             requireNonBlank(scope, "dashboard.scope.", SCOPE_KEYS, locale, problems);
             requireNonBlank(section(root, "dashboard", "module"), "dashboard.module.",
                     MODULE_KEYS, locale, problems);
+            requireNonBlank(section(root, "dashboard", "order"), "dashboard.order.",
+                    ORDER_KEYS, locale, problems);
 
             Map<String, Object> common = section(root, "common");
             requireNonBlank(common, "common.", List.of("title", "notice"), locale, problems);

@@ -10,6 +10,12 @@ export const userPreferenceService = {
   },
 
   async set(key: string, value: unknown): Promise<void> {
-    await put<void>(`${BASE}/${key}`, { value });
+    // The HTTP client resolves transport failures into an error Result
+    // instead of rejecting — surface them so callers can react (e.g. the
+    // dashboard tab ordering reverts with a visible failure).
+    const result = await put<void>(`${BASE}/${key}`, { value });
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || result.message || 'Failed to save preference');
+    }
   },
 };

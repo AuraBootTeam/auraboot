@@ -393,6 +393,10 @@ dashboard:
     moved: 폴더가 이동되었습니다
     assigned: 대시보드가 폴더로 이동되었습니다
 
+  order:
+    saved: 순서가 저장되었습니다
+    save_failed: 순서 저장에 실패했습니다, 되돌렸습니다
+
   scope:
     personal: 개인
     team: 팀

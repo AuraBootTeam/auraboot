@@ -546,6 +546,10 @@ dashboard:
     moved: Folder moved
     assigned: Dashboard moved into folder
 
+  order:
+    saved: Order saved
+    save_failed: Failed to save order, reverted
+
   scope:
     personal: Personal
     team: Team
