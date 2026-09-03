@@ -446,32 +446,56 @@ test.describe('BPM Showcase S1: approval core (@bpm-showcase)', () => {
     expect(rollbackResp.status(), `rollback HTTP ${rollbackResp.status()}`).toBeLessThan(400);
     await bobCtx.close();
 
-    // backend evidence: audit records the rollback; the fill task re-opens
-    // for alice
+    // backend evidence: audit records the rollback; the real rollback (SmartEngine
+    // 4.0.3) cancels the manager_approve task and re-opens the fill node for alice
     const audits = await listAuditEvents(request, adminToken, instanceId);
     expect(audits.map((a) => a.operation)).toContain('task_rollback');
-    // PRODUCT FINDING #7 (2026-08-30, deferred — root cause in SmartEngine):
-    // rollbackTask reports success and the audit row is written, but the
-    // engine token does NOT move — the manager_approve task stays pending and
-    // no fill task is re-created (verified in se_task_instance). We pin the
-    // current behavior so the engine-level fix flips this deliberately.
+
+    // Real-rollback semantics (flip of the former no-op pin): the abandoned
+    // manager_approve task is CANCELED — bob must not keep a live todo for it.
+    await expect
+      .poll(
+        async () => {
+          const tasks = await listTodoTasks(request, bobToken);
+          return tasks.filter(
+            (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'manager_approve',
+          ).length;
+        },
+        { timeout: 15_000, message: 'manager_approve todo must be canceled by the rollback' },
+      )
+      .toBe(0);
+
+    // The fill node re-opens: a fresh pending task is created for alice with a
+    // new task id (the old fill task was completed, not resurrected).
+    let reopenedFillTask: { taskId: string } | undefined;
     await expect
       .poll(
         async () => {
           const tasks = await listTodoTasks(request, await loginJwt(request, SHOWCASE_USERS.alice.email));
-          return tasks.some(
+          reopenedFillTask = tasks.find(
             (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'fill',
-          );
+          ) as { taskId: string } | undefined;
+          return Boolean(reopenedFillTask);
         },
-        { timeout: 15_000, message: 'documenting current behavior: fill task does not re-open after rollback' },
+        { timeout: 20_000, message: 'fill task must re-open for alice after rollback' },
       )
-      .toBe(false);
-    test.info().annotations.push({
-      type: 'issue',
-      description:
-        'PRODUCT FINDING: rollbackTask succeeds + audits but the engine token does not move ' +
-        '(no fill task re-created; manager task stays pending). SmartEngine-level root cause.',
+      .toBe(true);
+    expect(reopenedFillTask!.taskId, 're-opened fill task must be a fresh task, not the completed one')
+      .not.toBe(fillTaskId);
+
+    // Full cycle proof: alice re-completes the fill node and the instance
+    // advances to manager_approve again (the rolled-back flow is live).
+    const refillResp = await request.post(`/api/bpm/tasks/${reopenedFillTask!.taskId}/complete`, {
+      headers: { Authorization: `Bearer ${await loginJwt(request, SHOWCASE_USERS.alice.email)}`, 'Content-Type': 'application/json' },
+      data: { comment: `S1.6 refilled ${businessKey}` },
     });
+    expect(refillResp.ok(), 'refill complete').toBe(true);
+    await waitForTodoTask(
+      request,
+      bobToken,
+      (t) => t.processInstanceId === instanceId && t.processDefinitionActivityId === 'manager_approve',
+      { timeout: 20_000, message: 'manager_approve todo must re-appear after the rolled-back fill completes' },
+    );
   });
 
   test('S1.7 withdraw via API: initiator terminates the running instance (API-backed, missing-ui-entry)', async ({ request }, testInfo) => {

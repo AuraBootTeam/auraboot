@@ -159,6 +159,7 @@ echo "$BE_HEALTH" | grep -q '"status":"UP"' \
     || die "P1: backend not UP → environment-invalid(见 $P1_LOG)"
 echo "$BFF_HEALTH" | grep -q '"springBoot":{"status":"healthy"' \
     || die "P1: BFF→backend 链路不健康 → environment-invalid(见 $P1_LOG)"
+case "$VITE_CODE" in 200|302|304) ;; *) die "P1: vite 不可达(HTTP $VITE_CODE) → environment-invalid" ;; esac
 [ "$SE_COUNT" = "0" ] || die "P1: se_notification_instance 应不存在 → schema gate 失败"
 for col in title source_type source_ref dedup_key; do
     case "$NOTIFY_COLS" in *"$col"*) ;; *) die "P1: ab_bpm_notify_record 缺列 $col" ;; esac

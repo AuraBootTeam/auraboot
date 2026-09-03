@@ -228,7 +228,8 @@ test.describe.serial(
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       expect(meResp.ok(), `resolve admin /me: ${meResp.status()}`).toBe(true);
-      adminUserId = String((await meResp.json())?.data?.user?.id ?? '');
+      const rtMe = await meResp.json();
+      adminUserId = String(rtMe?.data?.user?.pid ?? rtMe?.data?.user?.id ?? '');
       expect(adminUserId, 'admin userId must be resolvable').toBeTruthy();
     });
 

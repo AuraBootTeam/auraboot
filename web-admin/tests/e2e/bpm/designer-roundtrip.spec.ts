@@ -583,6 +583,12 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
     await expect(page.locator('[data-testid="edge-label-input"]')).toHaveValue('low');
 
     // Deselect so the Save button's enabled path is stable
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
     // 6. Save via real toolbar button + SaveDialog submit. Wait for PUT.
@@ -722,6 +728,12 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
     await expect(nodeLabelInput).toHaveValue(renamed);
 
     // Deselect
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
     // 3. Save via real toolbar button + dialog

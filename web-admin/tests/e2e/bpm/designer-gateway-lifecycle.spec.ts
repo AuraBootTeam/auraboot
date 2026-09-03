@@ -541,6 +541,12 @@ test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] 
     });
 
     // Deselect any element so the Deploy button's isDirty check is stable.
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
     // 8. Deploy via toolbar button (real UI click)

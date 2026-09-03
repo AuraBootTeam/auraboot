@@ -449,7 +449,19 @@ test.describe(
       await fillEdgeConditionViaUI(page, 'e_gw_manager', COND_HIGH);
 
       // 5. Deselect so subsequent Save dialog opens cleanly.
-      await page.locator('.react-flow__pane').click({ position: { x: 30, y: 30 } });
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
+      // Deselect via the pane at its geometric center: the canvas corners
+      // host floating widgets (palette toggle top-left, zoom controls
+      // bottom-left) whose subtrees intercept corner clicks.
+      const paneBox = (await page.locator('.react-flow__pane').boundingBox())!;
+      await page.locator('.react-flow__pane').click({
+        position: { x: paneBox.width / 2, y: paneBox.height / 2 },
+      });
 
       // 6. Click the toolbar Save button → SaveDialog opens.
       // DesignerToolbar renders save button with testId prefix

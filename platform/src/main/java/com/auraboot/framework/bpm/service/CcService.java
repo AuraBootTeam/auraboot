@@ -109,6 +109,29 @@ public class CcService {
             throw new IllegalArgumentException("receiverUserIds must not contain null entries");
         }
 
+        // BPM tasks and process instances are persisted in DATABASE storage mode.
+        // Automation synthesized flows force the CUSTOM (in-session) storage mode
+        // for their own runtime, so when a cc_task action drives this method from
+        // an automation thread the engine queries below would otherwise consult
+        // the empty in-session view and report the task missing. Pin DATABASE for
+        // the engine lookups and restore the caller's mode afterwards.
+        com.auraboot.smart.framework.engine.storage.StorageMode previousStorageMode =
+            com.auraboot.smart.framework.engine.storage.StorageModeHolder.get();
+        com.auraboot.smart.framework.engine.storage.StorageModeHolder.set(
+            com.auraboot.smart.framework.engine.storage.StorageMode.DATABASE);
+        try {
+            doCcForUserIds(taskId, receiverUserIds, comment, sourceType, dedupKey);
+        } finally {
+            com.auraboot.smart.framework.engine.storage.StorageModeHolder.set(previousStorageMode);
+        }
+    }
+
+    private void doCcForUserIds(
+            String taskId,
+            List<Long> receiverUserIds,
+            String comment,
+            String sourceType,
+            String dedupKey) {
         Long currentUserIdLong = MetaContext.getCurrentUserId();
         String currentUserId = BpmSecurityUtil.getCurrentUserId();
         String tenantIdStr = MetaContext.getCurrentTenantIdAsString();
@@ -143,7 +166,13 @@ public class CcService {
                     .findFirst()
                     .orElse(null);
         }
-        if (currentUserIdLong != null) {
+        // System actors (automation runners / event-policy evaluation) execute
+        // policy-defined CC actions on the engine's own lifecycle events. They
+        // are not a user at the task, so the task-actor identity gate does not
+        // apply to them; the sourceType is fixed server-side per call site and
+        // cannot be chosen by REST callers.
+        boolean systemActor = "AUTOMATION".equals(sourceType) || "EVENT_POLICY".equals(sourceType);
+        if (currentUserIdLong != null && !systemActor) {
             boolean isInitiator = initiatorId != null
                     && (initiatorId.equals(String.valueOf(currentUserIdLong))
                             || initiatorId.equals(currentUserId));

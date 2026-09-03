@@ -519,6 +519,12 @@ test.describe(
       await expect(page.locator('[data-testid="hook-entry-2"]')).toHaveCount(0);
 
       // Deselect to stabilize isDirty before Save/Deploy
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
       await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
       // 8b. Save first — the hook add/remove/fill mutations above set

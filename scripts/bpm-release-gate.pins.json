@@ -1,26 +1,6 @@
 {
   "version": 1,
-  "_comment": "BPM 发布门禁硬门 skip 允许清单:硬门(smoke/showcase/designer)运行中任何被 skip/fixme 的测试标题必须匹配至少一条 allow.pattern,否则门禁失败。flips 记录钉住用例的翻转条件( informational,不参与 skip 匹配 )。",
-  "allow": [
-    {
-      "id": "s3-3-automation-cc-stub",
-      "pattern": "S3\\.3 automation cc_task.*",
-      "reason": "BLOCKED on SmartEngine 4.0.2: automation synthesized flows run on the storage-custom persister, which intentionally throws 'not implement intentionally' for activity/execution/task persistence (CustomActivityInstanceStorage etc.). Flip: implement custom storage (or switch the automation runtime storage mode) — same engine-authorization bucket as the rollbackTask fix (handover §7.3); then remove this pin and the test.fixme marker.",
-      "kind": "skip-allow"
-    }
-  ],
-  "flips": [
-    {
-      "id": "s1-6-rollback-noop-pin",
-      "pattern": "S1\\.6 rollback via UI.*",
-      "reason": "S1.6 当前钉住 SmartEngine rollbackTask 空转语义(回退仅写审计,不产生真实回退);UI 路径断言回退后发起人重新出现待办是通过 engine 现有 jumpTo 行为实现的。翻转条件:B(rollbackTask 真回退)落地的同一 PR 内改写 S1.6 断言(新增 pending task 取消/新 task 创建/事件断言)并删除本 flips 条目。owner 授权项见 handover §7.3。",
-      "kind": "flip-condition"
-    },
-    {
-      "id": "s3-3-automation-cc-stub-flip",
-      "pattern": "S3\\.3 automation cc_task.*",
-      "reason": "S3.3 以 fixme 钉住:SmartEngine 4.0.2 storage-custom 持久化有意未实现,automation 合成流程无法执行 cc_task 的 BPM 单库路径。翻转条件:SmartEngine 实现 custom 存储(或切换 automation runtime 存储模式)后去掉 test.fixme 与 allow 条目。owner 授权项见 handover §7.3。",
-      "kind": "flip-condition"
-    }
-  ]
+  "_comment": "BPM 发布门禁硬门 skip 允许清单:硬门(smoke/showcase/designer)运行中任何被 skip/fixme 的测试标题必须匹配至少一条 allow.pattern,否则门禁失败。flips 记录钉住用例的翻转条件( informational,不参与 skip 匹配 )。4.0.3 落地后历史 pin 均已翻转移除:当前 allow 为空。",
+  "allow": [],
+  "flips": []
 }
