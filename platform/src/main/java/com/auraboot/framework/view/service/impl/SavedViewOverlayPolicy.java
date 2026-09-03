@@ -2,8 +2,10 @@ package com.auraboot.framework.view.service.impl;
 
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.PageSchemaRuntimeDTO;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.entity.ViewConfig.ColumnConfig;
@@ -50,12 +52,15 @@ public class SavedViewOverlayPolicy {
     private static final int MAX_STALE_PATHS = 100;
 
     private final PageSchemaService pageSchemaService;
+    private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
 
     public SavedViewOverlayPolicy(
             PageSchemaService pageSchemaService,
+            MetaModelService metaModelService,
             ObjectMapper objectMapper) {
         this.pageSchemaService = pageSchemaService;
+        this.metaModelService = metaModelService;
         this.objectMapper = objectMapper;
     }
 
@@ -168,12 +173,24 @@ public class SavedViewOverlayPolicy {
         return config;
     }
 
+    /**
+     * Structural columns present on every dynamic model table and exposed by the
+     * runtime default view; a saved view may keep them in its column overlay even
+     * though the page DSL does not declare them.
+     */
+    private static final java.util.Set<String> AUDIT_COLUMN_FIELDS =
+            java.util.Set.of("created_at", "updated_at");
+
     private void rejectUnknownReferences(ViewConfig config, SchemaFacts facts) {
         if (config.getColumns() != null) {
             config.getColumns().stream()
                     .filter(java.util.Objects::nonNull)
                     .map(ColumnConfig::getFieldCode)
                     .filter(StringUtils::hasText)
+                    // Structural audit columns exist on every dynamic model table (the
+                    // runtime default view includes them) but are not declared in the
+                    // page DSL, so the page-schema facts never contain them.
+                    .filter(field -> !AUDIT_COLUMN_FIELDS.contains(field))
                     .filter(field -> !facts.fieldCodes().contains(field))
                     .findFirst()
                     .ifPresent(field -> { throw unknownReference("field", field); });
@@ -415,6 +432,24 @@ public class SavedViewOverlayPolicy {
         Set<String> mandatoryActions = new TreeSet<>();
         collect(objectMapper.valueToTree(page.getBlocks()), null,
                 fields, actions, mandatoryFields, mandatoryActions);
+        // The runtime table renders every model-declared column plus the
+        // structural audit columns, so a saved view's column overlay may
+        // reference them even though the page DSL block does not declare
+        // them. Without this, saving a personal view whose column state
+        // carries a model column fails overlay validation.
+        if (StringUtils.hasText(page.getModelCode())) {
+            metaModelService.getModelDefinition(page.getModelCode()).ifPresent(definition -> {
+                if (definition.getFields() != null) {
+                    definition.getFields().stream()
+                            .map(com.auraboot.framework.meta.dto.FieldDefinition::getCode)
+                            .filter(StringUtils::hasText)
+                            .forEach(fields::add);
+                }
+                // structural audit columns live on the model's physical table
+                fields.add("created_at");
+                fields.add("updated_at");
+            });
+        }
         return new SchemaFacts(fields, actions, mandatoryFields, mandatoryActions);
     }
 
