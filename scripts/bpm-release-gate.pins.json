@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "_comment": "BPM 发布门禁硬门 skip 允许清单:硬门(smoke/showcase/designer)运行中任何被 skip 的测试标题必须匹配至少一条 pattern,否则门禁失败。当前硬门零 skip → allow 为空。flips 记录钉住用例的翻转条件(非 skip 允许项)。",
+  "allow": [],
+  "flips": [
+    {
+      "id": "s1-6-rollback-noop-pin",
+      "pattern": "S1\\.6 rollback via UI.*",
+      "reason": "S1.6 当前钉住 SmartEngine rollbackTask 空转语义(回退仅写审计,不产生真实回退);UI 路径断言回退后发起人重新出现待办是通过 engine 现有 jumpTo 行为实现的。翻转条件:B(rollbackTask 真回退)落地的同一 PR 内改写 S1.6 断言(新增 pending task 取消/新 task 创建/事件断言)并删除本 flips 条目。owner 授权项见 handover §7.3。",
+      "kind": "flip-condition"
+    }
+  ]
+}

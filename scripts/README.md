@@ -183,6 +183,8 @@
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
+| `bpm-release-gate.pins.json` | 1 | 2026-09-03 | Skip allow-list + flip conditions for `bpm-release-gate.sh` hard tiers; an unpinned hard-tier skip fails the gate. |
+| `bpm-release-gate.sh` | 1 | 2026-09-03 | BPM release gate orchestrator (P1 env/schema gate → smoke/showcase/designer hard tiers → bpm contract advisory tier). Denominator SOT: workspace `docs/plans/2026-09-03-bpm-functional-acceptance-matrix.md`. |
 | `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
 | `oss-test.sh` | 7 | 2026-06-22 | Run Playwright E2E tests restricted to the OSS scope defined in oss-scope.json. |
