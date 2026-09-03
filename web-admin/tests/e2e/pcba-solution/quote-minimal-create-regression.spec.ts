@@ -461,12 +461,11 @@ test.describe('PCBA quote minimal create regression', () => {
         timeout: 20_000,
       });
       await expect(page.getByRole('tab', { name: /BOM价格计算|BOM Price/i })).toBeVisible();
-      await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toHaveCount(0);
-      await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByTestId('toolbar-btn-upload_cpl')).toBeVisible();
-      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible();
+      // Materials upload is create-only now: the detail toolbar keeps only the
+      // pricing-input mutation, and no upload buttons may reappear.
+      await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-upload_cpl')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toHaveCount(0);
 
       const main = page.locator('main');
       await expect(main).not.toContainText('资料准备中');
