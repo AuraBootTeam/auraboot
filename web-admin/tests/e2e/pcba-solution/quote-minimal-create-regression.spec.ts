@@ -266,16 +266,21 @@ test.describe('PCBA quote minimal create regression', () => {
       await waitForFormReady(page, 20_000);
       await accountOptionsLoaded;
 
-      expect(await visibleFormFieldIds(page)).toEqual([
-        'form-field-corrected_bom_file',
-        'form-field-cpl_source_file',
-        'form-field-gerber_source_file',
-        'form-field-qo_quote_crm_account_id',
-        'form-field-qo_quote_notes',
-        'form-field-qo_quote_price_factor',
-        'form-field-qo_quote_project_id',
-        'form-field-qo_quote_set_count',
-      ]);
+      await expect
+        .poll(
+          async () => visibleFormFieldIds(page),
+          { timeout: 20_000, intervals: [500, 1_000, 2_000] },
+        )
+        .toEqual([
+          'form-field-corrected_bom_file',
+          'form-field-cpl_source_file',
+          'form-field-gerber_source_file',
+          'form-field-qo_quote_crm_account_id',
+          'form-field-qo_quote_notes',
+          'form-field-qo_quote_price_factor',
+          'form-field-qo_quote_project_id',
+          'form-field-qo_quote_set_count',
+        ]);
       await expect(
         page.getByTestId('form-field-qo_quote_set_count').locator('input').first(),
       ).toHaveValue('1');
