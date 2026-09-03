@@ -46,11 +46,8 @@ class DashboardDesignerI18nKeyCoverageTest {
             "inFolder", "inFolderEmpty", "assign", "confirmDelete", "move", "targetNotFound",
             "created", "renamed", "deleted", "moved", "assigned");
 
-    // ko-KR is excluded: the file has a pre-existing SnakeYAML parse error (an unquoted
-    // "(예: ${trigger.recordPid})" scalar) unrelated to this slice, so the whole locale
-    // fails to load before any key check could run.
     private static final List<String> LOCALES = List.of(
-            "i18n.zh-CN.yaml", "i18n.en-US.yaml", "i18n.ja-JP.yaml");
+            "i18n.zh-CN.yaml", "i18n.en-US.yaml", "i18n.ja-JP.yaml", "i18n.ko-KR.yaml");
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> root(String resource) throws Exception {
