@@ -316,7 +316,8 @@ test.describe(
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       expect(meResp.ok()).toBe(true);
-      adminUserId = String((await meResp.json())?.data?.user?.id ?? '');
+      const ntMe = await meResp.json();
+      adminUserId = String(ntMe?.data?.user?.pid ?? ntMe?.data?.user?.id ?? '');
       expect(adminUserId, 'admin userId must be resolvable').toBeTruthy();
 
       // Precondition: ensure templates exist so NotificationServiceImpl.send

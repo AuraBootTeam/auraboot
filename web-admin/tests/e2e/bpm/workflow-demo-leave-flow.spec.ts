@@ -250,7 +250,7 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     });
     expect(meResp.ok(), `resolve admin /me: ${meResp.status()}`).toBe(true);
     const meBody = await meResp.json();
-    adminUserId = String(meBody?.data?.user?.id ?? '');
+    adminUserId = String(meBody?.data?.user?.pid ?? meBody?.data?.user?.id ?? '');
     expect(adminUserId, 'admin /me must return a userId').toBeTruthy();
 
     await setLeaveBalance(request, adminToken, adminUserId, 20);
