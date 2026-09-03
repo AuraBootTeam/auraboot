@@ -678,8 +678,8 @@ export function resolvePermissionHiddenDataSourceIds(
       if (typeof value === 'string' && candidates[value]) into.add(value);
     }
     if (Array.isArray(record.fields)) {
-      for (const field of record.fields as Array<Record<string, unknown>>) {
-        const fieldSource = field?.dataSource;
+      for (const field of record.fields) {
+        const fieldSource = (field as { dataSource?: unknown })?.dataSource;
         if (typeof fieldSource === 'string' && candidates[fieldSource]) into.add(fieldSource);
       }
     }
