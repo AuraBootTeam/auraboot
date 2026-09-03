@@ -46,6 +46,7 @@ const ids = {
   myOpportunitiesView: '',
   wonOpportunitiesView: '',
   adminUser: '',
+  adminUserDisplay: '',
   otherOwner: '',
   contact: '',
 };
@@ -487,6 +488,7 @@ test.beforeAll(async () => {
   expect(adminJwt).toBeTruthy();
   const currentUser = assertOk(await api('/api/auth/me'), 'read current admin identity')?.data?.user;
   ids.adminUser = String(currentUser?.pid || '');
+  ids.adminUserDisplay = String(currentUser?.name || 'Admin');
   expect(ids.adminUser, 'current admin must expose a public pid').toBeTruthy();
   ids.otherOwner = await provisionUser(OTHER_OWNER_EMAIL, 'crm_sales', `${RUN} 异地销售`);
   await provisionUser(VIEWER_EMAIL, 'crm_viewer', `${RUN} 只读观察者`);
@@ -630,7 +632,7 @@ test('Cordys-aligned preset views expose real all, self and won opportunity fact
   }
   await expect(discoveryRow).toBeVisible();
   await expect(page.locator('tr').filter({ hasText: names.otherOwned })).toHaveCount(0);
-  await expect(page.getByText('Admin User', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(ids.adminUserDisplay, { exact: true }).first()).toBeVisible();
   await expect(page.getByTestId(`quick-filter-view-${ids.myOpportunitiesView}`)).toContainText(
     '我的商机',
   );
@@ -784,6 +786,7 @@ test('a personal view owns its visible fields, pinned amount and row density', a
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
   await page.getByTestId('personal-view-save-current').click();
+  await page.waitForTimeout(2000);
   await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
   const competitorHeader = page.getByTestId('table-header-crm_opp_competitor');
