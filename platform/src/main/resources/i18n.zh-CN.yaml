@@ -851,6 +851,10 @@ dashboard:
     moved: 目录已移动
     assigned: 仪表盘已加入目录
 
+  order:
+    saved: 排序已保存
+    save_failed: 排序保存失败，已还原
+
   scope:
     personal: 个人
     team: 团队

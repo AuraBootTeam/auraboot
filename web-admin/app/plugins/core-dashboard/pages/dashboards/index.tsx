@@ -153,7 +153,7 @@ function DragHint({ label }: { label: string }) {
 // ---------------------------------------------------------------------------
 
 export default function DashboardViewerPage() {
-  const { showSuccessToast } = useToastContext();
+  const { showSuccessToast, showErrorToast } = useToastContext();
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const codeParam = searchParams.get('code');
@@ -299,15 +299,23 @@ export default function DashboardViewerPage() {
       if (oldIndex === -1 || newIndex === -1) return;
 
       const newCodes = arrayMove(codes, oldIndex, newIndex);
+      const previousCodes = orderedCodes;
       setOrderedCodes(newCodes);
-
-      // Persist to backend (fire-and-forget)
-      userPreferenceService.set(PREF_KEY, newCodes).catch(() => {});
 
       // Dismiss hint on first drag
       localStorage.setItem(HINT_STORAGE_KEY, '1');
+
+      // Persist non-optimistically: revert the move and surface a failure
+      // when the preference write does not stick.
+      userPreferenceService
+        .set(PREF_KEY, newCodes)
+        .then(() => showSuccessToast(t('dashboard.order.saved')))
+        .catch(() => {
+          setOrderedCodes(previousCodes);
+          showErrorToast(t('dashboard.order.save_failed'));
+        });
     },
-    [sortedList],
+    [sortedList, orderedCodes, showSuccessToast, showErrorToast, t],
   );
 
   const handleToggleFavorite = useCallback((code: string) => {

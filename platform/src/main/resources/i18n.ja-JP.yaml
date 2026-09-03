@@ -393,6 +393,10 @@ dashboard:
     moved: フォルダを移動しました
     assigned: ダッシュボードをフォルダに移動しました
 
+  order:
+    saved: 並び順を保存しました
+    save_failed: 並び順の保存に失敗しました、元に戻しました
+
   scope:
     personal: 個人
     team: チーム
