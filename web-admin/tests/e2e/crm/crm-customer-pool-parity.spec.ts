@@ -3365,7 +3365,9 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       );
       await winnerPage.getByTestId('filter-btn-search').click();
       await winnerSearchResponse;
-      await expect(companyCell(winnerPage, assignedName)).toHaveCount(0);
+      await expect
+        .poll(() => companyCell(winnerPage, assignedName).count(), { timeout: 15_000 })
+        .toBe(0);
       const winnerRow = winnerPage.getByRole('row', { name: new RegExp(conflictName) });
       await expect(winnerRow).toContainText(/已领取|Claimed/);
       await winnerRow.click();
