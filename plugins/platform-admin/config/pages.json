@@ -1823,7 +1823,16 @@
           }
         ]
       },
-      {
+          {
+      "id": "block_module_tree",
+      "blockType": "custom",
+      "component": "DashboardModuleTree",
+      "layout": {
+        "colSpan": 3,
+        "rowSpan": 1
+      }
+    },
+{
         "id": "block_table",
         "blockType": "table",
         "onRowClick": "navigate",
@@ -1978,7 +1987,7 @@
           }
         },
         "layout": {
-          "colSpan": 12,
+          "colSpan":  8,
           "rowSpan": 1
         }
       },

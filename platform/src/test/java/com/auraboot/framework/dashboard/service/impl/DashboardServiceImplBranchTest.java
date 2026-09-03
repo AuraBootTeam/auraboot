@@ -8,6 +8,7 @@ import com.auraboot.framework.dashboard.dto.DashboardUpdateRequest;
 import com.auraboot.framework.dashboard.dto.MountMenuRequest;
 import com.auraboot.framework.dashboard.entity.Dashboard;
 import com.auraboot.framework.dashboard.mapper.DashboardMapper;
+import com.auraboot.framework.dashboard.mapper.DashboardModuleMapper;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
@@ -52,6 +53,7 @@ import static org.mockito.Mockito.when;
 class DashboardServiceImplBranchTest {
 
     @Mock private DashboardMapper dashboardMapper;
+    @Mock private DashboardModuleMapper dashboardModuleMapper;
     @Mock private VersionHistoryService versionHistoryService;
     @Mock private UserPermissionService userPermissionService;
     @Mock private CurrentUserTeamResolver currentUserTeamResolver;
@@ -63,7 +65,7 @@ class DashboardServiceImplBranchTest {
 
     @BeforeEach
     void setUp() {
-        service = new DashboardServiceImpl(dashboardMapper, objectMapper, versionHistoryService,
+        service = new DashboardServiceImpl(dashboardMapper, dashboardModuleMapper, objectMapper, versionHistoryService,
                 userPermissionService, currentUserTeamResolver, menuService, permissionMapper);
         MetaContext.setContext(10L, 1L, "u-1", "user");
     }

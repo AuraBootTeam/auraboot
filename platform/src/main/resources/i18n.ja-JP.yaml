@@ -374,6 +374,25 @@ dashboard:
     publishFailedRetry: 公開に失敗しました。再試行してください
     unpublishSuccess: 公開を取り消しました
     unpublishFailed: 公開取消に失敗しました
+  module:
+    title: フォルダ
+    newFolder: フォルダを作成
+    newFolderPlaceholder: 新しいフォルダ名
+    under: 作成先
+    rootHint: 新しいフォルダはルートに作成されます
+    empty: フォルダはまだありません
+    inFolder: このフォルダのダッシュボード
+    inFolderEmpty: なし
+    assign: ダッシュボードをフォルダに追加...
+    confirmDelete: このフォルダを削除しますか？
+    move: フォルダへ移動（空欄でルート）
+    targetNotFound: 移動先のフォルダが見つかりません
+    created: フォルダを作成しました
+    renamed: フォルダ名を変更しました
+    deleted: フォルダを削除しました
+    moved: フォルダを移動しました
+    assigned: ダッシュボードをフォルダに移動しました
+
   scope:
     personal: 個人
     team: チーム

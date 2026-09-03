@@ -39,6 +39,12 @@ public class DashboardDTO {
     private Boolean isDefault;
     private Integer sortOrder;
 
+    /**
+     * Owning folder (dashboard module) PID; null = unassigned. Resolved to
+     * module_id on write.
+     */
+    private String modulePid;
+
     private JsonNode extension;
 
     private Instant createdAt;

@@ -832,6 +832,25 @@ dashboard:
     publishFailedRetry: 发布失败，请重试
     unpublishSuccess: 已取消发布
     unpublishFailed: 取消发布失败
+  module:
+    title: 目录
+    newFolder: 新建目录
+    newFolderPlaceholder: 新目录名称
+    under: 创建于
+    rootHint: 新目录将创建在根层级
+    empty: 暂无目录
+    inFolder: 目录内仪表盘
+    inFolderEmpty: 暂无
+    assign: 添加仪表盘到此目录...
+    confirmDelete: 确认删除目录？
+    move: 移动到目录（留空为根目录）
+    targetNotFound: 目标目录不存在
+    created: 目录已创建
+    renamed: 目录已重命名
+    deleted: 目录已删除
+    moved: 目录已移动
+    assigned: 仪表盘已加入目录
+
   scope:
     personal: 个人
     team: 团队
