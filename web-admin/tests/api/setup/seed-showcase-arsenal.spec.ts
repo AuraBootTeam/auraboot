@@ -52,6 +52,7 @@ async function cmd(
   payload: Record<string, unknown>,
   targetRecordId?: string,
   operationType?: string,
+  expectedVersion?: number,
 ): Promise<string> {
   const result = await executeCommandViaApi(
     page,
@@ -59,9 +60,29 @@ async function cmd(
     payload,
     targetRecordId,
     operationType,
+    { expectedVersion },
   );
   expect(result.code).toBe('0');
   return result.recordId;
+}
+
+async function fetchShowcaseRecordByName(
+  page: any,
+  name: string,
+): Promise<{ pid: string; rowVersion: number | null }> {
+  const filters = encodeURIComponent(
+    JSON.stringify([{ fieldName: 'sc_name', operator: 'eq', value: name }]),
+  );
+  const resp = await page.request.get(
+    `/api/dynamic/showcase_all_fields/list?pageNum=1&pageSize=1&filters=${filters}`,
+  );
+  const body = await resp.json().catch(() => ({}));
+  const record = body?.data?.records?.[0];
+  const rawVersion = record?.row_version ?? record?.rowVersion;
+  return {
+    pid: String(record?.pid ?? record?.id ?? ''),
+    rowVersion: rawVersion != null ? Number(rawVersion) : null,
+  };
 }
 
 async function findShowcaseRecordIdByName(page: any, name: string): Promise<string> {
@@ -631,7 +652,14 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
 
       const recordId = recordIds[index];
       if (recordId) {
-        await cmd(page, 'sc:update_showcase', payload, recordId, 'update');
+        // Strict CAS: echo the observed row_version or the platform rejects
+        // the UPDATE with CAS_VERSION_REQUIRED.
+        const current = await fetchShowcaseRecordByName(page, item.name);
+        if (current.pid && current.rowVersion != null) {
+          await cmd(
+            page, 'sc:update_showcase', payload, current.pid, 'update', current.rowVersion,
+          );
+        }
       }
     }
     console.log(`  Created ${created}/10 showcase records, available ${available}/10`);
@@ -646,7 +674,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     for (const idx of activateIndices) {
       if (!recordIds[idx]) continue;
       try {
-        await cmd(page, 'sc:activate_showcase', {}, recordIds[idx], 'update');
+        const current = await fetchShowcaseRecordByName(page, items[idx].name);
+        await cmd(
+          page, 'sc:activate_showcase', {}, current.pid || recordIds[idx], 'update',
+          current.rowVersion ?? undefined,
+        );
         console.log(`  Activated: ${items[idx].name}`);
       } catch (e) {
         console.warn(
@@ -659,7 +691,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     for (const idx of [3, 9]) {
       if (!recordIds[idx]) continue;
       try {
-        await cmd(page, 'sc:submit_review_showcase', {}, recordIds[idx], 'update');
+        const current = await fetchShowcaseRecordByName(page, items[idx].name);
+        await cmd(
+          page, 'sc:submit_review_showcase', {}, current.pid || recordIds[idx], 'update',
+          current.rowVersion ?? undefined,
+        );
         console.log(`  Submitted for review: ${items[idx].name}`);
       } catch (e) {
         console.warn(
@@ -671,7 +707,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     // Record 7: archive (active -> archived)
     if (recordIds[7]) {
       try {
-        await cmd(page, 'sc:archive_showcase', {}, recordIds[7], 'update');
+        const current = await fetchShowcaseRecordByName(page, items[7].name);
+        await cmd(
+          page, 'sc:archive_showcase', {}, current.pid || recordIds[7], 'update',
+          current.rowVersion ?? undefined,
+        );
         console.log(`  Archived: ${items[7].name}`);
       } catch (e) {
         console.warn(

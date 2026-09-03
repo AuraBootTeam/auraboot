@@ -913,7 +913,7 @@ export async function executeCommandViaApi(
   payload: Record<string, unknown> = {},
   targetRecordId?: string,
   operationType?: string,
-  options?: { allowHttpError?: boolean; timeoutMs?: number },
+  options?: { allowHttpError?: boolean; timeoutMs?: number; expectedVersion?: number },
 ): Promise<{ recordId: string; code: string }> {
   const data: Record<string, unknown> = { payload };
   // Public JSON callers must send the record target as `targetRecordPid` — the
@@ -923,6 +923,9 @@ export async function executeCommandViaApi(
   // unique_composite validator could not exclude the record being updated).
   if (targetRecordId) data.targetRecordPid = targetRecordId;
   if (operationType) data.operationType = operationType;
+  // Strict CAS: UPDATE/DELETE on an existing target is rejected with
+  // CAS_VERSION_REQUIRED unless the client echoes the observed row_version.
+  if (options?.expectedVersion != null) data.expectedVersion = options.expectedVersion;
 
   const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
     data,

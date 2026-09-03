@@ -42,7 +42,14 @@ dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 const PORT = parseInt(process.env.BFF_PORT || '3500', 10);
-const SPRING_BOOT_URL = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
+// Resolution order: explicit override → reset/runtime contract (AURA_BE_BASE is
+// exported by scripts/oss-reset-and-init.sh) → BE_PORT slot → host-mode default.
+// Without this chain a slot-based reset (e.g. BE_PORT=6463) leaves the BFF
+// proxying to the hardcoded :6443 default and every backend request ECONNREFUSEDs.
+const SPRING_BOOT_URL = process.env.SPRING_BOOT_URL
+  || process.env.AURA_BE_BASE
+  || (process.env.BE_PORT ? `http://127.0.0.1:${process.env.BE_PORT}` : '')
+  || 'http://127.0.0.1:6443';
 
 // 初始化服务
 const proxyService = new BffProxyService({ target: SPRING_BOOT_URL });
