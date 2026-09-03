@@ -29,7 +29,8 @@
         "pattern": "QS-{yyyyMMdd}-{seq}"
       },
       "crm_qs_owner": {
-        "strategy": "current_user_pid"
+        "strategy": "current_user_pid",
+        "preserveInput": true
       }
     },
     "permissions": [

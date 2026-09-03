@@ -24,7 +24,8 @@
    "pattern": "OPP-{yyyyMMdd}-{seq}"
   },
   "crm_opp_owner": {
-   "strategy": "current_user_pid"
+   "strategy": "current_user_pid",
+   "preserveInput": true
   },
   "crm_opp_stage": {
    "strategy": "fixed_value",
