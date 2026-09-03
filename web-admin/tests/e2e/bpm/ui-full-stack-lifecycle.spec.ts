@@ -455,9 +455,13 @@ test.describe(
       if (await drawerBackdrop.isVisible().catch(() => false)) {
         await drawerBackdrop.click();
       }
-      // Deselect via the pane, clicking LOW-LEFT: the floating palette toggle
-      // (top-left, z-50) intercepts clicks near the top-left corner.
-      await page.locator('.react-flow__pane').click({ position: { x: 30, y: 500 } });
+      // Deselect via the pane at its geometric center: the canvas corners
+      // host floating widgets (palette toggle top-left, zoom controls
+      // bottom-left) whose subtrees intercept corner clicks.
+      const paneBox = await page.locator('.react-flow__pane').boundingBox();
+      await page.locator('.react-flow__pane').click({
+        position: { x: paneBox.width / 2, y: paneBox.height / 2 },
+      });
 
       // 6. Click the toolbar Save button → SaveDialog opens.
       // DesignerToolbar renders save button with testId prefix
