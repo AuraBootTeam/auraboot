@@ -5,7 +5,9 @@
 //   FR-12: SN uniqueness + relabel/invalidate/evidence-backed identity recovery version chain.
 //   FR-14: retest→original-failure loop + component replacement As-built predecessor/lot chain.
 //   BACKEND_URL=http://127.0.0.1:6463 PG_DB=auraboot_63 node fr08-12-14-deep-golden.mjs
-import { login, execCommand, makeReporter, uid, queryDb, scalar } from './harness.mjs';
+import {
+  login, execCommand, makeReporter, uid, queryDb, scalar, seedExecutionBaseline,
+} from './harness.mjs';
 const R = makeReporter();
 const sq = (s) => String(s).replace(/'/g, "''");
 const errText = (r) => {
@@ -30,6 +32,12 @@ async function seedWorkOrder() {
     mfg_wo_plan_start: dstr(0),
     mfg_wo_plan_end: dstr(30),
   }, undefined, 'create', { allowError: true });
+  seedExecutionBaseline({
+    workOrderId: wo.recordId,
+    bomId: bom.recordId,
+    materialId: mat.recordId,
+    quantity: 10,
+  });
   const op = await execCommand(token, 'mfg_work_order_operation_pcba_execution:create', { mfg_wop_work_order_id: wo.recordId, mfg_wop_seq: 10, mfg_wop_name: `SMT ${code}`, mfg_wop_planned_qty: 50, mfg_wop_operator: 'Alice' }, undefined, 'create', { allowError: true });
   return { code, matId: mat.recordId, woId: wo.recordId, opId: op.recordId };
 }

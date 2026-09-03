@@ -22,7 +22,9 @@
 //     qc_test_defect (qc_td_test_result_id → the failed result); the rework order links to
 //     that defect via qc_rw_source_type='test_defect' + qc_rw_source_id (FR-14 fail→rework).
 
-import { login, execCommand, makeReporter, uid, queryDb, scalar } from './harness.mjs';
+import {
+  login, execCommand, makeReporter, uid, queryDb, scalar, seedExecutionBaseline,
+} from './harness.mjs';
 
 const sq = (s) => String(s).replace(/'/g, "''");
 const errText = (r) =>
@@ -59,6 +61,12 @@ async function frMaterialBindingAndGenealogy() {
   const wo = await execCommand(token, 'mfg_work_order_pcba_execution:create',
     { mfg_wo_name: `MB-WO ${code}`, mfg_wo_product_id: mat.recordId, mfg_wo_bom_id: bom.recordId, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
   if (!R.check('FR-08', 'create work order with BOM assigned (mfg_wo_bom_id set)', wo.recordId, `wo=${wo.recordId}`)) return;
+  seedExecutionBaseline({
+    workOrderId: wo.recordId,
+    bomId: bom.recordId,
+    materialId: mat.recordId,
+    quantity: 10,
+  });
 
   // Optional real work-order operation (unchecked by handler, but faithful to the shop-floor scan).
   const op = await execCommand(token, 'mfg_work_order_operation_pcba_execution:create',

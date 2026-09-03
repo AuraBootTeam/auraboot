@@ -156,9 +156,16 @@ async function frKitting() {
     { eng_bom_line_bom_id: bom.recordId, eng_bom_line_material_id: prod.recordId, eng_bom_line_qty: 10, eng_bom_line_unit: 'pcs' }, undefined, 'create', { allowError: true });
   R.check('FR-13', 'seed BOM line', line.recordId, `line=${line.recordId}`);
   const wo = await execCommand(token, 'mfg_work_order_pcba_execution:create',
-    { mfg_wo_name: `KitWO ${code}`, mfg_wo_product_id: `prod-${code}`, mfg_wo_bom_id: bom.recordId, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
+    { mfg_wo_name: `KitWO ${code}`, mfg_wo_product_id: prod.recordId, mfg_wo_bom_id: bom.recordId, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
   if (!R.check('FR-13', 'create work order (real BOM)', wo.recordId, `id=${wo.recordId}`)) return;
-  const kit = await execCommand(token, 'inv:compute_kitting', { inv_kr_work_order_id: wo.recordId }, undefined, 'action', { allowError: true });
+  const kit = await execCommand(
+    token,
+    'inv:compute_kitting',
+    { inv_kr_work_order_id: wo.recordId },
+    undefined,
+    'action',
+    { allowError: true, clientRequestId: uid('KIT-REQUEST') },
+  );
   R.check('FR-13', 'compute_kitting executes', kit.ok, `code=${kit.code} status=${kit.status} detail=${JSON.stringify(kit.raw?.context||'').slice(0,90)}`);
   const kr = queryDb(`select inv_kr_status, inv_kr_kitting_rate from mt_inv_kitting_result where inv_kr_work_order_id='${sq(wo.recordId)}'`);
   R.check('FR-13', 'exactly one kitting_result row per work order', kr.length === 1, `rows=${kr.length} status=${kr[0]?.[0]} rate=${kr[0]?.[1]}`);
@@ -170,21 +177,14 @@ async function frKitting() {
 }
 try { await frKitting(); } catch (e) { R.check('FR-13', 'no exception', false, String(e.message).slice(0, 200)); }
 
-// FR-10 FEFO — DEFERRED. Probed the seed path live (2026-07-24): warehouse(strategy=fefo via
-// update), warehouse_location, product, and expiry-dated inv:create_lot all seed cleanly, BUT the
-// balance-per-lot seed that FEFO sorts on is genuinely hard to build through the command pipeline:
-//   • inv:add_lot_transaction(inbound) executes (code 0) but does NOT create an inv_balance row;
-//   • the warehouse_in receive flow's line (inv:add_wh_in_line) carries product+qty but NO lot,
-//     so confirming it cannot produce the per-lot balance rows FEFO needs.
-// A faithful FR-10 golden therefore needs the correct lot-aware inbound path (or a documented
-// direct inv_balance seed) + a warehouse_out demand, then create_pick_order → assert near-expiry
-// lot allocated first. The FEFO ordering logic itself shipped in #217; only this seed remains.
-R.deferred('FR-10', 'FEFO golden blocked on lot-aware balance seed (add_lot_transaction ≠ balance; wh_in line has no lot)', 'seed path documented for follow-up');
+// FR-10 is intentionally owned by the separate fr10-fefo-golden.mjs executable. It now exercises
+// the current Inventory-owner issue intake and pick-task flow and is run immediately after this file
+// by scripts/mes-wms-golden-run.sh.
 
 // ------------------------------------------------------------------ summary
 const s = R.summary();
 const frCovered = [...new Set(R.results.filter((r) => !r.deferred).map((r) => r.fr))];
 console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail, ${s.deferred} deferred ===`);
-console.log(`    FRs with real-stack backend golden: ${frCovered.sort().join(', ')} (${frCovered.length}/8)`);
-console.log(`    Deferred (need multi-model seed): ${[...new Set(R.results.filter((r) => r.deferred).map((r) => r.fr))].join(', ') || 'none'}`);
+console.log(`    FRs covered in this executable: ${frCovered.sort().join(', ')} (${frCovered.length}/7)`);
+console.log('    FR-10 is covered by fr10-fefo-golden.mjs in the same runner.');
 process.exit(s.fail > 0 ? 1 : 0);

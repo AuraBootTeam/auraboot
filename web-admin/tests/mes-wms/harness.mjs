@@ -56,10 +56,19 @@ export async function login() {
 
 // Execute a command through the real pipeline.
 // POST /api/meta/commands/execute/{code} with {payload, targetRecordPid, operationType}.
-export async function execCommand(token, code, payload = {}, targetRecordPid, operationType, { allowError = false } = {}) {
+export async function execCommand(
+  token,
+  code,
+  payload = {},
+  targetRecordPid,
+  operationType,
+  { allowError = false, clientRequestId, expectedVersion } = {},
+) {
   const body = { payload };
   if (targetRecordPid) body.targetRecordPid = targetRecordPid;
   if (operationType) body.operationType = operationType;
+  if (clientRequestId) body.clientRequestId = clientRequestId;
+  if (expectedVersion != null) body.expectedVersion = expectedVersion;
   const r = await req(`/api/meta/commands/execute/${encodeURIComponent(code)}`, {
     method: 'POST', token, body, allowError,
   });
@@ -130,3 +139,68 @@ export function scalar(sql) {
   return rows.length ? rows[0][0] : null;
 }
 
+// Downstream MES goldens exercise material binding and identity behavior, not the already-covered
+// ReleaseWorkOrder command. Seed only its immutable bi-temporal prerequisite in the isolated test
+// database so those handlers cannot fall back to mutable live BOM rows. The payload shape matches
+// mfg-work-order-execution-baseline-v1 and is deliberately minimal for the single BOM line under test.
+export function seedExecutionBaseline({
+  workOrderId,
+  bomId,
+  materialId,
+  quantity = 1,
+  unit = 'pcs',
+  refDesignator = 'TEST',
+}) {
+  const tenantId = scalar(
+    `select tenant_id from mt_mfg_work_order_pcba_execution where pid='${sqlText(workOrderId)}'`,
+  );
+  if (!tenantId || !/^\d+$/.test(tenantId)) {
+    throw new Error(`cannot resolve tenant for execution-baseline fixture: ${workOrderId}`);
+  }
+  const payload = {
+    schemaVersion: 1,
+    baselineHash: '0'.repeat(64),
+    bom: {
+      id: bomId,
+      code: `TEST-${bomId}`,
+      name: 'MES golden immutable BOM fixture',
+      version: 'test-v1',
+      outputQty: 1,
+      contentHash: '1'.repeat(64),
+      lines: [{
+        lineId: `TEST-LINE-${workOrderId}`,
+        materialId,
+        quantity,
+        unit,
+        lossRate: 0,
+        refDesignator,
+      }],
+    },
+    workOrder: { id: workOrderId, bomId },
+  };
+  queryDb(`
+    insert into ab_bitemporal_record
+      (id, tenant_id, entity_type, entity_id, valid_from, valid_to, tx_from, tx_to,
+       payload, version_no, created_by, created_at, updated_at, deleted_flag)
+    values
+      (nextval('ab_bitemporal_record_id_seq'), ${tenantId}, 'mfg_wo_execution_baseline_v1',
+       '${sqlText(workOrderId)}', now(), '9999-12-31 23:59:59', now(),
+       '9999-12-31 23:59:59', '${sqlText(JSON.stringify(payload))}'::jsonb, 1,
+       ${tenantId}, now(), now(), false)
+  `);
+  const stored = scalar(`
+    select count(*) from ab_bitemporal_record
+    where tenant_id=${tenantId}
+      and entity_type='mfg_wo_execution_baseline_v1'
+      and entity_id='${sqlText(workOrderId)}'
+      and tx_to='9999-12-31 23:59:59'
+      and deleted_flag=false
+  `);
+  if (Number(stored) !== 1) {
+    throw new Error(`execution-baseline fixture was not stored exactly once: ${workOrderId}`);
+  }
+}
+
+function sqlText(value) {
+  return String(value).replaceAll("'", "''");
+}

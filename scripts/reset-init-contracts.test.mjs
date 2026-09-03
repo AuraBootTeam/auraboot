@@ -368,6 +368,54 @@ test('host-side build scripts never fall back to the system Gradle executable', 
   assert.match(buildPlugin, /clean build -x test --quiet --no-daemon/);
 });
 
+test('MES/WMS golden runner stages backend jars from their current owning repositories', () => {
+  const mesWms = read('scripts/mes-wms-golden-run.sh');
+
+  assert.match(mesWms, /CORE_HYBRID_JARS=\(crm\)/);
+  assert.match(
+    mesWms,
+    /build_jar "\$p" "\$CORE_ROOT\/plugins\/\$p\/backend"/,
+    'Core-owned CRM must be built from the Core plugin tree',
+  );
+  assert.doesNotMatch(
+    mesWms,
+    /(?:CORE|ENTERPRISE)_HYBRID_JARS=\([^)]*pcba-warehouse/s,
+    'config-only pcba-warehouse must not be treated as a backend jar',
+  );
+  assert.match(
+    mesWms,
+    /ENTERPRISE_HYBRID_JARS=\([^)]*\bsales\b/s,
+    'handler-backed Sales must be present before its commands are imported',
+  );
+  assert.doesNotMatch(
+    mesWms,
+    /IMPORT_PLUGINS=\([^)]*\breq\b/s,
+    'the focused MES/WMS closure must not import the unrelated, independently invalid req package',
+  );
+  assert.match(mesWms, /EXPECTED_STAGED_COUNT="\$\{#STAGED_PLUGIN_JARS\[@\]\}"/);
+  assert.doesNotMatch(mesWms, /expected exactly 16/);
+  assert.match(
+    mesWms,
+    /Registered plugin background component: inventoryReliableEventBridge/,
+    'backend readiness must include the Inventory reliable-integration bridge, not health alone',
+  );
+});
+
+test('MES/WMS downstream goldens follow immutable baseline and current Inventory owner contracts', () => {
+  const harness = read('web-admin/tests/mes-wms/harness.mjs');
+  const backend = read('web-admin/tests/mes-wms/mes-wms-backend-golden.mjs');
+  const fefo = read('web-admin/tests/mes-wms/fr10-fefo-golden.mjs');
+
+  assert.match(harness, /export function seedExecutionBaseline/);
+  assert.match(harness, /entity_type='mfg_wo_execution_baseline_v1'/);
+  assert.match(harness, /if \(clientRequestId\) body\.clientRequestId = clientRequestId/);
+  assert.doesNotMatch(backend, /R\.deferred\('FR-10'/);
+  assert.match(fefo, /inv:receive_source_issue_demand/);
+  assert.match(fefo, /inv:create_issue_pick_task/);
+  assert.doesNotMatch(fefo, /inv:generate_pick_order/);
+  assert.match(fefo, /inv_loc_status: 'active'/);
+});
+
 test('Docker bootstrap entrypoints preserve plugin dependency order', () => {
   for (const path of ['scripts/quickstart.sh', 'scripts/docker-bootstrap.sh']) {
     const script = read(path);
