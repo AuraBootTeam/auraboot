@@ -5,7 +5,9 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.dashboard.dto.*;
 import com.auraboot.framework.dashboard.entity.Dashboard;
+import com.auraboot.framework.dashboard.entity.DashboardModule;
 import com.auraboot.framework.dashboard.mapper.DashboardMapper;
+import com.auraboot.framework.dashboard.mapper.DashboardModuleMapper;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.menu.entity.Menu;
@@ -44,6 +46,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class DashboardServiceImpl implements DashboardService {
 
     private final DashboardMapper dashboardMapper;
+    private final DashboardModuleMapper dashboardModuleMapper;
     private final ObjectMapper objectMapper;
     private final VersionHistoryService versionHistoryService;
     private final UserPermissionService userPermissionService;
@@ -97,6 +100,9 @@ public class DashboardServiceImpl implements DashboardService {
         dashboard.setStatus(StatusConstants.DRAFT);
         dashboard.setIsDefault(request.getIsDefault() != null ? request.getIsDefault() : false);
         dashboard.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
+        if (StringUtils.hasText(request.getModulePid())) {
+            dashboard.setModuleId(resolveModuleId(tenantId, request.getModulePid()));
+        }
         dashboard.setExtension(request.getExtension());
         dashboard.setDeletedFlag(false);
         dashboard.setCreatedAt(Instant.now());
@@ -183,6 +189,9 @@ public class DashboardServiceImpl implements DashboardService {
         }
         if (request.getSortOrder() != null) {
             dashboard.setSortOrder(request.getSortOrder());
+        }
+        if (request.getModulePid() != null) {
+            dashboard.setModuleId(resolveModuleId(tenantId, request.getModulePid()));
         }
         if (request.getExtension() != null) {
             dashboard.setExtension(request.getExtension());
@@ -823,6 +832,23 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
 
+    private Long resolveModuleId(Long tenantId, String modulePid) {
+        DashboardModule module = dashboardModuleMapper.findByPid(modulePid);
+        if (module == null || !tenantId.equals(module.getTenantId())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Dashboard folder not found: " + modulePid);
+        }
+        return module.getId();
+    }
+
+    private String resolveModulePid(Long moduleId) {
+        if (moduleId == null) {
+            return null;
+        }
+        DashboardModule module = dashboardModuleMapper.selectById(moduleId);
+        return module != null ? module.getPid() : null;
+    }
+
     private DashboardDTO toDTO(Dashboard entity) {
         if (entity == null) {
             return null;
@@ -843,6 +869,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .status(entity.getStatus())
                 .isDefault(entity.getIsDefault())
                 .sortOrder(entity.getSortOrder())
+                .modulePid(resolveModulePid(entity.getModuleId()))
                 .extension(entity.getExtension())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())

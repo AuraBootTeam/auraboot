@@ -527,6 +527,25 @@ dashboard:
     publishFailedRetry: Publish failed, please retry
     unpublishSuccess: Unpublished
     unpublishFailed: Unpublish failed
+  module:
+    title: Folders
+    newFolder: New folder
+    newFolderPlaceholder: New folder name
+    under: Created under
+    rootHint: New folders land at the root
+    empty: No folders yet
+    inFolder: Dashboards in this folder
+    inFolderEmpty: None
+    assign: Add dashboard to folder...
+    confirmDelete: Delete this folder?
+    move: Move to folder (empty = root)
+    targetNotFound: Target folder not found
+    created: Folder created
+    renamed: Folder renamed
+    deleted: Folder deleted
+    moved: Folder moved
+    assigned: Dashboard moved into folder
+
   scope:
     personal: Personal
     team: Team

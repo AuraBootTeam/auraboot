@@ -50,6 +50,12 @@ public class DashboardUpdateRequest {
     private Integer sortOrder;
 
     /**
+     * Owning folder (dashboard module) PID; null = unassigned. Resolved to
+     * module_id on write.
+     */
+    private String modulePid;
+
+    /**
      * Extension data
      */
     private JsonNode extension;

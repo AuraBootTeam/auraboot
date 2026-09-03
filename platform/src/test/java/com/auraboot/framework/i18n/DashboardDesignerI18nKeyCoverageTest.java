@@ -40,6 +40,12 @@ class DashboardDesignerI18nKeyCoverageTest {
 
     private static final List<String> SCOPE_KEYS = List.of("personal", "team", "global");
 
+    /** Keys referenced by web-admin app/ui/smart/dashboard/DashboardModuleTree.tsx. */
+    private static final List<String> MODULE_KEYS = List.of(
+            "title", "newFolder", "newFolderPlaceholder", "under", "rootHint", "empty",
+            "inFolder", "inFolderEmpty", "assign", "confirmDelete", "move", "targetNotFound",
+            "created", "renamed", "deleted", "moved", "assigned");
+
     // ko-KR is excluded: the file has a pre-existing SnakeYAML parse error (an unquoted
     // "(예: ${trigger.recordPid})" scalar) unrelated to this slice, so the whole locale
     // fails to load before any key check could run.
@@ -85,6 +91,8 @@ class DashboardDesignerI18nKeyCoverageTest {
 
             requireNonBlank(designer, "dashboard.designer.", DESIGNER_KEYS, locale, problems);
             requireNonBlank(scope, "dashboard.scope.", SCOPE_KEYS, locale, problems);
+            requireNonBlank(section(root, "dashboard", "module"), "dashboard.module.",
+                    MODULE_KEYS, locale, problems);
 
             Map<String, Object> common = section(root, "common");
             requireNonBlank(common, "common.", List.of("title", "notice"), locale, problems);

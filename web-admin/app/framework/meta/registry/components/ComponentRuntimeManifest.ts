@@ -229,4 +229,7 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   teammembersblock: runtime('organization', 'TeamMembersBlock', {
     aliases: ['TeamMembersBlock', 'team-members', 'team_members', 'teammembersblock'],
   }),
+  dashboardmoduletree: runtime('dashboard', 'DashboardModuleTree', {
+    aliases: ['DashboardModuleTree', 'dashboardModuleTree', 'dashboard_module_tree'],
+  }),
 };

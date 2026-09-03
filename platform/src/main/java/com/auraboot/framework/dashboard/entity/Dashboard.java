@@ -98,6 +98,12 @@ public class Dashboard {
     private Integer sortOrder;
 
     /**
+     * Owning folder (dashboard module); null = unassigned.
+     */
+    @TableField("module_id")
+    private Long moduleId;
+
+    /**
      * Extension data as JSONB
      */
     @TableField(value = "extension", typeHandler = JsonNodeTypeHandler.class, jdbcType = JdbcType.OTHER)

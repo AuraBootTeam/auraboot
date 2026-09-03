@@ -241,6 +241,8 @@ export interface Dashboard {
   status: DashboardStatus;
   isDefault?: boolean;
   sortOrder?: number;
+  /** Owning folder (dashboard module) PID; null = unassigned. */
+  modulePid?: string | null;
   extension?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
@@ -261,6 +263,8 @@ export interface DashboardCreateRequest {
   widgets?: Widget[];
   isDefault?: boolean;
   sortOrder?: number;
+  /** Owning folder (dashboard module) PID; null = unassigned. */
+  modulePid?: string | null;
   extension?: Record<string, unknown>;
 }
 
@@ -276,6 +280,8 @@ export interface DashboardUpdateRequest {
   widgets?: Widget[];
   isDefault?: boolean;
   sortOrder?: number;
+  /** Owning folder (dashboard module) PID; null = unassigned. */
+  modulePid?: string | null;
   extension?: Record<string, unknown>;
 }
 

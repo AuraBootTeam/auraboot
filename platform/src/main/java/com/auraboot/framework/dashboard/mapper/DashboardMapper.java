@@ -38,6 +38,7 @@ public interface DashboardMapper extends BaseMapper<Dashboard> {
             @Result(property = "status", column = "status"),
             @Result(property = "isDefault", column = "is_default"),
             @Result(property = "sortOrder", column = "sort_order"),
+            @Result(property = "moduleId", column = "module_id"),
             @Result(property = "extension", column = "extension",
                     typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class),
             @Result(property = "deletedFlag", column = "deleted_flag"),
@@ -243,13 +244,13 @@ public interface DashboardMapper extends BaseMapper<Dashboard> {
     @Insert("""
         INSERT INTO ab_dashboard (
             pid, tenant_id, code, title, description, scope, owner_id, team_id,
-            layout_config, widgets, status, is_default, sort_order, extension,
+            layout_config, widgets, status, is_default, sort_order, module_id, extension,
             deleted_flag, created_at, updated_at, created_by, updated_by
         ) VALUES (
             #{pid}, #{tenantId}, #{code}, #{title}, #{description}, #{scope}, #{ownerId}, #{teamId},
             #{layoutConfig, typeHandler=com.auraboot.framework.application.typehandler.JsonNodeTypeHandler}::jsonb,
             #{widgets, typeHandler=com.auraboot.framework.application.typehandler.JsonNodeTypeHandler}::jsonb,
-            #{status}, #{isDefault}, #{sortOrder},
+            #{status}, #{isDefault}, #{sortOrder}, #{moduleId},
             #{extension, typeHandler=com.auraboot.framework.application.typehandler.JsonNodeTypeHandler}::jsonb,
             #{deletedFlag}, #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
         )
@@ -271,6 +272,7 @@ public interface DashboardMapper extends BaseMapper<Dashboard> {
             status = #{status},
             is_default = #{isDefault},
             sort_order = #{sortOrder},
+            module_id = #{moduleId},
             extension = #{extension, typeHandler=com.auraboot.framework.application.typehandler.JsonNodeTypeHandler}::jsonb,
             updated_at = #{updatedAt},
             updated_by = #{updatedBy}
