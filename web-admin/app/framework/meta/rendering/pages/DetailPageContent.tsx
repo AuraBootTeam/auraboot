@@ -70,7 +70,9 @@ import type {
   DataSourceConfig,
   DetailTabConfig,
   FieldConfig,
+  UnifiedSchema,
 } from '~/framework/meta/schemas/types';
+import { mergeDataSources } from '~/framework/meta/utils/extractDataSourcesFromSchema';
 import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -635,6 +637,78 @@ export function resolveVisibleTopLevelDetailBlocks(
   });
 }
 
+/**
+ * DataSource ids whose only references live under permission-hidden tabs.
+ *
+ * The page runtime registers every schema dataSource eagerly and auto-fetches on
+ * registration, so a surface the current user cannot open still fires its named
+ * queries and collects designed backend 403s into every session. A datasource is
+ * excludable only when it is referenced somewhere in the schema but never by a
+ * permission-visible block; ids with no block reference at all (page code,
+ * generated field option sources) are always kept.
+ *
+ * visibleWhen is deliberately not evaluated here: the exclusion set must stay
+ * stable across record loads and state changes, because usePageDataSources
+ * clears and re-registers the whole manager whenever its data source set changes.
+ */
+export function resolvePermissionHiddenDataSourceIds(
+  schema: UnifiedSchema | null,
+  hasPermission?: (permissionCode: string) => boolean,
+): Set<string> {
+  const hidden = new Set<string>();
+  const allBlocks = schema?.blocks;
+  if (!allBlocks || allBlocks.length === 0) return hidden;
+
+  const candidates = mergeDataSources(schema);
+  const candidateIds = Object.keys(candidates);
+  if (candidateIds.length === 0) return hidden;
+
+  const referencedByVisible = new Set<string>();
+  const referencedByAny = new Set<string>();
+  const collectReferences = (blocks: BlockConfig[], into: Set<string>): void => {
+    const visit = (value: unknown): void => {
+      if (typeof value === 'string') {
+        if (candidates[value]) into.add(value);
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (value && typeof value === 'object') {
+        Object.values(value).forEach(visit);
+      }
+    };
+    blocks.forEach(visit);
+  };
+
+  const permissionVisibleBlocks: BlockConfig[] = [];
+  const permissionHiddenBlocks: BlockConfig[] = [];
+  for (const block of allBlocks) {
+    if (block.blockType !== 'tabs') {
+      permissionVisibleBlocks.push(block);
+      continue;
+    }
+    for (const tab of ((block as BlockConfig & { tabs?: DetailTabConfig[] }).tabs ??
+      []) as DetailTabConfig[]) {
+      const tabVisible =
+        !tab.permissionCode || Boolean(hasPermission?.(tab.permissionCode));
+      (tabVisible ? permissionVisibleBlocks : permissionHiddenBlocks).push(
+        ...(tab.blocks ?? []),
+      );
+    }
+  }
+  collectReferences(permissionVisibleBlocks, referencedByVisible);
+  collectReferences([...permissionVisibleBlocks, ...permissionHiddenBlocks], referencedByAny);
+
+  for (const id of candidateIds) {
+    if (referencedByAny.has(id) && !referencedByVisible.has(id)) {
+      hidden.add(id);
+    }
+  }
+  return hidden;
+}
+
 const DIRECT_DETAIL_SPECIALIZED_BLOCK_TYPES = new Set([
   'activity-timeline',
   'record-comments',
@@ -933,11 +1007,20 @@ function DetailPageContentInner(props: PageContentProps) {
     [recordData, recordPid, schema],
   );
 
+  // Data sources referenced only by permission-hidden tabs must not fire: the
+  // runtime registers and auto-fetches eagerly, and a surface the user cannot
+  // open would still collect designed backend 403s on every page load.
+  const permissionHiddenDataSourceIds = useMemo(
+    () => resolvePermissionHiddenDataSourceIds(schema, hasPermission),
+    [schema, hasPermission],
+  );
+
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
     showToast,
     additionalContext: runtimeContext,
+    excludeDataSourceIds: permissionHiddenDataSourceIds,
   });
   useRuntimeStateSubscription(runtime);
 
