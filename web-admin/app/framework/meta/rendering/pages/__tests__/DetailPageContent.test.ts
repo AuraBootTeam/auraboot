@@ -1017,3 +1017,59 @@ describe('resolvePermissionHiddenDataSourceIds', () => {
     expect(resolvePermissionHiddenDataSourceIds(null, () => true)).toEqual(new Set());
   });
 });
+
+describe('resolvePermissionHiddenDataSourceIds with cross-surface refresh lists', () => {
+  it('treats poll.reload mentions in visible blocks as refresh instructions, not consumption', () => {
+    // Regression shape from the QuoteOps quote detail: the material status
+    // banner (visible to sales) declares poll.reload entries for the
+    // process-fee/output surfaces that #426 withholds from qo_sales. The
+    // banner renders quoteRecomputeStatus; the reload targets must stay
+    // excludable because DataSourceManager.fetch no-ops on unregistered ids.
+    const schema = {
+      blocks: [
+        {
+          blockType: 'status-banner',
+          id: 'material_processing_status',
+          dataSource: 'quoteRecomputeStatus',
+          poll: {
+            enabledWhenStatuses: ['pending', 'running'],
+            reload: ['quoteRecomputeStatus', 'processFeeMetrics', 'processFeeRuleHits', 'outputReadiness'],
+          },
+        },
+        {
+          blockType: 'tabs',
+          tabs: [
+            { key: 'material', blocks: [{ blockType: 'table', dataSource: 'materialsOverview' }] },
+            {
+              key: 'process_fee',
+              permissionCode: 'qo.quote.process_fee.read',
+              blocks: [
+                { blockType: 'metric-strip', dataSource: 'processFeeMetrics' },
+                { blockType: 'table', dataSource: 'processFeeRuleHits' },
+              ],
+            },
+            {
+              key: 'output',
+              permissionCode: 'qo.quote.output.read',
+              blocks: [{ blockType: 'table', dataSource: 'outputReadiness' }],
+            },
+          ],
+        },
+      ],
+      dataSources: {
+        quoteRecomputeStatus: {},
+        materialsOverview: {},
+        processFeeMetrics: {},
+        processFeeRuleHits: {},
+        outputReadiness: {},
+      },
+    } as any;
+
+    const sales = (code: string) =>
+      code !== 'qo.quote.process_fee.read' && code !== 'qo.quote.output.read';
+
+    expect(resolvePermissionHiddenDataSourceIds(schema, sales)).toEqual(
+      new Set(['processFeeMetrics', 'processFeeRuleHits', 'outputReadiness']),
+    );
+  });
+});
