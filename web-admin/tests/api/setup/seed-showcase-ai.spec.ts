@@ -184,6 +184,15 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   test('Phase AI2: Knowledge Base — Create KB and Documents', async ({ page }) => {
+    // The knowledge base requires an explicitly enabled embedding provider.
+    // Environments without one (OSS host resets carry no AI credentials) are
+    // environment-blocked, not product failures — skip and stay in the
+    // denominator instead of failing the whole seed sequence.
+    const embeddingProfiles = await listEmbeddingProfiles(page);
+    test.skip(
+      embeddingProfiles.length === 0,
+      'No embedding profile configured on this environment — knowledge-base seed blocked on AI credentials',
+    );
     const kbPid = await ensureKnowledgeBase(page);
     const existingDocNames = new Set(
       (await listKnowledgeDocuments(page, kbPid)).map((doc: any) => doc?.docName),
@@ -313,14 +322,20 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
       expect(record, `Missing seeded agent_definition ${agentCode}`).toBeTruthy();
     }
 
-    // Check knowledge bases
-    const knowledgeBases = await listKnowledgeBases(page);
-    const knowledgeBase = knowledgeBases.find((kb: any) => kb?.name === KNOWLEDGE_BASE_NAME);
-    expect(knowledgeBase, `Missing knowledge base ${KNOWLEDGE_BASE_NAME}`).toBeTruthy();
-    const documents = await listKnowledgeDocuments(page, knowledgeBase.pid);
-    expect(documents.length).toBeGreaterThanOrEqual(3);
-    console.log(`  Knowledge Bases:   ${knowledgeBases.length}`);
-    console.log(`  Knowledge Docs:    ${documents.length}`);
+    // Check knowledge bases — same environment gate as Phase AI2: without an
+    // embedding profile the KB seed was skipped, so there is nothing to assert.
+    const embeddingProfiles = await listEmbeddingProfiles(page);
+    if (embeddingProfiles.length === 0) {
+      console.log('  Knowledge Base:   skipped (no embedding profile configured)');
+    } else {
+      const knowledgeBases = await listKnowledgeBases(page);
+      const knowledgeBase = knowledgeBases.find((kb: any) => kb?.name === KNOWLEDGE_BASE_NAME);
+      expect(knowledgeBase, `Missing knowledge base ${KNOWLEDGE_BASE_NAME}`).toBeTruthy();
+      const documents = await listKnowledgeDocuments(page, knowledgeBase.pid);
+      expect(documents.length).toBeGreaterThanOrEqual(3);
+      console.log(`  Knowledge Bases:   ${knowledgeBases.length}`);
+      console.log(`  Knowledge Docs:    ${documents.length}`);
+    }
 
     console.log('═══════════════════════════════════════\n');
   });

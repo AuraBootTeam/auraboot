@@ -421,8 +421,52 @@ fi
 # Start backend in background as a single long-running process
 ./gradlew --no-daemon :bootJar -x test
 BOOT_JAR="$(resolve_boot_jar)"
+
+# Stage PF4J plugin backend jars before boot. Import-time validation
+# (ExtensionValidator S-EXT-HANDLER) checks CommandHandlerRegistry, which is
+# populated at ApplicationReadyEvent from @Extension classes discovered via the
+# plugin jar's META-INF/extensions.idx. Config-only directory imports never load
+# backend classes, so a plugin whose commands declare `handler:` refs (today:
+# crm) fails import with ~50 unregistered-handler errors unless its jar was
+# loaded at startup. Build it from source (cached, up-to-date after first run)
+# and stage it into the boot-relative plugins dir (aura.plugins.dir defaults to
+# "plugins" resolved from the platform cwd).
+mkdir -p "$PLATFORM_DIR/plugins"
+stage_plugin_jar() {
+    local plugin_name="$1"
+    local plugin_backend="$PROJECT_ROOT/plugins/${plugin_name}/backend"
+    [ -d "$plugin_backend" ] || return 0
+    local staged="no"
+    local existing_jar
+    existing_jar="$(ls "$plugin_backend/build/libs/${plugin_name}-plugin-"*.jar 2>/dev/null | sort | tail -1 || true)"
+    if [ -z "$existing_jar" ]; then
+        echo "   Building ${plugin_name} PF4J plugin jar (first run)..."
+        local plugin_api_jar="$PLATFORM_DIR/platform-plugin-api/build/libs/platform-plugin-api-1.0.0-SNAPSHOT.jar"
+        local plugin_api_args=""
+        [ -f "$plugin_api_jar" ] && plugin_api_args="-PplatformPluginApiJar=$plugin_api_jar"
+        # shellcheck disable=SC2086
+        (cd "$PROJECT_ROOT" && ./gradlew --project-dir "plugins/${plugin_name}/backend" jar $plugin_api_args --console=plain > /dev/null) || {
+            echo -e "${RED}   ${plugin_name} plugin jar build failed; its handler-backed commands will fail import validation${NC}" >&2
+            return 1
+        }
+        existing_jar="$(ls "$plugin_backend/build/libs/${plugin_name}-plugin-"*.jar 2>/dev/null | sort | tail -1 || true)"
+    fi
+    if [ -n "$existing_jar" ]; then
+        if ! cmp -s "$existing_jar" "$PLATFORM_DIR/plugins/$(basename "$existing_jar")" 2>/dev/null; then
+            cp -f "$existing_jar" "$PLATFORM_DIR/plugins/"
+        fi
+        echo -e "${GREEN}   Staged PF4J plugin jar: $(basename "$existing_jar")${NC}"
+        staged="yes"
+    fi
+    [ "$staged" = "yes" ]
+}
+stage_plugin_jar "crm"
+
 aura_reset_assert_port_available "backend" "$BE_PORT"
-BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env SERVER_PORT="$BE_PORT" java -jar "$BOOT_JAR")"
+BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env \
+    SERVER_PORT="$BE_PORT" \
+    DATABASE_URL="jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB}?charSet=UTF8" \
+    java -jar "$BOOT_JAR")"
 aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "java -jar"
 
 echo "   Backend starting (PID: $BACKEND_PID)..."
@@ -580,7 +624,10 @@ aura_reset_assert_port_available "web" "$VITE_PORT"
 aura_reset_assert_port_available "bff" "$BFF_PORT"
 WEB_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$FRONTEND_LOG" pnpm dev:web)"
 aura_reset_register_process "web" "$WEB_PID" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm dev:web"
-BFF_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$BFF_LOG" pnpm dev:bff)"
+# SPRING_BOOT_URL is mandatory in slot mode: bff.server.ts otherwise falls back
+# to AURA_BE_BASE (exported above) and finally the :6443 host-mode default,
+# which leaves the BFF proxying to a dead port on any non-default BE_PORT.
+BFF_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$BFF_LOG" env SPRING_BOOT_URL="$AURA_BE_BASE" pnpm dev:bff)"
 aura_reset_register_process "bff" "$BFF_PID" "$BFF_PORT" "$WEB_ADMIN_DIR" "pnpm dev:bff"
 
 echo "   Frontend starting (web PID: $WEB_PID, bff PID: $BFF_PID)..."
@@ -627,18 +674,22 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     cd "$WEB_ADMIN_DIR"
     mkdir -p tests/storage
 
-    # Login via BFF to get session cookie, then save storage state
+    # Login via the app form (field is `identifier` — `email` is not the form
+    # contract) to get the BFF session cookie, then save the storage state.
+    # Every command is errexit-guarded: a cold Vite SSR hiccup must degrade to
+    # the warning branch, never kill the script silently between steps.
     BFF_LOGIN_RESP=$(NO_PROXY=localhost curl -s -D - -o /dev/null -X POST ${AURA_VITE_BASE}/login \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "email=admin@auraboot.com&password=Test2026x&remember=on&redirectTo=/" 2>/dev/null)
-    SESSION_COOKIE=$(echo "$BFF_LOGIN_RESP" | grep -i "set-cookie.*__session" | sed 's/.*__session=\([^;]*\).*/\1/' | head -1)
+        -d "identifier=admin@auraboot.com&password=Test2026x&remember=on&redirectTo=/" 2>/dev/null) || BFF_LOGIN_RESP=""
+    SESSION_COOKIE=$(echo "$BFF_LOGIN_RESP" | grep -i "set-cookie.*__session" | sed 's/.*__session=\([^;]*\).*/\1/' | head -1 || true)
+    STORAGE_EXPIRY=$(( $(date +%s) + 604800 ))
 
     if [ -n "$SESSION_COOKIE" ]; then
         cat > tests/storage/admin.json << STORAGEJSON
 {
   "cookies": [
-    {"name":"__session","value":"$SESSION_COOKIE","domain":"localhost","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")},
-    {"name":"__session","value":"$SESSION_COOKIE","domain":"127.0.0.1","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")}
+    {"name":"__session","value":"$SESSION_COOKIE","domain":"localhost","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$STORAGE_EXPIRY},
+    {"name":"__session","value":"$SESSION_COOKIE","domain":"127.0.0.1","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$STORAGE_EXPIRY}
   ],
   "origins": []
 }
@@ -651,23 +702,23 @@ STORAGEJSON
     echo -e "${GREEN}   Step 6 complete (no Playwright required)${NC}"
 
     echo -e "${YELLOW}Step 7: Verifying user/tenant bootstrap data...${NC}"
-    DB_NAME="${POSTGRES_DB:-aura_boot}"
-    DB_USER="${POSTGRES_USER:-$(whoami)}"
-    DB_HOST="${POSTGRES_HOST:-localhost}"
+    # psql_run targets PG_HOST/PG_PORT/PG_USER/PG_DB — the same coordinates the
+    # reset itself used. (POSTGRES_* names were dead here and pointed readers at
+    # the legacy aura_boot default.)
     BOOTSTRAP_CHECK=$(psql_run -P pager=off -t -A -F',' -c "
 SELECT
-  (SELECT COUNT(*) FROM ab_user WHERE email='admin@auraboot.com' AND (deleted_flag=FALSE OR deleted_flag IS NULL)) AS admin_users,
-  (SELECT COUNT(*) FROM ab_tenant WHERE (deleted_flag=FALSE OR deleted_flag IS NULL)) AS tenants,
+  (SELECT COUNT(*) FROM ab_user WHERE email='admin@auraboot.com' AND (ab_user.deleted_flag=FALSE OR ab_user.deleted_flag IS NULL)) AS admin_users,
+  (SELECT COUNT(*) FROM ab_tenant WHERE (ab_tenant.deleted_flag=FALSE OR ab_tenant.deleted_flag IS NULL)) AS tenants,
   (SELECT COUNT(*) FROM ab_tenant_member tm JOIN ab_user u ON u.id=tm.user_id
     WHERE u.email='admin@auraboot.com' AND (tm.deleted_flag=FALSE OR tm.deleted_flag IS NULL)) AS admin_memberships;
-")
+") || BOOTSTRAP_CHECK=""
     IFS=',' read -r ADMIN_USERS TENANT_COUNT ADMIN_MEMBERSHIPS <<< "$BOOTSTRAP_CHECK"
 
-    echo "   admin users: ${ADMIN_USERS}"
-    echo "   tenant count: ${TENANT_COUNT}"
-    echo "   admin memberships: ${ADMIN_MEMBERSHIPS}"
+    echo "   admin users: ${ADMIN_USERS:-ERR}"
+    echo "   tenant count: ${TENANT_COUNT:-ERR}"
+    echo "   admin memberships: ${ADMIN_MEMBERSHIPS:-ERR}"
 
-    if [ "${ADMIN_USERS}" -lt 1 ] || [ "${TENANT_COUNT}" -lt 1 ] || [ "${ADMIN_MEMBERSHIPS}" -lt 1 ]; then
+    if ! [ "${ADMIN_USERS:-0}" -ge 1 ] || ! [ "${TENANT_COUNT:-0}" -ge 1 ] || ! [ "${ADMIN_MEMBERSHIPS:-0}" -ge 1 ]; then
         echo -e "${RED}   Bootstrap verification failed: user/tenant/member data is incomplete${NC}"
         exit 1
     fi
