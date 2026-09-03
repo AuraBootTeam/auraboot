@@ -78,10 +78,10 @@ test.describe('PCBA quote BOM price yunhan adoption', () => {
       await expect(yunhanCandidate).toBeVisible({ timeout: 20_000 });
       await expect(yunhanCandidate).toContainText(/云汉|Yunhan/);
       await expect(yunhanCandidate).toContainText('0.0264');
-      await expect(yunhanCandidate).toContainText('CNY');
 
       // Select the candidate and adopt it (confirm_cost_from_evidence).
       await yunhanCandidate.click();
+      await expect(reviewDrawer).toContainText('CNY');
       const confirmAction = page.getByTestId('review-drawer-candidate-action-confirm_price');
       await expect(confirmAction).toBeEnabled({ timeout: 10_000 });
 

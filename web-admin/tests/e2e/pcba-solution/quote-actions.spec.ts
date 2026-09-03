@@ -101,9 +101,17 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
       const bomFileId = await upload(page, S.bom!, 'bom.xlsx');
       expect(bomFileId, 'BOM uploaded').toBeTruthy();
       const corrected = JSON.stringify([{ name: 'bom.xlsx', url: `/api/file/download/${bomFileId}`, fileId: bomFileId }]);
+      const gerberFileId = await upload(page, S.gerber || S.bom!, 'gerber.zip');
+      const cplFileId = await upload(page, S.coord || S.bom!, 'cpl.csv');
+      expect(gerberFileId, 'Gerber uploaded').toBeTruthy();
+      expect(cplFileId, 'CPL uploaded').toBeTruthy();
+      const gerber = JSON.stringify([{ name: 'gerber.zip', url: `/api/file/download/${gerberFileId}`, fileId: gerberFileId }]);
+      const cpl = JSON.stringify([{ name: 'cpl.csv', url: `/api/file/download/${cplFileId}`, fileId: cplFileId }]);
       const cr = await post(page, 'qo_quote_common:create', {
         qo_quote_code: `QOA-${uid}`.slice(0, 28), qo_quote_customer: `QOA ${uid}`, qo_quote_project_id: projId,
         corrected_bom_file: corrected, corrected_bom_file_id: bomFileId, corrected_bom_filename: 'bom.xlsx',
+        gerber_source_file: gerber, gerber_source_file_id: gerberFileId, gerber_source_filename: 'gerber.zip',
+        cpl_source_file: cpl, cpl_source_file_id: cplFileId, cpl_source_filename: 'cpl.csv',
       });
       quoteId = pid(cr.body);
       expect(quoteId, `quote created (status=${cr.status} resp=${JSON.stringify(cr.body?.data || cr.body).slice(0, 240)})`).toBeTruthy();

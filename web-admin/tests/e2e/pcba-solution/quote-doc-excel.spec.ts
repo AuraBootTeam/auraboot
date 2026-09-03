@@ -67,11 +67,25 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
         multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
       });
       const fileId = (await up.json())?.data?.fileId;
+      const uploadSource = async (name: string, mimeType: string): Promise<string> => {
+        const response = await page.context().request.post('/api/file/upload', {
+          multipart: { file: { name, mimeType, buffer: buf } },
+        });
+        return String((await response.json())?.data?.fileId || '');
+      };
+      const gerberFileId = await uploadSource('gerber.zip', 'application/zip');
+      const cplFileId = await uploadSource('cpl.csv', 'text/csv');
+      expect(gerberFileId, 'Gerber uploaded').toBeTruthy();
+      expect(cplFileId, 'CPL uploaded').toBeTruthy();
       const code = `QOD-${uid}`.slice(0, 28);
       const corrected = JSON.stringify([{ name: 'bom.xlsx', url: `/api/file/download/${fileId}`, size: buf.length, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileId }]);
+      const gerber = JSON.stringify([{ name: 'gerber.zip', url: `/api/file/download/${gerberFileId}`, size: buf.length, type: 'application/zip', fileId: gerberFileId }]);
+      const cpl = JSON.stringify([{ name: 'cpl.csv', url: `/api/file/download/${cplFileId}`, size: buf.length, type: 'text/csv', fileId: cplFileId }]);
       const cr = await post(page, 'qo_quote_common:create', {
         qo_quote_code: code, qo_quote_customer: `QOD ${uid}`, qo_quote_project_id: projId,
         corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx',
+        gerber_source_file: gerber, gerber_source_file_id: gerberFileId, gerber_source_filename: 'gerber.zip',
+        cpl_source_file: cpl, cpl_source_file_id: cplFileId, cpl_source_filename: 'cpl.csv',
       });
       const quoteId = pid(cr.body);
       expect(quoteId, `quote created (status=${cr.status} resp=${JSON.stringify(cr.body?.data || cr.body).slice(0, 260)})`).toBeTruthy();

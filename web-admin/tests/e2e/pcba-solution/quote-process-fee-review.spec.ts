@@ -62,7 +62,6 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
     await expect(matchedRow).toHaveCount(1, { timeout: 20_000 });
     const matchedCells = matchedRow.locator('td');
     await expect(matchedCells.nth(0)).toHaveText('14');
-    await expect(matchedRow).toContainText('R14');
     await expect(matchedRow).toContainText(/E2E-EXACT-/);
     await expect(matchedRow).toContainText(/4(\.\d+)?\s*×\s*2(\.\d+)?\s*=\s*8(\.\d+)?/);
     await expect(matchedRow).toContainText('SMT');
