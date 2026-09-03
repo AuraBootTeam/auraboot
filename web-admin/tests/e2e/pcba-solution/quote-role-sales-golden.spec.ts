@@ -446,6 +446,18 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
     page.on('response', (resp: Response) => {
       const status = resp.status();
       if ((status === 401 || status === 403) && resp.url().includes('/api/')) {
+        // The detail runtime eagerly registers every schema dataSource, including
+        // the process-fee/output surfaces #426 withholds from qo_sales. Those
+        // backend denials are the designed contract (quote-surface-permission-release
+        // probes all four positively); silencing them needs a platform lazy-loading
+        // fix, so keep the zero-forbidden guard scoped to the journey's own commands.
+        if (
+          /datasourceId=nq%3Aqo_quote_(output_documents|output_readiness|process_fee_metrics|process_point_fact_workbench)/.test(
+            resp.url(),
+          )
+        ) {
+          return;
+        }
         forbidden.push({ step, url: resp.url(), status });
       }
     });
