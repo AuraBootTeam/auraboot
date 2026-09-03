@@ -21,6 +21,7 @@ import {
   resolveSubTableDataSourceConfig,
   resolveVisibleDetailTabs,
   resolveVisibleDetailTabsFromBlocks,
+  resolvePermissionHiddenDataSourceIds,
   resolveVisibleTopLevelDetailBlocks,
   resolveDetailHeaderLayoutClasses,
   resolveDetailPdfFileName,
@@ -869,5 +870,206 @@ describe('resolveDetailPdfFileName', () => {
     expect(
       resolveDetailPdfFileName({} as any, {} as any, 'sl_sales_order_common', 'en', t as any),
     ).toBe('sl_sales_order_common');
+  });
+});
+
+describe('resolvePermissionHiddenDataSourceIds', () => {
+  const buildSchema = (
+    blocks: any[],
+    dataSources: Record<string, any>,
+  ) =>
+    ({
+      blocks,
+      dataSources,
+    }) as any;
+
+  it('excludes ids referenced only by permission-hidden tabs', () => {
+    const schema = buildSchema(
+      [
+        {
+          blockType: 'metric-strip',
+          id: 'header_metrics',
+          dataSource: 'quoteHeaderSummary',
+        },
+        {
+          blockType: 'tabs',
+          tabs: [
+            {
+              key: 'bom_price',
+              blocks: [{ blockType: 'table', id: 'lines_table', dataSource: 'lines' }],
+            },
+            {
+              key: 'process_fee',
+              permissionCode: 'qo.quote.process_fee.read',
+              blocks: [
+                { blockType: 'table', id: 'hit_table', dataSource: 'processFeeRuleHits' },
+                { blockType: 'metric-strip', id: 'fee_metrics', dataSource: 'processFeeMetrics' },
+              ],
+            },
+            {
+              key: 'output',
+              permissionCode: 'qo.quote.output.read',
+              blocks: [{ blockType: 'table', id: 'docs', dataSource: 'quoteDocuments' }],
+            },
+          ],
+        },
+      ],
+      {
+        quoteHeaderSummary: {},
+        lines: {},
+        processFeeRuleHits: {},
+        processFeeMetrics: {},
+        quoteDocuments: {},
+        neverReferencedByAnyBlock: {},
+      },
+    );
+    const salesPermission = (code: string) =>
+      code !== 'qo.quote.process_fee.read' && code !== 'qo.quote.output.read';
+
+    const hidden = resolvePermissionHiddenDataSourceIds(schema, salesPermission);
+
+    expect(hidden).toEqual(
+      new Set(['processFeeRuleHits', 'processFeeMetrics', 'quoteDocuments']),
+    );
+  });
+
+  it('keeps a datasource that is also referenced by a visible tab', () => {
+    const schema = buildSchema(
+      [
+        {
+          blockType: 'tabs',
+          tabs: [
+            {
+              key: 'price',
+              blocks: [{ blockType: 'table', dataSource: 'lines' }],
+            },
+            {
+              key: 'gerber',
+              permissionCode: 'qo.quote.spec_process.read',
+              blocks: [
+                { blockType: 'gerber-viewer', dataSource: 'lines' },
+                { blockType: 'metric-strip', dataSource: 'processFeeMetrics' },
+              ],
+            },
+          ],
+        },
+      ],
+      { lines: {}, processFeeMetrics: {} },
+    );
+    // The caller lacks the gerber surface, but `lines` is still referenced by
+    // the visible price tab and must stay registered.
+    const hidden = resolvePermissionHiddenDataSourceIds(
+      schema,
+      (code) => code !== 'qo.quote.spec_process.read',
+    );
+
+    expect(hidden).toEqual(new Set(['processFeeMetrics']));
+  });
+
+  it('keeps ids that no visible or hidden block references (page code may use them)', () => {
+    const schema = buildSchema(
+      [
+        {
+          blockType: 'tabs',
+          tabs: [
+            { key: 'only', blocks: [{ blockType: 'table', dataSource: 'lines' }] },
+          ],
+        },
+      ],
+      { lines: {}, generatedFieldOptions: {} },
+    );
+
+    const hidden = resolvePermissionHiddenDataSourceIds(schema, () => false);
+
+    expect(hidden).toEqual(new Set());
+  });
+
+  it('keeps form-section field option sources on visible blocks', () => {
+    const schema = buildSchema(
+      [
+        {
+          blockType: 'form-section',
+          fields: [{ field: 'status', dataSource: 'statusOptions' }],
+        },
+        {
+          blockType: 'tabs',
+          tabs: [
+            {
+              key: 'hidden_tab',
+              permissionCode: 'qo.quote.output.read',
+              blocks: [{ blockType: 'table', dataSource: 'quoteDocuments' }],
+            },
+          ],
+        },
+      ],
+      { statusOptions: {}, quoteDocuments: {} },
+    );
+
+    const hidden = resolvePermissionHiddenDataSourceIds(schema, () => false);
+
+    expect(hidden).toEqual(new Set(['quoteDocuments']));
+  });
+
+  it('returns an empty set for schemas without datasources', () => {
+    expect(resolvePermissionHiddenDataSourceIds(buildSchema([], {}), () => true)).toEqual(
+      new Set(),
+    );
+    expect(resolvePermissionHiddenDataSourceIds(null, () => true)).toEqual(new Set());
+  });
+});
+
+describe('resolvePermissionHiddenDataSourceIds with cross-surface refresh lists', () => {
+  it('treats poll.reload mentions in visible blocks as refresh instructions, not consumption', () => {
+    // Regression shape from the QuoteOps quote detail: the material status
+    // banner (visible to sales) declares poll.reload entries for the
+    // process-fee/output surfaces that #426 withholds from qo_sales. The
+    // banner renders quoteRecomputeStatus; the reload targets must stay
+    // excludable because DataSourceManager.fetch no-ops on unregistered ids.
+    const schema = {
+      blocks: [
+        {
+          blockType: 'status-banner',
+          id: 'material_processing_status',
+          dataSource: 'quoteRecomputeStatus',
+          poll: {
+            enabledWhenStatuses: ['pending', 'running'],
+            reload: ['quoteRecomputeStatus', 'processFeeMetrics', 'processFeeRuleHits', 'outputReadiness'],
+          },
+        },
+        {
+          blockType: 'tabs',
+          tabs: [
+            { key: 'material', blocks: [{ blockType: 'table', dataSource: 'materialsOverview' }] },
+            {
+              key: 'process_fee',
+              permissionCode: 'qo.quote.process_fee.read',
+              blocks: [
+                { blockType: 'metric-strip', dataSource: 'processFeeMetrics' },
+                { blockType: 'table', dataSource: 'processFeeRuleHits' },
+              ],
+            },
+            {
+              key: 'output',
+              permissionCode: 'qo.quote.output.read',
+              blocks: [{ blockType: 'table', dataSource: 'outputReadiness' }],
+            },
+          ],
+        },
+      ],
+      dataSources: {
+        quoteRecomputeStatus: {},
+        materialsOverview: {},
+        processFeeMetrics: {},
+        processFeeRuleHits: {},
+        outputReadiness: {},
+      },
+    } as any;
+
+    const sales = (code: string) =>
+      code !== 'qo.quote.process_fee.read' && code !== 'qo.quote.output.read';
+
+    expect(resolvePermissionHiddenDataSourceIds(schema, sales)).toEqual(
+      new Set(['processFeeMetrics', 'processFeeRuleHits', 'outputReadiness']),
+    );
   });
 });
