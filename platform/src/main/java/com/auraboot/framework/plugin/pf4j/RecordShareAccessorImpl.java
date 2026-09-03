@@ -78,12 +78,16 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
 
         List<RecordShare> existing = recordShareService.listByRecordPidForManagement(
                 tenantId, resourceCode.trim(), recordPid.trim());
-        for (RecordShare share : existing) {
-            if ("member".equalsIgnoreCase(share.getSubjectType())
-                    && StringUtils.hasText(share.getSubjectPid())
-                    && !desiredMemberPids.contains(share.getSubjectPid())) {
-                recordShareService.removeByPid(tenantId, share.getPid());
-            }
+        List<String> staleSharePids = existing.stream()
+                .filter(share -> "member".equalsIgnoreCase(share.getSubjectType())
+                        && StringUtils.hasText(share.getSubjectPid())
+                        && !desiredMemberPids.contains(share.getSubjectPid()))
+                .map(RecordShare::getPid)
+                .toList();
+        if (!staleSharePids.isEmpty()) {
+            // Batch removal: each removeByPid would re-select the share it
+            // already has in memory.
+            recordShareService.removeByPids(tenantId, staleSharePids);
         }
         for (String memberPid : desiredMemberPids) {
             recordShareService.shareRecordByPid(

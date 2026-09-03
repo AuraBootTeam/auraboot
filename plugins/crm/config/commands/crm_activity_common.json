@@ -27,7 +27,8 @@
     ],
     "autoSetFields": {
       "crm_act_owner": {
-        "strategy": "current_user_pid"
+        "strategy": "current_user_pid",
+        "preserveInput": true
       },
       "crm_act_date": {
         "strategy": "current_datetime",

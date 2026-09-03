@@ -323,6 +323,7 @@ public class DynamicController {
                     && (condition.getOperator() == QueryCondition.Operator.IN
                             || condition.getOperator() == QueryCondition.Operator.NOT_IN)
                     && condition.getValues() != null
+                    && !condition.getValues().isEmpty()
                     && condition.getValues().stream()
                             .allMatch(value -> value == null || String.valueOf(value).isBlank())) {
                 continue;

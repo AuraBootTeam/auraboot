@@ -77,7 +77,8 @@ public class CommandStateCheckExecutor {
             List<String> fromStates = (List<String>) execConfig.get("fromStates");
             if (fromStates != null && !fromStates.isEmpty() && !fromStates.contains(currentState)) {
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
-                        "Current state '" + currentState + "' is not in allowed states: " + fromStates);
+                        "当前记录状态不满足操作条件 (Current state '" + currentState
+                                + "' is not in allowed states: " + fromStates + ")");
             }
         }
 

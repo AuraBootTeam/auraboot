@@ -31,6 +31,16 @@ class DynamicControllerBlankInConditionTest {
     }
 
     @Test
+    void keepsEmptyInConditionSoRuntimePermissionFiltersFailClosed() {
+        QueryCondition condition = inCondition();
+
+        List<QueryCondition> result = DynamicController.dropBlankInConditions(
+                new ArrayList<>(List.of(condition)));
+
+        assertThat(result).containsExactly(condition);
+    }
+
+    @Test
     void keepsInConditionWithAtLeastOneRealValue() {
         List<QueryCondition> result = DynamicController.dropBlankInConditions(
                 new ArrayList<>(List.of(inCondition("ok"))));
