@@ -10,6 +10,7 @@ import {
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
   queryDynamicRecords,
+  readDynamicRecord,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
   type CreatedRows,
@@ -209,6 +210,12 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     );
     expect(createdQuoteId, 'create should return the new quote id').toBeTruthy();
     created.quoteId = createdQuoteId;
+    // The create command mints a backend-generated quote code, so the scaffold's
+    // marker code no longer identifies the quote under test. Read the code back
+    // from the created record or the list navigation opens the wrong (empty) row.
+    const createdQuote = await readDynamicRecord(page, 'qo_quote_common', createdQuoteId);
+    created.quoteCode = String(createdQuote.qo_quote_code ?? '');
+    expect(created.quoteCode, 'created quote exposes its code').toBeTruthy();
 
     await expect
       .poll(

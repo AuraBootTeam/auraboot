@@ -471,22 +471,16 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const workbookPath = createCorrectedBomWorkbook(
         testInfo.outputPath('sales-role-corrected-bom.xlsx'),
       );
+      // corrected_bom_file renders the BomUploadReview component: the file is
+      // parsed into the first-10-row preview immediately, but the actual
+      // /api/file/upload POST happens at form submit, not on file selection.
       const uploadField = page.getByTestId('form-field-corrected_bom_file');
       await expect(uploadField).toBeVisible({ timeout: 15_000 });
-      const uploadResponsePromise = page.waitForResponse(
-        (response) =>
-          response.url().includes('/api/file/upload') && response.request().method() === 'POST',
-        { timeout: 30_000 },
-      );
-      const fileInput = uploadField.locator('input[type="file"]').first();
-      if ((await fileInput.count()) > 0) {
-        await fileInput.setInputFiles(workbookPath);
-      } else {
-        const chooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-        await uploadField.locator('button, [role="button"]').first().click();
-        await (await chooserPromise).setFiles(workbookPath);
-      }
-      expect((await uploadResponsePromise).ok(), 'corrected BOM upload succeeds').toBe(true);
+      const reviewInput = page.getByTestId('bom-upload-review-file-corrected_bom_file');
+      await expect(reviewInput).toBeAttached({ timeout: 15_000 });
+      await reviewInput.setInputFiles(workbookPath);
+      await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('已选 7 列')).toBeVisible();
 
       // Gerber and CPL are mandatory at create (DSL required + server-side check);
       // SmartUpload validates by extension, so write real .zip/.csv fixtures.
