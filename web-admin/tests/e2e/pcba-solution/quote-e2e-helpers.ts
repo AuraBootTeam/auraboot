@@ -258,10 +258,18 @@ export async function ensureQuoteRoleUser(page: Page, user: QuoteRoleUser): Prom
     timeout: 20_000,
   });
   const body = await resp.json().catch(() => ({}));
-  expect(
-    resp.ok(),
-    `create role user ${user.key} (${user.email}) HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 800)}`,
-  ).toBe(true);
+  if (!resp.ok()) {
+    // Fixed smoke accounts keep the gate reproducible on an already-used stack:
+    // re-provisioning an existing user is a no-op, not a failure. Role codes are
+    // only asserted on the fresh-create path; wrong roles on a reused user
+    // surface as functional failures in the permission matrices themselves.
+    const text = JSON.stringify(body);
+    expect(
+      resp.status() === 409 || /already exists|已存在/i.test(text),
+      `create role user ${user.key} (${user.email}) HTTP ${resp.status()}: ${text.slice(0, 800)}`,
+    ).toBe(true);
+    return;
+  }
 
   const assignedRoles = Array.isArray((body as any).data?.assignedRoles)
     ? (body as any).data.assignedRoles.map(String)
