@@ -486,8 +486,14 @@ export async function executeCommand(
   if (targetRecordId && (normalizedOperation === 'UPDATE' || normalizedOperation === 'DELETE')) {
     const model = commandCode.split(':')[0];
     if (model && model !== commandCode) {
-      const record = await readDynamicRecord(page, model, targetRecordId);
-      const rowVersion = Number(record.row_version ?? record.rowVersion);
+      // The prefix is only a guess: bom:update_material targets bom_material_master,
+      // and reading a guessed-but-wrong model fails closed with a model-permission
+      // 403. CAS is opt-in per command (executionConfig.casRequired), so the pre-read
+      // is an optimization, not a contract — when it cannot resolve, send the command
+      // without expectedVersion and let a structured CAS_VERSION_REQUIRED conflict
+      // fail loudly instead of blocking non-CAS commands here.
+      const record = await readDynamicRecord(page, model, targetRecordId).catch(() => null);
+      const rowVersion = Number(record?.row_version ?? record?.rowVersion);
       if (Number.isFinite(rowVersion)) {
         data.expectedVersion = rowVersion;
       }
