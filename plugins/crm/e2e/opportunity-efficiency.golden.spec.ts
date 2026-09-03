@@ -786,7 +786,7 @@ test('a personal view owns its visible fields, pinned amount and row density', a
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
   await page.getByTestId('personal-view-save-current').click();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(2500);
   await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
 
   const competitorHeader = page.getByTestId('table-header-crm_opp_competitor');

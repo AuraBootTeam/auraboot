@@ -171,15 +171,28 @@ async function moveUserMembershipToIsolatedTenant(userPid: string): Promise<void
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const membership = await client.query<{ member_id: string }>(
-      `SELECT tm.id::text AS member_id
-       FROM ab_tenant_member tm
-       INNER JOIN ab_user u ON u.id = tm.user_id
-       WHERE u.pid = $1 AND tm.status = 'active' AND tm.deleted_flag = false
-       LIMIT 1`,
-      [userPid],
-    );
-    expect(membership.rowCount).toBe(1);
+    // The provisioning API commits the user and its membership in separate
+    // transactions; poll briefly so an immediate membership read does not
+    // race the commit.
+    let membershipId: string | undefined;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const membership = await client.query<{ member_id: string }>(
+        `SELECT tm.id::text AS member_id
+         FROM ab_tenant_member tm
+         INNER JOIN ab_user u ON u.id = tm.user_id
+         WHERE u.pid = $1 AND tm.status = 'active' AND tm.deleted_flag = false
+         LIMIT 1`,
+        [userPid],
+      );
+      if (membership.rowCount === 1) {
+        membershipId = membership.rows[0].member_id;
+        break;
+      }
+      await client.query('COMMIT');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await client.query('BEGIN');
+    }
+    expect(membershipId, `no active tenant membership for ${userPid}`).toBeTruthy();
     const tenantId = (
       BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
     ).toString();
@@ -192,11 +205,11 @@ async function moveUserMembershipToIsolatedTenant(userPid: string): Promise<void
     );
     await client.query(
       `UPDATE ab_user_role SET deleted_flag = true, updated_at = now() WHERE member_id = $1`,
-      [membership.rows[0].member_id],
+      [membershipId!],
     );
     await client.query(
       `UPDATE ab_tenant_member SET tenant_id = $1, updated_at = now() WHERE id = $2`,
-      [tenantId, membership.rows[0].member_id],
+      [tenantId, membershipId!],
     );
     await client.query('COMMIT');
   } catch (error) {
