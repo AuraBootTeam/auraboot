@@ -1299,6 +1299,14 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         fullPage: true,
       });
 
+      // The admin-driven exporter's generate_document legitimately refreshes the
+      // derived cost rows as the administrator. Re-roll the cost and regenerate
+      // the document as the sales owner (sales holds qo.document.generate) so the
+      // SELF-isolation assertion below stays an honest fixture.
+      step = 'refresh cost rows as the sales owner';
+      await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
+      await executeCommand(page, 'qo_quote_common:generate_document', {}, quoteId);
+
       // 8. A second sales employee has the same capability atoms but cannot read any record
       // owned by the first employee. This explicitly covers quote child records involved in
       // recompute/export/reprice, not just the quote root. Run this before the administrator
