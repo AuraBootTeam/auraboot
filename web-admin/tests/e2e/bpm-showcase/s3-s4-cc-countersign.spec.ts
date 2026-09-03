@@ -7,6 +7,9 @@
  * - S3.1  bob 手动抄送 dave via Task Center 抄送 dialog → dave 的「抄送给我」
  *         tab 出现该条目(UI)且 /api/bpm/notify/received?type=CC 有记录(后端);
  *         抄送箱为只读(无通过/驳回动作)。
+ * - S3.3  automation cc_task: on_bpm_event(task_created) → cc_task 动作自动抄送
+ *         dave,断言 A 统一后的单库 ab_bpm_notify_record(sourceType=AUTOMATION)
+ *         经产品读路径可见。
  *
  * S4 会签:
  * - S4.1  并行会签(approverList=bob/carol/dave, 全部通过才算完): 三个人各自
@@ -381,6 +384,94 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     const badBody = (await bad.json().catch(() => ({}))) as { code?: string | number };
     const refused = bad.status() >= 400 || String(badBody.code ?? '0') !== '0';
     expect(refused, 'unknown receiver pid must be refused (fail-fast)').toBe(true);
+  });
+
+  // 钉住(BLOCKED on SmartEngine 4.0.2):automation 合成流程运行于 storage-custom
+  // 持久化模式,该模式对 activity/execution/task 存储有意抛 "not implement
+  // intentionally"(CustomActivityInstanceStorage 等),cc_task 的 BPM 单库路径
+  // 无法执行。翻转条件:SmartEngine 实现 custom 存储(或 automation runtime 切换
+  // 存储模式),与 B(rollbackTask)同属引擎授权工作;翻开后删除 pins 中的
+  // s3-3-automation-cc-stub 条目并去掉本 fixme。
+  test.fixme('S3.3 automation cc_task on bpm task_created writes the CC single store (API-backed)', async ({ request }) => {
+    // dave 的数字 ab_user id:auth/me 以字符串序列化,无 2^53 精度损失
+    const daveMe = await request.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${daveToken}` },
+    });
+    const daveUserId = String((await daveMe.json())?.data?.user?.id ?? '');
+    expect(daveUserId, 'dave numeric userId').toBeTruthy();
+
+    const businessKey = `SC3C-${Date.now()}`;
+    const marker = `S3.3 automation cc ${businessKey}`;
+
+    // automation: on_bpm_event(task_created, S3_KEY) → cc_task → USER:<dave>
+    // taskId 经 ${taskInstanceId} 模板从事件载荷解析(BpmTaskEventPublisher 键名)
+    const createResp = await request.post('/api/automations', {
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      data: {
+        name: `S3.3 cc_task ${businessKey}`,
+        description: 'BPM showcase: automation cc_task single-store assertion',
+        triggerType: 'on_bpm_event',
+        modelCode: S3_KEY,
+        // direct-assignee tasks publish task_assigned; candidate-style flows
+        // publish task_created — subscribe to both so the assertion holds for
+        // either emission path.
+        triggerConfig: { eventTypes: ['task_created', 'task_assigned'] },
+        actions: [
+          {
+            type: 'cc_task',
+            sequence: 0,
+            label: 'automation cc',
+            config: {
+              target: `USER:${daveUserId}`,
+              taskId: '${taskInstanceId}',
+              message: marker,
+            },
+          },
+        ],
+        enabled: true,
+      },
+    });
+    const created = await createResp.json().catch(() => ({}) as Record<string, unknown>);
+    expect(
+      createResp.ok(),
+      `create automation: ${createResp.status()} ${JSON.stringify(created).slice(0, 200)}`,
+    ).toBe(true);
+    const createdData = (created?.data ?? {}) as Record<string, unknown>;
+    const automationPid = String(createdData.pid ?? createdData.id ?? '');
+    expect(automationPid, 'automation pid').toBeTruthy();
+
+    // 发起实例 → task_created 事件 → automation cc_task → BPM 单库
+    const aliceToken = await loginJwt(request, SHOWCASE_USERS.alice.email);
+    const { instanceId } = await startProcessInstance(request, aliceToken, {
+      processDefinitionId: S3_KEY,
+      businessKey,
+      variables: {},
+    });
+    await waitForTodoTask(request, bobToken, (t) => t.processInstanceId === instanceId, {
+      timeout: 20_000,
+      message: 'assignee todo must appear (task_created fired)',
+    });
+
+    // dave 的抄送收件箱(产品读路径)出现 AUTOMATION 来源记录——A 统一后的单库断言
+    await expect
+      .poll(async () => {
+        const resp = await request.get('/api/bpm/notify/received?type=CC', {
+          headers: { Authorization: `Bearer ${daveToken}` },
+        });
+        const body = await resp.json().catch(() => ({}) as Record<string, unknown>);
+        const records = (body?.data ?? []) as Array<Record<string, unknown>>;
+        return records.filter(
+          (r) => r.content === marker && String(r.sourceType ?? '') === 'AUTOMATION',
+        ).length;
+      }, { timeout: 30_000, message: 'automation cc_task must land in the CC single store' })
+      .toBeGreaterThan(0);
+
+    // cleanup: 停用 automation,避免向后续用例的 task_created 事件继续抄送
+    const disable = await request.post(`/api/automations/${automationPid}/disable`, {
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      data: { enabled: false },
+    });
+    expect(disable.ok(), `disable automation: ${disable.status()} ${await disable.text()}`).toBe(true);
   });
 
   test('S4.1+S4.2 parallel countersign: three todos, partial keep running, all complete → end', async ({ browser, request }, testInfo) => {

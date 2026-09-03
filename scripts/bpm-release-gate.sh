@@ -225,12 +225,12 @@ if [ -s "$NOTRUN_ALL" ]; then
             continue
         fi
         title="$(echo "$line" | sed 's/^[[:space:]]*-[[:space:]]*[0-9]*[[:space:]]*//')"
-        if python3 - "$PINS_FILE" "$title" <<'PY' 2>/dev/null
+        if python3 - "$PINS_FILE" "$title" <<'PY'
 import json, re, sys
-pins = json.load(open(sys.argv[1]))
+pins = json.load(open(sys.argv[1]))["allow"]
 title = sys.argv[2]
 for pin in pins:
-    if pin.get("kind", "skip-allow") == "skip-allow" and re.search(pin["pattern"], title):
+    if re.search(pin["pattern"], title):
         print(f"   NOT-RUN(允许): {title}")
         print(f"     pin={pin['id']} — {pin['reason']}")
         sys.exit(0)
