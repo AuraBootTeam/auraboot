@@ -1783,6 +1783,17 @@ export function FormPageContent(props: PageContentProps) {
         : sourceRecordPid
           ? { ...formData, sourceRecordPid }
           : formData;
+      // BomUploadReview fields carry a local File + confirmed column mapping; both
+      // executors below need the uploaded file id and the review payload, so expand
+      // once here before dispatching.
+      const { expansions: reviewExpansions } = await expandBomUploadReviewPayload(
+        actionRecord,
+        modelFields,
+        token || undefined,
+      );
+      const dispatchActionRecord = Object.keys(reviewExpansions).length
+        ? { ...actionRecord, ...reviewExpansions }
+        : actionRecord;
       const effectiveAction = button.action;
       const effectiveActionType = resolveActionType(effectiveAction);
       const effectiveButton = {
@@ -1802,7 +1813,7 @@ export function FormPageContent(props: PageContentProps) {
         ) {
           clearFormDraftRef.current();
         }
-        return handleAction(effectiveButton as any, actionRecord as any);
+        return handleAction(effectiveButton as any, dispatchActionRecord as any);
       }
       // When action is an object like {type: "command", command: "xx:update_xx"},
       // extract the command code from it as well.
@@ -1851,13 +1862,7 @@ export function FormPageContent(props: PageContentProps) {
       setFieldErrors({});
       setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
-      const commandPayload = buildFormCommandPayload(actionRecord, modelFields, schema?.blocks);
-      const { expansions: reviewExpansions } = await expandBomUploadReviewPayload(
-        actionRecord,
-        modelFields,
-        token || undefined,
-      );
-      Object.assign(commandPayload, reviewExpansions);
+      const commandPayload = buildFormCommandPayload(dispatchActionRecord, modelFields, schema?.blocks);
 
       // Ensure sourceRecordPid is passed through to backend for SideEffect resolution
       if (sourceRecordPid && !commandPayload.sourceRecordPid) {
