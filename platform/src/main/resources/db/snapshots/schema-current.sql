@@ -9170,7 +9170,8 @@ CREATE TABLE public.ab_file_relation (
     sort_order integer DEFAULT 0,
     created_time timestamp with time zone,
     updated_time timestamp with time zone,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false,
+    tenant_id bigint
 );
 
 
@@ -24585,6 +24586,13 @@ CREATE INDEX idx_ab_file_relation_entity ON public.ab_file_relation USING btree 
 --
 
 CREATE INDEX idx_ab_file_relation_file_id ON public.ab_file_relation USING btree (file_id) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_ab_file_relation_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_file_relation_tenant ON public.ab_file_relation USING btree (tenant_id) WHERE (deleted_flag = false);
 
 
 --

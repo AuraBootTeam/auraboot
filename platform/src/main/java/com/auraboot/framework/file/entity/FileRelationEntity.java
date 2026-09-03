@@ -34,6 +34,12 @@ public class FileRelationEntity implements Serializable {
     private String fileId;
 
     /**
+     * 所属租户(TenantLineInnerInterceptor 按该列过滤,见 MybatisPlusConfig)
+     */
+    @TableField("tenant_id")
+    private Long tenantId;
+
+    /**
      * 关联实体类型
      */
     @TableField("entity_type")
