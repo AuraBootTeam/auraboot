@@ -386,13 +386,10 @@ test.describe('BPM Showcase S3+S4: cc loop & countersign (@bpm-showcase)', () =>
     expect(refused, 'unknown receiver pid must be refused (fail-fast)').toBe(true);
   });
 
-  // 钉住(BLOCKED on SmartEngine 4.0.2):automation 合成流程运行于 storage-custom
-  // 持久化模式,该模式对 activity/execution/task 存储有意抛 "not implement
-  // intentionally"(CustomActivityInstanceStorage 等),cc_task 的 BPM 单库路径
-  // 无法执行。翻转条件:SmartEngine 实现 custom 存储(或 automation runtime 切换
-  // 存储模式),与 B(rollbackTask)同属引擎授权工作;翻开后删除 pins 中的
-  // s3-3-automation-cc-stub 条目并去掉本 fixme。
-  test.fixme('S3.3 automation cc_task on bpm task_created writes the CC single store (API-backed)', async ({ request }) => {
+  // SmartEngine 4.0.3 completes the storage-custom persister, so the
+  // automation-driven cc_task path can reach the BPM single store
+  // (sourceType=AUTOMATION). Flip of the former fixme pin.
+  test('S3.3 automation cc_task on bpm task_created writes the CC single store (API-backed)', async ({ request }) => {
     // dave 的数字 ab_user id:auth/me 以字符串序列化,无 2^53 精度损失
     const daveMe = await request.get('/api/auth/me', {
       headers: { Authorization: `Bearer ${daveToken}` },
