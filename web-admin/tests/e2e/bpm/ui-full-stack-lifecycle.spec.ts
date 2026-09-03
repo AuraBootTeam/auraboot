@@ -449,6 +449,12 @@ test.describe(
       await fillEdgeConditionViaUI(page, 'e_gw_manager', COND_HIGH);
 
       // 5. Deselect so subsequent Save dialog opens cleanly.
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
       await page.locator('.react-flow__pane').click({ position: { x: 30, y: 30 } });
 
       // 6. Click the toolbar Save button → SaveDialog opens.

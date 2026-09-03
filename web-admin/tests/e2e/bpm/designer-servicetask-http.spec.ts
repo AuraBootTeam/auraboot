@@ -288,6 +288,12 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     await expect(serviceUrlInput).toHaveValue(healthUrl);
 
     // Deselect before Deploy so isDirty check is stable
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
     // D14: Deploy via toolbar (real click)

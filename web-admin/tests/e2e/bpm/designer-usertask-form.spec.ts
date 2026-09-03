@@ -309,6 +309,12 @@ test.describe('BPM Designer UserTask formPageKey Lifecycle', { tag: ['@bpm-regre
       .toBeGreaterThan(0);
 
     // Deselect canvas so Deploy's isDirty check is stable
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
     // D8: Deploy via toolbar

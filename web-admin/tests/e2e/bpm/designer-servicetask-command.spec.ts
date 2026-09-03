@@ -306,7 +306,13 @@ test.describe(
         page.locator('[data-testid="bpmn-save-dialog-panel"]'),
       ).toBeHidden({ timeout: 5_000 });
 
-      // Deselect so Deploy's isDirty logic is stable
+      // Deselect so Deploy's isDirty logic is stable. The inspector drawer
+      // mounts a full-screen backdrop (bpmn-drawer-backdrop) in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
       await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
       // 7. Deploy via toolbar (real UI click, D14)

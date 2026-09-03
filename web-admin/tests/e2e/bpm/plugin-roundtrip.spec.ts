@@ -420,6 +420,12 @@ test.describe(
       await expect(page.locator('[data-testid="usertask-expression"]')).toHaveValue(ASSIGNEE_HR);
 
       // Deselect so Save button stays stable
+      // The inspector drawer mounts a full-screen backdrop in compact
+      // viewports that intercepts pane clicks — dismiss it first.
+      const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+      if (await drawerBackdrop.isVisible().catch(() => false)) {
+        await drawerBackdrop.click();
+      }
       await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
 
       // 6. Save via real toolbar button (D14 — toast)
