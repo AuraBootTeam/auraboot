@@ -266,16 +266,21 @@ test.describe('PCBA quote minimal create regression', () => {
       await waitForFormReady(page, 20_000);
       await accountOptionsLoaded;
 
-      expect(await visibleFormFieldIds(page)).toEqual([
-        'form-field-corrected_bom_file',
-        'form-field-cpl_source_file',
-        'form-field-gerber_source_file',
-        'form-field-qo_quote_crm_account_id',
-        'form-field-qo_quote_notes',
-        'form-field-qo_quote_price_factor',
-        'form-field-qo_quote_project_id',
-        'form-field-qo_quote_set_count',
-      ]);
+      await expect
+        .poll(
+          async () => visibleFormFieldIds(page),
+          { timeout: 20_000, intervals: [500, 1_000, 2_000] },
+        )
+        .toEqual([
+          'form-field-corrected_bom_file',
+          'form-field-cpl_source_file',
+          'form-field-gerber_source_file',
+          'form-field-qo_quote_crm_account_id',
+          'form-field-qo_quote_notes',
+          'form-field-qo_quote_price_factor',
+          'form-field-qo_quote_project_id',
+          'form-field-qo_quote_set_count',
+        ]);
       await expect(
         page.getByTestId('form-field-qo_quote_set_count').locator('input').first(),
       ).toHaveValue('1');
@@ -301,7 +306,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(reviewInput).toBeAttached({ timeout: 15_000 });
       await reviewInput.setInputFiles(workbookPath);
       await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('已选 6 列')).toBeVisible();
+      await expect(page.getByText('已选 7 列')).toBeVisible();
       // Gerber and CPL are mandatory at create (DSL required + server-side
       // CreateQuoteHandler validation). SmartUpload validates by file extension,
       // so write real .zip/.csv fixtures instead of reusing the xlsx workbook.
@@ -346,7 +351,8 @@ test.describe('PCBA quote minimal create regression', () => {
       );
       const quoteId = String(quoteData.recordId ?? quoteData.quoteId ?? quoteData.pid ?? '');
       expect(quoteId, 'quote create should return quote id').toBeTruthy();
-      expect(quoteData.uploadedSourceCount).toBe(0);
+      // Gerber/CPL are now mandatory at create, so both source attachments dispatch.
+      expect(quoteData.uploadedSourceCount).toBe(2);
       expect(quoteData.correctedBomImported).toBe(true);
       const correctedBomImport = (quoteData.correctedBomImport ?? {}) as Record<string, unknown>;
       if (correctedBomImport.async === true && typeof correctedBomImport.taskCode === 'string') {
@@ -460,12 +466,11 @@ test.describe('PCBA quote minimal create regression', () => {
         timeout: 20_000,
       });
       await expect(page.getByRole('tab', { name: /BOM价格计算|BOM Price/i })).toBeVisible();
-      await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toHaveCount(0);
-      await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByTestId('toolbar-btn-upload_cpl')).toBeVisible();
-      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible();
+      // Materials upload is create-only now: the detail toolbar keeps only the
+      // pricing-input mutation, and no upload buttons may reappear.
+      await expect(page.getByTestId('toolbar-btn-upload_gerber_package')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-upload_cpl')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toHaveCount(0);
 
       const main = page.locator('main');
       await expect(main).not.toContainText('资料准备中');
