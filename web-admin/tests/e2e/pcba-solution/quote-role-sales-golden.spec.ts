@@ -412,6 +412,29 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
     await setYunhanMockScenario(page, 'release-default');
     const forbidden: ForbiddenHit[] = [];
     let step = 'login';
+    // The 报价Excel tab is gated by qo.quote.output.read, which the #426 seed contract
+    // deliberately withholds from qo_sales (quote-surface-permission-release pins
+    // sales to 资料上传/BOM价格计算/Gerber校验). Sales keeps driving every pricing action
+    // below; the workbook checkpoints are exported through an admin-driven page that
+    // holds the output surface.
+    let exporterContext: BrowserContext | undefined;
+    let exporterPage: Page | undefined;
+    const exportWorkbook = async (
+      quoteId: string,
+      label: string,
+      expectedSetCount: number,
+      expectedLine?: { mpn: string; unitCost: number },
+    ): Promise<void> => {
+      if (!exporterPage) throw new Error('admin exporter page not initialised');
+      await generateAndValidateWorkbook(
+        exporterPage,
+        quoteId,
+        label,
+        expectedSetCount,
+        testInfo,
+        expectedLine,
+      );
+    };
     page.on('response', (resp: Response) => {
       const status = resp.status();
       if ((status === 401 || status === 403) && resp.url().includes('/api/')) {
@@ -690,6 +713,15 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
 
         // 4. A single imported quote walks each price channel. Every accepted decision is read
         // back as the ordinary employee, directly covering the production 403 regression.
+        step = 'open admin exporter for output-gated Excel checkpoints';
+        exporterContext = await browser.newContext({
+          storageState: { cookies: [], origins: [] },
+        });
+        const exporter = await exporterContext.newPage();
+        exporterPage = exporter;
+        await loginViaUI(exporter, ADMIN_EMAIL, ADMIN_PASSWORD);
+        await openQuoteDetailFromList(exporter, created);
+
         step = 'adopt recent purchase and export';
         await adoptEvidence(page, lineId, recentEvidenceId, 'purchase_analysis_recent_price');
         await expect
@@ -702,7 +734,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           )
           .toBeCloseTo(RECENT_UNIT_PRICE, 6);
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'recent-purchase', 1, testInfo);
+        await exportWorkbook(quoteId, 'recent-purchase', 1);
 
         // A flat price keeps its unit price when the set count changes; only real quantity,
         // line amount and the local factor change. This is the no-ladder half of the release gate.
@@ -727,13 +759,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
               'purchase_analysis_recent_price',
             ].join('|'),
           );
-        await generateAndValidateWorkbook(
-          page,
-          quoteId,
-          'recent-purchase-flat-sets-factor',
-          FLAT_SET_COUNT,
-          testInfo,
-        );
+        await exportWorkbook(quoteId, 'recent-purchase-flat-sets-factor', FLAT_SET_COUNT);
 
         step = 'adopt yunhan ladder and export';
         await adoptEvidence(page, lineId, yunhanEvidenceId, 'yunhan');
@@ -747,7 +773,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           )
           .toBeCloseTo(YUNHAN_UNIT_PRICE * (PRICE_FACTOR / 100), 6);
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'yunhan', FLAT_SET_COUNT, testInfo);
+        await exportWorkbook(quoteId, 'yunhan', FLAT_SET_COUNT);
 
         // 5. Moving from 15,200 to 1,520,000 pieces crosses from the 5,000 tier to the
         // 500,000 tier. The selected supplier raw price and factor-derived cost must both move.
@@ -886,7 +912,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
 
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'sets-factor', SET_COUNT, testInfo);
+        await exportWorkbook(quoteId, 'sets-factor', SET_COUNT);
       } finally {
         await setupContext.close();
       }
@@ -1147,17 +1173,10 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         Number(lineBeforePreview.qo_ql_unit_cost),
         6,
       );
-      await generateAndValidateWorkbook(
-        page,
-        quoteId,
-        'reprice-preview-cancel',
-        SET_COUNT,
-        testInfo,
-        {
-          mpn: String(lineBeforePreview.qo_ql_mpn ?? ''),
-          unitCost: Number(lineBeforePreview.qo_ql_unit_cost),
-        },
-      );
+      await exportWorkbook(quoteId, 'reprice-preview-cancel', SET_COUNT, {
+        mpn: String(lineBeforePreview.qo_ql_mpn ?? ''),
+        unitCost: Number(lineBeforePreview.qo_ql_unit_cost),
+      });
 
       // Run the same explicit exact-model preview again, then adopt it. The confirmation request
       // is generated by the shared renderer with previewId only; trusted price/URL/ladder data is
@@ -1261,7 +1280,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       expect(String(refreshedLine.qo_ql_package ?? '')).toBe('0402');
       const refreshedUnitCost = Number(refreshedLine.qo_ql_unit_cost);
       expect(refreshedUnitCost).toBeCloseTo(0.01 * (PRICE_FACTOR / 100), 6);
-      await generateAndValidateWorkbook(page, quoteId, 'reprice', SET_COUNT, testInfo, {
+      await exportWorkbook(quoteId, 'reprice', SET_COUNT, {
         mpn: REPRICE_MPN,
         unitCost: refreshedUnitCost,
       });
@@ -1462,6 +1481,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const hits = forbidden.map((h) => `[${h.step}] ${h.status} ${h.url}`);
       expect(hits, `forbidden API hits as qo_sales:\n${hits.join('\n')}`).toEqual([]);
     } finally {
+      await exporterContext?.close().catch(() => {});
       await context.close();
     }
   });
