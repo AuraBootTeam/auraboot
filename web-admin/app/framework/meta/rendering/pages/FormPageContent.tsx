@@ -281,7 +281,8 @@ async function expandBomUploadReviewPayload(
       continue;
     }
     const dataType = modelFields[key]?.dataType;
-    if (dataType && String(dataType).toLowerCase() !== 'file') {
+    // Some review slots persist upload metadata as JSON text rather than a file column.
+    if (dataType && !['file', 'text'].includes(String(dataType).toLowerCase())) {
       continue;
     }
     const fileId = await uploadCommandFile(value.file, token);
@@ -1863,6 +1864,9 @@ export function FormPageContent(props: PageContentProps) {
       setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
       const commandPayload = buildFormCommandPayload(dispatchActionRecord, modelFields, schema?.blocks);
+      // Review metadata is command input rather than model data, so it is intentionally absent
+      // from the model-field whitelist used by buildFormCommandPayload.
+      Object.assign(commandPayload, reviewExpansions);
 
       // Ensure sourceRecordPid is passed through to backend for SideEffect resolution
       if (sourceRecordPid && !commandPayload.sourceRecordPid) {
