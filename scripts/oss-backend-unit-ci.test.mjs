@@ -83,6 +83,12 @@ test('backend CI runner preserves Gradle product-test exit status', () => {
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 
+test('backend CI runner keeps external DashScope checks out unless explicitly requested', () => {
+  assert.match(source, /AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0/);
+  assert.match(source, /unset DASHSCOPE_API_KEY/);
+  assert.match(source, /DashScope live checks disabled/);
+});
+
 test('backend CI runner executes destructive bootstrap verification only after the shared suite', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
   assert.match(source, /--continue cleanTest test bootstrapBillingAccountTest/);
