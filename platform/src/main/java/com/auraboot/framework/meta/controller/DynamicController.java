@@ -304,7 +304,32 @@ public class DynamicController {
             }
             condition.setSubConditions(resolveRuntimeFilterValues(condition.getSubConditions(), modelCode));
         }
-        return conditions;
+        return dropBlankInConditions(conditions);
+    }
+
+    /**
+     * An IN / NOT_IN condition whose resolved values are all blank means "the user did
+     * not select anything" (e.g. a DSL filter bound to {@code ${state.riskFilter}} before
+     * the user picks a value). Treating that as a predicate would filter out every row,
+     * so the condition is dropped instead — blank selection means no filtering.
+     */
+    static List<QueryCondition> dropBlankInConditions(List<QueryCondition> conditions) {
+        if (conditions == null || conditions.isEmpty()) {
+            return conditions;
+        }
+        List<QueryCondition> result = new ArrayList<>(conditions.size());
+        for (QueryCondition condition : conditions) {
+            if (condition != null
+                    && (condition.getOperator() == QueryCondition.Operator.IN
+                            || condition.getOperator() == QueryCondition.Operator.NOT_IN)
+                    && condition.getValues() != null
+                    && condition.getValues().stream()
+                            .allMatch(value -> value == null || String.valueOf(value).isBlank())) {
+                continue;
+            }
+            result.add(condition);
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
