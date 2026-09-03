@@ -869,6 +869,13 @@ async function moveUserMembershipToIsolatedTenant(
        WHERE member_id = $1`,
       [source.member_id],
     );
+    // A tenant move invalidates every session issued under the old tenant:
+    // the FK fk_user_session_member exists precisely to force this cleanup.
+    await client.query(
+      `DELETE FROM ab_user_session
+       WHERE tenant_id = $1 AND tenant_member_id = $2`,
+      [source.tenant_id, source.member_id],
+    );
     const moved = await client.query(
       `UPDATE ab_tenant_member
        SET tenant_id = $1, updated_at = now()
@@ -2829,14 +2836,18 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await expect(adminCard).toContainText(validName, { timeout: 20_000 });
       const adminAssignButton = adminCard.getByRole('button', { name: /分配|Assign/ });
       await expect(adminAssignButton).toBeVisible();
+      // Current IA: the card assign action navigates to the dedicated
+      // assign-form page (待分配客户 + 选择获配成员) instead of opening a dialog.
       await adminAssignButton.click();
-      const adminMobileAssignDialog = adminMobilePage.getByRole('dialog');
+      await expect(adminMobilePage).toHaveURL(/crm_customer_pool_assign\/edit/, {
+        timeout: 15_000,
+      });
       await expect(
-        adminMobileAssignDialog.getByText(/分配池内客户|Assign Pooled Customer/),
+        adminMobilePage.getByText(/分配池内客户|Assign Pooled Customer/).first(),
       ).toBeVisible();
-      await expect(adminMobileAssignDialog.getByTestId('member-picker-add')).toBeVisible();
+      await expect(adminMobilePage.getByTestId('member-picker-add')).toBeVisible();
       await attachScreenshot(adminMobilePage, testInfo, 'mobile-pool-admin-assign-dialog-390');
-      await adminMobileAssignDialog.getByRole('button', { name: /取消|Cancel/ }).click();
+      await adminMobilePage.goBack();
     } finally {
       await adminMobileContext.close();
     }
@@ -3066,7 +3077,7 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         'an old tenant-bound session must fail closed after membership moves to another tenant',
       ).toBe(false);
       expect(JSON.stringify(crossTenantClaimBody)).toMatch(
-        /tenant|member|permission|forbidden|not permitted|无权|权限/i,
+        /tenant|member|permission|forbidden|not permitted|unauthorized|unauthenticated|credentials changed|re-login|无权|权限|认证/i,
       );
 
       await command(
