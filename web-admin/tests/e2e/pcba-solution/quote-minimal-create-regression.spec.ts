@@ -301,7 +301,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(reviewInput).toBeAttached({ timeout: 15_000 });
       await reviewInput.setInputFiles(workbookPath);
       await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('已选 6 列')).toBeVisible();
+      await expect(page.getByText('已选 7 列')).toBeVisible();
       // Gerber and CPL are mandatory at create (DSL required + server-side
       // CreateQuoteHandler validation). SmartUpload validates by file extension,
       // so write real .zip/.csv fixtures instead of reusing the xlsx workbook.
