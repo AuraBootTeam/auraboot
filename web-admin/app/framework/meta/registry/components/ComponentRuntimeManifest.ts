@@ -114,6 +114,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   moneyinput: runtime('form', 'MoneyInput', {
     aliases: ['SmartMoneyInput', 'MoneyInput', 'moneyinput', 'money'],
   }),
+  bomuploadreview: runtime('form', 'BomUploadReview', {
+    aliases: ['SmartBomUploadReview', 'BomUploadReview', 'bom-upload-review'],
+  }),
   colorpicker: runtime('form', 'ColorPickerField', {
     aliases: ['ColorPickerField', 'colorpicker', 'color_picker', 'color'],
   }),

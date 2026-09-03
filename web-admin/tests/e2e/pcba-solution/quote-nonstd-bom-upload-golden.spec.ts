@@ -1,9 +1,13 @@
+import fs from 'node:fs';
 import type { Locator } from '@playwright/test';
+import os from 'node:os';
 import path from 'node:path';
 import { test, expect } from '../../fixtures';
+import { waitForFormReady } from '../helpers';
 import {
   createNonStandardBomWorkbook,
   isTransientViteDynamicImportIssue,
+  openQuoteCreateFormFromList,
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
@@ -11,6 +15,40 @@ import {
   type CreatedRows,
   yunhanMockControlUrl,
 } from './quote-e2e-helpers';
+
+/** Pick a reference-select option by its data-value (no text search needed for fixtures). */
+async function selectReferenceOption(
+  page: import('@playwright/test').Page,
+  field: string,
+  value: string,
+): Promise<void> {
+  const trigger = page.getByTestId(`select-trigger-${field}`);
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
+  await trigger.click();
+  const option = page.locator(`[role="option"][data-value="${value}"]`).first();
+  await expect(option, `${field} option ${value} should be loaded`).toBeVisible({
+    timeout: 15_000,
+  });
+  await option.click();
+}
+
+async function uploadSmartUpload(
+  page: import('@playwright/test').Page,
+  fieldTestId: string,
+  filePath: string,
+): Promise<void> {
+  const field = page.getByTestId(fieldTestId);
+  await expect(field).toBeVisible({ timeout: 15_000 });
+  const uploadResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/file/upload') && response.request().method() === 'POST',
+    { timeout: 30_000 },
+  );
+  const input = field.locator('input[type="file"]').first();
+  await input.setInputFiles(filePath);
+  const uploadResponse = await uploadResponsePromise;
+  expect(uploadResponse.ok(), `file upload HTTP ${uploadResponse.status()}`).toBe(true);
+}
 import { validateQuickCustomerBomWorkbook } from './quote-workbook-assertions';
 
 const QUICK_CONFIRM_COMMAND = 'qo_quote_common:quick_confirm_costs_by_category';
@@ -81,20 +119,30 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       consoleIssues.push(`pageerror: ${error.message}`);
     });
 
-    await openQuoteDetailFromList(page, created);
+    // Materials upload happens only at quote creation now: the non-standard BOM
+    // goes through the create form's BomUploadReview field (first-10-row preview +
+    // explicit column roles), and the create command carries the confirmed columns.
+    const accountId = created.rows.find((row) => row.model === 'crm_account_common')?.pid;
+    const projectId = created.rows.find((row) => row.model === 'req_requirement_set_pcba_bom')?.pid;
+    expect(accountId, 'scaffold account id').toBeTruthy();
+    expect(projectId, 'scaffold project id').toBeTruthy();
 
-    await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
-      timeout: 20_000,
-    });
-    const uploadButton = page.getByTestId('toolbar-btn-upload_corrected_bom');
-    await expect(uploadButton).toBeVisible({ timeout: 20_000 });
-    await expect(uploadButton).toHaveAccessibleName(/上传BOM资料|Upload BOM Data/i);
+    await openQuoteCreateFormFromList(page);
+    await waitForFormReady(page, 20_000);
+    await selectReferenceOption(page, 'qo_quote_crm_account_id', accountId!);
+    await selectReferenceOption(page, 'qo_quote_project_id', projectId!);
 
-    await uploadButton.click();
-    const uploadDialog = page.getByTestId('form-dialog');
-    await expect(uploadDialog).toBeVisible({ timeout: 15_000 });
+    const gerberFixture = path.join(os.tmpdir(), `nonstd-gerber-${Date.now()}.zip`);
+    fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+    const cplFixture = path.join(os.tmpdir(), `nonstd-cpl-${Date.now()}.csv`);
+    fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
+    await uploadSmartUpload(page, 'form-field-gerber_source_file', gerberFixture);
+    await uploadSmartUpload(page, 'form-field-cpl_source_file', cplFixture);
+
+    const reviewField = page.getByTestId('bom-upload-review-corrected_bom_file');
+    await expect(reviewField).toBeVisible({ timeout: 15_000 });
     await page
-      .getByTestId('bom-upload-review-file-corrected_bom_file_id')
+      .getByTestId('bom-upload-review-file-corrected_bom_file')
       .setInputFiles(workbookPath);
     await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('将发送给云汉的列')).toBeVisible();
@@ -103,25 +151,23 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(page.getByTestId('bom-upload-review-column-1')).toBeChecked();
     await expect(page.getByTestId('bom-upload-review-grid')).toContainText('240Ω ±1% 1/20W 0201');
     await testInfo.attach('nonstd-bom-upload-column-review.png', {
-      body: await uploadDialog.screenshot(),
+      body: await reviewField.screenshot(),
       contentType: 'image/png',
     });
 
     const commandRequestPromise = page.waitForRequest(
       (request) =>
-        request.url().includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
+        request.url().includes('/api/meta/commands/execute/qo_quote_common:create') &&
         request.method() === 'POST',
       { timeout: 60_000 },
     );
     const commandResponsePromise = page.waitForResponse(
       (response) =>
-        response
-          .url()
-          .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
+        response.url().includes('/api/meta/commands/execute/qo_quote_common:create') &&
         response.request().method() === 'POST',
       { timeout: 60_000 },
     );
-    await page.getByTestId('form-dialog-submit').click();
+    await page.getByTestId('form-btn-save').click();
 
     const commandRequest = await commandRequestPromise;
     const commandRequestBody = commandRequest.postDataJSON() as {
@@ -154,12 +200,15 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     const commandBody = await commandResponse.json().catch(() => ({}));
     expect(
       String((commandBody as any).code),
-      `import_corrected_bom response: ${JSON.stringify(commandBody).slice(0, 1000)}`,
+      `qo_quote_common:create response: ${JSON.stringify(commandBody).slice(0, 1000)}`,
     ).toBe('0');
-
-    const completionMessage = page.getByText('上传BOM资料已完成', { exact: true });
-    await expect(completionMessage).toHaveCount(1, { timeout: 30_000 });
-    await expect(completionMessage).toBeVisible();
+    const createdQuoteId = String(
+      (commandBody as any).data?.data?.recordId ??
+        (commandBody as any).data?.data?.quoteId ??
+        '',
+    );
+    expect(createdQuoteId, 'create should return the new quote id').toBeTruthy();
+    created.quoteId = createdQuoteId;
 
     await expect
       .poll(
@@ -213,8 +262,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     expect(Number(resistorLine?.qo_ql_qty)).toBe(3);
     expect(String(resistorLine?.qo_ql_description ?? '')).toContain('0201');
 
-    await page.getByRole('button', { name: /^关闭$/ }).click();
-    await expect(completionMessage).toHaveCount(0, { timeout: 10_000 });
+    await openQuoteDetailFromList(page, created);
 
     const lineIds = quoteLines.map((row) => String(row.pid)).filter(Boolean);
     expect(lineIds).toHaveLength(4);
@@ -388,23 +436,23 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       expect(Number(processCells[column])).toBe(Number(expected));
     }
 
-    await resistorHitRow.click();
-    const reviewDrawer = page.getByTestId('review-drawer');
-    await expect(reviewDrawer).toBeVisible({ timeout: 10_000 });
-    await expect(reviewDrawer).toContainText('WMF2400TEE');
-    await expect(reviewDrawer).toContainText(/单套用量\s*3(?:\.00)?/);
-    await expect(reviewDrawer).toContainText(/单件点数\s*2/);
-    await expect(reviewDrawer).toContainText(/单套点数\s*6/);
-    await expect(reviewDrawer).toContainText('fixed_points');
-    await expect(reviewDrawer).toContainText(/Excel行 3|Excel Row 3/i);
+    // The review drawer is retired; the flat nine-column table carries the facts.
+    await expect(page.getByTestId('review-drawer')).toHaveCount(0);
+    const processHeaders2 = await tableTexts(
+      resistorHitRow.locator('xpath=ancestor::table[1]').locator('thead th, thead [role="columnheader"]'),
+    );
+    const processCells2 = await tableTexts(resistorHitRow.locator('td, [role="cell"]'));
+    const noteColumn2 = processHeaders2.findIndex((header) => /说明\/处理|Note \/ Action/i.test(header));
+    expect(noteColumn2, `process headers2: ${processHeaders2.join(' | ')}`).toBeGreaterThanOrEqual(0);
+    expect(processCells2[noteColumn2] ?? '').toBe('');
+    const pointsColumn2 = processHeaders2.findIndex((header) => /数量\/点数|Qty \/ Points/i.test(header));
+    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/3(\.0+)?\s*×\s*2(\.0+)?\s*=\s*6(\.0+)?/);
 
     await testInfo.attach('nonstd-process-fee-0201-match.png', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
 
-    await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
-    await expect(reviewDrawer).toBeHidden({ timeout: 10_000 });
     await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
     const generateAction = page.getByTestId('workbench-action-generate_quote_excel');
     await expect(generateAction).toBeVisible({ timeout: 20_000 });
