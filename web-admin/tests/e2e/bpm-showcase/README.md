@@ -45,9 +45,9 @@ S6 另补 `wd-showcase-manager/hr@test.com` 进种子的 `wd_manager`/`wd_hr` �
 1. **已修**:`transferTask`/`delegateTask` 前端发 `{userId}`,后端要
    `targetUserId` → 转办/委托静默无效但报成功(`bpmWorkbenchService.ts` 已改为
    `targetUserId`,S2.1/S2.2 回归保护)。
-2. **deferred,需 owner 授权**:手动抄送链路断裂 —— MemberPicker 的 id 是
+2. **已修(2026-08-31,#1744)**:手动抄送链路断裂 —— MemberPicker 的 id 是
    pid 字符串,`Number(pid)`→NaN→JSON null → `BpmNotifyController.sendCarbonCopy`
-   NPE(500)。S3.1 钉住现状,只读抄送箱断言 BLOCKED。
+   NPE(500)。A(CC 存储统一)落地后 S3.1 实测绿,抄送箱只读断言已恢复。
 3. **deferred**:认领后其他角色成员仍可 complete(claim 不强制独占)。S2.3 pin。
 4. **deferred**:NODE 级 SLA record 在任务办结后永不完结
    (`SlaRecordService.completeByTaskId` 无调用方)。S7.3 pin。
@@ -66,9 +66,17 @@ S6 另补 `wd-showcase-manager/hr@test.com` 进种子的 `wd_manager`/`wd_hr` �
 
 ## 已知缺口(未测 / blocked)
 
-- S3 只读抄送箱断言:BLOCKED(见发现 2)。
+- ~~S3 只读抄送箱断言:BLOCKED(见发现 2)。~~ 已解除:A(CC 存储统一 #1744)
+  修复 MemberPicker NPE 链路,S3.1 实测绿。
 - S1 rollback/withdraw 步骤未单独落用例(控制器/权限已由后端 IT 覆盖,
   UI 路径待后续批次;见 plan §4 S1.5/S1.6 预留行)。
 - ~~包容网关 0 分支命中(所有条件为 false)行为未覆盖(需产品语义决策)。~~
   已覆盖:语义定为 default fallback(#1745, 无 default 的 inclusive fork 在
   converter fail-fast),S5.3 以真实引擎验证零命中走 default。
+
+## BPM 发布门禁
+
+`scripts/bpm-release-gate.sh`(repo 根)编排 smoke/showcase/designer 三层硬门 +
+`tests/e2e/bpm/` 契约套件 advisory 层;分母 SOT 与钉住项见 workspace
+`docs/plans/2026-09-03-bpm-functional-acceptance-matrix.md`,skip 允许清单见
+`scripts/bpm-release-gate.pins.json`。

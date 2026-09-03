@@ -192,10 +192,13 @@ test.describe('BPM Showcase S7: SLA deadline & escalation (@bpm-showcase)', () =
         { timeout: 20_000, message: 'SLA record must activate for the instance' },
       )
       .toBe(true);
+    // The scheduler may have already advanced a fresh record past RUNNING
+    // (deadline 15s vs. suite pacing) — both states prove activation and
+    // tracking; OVERDUE/escalation is asserted by the later phase.
     expect(
-      (record?.status ?? '').toUpperCase(),
-      'fresh SLA record must be running',
-    ).toBe('RUNNING');
+      ['RUNNING', 'WARNING'],
+      'fresh SLA record must be active (RUNNING or already WARNING)',
+    ).toContain((record?.status ?? '').toUpperCase());
 
     // UI evidence: admin sees the record on the SLA monitor page
     {
