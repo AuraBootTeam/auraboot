@@ -294,12 +294,14 @@ test.describe('PCBA quote minimal create regression', () => {
 
       await selectCustomer(page, accountId, accountName);
       await selectProject(page, projectId, projectName);
-      await uploadSmartUploadFile(
-        page,
-        'form-field-corrected_bom_file',
-        workbookPath,
-        'create-quote-converted-bom.xlsx',
-      );
+      // corrected_bom_file renders the BomUploadReview component (no plain
+      // SmartUpload input in the field container): feed the file straight into
+      // the review input and wait for the first-10-row preview grid.
+      const reviewInput = page.getByTestId('bom-upload-review-file-corrected_bom_file');
+      await expect(reviewInput).toBeAttached({ timeout: 15_000 });
+      await reviewInput.setInputFiles(workbookPath);
+      await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('已选 6 列')).toBeVisible();
       // Gerber and CPL are mandatory at create (DSL required + server-side
       // CreateQuoteHandler validation). SmartUpload validates by file extension,
       // so write real .zip/.csv fixtures instead of reusing the xlsx workbook.
