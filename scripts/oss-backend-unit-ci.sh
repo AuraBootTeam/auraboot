@@ -153,6 +153,16 @@ if [[ "$(printf '%s\n' "$seed_counts" | awk '$1 > 0 { ok++ } END { print ok + 0 
 fi
 
 cd "$PROJECT_ROOT" || environment_invalid 'cannot enter repository root'
+
+# The backend unit/IT gate must stay deterministic and credential-independent. DashScope checks
+# are live external-provider acceptance tests; they remain available through the dedicated golden
+# suites or an explicit one-off opt-in, but an ambient host key must not silently widen this suite.
+if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
+  unset DASHSCOPE_API_KEY
+  printf '%s\n' \
+    '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
+fi
+
 TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
