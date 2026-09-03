@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, queryFilteredList, waitForFormReady } from '../helpers';
@@ -298,18 +301,23 @@ test.describe('PCBA quote minimal create regression', () => {
         'create-quote-converted-bom.xlsx',
       );
       // Gerber and CPL are mandatory at create (DSL required + server-side
-      // CreateQuoteHandler validation); the fixture files satisfy the slots.
+      // CreateQuoteHandler validation). SmartUpload validates by file extension,
+      // so write real .zip/.csv fixtures instead of reusing the xlsx workbook.
+      const gerberFixture = path.join(os.tmpdir(), `create-quote-gerber-${Date.now()}.zip`);
+      fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+      const cplFixture = path.join(os.tmpdir(), `create-quote-cpl-${Date.now()}.csv`);
+      fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
       await uploadSmartUploadFile(
         page,
         'form-field-gerber_source_file',
-        workbookPath,
-        'create-quote-gerber.zip',
+        gerberFixture,
+        path.basename(gerberFixture),
       );
       await uploadSmartUploadFile(
         page,
         'form-field-cpl_source_file',
-        workbookPath,
-        'create-quote-cpl.csv',
+        cplFixture,
+        path.basename(cplFixture),
       );
       await page
         .getByTestId('form-field-qo_quote_notes')

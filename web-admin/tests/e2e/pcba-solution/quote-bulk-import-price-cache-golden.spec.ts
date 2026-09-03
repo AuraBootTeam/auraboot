@@ -66,6 +66,11 @@ function parseSnapshot(value: unknown): Record<string, unknown> {
 }
 
 test.describe('QuoteOps bulk import + current sourcing golden', () => {
+    // FIXME(#429 A1): the detail-page corrected-BOM upload button was removed;
+    // materials upload now happens only at quote creation. Rewrite this journey
+    // against the create-time upload-review once that slice lands.
+    test.fixme(true, 'detail-page corrected-BOM upload removed; pending create-time review rewrite');
+
   test.describe.configure({ timeout: 300_000 });
 
   test('imports correlated rows in bulk and ignores historical recent-cache evidence', async ({

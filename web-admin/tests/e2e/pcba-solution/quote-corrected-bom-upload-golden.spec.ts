@@ -11,6 +11,11 @@ import {
 } from './quote-e2e-helpers';
 
 test.describe('QuoteOps corrected BOM upload golden', () => {
+    // FIXME(#429 A1): the detail-page corrected-BOM upload button was removed;
+    // materials upload now happens only at quote creation. Rewrite this journey
+    // against the create-time upload-review once that slice lands.
+    test.fixme(true, 'detail-page corrected-BOM upload removed; pending create-time review rewrite');
+
   test.describe.configure({ timeout: 120_000 });
 
   test('uploads a corrected BOM workbook from the quote workbench and refreshes trace rows', async ({
