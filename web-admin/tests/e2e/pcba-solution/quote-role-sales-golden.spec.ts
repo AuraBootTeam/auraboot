@@ -292,23 +292,16 @@ async function adoptEvidence(
   }
 }
 
-async function generateAndValidateWorkbook(
-  page: Page,
-  quoteId: string,
-  label: string,
-  expectedSetCount: number,
-  testInfo: TestInfo,
-  expectedLine?: { mpn: string; unitCost: number },
-): Promise<string> {
+/** Close a review drawer left open by the previous pricing step and require a
+ * stable hidden window — a completed reprice can briefly rebind the same
+ * selected line after the first close, reopening the drawer and intercepting
+ * the next tab click. Do not force-click through a visible overlay, because
+ * that would hide a real user-facing obstruction. */
+async function settleReviewDrawer(page: Page): Promise<void> {
   const drawerClose = page.getByRole('button', {
     name: /关闭复核浮层|Close review drawer/,
   });
   const drawer = page.getByTestId('review-drawer');
-  // A completed reprice triggers an asynchronous row refresh. The refresh can
-  // briefly rebind the same selected line after the first close, reopening the
-  // drawer and intercepting the next tab click. Require a stable hidden window;
-  // do not force-click through a visible overlay, because that would hide a real
-  // user-facing obstruction.
   const closeDeadline = Date.now() + 10_000;
   let hiddenSince = 0;
   await expect
@@ -329,6 +322,17 @@ async function generateAndValidateWorkbook(
     )
     .toBe(true);
   await expect(drawer).toBeHidden({ timeout: 2_000 });
+}
+
+async function generateAndValidateWorkbook(
+  page: Page,
+  quoteId: string,
+  label: string,
+  expectedSetCount: number,
+  testInfo: TestInfo,
+  expectedLine?: { mpn: string; unitCost: number },
+): Promise<string> {
+  await settleReviewDrawer(page);
   await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
   const action = page.getByTestId('workbench-action-generate_quote_excel');
   await expect(action).toBeVisible({ timeout: 15_000 });
@@ -426,6 +430,10 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       expectedLine?: { mpn: string; unitCost: number },
     ): Promise<void> => {
       if (!exporterPage) throw new Error('admin exporter page not initialised');
+      // The export no longer runs on the sales page, so the drawer the sales
+      // steps leave behind must be settled here to keep the next sales tab
+      // click unobstructed.
+      await settleReviewDrawer(page);
       await generateAndValidateWorkbook(
         exporterPage,
         quoteId,
