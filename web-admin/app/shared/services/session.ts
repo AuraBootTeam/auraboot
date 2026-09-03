@@ -17,6 +17,72 @@ if (!SESSION_SECRET && NODE_ENV === 'production') {
   throw new Error('SESSION_SECRET environment variable must be set in production');
 }
 
+/**
+ * Resolves the `Secure` attribute for the `__session` cookie.
+ *
+ * Browsers refuse to store `Secure` cookies on plain-HTTP origins, so
+ * HTTP-only CI/internal deployments must set `SESSION_COOKIE_SECURE=false`.
+ * When the variable is absent the production-safe default applies
+ * (`Secure` in production, absent otherwise). Any value other than
+ * `true`/`false` fails fast instead of silently falling back.
+ */
+export function resolveSessionCookieSecure(
+  env: Record<string, string | undefined> | undefined,
+): boolean {
+  const override = env?.SESSION_COOKIE_SECURE;
+  if (override !== undefined && override !== '') {
+    if (override === 'true') return true;
+    if (override === 'false') return false;
+    throw new Error(
+      `SESSION_COOKIE_SECURE must be "true" or "false", got "${override}"`,
+    );
+  }
+  return (env?.NODE_ENV ?? 'development') === 'production';
+}
+
+/**
+ * Deployment preflight for the session cookie configuration.
+ *
+ * Compares the effective `Secure` decision against the declared public origin
+ * (`PUBLIC_URL`) and throws at startup when the browser would silently drop
+ * the session cookie:
+ * - HTTPS public origin requires `Secure` cookies;
+ * - plain-HTTP public origin (other than localhost) rejects `Secure` cookies.
+ */
+export function assertSessionCookieDeployment(
+  env: Record<string, string | undefined> | undefined,
+): void {
+  const publicUrl = env?.PUBLIC_URL;
+  if (!publicUrl) return;
+
+  let origin: URL;
+  try {
+    origin = new URL(publicUrl);
+  } catch {
+    throw new Error(`PUBLIC_URL is not a valid URL: "${publicUrl}"`);
+  }
+
+  const secure = resolveSessionCookieSecure(env);
+  const hostname = origin.hostname;
+  const isLoopbackHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+
+  if (origin.protocol === 'https:' && !secure) {
+    throw new Error(
+      `PUBLIC_URL "${publicUrl}" is HTTPS but the __session cookie is not Secure. ` +
+        'Remove SESSION_COOKIE_SECURE=false or set SESSION_COOKIE_SECURE=true.',
+    );
+  }
+
+  if (origin.protocol === 'http:' && !isLoopbackHost && secure) {
+    throw new Error(
+      `PUBLIC_URL "${publicUrl}" is plain HTTP, so browsers will reject the Secure __session cookie. ` +
+        'Set SESSION_COOKIE_SECURE=false for HTTP CI/internal deployments, or serve PUBLIC_URL via HTTPS.',
+    );
+  }
+}
+
+assertSessionCookieDeployment(processEnv);
+
 export const sessionStorage = createCookieSessionStorage({
   cookie: {
     name: '__session',
@@ -24,7 +90,7 @@ export const sessionStorage = createCookieSessionStorage({
     path: '/',
     sameSite: 'lax',
     secrets: [SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: NODE_ENV === 'production',
+    secure: resolveSessionCookieSecure(processEnv),
   },
 });
 
