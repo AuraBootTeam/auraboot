@@ -34,6 +34,12 @@ export interface UsePageRuntimeOptions {
   showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   /** Disable SchemaRuntime (some pages may not need it) */
   disableRuntime?: boolean;
+  /**
+   * DataSource ids to keep unregistered (never fetched). Detail pages pass the
+   * ids referenced only by permission-hidden tabs so inaccessible surfaces do
+   * not fire their queries; backend RBAC answers are unchanged for direct use.
+   */
+  excludeDataSourceIds?: Set<string>;
 }
 
 export interface UsePageRuntimeResult {
@@ -81,7 +87,8 @@ export function usePageRuntime(
   schema: UnifiedSchema | null,
   options?: UsePageRuntimeOptions,
 ): UsePageRuntimeResult {
-  const { additionalContext = {}, disableRuntime = false, showToast } = options || {};
+  const { additionalContext = {}, disableRuntime = false, showToast, excludeDataSourceIds } =
+    options || {};
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -143,6 +150,7 @@ export function usePageRuntime(
   const { manager: dataSourceManager } = usePageDataSources({
     context: expressionContext,
     schema,
+    excludeDataSourceIds,
   });
 
   // Initialize SchemaRuntime (conditional)

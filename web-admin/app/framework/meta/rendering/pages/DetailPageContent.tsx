@@ -70,7 +70,9 @@ import type {
   DataSourceConfig,
   DetailTabConfig,
   FieldConfig,
+  UnifiedSchema,
 } from '~/framework/meta/schemas/types';
+import { mergeDataSources } from '~/framework/meta/utils/extractDataSourcesFromSchema';
 import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -635,6 +637,85 @@ export function resolveVisibleTopLevelDetailBlocks(
   });
 }
 
+/**
+ * DataSource ids whose only consumers live under permission-hidden tabs.
+ *
+ * The page runtime registers every schema dataSource eagerly and auto-fetches on
+ * registration, so a surface the current user cannot open still fires its named
+ * queries and collects designed backend 403s into every session. A datasource is
+ * excludable only when it is consumed somewhere in the schema but never by a
+ * permission-visible block; ids with no consumer at all (page code, generated
+ * field option sources) are always kept.
+ *
+ * Consumption means the block renders the data (`dataSource`,
+ * `contextDataSource`, form/filter field option sources). Refresh instructions
+ * such as `poll.reload` deliberately do NOT count: reloading an unregistered id
+ * is a safe no-op in DataSourceManager.fetch, and status banners routinely
+ * declare cross-surface reload lists that the viewer may not be allowed to read.
+ *
+ * visibleWhen is deliberately not evaluated here: the exclusion set must stay
+ * stable across record loads and state changes, because usePageDataSources
+ * clears and re-registers the whole manager whenever its data source set changes.
+ */
+export function resolvePermissionHiddenDataSourceIds(
+  schema: UnifiedSchema | null,
+  hasPermission?: (permissionCode: string) => boolean,
+): Set<string> {
+  const hidden = new Set<string>();
+  const allBlocks = schema?.blocks;
+  if (!allBlocks || allBlocks.length === 0) return hidden;
+
+  const candidates = mergeDataSources(schema);
+  const candidateIds = Object.keys(candidates);
+  if (candidateIds.length === 0) return hidden;
+
+  const consumedByVisible = new Set<string>();
+  const consumedByAny = new Set<string>();
+  const collectConsumption = (block: BlockConfig, into: Set<string>): void => {
+    const record = block as BlockConfig & Record<string, unknown>;
+    for (const key of ['dataSource', 'contextDataSource'] as const) {
+      const value = record[key];
+      if (typeof value === 'string' && candidates[value]) into.add(value);
+    }
+    if (Array.isArray(record.fields)) {
+      for (const field of record.fields) {
+        const fieldSource = (field as { dataSource?: unknown })?.dataSource;
+        if (typeof fieldSource === 'string' && candidates[fieldSource]) into.add(fieldSource);
+      }
+    }
+    if (Array.isArray(record.blocks)) {
+      for (const child of record.blocks as BlockConfig[]) collectConsumption(child, into);
+    }
+  };
+
+  const permissionVisibleBlocks: BlockConfig[] = [];
+  const permissionHiddenBlocks: BlockConfig[] = [];
+  const walkTabs = (blocks: BlockConfig[], inheritedVisible: boolean): void => {
+    for (const block of blocks) {
+      if (block.blockType === 'tabs') {
+        for (const tab of ((block as BlockConfig & { tabs?: DetailTabConfig[] }).tabs ??
+          []) as DetailTabConfig[]) {
+          const tabVisible =
+            inheritedVisible && (!tab.permissionCode || Boolean(hasPermission?.(tab.permissionCode)));
+          walkTabs(tab.blocks ?? [], tabVisible);
+        }
+        continue;
+      }
+      collectConsumption(block, inheritedVisible ? consumedByVisible : consumedByAny);
+      const nested = (block as BlockConfig & { blocks?: BlockConfig[] }).blocks;
+      if (Array.isArray(nested)) walkTabs(nested, inheritedVisible);
+    }
+  };
+  walkTabs(allBlocks, true);
+
+  for (const id of candidateIds) {
+    if (consumedByAny.has(id) && !consumedByVisible.has(id)) {
+      hidden.add(id);
+    }
+  }
+  return hidden;
+}
+
 const DIRECT_DETAIL_SPECIALIZED_BLOCK_TYPES = new Set([
   'activity-timeline',
   'record-comments',
@@ -933,11 +1014,20 @@ function DetailPageContentInner(props: PageContentProps) {
     [recordData, recordPid, schema],
   );
 
+  // Data sources referenced only by permission-hidden tabs must not fire: the
+  // runtime registers and auto-fetches eagerly, and a surface the user cannot
+  // open would still collect designed backend 403s on every page load.
+  const permissionHiddenDataSourceIds = useMemo(
+    () => resolvePermissionHiddenDataSourceIds(schema, hasPermission),
+    [schema, hasPermission],
+  );
+
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
     showToast,
     additionalContext: runtimeContext,
+    excludeDataSourceIds: permissionHiddenDataSourceIds,
   });
   useRuntimeStateSubscription(runtime);
 

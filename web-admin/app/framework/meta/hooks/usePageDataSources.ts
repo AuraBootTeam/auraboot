@@ -39,6 +39,13 @@ export interface UsePageDataSourcesOptions {
    * 如果提供，会自动从字段中提取 dataSource 引用并合并到 schema.dataSources
    */
   schema?: UnifiedSchema | null;
+
+  /**
+   * DataSource ids to keep unregistered (never fetched). Used by detail pages
+   * for ids referenced only by permission-hidden tabs; ids referenced by
+   * nothing at all must not be listed here (page code may consume them).
+   */
+  excludeDataSourceIds?: Set<string>;
 }
 
 export interface UsePageDataSourcesResult {
@@ -117,15 +124,26 @@ export function usePageDataSources(options: UsePageDataSourcesOptions): UsePageD
    * 2. 否则使用直接传入的 dataSources
    */
   const mergedDataSources = useMemo(() => {
-    if (options.schema) {
-      // 方式 2: 自动提取和合并 (推荐)
-      return mergeDataSources(options.schema);
-    } else if (options.dataSources) {
-      // 方式 1: 直接使用传入的 dataSources (向后兼容)
-      return options.dataSources;
+    const base = options.schema
+      ? // 方式 2: 自动提取和合并 (推荐)
+        mergeDataSources(options.schema)
+      : options.dataSources;
+    if (!base) return {};
+    const exclude = options.excludeDataSourceIds;
+    if (!exclude || exclude.size === 0) return base;
+    const filtered: Record<string, DataSourceConfig> = {};
+    let removed = false;
+    for (const [id, config] of Object.entries(base)) {
+      if (exclude.has(id)) {
+        removed = true;
+        continue;
+      }
+      filtered[id] = config;
     }
-    return {};
-  }, [options.schema, options.dataSources]);
+    // Return the original identity when nothing was excluded so consumers can
+    // rely on reference equality to skip re-registration.
+    return removed ? filtered : base;
+  }, [options.schema, options.dataSources, options.excludeDataSourceIds]);
 
   // 当 dataSources 变化时,重新注册所有数据源
   // 使用 JSON.stringify 进行深度比较，避免对象引用变化导致重复注册
