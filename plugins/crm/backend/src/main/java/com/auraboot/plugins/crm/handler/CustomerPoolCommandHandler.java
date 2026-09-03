@@ -208,13 +208,12 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                 "crm_acc_pool_state", "owned",
                 "crm_acc_last_pool_id", poolId,
                 "crm_acc_claimed_at", now.toString()));
-        db.update("crm_customer_pool_item_common", itemId, Map.of(
-                "crm_cpi_status", event,
-                "crm_cpi_claimed_at", now.toString(),
-                "crm_cpi_claimed_by", owner));
-        HashMap<String, Object> clearedLease = new HashMap<>();
-        clearedLease.put("crm_cpi_recycle_token", null);
-        db.update("crm_customer_pool_item_common", itemId, clearedLease);
+        HashMap<String, Object> claimed = new HashMap<>();
+        claimed.put("crm_cpi_status", event);
+        claimed.put("crm_cpi_claimed_at", now.toString());
+        claimed.put("crm_cpi_claimed_by", owner);
+        claimed.put("crm_cpi_recycle_token", null);
+        db.update("crm_customer_pool_item_common", itemId, claimed);
         Map<String, Object> history = appendHistory(db, customerId, poolId, event,
                 string(item.get("crm_cpi_previous_owner")), owner, actor, null, now);
         shares.replaceReadUpdateSharesForUsers(
