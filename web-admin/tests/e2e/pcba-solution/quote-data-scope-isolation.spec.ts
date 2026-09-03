@@ -99,8 +99,15 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
   expect(fileId, `BOM uploaded for ${code}`).toBeTruthy();
 
   const corrected = JSON.stringify([{ name: 'bom.xlsx', url: `/api/file/download/${fileId}`, size: buf.length, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileId }]);
+  // CreateQuoteHandler enforces the mandatory-materials contract on every write
+  // path (#1777): gerber/cpl slots are required alongside the corrected BOM.
+  // The slots only need id+filename with a valid extension — the parse itself
+  // is offloaded to the background task queue and this spec asserts record
+  // visibility, not parse outcomes.
+  const gerberName = `e2e-gerber-${suffix}.zip`;
+  const cplName = `e2e-cpl-${suffix}.csv`;
   const cr = await page.context().request.post('/api/meta/commands/execute/qo_quote_common:create', {
-    data: { payload: { qo_quote_code: code, qo_quote_customer: `W2B ${suffix}`, qo_quote_project_id: projId, corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx' }, operationType: 'create' },
+    data: { payload: { qo_quote_code: code, qo_quote_customer: `W2B ${suffix}`, qo_quote_project_id: projId, corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx', gerber_source_file_id: gerberName, gerber_source_filename: gerberName, cpl_source_file_id: cplName, cpl_source_filename: cplName }, operationType: 'create' },
   });
   expect(cr.status(), `quote created for ${code}`).toBe(200);
 }
