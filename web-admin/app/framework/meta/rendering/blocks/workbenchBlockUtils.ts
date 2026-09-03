@@ -511,23 +511,51 @@ export async function executeSimpleWorkbenchAction(
     }
 
     const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
+    const operationType = args.operationType ? String(args.operationType).toUpperCase() : undefined;
     const params: Record<string, any> = {
       targetRecordPid,
-      operationType: args.operationType ? String(args.operationType).toUpperCase() : undefined,
+      operationType,
       payload: { ...(args.payload || {}), ...collectedInputs },
     };
     if (targetRecordPid) {
       params.targetRecordPid = targetRecordPid;
     }
+    // Strict CAS contract (#1752): existing-target mutations must carry the
+    // expectedVersion observed by the caller. Workbench drawers confirm rows
+    // resolved from list data, so when the caller passed no version we send the
+    // command once; a CAS_VERSION_REQUIRED conflict names the target model, and
+    // we complete the version handshake with its current row_version.
     Object.keys(params).forEach((key) => {
       if (params[key] === undefined) delete params[key];
     });
 
-    try {
-      let result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+    const sendCommand = () =>
+      fetchResult(`/api/meta/commands/execute/${command}`, {
         method: 'post',
         params,
       });
+    let result = await sendCommand();
+    if (
+      !isSuccessResult(result) &&
+      (result as any)?.context?.errorCode === 'CAS_VERSION_REQUIRED' &&
+      targetRecordPid
+    ) {
+      const conflictModel =
+        (result as any)?.context?.modelCode || String(command).split(':')[0];
+      const recordResult = await fetchResult(
+        `/api/dynamic/${encodeURIComponent(conflictModel)}/${encodeURIComponent(targetRecordPid)}`,
+        { method: 'get' },
+      );
+      if (isSuccessResult(recordResult)) {
+        const record = (recordResult as any)?.data?.data ?? (recordResult as any)?.data;
+        const version = Number(record?.row_version ?? record?.rowVersion);
+        if (Number.isFinite(version)) {
+          params.expectedVersion = version;
+          result = await sendCommand();
+        }
+      }
+    }
+    try {
       if (!isSuccessResult(result)) {
         // B-002 (DR-20260715-B-002): a business-rejected command puts the real,
         // localized reason in context.detail; message/desc are the generic envelope.

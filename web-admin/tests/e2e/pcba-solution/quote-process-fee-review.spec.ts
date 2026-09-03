@@ -8,7 +8,7 @@ function compact(value: string): string {
 test.describe('PCBA quote pricing and process-point evidence golden', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('shows Excel lineage and explains exact-package points while unsupported facts stay pending', async ({
+  test('maps every Excel row onto one flat table row and keeps review facts out of a drawer', async ({
     page,
   }, testInfo) => {
     // Unique fixture identifiers make old retained evidence unable to satisfy this run.
@@ -27,16 +27,26 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
       .locator('table')
       .filter({
         has: page.getByRole('columnheader', {
-          name: /原始封装 → 标准封装|Raw → Normalized Package/,
+          name: /厂商\/MPN|Manufacturer \/ MPN/,
         }),
       })
       .first();
     await expect(processTable).toBeVisible({ timeout: 20_000 });
     const headers = (await processTable.locator('thead th').allInnerTexts()).map(compact);
     expect(
-      headers[0].toLocaleLowerCase(),
+      headers,
       `unexpected process-point headers: ${JSON.stringify(headers)}`,
-    ).toBe('excel行');
+    ).toEqual([
+      '原始行',
+      '位号',
+      '状态',
+      '物料/规格',
+      '厂商/MPN',
+      '工序/依据',
+      'GERBER事实',
+      '数量/点数',
+      '说明/处理',
+    ]);
 
     const matchedChip = page.getByTestId('metric-strip-item-matched');
     const manualRequiredChip = page.getByTestId('metric-strip-item-partial');
@@ -52,56 +62,28 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
     await expect(matchedRow).toHaveCount(1, { timeout: 20_000 });
     const matchedCells = matchedRow.locator('td');
     await expect(matchedCells.nth(0)).toHaveText('14');
-    await expect(matchedRow).toContainText('0201 → 0201');
-    await expect(matchedRow).toContainText(/Excel行\s*3/);
-    await expect(matchedRow).toContainText(/4\.00/);
-    await expect(matchedRow).toContainText(/封装\s+0201\s+精确命中规则/);
+    await expect(matchedRow).toContainText('R14');
+    await expect(matchedRow).toContainText(/E2E-EXACT-/);
+    await expect(matchedRow).toContainText(/4(\.\d+)?\s*×\s*2(\.\d+)?\s*=\s*8(\.\d+)?/);
+    await expect(matchedRow).toContainText('SMT');
+    // A matched row stays quiet: the note/action column carries no review noise.
+    await expect(matchedCells.nth(8)).toHaveText('');
 
     await processTable.scrollIntoViewIfNeeded();
     await processTable.screenshot({ path: testInfo.outputPath('01-process-points-table.png') });
 
+    // The review drawer is retired: clicking a row must not open any overlay.
     await matchedRow.click({ force: true });
-    const reviewDrawer = page.getByTestId('review-drawer');
-    await expect(reviewDrawer).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('review-drawer-raw-panel')).toBeVisible();
-    await expect(page.getByTestId('review-drawer-canonical-panel')).toBeVisible();
-    await expect(page.getByTestId('review-drawer-parse-summary')).toBeVisible();
+    await expect(page.getByTestId('review-drawer')).toHaveCount(0);
 
-    const drawerText = compact(await reviewDrawer.innerText());
-    for (const expected of [
-      '本行输入',
-      '核算结果',
-      '计算依据',
-      '原始封装事实',
-      '标准封装',
-      'BOM封装列',
-      'package_exact',
-      'Excel行 3',
-      '单套用量 4',
-      '单件点数 2',
-      '单套点数 8',
-      '仅依据标准封装 0201 完全相等命中',
-      '未使用名称、MPN、位号或关键词',
-    ]) {
-      expect(drawerText, `process-point drawer is missing ${expected}`).toContain(expected);
-    }
-    for (const forbidden of ['解析证据与 Profile / LLM Policy', '无需在页面维护规则', '核算结论']) {
-      expect(drawerText).not.toContain(forbidden);
-    }
-    await expect(page.getByTestId('review-drawer-tab-source')).toHaveCount(0);
-    await expect(page.getByTestId('review-drawer-tab-candidates')).toHaveCount(0);
-    await reviewDrawer.screenshot({
-      path: testInfo.outputPath('02-process-point-evidence-drawer.png'),
-    });
-
-    await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
     await unmatchedChip.click();
     const unmatchedRow = processTable
       .locator('[data-testid^="table-row-"]')
       .filter({ hasText: 'E2E-UNMATCHED' });
     await expect(unmatchedRow).toHaveCount(1, { timeout: 20_000 });
     await expect(unmatchedRow).toContainText(/规则未命中|Rule Missing/);
-    await expect(unmatchedRow).toContainText(/TO-999\s*→\s*TO999/);
+    await expect(unmatchedRow).toContainText(/标准封装\s*TO999\s*未命中规则/);
+    await expect(unmatchedRow).toContainText(/补齐封装或调整规则/);
 
     await manualRequiredChip.click();
     const manualRequiredRow = processTable
@@ -109,7 +91,8 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
       .filter({ hasText: 'E2E-MIXED' });
     await expect(manualRequiredRow).toHaveCount(1, { timeout: 20_000 });
     await expect(manualRequiredRow).toContainText(/需人工复核|Needs Review/);
-    await expect(manualRequiredRow).toContainText(/当前只支持封装精确匹配|补齐封装/);
+    await expect(manualRequiredRow).toContainText(/封装缺失、无法识别或规则口径尚未启用/);
+    await expect(manualRequiredRow).toContainText(/补齐封装或调整规则/);
 
     await processTable.screenshot({
       path: testInfo.outputPath('03-process-point-pending-states.png'),

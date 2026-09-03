@@ -119,6 +119,33 @@ function resolveTargetExpectedVersion(
   return toExpectedVersion(record.row_version ?? record.rowVersion);
 }
 
+/**
+ * Resolve the CAS version for an existing-target mutation. Prefers the version
+ * carried by the triggering row; when that row is not the command target
+ * (e.g. confirming a quote line from a price-evidence row) it fetches the
+ * target record so strict UPDATE/DELETE mutations always send a version.
+ */
+async function resolveCommandExpectedVersion(
+  targetRecordPid: string | undefined,
+  operationType: string | undefined,
+  modelCode: string | undefined,
+  record: Record<string, any> | undefined,
+  token?: string,
+): Promise<number | undefined> {
+  const inlineVersion = resolveTargetExpectedVersion(targetRecordPid, record);
+  if (inlineVersion != null) return inlineVersion;
+  const normalizedOp = operationType?.toUpperCase();
+  if (!targetRecordPid || !modelCode) return undefined;
+  if (normalizedOp !== 'UPDATE' && normalizedOp !== 'DELETE') return undefined;
+  const result = await fetchResult(
+    `/api/dynamic/${encodeURIComponent(modelCode)}/${encodeURIComponent(targetRecordPid)}`,
+    { method: 'get', token },
+  );
+  if (!ResultHelper.isSuccess(result)) return undefined;
+  const payload = (result as any)?.data?.data ?? (result as any)?.data ?? null;
+  return toExpectedVersion(payload?.row_version ?? payload?.rowVersion);
+}
+
 function readPath(source: unknown, path: string): unknown {
   if (!source || typeof source !== 'object') return undefined;
   return path.split('.').reduce<unknown>((current, segment) => {
@@ -543,11 +570,38 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       if (commandOptions.expectedVersion != null) {
         body.expectedVersion = commandOptions.expectedVersion;
       }
-      const result = await fetchResult(`/api/meta/commands/execute/${commandCode}`, {
-        method: 'post',
-        params: body,
-        token,
-      });
+      const sendCommand = () =>
+        fetchResult(`/api/meta/commands/execute/${commandCode}`, {
+          method: 'post',
+          params: body,
+          token,
+        });
+      let result = await sendCommand();
+
+      // Strict CAS contract (#1752): when no version was resolvable up front, a
+      // CAS_VERSION_REQUIRED conflict names the target model — complete the
+      // version handshake with its current row_version and retry once.
+      if (
+        !ResultHelper.isSuccess(result) &&
+        commandOptions.expectedVersion == null &&
+        targetRecordPid &&
+        (result as any)?.context?.errorCode === 'CAS_VERSION_REQUIRED'
+      ) {
+        const conflictModel =
+          (result as any)?.context?.modelCode || String(commandCode).split(':')[0];
+        const recordResult = await fetchResult(
+          `/api/dynamic/${encodeURIComponent(conflictModel)}/${encodeURIComponent(targetRecordPid)}`,
+          { method: 'get', token },
+        );
+        if (ResultHelper.isSuccess(recordResult)) {
+          const record = (recordResult as any)?.data?.data ?? (recordResult as any)?.data;
+          const version = toExpectedVersion(record?.row_version ?? record?.rowVersion);
+          if (version != null) {
+            body.expectedVersion = version;
+            result = await sendCommand();
+          }
+        }
+      }
 
       if (!ResultHelper.isSuccess(result)) {
         throw new Error(resolveCommandErrorMessage(result, commandCode, t));
@@ -878,9 +932,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   locale,
                   t,
                 ),
-                expectedVersion: resolveTargetExpectedVersion(
+                expectedVersion: await resolveCommandExpectedVersion(
                   targetRecordPid,
+                  operationType,
+                  (effectiveCommand as any)?.modelCode,
                   record || context.data,
+                  token,
                 ),
               },
             );

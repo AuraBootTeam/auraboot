@@ -479,6 +479,20 @@ export async function executeCommand(
     data.targetRecordPid = targetRecordId;
   }
   if (operationType) data.operationType = operationType;
+  // Strict CAS contract (#1752): existing-target mutations must carry the
+  // expectedVersion observed by the caller. Most command codes prefix their
+  // model code, so the current row_version can be resolved automatically.
+  const normalizedOperation = (operationType ?? '').toUpperCase();
+  if (targetRecordId && (normalizedOperation === 'UPDATE' || normalizedOperation === 'DELETE')) {
+    const model = commandCode.split(':')[0];
+    if (model && model !== commandCode) {
+      const record = await readDynamicRecord(page, model, targetRecordId);
+      const rowVersion = Number(record.row_version ?? record.rowVersion);
+      if (Number.isFinite(rowVersion)) {
+        data.expectedVersion = rowVersion;
+      }
+    }
+  }
   const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
     data,
     timeout: 30_000,

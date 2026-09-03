@@ -106,8 +106,20 @@ class CommandTargetVersionLockPhaseTest {
     }
 
     @Test
+    void updateWithoutCasDeclaredProceedsVersionFree() {
+        // Broad policy: CAS is opt-in per command; a plain update with no
+        // casRequired executionConfig neither locks nor fails closed.
+        CommandPipelineContext ctx = context(null);
+        ctx.getRequest().setOperationType("UPDATE");
+
+        assertThat(phase.shouldSkip(ctx)).isTrue();
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
     void strictUpdateWithoutExpectedVersionFailsClosedBeforeLocking() {
         CommandPipelineContext ctx = context(null);
+        ctx.getCommand().setExecutionConfig("{\"casRequired\": true}");
         ctx.getRequest().setOperationType("UPDATE");
 
         assertThat(phase.shouldSkip(ctx)).isFalse();
@@ -119,6 +131,15 @@ class CommandTargetVersionLockPhaseTest {
                         .extracting(item -> ((CasVersionRequiredException) item).getConflictCode())
                         .isEqualTo(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED));
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void malformedCasConfigFailsOpenRatherThanBlockingCommands() {
+        CommandPipelineContext ctx = context(null);
+        ctx.getCommand().setExecutionConfig("not-json");
+        ctx.getRequest().setOperationType("UPDATE");
+
+        assertThat(phase.shouldSkip(ctx)).isTrue();
     }
 
     private void givenPhysicalModel() {

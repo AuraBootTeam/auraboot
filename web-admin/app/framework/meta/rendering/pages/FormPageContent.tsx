@@ -24,6 +24,7 @@ import {
 } from '~/framework/meta/hooks/useActionHandler';
 import { useComputedFields } from '~/framework/meta/hooks/useComputedFields';
 import { useToastContext } from '~/contexts/ToastContext';
+import { uploadCommandFile } from '~/framework/meta/utils/promptUpload';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
@@ -252,6 +253,57 @@ function collectSubmitPayloadFieldTypes(blocks: any[] | undefined): Record<strin
 
   visit(blocks);
   return fieldTypes;
+}
+
+/**
+ * A create-form field rendered by BomUploadReview carries a BomUploadReviewValue
+ * (local File + selected column mapping). Before the command payload is built,
+ * upload the reviewed file and expand the value into the slot fields the create
+ * handler expects (<field>, <field>_id, <field>_filename) plus the review
+ * payload (bom_sheet_name / bom_header_row_index / bom_selected_columns).
+ */
+async function expandBomUploadReviewPayload(
+  actionRecord: Record<string, any>,
+  modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>>,
+  token?: string,
+): Promise<{ expansions: Record<string, any>; reviewedFields: string[] }> {
+  const expansions: Record<string, any> = {};
+  const reviewedFields: string[] = [];
+  for (const [key, raw] of Object.entries(actionRecord)) {
+    const value = raw as BomUploadReviewValueLike | null | undefined;
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !(value.file instanceof File) ||
+      !value.payload ||
+      !Array.isArray(value.payload.bom_selected_columns)
+    ) {
+      continue;
+    }
+    const dataType = modelFields[key]?.dataType;
+    if (dataType && String(dataType).toLowerCase() !== 'file') {
+      continue;
+    }
+    const fileId = await uploadCommandFile(value.file, token);
+    reviewedFields.push(key);
+    expansions[key] = JSON.stringify([{ fileId, name: value.file.name }]);
+    expansions[`${key}_id`] = fileId;
+    expansions[`${key}_filename`] = value.file.name;
+    expansions.bom_sheet_name = value.payload.bom_sheet_name;
+    expansions.bom_header_row_index = value.payload.bom_header_row_index;
+    expansions.bom_selected_columns = value.payload.bom_selected_columns;
+  }
+  return { expansions, reviewedFields };
+}
+
+interface BomUploadReviewValueLike {
+  file: File;
+  valid: boolean;
+  payload: {
+    bom_sheet_name: string;
+    bom_header_row_index: number;
+    bom_selected_columns: Array<{ index: number; header: string; role: string }>;
+  };
 }
 
 export function buildFormCommandPayload(
@@ -1680,7 +1732,7 @@ export function FormPageContent(props: PageContentProps) {
   // In new mode, override form button commandCodes with the create command
   // so that save_draft/submit use CREATE instead of UPDATE
   const handleFormAction = useCallback(
-    (button: { commandCode?: string; [key: string]: any }) => {
+    async (button: { commandCode?: string; [key: string]: any }) => {
       // L1 SDK: delegate to external submit handler when provided
       if (onSubmitOverride) {
         const actionType = resolveActionType(button.action);
@@ -1800,6 +1852,12 @@ export function FormPageContent(props: PageContentProps) {
       setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
       const commandPayload = buildFormCommandPayload(actionRecord, modelFields, schema?.blocks);
+      const { expansions: reviewExpansions } = await expandBomUploadReviewPayload(
+        actionRecord,
+        modelFields,
+        token || undefined,
+      );
+      Object.assign(commandPayload, reviewExpansions);
 
       // Ensure sourceRecordPid is passed through to backend for SideEffect resolution
       if (sourceRecordPid && !commandPayload.sourceRecordPid) {

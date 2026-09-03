@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Browser, BrowserContext, Response, TestInfo } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
@@ -485,6 +487,34 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await (await chooserPromise).setFiles(workbookPath);
       }
       expect((await uploadResponsePromise).ok(), 'corrected BOM upload succeeds').toBe(true);
+
+      // Gerber and CPL are mandatory at create (DSL required + server-side check);
+      // SmartUpload validates by extension, so write real .zip/.csv fixtures.
+      const gerberFixture = path.join(os.tmpdir(), `sales-gerber-${Date.now()}.zip`);
+      fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+      const cplFixture = path.join(os.tmpdir(), `sales-cpl-${Date.now()}.csv`);
+      fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
+      for (const [fieldTestId, fixture] of [
+        ['form-field-gerber_source_file', gerberFixture],
+        ['form-field-cpl_source_file', cplFixture],
+      ] as const) {
+        const slotField = page.getByTestId(fieldTestId);
+        await expect(slotField).toBeVisible({ timeout: 15_000 });
+        const slotUpload = page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/file/upload') && response.request().method() === 'POST',
+          { timeout: 30_000 },
+        );
+        const slotInput = slotField.locator('input[type="file"]').first();
+        if ((await slotInput.count()) > 0) {
+          await slotInput.setInputFiles(fixture);
+        } else {
+          const chooser = page.waitForEvent('filechooser', { timeout: 10_000 });
+          await slotField.locator('button, [role="button"]').first().click();
+          await (await chooser).setFiles(fixture);
+        }
+        expect((await slotUpload).ok(), `${fieldTestId} upload succeeds`).toBe(true);
+      }
 
       await page
         .getByTestId('form-field-qo_quote_notes')
