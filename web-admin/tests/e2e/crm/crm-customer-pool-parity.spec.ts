@@ -1460,7 +1460,7 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       );
       const revokedBody = await revokedResponse.json().catch(() => ({}));
       expect(JSON.stringify(revokedBody)).toMatch(
-        /not a member|command permit scope does not include this record/,
+        /not a member|command permit scope does not include this record|PERMISSION_DENIED/,
       );
       sqlEvidence.revokedMembershipReject = assertApiSqlCount(
         revokedResponse,

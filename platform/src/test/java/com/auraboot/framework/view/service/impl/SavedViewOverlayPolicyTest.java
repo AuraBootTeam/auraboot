@@ -4,6 +4,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.PageSchemaRuntimeDTO;
 import com.auraboot.framework.meta.service.PageSchemaService;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.entity.ViewConfig.ColumnConfig;
 import com.auraboot.framework.view.entity.ViewConfig.FilterConfig;
@@ -29,12 +30,15 @@ class SavedViewOverlayPolicyTest {
     @Mock
     private PageSchemaService pageSchemaService;
 
+    @Mock
+    private MetaModelService metaModelService;
+
     private SavedViewOverlayPolicy policy;
 
     @BeforeEach
     void setUp() {
         policy = new SavedViewOverlayPolicy(
-                pageSchemaService, new ObjectMapper().findAndRegisterModules());
+                pageSchemaService, metaModelService, new ObjectMapper().findAndRegisterModules());
     }
 
     @Test

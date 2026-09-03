@@ -7,7 +7,7 @@
     "modelCode": "crm_account_relation_common",
     "inputFields": ["crm_acr_source_account_id", "crm_acr_target_account_id", "crm_acr_relation_type", "crm_acr_strength", "crm_acr_status", "crm_acr_effective_from", "crm_acr_effective_to", "crm_acr_notes"],
     "autoSetFields": {
-      "crm_acr_owner": { "strategy": "current_user_pid" },
+      "crm_acr_owner": { "strategy": "current_user_pid", "preserveInput": true },
       "crm_acr_status": { "strategy": "default_value", "value": "active" },
       "crm_acr_strength": { "strategy": "default_value", "value": "standard" }
     },

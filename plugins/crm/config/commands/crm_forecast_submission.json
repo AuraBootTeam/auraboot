@@ -23,7 +23,8 @@
         "value": "draft"
       },
       "crm_fcst_owner": {
-        "strategy": "current_user_pid"
+        "strategy": "current_user_pid",
+        "preserveInput": true
       }
     },
     "permissions": [

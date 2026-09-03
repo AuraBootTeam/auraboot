@@ -34,7 +34,8 @@
         "value": "unrouted"
       },
       "crm_cr_owner": {
-        "strategy": "current_user_pid"
+        "strategy": "current_user_pid",
+        "preserveInput": true
       }
     },
     "permissions": [

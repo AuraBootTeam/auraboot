@@ -21,7 +21,8 @@
         "pattern": "ACC-{yyyyMMdd}-{seq}"
       },
       "crm_acc_owner": {
-        "strategy": "current_user_pid"
+        "strategy": "current_user_pid",
+        "preserveInput": true
       },
     "crm_acc_status": {
       "strategy": "default_value",
