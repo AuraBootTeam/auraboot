@@ -76,7 +76,7 @@ const TARGET_OPERATION_TYPE = 'create';
 // Any valid employee pid works; we use the well-known seed employee #1
 // created by reset-and-init.sh (see mt_org_employee). The point is to
 // produce a real DB row whose existence proves the delegate executed.
-const TARGET_EMPLOYEE_PID = '01KPF6JCTWW61NWH5P13KNQT47';
+let TARGET_EMPLOYEE_PID = '';
 // Unique year-shift per run so parallel runs do not collide on the
 // (tenant, employee, year) unique-ish key if present. Years 2020..2030.
 const TARGET_YEAR = 2000 + (TS % 100);
@@ -202,6 +202,15 @@ test.describe(
 
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
+    // Resolve a live ab_user pid at runtime: the reference validation
+    // (findInTenantByPid) rejects the stale hardcoded ULID after any reset.
+    const me = await (await request.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    })).json();
+    TARGET_EMPLOYEE_PID = String(me?.data?.user?.pid ?? me?.data?.user?.id ?? '');
+    if (!TARGET_EMPLOYEE_PID) {
+      throw new Error('TARGET_EMPLOYEE_PID resolution failed');
+    }
     });
 
     // =======================================================================

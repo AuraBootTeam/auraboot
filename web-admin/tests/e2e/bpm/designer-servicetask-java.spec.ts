@@ -79,7 +79,7 @@ const TARGET_CLASS_NAME = 'commandServiceTaskDelegate';
 const TARGET_COMMAND_CODE = 'wd:create_leave_balance';
 const TARGET_OPERATION_TYPE = 'create';
 // Well-known seed employee from reset-and-init.sh (same as SVCC/SVCH).
-const TARGET_EMPLOYEE_PID = '01KPF6JCTWW61NWH5P13KNQT47';
+let TARGET_EMPLOYEE_PID = '';
 // Unique year so parallel runs / SVCC runs do not collide on the matching
 // row (years 2000..2099).
 const TARGET_YEAR = 2000 + (TS % 100);

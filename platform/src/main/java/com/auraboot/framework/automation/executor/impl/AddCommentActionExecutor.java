@@ -2,6 +2,7 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.RecordCommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -42,7 +43,15 @@ public class AddCommentActionExecutor implements ActionExecutor {
             throw new IllegalArgumentException("ADD_COMMENT action requires content");
         }
 
-        Map<String, Object> comment = recordCommentService.addComment(modelCode, recordPid, content, mentions);
+        // SLA timeout actions execute subject-less on the scheduler thread.
+        // recordCommentService.addComment -> assertRecordVisible -> getById
+        // enforces per-subject record permission, which with no subject throws
+        // "Permission context missing". The automation actor is a system
+        // actor writing on behalf of the SLA policy — execute under explicit
+        // ALL authority, same as other internal system accesses
+        // (cf. SendNotificationExecutor).
+        Map<String, Object> comment = MetaContext.runWithCommandPermitScope("ALL",
+                () -> recordCommentService.addComment(modelCode, recordPid, content, mentions));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("modelCode", modelCode);

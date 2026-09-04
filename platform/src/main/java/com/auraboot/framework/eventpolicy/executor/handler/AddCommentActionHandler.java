@@ -70,10 +70,18 @@ public class AddCommentActionHandler implements ActionHandler {
                     null);
         }
         String mentions = render(payload.get("mentions"), context);
+        // SLA timeout actions execute subject-less on the scheduler thread.
+        // recordCommentService.addComment -> assertRecordVisible -> getById
+        // enforces per-subject record permission, which with no subject throws
+        // "Permission context missing". The event-policy actor is a system
+        // actor writing on behalf of the SLA policy — run under explicit ALL
+        // command-permit authority (same pattern as SendNotificationExecutor).
         Map<String, Object> comment;
         try {
-            comment = recordCommentService.addComment(modelCode, recordPid, content,
-                    mentions != null && !mentions.isBlank() ? mentions : null);
+            comment = com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope(
+                    "ALL",
+                    () -> recordCommentService.addComment(modelCode, recordPid, content,
+                            mentions != null && !mentions.isBlank() ? mentions : null));
         } catch (RuntimeException e) {
             throw new ActionExecutionException(
                     "ADD_COMMENT failed: " + messageOf(e),

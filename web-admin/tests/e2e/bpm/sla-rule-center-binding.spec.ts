@@ -1221,9 +1221,9 @@ test('SLA config form hosts rule-center binding with backend field catalog and i
 
     await page.goto(decisionTraceHref, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByLabel('log-keyword')).toHaveValue(runResult.traceId!);
-    await expect(page.getByLabel('log-decision-code')).toHaveValue(decisionCode);
-    await expect(page.getByLabel('log-caller-type')).toHaveValue('SLA');
+    await expect(page.getByTestId('log-keyword')).toHaveValue(runResult.traceId!);
+    await expect(page.getByTestId('log-decision-code')).toHaveValue(decisionCode);
+    await expect(page.getByTestId('log-caller-type')).toHaveValue('SLA');
     expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
     const traceRow = page
       .locator('tr[data-testid^="elta-row-"]')
@@ -1373,9 +1373,9 @@ test('SLA rule binding test-run traces applicant user reference fact metadata @g
 
     await page.goto(decisionTraceHref, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByLabel('log-keyword')).toHaveValue(runResult.traceId!);
-    await expect(page.getByLabel('log-decision-code')).toHaveValue(decisionCode);
-    await expect(page.getByLabel('log-caller-type')).toHaveValue('SLA');
+    await expect(page.getByTestId('log-keyword')).toHaveValue(runResult.traceId!);
+    await expect(page.getByTestId('log-decision-code')).toHaveValue(decisionCode);
+    await expect(page.getByTestId('log-caller-type')).toHaveValue('SLA');
     expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
 
     const traceRow = page
@@ -1586,8 +1586,8 @@ test('SLA monitor shows RETRY_ASYNC timeout action strategy, retry timeline, and
     await traceLink.click();
     await expect(page).toHaveURL(/\/p\/decisionops_execution_logs/);
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByLabel('log-caller-type')).toHaveValue('SLA');
-    await expect(page.getByLabel('log-keyword')).toHaveValue(
+    await expect(page.getByTestId('log-caller-type')).toHaveValue('SLA');
+    await expect(page.getByTestId('log-keyword')).toHaveValue(
       actionLog.decisionTraceId ?? `SLA_TIMEOUT:${pid}`,
     );
     expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
