@@ -563,8 +563,16 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
-            @RequestBody Map<String, Object> data) {
+            @RequestBody Map<String, Object> data,
+            @Parameter(description = "客户端持有的乐观锁版本号(可选)")
+            @RequestHeader(value = "X-Base-Record-Version", required = false) Long baseRecordVersion) {
         log.info("更新数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
+        if (baseRecordVersion != null && !data.containsKey("_expectedVersion")) {
+            // Translate the header precondition into the payload token the
+            // service compare-and-swap path already consumes. Offline replay
+            // (mobile) sends this header instead of mutating its queued body.
+            data.put("_expectedVersion", baseRecordVersion);
+        }
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, data);
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));

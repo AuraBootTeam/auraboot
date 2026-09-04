@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
 import com.auraboot.framework.meta.service.executor.ModelDataExecutor;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.meta.exception.RecordVersionConflictException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.common.constant.ResponseCode;
@@ -1893,7 +1894,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion);
             if (result <= 0) {
                 if (expectedVersion != null) {
-                    throw new MetaServiceException("Update failed: version conflict (expected version " + expectedVersion + ")");
+                    throw new RecordVersionConflictException(
+                            "Update failed: version conflict (expected version " + expectedVersion + ")");
                 }
                 throw new MetaServiceException("Failed to update record");
             }

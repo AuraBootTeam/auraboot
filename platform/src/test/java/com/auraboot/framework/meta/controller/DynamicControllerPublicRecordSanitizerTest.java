@@ -64,7 +64,7 @@ class DynamicControllerPublicRecordSanitizerTest {
         assertMappingUsesRecordPid(DynamicController.class.getMethod(
                 "getRecordCapabilities", String.class, String.class, String.class, String.class));
         assertMappingUsesRecordPid(DynamicController.class.getMethod(
-                "update", String.class, String.class, Map.class));
+                "update", String.class, String.class, Map.class, Long.class));
         assertMappingUsesRecordPid(DynamicController.class.getMethod("delete", String.class, String.class));
         assertMappingUsesRecordPid(DynamicController.class.getMethod(
                 "getRelationData", String.class, String.class, String.class));
@@ -314,7 +314,7 @@ class DynamicControllerPublicRecordSanitizerTest {
 
         assertPublicRecord(controller.getById("order", "p3").getData(), "p3");
         assertPublicRecord(asMap(controller.create("order", Map.of("name", "new")).getData()), "p4");
-        assertPublicRecord(controller.update("order", "p5", Map.of("name", "edited")).getData(), "p5");
+        assertPublicRecord(controller.update("order", "p5", Map.of("name", "edited"), null).getData(), "p5");
     }
 
     @Test
