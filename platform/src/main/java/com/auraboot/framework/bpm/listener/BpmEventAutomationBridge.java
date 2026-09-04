@@ -3,21 +3,33 @@ package com.auraboot.framework.bpm.listener;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.bpm.event.BpmEvent;
-import com.auraboot.framework.bpm.event.EventBusService;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
 /**
  * Bridge between BPM events and Automation framework.
- * Subscribes to BpmEvent through EventBusService's internal subscriber channel
- * and forwards them to AutomationTriggerService for matching automation execution.
+ * Listens to BpmEvent on the Spring application-event channel and forwards
+ * them to AutomationTriggerService for matching automation execution.
  *
- * Uses getBpmEventType() to pass the raw event type (e.g. "process_started")
- * to automation, since automation rules are keyed by raw BPM types.
+ * <p><b>Transaction boundary:</b> BPM events are published synchronously
+ * inside the engine's task/process transaction (see AuraTaskEventPublisher).
+ * This bridge MUST run only after that transaction commits — otherwise the
+ * automation reads rows (e.g. the freshly created task behind a
+ * task_created event) that are not visible yet, and actions like cc_task
+ * fail with "Task not found". Hence {@code @TransactionalEventListener(phase
+ * = AFTER_COMMIT)}, mirroring InboxEventListener; {@code fallbackExecution =
+ * true} keeps events flowing for the transient publish paths that run
+ * without an enclosing transaction. The {@code @Async} hop keeps automation
+ * execution off the committing thread.</p>
+ *
+ * <p>Uses getBpmEventType() to pass the raw event type (e.g. "process_started")
+ * to automation, since automation rules are keyed by raw BPM types.</p>
  */
 @Slf4j
 @Component
@@ -33,16 +45,14 @@ public class BpmEventAutomationBridge {
     );
 
     private final AutomationTriggerService automationTriggerService;
-    private final EventBusService eventBusService;
 
-    @PostConstruct
-    public void subscribeToBpmEvents() {
-        for (String eventType : SUPPORTED_BPM_EVENT_TYPES) {
-            eventBusService.subscribe(eventType, this::onBpmEvent);
-        }
-    }
-
+    @Async("eventTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onBpmEvent(BpmEvent event) {
+        if (event.getBpmEventType() == null
+                || !SUPPORTED_BPM_EVENT_TYPES.contains(event.getBpmEventType())) {
+            return;
+        }
         if (event.getProcessKey() == null) {
             log.debug("Skipping BPM event without processKey: type={}", event.getBpmEventType());
             return;

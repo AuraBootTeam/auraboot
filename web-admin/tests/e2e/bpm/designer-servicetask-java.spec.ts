@@ -54,6 +54,7 @@ import {
   collectActivityEvents,
   undeployProcess,
 } from './_helpers/bpm-lifecycle';
+import { createLeaveApplicant } from '../../helpers/wd-fixtures';
 
 // ---------------------------------------------------------------------------
 // Serial — SVCJ-1 deploys; SVCJ-2 starts + validates execution; SVCJ-3 cleans.
@@ -206,14 +207,15 @@ test.describe(
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
 
-      // Resolve the admin's sys_user PID at runtime — reset-and-init recreates
-      // users with fresh pids, and wd:create_leave_balance validates
-      // wd_bal_employee against the tenant member projection (same resolution
-      // as designer-servicetask-command.spec.ts).
-      const me = await (await request.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      })).json();
-      TARGET_EMPLOYEE_PID = String(me?.data?.user?.pid ?? me?.data?.user?.id ?? '');
+      // Resolve a dedicated fixture employee at runtime — reset-and-init
+      // recreates users with fresh pids, and wd:create_leave_balance validates
+      // wd_bal_employee against the tenant member projection. A fixture user
+      // (not admin) keeps the wd:submit preActions balance lookup — which
+      // filters by employee only, no year — deterministic: this spec's balance
+      // rows for random target years must never pollute admin's seeded
+      // current-year balance.
+      const employee = await createLeaveApplicant(request, adminToken, `svcj_emp_${TS}`);
+      TARGET_EMPLOYEE_PID = employee.userId;
       if (!TARGET_EMPLOYEE_PID) {
         throw new Error('TARGET_EMPLOYEE_PID resolution failed');
       }
