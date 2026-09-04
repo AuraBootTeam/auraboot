@@ -15,6 +15,7 @@ import com.auraboot.framework.notification.service.EmailSender;
 import com.auraboot.framework.organization.dto.TeamMemberResponse;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final Map<String, NotificationChannel> channelMap;
     private final UserRoleMapper userRoleMapper;
     private final TeamMemberService teamMemberService;
+    private final UserMapper userMapper;
 
     public NotificationServiceImpl(
             NotificationTemplateService templateService,
@@ -48,12 +50,14 @@ public class NotificationServiceImpl implements NotificationService {
             EmailSender emailSender,
             List<NotificationChannel> channels,
             UserRoleMapper userRoleMapper,
-            TeamMemberService teamMemberService) {
+            TeamMemberService teamMemberService,
+            UserMapper userMapper) {
         this.templateService = templateService;
         this.sendLogMapper = sendLogMapper;
         this.emailSender = emailSender;
         this.userRoleMapper = userRoleMapper;
         this.teamMemberService = teamMemberService;
+        this.userMapper = userMapper;
         this.channelMap = channels.stream()
                 .collect(Collectors.toMap(NotificationChannel::getChannelCode, c -> c));
         log.info("NotificationService initialized with {} channels: {}",
@@ -97,7 +101,8 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         // Resolve recipient(s) per recipientType: user (default), role, or group/team.
-        // recipientId is a numeric userId (user), a role code (role) or a team pid (group).
+        // recipientId for "user" is a numeric user id or a sys_user PID (ULID);
+        // for "role" a role code; for "group"/"team" a team pid.
         List<Long> recipientUserIds = resolveRecipientUserIds(
                 request.getRecipientType(), request.getRecipientId(), tenantId);
 
@@ -148,10 +153,22 @@ public class NotificationServiceImpl implements NotificationService {
                         .toList();
             }
             default -> {
+                // BPM delegates resolve recipients from process variables, which
+                // carry the global sys_user PID (ULID), while notification
+                // persistence stores the internal numeric user id. Accept both
+                // shapes: parse numeric ids directly and resolve any other value
+                // through the tenant-scoped membership projection so a PID
+                // recipient is never silently dropped.
                 try {
                     return List.of(Long.parseLong(recipient));
                 } catch (NumberFormatException e) {
-                    return List.of();
+                    Long resolved = userMapper.findUserIdInTenantByPid(tenantId, recipient);
+                    if (resolved == null) {
+                        log.warn("Notification recipient '{}' did not resolve to a user in tenant {}",
+                                recipient, tenantId);
+                        return List.of();
+                    }
+                    return List.of(resolved);
                 }
             }
         }

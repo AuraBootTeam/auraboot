@@ -78,7 +78,8 @@ const TARGET_CLASS_NAME = 'commandServiceTaskDelegate';
 // runtime; see CommandServiceTaskDelegate.java#66-79.)
 const TARGET_COMMAND_CODE = 'wd:create_leave_balance';
 const TARGET_OPERATION_TYPE = 'create';
-// Well-known seed employee from reset-and-init.sh (same as SVCC/SVCH).
+// Admin's sys_user PID, resolved at runtime in beforeAll (reset-and-init
+// recreates users with fresh pids on every run).
 let TARGET_EMPLOYEE_PID = '';
 // Unique year so parallel runs / SVCC runs do not collide on the matching
 // row (years 2000..2099).
@@ -204,6 +205,18 @@ test.describe(
 
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
+
+      // Resolve the admin's sys_user PID at runtime — reset-and-init recreates
+      // users with fresh pids, and wd:create_leave_balance validates
+      // wd_bal_employee against the tenant member projection (same resolution
+      // as designer-servicetask-command.spec.ts).
+      const me = await (await request.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })).json();
+      TARGET_EMPLOYEE_PID = String(me?.data?.user?.pid ?? me?.data?.user?.id ?? '');
+      if (!TARGET_EMPLOYEE_PID) {
+        throw new Error('TARGET_EMPLOYEE_PID resolution failed');
+      }
     });
 
     // =======================================================================

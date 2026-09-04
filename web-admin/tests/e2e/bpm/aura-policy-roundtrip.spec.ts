@@ -246,8 +246,17 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
 
     // 3. D5 — process-level aura policies via ProcessMetadataPanel
     //    (panel is visible whenever no node/edge is selected). Click the
-    //    canvas background first to ensure selection is cleared.
+    //    canvas background first to ensure selection is cleared. At the
+    //    default 1280px viewport the designer workspace runs in compact mode,
+    //    where the inspector (property panel) mounts into a closed drawer —
+    //    open it via the workspace toggle before reading its fields.
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    const inspectorToggle = page.locator('[data-testid="bpmn-toggle-inspector"]');
+    if (await inspectorToggle.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await inspectorToggle.click();
+    }
+    const drawerBackdrop = page.locator('[data-testid="bpmn-drawer-backdrop"]');
+    await drawerBackdrop.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => {});
 
     const withdrawSelect = page.locator('[data-testid="prop-panel-withdraw-policy"]');
     await withdrawSelect.waitFor({ state: 'visible', timeout: 5_000 });
@@ -286,8 +295,29 @@ test.describe('BPM Designer aura.* policy round-trip (Epic C)', { tag: ['@bpm-re
     // each entry) on input; assert the normalized value, not the raw one.
     await expect(permsInput).toHaveValue('hr.leave.approve,hr.leave.view');
 
-    // Clear selection so the Save button's isDirty check stabilises.
-    await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    // Clear selection so the Save button's isDirty check stabilises. Clear
+    // through the store: in compact mode the open inspector drawer mounts a
+    // backdrop that would absorb a raw pane click (and close the drawer
+    // without deselecting the node).
+    await page.evaluate(() => {
+      const store = (
+        window as unknown as {
+          __bpmnDesignerStore?: {
+            getState: () => {
+              setSelectedEdge: (v: string | null) => void;
+              setSelectedNode: (v: string | null) => void;
+            };
+          };
+        }
+      ).__bpmnDesignerStore;
+      if (!store) throw new Error('BPMN store not exposed');
+      const s = store.getState();
+      s.setSelectedEdge(null);
+      s.setSelectedNode(null);
+    });
+    if (await drawerBackdrop.isVisible().catch(() => false)) {
+      await drawerBackdrop.click();
+    }
 
     // 5. Save via toolbar → SaveDialog confirm (handleSave always opens the
     // dialog, even for existing processes with a persisted id).

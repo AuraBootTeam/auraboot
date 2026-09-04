@@ -94,6 +94,7 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
         if (proxy == null) {
             return java.util.Optional.empty();
         }
+        java.util.Optional<ProxySelector> configured;
         try {
             URI uri = URI.create(proxy.contains("://") ? proxy : "http://" + proxy);
             String host = uri.getHost();
@@ -103,11 +104,76 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
                 return java.util.Optional.empty();
             }
             log.info("BPM HTTP serviceTask outbound proxy enabled: {}:{}", host, port);
-            return java.util.Optional.of(ProxySelector.of(new InetSocketAddress(host, port)));
+            configured = java.util.Optional.of(
+                    ProxySelector.of(new InetSocketAddress(host, port)));
         } catch (IllegalArgumentException ex) {
             log.warn("Ignoring invalid HTTP proxy setting for BPM serviceTask: {}", ex.getMessage());
             return java.util.Optional.empty();
         }
+        ProxySelector bypassing = new NoProxyBypassSelector(configured.get(), resolveNoProxyHosts());
+        return java.util.Optional.of(bypassing);
+    }
+
+    /**
+     * Honor NO_PROXY/no_proxy semantics that {@link HttpClient} does not
+     * implement, and always connect to loopback targets directly. A dev or
+     * CI host commonly exports {@code http_proxy} for package downloads;
+     * routing a loopback fixture (or an internal serviceTask target) through
+     * that proxy breaks the call with an unrelated connection error.
+     */
+    private static final class NoProxyBypassSelector extends ProxySelector {
+        private final ProxySelector delegate;
+        private final java.util.Set<String> noProxyHosts;
+
+        NoProxyBypassSelector(ProxySelector delegate, java.util.Set<String> noProxyHosts) {
+            this.delegate = delegate;
+            this.noProxyHosts = noProxyHosts;
+        }
+
+        @Override
+        public java.util.List<java.net.Proxy> select(URI uri) {
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+            if (isLoopbackHost(host) || matchesNoProxy(host)) {
+                return java.util.List.of(java.net.Proxy.NO_PROXY);
+            }
+            return delegate.select(uri);
+        }
+
+        @Override
+        public void connectFailed(URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {
+            delegate.connectFailed(uri, sa, ioe);
+        }
+
+        private boolean matchesNoProxy(String host) {
+            for (String suffix : noProxyHosts) {
+                if (host.equals(suffix) || host.endsWith("." + suffix)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean isLoopbackHost(String host) {
+            return "127.0.0.1".equals(host) || "localhost".equals(host) || "::1".equals(host)
+                    || host.startsWith("127.");
+        }
+    }
+
+    private static java.util.Set<String> resolveNoProxyHosts() {
+        String raw = firstNonBlank(
+                System.getenv("NO_PROXY"),
+                System.getenv("no_proxy"));
+        if (raw == null) {
+            return java.util.Set.of();
+        }
+        java.util.LinkedHashSet<String> hosts = new java.util.LinkedHashSet<>();
+        for (String item : raw.split(",")) {
+            String host = item.trim().toLowerCase();
+            if (!host.isEmpty()) {
+                hosts.add(host);
+            }
+        }
+        return hosts;
     }
 
     private static String firstNonBlank(String... values) {

@@ -38,6 +38,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
     private final DynamicDataMapper dynamicDataMapper;
     private final UserService userService;
     private final SpelExpressionParser spelParser = new SpelExpressionParser();
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Override
     public ValidationResult validateData(ModelDefinition modelDefinition, Map<String, Object> data, ValidationContext context) {
@@ -155,15 +157,50 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         if (refTarget == null || !"sys_user".equalsIgnoreCase(refTarget.getTargetEntity())) {
             return;
         }
-        if (!(value instanceof String userPid) || userPid.isBlank()) {
+        if (!(value instanceof String rawValue) || rawValue.isBlank()) {
             return;
         }
+        // Multi-reference fields (multiple:true) persist the member picker's
+        // JSON array string ('["pid1","pid2"]'). Validate each element; an
+        // empty selection is valid. A non-array string is a single PID.
+        List<String> userPids = parseReferenceValues(rawValue);
         Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId == null || userService == null
-                || userService.findInTenantByPid(tenantId, userPid) == null) {
-            errors.add("Field '" + fieldDefinition.getName()
-                    + "' must reference an active user in the current tenant");
+        for (String userPid : userPids) {
+            if (tenantId == null || userService == null
+                    || userService.findInTenantByPid(tenantId, userPid) == null) {
+                errors.add("Field '" + fieldDefinition.getName()
+                        + "' must reference an active user in the current tenant");
+                return;
+            }
         }
+    }
+
+    /**
+     * Split a reference field value into candidate PIDs. A JSON array string
+     * yields its string elements (an empty or blank-element array yields none);
+     * anything else is treated as one scalar PID.
+     */
+    private List<String> parseReferenceValues(String rawValue) {
+        String trimmed = rawValue.trim();
+        if (trimmed.startsWith("[")) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = JSON.readTree(trimmed);
+                if (node.isArray()) {
+                    List<String> values = new ArrayList<>();
+                    for (com.fasterxml.jackson.databind.JsonNode element : node) {
+                        String pid = element.asText();
+                        if (pid != null && !pid.isBlank()) {
+                            values.add(pid);
+                        }
+                    }
+                    return values;
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Reference field value is not valid JSON, validating as scalar PID: {}",
+                        e.getMessage());
+            }
+        }
+        return List.of(trimmed);
     }
 
     @Override

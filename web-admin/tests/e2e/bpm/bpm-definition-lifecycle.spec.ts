@@ -397,9 +397,11 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
-    // Find row and click Edit
+    // Find row and open the BPMN designer. The list DSL's rowActions no
+    // longer carry an "edit" code — name editing happens inside the designer
+    // reached via open_bpmn_designer (plugins/platform-admin/config/pages.json).
     const row = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
-    await clickRowActionByLocator(page, row, 'edit');
+    await clickRowActionByLocator(page, row, 'open_bpmn_designer');
 
     // Designer opens with ?pid=
     await page.waitForURL(/bpmn-designer.*pid=/, { timeout: 10_000 });
@@ -635,7 +637,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
         .catch(() => null),
       draftTab.click(),
     ]);
-    await expect(draftTab).toHaveClass(/border-blue-500|text-blue-600/);
+    await expect(draftTab).toHaveClass(/border-accent|text-accent/);
 
     // Find delete target row
     const row = await findRowInPaginatedList(page, PROCESS_KEY_DELETE, 12_000);
