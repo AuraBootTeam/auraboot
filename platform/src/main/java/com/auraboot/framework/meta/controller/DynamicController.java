@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.PageSchemaService;
@@ -67,6 +68,9 @@ public class DynamicController {
 
     @Autowired
     private DynamicDataService dynamicDataService;
+
+    @Autowired
+    private DictService dictService;
 
     @Autowired
     private NamedQueryService namedQueryService;
@@ -1225,7 +1229,51 @@ public class DynamicController {
             return ApiResponse.error("Model not found: " + modelCode);
         }
         List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields = modelFieldBindingService.getModelFields(model.getPid());
+        enrichDictOptions(fields);
         return ApiResponse.success(fields);
+    }
+
+    /**
+     * Inline static-dict options for fields bound via dictCode so rendering
+     * clients (mobile offline forms) get selectable options without a second
+     * dict round-trip. Fields that already carry options are left untouched;
+     * resolution failures degrade silently to dictCode-only metadata.
+     */
+    private void enrichDictOptions(List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return;
+        }
+        for (com.auraboot.framework.meta.dto.MetaFieldDTO field : fields) {
+            String dictCode = field.getDictCode();
+            if (dictCode == null || dictCode.isBlank() || field.getOptions() != null) {
+                continue;
+            }
+            try {
+                DictDTO dict = dictService.findByCode(dictCode);
+                if (dict == null || dict.getItems() == null) {
+                    continue;
+                }
+                List<Map<String, Object>> options = new ArrayList<>();
+                for (com.auraboot.framework.meta.entity.payload.DataSourceItemBean item : dict.getItems()) {
+                    Object value = item.getValue() != null ? item.getValue() : item.getCode();
+                    if (value == null) {
+                        continue;
+                    }
+                    Map<String, Object> option = new LinkedHashMap<>();
+                    option.put("value", String.valueOf(value));
+                    option.put("label", item.getLabel() != null ? item.getLabel() : String.valueOf(value));
+                    if (item.getOrder() != null) {
+                        option.put("sortNo", item.getOrder());
+                    }
+                    options.add(option);
+                }
+                if (!options.isEmpty()) {
+                    field.setOptions(options);
+                }
+            } catch (Exception e) {
+                log.debug("Dict option resolution failed for {}: {}", logSafe(dictCode), logSafe(e.getMessage()));
+            }
+        }
     }
 
     private PageSchemaDTO findPageSchemaQuietly(String pageKey) {
