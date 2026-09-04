@@ -621,7 +621,7 @@ class FileServiceImplTest {
 
     @Test
     void getFilesByEntity_withIds_queriesMapper() {
-        when(fileRelationMapper.findFileIdsByEntity("user", "1")).thenReturn(List.of("f1"));
+        when(fileRelationMapper.findFileIdsByEntity("user", "1")).thenReturn(List.of(11L));
         FileEntity e = new FileEntity();
         when(fileMapper.selectList(any(QueryWrapper.class))).thenReturn(List.of(e));
 
