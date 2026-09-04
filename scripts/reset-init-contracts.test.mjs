@@ -289,6 +289,8 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
   assert.match(golden, /seeds the runtime's shared wrapper distribution/);
   assert.match(golden, /META-INF\/MANIFEST\.MF/);
+  assert.match(golden, /JAR manifests fold physical lines after 72 bytes/);
+  assert.match(golden, /collecting && \/\^ \/.*value = value \$0/s);
   assert.match(golden, /plugin backend entryClass mismatch/);
   assert.match(golden, /entryClass is missing from jar/);
   assert.match(golden, /CI=true NPM_CONFIG_REGISTRY="\$npm_registry"/);
