@@ -1512,7 +1512,7 @@
     "modelCode": "e2et_field_zoo",
     "description": "List with toolbar search, filters block, create action and multi-view switcher (table/kanban/gallery) — serves FORM-FIELDS, FILTER-SORT, BATCH-MODE and MULTIVIEW families",
     "kind": "list",
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "layout": {
       "type": "grid",
       "cols": 12
