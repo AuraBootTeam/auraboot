@@ -7,6 +7,7 @@ import com.auraboot.framework.auth.entity.ExternalIdentityLink;
 import com.auraboot.framework.auth.mapper.ExternalIdentityLinkMapper;
 import com.auraboot.framework.auth.mapper.IdentityProviderInstanceMapper;
 import com.auraboot.framework.auth.service.FederatedIdentityRegistryService;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
@@ -29,6 +30,7 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
     private final IdentityProviderInstanceMapper identityProviderInstanceMapper;
     private final ExternalIdentityLinkMapper externalIdentityLinkMapper;
     private final SystemModeService systemModeService;
+    private final FederatedIdentityFeatureGate featureGate;
 
     @Override
     public FederatedLoginContext resolveLoginContext(
@@ -51,6 +53,7 @@ public class FederatedIdentityRegistryServiceImpl implements FederatedIdentityRe
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "Identity provider is not available for the default business tenant");
         }
+        featureGate.requireEnabled(context.getProviderType());
         return context;
     }
 

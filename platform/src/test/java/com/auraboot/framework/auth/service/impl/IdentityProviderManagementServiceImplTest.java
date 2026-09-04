@@ -4,6 +4,7 @@ import com.auraboot.framework.auth.dto.IdentityProviderSaveRequest;
 import com.auraboot.framework.auth.dto.IdentityProviderSummary;
 import com.auraboot.framework.auth.entity.IdentityProviderInstance;
 import com.auraboot.framework.auth.mapper.IdentityProviderInstanceMapper;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +30,18 @@ class IdentityProviderManagementServiceImplTest {
 
     @Mock
     private IdentityProviderInstanceMapper mapper;
+    @Mock
+    private FederatedIdentityFeatureGate featureGate;
 
     private IdentityProviderManagementServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new IdentityProviderManagementServiceImpl(mapper, new ObjectMapper());
+        service = new IdentityProviderManagementServiceImpl(mapper, new ObjectMapper(), featureGate);
+        org.mockito.Mockito.lenient().when(featureGate.isEnabled(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(true);
+        org.mockito.Mockito.lenient().doCallRealMethod().when(featureGate)
+                .requireEnabled(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -136,6 +143,54 @@ class IdentityProviderManagementServiceImplTest {
         assertThat(instance.getStatus()).isEqualTo("disabled");
         verify(mapper).updateById(instance);
         verify(mapper).updateBindingStatus(31L, "disabled");
+    }
+
+    @Test
+    void activeProviderCannotBeSavedWhenFeatureIsDisabled() {
+        IdentityProviderSaveRequest request = validRequest();
+        when(featureGate.isEnabled("oidc")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.save(request, 100L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not enabled");
+        verify(mapper, never()).insert(any(IdentityProviderInstance.class));
+    }
+
+    @Test
+    void disabledProviderConfigurationCanBePreparedWhileFeatureIsOff() {
+        IdentityProviderSaveRequest request = validRequest();
+        request.setStatus("disabled");
+        when(mapper.findApplicationId("business-web")).thenReturn(10L);
+        when(mapper.findChannelId(10L, "default-business-web", 100L)).thenReturn(20L);
+        when(mapper.findBindingId(20L, 30L)).thenReturn(null);
+        AtomicReference<IdentityProviderInstance> inserted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            IdentityProviderInstance instance = invocation.getArgument(0);
+            instance.setId(30L);
+            inserted.set(instance);
+            return 1;
+        }).when(mapper).insert(any(IdentityProviderInstance.class));
+        when(mapper.listManaged("business-web", 100L)).thenAnswer(invocation ->
+                List.of(summary(inserted.get().getPid(), "company-oidc", "business-web")));
+
+        assertThat(service.save(request, 100L).getCode()).isEqualTo("company-oidc");
+        verify(featureGate, never()).requireEnabled("oidc");
+    }
+
+    @Test
+    void disabledProviderCannotBeActivatedWhenFeatureIsOff() {
+        IdentityProviderInstance instance = new IdentityProviderInstance();
+        instance.setId(31L);
+        instance.setPid("mobile-idp-pid");
+        instance.setStatus("disabled");
+        instance.setProviderType("oidc");
+        when(mapper.findEditableByPid("mobile-idp-pid", 100L)).thenReturn(instance);
+        when(featureGate.isEnabled("oidc")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.setStatus("mobile-idp-pid", "active", 100L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not enabled");
+        verify(mapper, never()).updateById(any(IdentityProviderInstance.class));
     }
 
     private IdentityProviderSaveRequest validRequest() {
