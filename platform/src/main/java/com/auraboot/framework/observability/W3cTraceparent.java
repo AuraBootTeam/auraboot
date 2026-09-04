@@ -21,6 +21,7 @@ public final class W3cTraceparent {
     public static final String HEADER = "traceparent";
     private static final Pattern TRACE_ID = Pattern.compile("[0-9a-f]{32}");
     private static final Pattern SPAN_ID = Pattern.compile("[0-9a-f]{16}");
+    private static final Pattern TRACE_FLAGS = Pattern.compile("[0-9a-f]{2}");
 
     private W3cTraceparent() {
     }
@@ -54,10 +55,11 @@ public final class W3cTraceparent {
         }
         String traceId = parts[1];
         String spanId = parts[2];
-        if (!validTraceId(traceId) || !validSpanId(spanId)) {
+        String flags = parts[3];
+        if (!validTraceId(traceId) || !validSpanId(spanId) || !TRACE_FLAGS.matcher(flags).matches()) {
             return null;
         }
-        return new TraceIds(traceId, spanId);
+        return new TraceIds(traceId, spanId, (Integer.parseInt(flags, 16) & 1) == 1);
     }
 
     private static boolean validTraceId(String value) {
@@ -68,5 +70,5 @@ public final class W3cTraceparent {
         return value != null && SPAN_ID.matcher(value.toLowerCase(Locale.ROOT)).matches();
     }
 
-    public record TraceIds(String traceId, String spanId) {}
+    public record TraceIds(String traceId, String spanId, boolean sampled) {}
 }

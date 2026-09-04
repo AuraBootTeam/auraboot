@@ -2,7 +2,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.0
     ports:
-      - "9090:9090"
+      - "${AURA_OBS_PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml
@@ -13,17 +13,71 @@ services:
       - '--web.enable-remote-write-receiver'
     restart: unless-stopped
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "${AURA_OBS_ALERTMANAGER_PORT:-19093}:9093"
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    depends_on:
+      - observability-canary-receiver
+    restart: unless-stopped
+
+  observability-canary-receiver:
+    image: python:3.12-alpine
+    ports:
+      - "${AURA_OBS_CANARY_PORT:-18080}:8080"
+    volumes:
+      - ./docker/observability-canary/receiver.py:/app/receiver.py:ro
+      - observability_canary_data:/data
+    command: ["python", "/app/receiver.py"]
+    restart: unless-stopped
+
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    ports:
+      - "${AURA_OBS_PUSHGATEWAY_PORT:-19091}:9091"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.1.1
+    ports:
+      - "${AURA_OBS_LOKI_PORT:-13100}:3100"
+    volumes:
+      - ./docker/loki/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: ['-config.file=/etc/loki/local-config.yaml']
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    ports:
+      - "${AURA_OBS_TEMPO_PORT:-13200}:3200"
+      - "${AURA_OBS_ZIPKIN_PORT:-19411}:9411"
+    volumes:
+      - ./docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    command: ['-config.file=/etc/tempo/tempo.yml']
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:10.4.0
     ports:
-      - "3000:3000"
-    env_file: ./monitoring/.env
+      - "${AURA_OBS_GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-auraboot-observability-ci}
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning
       - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+      - loki
+      - tempo
     restart: unless-stopped
 
   # macOS incompatible — requires /proc and /sys from Linux kernel
@@ -104,3 +158,6 @@ volumes:
   prometheus_data:
   grafana_data:
   postgres_data:
+  observability_canary_data:
+  loki_data:
+  tempo_data:

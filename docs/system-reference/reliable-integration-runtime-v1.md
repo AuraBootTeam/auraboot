@@ -2,6 +2,7 @@
 type: system-reference
 status: active
 created: 2026-08-23
+updated: 2026-09-04
 ---
 
 # Reliable Integration Runtime v1
@@ -37,6 +38,28 @@ to fifteen minutes. A row that reaches `max_retries` enters `failed` and receive
 Replay is explicit and attributed (`replayed_by`). It resets the original outbox row to `pending`;
 it never mutates the envelope or silently retries an open poison event. Reconcile only recovers
 expired leases and materializes missing DLQ rows.
+
+## Tenant-admin DLQ operator API
+
+Core exposes the following authenticated tenant-administrator endpoints behind the existing
+`/api/admin/**` guard and admin action log:
+
+- `GET /api/admin/reliable-integration/dead-letters` lists tenant-scoped failures and accepts
+  `status`, `eventType`, `correlationId`, `pageNum`, and `pageSize` filters. Page size is bounded to
+  100.
+- `GET /api/admin/reliable-integration/dead-letters/{eventId}` returns the failure, consumer
+  receipts, and append-only replay history for one public event id.
+- `POST /api/admin/reliable-integration/dead-letters/{eventId}/replay` requires `reason` and
+  `expectedReplayCount`. The expected count is an optimistic concurrency fence. An exact retry with
+  the same actor, reason, and expected count returns the original replay result without appending a
+  second history row; a changed reason, different actor, or otherwise stale request returns conflict
+  instead of issuing another delivery attempt.
+
+The public contracts never expose internal numeric ids, payload, or headers. Replay accepts no
+replacement payload, so operators can only retry the immutable original envelope. Every successful
+replay appends one `ab_integration_dead_letter_replay` row with a ULID record id, tenant, public
+event id, correlation id, monotonic attempt, actor PID, mandatory reason, and request timestamp.
+Cross-tenant and missing event ids have the same not-found response.
 
 ## Procurement to Inventory pilot
 

@@ -153,7 +153,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
     );
 
     private static final Set<String> EXPLICIT_SEARCHABLE_DATA_TYPES = Set.of(
-        "string", "text", "enum", "dict",
+        "string", "text", "enum", "dict", "reference",
         "integer", "int", "long", "bigint", "smallint",
         "decimal", "number", "double", "float"
     );

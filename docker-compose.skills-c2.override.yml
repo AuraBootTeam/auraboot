@@ -31,12 +31,12 @@
 
 services:
   postgres:
-    container_name: auraboot-skills-c2-postgres
+    container_name: ${AURA_OSS_CI_POSTGRES_CONTAINER:-auraboot-skills-c2-postgres}
     profiles:
       - skills-c2-stack
     # Replace the base 5432:5432 mapping; shifted by +20.
     ports: !override
-      - "25442:5432"
+      - "${AURA_OSS_CI_POSTGRES_PORT:-25442}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
       POSTGRES_USER: ${POSTGRES_USER:-auraboot}
@@ -50,13 +50,13 @@ services:
       - ./platform/src/main/resources/db/snapshots/schema-current.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
   redis:
-    container_name: auraboot-skills-c2-redis
+    container_name: ${AURA_OSS_CI_REDIS_CONTAINER:-auraboot-skills-c2-redis}
     # Force-on for this stack; in the base file redis is gated by `cache`
     # profile, but B1 IT depends on Redis being up.
     profiles:
       - skills-c2-stack
     ports: !override
-      - "26389:6379"
+      - "${AURA_OSS_CI_REDIS_PORT:-26389}:6379"
     volumes:
       - skills_c2_redis_data:/data
 

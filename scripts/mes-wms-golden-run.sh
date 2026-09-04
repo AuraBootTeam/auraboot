@@ -53,6 +53,9 @@ BACKEND_PID=""
 BACKEND_TMUX_SESSION="mes-wms-${NAME}-backend"
 FRONTEND_PID=""
 start_backend() {
+  local background_ready_before
+  background_ready_before="$(grep -c 'Registered plugin background component: inventoryReliableEventBridge' "$SD/backend.log" 2>/dev/null || true)"
+  background_ready_before="${background_ready_before:-0}"
   if [ "$KEEP" = "1" ]; then
     command -v tmux >/dev/null || die "--keep requires tmux for detached backend ownership"
     tmux has-session -t "$BACKEND_TMUX_SESSION" 2>/dev/null \
@@ -80,9 +83,14 @@ start_backend() {
   fi
   BACKEND_PID="$(cat "$SD/backend.pid")"
   for i in $(seq 1 120); do
-    curl --noproxy '*' -sf "$BACKEND_URL/actuator/health" 2>/dev/null | grep -q '"status":"UP"' && return
+    if curl --noproxy '*' -sf "$BACKEND_URL/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
+      local background_ready_now
+      background_ready_now="$(grep -c 'Registered plugin background component: inventoryReliableEventBridge' "$SD/backend.log" 2>/dev/null || true)"
+      background_ready_now="${background_ready_now:-0}"
+      [ "$background_ready_now" -gt "$background_ready_before" ] && return
+    fi
     kill -0 "$BACKEND_PID" 2>/dev/null || { tail -20 "$SD/backend.log"; die "backend died"; }
-    [ "$i" = 120 ] && { tail -20 "$SD/backend.log"; die "backend not healthy in 240s"; }
+    [ "$i" = 120 ] && { tail -20 "$SD/backend.log"; die "backend or required inventory background components not ready in 240s"; }
     sleep 2
   done
 }
@@ -129,12 +137,14 @@ trap cleanup EXIT
 # The import below intentionally uses the MES/WMS dependency closure instead of pcba-agent:
 # unrelated reserve plugins must not make this focused gate fail (for example, pcba-warehouse
 # currently owns commands/pages for pe_wave and pe_asn but does not provide those models).
-HYBRID_JARS=(product-catalog crm inventory finance quality procurement pcba-solution
+CORE_HYBRID_JARS=(crm)
+ENTERPRISE_HYBRID_JARS=(product-catalog inventory finance sales quality procurement pcba-solution
   pcba-procurement jiejia-integration bom-standardization pcba-sales pcba-manufacturing
-  pcba-warehouse pcba-finance pcba-compliance)
+  pcba-finance pcba-compliance)
 QUOTE_HYBRID=(quote-engine)  # built from aura-quote/plugin-aura/<p>/backend
+STAGED_PLUGIN_JARS=("${CORE_HYBRID_JARS[@]}" "${ENTERPRISE_HYBRID_JARS[@]}" "${QUOTE_HYBRID[@]}")
 IMPORT_PLUGINS=(core-meta core-bpm platform-admin core-decisionops core-announcement core-aurabot
-  page-manager org-management agent-control-plane product-catalog crm pcba-crm req inventory finance
+  page-manager org-management agent-control-plane product-catalog crm pcba-crm inventory finance
   sales quality procurement quote-core pcba-base pcba-industry pcba-manufacturing pcba-compliance
   pcba-solution)
 
@@ -153,12 +163,15 @@ if [ -n "${AURA_PREBUILT_PLUGIN_JARS_DIR:-}" ]; then
   cp "$AURA_PREBUILT_PLUGIN_JARS_DIR"/*.jar "$STAGE/"
 else
   ( unset MAVEN_OPTS GRADLE_OPTS MAVEN_REPO_LOCAL
-    for p in "${HYBRID_JARS[@]}"; do build_jar "$p" "$PLUGINS/$p/backend"; done
+    for p in "${CORE_HYBRID_JARS[@]}"; do build_jar "$p" "$CORE_ROOT/plugins/$p/backend"; done
+    for p in "${ENTERPRISE_HYBRID_JARS[@]}"; do build_jar "$p" "$PLUGINS/$p/backend"; done
     for p in "${QUOTE_HYBRID[@]}"; do build_jar "$p" "$QUOTE_ROOT/plugin-aura/$p/backend"; done )
 fi
 STAGED_COUNT="$(find "$STAGE" -maxdepth 1 -type f -name '*.jar' | wc -l | tr -d ' ')"
-[ "$STAGED_COUNT" = 16 ] || die "staged $STAGED_COUNT hybrid jars; expected exactly 16"
-for p in "${HYBRID_JARS[@]}" "${QUOTE_HYBRID[@]}"; do
+EXPECTED_STAGED_COUNT="${#STAGED_PLUGIN_JARS[@]}"
+[ "$STAGED_COUNT" = "$EXPECTED_STAGED_COUNT" ] \
+  || die "staged $STAGED_COUNT hybrid jars; expected exactly $EXPECTED_STAGED_COUNT"
+for p in "${STAGED_PLUGIN_JARS[@]}"; do
   compgen -G "$STAGE/${p}-plugin-*.jar" >/dev/null || die "missing staged jar: $p"
 done
 log "    staged $STAGED_COUNT verified hybrid jars"
