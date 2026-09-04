@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # CI-only BPM release-image gate (L6). Builds the OSS platform runtime image
 # from the control-plane-synced checkout at the pinned ref, boots it against
-# an ephemeral Postgres+Redis stack, and requires a green health endpoint.
+# an ephemeral Postgres stack (schema applied via the pinned Flyway image,
+# matching scripts/reset-db.sh), and requires a green health endpoint.
 #
 # Daily development and the host-first release layers (P1-P5 in
 # scripts/bpm-release-gate.sh) never run this script; per the self-contained
@@ -50,15 +51,15 @@ mkdir "$WORK_ROOT"
 PROJECT="bpm-release-local-ci-${AURA_CI_JOB_ID//[^A-Za-z0-9_-]/-}"
 NET="bpm-release-$AURA_CI_JOB_ID"
 PG_CONTAINER="$PROJECT-pg"
-REDIS_CONTAINER="$PROJECT-redis"
 APP_CONTAINER="$PROJECT-app"
 PG_PORT_ON_NET=5432
 
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-180}"
+FLYWAY_IMAGE="${AURA_CI_RELEASE_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 
 cleanup() {
   local status=$?
-  docker rm -f "$APP_CONTAINER" "$REDIS_CONTAINER" "$PG_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$APP_CONTAINER" "$PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   if [[ -d "$LOCK_DIR" && "$(cat "$LOCK_DIR/owner" 2>/dev/null || true)" == "$LOCK_TOKEN" ]]; then
     rm -rf "$LOCK_DIR"
@@ -92,7 +93,7 @@ json.dump(receipt, open(path, "w"), indent=1, sort_keys=True)
 PY
 }
 
-for image in eclipse-temurin:25-jre-alpine pgvector/pgvector:pg16 redis:7-alpine; do
+for image in eclipse-temurin:25-jre-alpine pgvector/pgvector:pg16 "$FLYWAY_IMAGE"; do
   prefetch_pull "$image"
 done
 
@@ -110,17 +111,34 @@ docker build -f "$PLATFORM_DIR/Dockerfile.runtime" -t "$IMAGE_NAME" "$PLATFORM_D
 IMAGE_DIGEST="$(docker image inspect "$IMAGE_NAME" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
 [[ -n "$IMAGE_DIGEST" ]] || IMAGE_DIGEST="local:$IMAGE_NAME"
 
-# ---- verify: boot the image against ephemeral pg+redis, require health UP
+# ---- verify: boot the image against the ephemeral stack, require health UP
 info "verifying runtime image against ephemeral stack"
 docker network create "$NET" >/dev/null
 docker run -d --name "$PG_CONTAINER" --network "$NET" -e POSTGRES_USER=auraboot \
   -e POSTGRES_PASSWORD=auraboot_l6 -e POSTGRES_DB=aura_boot_l6 pgvector/pgvector:pg16 >/dev/null
-docker run -d --name "$REDIS_CONTAINER" --network "$NET" redis:7-alpine >/dev/null
 for i in $(seq 1 30); do
   if docker exec "$PG_CONTAINER" pg_isready -U auraboot -d aura_boot_l6 >/dev/null 2>&1; then break; fi
   [[ "$i" == "30" ]] && fatal "postgres never became ready"
   sleep 1
 done
+
+# Schema init: the platform does NOT run Flyway at boot — fresh stacks apply
+# platform/src/main/resources/db/migration/core exactly like scripts/reset-db.sh
+# (via scripts/db/flyway-migrate.sh). The CI host has no flyway CLI, so run the
+# pinned Flyway image against the ephemeral database with the same contract:
+# history table ab_flyway_schema_history, no baseline masking, naming validated,
+# clean disabled.
+docker run --rm --network "$NET" \
+  -v "$PLATFORM_DIR/src/main/resources/db/migration/core":/flyway/sql:ro \
+  "$FLYWAY_IMAGE" \
+  -url="jdbc:postgresql://$PG_CONTAINER:$PG_PORT_ON_NET/aura_boot_l6" \
+  -user=auraboot -password=auraboot_l6 \
+  -locations=filesystem:/flyway/sql \
+  -table=ab_flyway_schema_history \
+  -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true \
+  migrate > "$ARTIFACTS/logs/flyway-migrate.log" 2>&1 \
+  || fatal "flyway migrate failed — see logs/flyway-migrate.log"
+info "schema migrated via $FLYWAY_IMAGE"
 
 docker run -d --name "$APP_CONTAINER" --network "$NET" \
   -e SERVER_PORT=6443 \
