@@ -29,6 +29,19 @@ command -v node >/dev/null 2>&1 || invalid 'node is unavailable'
 docker compose version >/dev/null 2>&1 || invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || invalid 'Docker daemon is unavailable'
 
+# Exact-ref CI checkouts may be created under a restrictive umask. Bind-mounted
+# configuration must remain readable by the non-root users in the observability
+# images; only the ephemeral checkout permissions are relaxed here.
+find \
+  "$PROJECT_ROOT/docker/prometheus" \
+  "$PROJECT_ROOT/docker/alertmanager" \
+  "$PROJECT_ROOT/docker/observability-canary" \
+  "$PROJECT_ROOT/docker/loki" \
+  "$PROJECT_ROOT/docker/tempo" \
+  "$PROJECT_ROOT/docker/grafana/provisioning" \
+  "$PROJECT_ROOT/docker/grafana/dashboards" \
+  -type f -exec chmod a+r {} +
+
 "${COMPOSE[@]}" config --quiet
 "${COMPOSE[@]}" up -d prometheus alertmanager observability-canary-receiver pushgateway loki tempo grafana
 "${COMPOSE[@]}" ps --all > "$ARTIFACTS/compose-ps.txt"
