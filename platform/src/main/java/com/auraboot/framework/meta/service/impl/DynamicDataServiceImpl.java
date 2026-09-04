@@ -1948,6 +1948,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             return updatedRecord;
 
+        } catch (com.auraboot.framework.exception.ConflictException e) {
+            // Pass the optimistic-lock conflict through unwrapped: the 409 contract
+            // (CAS_VERSION_CONFLICT) is what mobile offline replay keys on.
+            throw e;
         } catch (Exception e) {
             log.error("Update operation failed for model {} with ID {}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);

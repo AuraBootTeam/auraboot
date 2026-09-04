@@ -2,6 +2,9 @@ package com.auraboot.framework.integration.meta;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -33,6 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.nio.file.Path;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,6 +70,9 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PluginImportService pluginImportService;
+
     private MockMvc mockMvc;
     private MockMvc authenticatedMvc;
 
@@ -80,11 +87,32 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
 
         MvcResult seed = mockMvc.perform(post("/api/test/seed")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(result -> Assertions.assertEquals(200,
-                        result.getResponse().getStatus(),
-                        "seed must return 200; body=" + result.getResponse().getContentAsString()))
                 .andReturn();
-        JsonNode seedBody = objectMapper.readTree(seed.getResponse().getContentAsString());
+        String seedJson = seed.getResponse().getContentAsString();
+        JsonNode seedBody = objectMapper.readTree(seedJson);
+        String firstSeedError = seedBody.path("context").path("detail").asText("");
+        Assertions.assertTrue(seed.getResponse().getStatus() == 200 || firstSeedError.contains("showcase"),
+                "seed must succeed or fail only on the showcase precondition; body=" + seedJson);
+
+        // The shared developer database may lack the showcase plugin pages that
+        // /api/test/seed requires for the mobile-E2E fixture guarantee. Import them
+        // explicitly (the same path the seed controller uses) and re-seed, so this IT
+        // does not depend on whoever ran the mobile E2E stack last.
+        if (seed.getResponse().getStatus() != 200) {
+            tenantId = seedBody.path("data").asLong(0);
+            tenantId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM ab_tenant WHERE name = 'e2e_test' ORDER BY id DESC LIMIT 1", Long.class);
+            userId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM ab_user WHERE email = 'e2e@test.local' ORDER BY id DESC LIMIT 1", Long.class);
+            importShowcasePlugin(tenantId, userId);
+            MvcResult reseed = mockMvc.perform(post("/api/test/seed")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(result -> Assertions.assertEquals(200,
+                            result.getResponse().getStatus(),
+                            "re-seed must return 200; body=" + result.getResponse().getContentAsString()))
+                    .andReturn();
+            seedBody = objectMapper.readTree(reseed.getResponse().getContentAsString());
+        }
         tenantId = seedBody.get("tenantId").asLong();
         userId = seedBody.get("userId").asLong();
         authenticatedMvc = authenticatedMvc(tenantId, userId);
@@ -155,6 +183,35 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "e2et_order_title", "CAS 409 legacy write"))))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * Import the OSS showcase plugin (list/form/detail showcase_all_fields pages) for the
+     * test tenant — the precondition /api/test/seed enforces for the mobile-E2E fixtures.
+     */
+    private void importShowcasePlugin(long tenantId, long userId) {
+        Path pluginDir = java.nio.file.Path.of(System.getProperty("user.dir"))
+                .resolve("../plugins/showcase").normalize();
+        Assertions.assertTrue(java.nio.file.Files.exists(pluginDir),
+                "showcase plugin directory must exist at " + pluginDir);
+        MetaContext.setContext(tenantId, userId, "e2e-test-user", "e2e@test.local");
+        try {
+            ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
+            Assertions.assertTrue(preview.isValid(), "showcase plugin parse must be valid: " + preview.getErrors());
+            ImportRequest request = ImportRequest.builder()
+                    .importId(preview.getImportId())
+                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
+                    .autoPublishModels(true)
+                    .autoPublishFields(true)
+                    .autoPublishCommands(true)
+                    .autoPublishPages(true)
+                    .autoDeployProcesses(true)
+                    .build();
+            var result = pluginImportService.execute(preview.getImportId(), request);
+            Assertions.assertTrue(result.isSuccess(), "showcase plugin import must succeed: " + result.getErrorMessage());
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     private MockMvc authenticatedMvc(long tenantId, long userId) {
