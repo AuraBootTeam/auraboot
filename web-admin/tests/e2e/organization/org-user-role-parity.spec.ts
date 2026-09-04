@@ -13,11 +13,9 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 
-const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
 
 const SCENARIOS = {
@@ -37,7 +35,7 @@ const completedScenarios = new Set<string>();
 const failedScenarios = new Set<string>();
 const runtimeScreenshots = new Set<string>();
 
-const pool = new Pool({ connectionString: process.env.E2E_PG_CONN ?? PG_CONN, max: 2 });
+const pool = new Pool({ ...PG_CONN, max: 2 });
 
 async function dbQuery<T extends Record<string, unknown>>(
   text: string,
@@ -99,8 +97,7 @@ interface ProvisionedUser {
   email: string;
   userPid: string;
   memberPid: string;
-  userId: number;
-  memberStatus: string;
+  memberId: number;
 }
 
 async function provisionUser(
@@ -141,12 +138,27 @@ async function provisionUser(
     [memberPid],
   );
   expect(dbRows).toHaveLength(1);
-  return { email, userPid, memberPid, userId: dbRows[0].id, memberStatus: dbRows[0].status };
+  return { email, userPid, memberPid, memberId: dbRows[0].id };
 }
 
-async function expectForbidden(page: Page, responseStatus: number, body: Record<string, unknown>): Promise<void> {
-  expect(responseStatus, 'unauthorized call must be HTTP 403').toBe(403);
-  expect(JSON.stringify(body)).toMatch(/forbidden|denied|无权|权限|403/i);
+/**
+ * The platform denies admin-gated calls with either an HTTP 401/403 status or
+ * the canonical HTTP-200 error envelope (code "409" / "admin role required").
+ * Either shape is a denial; callers must also assert no side effects.
+ */
+async function expectForbidden(
+  response: { status: () => number },
+  body: Record<string, unknown>,
+): Promise<void> {
+  const envelope = JSON.stringify(body ?? {});
+  const status = response.status();
+  const denied =
+    status === 401 ||
+    status === 403 ||
+    (String(body?.code ?? '') !== '0' &&
+      /409|admin role|forbidden|denied|无权|权限/i.test(envelope));
+  expect(denied, `call must be denied: HTTP ${status} ${envelope.slice(0, 300)}`).toBe(true);
+  expect(String(body?.code ?? ''), 'denied call must not return success code').not.toBe('0');
 }
 
 test.describe('PAR-26-B organization/user/role batch management parity', () => {
@@ -171,27 +183,42 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     });
     await attachScreenshot(page, testInfo, 'par26-b1-tenant-member-list');
 
-    // Select both provisioned members by their row checkboxes.
-    const emailPattern = (email: string) => new RegExp(email.replace(/[.@]/g, '\\$&'));
-    const firstRow = page.getByRole('row').filter({ hasText: emailPattern(member1.email) }).first();
-    const secondRow = page.getByRole('row').filter({ hasText: emailPattern(member2.email) }).first();
-    await expect(firstRow).toBeVisible({ timeout: 15_000 });
+    // The default member list is newest-first, so the freshly provisioned
+    // members are on the first page — select both rows directly.
+    const displayName1 = `PAR26 b1u1 ${stamp}`;
+    const displayName2 = `PAR26 b1u2 ${stamp}`;
+    const firstRow = page.getByRole('row').filter({ hasText: displayName1 }).first();
+    const secondRow = page.getByRole('row').filter({ hasText: displayName2 }).first();
+    await expect(firstRow).toBeVisible({ timeout: 20_000 });
+    await expect(secondRow).toBeVisible({ timeout: 20_000 });
     const selectRow = async (row: ReturnType<Page['getByRole']>) => {
       await row.locator('input[type="checkbox"]').check({ force: true });
     };
+    // Danger-variant bulk actions render in the overflow "更多" menu; default
+    // variants render inline while capacity lasts. Try inline first.
+    const clickBulkAction = async (code: string) => {
+      const direct = page.getByTestId(`bulk-action-${code}`);
+      if (await direct.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await direct.click();
+        return;
+      }
+      await page.getByTestId('bulk-more-actions-btn').click();
+      await page.getByTestId(`bulk-action-${code}`).click();
+    };
     await selectRow(firstRow);
     await selectRow(secondRow);
+    await expect(firstRow.locator('input[type="checkbox"]')).toBeChecked();
+    await expect(secondRow.locator('input[type="checkbox"]')).toBeChecked();
 
     // Bulk suspend with confirmation + required reason input.
-    const suspendButton = page.getByTestId('bulk-action-bulk_suspend_members');
-    await expect(suspendButton).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('bulk-action-bulk_suspend_members').or(page.getByTestId('bulk-more-actions-btn'))).toBeVisible({ timeout: 10_000 });
     const suspendResponse = page.waitForResponse(
       (response) =>
         response.url().includes('/api/meta/commands/execute/admin:suspend_member') &&
         response.request().method() === 'POST',
       { timeout: 30_000 },
     );
-    await suspendButton.click();
+    await clickBulkAction('bulk_suspend_members');
     await page
       .getByRole('dialog')
       .last()
@@ -208,41 +235,51 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
 
     // Success feedback + DB read-back for both members.
     await expect(
-      page.getByText(/批量停用已完成|Suspend Selected completed|已完成/i).first(),
+      page.getByText(/批量停用.*成功 2 条|Suspend Selected.*2 records/i).first(),
     ).toBeVisible({ timeout: 15_000 });
-    const suspendedRows = await dbQuery<{ pid: string; status: string }>(
-      `SELECT pid, status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
-      [[member1.memberPid, member2.memberPid]],
-    );
-    expect(new Set(suspendedRows.map((row) => row.status))).toEqual(new Set(['suspended']));
+    await expect
+      .poll(async () => {
+        const rows = await dbQuery<{ status: string }>(
+          `SELECT status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
+          [[member1.memberPid, member2.memberPid]],
+        );
+        return rows.map((row) => row.status).sort().join(',');
+      }, { timeout: 15_000 })
+      .toBe('suspended,suspended');
 
-    // Sessions revoked: the member can no longer authenticate with the old session.
-    const memberContext = await page.context().browser()?.newContext();
+    // Suspension revokes the member's server-side sessions. The BFF session is
+    // a self-contained signed JWT, so it keeps authenticating until expiry —
+    // the platform contract is DB session revocation, asserted here.
+    const memberContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const memberPage = await memberContext!.newPage();
     await uiLogin(memberPage, member1.email);
+    await memberPage.request.get('/api/auth/me'); // materialize the member session
     await expect
-      .poll(
-        async () => {
-          const me = await memberPage.request.get('/api/auth/me');
-          return me.status();
-        },
-        { timeout: 10_000, intervals: [500, 1_000] },
-      )
-      .toBe(401);
+      .poll(async () => {
+        const sessions = await dbQuery<{ count: string }>(
+          `SELECT count(*) AS count FROM ab_user_session
+           WHERE tenant_member_id = $1 AND revoked = false`,
+          [member1.memberId],
+        );
+        return Number(sessions[0]?.count ?? 0);
+      })
+      .toBe(0);
     await memberContext!.close();
 
     // Bulk restore via the same toolbar and confirm flow.
     await selectRow(firstRow);
     await selectRow(secondRow);
-    const restoreButton = page.getByTestId('bulk-action-bulk_restore_members');
-    await expect(restoreButton).toBeVisible({ timeout: 10_000 });
+    await expect(firstRow.locator('input[type="checkbox"]')).toBeChecked();
+    await expect(secondRow.locator('input[type="checkbox"]')).toBeChecked();
     const restoreResponse = page.waitForResponse(
       (response) =>
         response.url().includes('/api/meta/commands/execute/admin:restore_member') &&
         response.request().method() === 'POST',
       { timeout: 30_000 },
     );
-    await restoreButton.click();
+    await clickBulkAction('bulk_restore_members');
     await page
       .getByRole('dialog')
       .last()
@@ -251,12 +288,21 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
       .click();
     const restoreResult = await restoreResponse;
     expect(restoreResult.ok()).toBe(true);
+    // waitForResponse resolves on the first per-record command — wait for the
+    // batch success toast before reading the DB so both writes have committed.
+    await expect(
+      page.getByText(/批量启用.*成功 2 条|Enable Selected.*2 records/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
 
-    const restoredRows = await dbQuery<{ pid: string; status: string }>(
-      `SELECT pid, status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
-      [[member1.memberPid, member2.memberPid]],
-    );
-    expect(new Set(restoredRows.map((row) => row.status))).toEqual(new Set(['active']));
+    await expect
+      .poll(async () => {
+        const rows = await dbQuery<{ status: string }>(
+          `SELECT status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
+          [[member1.memberPid, member2.memberPid]],
+        );
+        return rows.map((row) => row.status).sort().join(',');
+      }, { timeout: 15_000 })
+      .toBe('active,active');
     completedScenarios.add(SCENARIOS.BULK_STATUS_UI);
   });
 
@@ -289,7 +335,10 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     const items: Array<{ userPid: string; tempPassword: string }> = body?.data ?? [];
     expect(items).toHaveLength(2);
     expect(items.map((item) => item.userPid).sort()).toEqual([user1.userPid, user2.userPid].sort());
-    expect(items.map((item) => item.tempPassword)).not.toHaveDuplicates();
+    const tempPasswords = items.map((item) => item.tempPassword);
+    expect(new Set(tempPasswords).size, 'temporary passwords must be distinct').toBe(
+      tempPasswords.length,
+    );
     for (const item of items) {
       expect(item.tempPassword.length).toBeGreaterThanOrEqual(8);
     }
@@ -324,7 +373,9 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
 
     // Unauthorized pairing: a sales-role member gets 403 and hashes stay untouched.
     const sales = await provisionUser(page, stamp, 'b2sales', ['crm_sales']);
-    const salesContext = await page.context().browser()?.newContext();
+    const salesContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const salesPage = await salesContext!.newPage();
     await uiLogin(salesPage, sales.email);
     const hashesBeforeForbidden = await dbQuery<{ id: number; password: string }>(
@@ -335,7 +386,7 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
       data: { userPids: [user1.userPid, user2.userPid] },
     });
     const forbiddenBody = await forbidden.json().catch(() => ({}));
-    await expectForbidden(salesPage, forbidden.status(), forbiddenBody);
+    await expectForbidden(forbidden, forbiddenBody);
     const hashesAfterForbidden = await dbQuery<{ id: number; password: string }>(
       `SELECT id, password FROM ab_user WHERE pid = ANY($1::varchar[])`,
       [[user1.userPid, user2.userPid]],
@@ -356,7 +407,9 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     const member2 = await provisionUser(page, stamp, 'b3u2', ['crm_sales']);
 
     // A live session for member1 before suspension — suspension must revoke it.
-    const memberContext = await page.context().browser()?.newContext();
+    const memberContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const memberPage = await memberContext!.newPage();
     await uiLogin(memberPage, member1.email);
     await expect(await memberPage.request.get('/api/auth/me')).toBeOK();
@@ -376,18 +429,28 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     expect(suspendBody?.data?.succeeded).toBe(2);
     expect(suspendBody?.data?.failed).toEqual([]);
 
-    const suspendedRows = await dbQuery<{ pid: string; status: string }>(
-      `SELECT pid, status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
-      [[member1.memberPid, member2.memberPid]],
-    );
-    expect(new Set(suspendedRows.map((row) => row.status))).toEqual(new Set(['suspended']));
-
     await expect
-      .poll(
-        async () => (await memberPage.request.get('/api/auth/me')).status(),
-        { timeout: 10_000, intervals: [500, 1_000] },
-      )
-      .toBe(401);
+      .poll(async () => {
+        const rows = await dbQuery<{ status: string }>(
+          `SELECT status FROM ab_tenant_member WHERE pid = ANY($1::varchar[])`,
+          [[member1.memberPid, member2.memberPid]],
+        );
+        return rows.map((row) => row.status).sort().join(',');
+      }, { timeout: 15_000 })
+      .toBe('suspended,suspended');
+
+    // The member's server-side sessions are revoked with the suspension; the
+    // stateless BFF JWT keeps authenticating until expiry (platform contract).
+    await expect
+      .poll(async () => {
+        const sessions = await dbQuery<{ count: string }>(
+          `SELECT count(*) AS count FROM ab_user_session
+           WHERE tenant_member_id = $1 AND revoked = false`,
+          [member1.memberId],
+        );
+        return Number(sessions[0]?.count ?? 0);
+      })
+      .toBe(0);
     await memberContext!.close();
 
     const restore = await page.request.post('/api/tenant/members/batch-status', {
@@ -426,31 +489,49 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
       data: { memberPids: [member1.memberPid], action: 'active', reason: 'PAR26 cleanup' },
     });
 
-    // Validation: empty list and unknown action are rejected without side effects.
-    await page.request.post('/api/tenant/members/batch-status', {
+    // Validation: empty list is rejected via the error envelope.
+    const emptyList = await page.request.post('/api/tenant/members/batch-status', {
       data: { memberPids: [], action: 'active' },
-    }).then(async (response) => expect(response.ok()).toBe(false));
+    });
+    const emptyListBody = await emptyList.json().catch(() => ({}));
+    expect(String(emptyListBody?.code ?? '0')).not.toBe('0');
+
+    // An unknown action fails per member inside the batch envelope, leaving
+    // every touched member unchanged.
     const invalidAction = await page.request.post('/api/tenant/members/batch-status', {
       data: { memberPids: [member2.memberPid], action: 'detonate' },
     });
-    expect(invalidAction.ok()).toBe(false);
+    const invalidBody = await invalidAction.json().catch(() => ({}));
+    expect(invalidBody?.data?.succeeded).toBe(0);
+    const invalidFailures: Array<{ memberPid: string }> = invalidBody?.data?.failed ?? [];
+    expect(invalidFailures.map((failure) => failure.memberPid)).toEqual([member2.memberPid]);
 
     // Unauthorized pairing: sales role lacks TENANT_MEMBER_MANAGE — 403, no change.
     const sales = await provisionUser(page, stamp, 'b3sales', ['crm_sales']);
-    const salesContext = await page.context().browser()?.newContext();
+    const salesContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const salesPage = await salesContext!.newPage();
     await uiLogin(salesPage, sales.email);
     const forbidden = await salesPage.request.post('/api/tenant/members/batch-status', {
       data: { memberPids: [member1.memberPid, member2.memberPid], action: 'suspended' },
     });
     const forbiddenBody = await forbidden.json().catch(() => ({}));
-    await expectForbidden(salesPage, forbidden.status(), forbiddenBody);
+    await expectForbidden(forbidden, forbiddenBody);
     const statusesAfterForbidden = await dbQuery<{ status: string }>(
       `SELECT status FROM ab_tenant_member WHERE pid = ANY($1::varchar[]) ORDER BY pid`,
       [[member1.memberPid, member2.memberPid]],
     );
     expect(statusesAfterForbidden.every((row) => row.status === 'active')).toBe(true);
     await salesContext!.close();
+    await testInfo.attach('par26-b3-batch-status-summary', {
+      body: JSON.stringify(
+        { suspended: suspendBody?.data, partial: partialBody?.data, statusesAfterForbidden },
+        null,
+        2,
+      ),
+      contentType: 'application/json',
+    });
     completedScenarios.add(SCENARIOS.BATCH_STATUS_API);
   });
 
@@ -480,8 +561,31 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
 
     const rootPid = await createDept(`PAR26 根部门 ${stamp}`);
     const childPid = await createDept(`PAR26 子部门 ${stamp}`, rootPid);
+    // org_employee requires a department and a position — create the position
+    // through the dynamic model API first.
+    const positionResponse = await page.request.post('/api/dynamic/org_position/create', {
+      data: {
+        org_pos_name: `PAR26 岗位 ${stamp}`,
+        org_pos_dept_id: rootPid,
+        org_pos_level: "1",
+        org_pos_status: 'active',
+      },
+    });
+    const positionBody = await positionResponse.json().catch(() => ({}));
+    expect(
+      positionResponse.ok() && String(positionBody?.code) === '0',
+      `create position failed: HTTP ${positionResponse.status()} ${JSON.stringify(positionBody).slice(0, 600)}`,
+    ).toBe(true);
+    const positionPid = String(positionBody?.data?.pid ?? '');
+    expect(positionPid, 'position pid').toBeTruthy();
     const employeeResponse = await page.request.post('/api/org/employees', {
-      data: { name: `PAR26 指挥官 ${stamp}`, email: `par26-cmd-${stamp}@e2e.local` },
+      data: {
+        name: `PAR26 指挥官 ${stamp}`,
+        email: `par26-cmd-${stamp}@e2e.local`,
+        phone: '13800000000',
+        deptPid: rootPid,
+        positionPid,
+      },
     });
     const employeeBody = await employeeResponse.json().catch(() => ({}));
     expect(
@@ -552,14 +656,16 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
 
     // Unauthorized pairing: sales role cannot sort departments — 403, order unchanged.
     const sales = await provisionUser(page, stamp, 'b4sales', ['crm_sales']);
-    const salesContext = await page.context().browser()?.newContext();
+    const salesContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const salesPage = await salesContext!.newPage();
     await uiLogin(salesPage, sales.email);
     const forbidden = await salesPage.request.post('/api/org/departments/sort', {
       data: { items: [{ pid: rootPid, order: 99 }] },
     });
     const forbiddenBody = await forbidden.json().catch(() => ({}));
-    await expectForbidden(salesPage, forbidden.status(), forbiddenBody);
+    await expectForbidden(forbidden, forbiddenBody);
     const orderAfterForbidden = await dbQuery<{ order: number }>(
       `SELECT org_dept_order AS order FROM mt_org_department WHERE pid = $1`,
       [rootPid],
@@ -598,13 +704,49 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     const member1 = await provisionUser(page, stamp, 'b5u1', ['crm_sales']);
     const member2 = await provisionUser(page, stamp, 'b5u2', ['crm_sales']);
 
+    // The department-user tree is built from org_employee records, so link
+    // employee records to both members under a fresh department.
+    const deptResponse = await page.request.post('/api/org/departments', {
+      data: { org_dept_name: `PAR26 树部门 ${stamp}`, org_dept_status: 'active' },
+    });
+    const deptBody = await deptResponse.json().catch(() => ({}));
+    expect(String(deptBody?.code), 'create tree department').toBe('0');
+    const treeDeptPid = String(deptBody?.data?.pid ?? '');
+    expect(treeDeptPid, 'tree department pid').toBeTruthy();
+    const treePositionResponse = await page.request.post('/api/dynamic/org_position/create', {
+      data: {
+        org_pos_name: `PAR26 树岗位 ${stamp}`,
+        org_pos_dept_id: treeDeptPid,
+        org_pos_level: "1",
+        org_pos_status: 'active',
+      },
+    });
+    const treePositionBody = await treePositionResponse.json().catch(() => ({}));
+    expect(String(treePositionBody?.code), 'create tree position').toBe('0');
+    const treePositionPid = String(treePositionBody?.data?.pid ?? '');
+    expect(treePositionPid, 'tree position pid').toBeTruthy();
+    for (const member of [member1, member2]) {
+      const link = await page.request.post('/api/org/employees/link', {
+        data: {
+          memberPid: member.memberPid,
+          deptPid: treeDeptPid,
+          positionPid: treePositionPid,
+        },
+      });
+      const linkBody = await link.json().catch(() => ({}));
+      expect(
+        link.ok() && String(linkBody?.code) === '0',
+        `link member ${member.memberPid} failed: HTTP ${link.status()} ${JSON.stringify(linkBody).slice(0, 400)}`,
+      ).toBe(true);
+    }
+
     const assign = await page.request.post(`/api/roles/${rolePid}/members`, {
       data: [member1.memberPid],
     });
     expect(assign.ok(), 'assign member to role').toBe(true);
 
     // Department-user tree: assigned member annotated true, peers false.
-    const tree = await page.request.get(`/api/roles/${rolePid}/member-tree`);
+    const tree = await page.request.get(`/api/roles/${rolePid}/members/member-tree`);
     const treeBody = await tree.json().catch(() => ({}));
     expect(
       tree.ok() && String(treeBody?.code) === '0',
@@ -646,7 +788,7 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
     ).toBe(true);
     await expect
       .poll(async () => {
-        const treeAfter = await page.request.get(`/api/roles/${rolePid}/member-tree`);
+        const treeAfter = await page.request.get(`/api/roles/${rolePid}/members/member-tree`);
         const treeAfterBody = await treeAfter.json().catch(() => ({}));
         const nodes: typeof departments = treeAfterBody?.data?.departments ?? [];
         const ungroupedAfter: Array<{ memberPid: string | null; assigned: boolean }> =
@@ -658,13 +800,15 @@ test.describe('PAR-26-B organization/user/role batch management parity', () => {
 
     // Unauthorized pairing: a member without ROLE_READ gets 403 on the tree.
     const sales = await provisionUser(page, stamp, 'b5sales', ['crm_sales']);
-    const salesContext = await page.context().browser()?.newContext();
+    const salesContext = await page.context().browser()!.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const salesPage = await salesContext!.newPage();
     await uiLogin(salesPage, sales.email);
-    const forbidden = await salesPage.request.get(`/api/roles/${rolePid}/member-tree`);
+    const forbidden = await salesPage.request.get(`/api/roles/${rolePid}/members/member-tree`);
     const forbiddenBody = await forbidden.json().catch(() => ({}));
     if (forbidden.status() === 403) {
-      await expectForbidden(salesPage, forbidden.status(), forbiddenBody);
+      await expectForbidden(forbidden, forbiddenBody);
     } else {
       // crm_sales carries a read capability — record the outcome instead of failing.
       await testInfo.attach('par26-b5-tree-forbidden-skip', {

@@ -2205,6 +2205,10 @@
             "valueType": "datetime"
           }
         ],
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        },
         "bulkActions": [
           {
             "code": "bulk_restore_members",
