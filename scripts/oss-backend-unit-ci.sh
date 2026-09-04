@@ -2,8 +2,8 @@
 
 # Self-contained Linux CI runner for the complete Gradle `test` task. Some
 # historical tests still use the fixed skills-c2 PostgreSQL/Redis ports, while
-# newer smoke tests use Testcontainers. Provision both paths and always clean
-# the dedicated Compose project before returning.
+# newer smoke tests use Testcontainers. Provision both paths and retain the
+# dedicated Compose project after returning for owner evidence inspection.
 
 set -uo pipefail
 
@@ -31,7 +31,8 @@ cleanup() {
   status=$?
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  docker compose "${COMPOSE_ARGS[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  printf '[oss-backend-unit-ci] runtime retained: compose_project=%s artifacts=%s\n' \
+    "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
 trap cleanup EXIT HUP INT TERM

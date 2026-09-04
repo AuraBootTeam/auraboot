@@ -15,7 +15,8 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.ok(statSync(runner).mode & 0o100);
   assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
-  assert.match(source, /down --volumes --remove-orphans/);
+  assert.match(source, /runtime retained: compose_project=/);
+  assert.doesNotMatch(source, /down --volumes --remove-orphans/);
   assert.match(source, /trap cleanup EXIT HUP INT TERM/);
   assert.match(source, /PostgreSQL init process complete; ready for start up\./);
   assert.match(source, /pg_isready -U auraboot -d aura_boot/);
