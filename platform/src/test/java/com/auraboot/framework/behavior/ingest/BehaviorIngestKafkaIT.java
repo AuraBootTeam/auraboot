@@ -45,7 +45,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @ActiveProfiles("integration-test")
 class BehaviorIngestKafkaIT {
 
-    private static final String BOOTSTRAP = "localhost:9092";
+    private static final String BOOTSTRAP = System.getenv().getOrDefault(
+            "AURA_CI_KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
     private static final long TENANT = 990_301L;
     private static final long USER = 990_302L;
 

@@ -16,6 +16,10 @@ test('backend CI runner is executable and owns its complete infrastructure lifec
   assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained: compose_project=/);
+  assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
+  assert.match(source, /free_port 25000 25999/);
+  assert.match(source, /free_port 26000 26999/);
+  assert.match(source, /free_port 27000 27999/);
   assert.doesNotMatch(source, /down --volumes --remove-orphans/);
   assert.match(source, /trap cleanup EXIT HUP INT TERM/);
   assert.match(source, /PostgreSQL init process complete; ready for start up\./);
@@ -98,23 +102,25 @@ test('backend CI runner executes destructive bootstrap verification only after t
   assert.match(buildSource, /outputs\.upToDateWhen \{ false \}/);
 });
 
-test('backend CI runner points fixed-stack tests at the isolated host ports', () => {
-  assert.match(source, /TEST_DATABASE_URL='jdbc:postgresql:\/\/127\.0\.0\.1:25442\/aura_boot/);
+test('backend CI runner points fixed-stack tests at runtime-owned host ports', () => {
+  assert.match(source, /TEST_DATABASE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
   assert.match(source, /TEST_DATABASE_USERNAME='auraboot'/);
   assert.match(source, /TEST_DATABASE_PASSWORD='auraboot_dev'/);
-  assert.match(source, /SPRING_DATASOURCE_URL='jdbc:postgresql:\/\/127\.0\.0\.1:25442\/aura_boot/);
+  assert.match(source, /SPRING_DATASOURCE_URL="jdbc:postgresql:\/\/127\.0\.0\.1:\$\{AURA_OSS_CI_POSTGRES_PORT\}\/aura_boot/);
   assert.match(source, /SPRING_DATASOURCE_USERNAME='auraboot'/);
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
-  assert.match(source, /SPRING_DATA_REDIS_PORT='26389'/);
-  assert.match(source, /SPRING_DATA_REDIS_URL='redis:\/\/127\.0\.0\.1:26389'/);
+  assert.match(source, /SPRING_DATA_REDIS_PORT="\$AURA_OSS_CI_REDIS_PORT"/);
+  assert.match(source, /SPRING_DATA_REDIS_URL="redis:\/\/127\.0\.0\.1:\$AURA_OSS_CI_REDIS_PORT"/);
+  assert.match(source, /SPRING_KAFKA_BOOTSTRAP_SERVERS="127\.0\.0\.1:\$AURA_OSS_CI_KAFKA_PORT"/);
   assert.match(source, /AURA_CI_REQUIRE_KAFKA='1'/);
+  assert.match(source, /AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127\.0\.0\.1:\$AURA_OSS_CI_KAFKA_PORT"/);
 });
 
 test('backend CI override provisions a required native Kafka broker', () => {
   const override = readFileSync(composeOverride, 'utf8');
   assert.match(override, /kafka:/);
   assert.match(override, /confluentinc\/cp-kafka:7\.5\.0/);
-  assert.match(override, /"9092:9092"/);
+  assert.match(override, /AURA_OSS_CI_KAFKA_PORT/);
   assert.match(override, /kafka-topics --bootstrap-server localhost:9092 --list/);
 });
