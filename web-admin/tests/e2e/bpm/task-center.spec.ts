@@ -240,13 +240,13 @@ test.describe('BPM Task Center', () => {
       await expect(async () => {
         await btn.click();
         const cls = await btn.getAttribute('class');
-        expect(cls).toContain('border-blue-600');
+        expect(cls).toContain('border-accent');
       }).toPass({ timeout: 8000 });
     };
 
     // Wait for initial data load (todo tab is default active)
     const todoTab = page.locator('button:has-text("待办任务")');
-    await expect(todoTab).toHaveClass(/border-blue-600/, { timeout: 8000 });
+    await expect(todoTab).toHaveClass(/border-accent/, { timeout: 8000 });
 
     // Wait for todo content to stabilize
     const todoContent = page.locator('table').or(page.locator('text=暂无任务'));
@@ -318,7 +318,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await completedBtn.click();
       const cls = await completedBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 8000 });
     const completedContent = page.locator('table').or(page.locator('text=暂无任务'));
     await expect(completedContent.first()).toBeVisible({ timeout: 8000 });
@@ -332,7 +332,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await ccBtn.click();
       const cls = await ccBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 8000 });
 
     // Wait for search input to disappear — confirms CC tab is active (search hidden per TaskCenter logic)
@@ -355,7 +355,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await urgeBtn.click();
       const cls = await urgeBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 5000 });
 
     // Wait for URGE content
@@ -887,7 +887,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await completedTab.click();
       const cls = await completedTab.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 5000 });
 
     // Should show table with completed tasks or empty state
