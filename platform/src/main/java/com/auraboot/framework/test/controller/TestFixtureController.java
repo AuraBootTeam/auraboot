@@ -425,12 +425,19 @@ public class TestFixtureController {
                 ? (String) params.get("modelCode")
                 : "e2et_order";
 
+        // Optional generic field overrides so non-order models can be seeded
+        // through the same fixture (e.g. e2et_field_zoo with required name).
+        Map<String, Object> extraFields = params != null && params.get("fields") instanceof Map
+                ? (Map<String, Object>) params.get("fields")
+                : Map.of();
+
         List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
                 record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
                 record.put("e2et_order_status", "draft");
+                record.putAll(extraFields);
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
                     recordPids.add(pid);
