@@ -365,6 +365,10 @@ describe('TraceGraphBlockRenderer — render smoke', () => {
     expect(screen.getAllByText('MAT-SRC')).toHaveLength(3);
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('kg')).toBeInTheDocument();
+    expect(screen.getByText('Trace unit PID')).toBeInTheDocument();
+    expect(screen.getByText('Material')).toBeInTheDocument();
+    expect(screen.queryByText('unit_pid')).not.toBeInTheDocument();
+    expect(screen.queryByText('material_ref')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('trace-node-details-close'));
     expect(screen.queryByTestId('trace-node-details-drawer')).not.toBeInTheDocument();

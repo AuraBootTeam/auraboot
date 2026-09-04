@@ -69,6 +69,21 @@ function getNodeColors(nodeType: string) {
   return NODE_TYPE_COLORS[nodeType.toUpperCase()] ?? DEFAULT_NODE_COLOR;
 }
 
+const TRACE_DETAIL_LABELS: Record<string, string> = {
+  unit_pid: 'Trace unit PID',
+  kind: 'Trace unit type',
+  material_ref: 'Material',
+  quantity: 'Quantity',
+  uom: 'Unit of measure',
+  depth: 'Graph depth',
+};
+
+function traceDetailLabel(key: string): string {
+  return TRACE_DETAIL_LABELS[key] ?? key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // Custom node renderer
 // ---------------------------------------------------------------------------
@@ -297,7 +312,7 @@ function TraceGraphInner({ nodes: traceNodes, edges: traceEdges }: TraceGraphCan
             <dl className="flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
               {detailEntries.map(([key, value]) => (
                 <div key={key}>
-                  <dt className="text-xs font-medium text-gray-500">{key}</dt>
+                  <dt className="text-xs font-medium text-gray-500">{traceDetailLabel(key)}</dt>
                   <dd className="mt-0.5 break-words text-gray-900">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                   </dd>
