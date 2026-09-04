@@ -134,8 +134,11 @@ const loki = read('loki-query.json');
 const tempo = read('tempo-trace.json');
 const datasources = read('grafana-datasources.json');
 const dashboards = read('grafana-dashboards.json');
+const tempoTraceIds = (tempo.batches ?? []).flatMap(batch =>
+  (batch.scopeSpans ?? []).flatMap(scope =>
+    (scope.spans ?? []).map(span => Buffer.from(span.traceId ?? '', 'base64').toString('hex'))));
 if (!JSON.stringify(loki).includes(runId) || !JSON.stringify(loki).includes(traceId)) throw new Error('Loki correlation proof missing');
-if (!JSON.stringify(tempo).includes(traceId)) throw new Error('Tempo trace proof missing');
+if (!tempoTraceIds.includes(traceId)) throw new Error('Tempo trace proof missing');
 for (const name of ['Prometheus', 'Loki', 'Tempo']) if (!datasources.some(x => x.name === name)) throw new Error(`Grafana datasource missing: ${name}`);
 if (dashboards.length < 9) throw new Error(`Grafana loaded ${dashboards.length} dashboards; expected at least 9`);
 fs.writeFileSync(path.join(dir, 'summary.json'), JSON.stringify({ contractVersion: 1, status: 'passed', runId, traceId, checks: { metrics: true, alerts: true, notificationDeduplicated: true, logs: true, traces: true, logTraceCorrelation: true, dashboards: dashboards.length, sloBurn: true } }, null, 2) + '\n');
@@ -149,5 +152,15 @@ wait_http loki "http://127.0.0.1:$AURA_OBS_LOKI_PORT/ready"
 wait_http tempo "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/ready"
 curl --fail --silent --show-error --get --data-urlencode 'query={service="auraboot-canary"}' \
   "http://127.0.0.1:$AURA_OBS_LOKI_PORT/loki/api/v1/query_range" | grep -q "$TRACE_ID"
-curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/api/traces/$TRACE_ID" | grep -q "$TRACE_ID"
+curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/api/traces/$TRACE_ID" \
+  > "$ARTIFACTS/tempo-trace-after-restart.json"
+node - "$ARTIFACTS/tempo-trace-after-restart.json" "$TRACE_ID" <<'NODE'
+const fs = require('node:fs');
+const [tempoPath, traceId] = process.argv.slice(2);
+const tempo = JSON.parse(fs.readFileSync(tempoPath, 'utf8'));
+const traceIds = (tempo.batches ?? []).flatMap(batch =>
+  (batch.scopeSpans ?? []).flatMap(scope =>
+    (scope.spans ?? []).map(span => Buffer.from(span.traceId ?? '', 'base64').toString('hex'))));
+if (!traceIds.includes(traceId)) process.exit(1);
+NODE
 printf '[observability-real-stack] PASS run=%s trace=%s artifacts=%s runtime=retained\n' "$RUN_ID" "$TRACE_ID" "$ARTIFACTS"
