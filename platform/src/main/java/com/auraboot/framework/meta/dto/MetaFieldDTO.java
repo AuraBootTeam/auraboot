@@ -129,6 +129,13 @@ public class MetaFieldDTO {
     private String dictCode;
 
     /**
+     * Inline dict options resolved from {@code dictCode} for rendering
+     * clients (mobile) that cannot make a second dict round-trip.
+     * Items shape: { value: String, label: String, sortNo?: Integer }.
+     */
+    private java.util.List<java.util.Map<String, Object>> options;
+
+    /**
      * 创建者
      */
     private String createdBy;
