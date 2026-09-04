@@ -6,8 +6,11 @@ import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.organization.dto.DepartmentTreeNode;
+import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
+import com.auraboot.framework.rbac.dto.RoleMemberTreeResponse;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleMemberService;
@@ -37,6 +40,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class RoleMemberServiceImpl implements RoleMemberService {
+
+    private static final int MEMBER_TREE_PAGE_SIZE = 500;
+    private static final int MEMBER_TREE_MAX_PAGES = 10;
 
     private final UserRoleService userRoleService;
     private final RoleService roleService;
@@ -217,6 +223,68 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         // 8. Enrich with pre-fetched data
         return limited.stream()
             .map(member -> buildRoleMemberDTO(member, null, candidateUserMap, limitedEmpMap))
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public RoleMemberTreeResponse getMemberTree(Long roleId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        // 1. Member IDs assigned to this role -> PID set for annotation
+        Set<Long> assignedMemberIds = findUserRolesByRoleId(roleId, tenantId).stream()
+            .map(UserRole::getMemberId)
+            .collect(Collectors.toSet());
+        Set<String> assignedMemberPids = assignedMemberIds.isEmpty()
+            ? Collections.emptySet()
+            : tenantMemberService.listByIds(assignedMemberIds).stream()
+                .filter(Objects::nonNull)
+                .map(TenantMember::getPid)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 2. All tenant employees (paged fetch, hard-capped)
+        List<OrgEmployeeDTO> employees = new ArrayList<>();
+        int pageNum = 1;
+        long total;
+        do {
+            PaginationResult<OrgEmployeeDTO> page = organizationService.getEmployeesByTenant(
+                pageNum, MEMBER_TREE_PAGE_SIZE, null);
+            total = page.getTotal() == null ? 0 : page.getTotal();
+            employees.addAll(page.getRecords());
+            pageNum++;
+        } while (employees.size() < total && pageNum <= MEMBER_TREE_MAX_PAGES);
+
+        // 3. Group employees by department, annotating assignment status
+        Map<String, List<RoleMemberTreeResponse.DeptUserNodeUser>> usersByDept = new HashMap<>();
+        List<RoleMemberTreeResponse.DeptUserNodeUser> ungrouped = new ArrayList<>();
+        for (OrgEmployeeDTO employee : employees) {
+            RoleMemberTreeResponse.DeptUserNodeUser nodeUser =
+                new RoleMemberTreeResponse.DeptUserNodeUser(
+                    employee.userPid(), employee.memberPid(), employee.name(),
+                    employee.memberPid() != null && assignedMemberPids.contains(employee.memberPid()));
+            if (employee.deptPid() == null || employee.deptPid().isBlank()) {
+                ungrouped.add(nodeUser);
+            } else {
+                usersByDept.computeIfAbsent(employee.deptPid(), k -> new ArrayList<>()).add(nodeUser);
+            }
+        }
+
+        List<RoleMemberTreeResponse.DeptUserTreeNode> tree =
+            toTreeNodes(organizationService.getDepartmentTree(tenantId), usersByDept);
+        return new RoleMemberTreeResponse(tree, ungrouped);
+    }
+
+    private List<RoleMemberTreeResponse.DeptUserTreeNode> toTreeNodes(
+            List<DepartmentTreeNode> nodes,
+            Map<String, List<RoleMemberTreeResponse.DeptUserNodeUser>> usersByDept) {
+        if (nodes == null) {
+            return List.of();
+        }
+        return nodes.stream()
+            .map(node -> new RoleMemberTreeResponse.DeptUserTreeNode(
+                node.pid(), node.name(), node.parentPid(),
+                toTreeNodes(node.children(), usersByDept),
+                usersByDept.getOrDefault(node.pid(), List.of())))
             .collect(Collectors.toList());
     }
 

@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
+import com.auraboot.framework.rbac.dto.RoleMemberTreeResponse;
 import com.auraboot.framework.rbac.dto.AddRoleMembersRequest;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleMemberService;
@@ -89,5 +90,12 @@ public class RoleMemberController {
             @PathVariable String rolePid,
             @RequestParam(required = false) String keyword) {
         return ApiResponse.success(roleMemberService.getCandidates(resolveRoleId(rolePid), keyword));
+    }
+
+    @GetMapping("/member-tree")
+    @RequirePermission(MetaPermission.ROLE_READ)
+    @Operation(summary = "Get the department-user tree annotated with role assignment status")
+    public ApiResponse<RoleMemberTreeResponse> getMemberTree(@PathVariable String rolePid) {
+        return ApiResponse.success(roleMemberService.getMemberTree(resolveRoleId(rolePid)));
     }
 }

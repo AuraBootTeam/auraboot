@@ -2205,6 +2205,79 @@
             "valueType": "datetime"
           }
         ],
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_restore_members",
+            "permissionCode": "org.role.update",
+            "variant": "default",
+            "label": {
+              "zh-CN": "批量启用",
+              "en-US": "Enable Selected"
+            },
+            "confirm": {
+              "zh-CN": "确定恢复选中的成员吗？恢复后成员可重新登录。",
+              "en-US": "Restore the selected members? They will be able to sign in again."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "admin:restore_member"
+            }
+          },
+          {
+            "code": "bulk_suspend_members",
+            "permissionCode": "org.role.update",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量停用",
+              "en-US": "Suspend Selected"
+            },
+            "confirm": {
+              "zh-CN": "确定停用选中的成员吗？停用后其全部登录会话将立即失效。",
+              "en-US": "Suspend the selected members? All their sessions will be invalidated immediately."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "admin:suspend_member",
+              "offboardingAction": "suspend",
+              "inputFieldsTitle": {
+                "zh-CN": "批量停用成员",
+                "en-US": "Suspend members"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": {
+                    "zh-CN": "停用原因",
+                    "en-US": "Reason"
+                  },
+                  "type": "textarea",
+                  "required": true
+                }
+              ]
+            }
+          },
+          {
+            "code": "bulk_reset_member_passwords",
+            "permissionCode": "org.role.update",
+            "variant": "default",
+            "label": {
+              "zh-CN": "批量重置密码",
+              "en-US": "Reset Passwords"
+            },
+            "confirm": {
+              "zh-CN": "确定为选中的成员批量生成新的临时密码？每个成员的临时密码需在成员详情中查看。",
+              "en-US": "Generate new temporary passwords for the selected members? Each temporary password must be viewed in the member detail."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "admin:reset_member_password"
+            }
+          }
+        ],
         "rowActions": [
           {
             "code": "approve",

@@ -10,6 +10,8 @@ import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import com.auraboot.framework.user.dto.BatchPasswordResetItem;
+import com.auraboot.framework.user.dto.BatchPasswordResetRequest;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionRequest;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.user.dto.EmployeeAccountImportPreviewResponse;
@@ -36,6 +38,7 @@ import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -236,6 +239,28 @@ public class AdminUserController {
         log.info("Admin reset password for user {}, mustChangePassword=false", userPid);
 
         return ApiResponse.success(Map.of("tempPassword", tempPassword));
+    }
+
+    /**
+     * Admin batch password reset. Each user rotates independently; the generated
+     * temporary passwords are returned once per user, mirroring the single-user
+     * reset contract. Batch size is capped by the request validation.
+     */
+    @PostMapping("/batch-reset-password")
+    @Operation(summary = "Admin batch reset user passwords")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
+    public ApiResponse<List<BatchPasswordResetItem>> batchResetPassword(
+            @Valid @RequestBody BatchPasswordResetRequest request) {
+        List<BatchPasswordResetItem> results = new ArrayList<>(request.userPids().size());
+        for (String userPid : request.userPids()) {
+            String tempPassword = generatePolicyCompliantPassword(12);
+            passwordManagementService.resetPasswordByAdmin(userPid, tempPassword);
+            results.add(new BatchPasswordResetItem(userPid, tempPassword));
+        }
+
+        log.info("Admin batch reset passwords for {} users", results.size());
+
+        return ApiResponse.success(results);
     }
 
     private String generateRandomPassword(int length) {
