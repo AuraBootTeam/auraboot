@@ -139,7 +139,7 @@ async function clickRowMenuAction(page: Page, row: ReturnType<Page['locator']>, 
   await moreBtn.click();
 
   // Wait for dropdown menu to appear
-  const menu = page.locator('.shadow-lg.ring-1').first();
+  const menu = page.locator('.shadow-pop, [class*="shadow-pop"], [role="menu"]').first();
   await expect(menu).toBeVisible({ timeout: 5_000 });
 
   // Click the specific action button
