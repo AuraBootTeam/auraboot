@@ -1708,6 +1708,17 @@
             "span": 2
           }
         ]
+      },
+      {
+        "id": "block_zoo_selection_info",
+        "blockType": "selection-info",
+        "title": {
+          "zh-CN": "已选记录",
+          "en-US": "Selection"
+        },
+        "selection": {
+          "bind": "selectedRows"
+        }
       }
     ]
   }
