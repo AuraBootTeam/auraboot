@@ -297,7 +297,9 @@
       "import": {
         "enabled": true,
         "permissionCode": "model.e2et_order.import",
-        "modes": ["insert"]
+        "modes": [
+          "insert"
+        ]
       },
       "options": {
         "detailNavigation": "page"
@@ -816,7 +818,9 @@
       "import": {
         "enabled": true,
         "permissionCode": "model.e2et_customer.import",
-        "modes": ["insert"]
+        "modes": [
+          "insert"
+        ]
       }
     },
     "layout": {
@@ -1496,6 +1500,210 @@
           {
             "field": "e2et_due_date",
             "span": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "e2et_field_zoo_list",
+    "name:zh-CN": "字段动物园列表",
+    "name:en": "Field Zoo List",
+    "modelCode": "e2et_field_zoo",
+    "description": "List with toolbar search, filters block, create action and multi-view switcher (table/kanban/gallery) — serves FORM-FIELDS, FILTER-SORT, BATCH-MODE and MULTIVIEW families",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "defaultView": "table",
+    "views": [
+      "table",
+      "kanban",
+      "gallery"
+    ],
+    "kanbanConfig": {
+      "groupByField": "e2et_zoo_select",
+      "titleField": "e2et_zoo_name"
+    },
+    "galleryConfig": {
+      "titleField": "e2et_zoo_name",
+      "imageField": "e2et_zoo_photo"
+    },
+    "blocks": [
+      {
+        "id": "block_zoo_filter",
+        "blockType": "filters",
+        "title": {
+          "zh-CN": "筛选",
+          "en-US": "Filters"
+        },
+        "filters": [
+          {
+            "field": "e2et_zoo_select",
+            "operator": "EQ",
+            "dictCode": "e2et_zoo_option",
+            "label": {
+              "zh-CN": "选项",
+              "en-US": "Option"
+            }
+          },
+          {
+            "field": "e2et_zoo_switch",
+            "operator": "EQ",
+            "label": {
+              "zh-CN": "仅启用",
+              "en-US": "Enabled only"
+            }
+          }
+        ]
+      },
+      {
+        "id": "block_zoo_toolbar",
+        "blockType": "toolbar",
+        "title": {
+          "zh-CN": "工具栏",
+          "en-US": "Toolbar"
+        },
+        "actions": [
+          {
+            "code": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "New"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "e2et_field_zoo_form"
+            }
+          },
+          {
+            "code": "batch_mode",
+            "label": {
+              "zh-CN": "批量",
+              "en-US": "Batch"
+            },
+            "action": {
+              "type": "command",
+              "command": "batch_mode"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "e2et_field_zoo_form",
+    "name:zh-CN": "字段动物园表单",
+    "name:en": "Field Zoo Form",
+    "modelCode": "e2et_field_zoo",
+    "description": "Create/edit form enumerating every supported widget type",
+    "kind": "form",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "section_zoo_basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "全部控件",
+          "en-US": "Every Widget"
+        },
+        "columns": 2,
+        "fields": [
+          {
+            "field": "e2et_zoo_name",
+            "span": 2,
+            "required": true
+          },
+          {
+            "field": "e2et_zoo_select",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_reference",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_date",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_switch",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_number",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_photo",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_signature",
+            "span": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "e2et_field_zoo_detail",
+    "name:zh-CN": "字段动物园详情",
+    "name:en": "Field Zoo Detail",
+    "modelCode": "e2et_field_zoo",
+    "description": "Read-only detail with edit/delete actions in the action bar",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "section_zoo_detail",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Info"
+        },
+        "columns": 2,
+        "fields": [
+          {
+            "field": "e2et_zoo_name",
+            "span": 2
+          },
+          {
+            "field": "e2et_zoo_select",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_reference",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_date",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_switch",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_number",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_photo",
+            "span": 1
+          },
+          {
+            "field": "e2et_zoo_signature",
+            "span": 2
           }
         ]
       }
