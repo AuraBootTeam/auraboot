@@ -122,5 +122,8 @@ test('backend CI override provisions a required native Kafka broker', () => {
   assert.match(override, /kafka:/);
   assert.match(override, /confluentinc\/cp-kafka:7\.5\.0/);
   assert.match(override, /AURA_OSS_CI_KAFKA_PORT/);
+  assert.match(override, /EXTERNAL:\/\/0\.0\.0\.0:19092/);
+  assert.match(override, /INTERNAL:\/\/kafka:9092/);
+  assert.match(override, /KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL/);
   assert.match(override, /kafka-topics --bootstrap-server localhost:9092 --list/);
 });
