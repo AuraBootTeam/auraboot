@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,14 +39,18 @@ class TenantLoginChannelServiceImplTest {
 
     @Mock
     private SystemModeService systemModeService;
+    @Mock
+    private FederatedIdentityFeatureGate featureGate;
 
     private TenantLoginChannelServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new TenantLoginChannelServiceImpl(channelMapper);
+        service = new TenantLoginChannelServiceImpl(channelMapper, featureGate);
         ReflectionTestUtils.setField(service, "applicationChannelMapper", applicationChannelMapper);
         ReflectionTestUtils.setField(service, "systemModeService", systemModeService);
+        org.mockito.Mockito.lenient().when(featureGate.isEnabled(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(true);
     }
 
     private TenantLoginChannel ch(String code, int order) {
@@ -90,9 +95,11 @@ class TenantLoginChannelServiceImplTest {
     @Test
     @DisplayName("application registry keeps federated methods while tenant toggles own built-in methods")
     void getEnabledChannelsFromApplicationRegistry() {
-        when(applicationChannelMapper.findEnabledAuthMethods(
+        when(applicationChannelMapper.findEnabledAuthOptions(
                 "business-web", "supplier-portal", 1L))
-                .thenReturn(List.of("email_password", "oidc"));
+                .thenReturn(List.of(
+                        new LoginChannelOption("email_password", "password", "email_password", null),
+                        new LoginChannelOption("oidc", "oauth", "OIDC", "oidc")));
         when(channelMapper.selectList(any())).thenReturn(List.of(ch("email_code", 0)));
 
         assertEquals(
@@ -105,15 +112,17 @@ class TenantLoginChannelServiceImplTest {
     void singleModeUsesServerOwnedDefaultTenant() {
         when(systemModeService.isSingleTenant()).thenReturn(true);
         when(systemModeService.getDefaultTenantId()).thenReturn(2L);
-        when(applicationChannelMapper.findEnabledAuthMethods(
+        when(applicationChannelMapper.findEnabledAuthOptions(
                 "business-web", "default-business-web", 2L))
-                .thenReturn(List.of("email_password", "wechat"));
+                .thenReturn(List.of(
+                        new LoginChannelOption("email_password", "password", "email_password", null),
+                        new LoginChannelOption("wechat", "oauth", "WeChat", "wechat_web")));
         when(channelMapper.selectList(any())).thenReturn(List.of(ch("email_password", 0)));
 
         assertEquals(
                 List.of("email_password", "wechat"),
                 service.getEnabledChannels(999L, "business-web", "default-business-web"));
-        verify(applicationChannelMapper).findEnabledAuthMethods(
+        verify(applicationChannelMapper).findEnabledAuthOptions(
                 "business-web", "default-business-web", 2L);
     }
 
@@ -139,11 +148,30 @@ class TenantLoginChannelServiceImplTest {
     }
 
     @Test
+    @DisplayName("federated options are hidden when their optional feature is disabled")
+    void disabledFederatedOptionsAreNotProjected() {
+        LoginChannelOption password = new LoginChannelOption(
+                "email_password", "password", "email_password", null);
+        LoginChannelOption corporateOidc = new LoginChannelOption(
+                "acme-workforce", "oauth", "Acme Workforce", "oidc");
+        when(applicationChannelMapper.findEnabledAuthOptions(
+                "business-web", "default-business-web", 1L))
+                .thenReturn(List.of(password, corporateOidc));
+        when(channelMapper.selectList(any())).thenReturn(List.of(ch("email_password", 0)));
+        when(featureGate.isEnabled("oidc")).thenReturn(false);
+
+        assertEquals(
+                List.of(password),
+                service.getEnabledChannelOptions(1L, "business-web", "default-business-web"));
+        assertEquals(
+                List.of("email_password"),
+                service.getEnabledChannels(1L, "business-web", "default-business-web"));
+    }
+
+    @Test
     @DisplayName("legacy channel options classify LDAP and arbitrary social providers")
     void getEnabledChannelOptionsLegacyFallback() {
         when(applicationChannelMapper.findEnabledAuthOptions(
-                "business-web", "default-business-web", 1L)).thenReturn(List.of());
-        when(applicationChannelMapper.findEnabledAuthMethods(
                 "business-web", "default-business-web", 1L)).thenReturn(List.of());
         when(channelMapper.selectList(any())).thenReturn(List.of(ch("ldap", 0), ch("custom-oauth", 1)));
 

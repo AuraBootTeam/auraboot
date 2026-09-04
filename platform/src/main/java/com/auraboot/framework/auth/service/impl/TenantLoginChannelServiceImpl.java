@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
 import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
     );
 
     private final TenantLoginChannelMapper channelMapper;
+    private final FederatedIdentityFeatureGate featureGate;
 
     @Autowired(required = false)
     private LoginApplicationChannelMapper applicationChannelMapper;
@@ -55,13 +57,14 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
     public List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
         Long effectiveTenantId = resolvePreAuthTenantId(tenantId);
         if (applicationChannelMapper != null) {
-            List<String> methods = applicationChannelMapper.findEnabledAuthMethods(
+            List<LoginChannelOption> options = applicationChannelMapper.findEnabledAuthOptions(
                     applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
                     channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
                     effectiveTenantId);
-            if (methods != null && !methods.isEmpty()) {
+            if (options != null && !options.isEmpty()) {
                 return mergeRegistryMethodsWithLegacyLocalToggles(
-                        methods, getEnabledChannels(effectiveTenantId));
+                        enabledRegistryOptions(options).stream().map(LoginChannelOption::getCode).toList(),
+                        getEnabledChannels(effectiveTenantId));
             }
         }
         return getEnabledChannels(effectiveTenantId);
@@ -78,7 +81,7 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
                     effectiveTenantId);
             if (options != null && !options.isEmpty()) {
                 return mergeRegistryOptionsWithLegacyLocalToggles(
-                        options, getEnabledChannels(effectiveTenantId));
+                        enabledRegistryOptions(options), getEnabledChannels(effectiveTenantId));
             }
         }
         return TenantLoginChannelService.super.getEnabledChannelOptions(
@@ -101,6 +104,7 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
             }
             return channels.stream()
                     .map(TenantLoginChannel::getChannel)
+                    .filter(this::isEnabledLoginMethod)
                     .distinct()
                     .collect(Collectors.toList());
         }
@@ -119,6 +123,7 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
 
         return channels.stream()
                 .map(TenantLoginChannel::getChannel)
+                .filter(this::isEnabledLoginMethod)
                 .collect(Collectors.toList());
     }
 
@@ -231,6 +236,17 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
 
     private boolean isLegacyManagedLocalMethod(String method) {
         return LEGACY_MANAGED_LOCAL_METHODS.contains(normalizeMethod(method));
+    }
+
+    private List<LoginChannelOption> enabledRegistryOptions(List<LoginChannelOption> options) {
+        return options.stream()
+                .filter(option -> option.getProviderType() == null
+                        || featureGate.isEnabled(option.getProviderType()))
+                .toList();
+    }
+
+    private boolean isEnabledLoginMethod(String method) {
+        return isLegacyManagedLocalMethod(method) || featureGate.isEnabled(method);
     }
 
     private String normalizeMethod(String method) {
