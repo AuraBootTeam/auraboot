@@ -87,5 +87,25 @@
     "orderNo": 50,
     "visible": true,
     "pageKey": "e2et_record_list"
+  },
+  {
+    "code": "e2et_field_zoo_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "字段动物园",
+    "name:en": "Field Zoo",
+    "path": "/p/e2et_field_zoo",
+    "component": null,
+    "icon": "Grid3x3",
+    "type": 1,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 60,
+    "visible": true,
+    "pageKey": "e2et_field_zoo_list",
+    "extension": {
+      "platforms": [
+        "web",
+        "mobile"
+      ]
+    }
   }
 ]

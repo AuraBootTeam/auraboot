@@ -333,5 +333,35 @@
         }
       }
     ]
+  },
+  {
+    "code": "e2et_zoo_option",
+    "name": "Field Zoo Option",
+    "name:zh-CN": "字段动物园选项",
+    "name:en": "Field Zoo Option",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "alpha",
+        "label": "Alpha",
+        "label:zh-CN": "选项甲",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "beta",
+        "label": "Beta",
+        "label:zh-CN": "选项乙",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "gamma",
+        "label": "Gamma",
+        "label:zh-CN": "选项丙",
+        "sortNo": 30,
+        "status": "enabled"
+      }
+    ]
   }
 ]

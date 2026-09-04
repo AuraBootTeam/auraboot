@@ -11,7 +11,9 @@
       "subtitleField": "e2et_order_no",
       "importPolicy": {
         "enabled": true,
-        "modes": ["insert"]
+        "modes": [
+          "insert"
+        ]
       },
       "rules": [
         {
@@ -126,7 +128,9 @@
       "subtitleField": "e2et_cust_code",
       "importPolicy": {
         "enabled": true,
-        "modes": ["insert"]
+        "modes": [
+          "insert"
+        ]
       }
     },
     "semantic_description": "Self-contained reference target for REFERENCE field and UNIQUE_COMPOSITE validation testing.",
@@ -163,5 +167,22 @@
     "domain_category": "platform",
     "data_sensitivity": "internal",
     "lifecycle_description": "OPEN → IN_PROGRESS → DONE (simple state machine for mobile test scenarios)"
+  },
+  {
+    "code": "e2et_field_zoo",
+    "displayName:zh-CN": "字段动物园",
+    "displayName:en": "Field Zoo",
+    "description": "One of every supported widget type on a single model: text, SELECT(enum), REFERENCE(searchable picker), DATE, BOOLEAN/SWITCH, NUMBER, UPLOAD(camera capture), SIGNATURE. Serves BACKLOG-MOB-IOS FORM-FIELDS / NATIVE-CAPS / FILTER-SORT families.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "titleField": "e2et_zoo_name",
+      "importPolicy": {
+        "enabled": true,
+        "modes": [
+          "insert"
+        ]
+      }
+    }
   }
 ]

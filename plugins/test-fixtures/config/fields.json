@@ -587,5 +587,97 @@
     "extension": {
       "format": "YYYY-MM-DD"
     }
+  },
+  {
+    "code": "e2et_zoo_name",
+    "displayName:zh-CN": "动物园名称",
+    "displayName:en": "Zoo Name",
+    "dataType": "string",
+    "description": "Field zoo title field (text input)",
+    "constraints": {
+      "required": true,
+      "maxLength": 100
+    },
+    "extension": {
+      "placeholder:zh-CN": "请输入名称",
+      "placeholder:en": "Enter name"
+    }
+  },
+  {
+    "code": "e2et_zoo_select",
+    "displayName:zh-CN": "下拉选择",
+    "displayName:en": "Select",
+    "dataType": "enum",
+    "description": "SELECT field type backed by e2et_zoo_option dict",
+    "dictCode": "e2et_zoo_option",
+    "defaultValue": "alpha",
+    "extension": {
+      "placeholder:zh-CN": "请选择",
+      "placeholder:en": "Select option"
+    }
+  },
+  {
+    "code": "e2et_zoo_reference",
+    "displayName:zh-CN": "引用客户",
+    "displayName:en": "Customer Reference",
+    "dataType": "reference",
+    "description": "REFERENCE field type with searchable picker (target e2et_customer)",
+    "refTarget": {
+      "targetModel": "e2et_customer",
+      "targetField": "e2et_cust_name"
+    },
+    "extension": {
+      "placeholder:zh-CN": "请选择客户",
+      "placeholder:en": "Select customer"
+    }
+  },
+  {
+    "code": "e2et_zoo_date",
+    "displayName:zh-CN": "日期",
+    "displayName:en": "Zoo Date",
+    "dataType": "date",
+    "description": "DATE field type",
+    "extension": {
+      "format": "YYYY-MM-DD"
+    }
+  },
+  {
+    "code": "e2et_zoo_switch",
+    "displayName:zh-CN": "开关",
+    "displayName:en": "Zoo Switch",
+    "dataType": "boolean",
+    "description": "BOOLEAN/SWITCH field type",
+    "defaultValue": "false"
+  },
+  {
+    "code": "e2et_zoo_number",
+    "displayName:zh-CN": "数量",
+    "displayName:en": "Zoo Number",
+    "dataType": "integer",
+    "description": "NUMBER field type",
+    "constraints": {
+      "min": 0,
+      "max": 100000
+    }
+  },
+  {
+    "code": "e2et_zoo_photo",
+    "displayName:zh-CN": "拍照上传",
+    "displayName:en": "Photo Capture",
+    "dataType": "file",
+    "description": "UPLOAD field type rendering the camera/photo capture surface",
+    "extension": {
+      "renderComponent": "file"
+    }
+  },
+  {
+    "code": "e2et_zoo_signature",
+    "displayName:zh-CN": "签名",
+    "displayName:en": "Signature",
+    "dataType": "string",
+    "description": "SIGNATURE extended field (handwritten signature capture)",
+    "extension": {
+      "renderComponent": "signature"
+    }
   }
 ]

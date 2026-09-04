@@ -115,6 +115,7 @@ public class TestFixtureController {
                 case "dashboard" -> createDashboardFixture(runId, request.getParams());
                 case "approval" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "approval", "high", "E2E Approval Request");
                 case "inbox_items" -> createInboxItemsFixture(runId, request.getParams(), authHeader);
+                case "inbox_empty" -> createInboxEmptyFixture(runId, request.getParams());
                 case "inbox_route" -> createRouteBearingInboxFixture(runId, request.getParams(), authHeader);
                 case "inbox_alert" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "alert", "medium", "E2E Alert Item");
                 case "inbox_mention" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "mention", "low", "E2E Mention Item");
@@ -477,6 +478,81 @@ public class TestFixtureController {
         String priority = "task".equals(type) || "assignment".equals(type) ? "normal" : "low";
         String titlePrefix = "E2E " + type.substring(0, 1).toUpperCase() + type.substring(1) + " Item";
         return createInboxItemsWithType(runId, params, authHeader, type, priority, titlePrefix);
+    }
+
+    /**
+     * Fixture: "inbox_empty"
+     * Marks every inbox item read for the resolved test user so the mobile
+     * inbox renders its deterministic empty state (BACKLOG-MOB-IOS-UX-EMPTY
+     * knob: seedInboxEmpty). InboxService stays reflective — see the class
+     * header note on the enterprise-core dependency.
+     */
+    private FixtureResult createInboxEmptyFixture(String runId, Map<String, Object> params) {
+        Object inboxService;
+        try {
+            inboxService = requireRuntimeBean(
+                    new String[]{"inboxService", "inboxServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.inbox.service.InboxService",
+                            "com.auraboot.framework.inbox.service.InboxServiceImpl"
+                    }
+            );
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Inbox module is not available (enterprise-core not loaded)"))
+                    .build();
+        }
+
+        Long tenantId = params != null && params.containsKey("tenantId")
+                ? longValue(params.get("tenantId")) : null;
+        Long userId = params != null && params.containsKey("userId")
+                ? longValue(params.get("userId")) : null;
+        if (tenantId == null) {
+            var tenant = tenantService.findByName("e2e_test");
+            if (tenant != null) {
+                tenantId = tenant.getId();
+            }
+        }
+        if (tenantId == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenantId — call POST /api/test/seed first"))
+                    .build();
+        }
+        if (userId == null) {
+            var user = userService.findByEmail("e2e@test.local");
+            if (user != null) {
+                userId = user.getId();
+            }
+        }
+        if (userId == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Cannot resolve userId — call POST /api/test/seed first"))
+                    .build();
+        }
+
+        try {
+            Method markAllRead = inboxService.getClass()
+                    .getMethod("markAllRead", Long.class, Long.class);
+            Object marked = markAllRead.invoke(inboxService, userId, tenantId);
+            return FixtureResult.builder()
+                    .success(true).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("markedRead", String.valueOf(marked)))
+                    .build();
+        } catch (Exception e) {
+            log.error("inbox_empty fixture failed: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", String.valueOf(e.getMessage())))
+                    .build();
+        }
     }
 
     /**
