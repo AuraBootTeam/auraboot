@@ -1893,7 +1893,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion);
             if (result <= 0) {
                 if (expectedVersion != null) {
-                    throw new MetaServiceException("Update failed: version conflict (expected version " + expectedVersion + ")");
+                    // Optimistic-lock miss must be a 409 (ConflictException), not a 400:
+                    // mobile offline replay only surfaces user-visible conflicts from 409.
+                    throw new com.auraboot.framework.exception.ConflictException(
+                            com.auraboot.framework.exception.ConflictException.ConflictCodes.CAS_VERSION_CONFLICT,
+                            "Update failed: version conflict (expected version " + expectedVersion + ")",
+                            Map.of(
+                                    "modelCode", modelCode,
+                                    "recordPid", recordId,
+                                    "expectedVersion", expectedVersion
+                            ));
                 }
                 throw new MetaServiceException("Failed to update record");
             }
