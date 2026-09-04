@@ -3,11 +3,14 @@ package com.auraboot.framework.tenant.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.tenant.controller.request.ApproveRequest;
+import com.auraboot.framework.tenant.controller.request.BatchMemberStatusRequest;
 import com.auraboot.framework.tenant.controller.request.MemberLifecycleRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
@@ -19,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +31,8 @@ import java.util.Map;
 @RequestMapping("/api/tenant/members")
 @Tag(name = "Tenant Members", description = "Tenant membership management")
 public class TenantMemberController {
+
+    private static final int MAX_BATCH_SIZE = 100;
 
     @Autowired
     private TenantMemberApplicationService memberApplicationService;
@@ -131,5 +137,43 @@ public class TenantMemberController {
 
         boolean result = memberApplicationService.batchRemoveMembers(memberPids, userId);
         return ApiResponse.success(result);
+    }
+
+    /**
+     * Batch enable/disable members. Each member transitions independently —
+     * a failure on one member does not roll the others back.
+     * Action values match the single-member status endpoint:
+     * active | inactive | suspended.
+     */
+    @PostMapping("/batch-status")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
+    @ResponseBody
+    public ApiResponse<Map<String, Object>> batchUpdateMemberStatus(
+            @RequestBody BatchMemberStatusRequest request,
+            @CurrentUserId Long userId) {
+
+        List<String> memberPids = request.getMemberPids();
+        if (memberPids == null || memberPids.isEmpty()) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "memberPids is required");
+        }
+        if (memberPids.size() > MAX_BATCH_SIZE) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "Batch size is limited to " + MAX_BATCH_SIZE + " members");
+        }
+
+        int succeeded = 0;
+        List<Map<String, String>> failed = new ArrayList<>();
+        for (String memberPid : memberPids) {
+            try {
+                memberApplicationService.updateMemberStatus(
+                        memberPid, request.getAction(), request.getReason(), null, userId);
+                succeeded++;
+            } catch (Exception e) {
+                log.warn("Batch status transition failed for member {}: {}", memberPid, e.getMessage());
+                failed.add(Map.of("memberPid", memberPid,
+                        "error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
+        }
+        return ApiResponse.success(Map.of("succeeded", succeeded, "failed", failed));
     }
 }

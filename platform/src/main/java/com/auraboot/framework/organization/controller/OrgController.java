@@ -3,6 +3,7 @@ package com.auraboot.framework.organization.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
@@ -87,6 +88,8 @@ public class OrgController {
     @DeleteMapping("/departments/{pid}")
     @RequirePermission("org.team.manage")
     public ApiResponse<Void> deleteDepartment(@PathVariable String pid) {
+        requireDepartmentExists(pid);
+
         // Check for child departments
         List<String> subPids = organizationService.getDeptAndSubPids(pid);
         if (subPids.size() > 1) {
@@ -104,6 +107,73 @@ public class OrgController {
 
         dynamicDataService.delete(MODEL_ORG_DEPARTMENT, pid);
         return ApiResponse.success();
+    }
+
+    /**
+     * Pre-check department deletion without deleting. Mirrors the exact guards
+     * enforced by DELETE /departments/{pid} so the UI can warn before committing.
+     */
+    @GetMapping("/departments/{pid}/delete-check")
+    public ApiResponse<DepartmentAdminRequests.DeleteCheckResponse> checkDepartmentDelete(
+            @PathVariable String pid) {
+        requireDepartmentExists(pid);
+
+        List<DepartmentAdminRequests.DeleteBlocker> blockers = new ArrayList<>();
+        int subTreeSize = organizationService.getDeptAndSubPids(pid).size();
+        if (subTreeSize > 1) {
+            blockers.add(new DepartmentAdminRequests.DeleteBlocker(
+                "child_departments", subTreeSize - 1L,
+                "Department has child departments. Remove children first."));
+        }
+        long employeeCount = organizationService.getEmployeesByDept(pid, false, 1, 1, null).getTotal();
+        if (employeeCount > 0) {
+            blockers.add(new DepartmentAdminRequests.DeleteBlocker(
+                "employees", employeeCount,
+                "Department still has employees. Transfer or remove them first."));
+        }
+        return ApiResponse.success(new DepartmentAdminRequests.DeleteCheckResponse(
+            blockers.isEmpty(), blockers));
+    }
+
+    /**
+     * Batch reorder departments. Each item is applied independently.
+     */
+    @PostMapping("/departments/sort")
+    @RequirePermission("org.team.manage")
+    public ApiResponse<Void> sortDepartments(
+            @Valid @RequestBody DepartmentAdminRequests.SortRequest request) {
+        for (DepartmentAdminRequests.SortItem item : request.items()) {
+            dynamicDataService.update(MODEL_ORG_DEPARTMENT, item.pid(),
+                Map.of("org_dept_order", item.order()));
+        }
+        return ApiResponse.success();
+    }
+
+    /**
+     * Set the department commander (manager) by employee PID.
+     * The manager is stored as an org_employee reference and resolved to a
+     * user by the approver resolver.
+     */
+    @PostMapping("/departments/{pid}/set-commander")
+    @RequirePermission("org.team.manage")
+    public ApiResponse<Void> setDepartmentCommander(
+            @PathVariable String pid,
+            @Valid @RequestBody DepartmentAdminRequests.SetCommanderRequest request) {
+        requireDepartmentExists(pid);
+        if (dynamicDataService.getById("org_employee", request.employeePid()) == null) {
+            throw new RootUnCheckedException(BadParam,
+                "Employee not found: " + request.employeePid());
+        }
+        dynamicDataService.update(MODEL_ORG_DEPARTMENT, pid,
+            Map.of("org_dept_manager_id", request.employeePid()));
+        return ApiResponse.success();
+    }
+
+    private void requireDepartmentExists(String pid) {
+        if (dynamicDataService.getById(MODEL_ORG_DEPARTMENT, pid) == null) {
+            throw new RootUnCheckedException(ResponseCode.NOT_FOUND,
+                "Department not found: " + pid);
+        }
     }
 
     // ==================== Employee Endpoints ====================

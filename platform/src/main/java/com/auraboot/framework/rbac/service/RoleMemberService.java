@@ -2,6 +2,7 @@ package com.auraboot.framework.rbac.service;
 
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
+import com.auraboot.framework.rbac.dto.RoleMemberTreeResponse;
 
 import java.util.List;
 import java.time.LocalDate;
@@ -41,4 +42,10 @@ public interface RoleMemberService {
      * Optionally filtered by keyword (name/email).
      */
     List<RoleMemberDTO> getCandidates(Long roleId, String keyword);
+
+    /**
+     * Get the department-user tree annotated with role assignment status,
+     * for tree-based member assignment UX.
+     */
+    RoleMemberTreeResponse getMemberTree(Long roleId);
 }
