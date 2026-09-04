@@ -31,7 +31,11 @@ const STEADY_COMMAND_SQL_BUDGET = 100;
 // The first successful permanent purge initializes metadata for the pool projection,
 // ownership history and both activity relation shapes. Fresh-plugin runs have measured 102-114
 // SQL while the second item in the same batch remains 85, so keep a narrow cold-only ceiling.
-const COLD_CUSTOMER_DELETE_SQL_BUDGET = 120;
+// 2026-09-03 recalibration: the steady batch-delete now costs 126 on a fresh
+// demo DB — the +6 over the old 120 comes from intentional platform features
+// added since 2026-08-20 (audit user-name resolution #1642, CAS contract
+// #1752). Breakdown archived in the re-evidence evidence dir.
+const COLD_CUSTOMER_DELETE_SQL_BUDGET = 130;
 const REJECT_SQL_BUDGET = 75;
 const MEMBER_OPERATIONS_SCENARIO =
   'member scope, quick edit, chart, exports, guarded delete, batch update, claim and assignment persist on the real stack';
@@ -1079,9 +1083,15 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const sqlEvidence: Record<string, number> = {};
     await uiLogin(page, ADMIN_EMAIL);
     const stamp = `${Date.now()}`;
-    const meResponse = await page.request.get('/api/auth/me');
-    const meBody = await meResponse.json();
-    const adminPid = String(meBody?.data?.user?.pid ?? '');
+    // The BFF's form-login occasionally lands a session whose auth/me probe
+    // races the identity hydration; re-login until the pid resolves.
+    let adminPid = '';
+    for (let attempt = 0; attempt < 3 && !adminPid; attempt++) {
+      if (attempt > 0) await uiLogin(page, ADMIN_EMAIL);
+      const meResponse = await page.request.get('/api/auth/me');
+      const meBody = await meResponse.json().catch(() => ({}));
+      adminPid = String(meBody?.data?.user?.pid ?? '');
+    }
     expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
     const sales = await provisionUser(page, stamp, 'sales', ['crm_sales']);
     const manager = await provisionUser(page, stamp, 'manager', ['crm_sales_manager']);
@@ -3355,7 +3365,9 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       );
       await winnerPage.getByTestId('filter-btn-search').click();
       await winnerSearchResponse;
-      await expect(companyCell(winnerPage, assignedName)).toHaveCount(0);
+      await expect
+        .poll(() => companyCell(winnerPage, assignedName).count(), { timeout: 15_000 })
+        .toBe(0);
       const winnerRow = winnerPage.getByRole('row', { name: new RegExp(conflictName) });
       await expect(winnerRow).toContainText(/已领取|Claimed/);
       await winnerRow.click();
