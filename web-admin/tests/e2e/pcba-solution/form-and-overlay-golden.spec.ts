@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { waitForFormReady } from '../helpers';
@@ -152,11 +153,28 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
       await waitForFormReady(page, 20_000);
       await selectCustomer(page, accountId, accountName);
       await selectProject(page, projectId, projectName);
+      const bomReview = page.getByTestId('bom-upload-review-corrected_bom_file');
+      await expect(bomReview).toBeVisible({ timeout: 15_000 });
+      await page
+        .getByTestId('bom-upload-review-file-corrected_bom_file')
+        .setInputFiles(workbookPath);
+      await expect(bomReview).toContainText('form-submit-disable-bom.xlsx');
+
+      const gerberFixture = testInfo.outputPath('form-submit-disable-gerber.zip');
+      fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+      const cplFixture = testInfo.outputPath('form-submit-disable-cpl.csv');
+      fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
       await uploadSmartUploadFile(
         page,
-        'form-field-corrected_bom_file',
-        workbookPath,
-        'form-submit-disable-bom.xlsx',
+        'form-field-gerber_source_file',
+        gerberFixture,
+        'form-submit-disable-gerber.zip',
+      );
+      await uploadSmartUploadFile(
+        page,
+        'form-field-cpl_source_file',
+        cplFixture,
+        'form-submit-disable-cpl.csv',
       );
 
       // Force the real create-command round trip to take long enough that the

@@ -292,23 +292,16 @@ async function adoptEvidence(
   }
 }
 
-async function generateAndValidateWorkbook(
-  page: Page,
-  quoteId: string,
-  label: string,
-  expectedSetCount: number,
-  testInfo: TestInfo,
-  expectedLine?: { mpn: string; unitCost: number },
-): Promise<string> {
+/** Close a review drawer left open by the previous pricing step and require a
+ * stable hidden window — a completed reprice can briefly rebind the same
+ * selected line after the first close, reopening the drawer and intercepting
+ * the next tab click. Do not force-click through a visible overlay, because
+ * that would hide a real user-facing obstruction. */
+async function settleReviewDrawer(page: Page): Promise<void> {
   const drawerClose = page.getByRole('button', {
     name: /关闭复核浮层|Close review drawer/,
   });
   const drawer = page.getByTestId('review-drawer');
-  // A completed reprice triggers an asynchronous row refresh. The refresh can
-  // briefly rebind the same selected line after the first close, reopening the
-  // drawer and intercepting the next tab click. Require a stable hidden window;
-  // do not force-click through a visible overlay, because that would hide a real
-  // user-facing obstruction.
   const closeDeadline = Date.now() + 10_000;
   let hiddenSince = 0;
   await expect
@@ -329,6 +322,17 @@ async function generateAndValidateWorkbook(
     )
     .toBe(true);
   await expect(drawer).toBeHidden({ timeout: 2_000 });
+}
+
+async function generateAndValidateWorkbook(
+  page: Page,
+  quoteId: string,
+  label: string,
+  expectedSetCount: number,
+  testInfo: TestInfo,
+  expectedLine?: { mpn: string; unitCost: number },
+): Promise<string> {
+  await settleReviewDrawer(page);
   await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
   const action = page.getByTestId('workbench-action-generate_quote_excel');
   await expect(action).toBeVisible({ timeout: 15_000 });
@@ -412,6 +416,33 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
     await setYunhanMockScenario(page, 'release-default');
     const forbidden: ForbiddenHit[] = [];
     let step = 'login';
+    // The 报价Excel tab is gated by qo.quote.output.read, which the #426 seed contract
+    // deliberately withholds from qo_sales (quote-surface-permission-release pins
+    // sales to 资料上传/BOM价格计算/Gerber校验). Sales keeps driving every pricing action
+    // below; the workbook checkpoints are exported through an admin-driven page that
+    // holds the output surface.
+    let exporterContext: BrowserContext | undefined;
+    let exporterPage: Page | undefined;
+    const exportWorkbook = async (
+      quoteId: string,
+      label: string,
+      expectedSetCount: number,
+      expectedLine?: { mpn: string; unitCost: number },
+    ): Promise<void> => {
+      if (!exporterPage) throw new Error('admin exporter page not initialised');
+      // The export no longer runs on the sales page, so the drawer the sales
+      // steps leave behind must be settled here to keep the next sales tab
+      // click unobstructed.
+      await settleReviewDrawer(page);
+      await generateAndValidateWorkbook(
+        exporterPage,
+        quoteId,
+        label,
+        expectedSetCount,
+        testInfo,
+        expectedLine,
+      );
+    };
     page.on('response', (resp: Response) => {
       const status = resp.status();
       if ((status === 401 || status === 403) && resp.url().includes('/api/')) {
@@ -471,22 +502,16 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const workbookPath = createCorrectedBomWorkbook(
         testInfo.outputPath('sales-role-corrected-bom.xlsx'),
       );
+      // corrected_bom_file renders the BomUploadReview component: the file is
+      // parsed into the first-10-row preview immediately, but the actual
+      // /api/file/upload POST happens at form submit, not on file selection.
       const uploadField = page.getByTestId('form-field-corrected_bom_file');
       await expect(uploadField).toBeVisible({ timeout: 15_000 });
-      const uploadResponsePromise = page.waitForResponse(
-        (response) =>
-          response.url().includes('/api/file/upload') && response.request().method() === 'POST',
-        { timeout: 30_000 },
-      );
-      const fileInput = uploadField.locator('input[type="file"]').first();
-      if ((await fileInput.count()) > 0) {
-        await fileInput.setInputFiles(workbookPath);
-      } else {
-        const chooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-        await uploadField.locator('button, [role="button"]').first().click();
-        await (await chooserPromise).setFiles(workbookPath);
-      }
-      expect((await uploadResponsePromise).ok(), 'corrected BOM upload succeeds').toBe(true);
+      const reviewInput = page.getByTestId('bom-upload-review-file-corrected_bom_file');
+      await expect(reviewInput).toBeAttached({ timeout: 15_000 });
+      await reviewInput.setInputFiles(workbookPath);
+      await expect(page.getByText('原始 BOM 前 10 行')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('已选 7 列')).toBeVisible();
 
       // Gerber and CPL are mandatory at create (DSL required + server-side check);
       // SmartUpload validates by extension, so write real .zip/.csv fixtures.
@@ -696,6 +721,15 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
 
         // 4. A single imported quote walks each price channel. Every accepted decision is read
         // back as the ordinary employee, directly covering the production 403 regression.
+        step = 'open admin exporter for output-gated Excel checkpoints';
+        exporterContext = await browser.newContext({
+          storageState: { cookies: [], origins: [] },
+        });
+        const exporter = await exporterContext.newPage();
+        exporterPage = exporter;
+        await loginViaUI(exporter, ADMIN_EMAIL, ADMIN_PASSWORD);
+        await openQuoteDetailFromList(exporter, created);
+
         step = 'adopt recent purchase and export';
         await adoptEvidence(page, lineId, recentEvidenceId, 'purchase_analysis_recent_price');
         await expect
@@ -708,7 +742,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           )
           .toBeCloseTo(RECENT_UNIT_PRICE, 6);
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'recent-purchase', 1, testInfo);
+        await exportWorkbook(quoteId, 'recent-purchase', 1);
 
         // A flat price keeps its unit price when the set count changes; only real quantity,
         // line amount and the local factor change. This is the no-ladder half of the release gate.
@@ -733,13 +767,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
               'purchase_analysis_recent_price',
             ].join('|'),
           );
-        await generateAndValidateWorkbook(
-          page,
-          quoteId,
-          'recent-purchase-flat-sets-factor',
-          FLAT_SET_COUNT,
-          testInfo,
-        );
+        await exportWorkbook(quoteId, 'recent-purchase-flat-sets-factor', FLAT_SET_COUNT);
 
         step = 'adopt yunhan ladder and export';
         await adoptEvidence(page, lineId, yunhanEvidenceId, 'yunhan');
@@ -753,7 +781,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           )
           .toBeCloseTo(YUNHAN_UNIT_PRICE * (PRICE_FACTOR / 100), 6);
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'yunhan', FLAT_SET_COUNT, testInfo);
+        await exportWorkbook(quoteId, 'yunhan', FLAT_SET_COUNT);
 
         // 5. Moving from 15,200 to 1,520,000 pieces crosses from the 5,000 tier to the
         // 500,000 tier. The selected supplier raw price and factor-derived cost must both move.
@@ -892,7 +920,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
 
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'sets-factor', SET_COUNT, testInfo);
+        await exportWorkbook(quoteId, 'sets-factor', SET_COUNT);
       } finally {
         await setupContext.close();
       }
@@ -1153,17 +1181,10 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         Number(lineBeforePreview.qo_ql_unit_cost),
         6,
       );
-      await generateAndValidateWorkbook(
-        page,
-        quoteId,
-        'reprice-preview-cancel',
-        SET_COUNT,
-        testInfo,
-        {
-          mpn: String(lineBeforePreview.qo_ql_mpn ?? ''),
-          unitCost: Number(lineBeforePreview.qo_ql_unit_cost),
-        },
-      );
+      await exportWorkbook(quoteId, 'reprice-preview-cancel', SET_COUNT, {
+        mpn: String(lineBeforePreview.qo_ql_mpn ?? ''),
+        unitCost: Number(lineBeforePreview.qo_ql_unit_cost),
+      });
 
       // Run the same explicit exact-model preview again, then adopt it. The confirmation request
       // is generated by the shared renderer with previewId only; trusted price/URL/ladder data is
@@ -1267,7 +1288,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       expect(String(refreshedLine.qo_ql_package ?? '')).toBe('0402');
       const refreshedUnitCost = Number(refreshedLine.qo_ql_unit_cost);
       expect(refreshedUnitCost).toBeCloseTo(0.01 * (PRICE_FACTOR / 100), 6);
-      await generateAndValidateWorkbook(page, quoteId, 'reprice', SET_COUNT, testInfo, {
+      await exportWorkbook(quoteId, 'reprice', SET_COUNT, {
         mpn: REPRICE_MPN,
         unitCost: refreshedUnitCost,
       });
@@ -1277,6 +1298,14 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         path: testInfo.outputPath('ordinary-sales-reprice-result.png'),
         fullPage: true,
       });
+
+      // The admin-driven exporter's generate_document legitimately refreshes the
+      // derived cost rows as the administrator. Re-roll the cost and regenerate
+      // the document as the sales owner (sales holds qo.document.generate) so the
+      // SELF-isolation assertion below stays an honest fixture.
+      step = 'refresh cost rows as the sales owner';
+      await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
+      await executeCommand(page, 'qo_quote_common:generate_document', {}, quoteId);
 
       // 8. A second sales employee has the same capability atoms but cannot read any record
       // owned by the first employee. This explicitly covers quote child records involved in
@@ -1468,6 +1497,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const hits = forbidden.map((h) => `[${h.step}] ${h.status} ${h.url}`);
       expect(hits, `forbidden API hits as qo_sales:\n${hits.join('\n')}`).toEqual([]);
     } finally {
+      await exporterContext?.close().catch(() => {});
       await context.close();
     }
   });

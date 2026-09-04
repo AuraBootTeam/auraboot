@@ -181,7 +181,7 @@ test.describe('BOM material library page @smoke', () => {
     // the library: the operator sees an error, AND nothing was written. A form
     // that shows a toast but saves anyway passes a "did an error appear" check.
     await expect(
-      page.locator('[role="alert"], .text-destructive, [data-testid*="error"]').first(),
+      page.getByText(/请填写规格型号|Specification model is required/i, { exact: true }).first(),
       'an empty required field is reported to the operator',
     ).toBeVisible({ timeout: 20_000 });
 

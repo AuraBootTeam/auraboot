@@ -258,10 +258,18 @@ export async function ensureQuoteRoleUser(page: Page, user: QuoteRoleUser): Prom
     timeout: 20_000,
   });
   const body = await resp.json().catch(() => ({}));
-  expect(
-    resp.ok(),
-    `create role user ${user.key} (${user.email}) HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 800)}`,
-  ).toBe(true);
+  if (!resp.ok()) {
+    // Fixed smoke accounts keep the gate reproducible on an already-used stack:
+    // re-provisioning an existing user is a no-op, not a failure. Role codes are
+    // only asserted on the fresh-create path; wrong roles on a reused user
+    // surface as functional failures in the permission matrices themselves.
+    const text = JSON.stringify(body);
+    expect(
+      resp.status() === 409 || /already exists|已存在/i.test(text),
+      `create role user ${user.key} (${user.email}) HTTP ${resp.status()}: ${text.slice(0, 800)}`,
+    ).toBe(true);
+    return;
+  }
 
   const assignedRoles = Array.isArray((body as any).data?.assignedRoles)
     ? (body as any).data.assignedRoles.map(String)
@@ -486,8 +494,14 @@ export async function executeCommand(
   if (targetRecordId && (normalizedOperation === 'UPDATE' || normalizedOperation === 'DELETE')) {
     const model = commandCode.split(':')[0];
     if (model && model !== commandCode) {
-      const record = await readDynamicRecord(page, model, targetRecordId);
-      const rowVersion = Number(record.row_version ?? record.rowVersion);
+      // The prefix is only a guess: bom:update_material targets bom_material_master,
+      // and reading a guessed-but-wrong model fails closed with a model-permission
+      // 403. CAS is opt-in per command (executionConfig.casRequired), so the pre-read
+      // is an optimization, not a contract — when it cannot resolve, send the command
+      // without expectedVersion and let a structured CAS_VERSION_REQUIRED conflict
+      // fail loudly instead of blocking non-CAS commands here.
+      const record = await readDynamicRecord(page, model, targetRecordId).catch(() => null);
+      const rowVersion = Number(record?.row_version ?? record?.rowVersion);
       if (Number.isFinite(rowVersion)) {
         data.expectedVersion = rowVersion;
       }

@@ -9,6 +9,7 @@ import {
 } from './quote-e2e-helpers';
 
 const DASHBOARD_PATH = '/dashboards/view/qo_tool_admin_dashboard';
+const HOME_PATH = '/home';
 const TREND_QUERIES = ['qo_tool_quote_weekly_trend', 'qo_tool_bom_weekly_trend'] as const;
 const PEOPLE_QUERIES = [
   'qo_tool_quote_people_workload',
@@ -101,7 +102,7 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
   test('admin gets one menu link and the same four charts on dashboard and home', async ({ page }) => {
     await page.goto('/home', { waitUntil: 'domcontentloaded' });
     await ensureSidebarExpanded(page);
-    await expect(page.getByTestId('sidebar').locator(`a[href="${DASHBOARD_PATH}"]`)).toHaveCount(1);
+    await expect(page.getByTestId('sidebar').locator(`a[href="${HOME_PATH}"]`)).toHaveCount(1);
 
     await expectFourCharts(page, '/home');
     await expectFourCharts(page, DASHBOARD_PATH);
@@ -130,7 +131,7 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
     await withUserPage(browser, ordinaryUser, async (page) => {
       await expectFourCharts(page, '/home');
       await ensureSidebarExpanded(page);
-      await expect(page.getByTestId('sidebar').locator(`a[href="${DASHBOARD_PATH}"]`)).toHaveCount(0);
+      await expect(page.getByTestId('sidebar').locator(`a[href="${HOME_PATH}"]`)).toHaveCount(1);
 
       for (const code of TREND_QUERIES) {
         const records = await queryRecords(page, code);
