@@ -1186,8 +1186,8 @@ test('BPM userTask applicant field assignment links ProcessStatus and unified De
     processTraceLink.click(),
   ]);
   await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByLabel('log-keyword')).toHaveValue(applicantDecisionTraceId);
-  await expect(page.getByLabel('log-caller-type')).toHaveValue('BPM');
+  await expect(page.getByTestId('log-keyword')).toHaveValue(applicantDecisionTraceId);
+  await expect(page.getByTestId('log-caller-type')).toHaveValue('BPM');
 
   const traceRow = page
     .locator('tr[data-testid^="elta-row-"]')
