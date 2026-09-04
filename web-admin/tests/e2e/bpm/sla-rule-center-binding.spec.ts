@@ -1222,7 +1222,7 @@ test('SLA config form hosts rule-center binding with backend field catalog and i
     await page.goto(decisionTraceHref, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('log-keyword')).toHaveValue(runResult.traceId!);
-    await expect(page.getByLabel('log-decision-code')).toHaveValue(decisionCode);
+    await expect(page.getByTestId('log-decision-code')).toHaveValue(decisionCode);
     await expect(page.getByTestId('log-caller-type')).toHaveValue('SLA');
     expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
     const traceRow = page
@@ -1374,7 +1374,7 @@ test('SLA rule binding test-run traces applicant user reference fact metadata @g
     await page.goto(decisionTraceHref, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('log-keyword')).toHaveValue(runResult.traceId!);
-    await expect(page.getByLabel('log-decision-code')).toHaveValue(decisionCode);
+    await expect(page.getByTestId('log-decision-code')).toHaveValue(decisionCode);
     await expect(page.getByTestId('log-caller-type')).toHaveValue('SLA');
     expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
 
