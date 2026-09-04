@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -61,7 +62,12 @@ class BehaviorIngestKafkaIT {
 
     @BeforeEach
     void setup() throws Exception {
-        assumeTrue(kafkaAvailable(), "Kafka broker not available at " + BOOTSTRAP);
+        boolean available = kafkaAvailable();
+        if ("1".equals(System.getenv("AURA_CI_REQUIRE_KAFKA"))) {
+            assertTrue(available, "CI requires Kafka broker at " + BOOTSTRAP);
+        } else {
+            assumeTrue(available, "Kafka broker not available at " + BOOTSTRAP);
+        }
         ensureTables();
         cleanup();
 

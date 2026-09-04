@@ -14,7 +14,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
   assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
-  assert.match(source, /up -d --wait postgres redis/);
+  assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /down --volumes --remove-orphans/);
   assert.match(source, /trap cleanup EXIT HUP INT TERM/);
   assert.match(source, /PostgreSQL init process complete; ready for start up\./);
@@ -107,4 +107,13 @@ test('backend CI runner points fixed-stack tests at the isolated host ports', ()
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
   assert.match(source, /SPRING_DATA_REDIS_PORT='26389'/);
   assert.match(source, /SPRING_DATA_REDIS_URL='redis:\/\/127\.0\.0\.1:26389'/);
+  assert.match(source, /AURA_CI_REQUIRE_KAFKA='1'/);
+});
+
+test('backend CI override provisions a required native Kafka broker', () => {
+  const override = readFileSync(composeOverride, 'utf8');
+  assert.match(override, /kafka:/);
+  assert.match(override, /confluentinc\/cp-kafka:7\.5\.0/);
+  assert.match(override, /"9092:9092"/);
+  assert.match(override, /kafka-topics --bootstrap-server localhost:9092 --list/);
 });

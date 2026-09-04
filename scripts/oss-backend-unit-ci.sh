@@ -83,8 +83,8 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
   environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
 fi
 
-if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
-  environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
+if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
+  environment_invalid 'skills-c2 PostgreSQL/Redis/Kafka stack did not become healthy'
 fi
 
 # The PostgreSQL image reports healthy while its temporary init server may still
@@ -175,4 +175,5 @@ SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
 SPRING_DATA_REDIS_PORT='26389' \
 SPRING_DATA_REDIS_URL='redis://127.0.0.1:26389' \
+AURA_CI_REQUIRE_KAFKA='1' \
 platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest

@@ -36,6 +36,7 @@ class W3cTraceparentTest {
 
         assertEquals(TRACE_ID, ids.traceId());
         assertEquals(SPAN_ID, ids.spanId());
+        assertTrue(ids.sampled());
     }
 
     @Test
@@ -43,5 +44,6 @@ class W3cTraceparentTest {
         assertNull(W3cTraceparent.parse(null));
         assertNull(W3cTraceparent.parse("bad"));
         assertNull(W3cTraceparent.parse("00-" + TRACE_ID + "-badspanid-01"));
+        assertNull(W3cTraceparent.parse("00-" + TRACE_ID + "-" + SPAN_ID + "-zz"));
     }
 }
