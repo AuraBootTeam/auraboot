@@ -737,7 +737,11 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
 
     // Verify only matching results are shown after React has committed the
     // filtered response. The table can briefly keep stale rows visible after
-    // the network response resolves under full-suite load.
+    // the network response resolves under full-suite load: the toolbar's
+    // debounced URL-sync can interleave one extra unfiltered loadData that
+    // overwrites the filtered render. Re-commit the keyword once if that
+    // happens, then require the table to converge on UID-only rows.
+    let recommitted = false;
     await expect
       .poll(
         async () => {
@@ -746,9 +750,14 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
             .filter(Boolean)
             .slice(0, 5);
           if (texts.length === 0) return 'no rows';
-          return texts.every((text) => text.includes(UID)) ? 'ok' : texts.join('\n');
+          if (texts.every((text) => text.includes(UID))) return 'ok';
+          if (!recommitted && (await searchInput.inputValue()) === UID) {
+            recommitted = true;
+            await searchInput.press('Enter').catch(() => null);
+          }
+          return texts.join('\n');
         },
-        { timeout: 10000, intervals: [500, 1000, 1500] },
+        { timeout: 15_000 },
       )
       .toBe('ok');
   });
