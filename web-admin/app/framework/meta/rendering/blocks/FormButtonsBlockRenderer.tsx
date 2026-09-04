@@ -39,7 +39,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
 
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
   const dataSourceManager = runtime.getDataSourceManager();
@@ -82,6 +82,8 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
 
   // 渲染单个按钮
   const renderButton = (button: ButtonConfig) => {
+    if (button.permissionCode && !hasPermission(button.permissionCode)) return null;
+
     // 检查按钮可见性
     if (button.visibleWhen) {
       const visible = evaluator.evaluateCondition(button.visibleWhen, context);

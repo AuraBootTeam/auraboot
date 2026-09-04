@@ -20,7 +20,7 @@
 
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import { buildTraceGraph } from '../TraceGraphBlockRenderer';
@@ -32,8 +32,30 @@ import { TraceGraphBlockRenderer } from '../TraceGraphBlockRenderer';
 // ---------------------------------------------------------------------------
 vi.mock('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ReactFlow: ({ nodes, edges }: { nodes: any[]; edges: any[] }) => (
-    <div data-testid="mock-react-flow" data-node-count={nodes.length} data-edge-count={edges.length} />
+  ReactFlow: ({
+    nodes,
+    edges,
+    onNodeClick,
+  }: {
+    nodes: any[];
+    edges: any[];
+    onNodeClick?: (event: unknown, node: any) => void;
+  }) => (
+    <div
+      data-testid="mock-react-flow"
+      data-node-count={nodes.length}
+      data-edge-count={edges.length}
+    >
+      {nodes.map((node) => (
+        <button
+          key={node.id}
+          data-testid={`mock-node-${node.id}`}
+          onClick={() => onNodeClick?.({}, node)}
+        >
+          {node.data.label}
+        </button>
+      ))}
+    </div>
   ),
   Controls: () => null,
   Background: () => null,
@@ -47,11 +69,13 @@ vi.mock('@xyflow/react', () => ({
 // Helper: minimal SchemaRuntime stub
 // ---------------------------------------------------------------------------
 
-function makeRuntime(overrides: {
-  rows?: unknown[];
-  loading?: boolean;
-  error?: Error | null;
-} = {}): SchemaRuntime {
+function makeRuntime(
+  overrides: {
+    rows?: unknown[];
+    loading?: boolean;
+    error?: Error | null;
+  } = {},
+): SchemaRuntime {
   const { rows = [], loading = false, error = null } = overrides;
   const data: Record<string, unknown> = rows.length > 0 ? { traceDs: rows } : {};
 
@@ -189,9 +213,27 @@ describe('buildTraceGraph — edge and corner cases', () => {
 
   it('corner: multiple rows sharing same work_order → node deduped, multiple edges', () => {
     const rows = [
-      { work_order_id: 'WO-1', work_order_code: 'WO-X', lot_id: 'LOT-A', lot_code: 'LA', qty_consumed: 10 },
-      { work_order_id: 'WO-1', work_order_code: 'WO-X', lot_id: 'LOT-B', lot_code: 'LB', qty_consumed: 20 },
-      { work_order_id: 'WO-1', work_order_code: 'WO-X', lot_id: 'LOT-A', lot_code: 'LA', qty_consumed: 5 },
+      {
+        work_order_id: 'WO-1',
+        work_order_code: 'WO-X',
+        lot_id: 'LOT-A',
+        lot_code: 'LA',
+        qty_consumed: 10,
+      },
+      {
+        work_order_id: 'WO-1',
+        work_order_code: 'WO-X',
+        lot_id: 'LOT-B',
+        lot_code: 'LB',
+        qty_consumed: 20,
+      },
+      {
+        work_order_id: 'WO-1',
+        work_order_code: 'WO-X',
+        lot_id: 'LOT-A',
+        lot_code: 'LA',
+        qty_consumed: 5,
+      },
     ];
 
     const { nodes, edges } = buildTraceGraph(rows, 'consumption');
@@ -275,7 +317,13 @@ describe('TraceGraphBlockRenderer — render smoke', () => {
   it('smoke-rows: renders canvas section when rows are present', () => {
     const runtime = makeRuntime({
       rows: [
-        { work_order_id: 'WO-1', work_order_code: 'WO-X', lot_id: 'LOT-A', lot_code: 'LA', qty_consumed: 10 },
+        {
+          work_order_id: 'WO-1',
+          work_order_code: 'WO-X',
+          lot_id: 'LOT-A',
+          lot_code: 'LA',
+          qty_consumed: 10,
+        },
       ],
     });
     const block = { ...baseBlock, mode: 'consumption' } as any;
@@ -286,6 +334,40 @@ describe('TraceGraphBlockRenderer — render smoke', () => {
     const flowEl = screen.getByTestId('mock-react-flow');
     expect(Number(flowEl.getAttribute('data-node-count'))).toBe(2);
     expect(Number(flowEl.getAttribute('data-edge-count'))).toBe(1);
+  });
+
+  it('opens a datasource-scoped detail drawer when a trace node is selected', () => {
+    const runtime = makeRuntime({
+      rows: [
+        {
+          src_unit_pid: 'TU-SRC',
+          src_kind: 'batch',
+          src_material_ref: 'MAT-SRC',
+          src_quantity: 42,
+          src_uom: 'kg',
+          src_depth: 0,
+          dst_unit_pid: 'TU-DST',
+          dst_kind: 'serial',
+          dst_material_ref: 'MAT-DST',
+          dst_quantity: 7,
+          dst_uom: 'ea',
+          dst_depth: 1,
+          edge_type: 'split',
+        },
+      ],
+    });
+    const block = { ...baseBlock, mode: 'mn-trace' } as any;
+
+    render(<TraceGraphBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('mock-node-TU-SRC'));
+
+    expect(screen.getByTestId('trace-node-details-drawer')).toBeInTheDocument();
+    expect(screen.getAllByText('MAT-SRC')).toHaveLength(3);
+    expect(screen.getByText('42')).toBeInTheDocument();
+    expect(screen.getByText('kg')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('trace-node-details-close'));
+    expect(screen.queryByTestId('trace-node-details-drawer')).not.toBeInTheDocument();
   });
 
   it('smoke-error: renders error alert from datasource', () => {
@@ -338,11 +420,7 @@ describe('buildTraceGraph — mn-trace mode', () => {
   });
 
   it('edge: rows missing src or dst pid are skipped', () => {
-    const rows = [
-      edgeRow({ src_unit_pid: null }),
-      edgeRow({ dst_unit_pid: null }),
-      edgeRow({}),
-    ];
+    const rows = [edgeRow({ src_unit_pid: null }), edgeRow({ dst_unit_pid: null }), edgeRow({})];
 
     const { nodes, edges } = buildTraceGraph(rows, 'mn-trace');
 

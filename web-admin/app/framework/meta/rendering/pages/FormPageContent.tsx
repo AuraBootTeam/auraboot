@@ -734,6 +734,13 @@ export function isFormButtonDisabled(
   return submitsForm && !submitReady;
 }
 
+export function canRenderFormButton(
+  button: { permissionCode?: string },
+  hasPermission: (permissionCode: string) => boolean,
+): boolean {
+  return !button.permissionCode || hasPermission(button.permissionCode);
+}
+
 /**
  * Resolve the redirect target after a successful form submit.
  *
@@ -1178,7 +1185,7 @@ export function FormPageContent(props: PageContentProps) {
 
   // Get user info and permissions from context
   const { user } = useUser();
-  const { permissions } = usePermissions();
+  const { permissions, hasPermission } = usePermissions();
 
   // Kind × capability validation: fetch selected model's capabilities when the
   // form has both `model_code` and `kind` fields. No-op for other forms.
@@ -1863,7 +1870,11 @@ export function FormPageContent(props: PageContentProps) {
       setFieldErrors({});
       setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
-      const commandPayload = buildFormCommandPayload(dispatchActionRecord, modelFields, schema?.blocks);
+      const commandPayload = buildFormCommandPayload(
+        dispatchActionRecord,
+        modelFields,
+        schema?.blocks,
+      );
       // Review metadata is command input rather than model data, so it is intentionally absent
       // from the model-field whitelist used by buildFormCommandPayload.
       Object.assign(commandPayload, reviewExpansions);
@@ -2382,8 +2393,7 @@ export function FormPageContent(props: PageContentProps) {
   // a SmartInput that is then replaced by (for example) SmartNumberInput. Keep the form in one
   // explicit loading state until both record and field contracts are authoritative so values can
   // never live only in a provisional control's local state.
-  const formInteractionReady =
-    mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
+  const formInteractionReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
   // B-003 (DR-20260715-B-003): kind:form previously hard-coded form-section / tabs /
   // custom / form-buttons / sub-table and silently dropped every other top-level block —
@@ -2519,6 +2529,7 @@ export function FormPageContent(props: PageContentProps) {
                           data-testid={block.id ? `form-toolbar-${block.id}` : 'form-toolbar'}
                         >
                           {buttons.map((button: any) => {
+                            if (!canRenderFormButton(button, hasPermission)) return null;
                             if (
                               button.visibleWhen &&
                               !evaluateCondition(button.visibleWhen, pageContext)
@@ -2842,6 +2853,7 @@ export function FormPageContent(props: PageContentProps) {
                 effectiveButtonBlock.buttons.length > 0 && (
                   <div className="border-border mt-6 flex justify-end space-x-3 border-t pt-6">
                     {effectiveButtonBlock.buttons.map((button: any) => {
+                      if (!canRenderFormButton(button, hasPermission)) return null;
                       // Check button visibility condition
                       if (button.visibleWhen) {
                         const isVisible = evaluateCondition(button.visibleWhen, pageContext);
