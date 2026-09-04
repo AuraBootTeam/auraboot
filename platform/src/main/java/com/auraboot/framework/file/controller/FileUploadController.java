@@ -3,6 +3,8 @@ package com.auraboot.framework.file.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.annotation.CurrentUserId;
+import com.auraboot.framework.audit.entity.AdminEventLog;
+import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.file.constant.StorageType;
@@ -52,6 +54,8 @@ public class FileUploadController {
     private DynamicDataService dynamicDataService;
     @Autowired
     private DataAccessAuthorizationHelper dataAccessAuthorizationHelper;
+    @Autowired
+    private AdminEventLogService adminEventLogService;
     
     /**
      * Single file upload via multipart
@@ -210,6 +214,14 @@ public class FileUploadController {
             Resource resource = new InputStreamResource(stream);
             MediaType contentType = resolveDownloadContentType(fileEntity);
             String dispositionType = isInlineDisplayType(contentType) ? "inline" : "attachment";
+            adminEventLogService.record(AdminEventLog.builder()
+                    .actorUserId(userId)
+                    .actionType("file.download")
+                    .resourceType("file")
+                    .resourcePid(fileId)
+                    .success(true)
+                    .reason("authorized file download")
+                    .build());
             return ResponseEntity.ok()
                     .contentType(contentType)
                     .header(HttpHeaders.CONTENT_DISPOSITION,
