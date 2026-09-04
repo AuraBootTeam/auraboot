@@ -91,6 +91,39 @@ describe('RuntimeFieldRenderer bindState', () => {
     expect(notifyStateChanged).not.toHaveBeenCalled();
   });
 
+  it('localizes top-level placeholder and help text used by DSL filter fields', async () => {
+    let captured: any;
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: (p: any) => {
+        captured = p;
+        return <div data-testid="cl" />;
+      },
+    }));
+    const runtime = buildRuntime({
+      updateField: vi.fn(),
+      updateState: vi.fn(),
+      notifyStateChanged: vi.fn(),
+    });
+    const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
+
+    render(
+      <RuntimeFieldRenderer
+        field={{
+          field: 'qtr_case_title',
+          component: 'SmartInput',
+          placeholder: { 'zh-CN': '搜索调查编号', en: 'Search investigations' },
+          helpText: { 'zh-CN': '输入业务编号', en: 'Enter a business key' },
+        } as any}
+        runtime={runtime}
+      />,
+    );
+    await waitFor(() => expect(captured).toBeTruthy());
+
+    expect(captured.props.placeholder).toBe('搜索调查编号');
+    expect(captured.props.helpText).toBe('输入业务编号');
+  });
+
   it('infers SmartJsonEditor for runtime jsonb fields declared as textarea', async () => {
     let captured: any;
     vi.resetModules();
