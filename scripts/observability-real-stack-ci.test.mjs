@@ -17,6 +17,10 @@ test('real-stack runner proves every observability acceptance surface', () => {
   for (const proof of ['notificationDeduplicated', 'loki-query.json', 'tempo-trace.json', 'grafana-dashboards.json', 'AuraBootAvailabilitySloBurn', 'restart prometheus loki tempo']) {
     assert.ok(runner.includes(proof), proof);
   }
+  for (const port of ['PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
+    assert.match(runner, new RegExp(`AURA_OBS_${port}_PORT`));
+    assert.match(compose, new RegExp(`AURA_OBS_${port}_PORT`));
+  }
   assert.doesNotMatch(runner, /docker compose[^\n]*down|down --volumes/);
 });
 

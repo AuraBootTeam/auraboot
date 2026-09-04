@@ -8,6 +8,14 @@ COMPOSE=(docker compose -f "$PROJECT_ROOT/docker-compose.observability.yml" -p a
 RUN_ID="obs-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 TRACE_ID="$(printf '%032x' "$$")"
 SPAN_ID="$(printf '%016x' "$$")"
+export AURA_OBS_PROMETHEUS_PORT="${AURA_OBS_PROMETHEUS_PORT:-29090}"
+export AURA_OBS_ALERTMANAGER_PORT="${AURA_OBS_ALERTMANAGER_PORT:-29093}"
+export AURA_OBS_CANARY_PORT="${AURA_OBS_CANARY_PORT:-28080}"
+export AURA_OBS_PUSHGATEWAY_PORT="${AURA_OBS_PUSHGATEWAY_PORT:-29091}"
+export AURA_OBS_LOKI_PORT="${AURA_OBS_LOKI_PORT:-23100}"
+export AURA_OBS_TEMPO_PORT="${AURA_OBS_TEMPO_PORT:-23200}"
+export AURA_OBS_ZIPKIN_PORT="${AURA_OBS_ZIPKIN_PORT:-29411}"
+export AURA_OBS_GRAFANA_PORT="${AURA_OBS_GRAFANA_PORT:-23000}"
 mkdir -p "$ARTIFACTS"
 
 invalid() {
@@ -36,16 +44,16 @@ wait_http() {
   done
 }
 
-wait_http prometheus http://127.0.0.1:9090/-/ready
-wait_http alertmanager http://127.0.0.1:19093/-/ready
-wait_http canary-receiver http://127.0.0.1:18080/health
-wait_http pushgateway http://127.0.0.1:19091/-/ready
-wait_http loki http://127.0.0.1:13100/ready
-wait_http tempo http://127.0.0.1:13200/ready
-wait_http grafana http://127.0.0.1:3000/api/health
+wait_http prometheus "http://127.0.0.1:$AURA_OBS_PROMETHEUS_PORT/-/ready"
+wait_http alertmanager "http://127.0.0.1:$AURA_OBS_ALERTMANAGER_PORT/-/ready"
+wait_http canary-receiver "http://127.0.0.1:$AURA_OBS_CANARY_PORT/health"
+wait_http pushgateway "http://127.0.0.1:$AURA_OBS_PUSHGATEWAY_PORT/-/ready"
+wait_http loki "http://127.0.0.1:$AURA_OBS_LOKI_PORT/ready"
+wait_http tempo "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/ready"
+wait_http grafana "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT/api/health"
 
 cat <<METRICS | curl --fail --silent --show-error --data-binary @- \
-  "http://127.0.0.1:19091/metrics/job/auraboot-observability-canary"
+  "http://127.0.0.1:$AURA_OBS_PUSHGATEWAY_PORT/metrics/job/auraboot-observability-canary"
 # TYPE auraboot_observability_canary gauge
 auraboot_observability_canary{run_id="$RUN_ID"} 1
 # TYPE auraboot_sli_availability_ratio gauge
@@ -69,19 +77,19 @@ const line = JSON.stringify({ level: 'ERROR', service: 'auraboot-canary', tenant
 process.stdout.write(JSON.stringify({ streams: [{ stream: { service: 'auraboot-canary', run_id: runId }, values: [[timestamp, line]] }] }));
 NODE
 curl --fail --silent --show-error -H 'Content-Type: application/json' \
-  --data-binary "@$ARTIFACTS/loki-push.json" http://127.0.0.1:13100/loki/api/v1/push
+  --data-binary "@$ARTIFACTS/loki-push.json" "http://127.0.0.1:$AURA_OBS_LOKI_PORT/loki/api/v1/push"
 
 node - "$TRACE_ID" "$SPAN_ID" "$RUN_ID" > "$ARTIFACTS/zipkin-trace.json" <<'NODE'
 const [traceId, spanId, runId] = process.argv.slice(2);
 process.stdout.write(JSON.stringify([{ traceId, id: spanId, name: 'auraboot.observability.canary', timestamp: Date.now() * 1000, duration: 1000, localEndpoint: { serviceName: 'auraboot-canary' }, tags: { runId, tenantId: '990301', userId: '990302' } }]));
 NODE
 curl --fail --silent --show-error -H 'Content-Type: application/json' \
-  --data-binary "@$ARTIFACTS/zipkin-trace.json" http://127.0.0.1:19411/api/v2/spans
+  --data-binary "@$ARTIFACTS/zipkin-trace.json" "http://127.0.0.1:$AURA_OBS_ZIPKIN_PORT/api/v2/spans"
 
 deadline=$((SECONDS + 120))
 while true; do
-  curl --fail --silent --show-error 'http://127.0.0.1:9090/api/v1/alerts' > "$ARTIFACTS/prometheus-alerts.json"
-  curl --fail --silent --show-error 'http://127.0.0.1:18080/events' > "$ARTIFACTS/alert-notifications.json"
+  curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_PROMETHEUS_PORT/api/v1/alerts" > "$ARTIFACTS/prometheus-alerts.json"
+  curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_CANARY_PORT/events" > "$ARTIFACTS/alert-notifications.json"
   if node - "$ARTIFACTS/prometheus-alerts.json" "$ARTIFACTS/alert-notifications.json" "$RUN_ID" <<'NODE'
 const fs = require('node:fs');
 const [alertsPath, eventsPath, runId] = process.argv.slice(2);
@@ -97,12 +105,12 @@ NODE
 done
 
 curl --fail --silent --show-error --get --data-urlencode 'query={service="auraboot-canary"}' \
-  http://127.0.0.1:13100/loki/api/v1/query_range > "$ARTIFACTS/loki-query.json"
-curl --fail --silent --show-error "http://127.0.0.1:13200/api/traces/$TRACE_ID" > "$ARTIFACTS/tempo-trace.json"
+  "http://127.0.0.1:$AURA_OBS_LOKI_PORT/loki/api/v1/query_range" > "$ARTIFACTS/loki-query.json"
+curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/api/traces/$TRACE_ID" > "$ARTIFACTS/tempo-trace.json"
 curl --fail --silent --show-error -u admin:auraboot-observability-ci \
-  http://127.0.0.1:3000/api/datasources > "$ARTIFACTS/grafana-datasources.json"
+  "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT/api/datasources" > "$ARTIFACTS/grafana-datasources.json"
 curl --fail --silent --show-error -u admin:auraboot-observability-ci \
-  'http://127.0.0.1:3000/api/search?type=dash-db' > "$ARTIFACTS/grafana-dashboards.json"
+  "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT/api/search?type=dash-db" > "$ARTIFACTS/grafana-dashboards.json"
 
 node - "$ARTIFACTS" "$RUN_ID" "$TRACE_ID" <<'NODE'
 const fs = require('node:fs');
@@ -123,10 +131,10 @@ NODE
 # Retention is proved across bounded service restarts. The project and volumes remain available
 # for evidence inspection; the CI runtime owner can remove them after its retention TTL.
 "${COMPOSE[@]}" restart prometheus loki tempo
-wait_http prometheus http://127.0.0.1:9090/-/ready
-wait_http loki http://127.0.0.1:13100/ready
-wait_http tempo http://127.0.0.1:13200/ready
+wait_http prometheus "http://127.0.0.1:$AURA_OBS_PROMETHEUS_PORT/-/ready"
+wait_http loki "http://127.0.0.1:$AURA_OBS_LOKI_PORT/ready"
+wait_http tempo "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/ready"
 curl --fail --silent --show-error --get --data-urlencode 'query={service="auraboot-canary"}' \
-  http://127.0.0.1:13100/loki/api/v1/query_range | grep -q "$TRACE_ID"
-curl --fail --silent --show-error "http://127.0.0.1:13200/api/traces/$TRACE_ID" | grep -q "$TRACE_ID"
+  "http://127.0.0.1:$AURA_OBS_LOKI_PORT/loki/api/v1/query_range" | grep -q "$TRACE_ID"
+curl --fail --silent --show-error "http://127.0.0.1:$AURA_OBS_TEMPO_PORT/api/traces/$TRACE_ID" | grep -q "$TRACE_ID"
 printf '[observability-real-stack] PASS run=%s trace=%s artifacts=%s runtime=retained\n' "$RUN_ID" "$TRACE_ID" "$ARTIFACTS"
