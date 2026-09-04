@@ -568,4 +568,18 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     await expect(row).toHaveCount(1);
     await expect(row.first()).toContainText(PROCESS_NAME_A);
   });
+
+  test('UI-4: deployment mode is restored to single before dependent suites', async ({
+    request,
+  }) => {
+    // The workspace-switcher window is over; put the mode back and — critically
+    // for the contract project that depends on this suite — wait out the
+    // backend's 60s SystemConfigService cache here INSIDE a test (full test
+    // timeout applies; afterAll hooks have a much shorter default budget).
+    // While the policy still reads "multi", every admin login issued by other
+    // suites returns a tenant-less JWT (admin belongs to System + Business
+    // tenants) and 401s — this wait guarantees the next project starts clean.
+    await setSystemMode('single');
+    await waitForDeploymentMode(request, 'single');
+  });
 });

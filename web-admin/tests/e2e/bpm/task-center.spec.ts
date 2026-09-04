@@ -90,7 +90,7 @@ async function gotoTaskCenter(page: import('@playwright/test').Page) {
 /** Check if task table has rows (returns true if task name buttons exist) */
 async function hasTaskRows(page: import('@playwright/test').Page): Promise<boolean> {
   return page
-    .locator('table button.text-blue-600')
+    .locator('table button.text-accent')
     .first()
     .waitFor({ state: 'visible', timeout: 3000 })
     .then(() => true)
@@ -379,7 +379,7 @@ test.describe('BPM Task Center', () => {
       test.skip(true, 'No tasks available to test detail navigation in current environment');
     }
 
-    const taskLinks = page.locator('table button.text-blue-600');
+    const taskLinks = page.locator('table button.text-accent');
 
     // Click first task name to navigate to detail page
     await taskLinks.first().click();
@@ -835,7 +835,7 @@ test.describe('BPM Task Center', () => {
       throw new Error('No tasks available');
     }
 
-    const taskLinks = page.locator('table button.text-blue-600');
+    const taskLinks = page.locator('table button.text-accent');
 
     await taskLinks.first().click();
     await page.waitForURL(/\/p\/.+\/view\/|\/bpm\/process-status/, { timeout: 10_000 });

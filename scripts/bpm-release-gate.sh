@@ -104,9 +104,15 @@ run_suite() {
         } | strip_ansi | tee "$log" | tail -4
     ) || true
     SUITE_EXIT="$(grep -E '^SUITE_EXIT=[0-9]+$' "$log" | tail -1 | cut -d= -f2)"
-    S_PASSED="$(grep -cE "✓.*\\[$project\\]" "$log" || true)"
-    S_FAILED="$(grep -cE "✘.*\\[$project\\]" "$log" || true)"
-    grep -E "^[[:space:]]*-[[:space:]]+[0-9]+.*\\[$project\\]" "$log" > "$EVIDENCE_DIR/notrun-$name.txt" || true
+    # bpm-api 跑两个 project:bpm-isolation(串行前置,全局改 system.mode)
+    # + contract 主体;两者都计入 passed/failed/not-run。
+    local marker="\\[$project\\]"
+    if [ "$project" = "contract" ]; then
+        marker="\\[(contract|bpm-isolation)\\]"
+    fi
+    S_PASSED="$(grep -cE "✓.*$marker" "$log" || true)"
+    S_FAILED="$(grep -cE "✘.*$marker" "$log" || true)"
+    grep -E "^[[:space:]]*-[[:space:]]+[0-9]+.*$marker" "$log" > "$EVIDENCE_DIR/notrun-$name.txt" || true
     S_NOTRUN="$(wc -l < "$EVIDENCE_DIR/notrun-$name.txt" | tr -d ' ')"
     echo -e "   ${GREEN}$name: passed=$S_PASSED failed=$S_FAILED not_run=$S_NOTRUN exit=${SUITE_EXIT}${NC}"
 }
