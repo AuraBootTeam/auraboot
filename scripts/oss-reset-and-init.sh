@@ -466,6 +466,7 @@ aura_reset_assert_port_available "backend" "$BE_PORT"
 BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env \
     SERVER_PORT="$BE_PORT" \
     DATABASE_URL="jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DB}?charSet=UTF8" \
+    AURA_SSRF_ALLOWED_PRIVATE_HOSTS="127.0.0.1,localhost" \
     java -jar "$BOOT_JAR")"
 aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "java -jar"
 

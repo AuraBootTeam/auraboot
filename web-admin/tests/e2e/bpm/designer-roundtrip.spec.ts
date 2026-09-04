@@ -208,11 +208,14 @@ async function openDesignerFromList(page: Page, pid: string, processKey: string)
   const row = page.locator('main table tbody tr').filter({ hasText: processKey }).first();
   await row.waitFor({ state: 'visible', timeout: 10_000 });
 
-  // The page DSL sets onRowClick=navigate with detailUrl=/bpmn-designer?pid={pid}
-  // (see plugins/platform-admin/config/pages.json bpm_process_management_list).
-  // Click the processKey cell to trigger that navigation. Navigation is racy
-  // because the DSL re-renders the row after search — wait for URL to actually
-  // change, with one retry on the row click if the first click was absorbed.
+  // The page DSL sets onRowClick=navigate with
+  // detailUrl=/p/bpm_process_management/edit/{pid} (the definition config
+  // page — see plugins/platform-admin/config/pages.json). That page carries
+  // an "open_bpmn_designer" toolbar button to reach /bpmn-designer?pid={pid}.
+  // Click the processKey cell to trigger the row navigation. Navigation is
+  // racy because the DSL re-renders the row after search — wait for URL to
+  // actually change, with one retry on the row click if the first click was
+  // absorbed.
   const processKeyCell = row
     .locator('td')
     .filter({ hasText: processKey })
@@ -220,15 +223,23 @@ async function openDesignerFromList(page: Page, pid: string, processKey: string)
   await processKeyCell.waitFor({ state: 'visible', timeout: 8_000 });
   await processKeyCell.click();
 
+  const openDesignerButton = page
+    .locator('[data-testid="toolbar-btn-open_bpmn_designer"]')
+    .first();
   try {
-    await page.waitForURL(/bpmn-designer/, { timeout: 8_000 });
+    await page.waitForURL(/bpm_process_management\/edit\//, { timeout: 8_000 });
   } catch {
     // First click was absorbed (search filter still applying) — retry once.
     const row2 = page.locator('main table tbody tr').filter({ hasText: processKey }).first();
     await row2.waitFor({ state: 'visible', timeout: 5_000 });
     await row2.locator('td').filter({ hasText: processKey }).first().click();
-    await page.waitForURL(/bpmn-designer/, { timeout: 10_000 });
+    await page.waitForURL(/bpm_process_management\/edit\//, { timeout: 10_000 });
   }
+  await openDesignerButton.waitFor({ state: 'visible', timeout: 8_000 });
+  await Promise.all([
+    page.waitForURL(/bpmn-designer/, { timeout: 10_000 }),
+    openDesignerButton.click(),
+  ]);
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __bpmnDesignerStore?: unknown }).__bpmnDesignerStore),

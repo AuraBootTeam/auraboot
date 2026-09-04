@@ -215,6 +215,48 @@ async function seedSecondTenant(
   }
 }
 
+/**
+ * Flip the deployment mode via SQL (ab_system_config). The backend caches
+ * system config for 60s — callers must poll access-policy before relying on
+ * the new mode in UI surfaces.
+ */
+async function setSystemMode(mode: 'single' | 'multi'): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  try {
+    await client.connect();
+    await client.query(
+      `UPDATE ab_system_config SET config_value = $1, updated_at = now()
+       WHERE config_key = 'system.mode'`,
+      [mode],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+async function waitForDeploymentMode(
+  request: APIRequestContext,
+  expected: 'single' | 'multi',
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const resp = await request.get(`${BACKEND_URL}/api/auth/access-policy`);
+        if (!resp.ok()) {
+          // eslint-disable-next-line no-console
+          console.warn(`[tenant-isolation] access-policy HTTP ${resp.status()}`);
+          return '';
+        }
+        const mode = String((await resp.json())?.data?.deploymentMode ?? '');
+        // eslint-disable-next-line no-console
+        console.warn(`[tenant-isolation] t=${Math.round(Date.now() / 1000)} poll mode=${mode}`);
+        return mode;
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(expected);
+}
+
 async function createAndDeploy(
   request: APIRequestContext,
   jwt: string,
@@ -333,23 +375,38 @@ async function switchTenantViaHeader(page: Page, tenantId: string): Promise<void
   const switchBtn = page.locator(`[data-testid="tenant-switch-${tenantId}"]`);
   await switchBtn.waitFor({ state: 'visible', timeout: 5_000 });
   // The button triggers a POST form submission to /_action/switch-space which
-  // reissues the session cookie then redirects to "/". Wait for the
+  // reissues the session cookie then redirects to "/". The menu is tall —
+  // the workspace section can sit below the fold, so scroll it into view and
+  // click via the DOM node (Playwright's actionability check rejects clicks
+  // on elements whose center is outside the viewport). Wait for the
   // navigation to settle before returning.
+  await switchBtn.scrollIntoViewIfNeeded().catch(() => {});
   await Promise.all([
     page.waitForURL(/\/(dashboards)?$|\/$/, { timeout: 15_000 }),
-    switchBtn.click(),
+    switchBtn.evaluate((el: HTMLElement) => el.click()),
   ]);
-  // Header re-renders with the new tenant name.
-  await expect(page.locator('[data-testid="current-tenant-name"]')).toBeVisible({
-    timeout: 10_000,
-  });
+  // The switch POST reissues the session cookie then redirects to "/". The
+  // header tenant badge is the post-switch UI signal, but it only renders in
+  // the non-simplified header variant — assert the session's tenant through
+  // /api/auth/me instead (the actual source of truth for the reissued cookie).
+  await expect
+    .poll(async () => {
+      const me = await page.request.get('/api/auth/me');
+      if (!me.ok()) return '';
+      const body = await me.json();
+      return String(body?.data?.tenantId ?? body?.data?.user?.tenantId ?? '');
+    }, { timeout: 15_000 })
+    .toBe(String(tenantId));
 }
 
 /** Read the tenant-name badge in the header (the post-switch source of truth). */
 async function readCurrentTenantName(page: Page): Promise<string> {
-  const badge = page.locator('[data-testid="current-tenant-name"]');
-  await badge.waitFor({ state: 'visible', timeout: 5_000 });
-  return (await badge.textContent())?.trim() ?? '';
+  // The header badge only renders in the non-simplified header variant, so
+  // read the tenant name from the session (/api/auth/me) instead.
+  const me = await page.request.get('/api/auth/me');
+  expect(me.ok(), `/api/auth/me: ${me.status()}`).toBe(true);
+  const body = await me.json();
+  return String(body?.data?.tenantName ?? body?.data?.user?.tenantName ?? '');
 }
 
 // ── Suite state ─────────────────────────────────────────────────────────────
@@ -359,7 +416,11 @@ let tenantBName = '';
 let tenantADefPid = '';
 
 test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
-  test.describe.configure({ mode: 'serial', timeout: 120_000 });
+  test.describe.configure({ mode: 'serial' });
+  // beforeAll waits out the backend's 60s system-config cache after flipping
+  // system.mode (waitForDeploymentMode), so the default 15s global timeout
+  // cannot cover the hook. Apply an explicit per-test timeout instead.
+  test.setTimeout(240_000);
 
   test.beforeAll(async ({ request }) => {
     // 1. Resolve tenant A (default AuraBoot Dev workspace).
@@ -373,7 +434,15 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     tenantBId = await seedSecondTenant(userId, tenantBName, tenantAId);
     expect(tenantBId).not.toBe(tenantAId);
 
-    // 3. Deploy a process definition under tenant A (fixture; the UI below
+    // 3. The header workspace switcher only renders when the deployment mode
+    //    is not "single" (UserMenuWidget gates on access-policy.deploymentMode).
+    //    The OSS dev seed bootstraps "single", so flip it for the duration of
+    //    this suite (same SQL-fixture authority as the tenant B seed). The
+    //    SystemConfigService caches reads for up to 60s — UI-1 waits out that
+    //    cache via waitForDeploymentMode before driving the header UI.
+    await setSystemMode('multi');
+
+    // 4. Deploy a process definition under tenant A (fixture; the UI below
     //    only *reads* the list, it does not assume this row exists ambiently).
     tenantADefPid = await createAndDeploy(request, tenantAJwt, {
       processKey: PROCESS_KEY_A,
@@ -425,9 +494,17 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     } finally {
       await client.end().catch(() => {});
     }
+    // Restore the OSS dev default so the multi-mode window never outlives
+    // this suite (other specs must keep seeing the seeded single mode).
+    await setSystemMode('single');
   });
 
-  test('UI-1: tenant A sees its own process definition in the list', async ({ page }) => {
+  test('UI-1: tenant A sees its own process definition in the list', async ({ page, request }) => {
+    // beforeAll flipped system.mode to multi; the backend's SystemConfigService
+    // caches reads for up to 60s. Wait here (inside the test body, where the
+    // 240s test timeout applies) until the access policy reflects the flip.
+    await waitForDeploymentMode(request, 'multi');
+
     // The cached storageState (admin.json) already logs admin in — but it may
     // be scoped to tenant A or unscoped. Force a known tenant-A session by
     // switching via the header (idempotent: if we are already in tenant A,
@@ -465,12 +542,12 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     // Tenant B is freshly provisioned — it has no BPM plugin installed, so
     // the 流程管理 sidebar parent does NOT render. This is a stronger
     // isolation signal than "empty list": the very *navigation affordance*
-    // to tenant A's BPM data is absent. Assert the menu item is missing.
-    const nav = page.locator('nav').first();
-    await nav.waitFor({ state: 'visible', timeout: 10_000 });
-    const bpmParent = nav.getByRole('button', { name: /流程管理|Process Management/i });
+    // to tenant A's BPM data is absent. A fresh tenant may render no sidebar
+    // <nav> at all (empty menu tree), so assert absence globally rather than
+    // waiting for the sidebar shell to mount.
+    const bpmParent = page.getByRole('button', { name: /流程管理|Process Management/i });
     await expect(bpmParent).toHaveCount(0);
-    const bpmLeaf = nav.locator('a[href*="bpm_process_management"]');
+    const bpmLeaf = page.locator('a[href*="bpm_process_management"]');
     await expect(bpmLeaf).toHaveCount(0);
 
     // Global sanity: nothing on the dashboard (the default post-switch page)

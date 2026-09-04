@@ -683,10 +683,11 @@ test.describe('BPM Task Center', () => {
     await moreButtons.first().click();
     const menu = page.locator('.absolute.right-0.z-10');
 
-    // Urge button should be present with orange text
+    // Urge button should be present with warning-amber text (design-system
+    // status token — raw tailwind palette classes were migrated).
     const urgeBtn = menu.locator('button:has-text("催办")');
     await expect(urgeBtn).toBeVisible();
-    await expect(urgeBtn).toHaveClass(/text-orange-600/);
+    await expect(urgeBtn).toHaveClass(/text-status-amber/);
 
     // Click urge - should trigger toast (success or warning if no assignee)
     await urgeBtn.click();
@@ -781,12 +782,12 @@ test.describe('BPM Task Center', () => {
     // Priority column header should exist
     await expect(page.locator('th:has-text("优先级")')).toBeVisible();
 
-    // Priority badges use specific colors:
-    // high: bg-red-100 text-red-700 "高"
-    // medium: bg-yellow-100 text-yellow-700 "中"
-    // low: bg-green-100 text-green-700 "低"
+    // Priority badges use design-system status tokens:
+    // high: bg-status-red-bg text-status-red "高"
+    // medium: bg-status-amber-bg text-status-amber "中"
+    // low: bg-status-green-bg text-status-green "低"
     const priorityBadges = page.locator(
-      'table span.bg-red-100, table span.bg-yellow-100, table span.bg-green-100',
+      'table span.bg-status-red-bg, table span.bg-status-amber-bg, table span.bg-status-green-bg',
     );
     const badgeCount = await priorityBadges.count();
 
@@ -794,7 +795,7 @@ test.describe('BPM Task Center', () => {
     if (badgeCount > 0) {
       const firstBadge = priorityBadges.first();
       const classList = await firstBadge.getAttribute('class');
-      expect(classList).toMatch(/bg-(red|yellow|green)-100/);
+      expect(classList).toMatch(/bg-status-(red|amber|green)-bg/);
     }
   });
 

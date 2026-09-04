@@ -442,10 +442,12 @@ test.describe('BPMN Designer — Deep Interaction', () => {
     // Navigate away to list first (proves data was truly persisted)
     await navigateToProcessDefinitionList(page);
 
-    // Find our process row in the list by name, then click Edit to reopen in designer
+    // Reopen in the designer via the row's open_bpmn_designer action — the
+    // list DSL no longer carries an "edit" rowAction code (row click now
+    // navigates to the definition config page instead).
     const row = await findRowInPaginatedList(page, PROCESS_NAME);
     expect(row, `Row with name "${PROCESS_NAME}" must be found in list`).toBeTruthy();
-    await clickRowActionByLocator(page, row!, 'edit');
+    await clickRowActionByLocator(page, row!, 'open_bpmn_designer');
 
     // Wait for designer page to load with pid param
     await page.waitForURL(/bpmn-designer.*pid=/, { timeout: 10_000 });
