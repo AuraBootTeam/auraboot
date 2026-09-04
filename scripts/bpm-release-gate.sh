@@ -9,11 +9,10 @@
 #   P2 冒烟   — tests/e2e/bpm-smoke/                    (硬门)
 #   P3 旅程   — tests/e2e/bpm-showcase/  @oss 20 用例    (硬门)
 #   P4 设计器 — tests/e2e/bpm-designer/ 顶层 spec        (硬门)
-#   P5 契约   — tests/e2e/bpm/ (PW_PROFILE=contract)    (advisory:如实上报,不拦发布;
-#                                                          首轮实测 28 failed,收敛后升硬门)
+#   P5 契约   — tests/e2e/bpm/ (PW_PROFILE=contract)    (硬门,2026-09-05 升级;
+#                                                          首轮实测 28 failed,五轮收敛全绿)
 #
-# 判定:硬门(P1-P4)任一失败,或出现未在 pins 清单登记的 skip → exit 非零;
-#       P5 结果原样写入结论行,供发布决策者直视。
+# 判定:硬门(P1-P5)任一失败,或出现未在 pins 清单登记的 skip → exit 非零。
 #
 # 用法:
 #   ./scripts/bpm-release-gate.sh                    # 全量:重建环境 + 三层硬门
@@ -173,7 +172,7 @@ done
 [ "$STORAGE_STATE" = "present" ] || die "P1: storage state 缺失(需先跑一次含 Step 6 的 reset)"
 echo -e "${GREEN}   P1 environment gate PASS${NC}"
 
-# ============ P2-P4 硬门 / P5 advisory ============
+# ============ P2-P5 硬门 ============
 HARD_FAILED_TIERS=0
 HARD_PASSED=0
 HARD_TOTAL=0
@@ -204,13 +203,20 @@ if want_suite designer; then
     tier_result "designer" "$EVIDENCE_DIR/suite-designer.log" "oss"
 fi
 
-ADVISORY_LINE="l5=advisory:not-run"
+L5_LINE="l5=hard:not-run"
 if want_suite bpm-api; then
-    # advisory 层:contract profile 的 bpm/ 契约套件。失败不拦门禁,但必须原样进结论
-    #(首轮实测:214 用例 / 85 passed / 28 failed / 10 skipped / 91 did not run;
-    # 失败聚类与收敛计划见验收矩阵 §5/§8,收敛完成后本层升硬门。)
+    # 硬门层(2026-09-05 升级):contract profile 的 bpm/ 契约套件,失败与
+    # 未登记 not-run 一律拦门禁。历史:首轮 214 用例 / 28 failed(见验收矩阵
+    # §5/§8);经 5 轮收敛(产品修复 #1809/#1812 + 契约修复)全绿后升硬。
+    # bpm-api 跑 bpm-isolation + contract 两个 project(run_suite 已合并计数)。
     run_suite "bpm-api" playwright.config.ts contract "e2e/bpm/" contract
-    ADVISORY_LINE="l5=advisory:passed=$S_PASSED failed=$S_FAILED not_run=$S_NOTRUN exit=$SUITE_EXIT"
+    L5_LINE="l5=hard:passed=$S_PASSED failed=$S_FAILED not_run=$S_NOTRUN exit=$SUITE_EXIT"
+    if [ "$SUITE_EXIT" != "0" ] || [ "$S_FAILED" != "0" ]; then
+        HARD_FAILED_TIERS=$((HARD_FAILED_TIERS+1))
+    fi
+    HARD_PASSED=$((HARD_PASSED+S_PASSED))
+    HARD_TOTAL=$((HARD_TOTAL+S_PASSED+S_FAILED+S_NOTRUN))
+    grep -E "^[[:space:]]*-[[:space:]]+[0-9]+.*\[(contract|bpm-isolation)\]" "$EVIDENCE_DIR/suite-bpm-api.log" >> "$NOTRUN_ALL" || true
 fi
 
 # ============ pins 对账:硬门 not-run 必须有主(或归因于同文件失败的 serial 级联) ============
@@ -219,9 +225,9 @@ CASCADE=0
 if [ -s "$NOTRUN_ALL" ]; then
     phase "Pins 对账(硬门 not-run 必须登记或为失败级联)"
     FAILED_FILES=""
-    for f in "$EVIDENCE_DIR"/suite-smoke.log "$EVIDENCE_DIR"/suite-showcase.log "$EVIDENCE_DIR"/suite-designer.log; do
+    for f in "$EVIDENCE_DIR"/suite-smoke.log "$EVIDENCE_DIR"/suite-showcase.log "$EVIDENCE_DIR"/suite-designer.log "$EVIDENCE_DIR"/suite-bpm-api.log; do
         [ -f "$f" ] || continue
-        FAILED_FILES="$FAILED_FILES$(grep -E "✘.*\\[(oss|contract)\\]" "$f" 2>/dev/null | grep -oE "tests/e2e/[^ ]+\.spec\.ts" || true)"
+        FAILED_FILES="$FAILED_FILES$(grep -E "✘.*\[(oss|contract|bpm-isolation)\]" "$f" 2>/dev/null | grep -oE "tests/e2e/[^ ]+\.spec\.ts" || true)"
     done
     FAILED_FILES="$(echo "$FAILED_FILES" | sort -u)"
     while IFS= read -r line; do
@@ -256,13 +262,13 @@ fi
 
 # ============ 结论 ============
 OSS_MAIN="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
-GATE_LINE="bpm-release-gate | label=$GATE_LABEL | hard: passed=$HARD_PASSED/$HARD_TOTAL failed_tiers=$HARD_FAILED_TIERS unpinned_notrun=$UNPINNED cascade=$CASCADE | $ADVISORY_LINE | oss_main=$OSS_MAIN"
+GATE_LINE="bpm-release-gate | label=$GATE_LABEL | hard: passed=$HARD_PASSED/$HARD_TOTAL failed_tiers=$HARD_FAILED_TIERS unpinned_notrun=$UNPINNED cascade=$CASCADE | $L5_LINE | oss_main=$OSS_MAIN"
 {
     echo "=== BPM RELEASE GATE VERDICT $(date '+%F %T %z') ==="
     echo "$GATE_LINE"
     echo "evidence=$EVIDENCE_DIR"
     if [ "$HARD_FAILED_TIERS" = "0" ]; then
-        echo "VERDICT=PASS(hard tiers green; advisory tier 见上行)"
+        echo "VERDICT=PASS(hard tiers green,含 L5 契约层)"
     else
         echo "VERDICT=FAIL($HARD_FAILED_TIERS 个硬门层失败/违规)"
     fi
