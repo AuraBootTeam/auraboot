@@ -97,6 +97,40 @@ class QueryBuilderKeywordSearchTest {
     }
 
     @Test
+    @DisplayName("explicit searchable reference fields match their stored reference value")
+    void explicitSearchableReferenceFieldsAreCastToText() {
+        ModelDefinition model = ModelDefinition.builder()
+            .code("material_consumption")
+            .tableName("mt_material_consumption")
+            .fields(List.of(
+                FieldDefinition.builder()
+                    .code("work_order_id")
+                    .columnName("work_order_id")
+                    .dataType("reference")
+                    .searchable(true)
+                    .build(),
+                FieldDefinition.builder()
+                    .code("fact_type")
+                    .columnName("fact_type")
+                    .dataType("enum")
+                    .searchable(true)
+                    .build()
+            ))
+            .build();
+
+        QueryBuilderService.QueryBuilder query = queryBuilderService.buildConditionQuery(model, List.of());
+        queryBuilderService.buildKeywordSearch(query, "01M1NBEGMV70BXDW6T7DNWHE9X", model);
+
+        String sql = query.getSql().toLowerCase(Locale.ROOT);
+        assertTrue(sql.contains("cast(work_order_id as text) ilike"), sql);
+        assertTrue(sql.contains("fact_type ilike"), sql);
+        assertEquals(
+            List.of("%01M1NBEGMV70BXDW6T7DNWHE9X%", "%01M1NBEGMV70BXDW6T7DNWHE9X%"),
+            query.getParameters()
+        );
+    }
+
+    @Test
     @DisplayName("text-declared field whose PHYSICAL column is JSONB is CAST to text (robust defense)")
     void textDeclaredButPhysicallyJsonbIsCast() {
         // Defense-in-depth: a global field code can be jsonb in one table and text in
