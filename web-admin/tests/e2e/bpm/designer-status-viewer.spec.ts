@@ -159,7 +159,7 @@ async function openStatusViewerFromList(
   // Click the row "..." menu and pick 查看详情
   const moreBtn = row.locator('button').filter({ has: page.locator('svg') }).last();
   await moreBtn.click();
-  const menu = page.locator('.shadow-lg.ring-1').first();
+  const menu = page.locator('.shadow-pop, [class*="shadow-pop"], [role="menu"]').first();
   await expect(menu).toBeVisible({ timeout: 5_000 });
   const viewBtn = menu.locator('button').filter({ hasText: /查看详情/ }).first();
   await expect(viewBtn).toBeVisible({ timeout: 3_000 });
