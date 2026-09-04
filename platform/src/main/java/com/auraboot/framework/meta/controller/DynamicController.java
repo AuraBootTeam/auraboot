@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.DictItemService;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.NamedQueryService;
@@ -71,6 +72,9 @@ public class DynamicController {
 
     @Autowired
     private DictService dictService;
+
+    @Autowired
+    private DictItemService dictItemService;
 
     @Autowired
     private NamedQueryService namedQueryService;
@@ -1234,6 +1238,54 @@ public class DynamicController {
     }
 
     /**
+     * Resolve a dict code into mobile-consumable options. Primary source is
+     * the enabled dict-item table (items live outside the dict row); falls
+     * back to the inline bean payload when the dict row carries one.
+     */
+    private List<Map<String, Object>> resolveDictItems(String dictCode) {
+        DictDTO dict = dictService.findByCode(dictCode);
+        if (dict == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> options = new ArrayList<>();
+        List<com.auraboot.framework.meta.dto.DictItemDTO> items =
+                dict.getPid() != null ? dictItemService.findByDictAndStatus(dict.getPid(), "enabled") : null;
+        if (items != null) {
+            for (com.auraboot.framework.meta.dto.DictItemDTO item : items) {
+                String value = item.getValue();
+                if (value == null) {
+                    continue;
+                }
+                Map<String, Object> option = new LinkedHashMap<>();
+                option.put("value", value);
+                option.put("label", item.getLabel() != null ? item.getLabel() : value);
+                if (item.getSortNo() != null) {
+                    option.put("sortNo", item.getSortNo());
+                }
+                options.add(option);
+            }
+            return options;
+        }
+        if (dict.getItems() == null) {
+            return options;
+        }
+        for (com.auraboot.framework.meta.entity.payload.DataSourceItemBean item : dict.getItems()) {
+            Object value = item.getValue() != null ? item.getValue() : item.getCode();
+            if (value == null) {
+                continue;
+            }
+            Map<String, Object> option = new LinkedHashMap<>();
+            option.put("value", String.valueOf(value));
+            option.put("label", item.getLabel() != null ? item.getLabel() : String.valueOf(value));
+            if (item.getOrder() != null) {
+                option.put("sortNo", item.getOrder());
+            }
+            options.add(option);
+        }
+        return options;
+    }
+
+    /**
      * Inline static-dict options for fields bound via dictCode so rendering
      * clients (mobile offline forms) get selectable options without a second
      * dict round-trip. Fields that already carry options are left untouched;
@@ -1249,24 +1301,7 @@ public class DynamicController {
                 continue;
             }
             try {
-                DictDTO dict = dictService.findByCode(dictCode);
-                if (dict == null || dict.getItems() == null) {
-                    continue;
-                }
-                List<Map<String, Object>> options = new ArrayList<>();
-                for (com.auraboot.framework.meta.entity.payload.DataSourceItemBean item : dict.getItems()) {
-                    Object value = item.getValue() != null ? item.getValue() : item.getCode();
-                    if (value == null) {
-                        continue;
-                    }
-                    Map<String, Object> option = new LinkedHashMap<>();
-                    option.put("value", String.valueOf(value));
-                    option.put("label", item.getLabel() != null ? item.getLabel() : String.valueOf(value));
-                    if (item.getOrder() != null) {
-                        option.put("sortNo", item.getOrder());
-                    }
-                    options.add(option);
-                }
+                List<Map<String, Object>> options = resolveDictItems(dictCode);
                 if (!options.isEmpty()) {
                     field.setOptions(options);
                 }
