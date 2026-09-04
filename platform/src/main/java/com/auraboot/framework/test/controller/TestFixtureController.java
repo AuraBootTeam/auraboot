@@ -435,9 +435,14 @@ public class TestFixtureController {
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
-                record.put("e2et_order_status", "draft");
-                record.putAll(extraFields);
+                if (extraFields.isEmpty()) {
+                    record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
+                    record.put("e2et_order_status", "draft");
+                } else {
+                    // Non-order model: only caller-supplied fields — unknown
+                    // columns would fail dynamic-create validation.
+                    record.putAll(extraFields);
+                }
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
                     recordPids.add(pid);
