@@ -1517,20 +1517,6 @@
       "type": "grid",
       "cols": 12
     },
-    "defaultView": "table",
-    "views": [
-      "table",
-      "kanban",
-      "gallery"
-    ],
-    "kanbanConfig": {
-      "groupByField": "e2et_zoo_select",
-      "titleField": "e2et_zoo_name"
-    },
-    "galleryConfig": {
-      "titleField": "e2et_zoo_name",
-      "imageField": "e2et_zoo_photo"
-    },
     "blocks": [
       {
         "id": "block_zoo_filter",
@@ -1591,7 +1577,23 @@
           }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "defaultView": "table",
+      "views": [
+        "table",
+        "kanban",
+        "gallery"
+      ],
+      "kanbanConfig": {
+        "groupByField": "e2et_zoo_select",
+        "titleField": "e2et_zoo_name"
+      },
+      "galleryConfig": {
+        "titleField": "e2et_zoo_name",
+        "imageField": "e2et_zoo_photo"
+      }
+    }
   },
   {
     "pageKey": "e2et_field_zoo_form",
