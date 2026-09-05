@@ -11,7 +11,7 @@
  *   SN         → purple
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -36,6 +36,8 @@ export interface TraceNode {
   id: string;
   label: string;
   nodeType: 'WORK_ORDER' | 'LOT' | 'COMPONENT' | 'SN' | string;
+  /** Already-authorized datasource fields to show when the node is selected. */
+  details?: Record<string, unknown>;
 }
 
 export interface TraceEdge {
@@ -67,6 +69,21 @@ function getNodeColors(nodeType: string) {
   return NODE_TYPE_COLORS[nodeType.toUpperCase()] ?? DEFAULT_NODE_COLOR;
 }
 
+const TRACE_DETAIL_LABELS: Record<string, string> = {
+  unit_pid: 'Trace unit PID',
+  kind: 'Trace unit type',
+  material_ref: 'Material',
+  quantity: 'Quantity',
+  uom: 'Unit of measure',
+  depth: 'Graph depth',
+};
+
+function traceDetailLabel(key: string): string {
+  return TRACE_DETAIL_LABELS[key] ?? key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // Custom node renderer
 // ---------------------------------------------------------------------------
@@ -74,6 +91,7 @@ function getNodeColors(nodeType: string) {
 interface TraceNodeData extends Record<string, unknown> {
   label: string;
   nodeType: string;
+  details?: Record<string, unknown>;
 }
 
 function TraceNodeRenderer({ id, data }: NodeProps) {
@@ -84,7 +102,7 @@ function TraceNodeRenderer({ id, data }: NodeProps) {
     <div
       data-testid={`trace-node-${id}`}
       data-node-type={nodeData.nodeType}
-      className={`flex min-w-36 max-w-52 flex-col items-start justify-center rounded border-2 px-3 py-2 text-xs ${bg} ${border} ${text}`}
+      className={`flex max-w-52 min-w-36 flex-col items-start justify-center rounded border-2 px-3 py-2 text-xs ${bg} ${border} ${text}`}
     >
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-gray-400" />
       <span
@@ -92,7 +110,7 @@ function TraceNodeRenderer({ id, data }: NodeProps) {
       >
         {nodeData.nodeType.replace('_', ' ')}
       </span>
-      <span className="truncate font-medium leading-tight">{nodeData.label}</span>
+      <span className="truncate leading-tight font-medium">{nodeData.label}</span>
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !bg-gray-400" />
     </div>
   );
@@ -182,7 +200,7 @@ function buildFlowLayout(
         x: col * (NODE_WIDTH + COL_GAP),
         y: row * (NODE_HEIGHT + ROW_GAP),
       },
-      data: { label: n.label, nodeType: n.nodeType } satisfies TraceNodeData,
+      data: { label: n.label, nodeType: n.nodeType, details: n.details } satisfies TraceNodeData,
     };
   });
 
@@ -223,26 +241,88 @@ function ViewportSync({ nodeCount }: { nodeCount: number }) {
 
 function TraceGraphInner({ nodes: traceNodes, edges: traceEdges }: TraceGraphCanvasProps) {
   const { nodes: flowNodes, edges: flowEdges } = buildFlowLayout(traceNodes, traceEdges);
+  const [selectedNode, setSelectedNode] = useState<LayoutNode | null>(null);
+
+  const detailEntries = Object.entries(selectedNode?.data.details ?? {}).filter(
+    ([, value]) => value !== null && value !== undefined && value !== '',
+  );
 
   return (
-    <ReactFlow
-      nodes={flowNodes}
-      edges={flowEdges}
-      nodeTypes={nodeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      panOnDrag={true}
-      zoomOnScroll={true}
-      minZoom={0.2}
-      maxZoom={2}
-      fitView
-      fitViewOptions={{ padding: 0.2 }}
-    >
-      <ViewportSync nodeCount={flowNodes.length} />
-      <Controls showInteractive={false} />
-      <Background />
-    </ReactFlow>
+    <>
+      <ReactFlow
+        nodes={flowNodes}
+        edges={flowEdges}
+        nodeTypes={nodeTypes}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        onNodeClick={(_event, node) => setSelectedNode(node as LayoutNode)}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        minZoom={0.2}
+        maxZoom={2}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+      >
+        <ViewportSync nodeCount={flowNodes.length} />
+        <Controls showInteractive={false} />
+        <Background />
+      </ReactFlow>
+
+      {selectedNode && (
+        <>
+          <button
+            type="button"
+            aria-label="Close node details"
+            className="absolute inset-0 z-10 cursor-default bg-black/10"
+            onClick={() => setSelectedNode(null)}
+            data-testid="trace-node-details-backdrop"
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="trace-node-details-title"
+            className="absolute inset-y-0 right-0 z-20 flex w-80 max-w-[90%] flex-col border-l border-gray-200 bg-white shadow-xl"
+            data-testid="trace-node-details-drawer"
+          >
+            <header className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                  {selectedNode.data.nodeType.replace('_', ' ')}
+                </div>
+                <h2
+                  id="trace-node-details-title"
+                  className="truncate text-base font-semibold text-gray-900"
+                >
+                  {selectedNode.data.label}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNode(null)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close node details"
+                data-testid="trace-node-details-close"
+              >
+                <span aria-hidden="true" className="text-xl leading-none">
+                  ×
+                </span>
+              </button>
+            </header>
+            <dl className="flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
+              {detailEntries.map(([key, value]) => (
+                <div key={key}>
+                  <dt className="text-xs font-medium text-gray-500">{traceDetailLabel(key)}</dt>
+                  <dd className="mt-0.5 break-words text-gray-900">
+                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
+        </>
+      )}
+    </>
   );
 }
 
@@ -263,7 +343,7 @@ export function TraceGraphCanvas({ nodes, edges }: TraceGraphCanvasProps) {
       // which only resolves against a parent with a *definite* height. A
       // min-height-only parent leaves the pane at 0px → no nodes render (caught
       // by the browser golden; unit tests mock @xyflow/react and miss this).
-      className="h-[420px] w-full overflow-hidden rounded border border-gray-200 bg-white"
+      className="relative h-[420px] w-full overflow-hidden rounded border border-gray-200 bg-white"
     >
       <ReactFlowProvider>
         <TraceGraphInner nodes={nodes} edges={edges} />

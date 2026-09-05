@@ -339,6 +339,19 @@ function stableConfigString(value: unknown): string {
   return JSON.stringify(value ?? null);
 }
 
+/**
+ * Claim the next list-data request and return a guard for state commits.
+ *
+ * List pages can start several requests during mount while a user immediately
+ * searches or changes a view. Network completion order is not intent order, so
+ * only the most recently started request may update data, pagination, errors,
+ * or loading state.
+ */
+export function beginLatestListRequest(sequenceRef: { current: number }): () => boolean {
+  const requestSequence = ++sequenceRef.current;
+  return () => requestSequence === sequenceRef.current;
+}
+
 function isNoopViewConfigPatchEntry(
   key: keyof ViewConfig,
   value: unknown,
@@ -1061,7 +1074,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Search keyword for toolbar search input
   const [keyword, _setKeyword] = useState(urlKeyword);
   const keywordRef = useRef(keyword);
-  const tabRequestSeqRef = useRef(0);
+  const listRequestSeqRef = useRef(0);
 
   // Debounced URL sync for keyword (300ms) — keeps input responsive while
   // reducing URL/history updates during rapid typing
@@ -2028,6 +2041,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
     async (params?: ListLoadDataParams) => {
+      const isLatestRequest = beginLatestListRequest(listRequestSeqRef);
       if (!schema || skipListData) {
         setData([]);
         setError(null);
@@ -2143,6 +2157,8 @@ function ListPageContentInner(props: PageContentProps) {
           token: token || undefined,
         });
 
+        if (!isLatestRequest()) return;
+
         if (ResultHelper.isSuccess(result) && result.data) {
           // Handle both paginated ({ records, total, current }) and flat array responses
           const responseData = result.data;
@@ -2177,11 +2193,14 @@ function ListPageContentInner(props: PageContentProps) {
           setError(result.desc || t('common.loadDataError') || 'Failed to load data');
         }
       } catch (err) {
+        if (!isLatestRequest()) return;
         setError(
           err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
         );
       } finally {
-        setLoading(false);
+        if (isLatestRequest()) {
+          setLoading(false);
+        }
       }
     },
     [
@@ -2350,7 +2369,7 @@ function ListPageContentInner(props: PageContentProps) {
     (tabKey: string) => {
       if (skipListData) return;
       setActiveTab(tabKey);
-      const requestSeq = ++tabRequestSeqRef.current;
+      const isLatestRequest = beginLatestListRequest(listRequestSeqRef);
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
       let tabCondition: ListQueryFilterCondition | null = null;
       if (schema?.blocks) {
@@ -2426,7 +2445,7 @@ function ListPageContentInner(props: PageContentProps) {
             params: queryParams,
             token: token || undefined,
           });
-          if (requestSeq !== tabRequestSeqRef.current) return;
+          if (!isLatestRequest()) return;
           if (ResultHelper.isSuccess(result) && result.data) {
             const responseData = result.data;
             if (Array.isArray(responseData)) {
@@ -2459,12 +2478,12 @@ function ListPageContentInner(props: PageContentProps) {
             setError(result.desc || t('common.loadDataError') || 'Failed to load data');
           }
         } catch (err) {
-          if (requestSeq !== tabRequestSeqRef.current) return;
+          if (!isLatestRequest()) return;
           setError(
             err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
           );
         } finally {
-          if (requestSeq === tabRequestSeqRef.current) {
+          if (isLatestRequest()) {
             setLoading(false);
           }
         }

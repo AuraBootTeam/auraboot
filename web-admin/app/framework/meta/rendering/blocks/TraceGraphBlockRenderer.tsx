@@ -133,6 +133,12 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
           id: workOrderId,
           label: row.work_order_code ?? row.work_order_name ?? workOrderId,
           nodeType: 'WORK_ORDER',
+          details: {
+            work_order_id: workOrderId,
+            work_order_code: row.work_order_code,
+            work_order_name: row.work_order_name,
+            material_id: row.material_id,
+          },
         });
       }
 
@@ -141,6 +147,12 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
           id: lotId,
           label: row.lot_code ?? lotId,
           nodeType: 'LOT',
+          details: {
+            lot_id: lotId,
+            lot_code: row.lot_code,
+            consumed_at: row.consumed_at,
+            qty_consumed: row.qty_consumed,
+          },
         });
       }
 
@@ -165,22 +177,39 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
       return value ? value.toUpperCase() : 'COMPONENT';
     };
     const labelFor = (kind: unknown, materialRef: unknown, pid: string): string =>
-      materialRef != null && String(materialRef).length > 0
-        ? `${String(materialRef)}`
-        : pid;
-    const putNode = (pid: string, kind: unknown, materialRef: unknown) => {
-      if (!pid || nodeMap.has(pid)) return;
+      materialRef != null && String(materialRef).length > 0 ? `${String(materialRef)}` : pid;
+    const putNode = (
+      pid: string,
+      kind: unknown,
+      materialRef: unknown,
+      details: Record<string, unknown>,
+    ) => {
+      if (!pid) return;
+      const existing = nodeMap.get(pid);
+      if (existing) {
+        existing.details = { ...existing.details, ...details };
+        return;
+      }
       nodeMap.set(pid, {
         id: pid,
         label: labelFor(kind, materialRef, pid),
         nodeType: nodeTypeForKind(kind),
+        details,
       });
     };
+    const unitDetails = (row: MnTraceRow, prefix: 'src_' | 'dst_' | '') => ({
+      unit_pid: row[`${prefix}unit_pid`],
+      kind: row[`${prefix}kind`],
+      material_ref: row[`${prefix}material_ref`],
+      quantity: row[`${prefix}quantity`],
+      uom: row[`${prefix}uom`],
+      depth: row[`${prefix}depth`],
+    });
     for (const raw of rows) {
       const row = raw as MnTraceRow;
       if (row.src_unit_pid && row.dst_unit_pid) {
-        putNode(row.src_unit_pid, row.src_kind, row.src_material_ref);
-        putNode(row.dst_unit_pid, row.dst_kind, row.dst_material_ref);
+        putNode(row.src_unit_pid, row.src_kind, row.src_material_ref, unitDetails(row, 'src_'));
+        putNode(row.dst_unit_pid, row.dst_kind, row.dst_material_ref, unitDetails(row, 'dst_'));
         edges.push({
           id: `e-${row.edge_pid ?? `${row.src_unit_pid}->${row.dst_unit_pid}`}-${edges.length}`,
           source: row.src_unit_pid,
@@ -188,7 +217,7 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
           label: row.edge_type ?? undefined,
         });
       } else if (row.unit_pid) {
-        putNode(row.unit_pid, row.kind, row.material_ref);
+        putNode(row.unit_pid, row.kind, row.material_ref, unitDetails(row, ''));
       }
     }
   } else {
@@ -204,6 +233,7 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
           id: finishedSn,
           label: finishedSn,
           nodeType: 'SN',
+          details: { finished_sn: finishedSn },
         });
       }
 
@@ -214,6 +244,11 @@ export function buildTraceGraph(rows: unknown[], mode?: TraceMode): TraceGraph {
             ? `${componentSn} (${row.component_material_name})`
             : componentSn,
           nodeType: 'COMPONENT',
+          details: {
+            component_sn: componentSn,
+            component_material_id: row.component_material_id,
+            component_material_name: row.component_material_name,
+          },
         });
       }
 
@@ -275,7 +310,7 @@ export const TraceGraphBlockRenderer: React.FC<TraceGraphBlockRendererProps> = (
       <div
         role="alert"
         data-testid="trace-graph-error"
-        className="bg-status-red-bg text-status-red rounded border border-status-red p-4 text-sm"
+        className="bg-status-red-bg text-status-red border-status-red rounded border p-4 text-sm"
       >
         {message || 'Failed to load trace data'}
       </div>

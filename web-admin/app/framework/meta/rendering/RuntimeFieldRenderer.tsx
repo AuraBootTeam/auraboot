@@ -276,6 +276,14 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
     () => (field.label ? localizeText(field.label) : undefined),
     [field.label, localizeText],
   );
+  const localizedFieldPlaceholder = useMemo(
+    () => ((field as any).placeholder ? localizeText((field as any).placeholder) : undefined),
+    [field, localizeText],
+  );
+  const localizedFieldHelpText = useMemo(
+    () => ((field as any).helpText ? localizeText((field as any).helpText) : undefined),
+    [field, localizeText],
+  );
 
   const localizedProps = useMemo(() => {
     const props = { ...(field.props || {}) };
@@ -325,6 +333,8 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
     disabled: isDisabled,
     readOnly: isReadOnly,
     required: isRequired,
+    placeholder: localizedFieldPlaceholder,
+    helpText: localizedFieldHelpText,
     context,
     ...localizedProps, // 合并字段配置的其他 props
   };

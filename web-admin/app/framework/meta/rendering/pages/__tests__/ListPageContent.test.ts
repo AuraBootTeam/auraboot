@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   applyLocalSortUpdate,
+  beginLatestListRequest,
   buildListReferenceDisplayCacheKey,
   buildBulkFieldCommandPayload,
   buildViewManageFieldOptions,
@@ -32,6 +33,25 @@ import {
   resolveSavedViewFilterExpressions,
   resolveInitialListTabKey,
 } from '../ListPageContent';
+
+describe('beginLatestListRequest', () => {
+  it('prevents a slower previous response from committing after a newer request starts', () => {
+    const sequenceRef = { current: 0 };
+    const mayCommitInitialLoad = beginLatestListRequest(sequenceRef);
+    const mayCommitKeywordSearch = beginLatestListRequest(sequenceRef);
+
+    expect(mayCommitKeywordSearch()).toBe(true);
+    expect(mayCommitInitialLoad()).toBe(false);
+  });
+
+  it('keeps the current request valid until another request supersedes it', () => {
+    const sequenceRef = { current: 0 };
+    const mayCommit = beginLatestListRequest(sequenceRef);
+
+    expect(mayCommit()).toBe(true);
+    expect(mayCommit()).toBe(true);
+  });
+});
 
 describe('resolveInitialListTabKey', () => {
   it('uses the explicit all tab when the DSL provides one', () => {
