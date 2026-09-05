@@ -722,3 +722,355 @@ describe('ActionRegistry registry API', () => {
     actionRegistry.unregister('__unit_batch_b__');
   });
 });
+
+describe('ActionRegistry router.back / cancel handlers', () => {
+  it('router.back and cancel both navigate back by -1', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('router.back', { navigate });
+    await actionRegistry.execute('cancel', { navigate });
+    expect(navigate).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledWith(-1);
+  });
+
+  it('router.back and cancel log and no-op without navigate', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('router.back', {});
+    await actionRegistry.execute('cancel', {});
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry dataSource handlers', () => {
+  it('dataSource.fetch calls manager.fetch with target and args', async () => {
+    const dataSourceManager = { fetch: vi.fn(), reload: vi.fn() };
+    const args = { target: 'ds_orders', extra: 1 };
+    await actionRegistry.execute('dataSource.fetch', { dataSourceManager, args });
+    expect(dataSourceManager.fetch).toHaveBeenCalledWith('ds_orders', args);
+  });
+
+  it('dataSource.fetch logs and no-ops without a manager or a target', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('dataSource.fetch', {});
+    await actionRegistry.execute('dataSource.fetch', { dataSourceManager: { fetch: vi.fn() } });
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+
+  it('dataSource.reload reloads a single target, an array, and cleans empty entries', async () => {
+    const dataSourceManager = { reload: vi.fn() };
+    await actionRegistry.execute('dataSource.reload', {
+      dataSourceManager,
+      args: { target: 'ds_a' },
+    });
+    expect(dataSourceManager.reload).toHaveBeenCalledWith('ds_a');
+
+    await actionRegistry.execute('dataSource.reload', {
+      dataSourceManager,
+      args: { targets: ['ds_a', '', 'ds_b'] },
+    });
+    expect(dataSourceManager.reload).toHaveBeenCalledWith(['ds_a', 'ds_b']);
+  });
+
+  it('dataSource.reload logs and no-ops without a manager or resolvable targets', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('dataSource.reload', {});
+    await actionRegistry.execute('dataSource.reload', {
+      dataSourceManager: { reload: vi.fn() },
+      args: { id: '' },
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry toast handlers', () => {
+  it('toast.show prefers args.message over args.content and resolves i18n objects', async () => {
+    const showToast = vi.fn();
+    await actionRegistry.execute('toast.show', {
+      showToast,
+      args: { message: { 'zh-CN': '已保存', 'en-US': 'Saved' } },
+    });
+    expect(showToast).toHaveBeenCalledWith('已保存', 'info');
+
+    await actionRegistry.execute('toast.show', {
+      showToast,
+      args: { content: 'plain', level: 'warning' },
+    });
+    expect(showToast).toHaveBeenCalledWith('plain', 'warning');
+  });
+
+  it('toast.success and toast.error default missing messages and force the level', async () => {
+    const showToast = vi.fn();
+    await actionRegistry.execute('toast.success', { showToast, args: {} });
+    expect(showToast).toHaveBeenCalledWith('Operation successful', 'success');
+
+    await actionRegistry.execute('toast.error', { showToast, args: { content: { 'en-US': 'Oops' } } });
+    expect(showToast).toHaveBeenCalledWith('Oops', 'error');
+
+    await actionRegistry.execute('toast.success', { showToast, args: { message: {} } });
+    expect(showToast).toHaveBeenCalledWith('Operation successful', 'success');
+  });
+
+  it('toasts tolerate a missing showToast sink', async () => {
+    await expect(
+      actionRegistry.execute('toast.show', { args: { message: 'hi' } }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('ActionRegistry dialog.form handler', () => {
+  it('stores submitted values into the scoped form state', async () => {
+    const stateManager = { updateForm: vi.fn() };
+    window.addEventListener('dialog:form', (e) => {
+      (e as CustomEvent).detail.onSubmit({ name: 'a', qty: 2 });
+    }, { once: true });
+
+    await actionRegistry.execute('dialog.form', {
+      stateManager,
+      scopeId: 'scope-1',
+      args: { title: 'Add', fields: [{ field: 'name', type: 'input' }] },
+    });
+
+    expect(stateManager.updateForm).toHaveBeenCalledWith('scope-1', 'name', 'a');
+    expect(stateManager.updateForm).toHaveBeenCalledWith('scope-1', 'qty', 2);
+  });
+
+  it('returns silently when the user cancels', async () => {
+    const stateManager = { updateForm: vi.fn() };
+    window.addEventListener('dialog:form', (e) => {
+      (e as CustomEvent).detail.onCancel();
+    }, { once: true });
+
+    await actionRegistry.execute('dialog.form', {
+      stateManager,
+      scopeId: 'scope-1',
+      args: { fields: [{ field: 'name' }] },
+    });
+
+    expect(stateManager.updateForm).not.toHaveBeenCalled();
+  });
+
+  it('logs and no-ops without fields in args', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('dialog.form', { args: {} });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry event.emit / noop handlers', () => {
+  it('event.emit dispatches a CustomEvent with args as detail', () => {
+    const listener = vi.fn();
+    window.addEventListener('menu:refresh', listener);
+    try {
+      actionRegistry.execute('event.emit', { args: { event: 'menu:refresh', extra: 1 } });
+      expect(listener).toHaveBeenCalledTimes(1);
+      const detail = listener.mock.calls[0][0].detail;
+      expect(detail.event).toBe('menu:refresh');
+      expect(detail.extra).toBe(1);
+    } finally {
+      window.removeEventListener('menu:refresh', listener);
+    }
+  });
+
+  it('event.emit logs and no-ops without an event name', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    actionRegistry.execute('event.emit', { args: {} });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('noop resolves without touching anything', async () => {
+    await expect(actionRegistry.execute('noop', {})).resolves.toBeUndefined();
+  });
+});
+
+describe('ActionRegistry form.reset / state.set handlers', () => {
+  it('form.reset resets the scoped form', async () => {
+    const stateManager = { resetForm: vi.fn() };
+    await actionRegistry.execute('form.reset', { stateManager, scopeId: 's1' });
+    expect(stateManager.resetForm).toHaveBeenCalledWith('s1');
+  });
+
+  it('form.reset logs and no-ops without stateManager or scopeId', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('form.reset', {});
+    await actionRegistry.execute('form.reset', { stateManager: { resetForm: vi.fn() } });
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+
+  it('state.set writes every args entry into the scoped state', async () => {
+    const stateManager = { updateState: vi.fn() };
+    await actionRegistry.execute('state.set', {
+      stateManager,
+      scopeId: 's1',
+      args: { mode: 'compact', page: 2 },
+    });
+    expect(stateManager.updateState).toHaveBeenCalledWith('s1', 'mode', 'compact');
+    expect(stateManager.updateState).toHaveBeenCalledWith('s1', 'page', 2);
+  });
+
+  it('state.set logs and no-ops without stateManager, scopeId, or args', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('state.set', {});
+    await actionRegistry.execute('state.set', { stateManager: { updateState: vi.fn() } });
+    await actionRegistry.execute('state.set', { stateManager: { updateState: vi.fn() }, scopeId: 's1' });
+    expect(spy).toHaveBeenCalledTimes(3);
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry form.validate handler', () => {
+  const makeState = (form: Record<string, unknown>) => ({
+    getContext: vi.fn(() => ({ form })),
+  });
+
+  it('passes when no field carries validation rules', async () => {
+    await expect(
+      actionRegistry.execute('form.validate', {
+        stateManager: makeState({ name: 'x' }),
+        scopeId: 's1',
+        args: { fields: [{ field: 'name' }] },
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('collects the first failing rule per field, toasts, and throws', async () => {
+    const showToast = vi.fn();
+    await expect(
+      actionRegistry.execute('form.validate', {
+        stateManager: makeState({ name: '', email: 'not-an-email' }),
+        scopeId: 's1',
+        showToast,
+        args: {
+          fields: [
+            { field: 'name', label: 'Name', validation: [{ type: 'required', message: 'Name is required' }] },
+            { field: 'email', validation: [{ type: 'email', message: 'Bad email' }] },
+          ],
+        },
+      }),
+    ).rejects.toThrow('Form validation failed');
+
+    expect(showToast).toHaveBeenCalledWith(
+      expect.stringContaining('name: Name is required'),
+      'error',
+    );
+  });
+
+  it('logs and no-ops without stateManager or scopeId', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await actionRegistry.execute('form.validate', {});
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe('ActionRegistry ui.openContainer / ui.closeContainer handlers', () => {
+  it('drawer.form create/edit routes navigate from schema.modelCode', async () => {
+    const navigate = vi.fn();
+    const ctx = { navigate, schema: { modelCode: 'sl_order' } };
+    await actionRegistry.execute('ui.openContainer', {
+      ...ctx,
+      stepTarget: 'drawer.form',
+      args: { mode: 'create' },
+    });
+    expect(navigate).toHaveBeenCalledWith('/p/sl_order/new');
+
+    await actionRegistry.execute('ui.openContainer', {
+      ...ctx,
+      args: { target: 'form', mode: 'edit', id: 'R9' },
+    });
+    expect(navigate).toHaveBeenCalledWith('/p/sl_order/edit/R9');
+  });
+
+  it('parses modelCode from a "list.model" schema.id and opens detail views', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('ui.openContainer', {
+      navigate,
+      schema: { id: 'list.sl_order' },
+      args: { target: 'drawer.detail', id: 'R7' },
+    });
+    expect(navigate).toHaveBeenCalledWith('/p/sl_order/view/R7');
+  });
+
+  it('warns on unknown mode/detail without id/unknown target, and errors without navigate or model', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const navigate = vi.fn();
+
+    await actionRegistry.execute('ui.openContainer', {
+      navigate,
+      schema: { modelCode: 'm1' },
+      args: { target: 'drawer.form', mode: 'weird' },
+    });
+    await actionRegistry.execute('ui.openContainer', {
+      navigate,
+      schema: { modelCode: 'm1' },
+      args: { target: 'drawer.detail' },
+    });
+    await actionRegistry.execute('ui.openContainer', {
+      navigate,
+      schema: { modelCode: 'm1' },
+      args: { target: 'teleport' },
+    });
+    await actionRegistry.execute('ui.openContainer', {
+      schema: { modelCode: 'm1' },
+      args: { target: 'form' },
+    });
+    await actionRegistry.execute('ui.openContainer', {
+      navigate,
+      schema: {},
+      args: { target: 'form' },
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+    expect(errorSpy).toHaveBeenCalledTimes(2);
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('ui.closeContainer navigates back and tolerates a missing navigate', async () => {
+    const navigate = vi.fn();
+    await actionRegistry.execute('ui.closeContainer', { navigate });
+    expect(navigate).toHaveBeenCalledWith(-1);
+    await expect(actionRegistry.execute('ui.closeContainer', {})).resolves.toBeUndefined();
+  });
+});
+
+describe('ActionRegistry notify handler', () => {
+  it('notify(dataSource reload) reloads the payload data source', async () => {
+    const dataSourceManager = { reload: vi.fn() };
+    await actionRegistry.execute('notify', {
+      dataSourceManager,
+      args: { channel: 'dataSource', payload: { id: 'ds_x', event: 'reload' } },
+    });
+    expect(dataSourceManager.reload).toHaveBeenCalledWith('ds_x');
+  });
+
+  it('notify warns on missing channel/manager/id and unknown channels/events', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const dataSourceManager = { reload: vi.fn() };
+
+    await actionRegistry.execute('notify', { args: {} });
+    await actionRegistry.execute('notify', { args: { channel: 'dataSource' } });
+    await actionRegistry.execute('notify', {
+      args: { channel: 'dataSource', payload: { event: 'reload' } },
+      dataSourceManager,
+    });
+    await actionRegistry.execute('notify', {
+      args: { channel: 'dataSource', payload: { id: 'ds_x', event: 'purge' } },
+      dataSourceManager,
+    });
+    await actionRegistry.execute('notify', {
+      args: { channel: 'sms' },
+      dataSourceManager,
+    });
+
+    expect(warnSpy).toHaveBeenCalledTimes(5);
+    expect(dataSourceManager.reload).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});

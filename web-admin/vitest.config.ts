@@ -76,20 +76,19 @@ export default defineConfig({
         '**/types/**',
       ],
       thresholds: {
-        // Ratchet — consolidated 2026-06-19 (wave 4). The floors lagged actual by ~5pt:
-        // a fresh full run measured lines 30.17 / stmts 29.62 / funcs 27.39 / branches
-        // 24.55 (423 spec files / 4342 tests) but the floors were still at the round-2
-        // values. Raised to lock in the achieved coverage (~2-3pt flaky margin) and
-        // extended ActionRegistry handler coverage (navigate/new/search/reset/setState +
-        // error branches). NOTE: vitest covers logic (services / hooks / engines / utils);
-        // React presentation components are covered by Playwright E2E, so the vitest line
-        // ceiling is ~30% — reaching 80% line needs the coverage:e2e harness merged with
-        // vitest (GA stack) or a redefined target, NOT more component unit tests (tracker §7,
-        // owner task #14). The logic layer is now near-exhausted (~5 .ts modules remain).
-        lines: 28,
-        statements: 27,
-        functions: 25,
-        branches: 22,
+        // Ratchet — 2026-09-06 (coverage-to-90 wave 1). A fresh full run measured
+        // lines 41.43 / stmts 40.63 / funcs 38.11 / branches 35.76 (632 spec files /
+        // 6331 tests); floors raised from the 2026-06-19 values to lock in the
+        // achieved coverage (~2-3pt flaky margin). NOTE: vitest covers logic
+        // (services / hooks / engines / utils); React presentation components are
+        // covered by Playwright E2E, so the vitest-only line ceiling is far below a
+        // 90% bundle target — reaching it needs the coverage:e2e harness merged with
+        // vitest (GA stack) or a redefined target, NOT more component unit tests
+        // (tracker §7, owner task #14).
+        lines: 38,
+        statements: 37,
+        functions: 35,
+        branches: 33,
       },
     },
     // 禁用 watch 模式的交互提示
