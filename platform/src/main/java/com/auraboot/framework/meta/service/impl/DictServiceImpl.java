@@ -296,6 +296,14 @@ public class DictServiceImpl implements DictService {
         return dict != null ? dictConverter.toDTO(dict) : null;
     }
 
+    @Override
+    public List<DictItem> findEnabledItems(Long dictId) {
+        if (dictId == null) {
+            return List.of();
+        }
+        return dictItemMapper.selectByDictIdAndStatus(dictId, "enabled");
+    }
+
     // ==================== 查询操作（修复租户上下文） ====================
 
     @Override

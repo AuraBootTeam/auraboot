@@ -38,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
 
-    private static final String AGENT_A_CODE   = "eval_it_agent_a";
-    private static final String AGENT_B_CODE   = "eval_it_agent_b";
+    private static final String AGENT_A_CODE   = "eval_it_agent_a_" + Long.toHexString(System.nanoTime());
+    private static final String AGENT_B_CODE   = "eval_it_agent_b_" + Long.toHexString(System.nanoTime());
     private static final String PLUGIN_A_PID   = "plugin-a";
     private static final String PLUGIN_B_PID   = "plugin-b";
     private static final String CASE_ID_A      = "a-1";

@@ -6,7 +6,6 @@ import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.entity.DictItem;
-import com.auraboot.framework.meta.mapper.DictItemMapper;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.NamedQueryService;
@@ -73,9 +72,6 @@ public class DynamicController {
 
     @Autowired
     private DictService dictService;
-
-    @Autowired
-    private DictItemMapper dictItemMapper;
 
     @Autowired
     private NamedQueryService namedQueryService;
@@ -1250,7 +1246,7 @@ public class DynamicController {
         }
         List<Map<String, Object>> options = new ArrayList<>();
         List<DictItem> items = dict.getId() != null
-                ? dictItemMapper.selectByDictIdAndStatus(dict.getId(), "enabled") : null;
+                ? dictService.findEnabledItems(dict.getId()) : null;
         if (items != null) {
             for (DictItem item : items) {
                 String value = item.getValue();
