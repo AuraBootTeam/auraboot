@@ -73,21 +73,39 @@ public class ToolProviderRegistry {
      * <p>Individual provider discovery failures are caught and logged as warnings so that a single
      * broken provider does not prevent the others from contributing their tools.
      *
+     * <p>Providers are merged round-robin instead of concatenated: a flat concat feeds the
+     * whole budget to whichever provider happens to sort first (dsl lists every model as a
+     * tool, so tenants with many models starved the platform built-ins entirely once
+     * dsl tools filled {@code maxResults}).
+     *
      * @param ctx discovery context carrying tenant, model hint, and result limit
      * @return aggregated list of tool definitions; at most {@code ctx.getMaxResults()} entries
      */
     public List<ToolDefinition> discoverAll(ToolDiscoveryContext ctx) {
-        return providers.stream()
-                .flatMap(p -> {
+        List<List<ToolDefinition>> perProvider = providers.stream()
+                .map(p -> {
                     try {
-                        return p.discover(ctx).stream();
+                        return p.discover(ctx);
                     } catch (Exception e) {
                         log.warn("Provider {} discovery failed: {}", p.providerCode(), e.getMessage());
-                        return java.util.stream.Stream.empty();
+                        return java.util.Collections.<ToolDefinition>emptyList();
                     }
                 })
-                .limit(ctx.getMaxResults())
                 .toList();
+
+        List<ToolDefinition> merged = new java.util.ArrayList<>(ctx.getMaxResults());
+        int rounds = perProvider.stream().mapToInt(List::size).max().orElse(0);
+        for (int round = 0; round < rounds && merged.size() < ctx.getMaxResults(); round++) {
+            for (List<ToolDefinition> tools : perProvider) {
+                if (merged.size() >= ctx.getMaxResults()) {
+                    return merged;
+                }
+                if (round < tools.size()) {
+                    merged.add(tools.get(round));
+                }
+            }
+        }
+        return merged;
     }
 
     /**

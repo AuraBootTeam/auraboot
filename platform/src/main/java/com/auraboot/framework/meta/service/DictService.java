@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Dict;
+import com.auraboot.framework.meta.entity.DictItem;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.util.List;
@@ -49,6 +50,14 @@ public interface DictService {
      * @return 字典响应，如果不存在返回 null
      */
     DictDTO findByCode(String code);
+
+    /**
+     * Enabled dict items for a dict, for option rendering. Keeps controllers
+     * out of the mapper layer (architecture Rule 2).
+     * @param dictId dict row id; may be {@code null}
+     * @return enabled items, or an empty list when {@code dictId} is {@code null}
+     */
+    List<DictItem> findEnabledItems(Long dictId);
 
     // ==================== 查询操作 ====================
 
