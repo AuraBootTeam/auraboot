@@ -1,8 +1,30 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, type Plugin } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
+// Mirror of vite.config.ts's `virtual:auraboot-web-contributions` resolution for the
+// unit-test pipeline. Without it, any module importing the virtual id (e.g.
+// app/framework/boot-plugins.ts) fails Vitest's transform and the coverage provider
+// silently drops the raw TS source it cannot parse — excluding real logic from the
+// denominator. Tests stub enterprise contributions as empty via vi.mock.
+const webContributionsStub: Plugin = {
+  name: 'auraboot-web-contributions-vitest-stub',
+  resolveId(id) {
+    if (id === 'virtual:auraboot-web-contributions') {
+      return '\0virtual:auraboot-web-contributions';
+    }
+    return null;
+  },
+  load(id) {
+    if (id === '\0virtual:auraboot-web-contributions') {
+      // Plain JS — virtual module ids are parsed without a TS transform.
+      return 'export const ENTERPRISE_PLUGINS = []';
+    }
+    return null;
+  },
+};
+
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  plugins: [tsconfigPaths(), webContributionsStub],
   test: {
     globals: true,
     environment: 'jsdom',
