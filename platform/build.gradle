@@ -743,7 +743,11 @@ tasks.register('testPlugin', Test) {
 }
 
 jacoco {
-    toolVersion = '0.8.12'
+    // Keep in lockstep with the jacocoAnt/jacocoRuntime pair above (bumped to 0.8.15 in
+    // PR #1762): a mixed install made the report parser (0.8.12) unable to match the exec
+    // class IDs recorded by the 0.8.15 offline instrumentation, and every package read
+    // near-zero coverage while the suite was green.
+    toolVersion = '0.8.15'
 }
 
 // Classes excluded from coverage measurement:

@@ -93,7 +93,8 @@ public class ToolProviderRegistry {
                 })
                 .toList();
 
-        List<ToolDefinition> merged = new java.util.ArrayList<>(ctx.getMaxResults());
+        // Do NOT pre-size with maxResults: callers pass Integer.MAX_VALUE for "unbounded".
+        List<ToolDefinition> merged = new java.util.ArrayList<>();
         int rounds = perProvider.stream().mapToInt(List::size).max().orElse(0);
         for (int round = 0; round < rounds && merged.size() < ctx.getMaxResults(); round++) {
             for (List<ToolDefinition> tools : perProvider) {
