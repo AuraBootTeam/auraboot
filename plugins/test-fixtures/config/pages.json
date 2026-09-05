@@ -1728,7 +1728,7 @@
     "name:en": "Golden Test Workbench",
     "modelCode": "e2et_field_zoo",
     "kind": "list",
-    "schemaVersion": 5,
+    "schemaVersion": 4,
     "layout": {
       "type": "grid",
       "cols": 12
