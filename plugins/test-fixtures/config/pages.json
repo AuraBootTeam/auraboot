@@ -1721,5 +1721,82 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "e2et_golden_workbench",
+    "name:zh-CN": "Golden 测试工作台",
+    "name:en": "Golden Test Workbench",
+    "modelCode": "e2et_field_zoo",
+    "kind": "list",
+    "schemaVersion": 5,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "description": "Deterministic golden screenshot target: toolbar + filters + selection-info + table view. Fixed field set and stable data pattern.",
+    "blocks": [
+      {
+        "id": "block_golden_filter",
+        "blockType": "filters",
+        "title": {
+          "zh-CN": "筛选",
+          "en-US": "Filters"
+        },
+        "filters": [
+          {
+            "field": "e2et_zoo_select",
+            "operator": "EQ",
+            "dictCode": "e2et_zoo_option",
+            "label": {
+              "zh-CN": "选项",
+              "en-US": "Option"
+            }
+          }
+        ]
+      },
+      {
+        "id": "block_golden_toolbar",
+        "blockType": "toolbar",
+        "title": {
+          "zh-CN": "工具栏",
+          "en-US": "Toolbar"
+        },
+        "actions": [
+          {
+            "code": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "New"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "e2et_field_zoo_form"
+            }
+          },
+          {
+            "code": "batch_mode",
+            "label": {
+              "zh-CN": "批量",
+              "en-US": "Batch"
+            },
+            "action": {
+              "type": "command",
+              "command": "batch_mode"
+            }
+          }
+        ]
+      },
+      {
+        "id": "block_golden_selection_info",
+        "blockType": "selection-info",
+        "title": {
+          "zh-CN": "已选记录",
+          "en-US": "Selection"
+        },
+        "selection": {
+          "bind": "selectedRows"
+        }
+      }
+    ]
   }
 ]
