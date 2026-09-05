@@ -12,6 +12,7 @@ import {
   queryDynamicRecords,
   readDynamicRecord,
   seedQuoteForCorrectedBomUpload,
+  writeMiniBoardZip,
   setYunhanMockScenario,
   type CreatedRows,
   yunhanMockControlUrl,
@@ -133,10 +134,19 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await selectReferenceOption(page, 'qo_quote_crm_account_id', accountId!);
     await selectReferenceOption(page, 'qo_quote_project_id', projectId!);
 
-    const gerberFixture = path.join(os.tmpdir(), `nonstd-gerber-${Date.now()}.zip`);
-    fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+    // Gerber-only caliber: the zip must be a real parseable board so the
+    // auto-parse + auto-recompute chain yields matched detail hits. R1 (SMD,
+    // 3 pads of 0.283mm2 -> 1 point each) covers the resistor line; D1 (THT,
+    // 2 holes of 0.8mm -> 1 point each) covers the diode line.
+    const gerberFixture = writeMiniBoardZip(
+      path.join(os.tmpdir(), `nonstd-gerber-${Date.now()}.zip`),
+      { pads: 3, holes: 2 },
+    );
     const cplFixture = path.join(os.tmpdir(), `nonstd-cpl-${Date.now()}.csv`);
-    fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
+    fs.writeFileSync(
+      cplFixture,
+      'Designator,Mid X,Mid Y,Layer,Pins,SMD\nR1,0,0,top,3,Yes\nD1,10,0,top,2,No\n',
+    );
     await uploadSmartUpload(page, 'form-field-gerber_source_file', gerberFixture);
     await uploadSmartUpload(page, 'form-field-cpl_source_file', cplFixture);
 
@@ -264,6 +274,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     expect(quoteLines.map((row) => String(row.qo_ql_mpn)).sort()).toEqual(expectedMpns);
 
     const resistorLine = quoteLines.find((row) => row.qo_ql_mpn === `WMF2400TEE${mpnSuffix}`);
+    const diodeLine = quoteLines.find((row) => row.qo_ql_mpn === `1N4148W${mpnSuffix}`);
     expect(resistorLine, 'the blank-package 0201 resistor line must be imported').toBeTruthy();
     expect(String(resistorLine?.qo_ql_package ?? '')).toBe('');
     expect(Number(resistorLine?.qo_ql_qty)).toBe(3);
@@ -332,9 +343,12 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         mockUploadRequestObserved: true,
       });
 
-    // The same UI upload must also have triggered process-point calculation. The matching row
-    // proves package normalization + exact package matching -> Excel rule row 3. The backend owns
-    // points only; the exported quote template owns the point-unit-price multiplication.
+    // The same UI upload must also have triggered Gerber parse + process-point
+    // recalculation (gerber-only caliber). The fixture attributes 3 paste pads
+    // (0.283mm2 each, first SMT bucket = 1 point) to R1 and 2 drill holes
+    // (0.8mm, first DIP bucket = 1 point) to D1, so the resistor line carries a
+    // matched SMT detail hit and the diode line a matched DIP detail hit. The
+    // exported quote template owns the point-unit-price multiplication.
     let processHits: Record<string, unknown>[] = [];
     await expect
       .poll(
@@ -342,9 +356,13 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
           processHits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
             { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: created.quoteId },
           ]);
-          const resistorHit = processHits.find(
-            (row) => String(row.qo_pfrh_quote_line_id) === String(resistorLine?.pid),
-          );
+          const resistorHit = processHits.find((row) => {
+            const lineId = String(row.qo_pfrh_quote_line_id);
+            return (
+              lineId === String(resistorLine?.pid) &&
+              String(row.qo_pfrh_process_stage) === 'SMT'
+            );
+          });
           return resistorHit
             ? {
                 status: resistorHit.qo_pfrh_match_status,
@@ -361,28 +379,29 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       .toEqual({
         status: 'matched',
         stage: 'SMT',
-        basis: 'fixed_points',
-        unitPoints: 2,
-        totalPoints: 6,
+        basis: 'gerber_histogram',
+        unitPoints: 3,
+        totalPoints: 3,
         amount: 0,
       });
-    expect(processHits).toHaveLength(4);
+    expect(processHits).toHaveLength(2);
 
     const resistorHit = processHits.find(
       (row) => String(row.qo_pfrh_quote_line_id) === String(resistorLine?.pid),
     );
-    expect(String(resistorHit?.qo_pfrh_point_formula)).toBe('3 × 2 = 6');
-    expect(resistorHit?.qo_pfrh_point_source).toBe('rule-fixed-points');
-    expect(String(resistorHit?.qo_pfrh_trace)).toContain('ruleRow=3');
+    expect(String(resistorHit?.qo_pfrh_point_formula)).toBe('1 × 3 = 3');
+    expect(resistorHit?.qo_pfrh_point_source).toBe('gerber-smt-detail');
+    expect(String(resistorHit?.qo_pfrh_trace)).toContain('BOARD_SCOPE refdes=R1');
 
-    const matchedRules = await queryDynamicRecords(page, 'qo_process_fee_rule_line_common', [
-      { fieldName: 'pid', operator: 'EQ', value: resistorHit?.qo_pfrh_rule_line_id },
-    ]);
-    expect(matchedRules).toHaveLength(1);
-    expect(Number(matchedRules[0]?.qo_pfrl_source_row_no)).toBe(3);
-    expect(String(matchedRules[0]?.qo_pfrl_component_type)).toContain('0201');
-    expect(Number(matchedRules[0]?.qo_pfrl_point_count)).toBe(2);
-    expect(matchedRules[0]?.qo_pfrl_unit_price ?? null).toBeNull();
+    const diodeHit = processHits.find((row) => {
+      const lineId = String(row.qo_pfrh_quote_line_id);
+      return lineId === String(diodeLine?.pid) && String(row.qo_pfrh_process_stage) === 'DIP';
+    });
+    expect(diodeHit, 'diode line must carry the matched DIP detail hit').toBeTruthy();
+    expect(Number(diodeHit?.qo_pfrh_unit_points)).toBe(2);
+    expect(Number(diodeHit?.qo_pfrh_total_points)).toBe(2);
+    expect(String(diodeHit?.qo_pfrh_point_source)).toBe('gerber-dip-detail');
+    expect(String(diodeHit?.qo_pfrh_trace)).toContain('BOARD_SCOPE refdes=D1');
 
     await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
     await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({
@@ -427,9 +446,11 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       .filter({ hasText: 'WMF2400TEE' });
     await expect(resistorHitRow).toHaveCount(1, { timeout: 20_000 });
     await expect(resistorHitRow).toContainText(/完全匹配|Matched/i);
-    await expect(resistorHitRow).toContainText('SMT');
+    // Gerber-only caliber: the row shows the real Gerber fact (3 paste pads of
+    // 0.283mm2) instead of a stage column; 工序/依据 retired with the caliber.
+    await expect(resistorHitRow).toContainText('0.283x3 · 3pad');
 
-    // The review drawer is retired; the flat nine-column table carries the facts
+    // The review drawer is retired; the flat seven-column table carries the facts
     // (qty/unit points/total points live only in the combined 数量/点数 column).
     await expect(page.getByTestId('review-drawer')).toHaveCount(0);
     const processHeaders2 = await tableTexts(
@@ -440,7 +461,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     expect(noteColumn2, `process headers2: ${processHeaders2.join(' | ')}`).toBeGreaterThanOrEqual(0);
     expect(processCells2[noteColumn2] ?? '').toBe('');
     const pointsColumn2 = processHeaders2.findIndex((header) => /数量\/点数|Qty \/ Points/i.test(header));
-    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/3(\.0+)?\s*×\s*2(\.0+)?\s*=\s*6(\.0+)?/);
+    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/1\s*×\s*3\s*=\s*3/);
 
     await testInfo.attach('nonstd-process-fee-0201-match.png', {
       body: await page.screenshot({ fullPage: true }),
