@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
+import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -172,6 +173,54 @@ class FileAccessorImplTest {
         ArgumentCaptor<MultipartFile> fileCaptor = ArgumentCaptor.forClass(MultipartFile.class);
         verify(fileService).uploadFile(fileCaptor.capture(), eq(42L));
         assertThat(fileCaptor.getValue().getOriginalFilename()).isEqualTo("原始-BOM.xlsx");
+    }
+
+    @Test
+    void saveAndLink_registersTheGeneratedFileAgainstTheExactBusinessField() {
+        byte[] bytes = "governed-report".getBytes(StandardCharsets.UTF_8);
+        FileUploadResponseDTO response = new FileUploadResponseDTO();
+        response.setFileId("report-file-pid");
+        response.setOriginalName("recall-report.json");
+        response.setFileSize((long) bytes.length);
+        response.setUrl("/api/file/download/report-file-pid");
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L)))
+                .thenReturn(response);
+        when(fileService.createFileRelation(org.mockito.ArgumentMatchers.any(FileRelationRequestDTO.class), eq(42L)))
+                .thenReturn(true);
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        FileAccessor.SavedFile saved = accessor.saveAndLink(
+                "recall-report.json", "application/json", bytes,
+                "qtr_recall_exercise", "exercise-pid", "qtr_re_report_ref");
+
+        assertThat(saved.fileId()).isEqualTo("report-file-pid");
+        ArgumentCaptor<FileRelationRequestDTO> relationCaptor = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
+        verify(fileService).createFileRelation(relationCaptor.capture(), eq(42L));
+        FileRelationRequestDTO relation = relationCaptor.getValue();
+        assertThat(relation.getEntityType()).isEqualTo("qtr_recall_exercise");
+        assertThat(relation.getEntityId()).isEqualTo("exercise-pid");
+        assertThat(relation.getFieldName()).isEqualTo("qtr_re_report_ref");
+        assertThat(relation.getFileIds()).containsExactly("report-file-pid");
+    }
+
+    @Test
+    void saveAndLink_failsClosedWhenTheHostCannotPersistTheRelation() {
+        byte[] bytes = "governed-report".getBytes(StandardCharsets.UTF_8);
+        FileUploadResponseDTO response = new FileUploadResponseDTO();
+        response.setFileId("report-file-pid");
+        response.setOriginalName("recall-report.json");
+        response.setFileSize((long) bytes.length);
+        when(fileService.uploadFile(org.mockito.ArgumentMatchers.any(MultipartFile.class), eq(42L)))
+                .thenReturn(response);
+        when(fileService.createFileRelation(org.mockito.ArgumentMatchers.any(FileRelationRequestDTO.class), eq(42L)))
+                .thenReturn(false);
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.saveAndLink(
+                        "recall-report.json", "application/json", bytes,
+                        "qtr_recall_exercise", "exercise-pid", "qtr_re_report_ref"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("relation");
     }
 
     private static FileEntity file(String pid, String storageKey, String originalName) {

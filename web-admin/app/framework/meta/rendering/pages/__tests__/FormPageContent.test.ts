@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  canRenderFormButton,
   collectFormFieldDataTypes,
   getJsonFormValueError,
   getFormFieldValueWithAlias,
@@ -32,6 +33,17 @@ describe('isFormButtonDisabled', () => {
   it('disables every form action during an active submission', () => {
     expect(isFormButtonDisabled({ code: 'cancel' }, false, true, true)).toBe(true);
     expect(isFormButtonDisabled({ code: 'refresh' }, true, false, true)).toBe(true);
+  });
+});
+
+describe('canRenderFormButton', () => {
+  it('fails closed when a DSL form action requires a permission the user lacks', () => {
+    expect(canRenderFormButton({ permissionCode: 'qtr.impact.compute' }, () => false)).toBe(false);
+  });
+
+  it('keeps unrestricted navigation actions and granted commands visible', () => {
+    expect(canRenderFormButton({}, () => false)).toBe(true);
+    expect(canRenderFormButton({ permissionCode: 'qtr.case.create' }, () => true)).toBe(true);
   });
 });
 

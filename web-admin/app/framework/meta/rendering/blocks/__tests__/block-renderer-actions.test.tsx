@@ -120,6 +120,30 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('FormButtonsBlockRenderer', () => {
+  it('filters form buttons by permissionCode before rendering', () => {
+    hasPermissionSpy.mockImplementation((code?: string) => code !== 'qtr.impact.compute');
+    const runtime = makeRuntime();
+    const block = {
+      type: 'form-buttons',
+      buttons: [
+        {
+          code: 'compute',
+          label: 'Compute impact',
+          permissionCode: 'qtr.impact.compute',
+          action: { type: 'command', command: 'qtr:request_impact_snapshot' },
+        },
+        { code: 'cancel', label: 'Cancel', action: { type: 'builtin', name: 'back' } },
+      ],
+    };
+
+    const { getByTestId, queryByTestId } = render(
+      <FormButtonsBlockRenderer block={block as any} runtime={runtime} />,
+    );
+
+    expect(queryByTestId('form-btn-compute')).toBeNull();
+    expect(getByTestId('form-btn-cancel')).toBeInTheDocument();
+  });
+
   it('dispatches new-format action through useActionHandler', () => {
     const runtime = makeRuntime();
     const block = {

@@ -104,8 +104,8 @@ class FileRelationTenantScopeIT {
             assertThat(ownerView).hasSize(1);
             assertThat(ownerView.get(0).getTenantId()).isEqualTo(TENANT_A);
 
-            List<String> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-a-1");
-            assertThat(ownerIds).containsExactly(String.valueOf(fileId));
+            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-a-1");
+            assertThat(ownerIds).containsExactly(fileId);
         } finally {
             MetaContext.clear();
         }
@@ -133,8 +133,8 @@ class FileRelationTenantScopeIT {
 
         MetaContext.setContext(TENANT_A, USER_A, "relscope-a", "relscope-a");
         try {
-            List<String> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-legacy-1");
-            assertThat(ownerIds).containsExactly(String.valueOf(fileId));
+            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-legacy-1");
+            assertThat(ownerIds).containsExactly(fileId);
         } finally {
             MetaContext.clear();
         }

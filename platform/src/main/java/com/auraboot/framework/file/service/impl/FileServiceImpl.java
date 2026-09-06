@@ -298,7 +298,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public List<FileEntity> getFilesByEntity(String entityType, String entityId) {
-        List<String> fileIds = fileRelationMapper.findFileIdsByEntity(entityType, entityId);
+        List<Long> fileIds = fileRelationMapper.findFileIdsByEntity(entityType, entityId);
         if (fileIds.isEmpty()) {
             return new ArrayList<>();
         }
@@ -311,7 +311,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public List<FileEntity> getFilesByEntityAndField(String entityType, String entityId, String fieldName) {
-        List<String> fileIds = fileRelationMapper.findFileIdsByEntityAndField(entityType, entityId, fieldName);
+        List<Long> fileIds = fileRelationMapper.findFileIdsByEntityAndField(entityType, entityId, fieldName);
         if (fileIds.isEmpty()) {
             return new ArrayList<>();
         }

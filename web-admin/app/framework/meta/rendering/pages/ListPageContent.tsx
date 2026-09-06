@@ -339,6 +339,19 @@ function stableConfigString(value: unknown): string {
   return JSON.stringify(value ?? null);
 }
 
+/**
+ * Claim the next list-data request and return a guard for state commits.
+ *
+ * List pages can start several requests during mount while a user immediately
+ * searches or changes a view. Network completion order is not intent order, so
+ * only the most recently started request may update data, pagination, errors,
+ * or loading state.
+ */
+export function beginLatestListRequest(sequenceRef: { current: number }): () => boolean {
+  const requestSequence = ++sequenceRef.current;
+  return () => requestSequence === sequenceRef.current;
+}
+
 function isNoopViewConfigPatchEntry(
   key: keyof ViewConfig,
   value: unknown,
@@ -1061,7 +1074,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Search keyword for toolbar search input
   const [keyword, _setKeyword] = useState(urlKeyword);
   const keywordRef = useRef(keyword);
-  const tabRequestSeqRef = useRef(0);
+  const listRequestSeqRef = useRef(0);
 
   // Debounced URL sync for keyword (300ms) — keeps input responsive while
   // reducing URL/history updates during rapid typing
@@ -2037,6 +2050,9 @@ function ListPageContentInner(props: PageContentProps) {
       // Claim the newest slot before doing anything; an older invocation that
       // resolves later must not touch table state (see loadDataSeqRef).
       const requestId = ++loadDataSeqRef.current;
+      // Sibling flows below share the stale-response guard name against the
+      // canonical loadData sequence (PD-012).
+      const isLatestRequest = () => requestId === loadDataSeqRef.current;
       if (!schema || skipListData) {
         setData([]);
         setError(null);
@@ -2374,7 +2390,7 @@ function ListPageContentInner(props: PageContentProps) {
     (tabKey: string) => {
       if (skipListData) return;
       setActiveTab(tabKey);
-      const requestSeq = ++tabRequestSeqRef.current;
+      const isLatestRequest = beginLatestListRequest(listRequestSeqRef);
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
       let tabCondition: ListQueryFilterCondition | null = null;
       if (schema?.blocks) {
@@ -2450,7 +2466,7 @@ function ListPageContentInner(props: PageContentProps) {
             params: queryParams,
             token: token || undefined,
           });
-          if (requestSeq !== tabRequestSeqRef.current) return;
+          if (!isLatestRequest()) return;
           if (ResultHelper.isSuccess(result) && result.data) {
             const responseData = result.data;
             if (Array.isArray(responseData)) {
@@ -2483,12 +2499,12 @@ function ListPageContentInner(props: PageContentProps) {
             setError(result.desc || t('common.loadDataError') || 'Failed to load data');
           }
         } catch (err) {
-          if (requestSeq !== tabRequestSeqRef.current) return;
+          if (!isLatestRequest()) return;
           setError(
             err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
           );
         } finally {
-          if (requestSeq === tabRequestSeqRef.current) {
+          if (isLatestRequest()) {
             setLoading(false);
           }
         }

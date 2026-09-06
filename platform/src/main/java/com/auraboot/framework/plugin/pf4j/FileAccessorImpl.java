@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
+import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.file.support.FileNameEncodingSupport;
@@ -88,6 +89,30 @@ public class FileAccessorImpl implements FileAccessor {
         String responseName = StringUtils.hasText(response.getOriginalName()) ? response.getOriginalName() : safeName;
         long responseSize = response.getFileSize() != null ? response.getFileSize() : bytes.length;
         return new SavedFile(response.getFileId(), responseName, responseSize, response.getUrl());
+    }
+
+    @Override
+    public SavedFile saveAndLink(
+            String originalName,
+            String contentType,
+            byte[] bytes,
+            String entityType,
+            String entityId,
+            String fieldName
+    ) {
+        requireText(entityType, "entityType");
+        requireText(entityId, "entityId");
+        requireText(fieldName, "fieldName");
+        SavedFile saved = save(originalName, contentType, bytes);
+        FileRelationRequestDTO relation = new FileRelationRequestDTO();
+        relation.setEntityType(entityType);
+        relation.setEntityId(entityId);
+        relation.setFieldName(fieldName);
+        relation.setFileIds(new String[]{saved.fileId()});
+        if (!fileService.createFileRelation(relation, userId)) {
+            throw new IllegalStateException("generated file relation was not persisted");
+        }
+        return saved;
     }
 
     private static String firstText(String first, String second) {

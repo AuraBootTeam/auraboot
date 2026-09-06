@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -51,6 +52,9 @@ class FileUploadControllerTest {
     @Mock
     private DataAccessAuthorizationHelper dataAccessAuthorizationHelper;
 
+    @Mock
+    private com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
+
     private MockMvc mvc;
     private FileUploadController controller;
 
@@ -61,6 +65,7 @@ class FileUploadControllerTest {
         ReflectionTestUtils.setField(controller, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);
         ReflectionTestUtils.setField(controller, "dataAccessAuthorizationHelper", dataAccessAuthorizationHelper);
+        ReflectionTestUtils.setField(controller, "adminEventLogService", adminEventLogService);
         HandlerMethodArgumentResolver currentUserResolver = new HandlerMethodArgumentResolver() {
             @Override
             public boolean supportsParameter(org.springframework.core.MethodParameter parameter) {
@@ -208,6 +213,13 @@ class FileUploadControllerTest {
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         verify(dataAccessAuthorizationHelper).authorizeRecordId(
                 eq("crm_account_common"), eq("read"), eq("account-pid"), any());
+        org.mockito.ArgumentCaptor<com.auraboot.framework.audit.entity.AdminEventLog> auditCaptor =
+                org.mockito.ArgumentCaptor.forClass(com.auraboot.framework.audit.entity.AdminEventLog.class);
+        verify(adminEventLogService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().getActionType()).isEqualTo("file.download");
+        assertThat(auditCaptor.getValue().getResourcePid()).isEqualTo("file-pid");
+        assertThat(auditCaptor.getValue().getActorUserId()).isEqualTo(42L);
+        assertThat(auditCaptor.getValue().getSuccess()).isTrue();
     }
 
     @Test
@@ -227,6 +239,7 @@ class FileUploadControllerTest {
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessage("revoked");
         verify(storageProvider, org.mockito.Mockito.never()).download(any());
+        verifyNoInteractions(adminEventLogService);
     }
 
     private static void assertPermission(String methodName, String expected, Class<?>... parameterTypes)
