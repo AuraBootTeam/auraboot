@@ -457,9 +457,10 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       resistorHitRow.locator('xpath=ancestor::table[1]').locator('thead th, thead [role="columnheader"]'),
     );
     const processCells2 = await tableTexts(resistorHitRow.locator('td, [role="cell"]'));
-    const noteColumn2 = processHeaders2.findIndex((header) => /说明\/处理|Note \/ Action/i.test(header));
-    expect(noteColumn2, `process headers2: ${processHeaders2.join(' | ')}`).toBeGreaterThanOrEqual(0);
-    expect(processCells2[noteColumn2] ?? '').toBe('');
+    expect(
+      processHeaders2.some((header) => /说明\/处理|Note \/ Action/i.test(header)),
+      '说明/处理 column retired with the v2 tab',
+    ).toBe(false);
     const pointsColumn2 = processHeaders2.findIndex((header) => /数量\/点数|Qty \/ Points/i.test(header));
     expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/1\s*×\s*3\s*=\s*3/);
 
