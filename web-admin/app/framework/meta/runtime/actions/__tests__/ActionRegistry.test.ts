@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 
 describe('ActionRegistry delete translations', () => {
   it('does not leak unresolved i18n keys into confirmation and success toasts', async () => {
@@ -743,7 +744,7 @@ describe('ActionRegistry router.back / cancel handlers', () => {
 
 describe('ActionRegistry dataSource handlers', () => {
   it('dataSource.fetch calls manager.fetch with target and args', async () => {
-    const dataSourceManager = { fetch: vi.fn(), reload: vi.fn() };
+    const dataSourceManager = { fetch: vi.fn(), reload: vi.fn() } as unknown as DataSourceManager;
     const args = { target: 'ds_orders', extra: 1 };
     await actionRegistry.execute('dataSource.fetch', { dataSourceManager, args });
     expect(dataSourceManager.fetch).toHaveBeenCalledWith('ds_orders', args);
@@ -752,13 +753,13 @@ describe('ActionRegistry dataSource handlers', () => {
   it('dataSource.fetch logs and no-ops without a manager or a target', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await actionRegistry.execute('dataSource.fetch', {});
-    await actionRegistry.execute('dataSource.fetch', { dataSourceManager: { fetch: vi.fn() } });
+    await actionRegistry.execute('dataSource.fetch', { dataSourceManager: { fetch: vi.fn() } as unknown as DataSourceManager });
     expect(spy).toHaveBeenCalledTimes(2);
     spy.mockRestore();
   });
 
   it('dataSource.reload reloads a single target, an array, and cleans empty entries', async () => {
-    const dataSourceManager = { reload: vi.fn() };
+    const dataSourceManager = { reload: vi.fn() } as unknown as DataSourceManager;
     await actionRegistry.execute('dataSource.reload', {
       dataSourceManager,
       args: { target: 'ds_a' },
@@ -776,7 +777,7 @@ describe('ActionRegistry dataSource handlers', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await actionRegistry.execute('dataSource.reload', {});
     await actionRegistry.execute('dataSource.reload', {
-      dataSourceManager: { reload: vi.fn() },
+      dataSourceManager: { reload: vi.fn() } as unknown as DataSourceManager,
       args: { id: '' },
     });
     expect(spy).toHaveBeenCalledTimes(2);
@@ -1042,7 +1043,7 @@ describe('ActionRegistry ui.openContainer / ui.closeContainer handlers', () => {
 
 describe('ActionRegistry notify handler', () => {
   it('notify(dataSource reload) reloads the payload data source', async () => {
-    const dataSourceManager = { reload: vi.fn() };
+    const dataSourceManager = { reload: vi.fn() } as unknown as DataSourceManager;
     await actionRegistry.execute('notify', {
       dataSourceManager,
       args: { channel: 'dataSource', payload: { id: 'ds_x', event: 'reload' } },
@@ -1052,7 +1053,7 @@ describe('ActionRegistry notify handler', () => {
 
   it('notify warns on missing channel/manager/id and unknown channels/events', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const dataSourceManager = { reload: vi.fn() };
+    const dataSourceManager = { reload: vi.fn() } as unknown as DataSourceManager;
 
     await actionRegistry.execute('notify', { args: {} });
     await actionRegistry.execute('notify', { args: { channel: 'dataSource' } });
