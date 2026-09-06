@@ -88,11 +88,14 @@ public class CcService {
     }
 
     /**
-     * CC with already-resolved numeric user ids (automation / event-policy
-     * callers whose {@code resolveUserTargets} produces numeric ids).
+     * CC with already-resolved numeric user ids, attributed to the current
+     * user ({@code TASK_API}) so the cc-policy identity gate applies. System
+     * callers (automation / event-policy) MUST pass their own sourceType via
+     * the explicit overload — branding a call {@code AUTOMATION} is what
+     * skips the gate, so it is never a default.
      */
     public void ccForUserIds(String taskId, List<Long> receiverUserIds, String comment) {
-        ccForUserIds(taskId, receiverUserIds, comment, "AUTOMATION", null);
+        ccForUserIds(taskId, receiverUserIds, comment, "TASK_API", null);
     }
 
     @Transactional
