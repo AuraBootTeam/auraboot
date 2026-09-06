@@ -53,6 +53,9 @@ class NotificationServiceChannelRoutingTest {
     @Mock
     private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
 
+    @Mock
+    private com.auraboot.framework.user.mapper.UserMapper userMapper;
+
     private NotificationServiceImpl notificationService;
 
     private MockedStatic<MetaContext> metaContextMock;
@@ -70,7 +73,7 @@ class NotificationServiceChannelRoutingTest {
 
         notificationService = new NotificationServiceImpl(
                 templateService, sendLogMapper, emailSender, List.of(inAppChannel, emailChannel),
-                userRoleMapper, teamMemberService);
+                userRoleMapper, teamMemberService, userMapper);
 
         // Mock MetaContext
         metaContextMock = Mockito.mockStatic(MetaContext.class);

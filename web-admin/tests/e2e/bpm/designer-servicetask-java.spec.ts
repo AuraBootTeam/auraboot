@@ -54,6 +54,7 @@ import {
   collectActivityEvents,
   undeployProcess,
 } from './_helpers/bpm-lifecycle';
+import { createLeaveApplicant } from '../../helpers/wd-fixtures';
 
 // ---------------------------------------------------------------------------
 // Serial — SVCJ-1 deploys; SVCJ-2 starts + validates execution; SVCJ-3 cleans.
@@ -78,7 +79,8 @@ const TARGET_CLASS_NAME = 'commandServiceTaskDelegate';
 // runtime; see CommandServiceTaskDelegate.java#66-79.)
 const TARGET_COMMAND_CODE = 'wd:create_leave_balance';
 const TARGET_OPERATION_TYPE = 'create';
-// Well-known seed employee from reset-and-init.sh (same as SVCC/SVCH).
+// Admin's sys_user PID, resolved at runtime in beforeAll (reset-and-init
+// recreates users with fresh pids on every run).
 let TARGET_EMPLOYEE_PID = '';
 // Unique year so parallel runs / SVCC runs do not collide on the matching
 // row (years 2000..2099).
@@ -204,6 +206,19 @@ test.describe(
 
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
+
+      // Resolve a dedicated fixture employee at runtime — reset-and-init
+      // recreates users with fresh pids, and wd:create_leave_balance validates
+      // wd_bal_employee against the tenant member projection. A fixture user
+      // (not admin) keeps the wd:submit preActions balance lookup — which
+      // filters by employee only, no year — deterministic: this spec's balance
+      // rows for random target years must never pollute admin's seeded
+      // current-year balance.
+      const employee = await createLeaveApplicant(request, adminToken, `svcj_emp_${TS}`);
+      TARGET_EMPLOYEE_PID = employee.userId;
+      if (!TARGET_EMPLOYEE_PID) {
+        throw new Error('TARGET_EMPLOYEE_PID resolution failed');
+      }
     });
 
     // =======================================================================

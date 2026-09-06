@@ -50,6 +50,7 @@ import {
   collectActivityEvents,
   undeployProcess,
 } from './_helpers/bpm-lifecycle';
+import { createLeaveApplicant } from '../../helpers/wd-fixtures';
 
 // ---------------------------------------------------------------------------
 // Serial — SVCC-1 deploys; SVCC-2 starts + validates execution; SVCC-3 cleans.
@@ -202,15 +203,17 @@ test.describe(
 
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
-    // Resolve a live ab_user pid at runtime: the reference validation
-    // (findInTenantByPid) rejects the stale hardcoded ULID after any reset.
-    const me = await (await request.get('/api/auth/me', {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    })).json();
-    TARGET_EMPLOYEE_PID = String(me?.data?.user?.pid ?? me?.data?.user?.id ?? '');
-    if (!TARGET_EMPLOYEE_PID) {
-      throw new Error('TARGET_EMPLOYEE_PID resolution failed');
-    }
+      // Resolve a live ab_user pid at runtime: the reference validation
+      // (findInTenantByPid) rejects the stale hardcoded ULID after any reset.
+      // A dedicated fixture employee (not admin) keeps the wd:submit
+      // preActions balance lookup — which filters by employee only, no year —
+      // deterministic: command-spec balance rows for random target years must
+      // never pollute admin's seeded current-year balance.
+      const employee = await createLeaveApplicant(request, adminToken, `svcc_emp_${TS}`);
+      TARGET_EMPLOYEE_PID = employee.userId;
+      if (!TARGET_EMPLOYEE_PID) {
+        throw new Error('TARGET_EMPLOYEE_PID resolution failed');
+      }
     });
 
     // =======================================================================

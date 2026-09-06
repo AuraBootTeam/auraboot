@@ -690,5 +690,26 @@
       "e2et_order_remark"
     ],
     "permissions": []
+  },
+  {
+    "code": "e2et_field_zoo.create",
+    "displayName:zh-CN": "新建字段记录",
+    "displayName:en": "Create Field Zoo Record",
+    "description": "Create a field-zoo record (required name; select/reference/date/switch/number/photo/signature optional)",
+    "type": "create",
+    "modelCode": "e2et_field_zoo",
+    "inputFields": [
+      "e2et_zoo_name",
+      "e2et_zoo_select",
+      "e2et_zoo_reference",
+      "e2et_zoo_date",
+      "e2et_zoo_switch",
+      "e2et_zoo_number",
+      "e2et_zoo_photo",
+      "e2et_zoo_signature"
+    ],
+    "permissions": [
+      "e2et.order.manage"
+    ]
   }
 ]

@@ -346,11 +346,28 @@ export default defineConfig({
     ...(runProfile === 'contract'
       ? [
           {
+            // BPM tenant-isolation UI suite mutates the GLOBAL deployment mode
+            // (system.mode -> multi for the suite window). Admin logins issued
+            // while the flip is visible return a tenant-less JWT (admin belongs
+            // to System + Business tenants -> multi mode requires space
+            // selection), which 401s every concurrently running spec that logs
+            // in as admin. Run it ALONE ahead of the contract project so no
+            // other spec shares its mutation window.
+            name: 'bpm-isolation',
+            testDir: './tests/e2e',
+            testMatch: /tests\/e2e\/bpm\/tenant-isolation-ui\.spec\.ts$/,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+          {
             name: 'contract',
             testDir: './tests/e2e',
             testMatch: contractScopeRegex,
-            testIgnore: deepSpecPattern,
-            dependencies: ['auth'],
+            testIgnore: [deepSpecPattern, /tests\/e2e\/bpm\/tenant-isolation-ui\.spec\.ts$/],
+            dependencies: ['auth', 'bpm-isolation'],
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,

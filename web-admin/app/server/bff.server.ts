@@ -41,6 +41,11 @@ axios.defaults.timeout = 30000; // 30s — prevents slow backend from cascading 
 dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
+// The gateway terminates the browser origin and forwards X-Forwarded-Proto/Host;
+// react-router v7 single-fetch submissions validate the request Origin against
+// the derived origin, so without trust proxy every .data POST (e.g. logout)
+// fails 400 Bad Request behind the reverse proxy.
+app.set('trust proxy', true);
 const PORT = parseInt(process.env.BFF_PORT || '3500', 10);
 // Resolution order: explicit override → reset/runtime contract (AURA_BE_BASE is
 // exported by scripts/oss-reset-and-init.sh) → BE_PORT slot → host-mode default.

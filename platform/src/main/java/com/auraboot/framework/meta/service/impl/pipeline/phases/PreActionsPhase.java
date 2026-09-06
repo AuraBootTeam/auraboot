@@ -54,6 +54,9 @@ import java.util.Map;
  * <p>Placeholders {@code ${payload.*}} / {@code ${currentRecord.*}} /
  * {@code ${<exposeAs>.*}} are resolved against the current payload, any loaded
  * {@code currentRecord} snapshot, and the results of each {@code contextLookup}.
+ * The builtin {@code ${system.year}} / {@code ${system.month}} / {@code
+ * ${system.day}} / {@code ${system.date}} placeholders expose the server clock
+ * for time-scoped lookups (e.g. the current year's leave balance).
  * If the rule engine reports {@code valid == false}, a {@link BusinessException}
  * is raised with the reason as the i18n key — aborting the command before any
  * DB write happens.
@@ -70,6 +73,8 @@ public class PreActionsPhase implements CommandPhase {
     private static final String PLACEHOLDER_SUFFIX = "}";
     private static final String SCOPE_PAYLOAD = "payload";
     private static final String SCOPE_CURRENT_RECORD = "currentRecord";
+    /** Builtin clock scope: ${system.year} / ${system.month} / ${system.day} / ${system.date}. */
+    private static final String SCOPE_SYSTEM = "system";
     private static final String RULE_RESULT_KEY_VALID = "valid";
     private static final String RULE_RESULT_KEY_REASON = "reason";
     private static final String FALLBACK_REASON_KEY = "bpm.rule.execution_failed";
@@ -156,6 +161,7 @@ public class PreActionsPhase implements CommandPhase {
                 Map<String, Object> scope = new HashMap<>();
                 scope.put(SCOPE_PAYLOAD, payload);
                 if (currentRecord != null) scope.put(SCOPE_CURRENT_RECORD, currentRecord);
+                scope.put(SCOPE_SYSTEM, systemScope());
 
                 List<QueryCondition> conditions =
                         resolveFilters((List<Map<String, Object>>) lookup.get("filters"), scope);
@@ -176,6 +182,7 @@ public class PreActionsPhase implements CommandPhase {
         if (currentRecord != null) {
             fullScope.put(SCOPE_CURRENT_RECORD, currentRecord);
         }
+        fullScope.put(SCOPE_SYSTEM, systemScope());
         fullScope.putAll(lookupScope);
 
         Map<String, Object> factsTemplate = action.get("facts") instanceof Map
@@ -240,6 +247,21 @@ public class PreActionsPhase implements CommandPhase {
      * Resolve a value that may be a {@code "${scope.field}"} placeholder string.
      * Non-string values pass through unchanged.
      */
+    /**
+     * Builtin clock scope for {@code ${system.*}} placeholders. Exposed as
+     * strings-free typed values (year/month/day as ints, date as ISO-8601)
+     * so they bind directly against typed columns in query conditions.
+     */
+    private Map<String, Object> systemScope() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        Map<String, Object> system = new HashMap<>();
+        system.put("year", today.getYear());
+        system.put("month", today.getMonthValue());
+        system.put("day", today.getDayOfMonth());
+        system.put("date", today.toString());
+        return system;
+    }
+
     private Object resolveValue(Object raw, Map<String, Object> scope) {
         if (!(raw instanceof String s)) return raw;
         if (!(s.startsWith(PLACEHOLDER_PREFIX) && s.endsWith(PLACEHOLDER_SUFFIX))) return s;

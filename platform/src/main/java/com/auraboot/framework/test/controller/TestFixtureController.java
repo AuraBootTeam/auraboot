@@ -115,6 +115,7 @@ public class TestFixtureController {
                 case "dashboard" -> createDashboardFixture(runId, request.getParams());
                 case "approval" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "approval", "high", "E2E Approval Request");
                 case "inbox_items" -> createInboxItemsFixture(runId, request.getParams(), authHeader);
+                case "inbox_empty" -> createInboxEmptyFixture(runId, request.getParams());
                 case "inbox_route" -> createRouteBearingInboxFixture(runId, request.getParams(), authHeader);
                 case "inbox_alert" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "alert", "medium", "E2E Alert Item");
                 case "inbox_mention" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "mention", "low", "E2E Mention Item");
@@ -424,12 +425,24 @@ public class TestFixtureController {
                 ? (String) params.get("modelCode")
                 : "e2et_order";
 
+        // Optional generic field overrides so non-order models can be seeded
+        // through the same fixture (e.g. e2et_field_zoo with required name).
+        Map<String, Object> extraFields = params != null && params.get("fields") instanceof Map
+                ? (Map<String, Object>) params.get("fields")
+                : Map.of();
+
         List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
-                record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
-                record.put("e2et_order_status", "draft");
+                if (extraFields.isEmpty()) {
+                    record.put("e2et_order_no", "xp_" + runId + "_record_" + (i + 1));
+                    record.put("e2et_order_status", "draft");
+                } else {
+                    // Non-order model: only caller-supplied fields — unknown
+                    // columns would fail dynamic-create validation.
+                    record.putAll(extraFields);
+                }
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
                     recordPids.add(pid);
@@ -477,6 +490,111 @@ public class TestFixtureController {
         String priority = "task".equals(type) || "assignment".equals(type) ? "normal" : "low";
         String titlePrefix = "E2E " + type.substring(0, 1).toUpperCase() + type.substring(1) + " Item";
         return createInboxItemsWithType(runId, params, authHeader, type, priority, titlePrefix);
+    }
+
+    /**
+     * Fixture: "inbox_empty"
+     * Marks every inbox item read for the resolved test user so the mobile
+     * inbox renders its deterministic empty state (BACKLOG-MOB-IOS-UX-EMPTY
+     * knob: seedInboxEmpty). InboxService stays reflective — see the class
+     * header note on the enterprise-core dependency.
+     */
+    private FixtureResult createInboxEmptyFixture(String runId, Map<String, Object> params) {
+        Object inboxService;
+        try {
+            inboxService = requireRuntimeBean(
+                    new String[]{"inboxService", "inboxServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.inbox.service.InboxService",
+                            "com.auraboot.framework.inbox.service.InboxServiceImpl"
+                    }
+            );
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Inbox module is not available (enterprise-core not loaded)"))
+                    .build();
+        }
+
+        Long tenantId = params != null && params.containsKey("tenantId")
+                ? longValue(params.get("tenantId")) : null;
+        Long userId = params != null && params.containsKey("userId")
+                ? longValue(params.get("userId")) : null;
+        if (tenantId == null) {
+            var tenant = tenantService.findByName("e2e_test");
+            if (tenant != null) {
+                tenantId = tenant.getId();
+            }
+        }
+        if (tenantId == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenantId — call POST /api/test/seed first"))
+                    .build();
+        }
+        if (userId == null) {
+            var user = userService.findByEmail("e2e@test.local");
+            if (user != null) {
+                userId = user.getId();
+            }
+        }
+        if (userId == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Cannot resolve userId — call POST /api/test/seed first"))
+                    .build();
+        }
+
+        try {
+            // Dismiss (not just mark read) — the mobile inbox list still shows
+            // read items, so only dismissing empties the visible list.
+            Method listByUser = inboxService.getClass().getMethod("listByUser",
+                    Long.class, Long.class, String.class, String.class, int.class, int.class);
+            // listByUser may return a projection type other than the entity —
+            // resolve getId on the RUNTIME element class, not the declared one.
+            Method getId = null;
+            Method batchDismiss = inboxService.getClass()
+                    .getMethod("batchDismiss", java.util.List.class, Long.class, Long.class);
+
+            int dismissedTotal = 0;
+            for (int round = 0; round < 10; round++) {
+                Object page = listByUser.invoke(inboxService, userId, tenantId, null, "PENDING", 1, 200);
+                List<?> records = (List<?>) page.getClass().getMethod("getRecords").invoke(page);
+                if (records == null || records.isEmpty()) {
+                    break;
+                }
+                List<Long> ids = new ArrayList<>();
+                for (Object item : records) {
+                    if (getId == null) {
+                        getId = item.getClass().getMethod("getId");
+                    }
+                    Object id = getId.invoke(item);
+                    if (id instanceof Long lid) {
+                        ids.add(lid);
+                    }
+                }
+                if (ids.isEmpty()) {
+                    break;
+                }
+                batchDismiss.invoke(inboxService, ids, userId, tenantId);
+                dismissedTotal += ids.size();
+            }
+            return FixtureResult.builder()
+                    .success(true).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("dismissed", String.valueOf(dismissedTotal)))
+                    .build();
+        } catch (Exception e) {
+            log.error("inbox_empty fixture failed: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_empty").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", String.valueOf(e.getMessage())))
+                    .build();
+        }
     }
 
     /**

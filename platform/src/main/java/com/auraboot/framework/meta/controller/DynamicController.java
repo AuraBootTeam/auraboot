@@ -5,6 +5,8 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.entity.DictItem;
+import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.PageSchemaService;
@@ -67,6 +69,9 @@ public class DynamicController {
 
     @Autowired
     private DynamicDataService dynamicDataService;
+
+    @Autowired
+    private DictService dictService;
 
     @Autowired
     private NamedQueryService namedQueryService;
@@ -563,8 +568,16 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
-            @RequestBody Map<String, Object> data) {
+            @RequestBody Map<String, Object> data,
+            @Parameter(description = "客户端持有的乐观锁版本号(可选)")
+            @RequestHeader(value = "X-Base-Record-Version", required = false) Long baseRecordVersion) {
         log.info("更新数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
+        if (baseRecordVersion != null && !data.containsKey("_expectedVersion")) {
+            // Translate the header precondition into the payload token the
+            // service compare-and-swap path already consumes. Offline replay
+            // (mobile) sends this header instead of mutating its queued body.
+            data.put("_expectedVersion", baseRecordVersion);
+        }
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, data);
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
@@ -1217,7 +1230,82 @@ public class DynamicController {
             return ApiResponse.error("Model not found: " + modelCode);
         }
         List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields = modelFieldBindingService.getModelFields(model.getPid());
+        enrichDictOptions(fields);
         return ApiResponse.success(fields);
+    }
+
+    /**
+     * Resolve a dict code into mobile-consumable options. Primary source is
+     * the enabled dict-item table (items live outside the dict row); falls
+     * back to the inline bean payload when the dict row carries one.
+     */
+    private List<Map<String, Object>> resolveDictItems(String dictCode) {
+        DictDTO dict = dictService.findByCode(dictCode);
+        if (dict == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> options = new ArrayList<>();
+        List<DictItem> items = dict.getId() != null
+                ? dictService.findEnabledItems(dict.getId()) : null;
+        if (items != null) {
+            for (DictItem item : items) {
+                String value = item.getValue();
+                if (value == null) {
+                    continue;
+                }
+                Map<String, Object> option = new LinkedHashMap<>();
+                option.put("value", value);
+                option.put("label", item.getLabel() != null ? item.getLabel() : value);
+                if (item.getSortNo() != null) {
+                    option.put("sortNo", item.getSortNo());
+                }
+                options.add(option);
+            }
+            return options;
+        }
+        if (dict.getItems() == null) {
+            return options;
+        }
+        for (com.auraboot.framework.meta.entity.payload.DataSourceItemBean item : dict.getItems()) {
+            Object value = item.getValue() != null ? item.getValue() : item.getCode();
+            if (value == null) {
+                continue;
+            }
+            Map<String, Object> option = new LinkedHashMap<>();
+            option.put("value", String.valueOf(value));
+            option.put("label", item.getLabel() != null ? item.getLabel() : String.valueOf(value));
+            if (item.getOrder() != null) {
+                option.put("sortNo", item.getOrder());
+            }
+            options.add(option);
+        }
+        return options;
+    }
+
+    /**
+     * Inline static-dict options for fields bound via dictCode so rendering
+     * clients (mobile offline forms) get selectable options without a second
+     * dict round-trip. Fields that already carry options are left untouched;
+     * resolution failures degrade silently to dictCode-only metadata.
+     */
+    private void enrichDictOptions(List<com.auraboot.framework.meta.dto.MetaFieldDTO> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return;
+        }
+        for (com.auraboot.framework.meta.dto.MetaFieldDTO field : fields) {
+            String dictCode = field.getDictCode();
+            if (dictCode == null || dictCode.isBlank() || field.getOptions() != null) {
+                continue;
+            }
+            try {
+                List<Map<String, Object>> options = resolveDictItems(dictCode);
+                if (!options.isEmpty()) {
+                    field.setOptions(options);
+                }
+            } catch (Exception e) {
+                log.debug("Dict option resolution failed for {}: {}", logSafe(dictCode), logSafe(e.getMessage()));
+            }
+        }
     }
 
     private PageSchemaDTO findPageSchemaQuietly(String pageKey) {

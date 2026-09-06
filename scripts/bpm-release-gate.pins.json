@@ -1,6 +1,27 @@
 {
-  "version": 1,
-  "_comment": "BPM 发布门禁硬门 skip 允许清单:硬门(smoke/showcase/designer)运行中任何被 skip/fixme 的测试标题必须匹配至少一条 allow.pattern,否则门禁失败。flips 记录钉住用例的翻转条件( informational,不参与 skip 匹配 )。4.0.3 落地后历史 pin 均已翻转移除:当前 allow 为空。",
-  "allow": [],
+  "version": 2,
+  "_comment": "BPM 发布门禁硬门 skip 允许清单:硬门(smoke/showcase/designer + L5 bpm-api)运行中任何被 skip/fixme 的测试标题必须匹配至少一条 allow.pattern,否则门禁失败。flips 记录钉住用例的翻转条件( informational,不参与 skip 匹配 )。历史 pin(4.0.3)均已翻转移除;当前 allow 仅登记 L5 升硬(2026-09-05)时的 8 条 skip。",
+  "allow": [
+    {
+      "id": "l5-lc02-06-fixme-superseded",
+      "pattern": "BPM-LC0[2-6]:",
+      "reason": "bpm-lifecycle.spec.ts LC02-LC06 为 test.fixme 永久跳过:旧版生命周期断言已被 bpm-definition-lifecycle PD 系列(PD-001..PD-014,全量运行)覆盖,保留仅作历史参照"
+    },
+    {
+      "id": "l5-bd006-env-conditional",
+      "pattern": "BD-006 — Select node",
+      "reason": "环境条件跳过:临时流程创建失败(403/无 pid)或画布未渲染时诚实 skip,非产品断言失败;画布节点编辑路径由 BD-007/BD-008/B4 系列硬性覆盖"
+    },
+    {
+      "id": "l5-bfi003-no-ambient-task",
+      "pattern": "BFI-003: Task drawer shows detail",
+      "reason": "环境条件跳过:任务中心无可见任务行时诚实 skip(数据依赖);任务抽屉渲染由 task-center TC 系列硬性覆盖"
+    },
+    {
+      "id": "l5-bfi006-no-instance",
+      "pattern": "BFI-006: Leave request data visible",
+      "reason": "环境条件跳过:依赖 HR 插件与前序实例数据(hrPluginReady/pid 缺失时诚实 skip);请假数据展示由 ui-full-stack G2-G4 与 notification-task NT 系列硬性覆盖"
+    }
+  ],
   "flips": []
 }

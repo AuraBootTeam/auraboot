@@ -49,7 +49,7 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
-import { createLeaveApplicant, ensureRoleUsers } from '../../helpers/wd-fixtures';
+import { createLeaveApplicant, ensureRoleUsers, setLeaveBalance } from '../../helpers/wd-fixtures';
 import { findRowInPaginatedList } from '../helpers';
 import {
   AuditOp,
@@ -388,6 +388,11 @@ test.describe(
       leaveApplicantEmail = applicant.email;
       expect(leaveApplicantUserId, 'fixture applicant userId must be created').toBeTruthy();
       expect(leaveApplicantEmail, 'fixture applicant email must be created').toBeTruthy();
+
+      // Annual-leave requests are rejected without a balance row for the
+      // applicant (wd_leave_validation rule "reject_annual_without_balance_record"),
+      // so seed one for the fresh fixture user via the public command.
+      await setLeaveBalance(request, adminToken, leaveApplicantUserId, 5);
     });
 
     // =======================================================================
@@ -615,8 +620,10 @@ test.describe(
       const createBody = await createResp.json();
       expect(String(createBody?.code)).toBe('0');
       const seedData = createBody?.data?.data ?? createBody?.data ?? {};
-      leaveRequestPid = String(seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '');
-      expect(leaveRequestPid, 'draft create must return a recordId').toBeTruthy();
+      leaveRequestPid = String(
+        seedData?.recordPid ?? seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '',
+      );
+      expect(leaveRequestPid, 'draft create must return a recordPid').toBeTruthy();
 
       // 1. Sidebar navigation → "我的申请" list page (D1)
       await navigateToLeaveRequestList(page);

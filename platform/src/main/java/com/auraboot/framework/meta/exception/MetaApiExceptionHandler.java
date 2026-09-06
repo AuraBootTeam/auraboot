@@ -37,6 +37,24 @@ public class MetaApiExceptionHandler {
     }
 
     /**
+     * Handle stale optimistic-version mutations — HTTP 409 with the wire-stable
+     * {@code 40900} code so mobile offline replay branches into conflict
+     * resolution instead of treating the failure as a generic business error.
+     */
+    @ExceptionHandler(RecordVersionConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRecordVersionConflictException(
+            RecordVersionConflictException e) {
+        log.warn("Record version conflict: {}", e.getMessage());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                HttpStatus.CONFLICT.value(), e.getMessage());
+        // Override the numeric default with the wire-stable mobile contract code.
+        response.setCode(RecordVersionConflictException.CODE);
+
+        return ResponseEntity.status(RecordVersionConflictException.status()).body(response);
+    }
+
+    /**
      * Handle security exceptions — do not expose internal details.
      */
     @ExceptionHandler(SecurityException.class)

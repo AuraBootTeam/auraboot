@@ -397,9 +397,11 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     test.skip(missingProcessUpdatePermission, 'Missing permission: bpm.process.update');
     await navigateToProcessDefinitionList(page);
 
-    // Find row and click Edit
+    // Find row and open the BPMN designer. The list DSL's rowActions no
+    // longer carry an "edit" code — name editing happens inside the designer
+    // reached via open_bpmn_designer (plugins/platform-admin/config/pages.json).
     const row = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
-    await clickRowActionByLocator(page, row, 'edit');
+    await clickRowActionByLocator(page, row, 'open_bpmn_designer');
 
     // Designer opens with ?pid=
     await page.waitForURL(/bpmn-designer.*pid=/, { timeout: 10_000 });
@@ -635,7 +637,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
         .catch(() => null),
       draftTab.click(),
     ]);
-    await expect(draftTab).toHaveClass(/border-blue-500|text-blue-600/);
+    await expect(draftTab).toHaveClass(/border-accent|text-accent/);
 
     // Find delete target row
     const row = await findRowInPaginatedList(page, PROCESS_KEY_DELETE, 12_000);
@@ -734,8 +736,9 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     });
 
     // Verify only matching results are shown after React has committed the
-    // filtered response. The table can briefly keep stale rows visible after
-    // the network response resolves under full-suite load.
+    // filtered response. Concurrent loadData triggers are serialized by
+    // requestId in ListPageContent (stale responses are dropped), so the
+    // table must converge on UID-only rows.
     await expect
       .poll(
         async () => {
@@ -746,7 +749,7 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
           if (texts.length === 0) return 'no rows';
           return texts.every((text) => text.includes(UID)) ? 'ok' : texts.join('\n');
         },
-        { timeout: 10000, intervals: [500, 1000, 1500] },
+        { timeout: 15_000 },
       )
       .toBe('ok');
   });

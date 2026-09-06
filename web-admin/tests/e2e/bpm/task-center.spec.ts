@@ -90,7 +90,7 @@ async function gotoTaskCenter(page: import('@playwright/test').Page) {
 /** Check if task table has rows (returns true if task name buttons exist) */
 async function hasTaskRows(page: import('@playwright/test').Page): Promise<boolean> {
   return page
-    .locator('table button.text-blue-600')
+    .locator('table button.text-accent')
     .first()
     .waitFor({ state: 'visible', timeout: 3000 })
     .then(() => true)
@@ -240,13 +240,13 @@ test.describe('BPM Task Center', () => {
       await expect(async () => {
         await btn.click();
         const cls = await btn.getAttribute('class');
-        expect(cls).toContain('border-blue-600');
+        expect(cls).toContain('border-accent');
       }).toPass({ timeout: 8000 });
     };
 
     // Wait for initial data load (todo tab is default active)
     const todoTab = page.locator('button:has-text("待办任务")');
-    await expect(todoTab).toHaveClass(/border-blue-600/, { timeout: 8000 });
+    await expect(todoTab).toHaveClass(/border-accent/, { timeout: 8000 });
 
     // Wait for todo content to stabilize
     const todoContent = page.locator('table').or(page.locator('text=暂无任务'));
@@ -318,7 +318,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await completedBtn.click();
       const cls = await completedBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 8000 });
     const completedContent = page.locator('table').or(page.locator('text=暂无任务'));
     await expect(completedContent.first()).toBeVisible({ timeout: 8000 });
@@ -332,7 +332,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await ccBtn.click();
       const cls = await ccBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 8000 });
 
     // Wait for search input to disappear — confirms CC tab is active (search hidden per TaskCenter logic)
@@ -355,7 +355,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await urgeBtn.click();
       const cls = await urgeBtn.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 5000 });
 
     // Wait for URGE content
@@ -379,7 +379,7 @@ test.describe('BPM Task Center', () => {
       test.skip(true, 'No tasks available to test detail navigation in current environment');
     }
 
-    const taskLinks = page.locator('table button.text-blue-600');
+    const taskLinks = page.locator('table button.text-accent');
 
     // Click first task name to navigate to detail page
     await taskLinks.first().click();
@@ -683,10 +683,11 @@ test.describe('BPM Task Center', () => {
     await moreButtons.first().click();
     const menu = page.locator('.absolute.right-0.z-10');
 
-    // Urge button should be present with orange text
+    // Urge button should be present with warning-amber text (design-system
+    // status token — raw tailwind palette classes were migrated).
     const urgeBtn = menu.locator('button:has-text("催办")');
     await expect(urgeBtn).toBeVisible();
-    await expect(urgeBtn).toHaveClass(/text-orange-600/);
+    await expect(urgeBtn).toHaveClass(/text-status-amber/);
 
     // Click urge - should trigger toast (success or warning if no assignee)
     await urgeBtn.click();
@@ -781,12 +782,12 @@ test.describe('BPM Task Center', () => {
     // Priority column header should exist
     await expect(page.locator('th:has-text("优先级")')).toBeVisible();
 
-    // Priority badges use specific colors:
-    // high: bg-red-100 text-red-700 "高"
-    // medium: bg-yellow-100 text-yellow-700 "中"
-    // low: bg-green-100 text-green-700 "低"
+    // Priority badges use design-system status tokens:
+    // high: bg-status-red-bg text-status-red "高"
+    // medium: bg-status-amber-bg text-status-amber "中"
+    // low: bg-status-green-bg text-status-green "低"
     const priorityBadges = page.locator(
-      'table span.bg-red-100, table span.bg-yellow-100, table span.bg-green-100',
+      'table span.bg-status-red-bg, table span.bg-status-amber-bg, table span.bg-status-green-bg',
     );
     const badgeCount = await priorityBadges.count();
 
@@ -794,7 +795,7 @@ test.describe('BPM Task Center', () => {
     if (badgeCount > 0) {
       const firstBadge = priorityBadges.first();
       const classList = await firstBadge.getAttribute('class');
-      expect(classList).toMatch(/bg-(red|yellow|green)-100/);
+      expect(classList).toMatch(/bg-status-(red|amber|green)-bg/);
     }
   });
 
@@ -834,7 +835,7 @@ test.describe('BPM Task Center', () => {
       throw new Error('No tasks available');
     }
 
-    const taskLinks = page.locator('table button.text-blue-600');
+    const taskLinks = page.locator('table button.text-accent');
 
     await taskLinks.first().click();
     await page.waitForURL(/\/p\/.+\/view\/|\/bpm\/process-status/, { timeout: 10_000 });
@@ -887,7 +888,7 @@ test.describe('BPM Task Center', () => {
     await expect(async () => {
       await completedTab.click();
       const cls = await completedTab.getAttribute('class');
-      expect(cls).toContain('border-blue-600');
+      expect(cls).toContain('border-accent');
     }).toPass({ timeout: 5000 });
 
     // Should show table with completed tasks or empty state

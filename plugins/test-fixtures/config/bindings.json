@@ -502,5 +502,101 @@
       "searchable": false,
       "sortable": true
     }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_name",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_select",
+    "sequence": 2,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_reference",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_date",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_switch",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_number",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_photo",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "e2et_field_zoo",
+    "fieldCode": "e2et_zoo_signature",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": false,
+      "sortable": true
+    }
   }
 ]

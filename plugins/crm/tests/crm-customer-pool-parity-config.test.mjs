@@ -279,8 +279,25 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   const mobileAssign = poolQueue.rowActions.find((action) => action.code === 'assign');
   assert.equal(mobileAssign.mobileOnly, true);
   assert.equal(mobileAssign.permissionCode, 'crm.customer_pool.assign');
-  assert.equal(mobileAssign.action.command, 'crm:assign_pool_customer');
-  assert.equal(mobileAssign.action.inputFields[0].component, 'MemberPicker');
+  // #1693 moved mobile assignment to a dedicated form page: the governed command,
+  // the member picker and the membership/capacity validation live there now.
+  assert.equal(mobileAssign.action.type, 'navigate');
+  assert.equal(mobileAssign.action.to, 'crm_customer_pool_assign_form');
+  const assignForm = pages.find((page) => page.pageKey === 'crm_customer_pool_assign_form')
+    ?? await json('config/pages/crm_customer_pool_assign_form.json');
+  const assignFormFields = assignForm.blocks
+    .filter((block) => block.blockType === 'form-section')
+    .flatMap((block) => block.fields ?? []);
+  const assigneeField = assignFormFields.find((field) => field.field === 'crm_cpi_claimed_by');
+  assert.ok(assigneeField, 'assign form must collect crm_cpi_claimed_by');
+  assert.equal(assigneeField.required, true);
+  assert.match(assigneeField.renderComponent, /memberpicker/i);
+  const assignConfirm = assignForm.blocks
+    .filter((block) => block.blockType === 'form-buttons')
+    .flatMap((block) => block.buttons ?? [])
+    .find((button) => button.code === 'assign_pool_customer_confirm');
+  assert.ok(assignConfirm, 'assign form must keep the governed confirm action');
+  assert.match(JSON.stringify(assignConfirm), /crm:assign_pool_customer/);
   const operationalStateColumn = poolQueue.columns.find((column) => column.field === 'operational_state');
   assert.equal(operationalStateColumn?.dictCode, 'crm_customer_pool_operational_state');
   assert.deepEqual(
