@@ -38,6 +38,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DynamicDataAccessorImpl implements DataAccessor {
 
+    private static final int QUERY_PAGE_SIZE = 1_000;
+
     private final DynamicDataService dynamicDataService;
 
     @Override
@@ -61,15 +63,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             }
         }
 
-        DynamicQueryRequest request = DynamicQueryRequest.builder()
-                .pageNum(1)
-                .pageSize(10000)
-                .conditions(conditions)
-                .build();
-
-        PaginationResult<Map<String, Object>> result =
-                withCommandAuthority(() -> dynamicDataService.list(modelCode, request));
-        return result.getRecords() != null ? result.getRecords() : List.of();
+        return queryAll(modelCode, conditions);
     }
 
     @Override
@@ -84,19 +78,32 @@ public class DynamicDataAccessorImpl implements DataAccessor {
 
         log.debug("Plugin DataAccessor: queryIn({}, {}, {} values)", modelCode, fieldName, queryValues.size());
 
-        DynamicQueryRequest request = DynamicQueryRequest.builder()
-                .pageNum(1)
-                .pageSize(10000)
-                .conditions(List.of(QueryCondition.builder()
+        return queryAll(modelCode, List.of(QueryCondition.builder()
                         .fieldName(fieldName)
                         .operator(QueryCondition.Operator.IN)
                         .values(queryValues)
-                        .build()))
-                .build();
+                        .build()));
+    }
 
-        PaginationResult<Map<String, Object>> result =
-                withCommandAuthority(() -> dynamicDataService.list(modelCode, request));
-        return result.getRecords() != null ? result.getRecords() : List.of();
+    private List<Map<String, Object>> queryAll(String modelCode, List<QueryCondition> conditions) {
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (int pageNum = 1; ; pageNum++) {
+            DynamicQueryRequest request = DynamicQueryRequest.builder()
+                    .pageNum(pageNum)
+                    .pageSize(QUERY_PAGE_SIZE)
+                    .conditions(conditions)
+                    .build();
+            PaginationResult<Map<String, Object>> result =
+                    withCommandAuthority(() -> dynamicDataService.list(modelCode, request));
+            List<Map<String, Object>> page = result == null || result.getRecords() == null
+                    ? List.of() : result.getRecords();
+            records.addAll(page);
+            Long total = result == null ? null : result.getTotal();
+            if (page.isEmpty() || page.size() < QUERY_PAGE_SIZE
+                    || (total != null && records.size() >= total)) {
+                return List.copyOf(records);
+            }
+        }
     }
 
     private static List<Object> distinctNonNullValues(Collection<?> values) {
