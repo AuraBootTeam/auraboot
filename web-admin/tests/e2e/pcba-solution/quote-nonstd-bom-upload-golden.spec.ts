@@ -439,7 +439,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(page.getByTestId('metric-strip-qo_process_fee_metrics')).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByTestId('metric-strip-item-matched_count')).toContainText(/[1-9]/);
+    await expect(page.getByTestId('metric-strip-item-total_points')).toBeVisible();
 
     const resistorHitRow = page
       .locator('[data-testid^="table-row-"]')

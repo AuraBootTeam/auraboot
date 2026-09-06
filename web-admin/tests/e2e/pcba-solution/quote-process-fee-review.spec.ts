@@ -23,16 +23,12 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
     await expect(processPointsTab).toBeVisible({ timeout: 20_000 });
     await processPointsTab.click();
 
-    // Gerber-only caliber (2026-09-04): the board summary card is the primary
-    // presentation. Without Gerber histograms every row stays unresolved, so the
-    // card reports 部分识别 plus the aggregated trace-backed reason.
-    await expect(
-      page.getByRole('heading', { name: /板级加工点数汇总|Board Process Point Summary/ }),
-    ).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/部分识别/)).toBeVisible();
-    await expect(
-      page.getByText(/3 行待复核[:：]\s*未上传 Gerber，无法按面积区间计点/),
-    ).toBeVisible();
+    // Gerber-only caliber v2 (2026-09-06): the strip keeps TOTAL points and the
+    // rule version; the board summary card retired. Without Gerber histograms
+    // every row stays 需人工复核 and the rows aggregate back to ORIGINAL Excel
+    // lines (refdes lists intact).
+    await expect(page.getByText(/规则版本|Rule Version/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('metric-strip-item-total_points')).toBeVisible();
 
     const processTable = page
       .locator('table')
@@ -47,7 +43,7 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
     expect(
       headers,
       `unexpected process-point headers: ${JSON.stringify(headers)}`,
-    ).toEqual(['原始行', '位号', '状态', '物料/规格', 'GERBER事实', '数量/点数', '说明/处理']);
+    ).toEqual(['原始行', '位号', '状态', '物料/规格', 'GERBER事实', '数量/点数']);
 
     const matchedChip = page.getByTestId('metric-strip-item-matched');
     const manualRequiredChip = page.getByTestId('metric-strip-item-partial');
@@ -61,11 +57,10 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
       const row = processTable.locator('[data-testid^="table-row-"]').filter({ hasText: mpn });
       await expect(row).toHaveCount(1, { timeout: 20_000 });
       await expect(row).toContainText(/需人工复核|Needs Review/);
-      // GERBER事实 stays a bare dash: the empty "- · 0point" concatenation is gone,
-      // and the note column carries the trace-backed reason plus the action.
-      await expect(row).toContainText(
-        /未上传 Gerber，无法按面积区间计点；补齐 Gerber 资料或确认解析结果后重新计算/,
-      );
+      // GERBER事实 stays a bare dash (no parse, no facts) and the note column is
+      // retired — reasons live in the trace, not in a UI column.
+      await expect(row).toContainText('共 0 点');
+      await expect(row).not.toContainText(/未上传 Gerber/);
     }
 
     await processTable.scrollIntoViewIfNeeded();
