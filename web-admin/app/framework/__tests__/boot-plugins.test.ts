@@ -21,7 +21,7 @@ vi.mock('~/plugins/core-decisionops', () => ({ default: { manifest: { code: 'cor
 
 const pluginLoader = {
   setFeatureGate: vi.fn(),
-  list: vi.fn(() => []),
+  list: vi.fn(() => [] as Array<{ state: string; definition: { manifest: { code: string } } }>),
   install: vi.fn(),
   enable: vi.fn(),
   activateAll: vi.fn(async () => ['core-demo']),
