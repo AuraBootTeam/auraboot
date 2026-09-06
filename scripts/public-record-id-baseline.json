@@ -1,22 +1,49 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-24T14:45:54.329Z",
+  "generatedAt": "2026-09-06T15:53:15.979Z",
   "accepted": [
+    {
+      "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|List<Map<String, Object>> options = new ArrayList<>();",
+      "code": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK",
+      "category": "dynamic-read-boundary",
+      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java",
+      "line": 1247,
+      "field": "dynamic-record-map",
+      "evidence": "List<Map<String, Object>> options = new ArrayList<>();"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|List<Map<String, Object>> options = resolveDictItems(dictCode);",
+      "code": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK",
+      "category": "dynamic-read-boundary",
+      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java",
+      "line": 1301,
+      "field": "dynamic-record-map",
+      "evidence": "List<Map<String, Object>> options = resolveDictItems(dictCode);"
+    },
     {
       "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);",
       "code": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK",
       "category": "dynamic-read-boundary",
       "file": "platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java",
-      "line": 297,
+      "line": 401,
       "field": "dynamic-record-map",
       "evidence": "Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|private List<Map<String, Object>> resolveDictItems(String dictCode) {",
+      "code": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK",
+      "category": "dynamic-read-boundary",
+      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java",
+      "line": 1242,
+      "field": "dynamic-record-map",
+      "evidence": "private List<Map<String, Object>> resolveDictItems(String dictCode) {"
     },
     {
       "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts||recordId|const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;",
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts",
-      "line": 317,
+      "line": 513,
       "field": "recordId",
       "evidence": "const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;"
     },
@@ -25,7 +52,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/plugins/core-aurabot/components-shell/AuraBotProvider.tsx",
-      "line": 468,
+      "line": 480,
       "field": "recordId",
       "evidence": "const recordPid = params.recordPid ?? params.recordId;"
     },
@@ -70,7 +97,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/routes/p.$pageKey.edit.tsx",
-      "line": 14,
+      "line": 16,
       "field": "recordId",
       "evidence": "const recordPid = params.recordPid ?? params.recordId;"
     },
@@ -88,7 +115,7 @@
       "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
       "category": "frontend-runtime",
       "file": "web-admin/app/routes/p.$pageKey.view.tsx",
-      "line": 13,
+      "line": 15,
       "field": "recordId",
       "evidence": "return params.recordPid ?? params.recordId;"
     },

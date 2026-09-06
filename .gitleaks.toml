@@ -5,7 +5,7 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "Global allowlist for known-safe placeholders and test fixtures."
 
 paths = [
@@ -61,3 +61,7 @@ regexes = [
   # JWT example / test tokens (literal "test" suffix)
   '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.test''',
 ]
+
+[[allowlists]]
+description = "Historical local observability canary (commit 322ed0c49c, removed from main): containerized Grafana local-stack basic auth on 127.0.0.1:3000, a CI test-stack default rather than a real credential."
+commits = ['322ed0c49cf2d04fe95642a20e6f6f594d211d22']
