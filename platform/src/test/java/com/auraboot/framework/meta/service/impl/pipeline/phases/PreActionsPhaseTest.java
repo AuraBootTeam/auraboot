@@ -211,4 +211,74 @@ class PreActionsPhaseTest {
                 .containsEntry("attachmentCount", 0);
         assertThat(ctx.getBeforeSnapshot()).isEqualTo(currentRecord);
     }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void execute_systemYearPlaceholder_scopesContextLookupFilterAndFacts() {
+        // Mirrors wd:submit_leave_request: the balance lookup must be scoped to
+        // the current year (${system.year}) so stale rows for other years can
+        // never satisfy (or fail) the current year's annual-leave validation.
+        Map<String, Object> lookup = Map.of(
+                "modelCode", "wd_leave_balance",
+                "filters", List.of(
+                        Map.of("field", "wd_bal_employee", "op", "=", "value", "${payload.wd_req_applicant}"),
+                        Map.of("field", "wd_bal_year", "op", "=", "value", "${system.year}")
+                ),
+                "exposeAs", "balance"
+        );
+        Map<String, Object> action = Map.of(
+                "type", "bpm:run-rule",
+                "ruleCode", "wd_leave_validation",
+                "contextLookup", List.of(lookup),
+                "facts", Map.of(
+                        "balanceRemaining", "${balance.wd_bal_annual_remaining}",
+                        "requestYear", "${system.year}"
+                )
+        );
+
+        Map<String, Object> payload = Map.of("wd_req_applicant", "emp-1");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        CommandDefinition command = new CommandDefinition();
+        command.setModelCode("wd_leave_request");
+
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .tenantId(100L)
+                .request(request)
+                .command(command)
+                .execConfig(new HashMap<>(Map.of("preActions", List.of(action))))
+                .payload(new HashMap<>(payload))
+                .build();
+
+        when(dynamicDataService.list(eq("wd_leave_balance"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(
+                        List.of(Map.of("wd_bal_annual_remaining", 2)),
+                        1L,
+                        1,
+                        1
+                ));
+        when(droolsEngineService.evaluate(eq("wd_leave_validation"), any()))
+                .thenReturn(Map.of("valid", true));
+
+        phase.execute(ctx);
+
+        int expectedYear = java.time.LocalDate.now().getYear();
+        ArgumentCaptor<DynamicQueryRequest> requestCaptor =
+                ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        org.mockito.Mockito.verify(dynamicDataService)
+                .list(eq("wd_leave_balance"), requestCaptor.capture());
+        List<com.auraboot.framework.meta.dto.QueryCondition> conditions =
+                requestCaptor.getValue().getConditions();
+        assertThat(conditions).extracting(
+                        com.auraboot.framework.meta.dto.QueryCondition::getFieldName,
+                        com.auraboot.framework.meta.dto.QueryCondition::getValue)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("wd_bal_employee", "emp-1"),
+                        org.assertj.core.groups.Tuple.tuple("wd_bal_year", expectedYear));
+
+        ArgumentCaptor<Map<String, Object>> factsCaptor = ArgumentCaptor.forClass((Class) Map.class);
+        org.mockito.Mockito.verify(droolsEngineService).evaluate(any(), factsCaptor.capture());
+        assertThat(factsCaptor.getValue())
+                .containsEntry("balanceRemaining", 2)
+                .containsEntry("requestYear", expectedYear);
+    }
 }

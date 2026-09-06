@@ -103,6 +103,11 @@
                 "field": "wd_bal_employee",
                 "op": "=",
                 "value": "${payload.wd_req_applicant}"
+              },
+              {
+                "field": "wd_bal_year",
+                "op": "=",
+                "value": "${system.year}"
               }
             ],
             "exposeAs": "balance"
@@ -174,6 +179,11 @@
                 "field": "wd_bal_employee",
                 "op": "=",
                 "value": "${currentRecord.wd_req_applicant}"
+              },
+              {
+                "field": "wd_bal_year",
+                "op": "=",
+                "value": "${system.year}"
               }
             ],
             "exposeAs": "balance"
