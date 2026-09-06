@@ -14,7 +14,13 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLATFORM_DIR="$REPO_ROOT/platform"
 
+# Exit-code contract (tools/regression/orchestrator.sh): 0 pass, 1 product
+# failure (what the report is for), 2 environment-invalid (precondition not
+# met). Preflight/precondition problems exit 2; anything that means the
+# ARTIFACT or its packaging is broken exits 1 so the ledger records a real
+# regression instead of an environment excuse.
 fatal() { printf 'bpm-release-image-gate: %s\n' "$*" >&2; exit 2; }
+fail() { printf 'bpm-release-image-gate: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 
@@ -100,14 +106,14 @@ done
 # ---- package: host-first boot jar (warmed wrapper cache), Docker packaging only
 info "building platform bootJar at $REF_SHA"
 (cd "$PLATFORM_DIR" && ./gradlew bootJar --console=plain) > "$ARTIFACTS/logs/gradle-bootjar.log" 2>&1 \
-  || fatal "bootJar build failed — see $(basename "$ARTIFACTS")/logs/gradle-bootjar.log"
+  || fail "bootJar build failed — see $(basename "$ARTIFACTS")/logs/gradle-bootjar.log"
 BOOT_JAR="$(ls -t "$PLATFORM_DIR"/build/libs/*-boot.jar 2>/dev/null | head -1)"
-[[ -n "$BOOT_JAR" ]] || fatal "boot jar not found after build"
+[[ -n "$BOOT_JAR" ]] || fail "boot jar not found after build"
 
 info "packaging $IMAGE_NAME"
 docker build -f "$PLATFORM_DIR/Dockerfile.runtime" -t "$IMAGE_NAME" "$PLATFORM_DIR" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 \
-  || fatal "docker build failed — see logs/docker-build.log"
+  || fail "docker build failed — see logs/docker-build.log"
 IMAGE_DIGEST="$(docker image inspect "$IMAGE_NAME" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
 [[ -n "$IMAGE_DIGEST" ]] || IMAGE_DIGEST="local:$IMAGE_NAME"
 
@@ -137,7 +143,7 @@ docker run --rm --network "$NET" \
   -table=ab_flyway_schema_history \
   -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true \
   migrate > "$ARTIFACTS/logs/flyway-migrate.log" 2>&1 \
-  || fatal "flyway migrate failed — see logs/flyway-migrate.log"
+  || fail "flyway migrate failed — see logs/flyway-migrate.log"
 info "schema migrated via $FLYWAY_IMAGE"
 
 docker run -d --name "$APP_CONTAINER" --network "$NET" \
@@ -147,7 +153,7 @@ docker run -d --name "$APP_CONTAINER" --network "$NET" \
   -e SPRING_DATASOURCE_PASSWORD=auraboot_l6 \
   -e PGHOST="$PG_CONTAINER" -e PGPORT="$PG_PORT_ON_NET" -e PG_DB=aura_boot_l6 \
   -e PGUSER=auraboot -e PGPASSWORD=auraboot_l6 \
-  "$IMAGE_NAME" > "$ARTIFACTS/logs/app-container.log" 2>&1 || fatal "app container failed to start"
+  "$IMAGE_NAME" > "$ARTIFACTS/logs/app-container.log" 2>&1 || fail "app container failed to start"
 
 HEALTH=""
 for i in $(seq 1 60); do
@@ -155,7 +161,7 @@ for i in $(seq 1 60); do
   if printf '%s' "$HEALTH" | grep -q '"status":"UP"'; then break; fi
   [[ "$i" == "60" ]] && {
     docker logs "$APP_CONTAINER" > "$ARTIFACTS/logs/app-container-tail.log" 2>&1 || true
-    fatal "container never reported health UP (last=$HEALTH) — see logs/app-container-tail.log"
+    fail "container never reported health UP (last=$HEALTH) — see logs/app-container-tail.log"
   }
   sleep 3
 done
