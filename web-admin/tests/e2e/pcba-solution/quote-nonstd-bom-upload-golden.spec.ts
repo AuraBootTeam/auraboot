@@ -462,7 +462,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       '说明/处理 column retired with the v2 tab',
     ).toBe(false);
     const pointsColumn2 = processHeaders2.findIndex((header) => /数量\/点数|Qty \/ Points/i.test(header));
-    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/1\s*×\s*3\s*=\s*3/);
+    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/共 3 点/);
 
     await testInfo.attach('nonstd-process-fee-0201-match.png', {
       body: await page.screenshot({ fullPage: true }),
