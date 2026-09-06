@@ -1947,3 +1947,108 @@ export async function seedGerberRuntimeQuote(page: Page): Promise<CreatedRows> {
     },
   ]);
 }
+
+// ---------------------------------------------------------------------------
+// Gerber-caliber mini board fixture (2026-09-06): the process-point gates need
+// a Gerber package the sidecar can really parse, so the recomputed points are
+// > 0 under the gerber-only caliber. The zip carries a synthetic top-copper
+// RS-274X layer (round flashes at 2mm pitch near the origin) and a metric
+// Excellon drill; the numbers below are asserted by the sidecar contract:
+// pads -> first SMD CPL row (1 point per 0.283mm2 pad), holes -> first THT
+// CPL row (1 point per 0.8mm hole).
+
+function crc32(bytes: Uint8Array): number {
+  let table = (globalThis as Record<string, unknown>).__miniZipCrcTable as Uint32Array | undefined;
+  if (!table) {
+    table = new Uint32Array(256);
+    for (let i = 0; i < 256; i += 1) {
+      let c = i;
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+      table[i] = c >>> 0;
+    }
+    (globalThis as Record<string, unknown>).__miniZipCrcTable = table;
+  }
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = (crc >>> 8) ^ table[(crc ^ byte) & 0xff];
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function miniZip(files: Array<{ name: string; content: string }>): Buffer {
+  const local: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+  for (const file of files) {
+    const nameBytes = Buffer.from(file.name, 'utf8');
+    const data = Buffer.from(file.content, 'utf8');
+    const crc = crc32(data);
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(0, 6);
+    header.writeUInt16LE(0, 8);
+    header.writeUInt16LE(0, 10);
+    header.writeUInt16LE(0, 12);
+    header.writeUInt32LE(crc, 14);
+    header.writeUInt32LE(data.length, 18);
+    header.writeUInt32LE(data.length, 22);
+    header.writeUInt16LE(nameBytes.length, 26);
+    local.push(header, nameBytes, data);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(20, 4);
+    entry.writeUInt16LE(20, 6);
+    entry.writeUInt16LE(0, 8);
+    entry.writeUInt16LE(0, 10);
+    entry.writeUInt16LE(0, 12);
+    entry.writeUInt16LE(0, 14);
+    entry.writeUInt32LE(crc, 16);
+    entry.writeUInt32LE(data.length, 20);
+    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt16LE(nameBytes.length, 28);
+    entry.writeUInt32LE(offset, 42);
+    central.push(entry, nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const centralBytes = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(files.length, 8);
+  eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(centralBytes.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  return Buffer.concat([...local, centralBytes, eocd]);
+}
+
+export function writeMiniBoardZip(
+  filePath: string,
+  options: { pads?: number; holes?: number } = {},
+): string {
+  const { pads = 3, holes = 2 } = options;
+  const gerber = [
+    'G04 mini gerber fixture*',
+    '%FSLAX24Y24*%',
+    '%MOMM*%',
+    '%ADD10C,0.600*%',
+    'D10*',
+    ...Array.from({ length: pads }, (_, i) => `X${String(i * 20000).padStart(6, '0')}Y000000D03*`),
+    'M02*',
+  ].join('\n');
+  const drill = [
+    'M48',
+    'METRIC',
+    'T01C0.800',
+    '%',
+    'T01',
+    ...Array.from({ length: holes }, (_, i) => `X${(i * 1.5).toFixed(3)}Y0.000`),
+    'M30',
+  ].join('\n');
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(
+    filePath,
+    miniZip([
+      { name: 'board.gtl', content: gerber },
+      ...(holes > 0 ? [{ name: 'board.TXT', content: drill }] : []),
+    ]),
+  );
+  return filePath;
+}

@@ -77,7 +77,7 @@ class ComplaintLoopGoldenIT extends BaseIntegrationTest {
         MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
 
         dropIfExists(complaintTable);
-        cleanMeta(complaintModel);
+        cleanMeta(complaintModel, "c_subject", "c_assignee");
         publishModel(complaintModel, "CS complaint", new String[]{"c_subject", "c_assignee"});
 
         // Auto-assign: on complaint create, set the assignee to the CS queue owner.
@@ -110,7 +110,7 @@ class ComplaintLoopGoldenIT extends BaseIntegrationTest {
             jdbcTemplate.update("DELETE FROM ab_sla_record WHERE node_id = ?", complaintModel);
             if (slaConfigPid != null) jdbcTemplate.update("DELETE FROM ab_sla_config WHERE pid = ?", slaConfigPid);
             dropIfExists(complaintTable);
-            cleanMeta(complaintModel);
+            cleanMeta(complaintModel, "c_subject", "c_assignee");
         } catch (Exception ignored) {}
     }
 
@@ -166,7 +166,7 @@ class ComplaintLoopGoldenIT extends BaseIntegrationTest {
         metaModelService.publish(m.getPid(), code + " IT fixture");
     }
 
-    private void cleanMeta(String modelCode) {
+    private void cleanMeta(String modelCode, String... fieldCodes) {
         try {
             jdbcTemplate.update(
                     "DELETE FROM ab_meta_field WHERE id IN (SELECT field_id FROM ab_meta_model_field_binding b "
@@ -174,6 +174,13 @@ class ComplaintLoopGoldenIT extends BaseIntegrationTest {
             jdbcTemplate.update("DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
                     + "(SELECT id FROM ab_meta_model WHERE code = ?)", modelCode);
             jdbcTemplate.update("DELETE FROM ab_meta_model WHERE code = ?", modelCode);
+            // Fields left unbound by a previously interrupted run escape the binding-join
+            // delete above, and their (tenant_id, code, version) rows then collide with
+            // uq_meta_field_code_ver on re-publish. Delete them directly by code.
+            for (String code : fieldCodes) {
+                jdbcTemplate.update("DELETE FROM ab_meta_field WHERE tenant_id = ? AND code = ?",
+                        getTestTenant().getId(), code);
+            }
         } catch (Exception e) {
             log.warn("[cleanup] meta cleanup for {} failed: {}", modelCode, e.getMessage());
         }

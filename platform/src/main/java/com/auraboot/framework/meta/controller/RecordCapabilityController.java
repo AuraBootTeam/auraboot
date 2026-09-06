@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.RecordCapabilities;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
+import com.auraboot.framework.meta.service.RecordRelatedCountsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +38,8 @@ public class RecordCapabilityController {
 
     private final RecordCapabilityService recordCapabilityService;
 
+    private final RecordRelatedCountsService recordRelatedCountsService;
+
     /**
      * Get available capabilities for a specific record.
      * <p>
@@ -55,6 +58,18 @@ public class RecordCapabilityController {
      * @param ifNoneMatch ETag from a previous response for conditional request
      * @return capabilities response with ETag header
      */
+    @GetMapping("/{modelCode}/{recordPid}/related-counts")
+    @Operation(
+            summary = "Get related record counts",
+            description = "Aggregate per-model record counts for every model referencing this record "
+                    + "through a reference field — mobile detail Related-Tab badges"
+    )
+    public ApiResponse<java.util.Map<String, Long>> getRelatedCounts(
+            @Parameter(description = "Model code") @PathVariable String modelCode,
+            @Parameter(description = "Record public pid") @PathVariable String recordPid) {
+        return ApiResponse.success(recordRelatedCountsService.relatedCounts(modelCode, recordPid));
+    }
+
     @GetMapping("/{modelCode}/{recordPid}/capabilities")
     @Operation(
             summary = "Get record capabilities",

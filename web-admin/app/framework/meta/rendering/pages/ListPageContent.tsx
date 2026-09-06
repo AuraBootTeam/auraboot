@@ -1447,6 +1447,12 @@ function ListPageContentInner(props: PageContentProps) {
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
   const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
+  // Monotonic sequence for loadData invocations. Concurrent triggers (debounced
+  // keyword auto-search, URL-sync effect, Enter commit, pagination) can overlap;
+  // responses must apply only when their request is still the newest one, or a
+  // stale unfiltered response can land after a filtered one and overwrite the
+  // table (PD-012).
+  const loadDataSeqRef = useRef(0);
 
   // Record preview drawer state
   const [previewRecordId, setPreviewRecordId] = useState<string | null>(null);
@@ -2028,6 +2034,9 @@ function ListPageContentInner(props: PageContentProps) {
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
     async (params?: ListLoadDataParams) => {
+      // Claim the newest slot before doing anything; an older invocation that
+      // resolves later must not touch table state (see loadDataSeqRef).
+      const requestId = ++loadDataSeqRef.current;
       if (!schema || skipListData) {
         setData([]);
         setError(null);
@@ -2143,6 +2152,13 @@ function ListPageContentInner(props: PageContentProps) {
           token: token || undefined,
         });
 
+        // A newer loadData was issued while this request was in flight — this
+        // response (and its pagination) is stale; drop it instead of letting
+        // it overwrite the newer render.
+        if (requestId !== loadDataSeqRef.current) {
+          return;
+        }
+
         if (ResultHelper.isSuccess(result) && result.data) {
           // Handle both paginated ({ records, total, current }) and flat array responses
           const responseData = result.data;
@@ -2177,11 +2193,19 @@ function ListPageContentInner(props: PageContentProps) {
           setError(result.desc || t('common.loadDataError') || 'Failed to load data');
         }
       } catch (err) {
+        // A stale request's error must not clobber the newer request's state.
+        if (requestId !== loadDataSeqRef.current) {
+          return;
+        }
         setError(
           err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
         );
       } finally {
-        setLoading(false);
+        // Only the newest invocation owns the loading flag; an older one that
+        // resolves late must not clear the newer request's spinner.
+        if (requestId === loadDataSeqRef.current) {
+          setLoading(false);
+        }
       }
     },
     [

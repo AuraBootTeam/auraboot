@@ -46,7 +46,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class DeviceOperationsAgentIT extends BaseIntegrationTest {
 
-    private static final String AGENT_CODE = "device_operations_agent";
+    // Run-unique: ab_agent_release rows are immutable, so a fixed code would collide
+    // with leftover releases from any previous run on the shared database.
+    private static final String AGENT_CODE = "device_operations_agent_" + Long.toHexString(System.nanoTime());
     private static final List<String> DEVICE_WRITE_TOOLS = List.of(
             "cmd:iot_device:invoke_service", "cmd:iot_alarm_event:ack", "cmd:iot_alarm_event:clear");
 

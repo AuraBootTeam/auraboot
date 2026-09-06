@@ -8,6 +8,7 @@ import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.integration.SelfRegistrationTestSupport;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.TenantProvisioningPolicy;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.saas.constant.SystemMode;
@@ -83,6 +84,12 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
         // SYSTEM_MODE is readonly once set, so use initialize() (upsert-style) not set().
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, SystemMode.MULTI.getCode(),
                 "system", "string", "System mode (single/multi/hybrid)", true);
+        // Tenant self-provisioning is a separate gate from the registration switch; a
+        // leftover provisioning_policy=disabled row on the shared DB (or restore in
+        // tearDown below) would fail createTenantForUser with FORBIDDEN.
+        systemConfigService.initialize(SystemConfigKeys.SYSTEM_TENANT_PROVISIONING_POLICY,
+                TenantProvisioningPolicy.SELF_SERVICE.getCode(),
+                "system", "string", "Tenant provisioning policy", false);
         SelfRegistrationTestSupport.setAllowed(systemConfigService, true);
         // The self-serve register/create-tenant flow runs without an ambient tenant context.
         MetaContext.clear();
@@ -94,6 +101,9 @@ class MultiTenantSelfRegistrationIntegrationTest extends BaseIntegrationTest {
         try {
             systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, SystemMode.SINGLE.getCode(),
                     "system", "string", "System mode (single/multi/hybrid)", true);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_TENANT_PROVISIONING_POLICY,
+                    TenantProvisioningPolicy.DISABLED.getCode(),
+                    "system", "string", "Tenant provisioning policy", false);
             SelfRegistrationTestSupport.setAllowed(systemConfigService, false);
         } catch (Exception ignored) {
             // best-effort restore on the throwaway test DB

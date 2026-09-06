@@ -517,7 +517,10 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_account_name',
     'crm_customer_pool_item_list:crm_customer_pool_evidence:owner_name',
     'crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_account_name',
-    'crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_claimed_by',
+    // #1693 reworked the queue surface: ownership is displayed through the joined
+    // owner_name column, while the raw crm_cpi_claimed_by field is written by the
+    // assign action (inputFields) instead of being shown as a raw pid column.
+    'crm_customer_pool_item_list:crm_customer_pool_queue:owner_name',
     'crm_customer_pool_item_list:crm_customer_pool_queue:operational_state',
     'crm_customer_pool_item_list:crm_customer_pool_search:crm_cpi_account_name',
     'crm_customer_pool_item_list:crm_customer_pool_status:owner_name',

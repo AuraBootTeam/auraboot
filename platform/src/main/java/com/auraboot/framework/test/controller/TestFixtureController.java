@@ -549,13 +549,43 @@ public class TestFixtureController {
         }
 
         try {
-            Method markAllRead = inboxService.getClass()
-                    .getMethod("markAllRead", Long.class, Long.class);
-            Object marked = markAllRead.invoke(inboxService, userId, tenantId);
+            // Dismiss (not just mark read) — the mobile inbox list still shows
+            // read items, so only dismissing empties the visible list.
+            Method listByUser = inboxService.getClass().getMethod("listByUser",
+                    Long.class, Long.class, String.class, String.class, int.class, int.class);
+            // listByUser may return a projection type other than the entity —
+            // resolve getId on the RUNTIME element class, not the declared one.
+            Method getId = null;
+            Method batchDismiss = inboxService.getClass()
+                    .getMethod("batchDismiss", java.util.List.class, Long.class, Long.class);
+
+            int dismissedTotal = 0;
+            for (int round = 0; round < 10; round++) {
+                Object page = listByUser.invoke(inboxService, userId, tenantId, null, "PENDING", 1, 200);
+                List<?> records = (List<?>) page.getClass().getMethod("getRecords").invoke(page);
+                if (records == null || records.isEmpty()) {
+                    break;
+                }
+                List<Long> ids = new ArrayList<>();
+                for (Object item : records) {
+                    if (getId == null) {
+                        getId = item.getClass().getMethod("getId");
+                    }
+                    Object id = getId.invoke(item);
+                    if (id instanceof Long lid) {
+                        ids.add(lid);
+                    }
+                }
+                if (ids.isEmpty()) {
+                    break;
+                }
+                batchDismiss.invoke(inboxService, ids, userId, tenantId);
+                dismissedTotal += ids.size();
+            }
             return FixtureResult.builder()
                     .success(true).fixtureName("inbox_empty").testRunId(runId)
                     .recordsCreated(0).recordPids(List.of())
-                    .metadata(Map.of("markedRead", String.valueOf(marked)))
+                    .metadata(Map.of("dismissed", String.valueOf(dismissedTotal)))
                     .build();
         } catch (Exception e) {
             log.error("inbox_empty fixture failed: {}", e.getMessage(), e);

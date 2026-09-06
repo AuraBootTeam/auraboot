@@ -17,6 +17,7 @@ import {
   readDynamicRecord,
   reassignRecordOwnerByEmail,
   setYunhanMockScenario,
+  writeMiniBoardZip,
   QUOTE_ROLE_TEST_PASSWORD,
   yunhanMockControlUrl,
   type CreatedRows,
@@ -515,10 +516,18 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
 
       // Gerber and CPL are mandatory at create (DSL required + server-side check);
       // SmartUpload validates by extension, so write real .zip/.csv fixtures.
-      const gerberFixture = path.join(os.tmpdir(), `sales-gerber-${Date.now()}.zip`);
-      fs.writeFileSync(gerberFixture, 'PK\x05\x06');
+      // Gerber-only caliber: the zip must parse so the auto-parse + recompute
+      // chain lands matched points on the edited RC0603 row (refdes R1). R1 is
+      // the only SMD CPL row (8 pads of 0.283mm2 = 8 points, first bucket).
+      const gerberFixture = writeMiniBoardZip(
+        path.join(os.tmpdir(), `sales-gerber-${Date.now()}.zip`),
+        { pads: 8, holes: 4 },
+      );
       const cplFixture = path.join(os.tmpdir(), `sales-cpl-${Date.now()}.csv`);
-      fs.writeFileSync(cplFixture, 'Designator,Mid X,Mid Y,Layer\nR1,0,0,top\n');
+      fs.writeFileSync(
+        cplFixture,
+        'Designator,Mid X,Mid Y,Layer,Pins,SMD\nR1,0,0,top,8,Yes\n',
+      );
       for (const [fieldTestId, fixture] of [
         ['form-field-gerber_source_file', gerberFixture],
         ['form-field-cpl_source_file', cplFixture],

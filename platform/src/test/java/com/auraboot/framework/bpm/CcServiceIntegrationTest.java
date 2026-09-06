@@ -40,7 +40,7 @@ class CcServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(r501.getFirst().getProcessInstanceId()).isEqualTo(setup.instanceId());
         assertThat(r501.getFirst().getContent()).isEqualTo("please be aware");
         assertThat(r501.getFirst().getIsRead()).isFalse();
-        assertThat(r501.getFirst().getSourceType()).isEqualTo("AUTOMATION");
+        assertThat(r501.getFirst().getSourceType()).isEqualTo("TASK_API");
         assertThat(r502).hasSize(1);
     }
 
