@@ -448,7 +448,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(resistorHitRow).toContainText(/完全匹配|Matched/i);
     // Gerber-only caliber: the row shows the real Gerber fact (3 paste pads of
     // 0.283mm2) instead of a stage column; 工序/依据 retired with the caliber.
-    await expect(resistorHitRow).toContainText('0.283x3 · 3pad');
+    await expect(resistorHitRow).toContainText('焊盘 0.283mm² × 3(合计 0.85mm²)');
 
     // The review drawer is retired; the flat seven-column table carries the facts
     // (qty/unit points/total points live only in the combined 数量/点数 column).
