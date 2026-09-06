@@ -58,15 +58,19 @@ test('won and lost commands enforce closing rules in the command pipeline', () =
   const win = byCode.get('crm:win_opportunity');
   const lose = byCode.get('crm:lose_opportunity');
 
-  assert.deepEqual(
-    win.preconditions.map(({ field, operator, value }) => ({ field, operator, value })),
-    [
-      { field: 'crm_opp_expected_amount', operator: 'GT', value: 0 },
-      { field: 'crm_opp_expected_close_date', operator: 'NOT_NULL', value: undefined },
-    ],
-  );
+  // #1697 moved the close rules out of DSL preconditions: they are data-driven
+  // (crm_opportunity_close_rule) and enforced inside crm:close_opportunity —
+  // positive amount, close date, loss reason and loss note are covered by
+  // OpportunityCloseHandlerTest. The DSL contract is the state machine plus the
+  // handler wiring below.
+  assert.equal(win.preconditions, undefined);
+  assert.deepEqual(win.fromStates, ['discovery', 'qualification', 'proposal', 'negotiation']);
+  assert.equal(win.toState, 'closed_won');
+  assert.equal(win.stateField, 'crm_opp_stage');
   assert.ok(lose.inputFields.includes('crm_opp_lost_reason_code'));
-  assert.ok(lose.preconditions.some((rule) => rule.field === 'crm_opp_lost_reason_code'));
+  assert.equal(lose.preconditions, undefined);
+  assert.deepEqual(lose.fromStates, ['discovery', 'qualification', 'proposal', 'negotiation']);
+  assert.equal(lose.toState, 'closed_lost');
   assert.equal(win.handler, 'crm:close_opportunity');
   assert.equal(lose.handler, 'crm:close_opportunity');
   assert.equal(win.handlerParams?.dslPersistence, false);
