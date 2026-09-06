@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -59,7 +60,7 @@ class DynamicDataAccessorImplTest {
     @Test
     void query_builds_EQ_conditions_from_filters_map() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
-            .thenReturn(PaginationResult.of(List.of(Map.of("a", 1)), 1L, 1, 10000));
+            .thenReturn(PaginationResult.of(List.of(Map.of("a", 1)), 1L, 1, 1000));
 
         List<Map<String, Object>> rows = accessor.query("m", Map.of("status", "open"));
         assertThat(rows).hasSize(1);
@@ -68,7 +69,7 @@ class DynamicDataAccessorImplTest {
         verify(dynamicDataService).list(eq("m"), cap.capture());
         DynamicQueryRequest req = cap.getValue();
         assertThat(req.getPageNum()).isEqualTo(1);
-        assertThat(req.getPageSize()).isEqualTo(10000);
+        assertThat(req.getPageSize()).isEqualTo(1000);
         assertThat(req.getConditions()).hasSize(1);
         QueryCondition c = req.getConditions().get(0);
         assertThat(c.getFieldName()).isEqualTo("status");
@@ -79,7 +80,7 @@ class DynamicDataAccessorImplTest {
     @Test
     void query_with_null_filters_uses_empty_conditions() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
-            .thenReturn(PaginationResult.of(List.of(), 0L, 1, 10000));
+            .thenReturn(PaginationResult.of(List.of(), 0L, 1, 1000));
 
         accessor.query("m", null);
 
@@ -97,9 +98,30 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void query_collects_every_page_promised_by_the_data_accessor_contract() {
+        List<Map<String, Object>> firstPage = java.util.stream.IntStream.range(0, 1000)
+                .mapToObj(index -> Map.<String, Object>of("id", index))
+                .toList();
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenAnswer(invocation -> {
+                    DynamicQueryRequest request = invocation.getArgument(1);
+                    return request.getPageNum() == 1
+                            ? PaginationResult.of(firstPage, 1001L, 1, 1000)
+                            : PaginationResult.of(List.of(Map.of("id", 1000)), 1001L, 2, 1000);
+                });
+
+        assertThat(accessor.query("m", Map.of())).hasSize(1001);
+
+        ArgumentCaptor<DynamicQueryRequest> cap = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService, times(2)).list(eq("m"), cap.capture());
+        assertThat(cap.getAllValues()).extracting(DynamicQueryRequest::getPageNum)
+                .containsExactly(1, 2);
+    }
+
+    @Test
     void queryIn_builds_IN_condition_from_distinct_non_null_values() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
-            .thenReturn(PaginationResult.of(List.of(Map.of("code", "A")), 1L, 1, 10000));
+            .thenReturn(PaginationResult.of(List.of(Map.of("code", "A")), 1L, 1, 1000));
 
         List<Map<String, Object>> rows = accessor.queryIn("m", "code", java.util.Arrays.asList("A", "B", "A", null));
         assertThat(rows).hasSize(1);
@@ -108,7 +130,7 @@ class DynamicDataAccessorImplTest {
         verify(dynamicDataService).list(eq("m"), cap.capture());
         DynamicQueryRequest req = cap.getValue();
         assertThat(req.getPageNum()).isEqualTo(1);
-        assertThat(req.getPageSize()).isEqualTo(10000);
+        assertThat(req.getPageSize()).isEqualTo(1000);
         assertThat(req.getConditions()).hasSize(1);
         QueryCondition c = req.getConditions().get(0);
         assertThat(c.getFieldName()).isEqualTo("code");
