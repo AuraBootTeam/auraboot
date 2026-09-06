@@ -75,9 +75,13 @@ test('opportunity create command auto-sets owner to the authenticated user', asy
   const commands = await readJson('commands/crm_opportunity_common.json');
   const create = commands.find((command) => command.code === 'crm:create_opportunity');
   assert.ok(create, 'crm:create_opportunity must exist');
+  // #1796 added preserveInput so an explicitly provided owner wins over the
+  // auto-fill; the auto-set still guarantees self/dept scoped creators can
+  // reopen their own records when no owner was passed.
   assert.deepEqual(create.autoSetFields?.crm_opp_owner, {
     strategy: 'current_user_pid',
-  }, 'create must fill crm_opp_owner so self/dept scoped creators can reopen their own records');
+    preserveInput: true,
+  }, 'create must fill crm_opp_owner (explicit owner input still wins)');
 });
 
 test('explicit model permissions retain the resource/action metadata used by data scopes', async () => {
