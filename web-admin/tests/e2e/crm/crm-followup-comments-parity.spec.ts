@@ -129,7 +129,7 @@ test.describe('CRM follow-up comments — Cordys PAR-12 parity', () => {
     baseURL,
   }, testInfo) => {
     const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
-    const uid = uniqueId('crm_comment');
+    const uid = uniqueId('协作评论');
     const teammate: TestUser = {
       email: `crm-comment-${uid}@e2e.local`,
       displayName: `CRM Reviewer ${uid}`,

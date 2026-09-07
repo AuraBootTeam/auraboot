@@ -171,7 +171,7 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_contact_form');
+    const uid = uniqueId('联系人表单');
     const accountName = `Contact Form Account ${uid}`;
     const contactName = `Contact Form Person ${uid}`;
     const account = await executeCommandViaApi(
@@ -316,7 +316,7 @@ test.describe('CRM contact management — Cordys PAR-07 Web parity', () => {
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_contact_t05');
+    const uid = uniqueId('联系人T05');
     const account = await executeCommandViaApi(
       page,
       'crm:create_account',

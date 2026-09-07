@@ -140,7 +140,7 @@ test.describe.serial('CRM lead management — Cordys PAR-03 source-bound parity'
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_lead_manage');
+    const uid = uniqueId('线索管理');
     const original = `Lead Manage ${uid}`;
     const updated = `Lead Updated ${uid}`;
     const created = await executeCommandViaApi(
@@ -229,7 +229,7 @@ test.describe.serial('CRM lead management — Cordys PAR-03 source-bound parity'
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_lead_batch');
+    const uid = uniqueId('线索批量');
     const companies = [`Lead Batch A ${uid}`, `Lead Batch B ${uid}`, `Lead Row Delete ${uid}`];
     const records = await Promise.all(
       companies.map((company) =>
@@ -324,7 +324,7 @@ test.describe.serial('CRM lead management — Cordys PAR-03 source-bound parity'
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_lead_governed');
+    const uid = uniqueId('线索治理');
     const companies = {
       transferA: `Lead Transfer A ${uid}`,
       transferB: `Lead Transfer B ${uid}`,

@@ -77,7 +77,7 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
   test('PAR05-REL-01: UI CRUD keeps one relationship fact visible from both accounts @critical @golden', async ({
     page,
   }, testInfo) => {
-    const uid = uniqueId('crm_account_relation');
+    const uid = uniqueId('客户关系');
     const sourceName = `源客户 ${uid}`;
     const targetName = `关系客户 ${uid}`;
     const thirdName = `边界客户 ${uid}`;
@@ -301,7 +301,7 @@ test.describe('CRM account relationship graph — Cordys PAR-05 parity', () => {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    const uid = uniqueId('crm_relation_save');
+    const uid = uniqueId('关系保存');
     const sourceName = `保存源客户 ${uid.slice(-8)}`;
     const targetName = `保存目标客户 ${uid.slice(-8)}`;
     const source = await createAccount(page, sourceName, uid);

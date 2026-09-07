@@ -101,7 +101,7 @@ test.describe('CRM account collaboration', () => {
     baseURL,
   }, testInfo) => {
     const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
-    const uid = uniqueId('crm_share');
+    const uid = uniqueId('协作共享');
     const owner: TestUser = {
       email: `crm-owner-${uid}@e2e.local`,
       displayName: `CRM Owner ${uid}`,

@@ -164,7 +164,7 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_account_manage');
+    const uid = uniqueId('客户管理');
     const original = `Account Manage ${uid}`;
     const updated = `Account Updated ${uid}`;
     const created = await createAccount(page, original, uid);
@@ -283,7 +283,7 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_account_batch');
+    const uid = uniqueId('客户批量');
     const names = [`Account Batch A ${uid}`, `Account Batch B ${uid}`, `Account Row Delete ${uid}`];
     const records = await Promise.all(names.map((name) => createAccount(page, name, uid)));
 
@@ -354,7 +354,7 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_account_merge');
+    const uid = uniqueId('客户合并');
     const sourceName = `Account Merge Source ${uid}`;
     const targetName = `Account Merge Target ${uid}`;
     const source = await createAccount(page, sourceName, uid);
@@ -403,7 +403,7 @@ test.describe.serial('CRM account management — Cordys PAR-05 source-bound pari
     page,
   }, testInfo) => {
     trackRuntimeFailures(page);
-    const uid = uniqueId('crm_account_governed');
+    const uid = uniqueId('客户治理');
     const names = {
       transferA: `Account Transfer A ${uid}`,
       transferB: `Account Transfer B ${uid}`,
