@@ -137,7 +137,7 @@ test.describe('CRM lead conversion activity carry — Cordys PAR-03 parity', () 
   test('PAR03-UI-01: conversion preserves follow-up graph and comments @critical @golden', async ({
     page,
   }, testInfo) => {
-    const uid = uniqueId('crm_convert_activity');
+    const uid = uniqueId('转化跟进');
     const company = `PAR-03 转化客户 ${uid}`;
     const contactName = `采购负责人 ${uid}`;
     const directSubject = `现场拜访记录 ${uid}`;

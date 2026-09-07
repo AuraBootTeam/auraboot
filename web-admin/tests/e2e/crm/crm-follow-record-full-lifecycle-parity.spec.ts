@@ -222,7 +222,7 @@ test.describe.serial('CRM follow-up record lifecycle — Cordys PAR-10 source-bo
         );
       }
     });
-    const uid = uniqueId('crm_follow_record');
+    const uid = uniqueId('跟进记录');
     const leadLabel = `Follow Lead ${uid}`;
     const accountLabel = `Follow Account ${uid}`;
     const opportunityLabel = `Follow Opportunity ${uid}`;
@@ -491,7 +491,7 @@ test.describe.serial('CRM follow-up plan lifecycle — Cordys PAR-11 source-boun
         );
       }
     });
-    const uid = uniqueId('crm_follow_plan');
+    const uid = uniqueId('跟进计划');
     const leadLabel = `Plan Lead ${uid}`;
     const accountLabel = `Plan Account ${uid}`;
     const opportunityLabel = `Plan Opportunity ${uid}`;

@@ -78,7 +78,7 @@ test.describe('CRM contact-channel field masking', () => {
     baseURL,
   }, testInfo) => {
     const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
-    const uid = uniqueId('crm_mask');
+    const uid = uniqueId('渠道脱敏');
     const sales: TestUser = {
       email: `crm-mask-sales-${uid}@e2e.local`,
       displayName: `CRM Mask Sales ${uid}`,

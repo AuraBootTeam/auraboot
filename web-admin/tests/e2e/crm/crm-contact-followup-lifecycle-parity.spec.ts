@@ -118,7 +118,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
     page,
     browser,
   }, testInfo) => {
-    const uid = uniqueId('crm_lifecycle');
+    const uid = uniqueId('联系人生命周期');
     const accountName = `PAR 生命周期客户 ${uid}`;
     const firstName = `主联系人甲 ${uid}`;
     const secondName = `联系人乙 ${uid}`;
