@@ -351,8 +351,9 @@ test.describe('PCBA quote minimal create regression', () => {
       );
       const quoteId = String(quoteData.recordId ?? quoteData.quoteId ?? quoteData.pid ?? '');
       expect(quoteId, 'quote create should return quote id').toBeTruthy();
-      // Gerber/CPL are now mandatory at create, so both source attachments dispatch.
-      expect(quoteData.uploadedSourceCount).toBe(2);
+      // Gerber/CPL/corrected-BOM are mandatory at create, so all three source
+      // attachments dispatch (the BOM also lands as the raw_bom attachment row).
+      expect(quoteData.uploadedSourceCount).toBe(3);
       expect(quoteData.correctedBomImported).toBe(true);
       const correctedBomImport = (quoteData.correctedBomImport ?? {}) as Record<string, unknown>;
       if (correctedBomImport.async === true && typeof correctedBomImport.taskCode === 'string') {
