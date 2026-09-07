@@ -59,7 +59,9 @@ test('OSS reset uses fail-closed runtime ownership instead of global process mat
   assert.match(reset, /aura_reset_register_process "backend"[^\n]+"java -jar"/);
   assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"backend"[^\n]+"java -jar"/);
   assert.match(reset, /\.\/gradlew --no-daemon :bootJar -x test/);
-  assert.match(reset, /aura_reset_spawn_detached[^\n]+java -jar "\$BOOT_JAR"/);
+  // The spawn call may pass env assignments on continuation lines; the contract
+  // intent is that the detached spawn runs the boot jar, not a same-line match.
+  assert.match(reset, /aura_reset_spawn_detached[\s\S]{0,400}?java -jar "\$BOOT_JAR"\)/);
   assert.match(reset, /aura_reset_register_process "web"/);
   assert.match(reset, /aura_reset_register_process "bff"/);
   assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"web"/);

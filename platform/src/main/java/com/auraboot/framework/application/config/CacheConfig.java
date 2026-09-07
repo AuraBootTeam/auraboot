@@ -91,8 +91,7 @@ public class CacheConfig {
 
             // DSL projection caches
 
-            // Data permission caches
-            "dataPermissionRowFilter",
+            // Data permission caches (row filters are intentionally uncached: #1602)
             "dataPermissionMaskRules",
 
             // Command execution caches (N+1 optimization)
