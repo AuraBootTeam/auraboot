@@ -64,6 +64,7 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
+import com.auraboot.framework.permission.service.CommandActionDeriver;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -151,6 +152,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PageSchemaContributionImportService pageSchemaContributionImportService;
     private final NotificationTemplateMapper notificationTemplateMapper;
     private final AutoPermissionAssignmentService autoPermissionAssignmentService;
+    private final CommandActionDeriver commandActionDeriver;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
     private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
@@ -1638,6 +1640,14 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 
+        // Generated model actions (model.<code>.create/update/... plus command verbs)
+        // only exist after the post-processing above, which runs AFTER the ROLE import
+        // stage. Role declarations referencing them were silently skipped at that stage
+        // ("Permission not found for role binding"), so plugin business roles ended up
+        // without model write access on first import. Reconcile now that every generated
+        // action resolves; binding is idempotent.
+        reconcileRolePermissionBindings(manifest, tenantId);
+
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.
         publishSemanticResources(manifest, result, tenantId);
@@ -1727,6 +1737,59 @@ public class PluginImportServiceImpl implements PluginImportService {
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
                 autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
+            }
+        }
+    }
+
+    /**
+     * True when {@code permissionCode} names a model action (model.&lt;modelCode&gt;.&lt;action&gt;)
+     * that this import will itself generate for one of the models it provides: the action
+     * set of {@code autoAssignPermissions} is baseline CRUD/import/export plus command
+     * verbs. Restricting the check to manifest-provided models keeps the escape hatch from
+     * whitelisting references to other plugins' models.
+     */
+    private boolean isGeneratedModelActionReference(String permissionCode, Set<String> manifestModelCodes,
+                                                    List<CommandDefinitionDTO> manifestCommands) {
+        if (!permissionCode.startsWith("model.")) {
+            return false;
+        }
+        String withoutPrefix = permissionCode.substring("model.".length());
+        int lastDot = withoutPrefix.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot == withoutPrefix.length() - 1) {
+            return false;
+        }
+        String modelCode = withoutPrefix.substring(0, lastDot);
+        String action = withoutPrefix.substring(lastDot + 1);
+        if (!manifestModelCodes.contains(modelCode) || manifestCommands == null) {
+            return false;
+        }
+        Map<String, String> execTypeByCommandCode = new LinkedHashMap<>();
+        for (CommandDefinitionDTO cmd : manifestCommands) {
+            if (cmd == null || !modelCode.equals(cmd.getModelCode()) || isBlank(cmd.getCode())) {
+                continue;
+            }
+            String execType = !isBlank(cmd.getType()) ? cmd.getType().toLowerCase() : null;
+            execTypeByCommandCode.putIfAbsent(cmd.getCode(), execType);
+        }
+        return commandActionDeriver.deriveActionsFromCommandExecTypes(modelCode, execTypeByCommandCode)
+                .contains(action);
+    }
+
+    private void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {
+        if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) {
+            return;
+        }
+        for (RoleDefinitionDTO role : manifest.getRoles()) {
+            if (role == null || !role.isValid()) {
+                continue;
+            }
+            try {
+                resourceImporter.reconcileRolePermissions(role, tenantId);
+            } catch (Exception e) {
+                // Per-role best-effort, mirroring updateRolePermissions: one broken role
+                // must not abort the import; the warning keeps the gap visible in logs.
+                log.warn("Role permission reconciliation failed for role {}: {}",
+                        logSafe(role.getCode()), logSafe(e.getMessage()), e);
             }
         }
     }
@@ -3350,12 +3413,19 @@ public class PluginImportServiceImpl implements PluginImportService {
                     if (isBlank(permissionCode)) {
                         continue;
                     }
-                    if (!manifestPermissionCodes.contains(permissionCode)
-                            && !existsInTenant(tenantId, permissionCode, permissionExistsCache,
-                            code -> resourceImporter.checkPermissionExists(tenantId, code))) {
-                        String msg = "Role '" + role.getCode() + "' references missing permission: " + permissionCode;
-                        errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
+                    if (manifestPermissionCodes.contains(permissionCode)
+                            || existsInTenant(tenantId, permissionCode, permissionExistsCache,
+                            code -> resourceImporter.checkPermissionExists(tenantId, code))
+                            // Model actions this plugin generates for its own models
+                            // (baseline CRUD/import/export + command verbs) do not have
+                            // permission rows yet at validation time; roles legitimately
+                            // reference them and the import binds them post-generation.
+                            || isGeneratedModelActionReference(permissionCode, manifestModelCodes,
+                            manifest.getCommands())) {
+                        continue;
                     }
+                    String msg = "Role '" + role.getCode() + "' references missing permission: " + permissionCode;
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
                 if (role.getPermissionPolicies() != null) {
                     for (RolePermissionPolicyDefinitionDTO policy : role.getPermissionPolicies()) {
