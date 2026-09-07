@@ -1941,6 +1941,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             return updatedRecord;
 
+        } catch (RecordVersionConflictException e) {
+            // Pass the wire-stable 409/40900 contract through unwrapped: mobile
+            // offline replay keys on this status to branch into conflict resolution.
+            throw e;
         } catch (Exception e) {
             log.error("Update operation failed for model {} with ID {}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
