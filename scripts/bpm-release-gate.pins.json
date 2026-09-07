@@ -21,6 +21,11 @@
       "id": "l5-bfi006-no-instance",
       "pattern": "BFI-006: Leave request data visible",
       "reason": "环境条件跳过:依赖 HR 插件与前序实例数据(hrPluginReady/pid 缺失时诚实 skip);请假数据展示由 ui-full-stack G2-G4 与 notification-task NT 系列硬性覆盖"
+    },
+    {
+      "id": "l5-pr004-no-started-instances",
+      "pattern": "PR-004 -- My Started tab shows instances",
+      "reason": "环境条件跳过:「我发起的」tab 无实例数据(暂无实例/空态)时诚实 skip;同文件 PR-002/003/005-010 全量运行硬性覆盖 ProcessTable 渲染与行级断言。2026-09-07 首次触发(数据时序),非产品断言失败"
     }
   ],
   "flips": []
