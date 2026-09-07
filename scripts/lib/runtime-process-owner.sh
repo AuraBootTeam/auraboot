@@ -349,7 +349,8 @@ aura_reset_reclaim_stale_lock() {
     owner_host="$(aura_reset_record_value "$owner_file" hostname)"
     owner_pid="$(aura_reset_record_value "$owner_file" pid)"
     owner_start="$(aura_reset_record_value "$owner_file" start_time)"
-    [ "$owner_host" = "$AURA_RESET_OWNER_HOSTNAME" ] || return 1
+    # hostname is diagnostic only (macOS rotates it with network/reboot);
+    # lock ownership is proven by pid aliveness + start_time below.
     [[ "$owner_pid" =~ ^[1-9][0-9]*$ ]] || return 1
     [ -n "$owner_start" ] || return 1
 
@@ -741,6 +742,11 @@ aura_reset_assert_service_owned() {
     }
 
     runtime_id="$(aura_reset_record_value "$record_file" runtime_id)"
+    # hostname is NOT part of the match: macOS rotates the hostname with
+    # network changes and reboots, so comparing it rejects the machine's own
+    # perfectly-alive runtime after such a rotation (2026-09-07 incident).
+    # Identity is over-determined by runtime_id/source_root/process_root/port/
+    # command_token plus live pid+pgid+start_time checks.
     hostname="$(aura_reset_record_value "$record_file" hostname)"
     record_service="$(aura_reset_record_value "$record_file" service)"
     pid="$(aura_reset_record_value "$record_file" pid)"
@@ -755,7 +761,6 @@ aura_reset_assert_service_owned() {
     command_token="$(aura_reset_record_value "$record_file" command_token)"
 
     [ "$runtime_id" = "$AURA_RESET_OWNER_RUNTIME_ID" ] \
-        && [ "$hostname" = "$AURA_RESET_OWNER_HOSTNAME" ] \
         && [ "$record_service" = "$service" ] \
         && [ "$source_root" = "$AURA_RESET_OWNER_SOURCE_ROOT" ] \
         && [ "$process_root" = "$canonical_process_root" ] \
@@ -864,6 +869,11 @@ aura_reset_stop_service() {
     fi
 
     runtime_id="$(aura_reset_record_value "$record_file" runtime_id)"
+    # hostname is NOT part of the match: macOS rotates the hostname with
+    # network changes and reboots, so comparing it rejects the machine's own
+    # perfectly-alive runtime after such a rotation (2026-09-07 incident).
+    # Identity is over-determined by runtime_id/source_root/process_root/port/
+    # command_token plus live pid+pgid+start_time checks.
     hostname="$(aura_reset_record_value "$record_file" hostname)"
     record_service="$(aura_reset_record_value "$record_file" service)"
     pid="$(aura_reset_record_value "$record_file" pid)"
@@ -878,7 +888,6 @@ aura_reset_stop_service() {
     command_token="$(aura_reset_record_value "$record_file" command_token)"
 
     [ "$runtime_id" = "$AURA_RESET_OWNER_RUNTIME_ID" ] \
-        && [ "$hostname" = "$AURA_RESET_OWNER_HOSTNAME" ] \
         && [ "$record_service" = "$service" ] \
         && [ "$source_root" = "$AURA_RESET_OWNER_SOURCE_ROOT" ] \
         && [ "$process_root" = "$canonical_process_root" ] \
