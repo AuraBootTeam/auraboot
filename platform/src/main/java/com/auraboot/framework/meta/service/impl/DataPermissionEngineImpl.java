@@ -334,10 +334,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     // ==================== Cache Eviction ====================
 
     /**
-     * Evict all cached row filters and mask rules for a tenant.
-     * Should be called when policies or role bindings change.
+     * Evict cached mask rules for a tenant. Should be called when policies or
+     * role bindings change. Row filters are intentionally uncached (record-share
+     * grants can be created, revoked, or expire at any time — #1602).
      */
-    @CacheEvict(value = {"dataPermissionRowFilter", "dataPermissionMaskRules"}, allEntries = true)
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void evictCache() {
         log.info("Evicted all data permission engine caches");
     }

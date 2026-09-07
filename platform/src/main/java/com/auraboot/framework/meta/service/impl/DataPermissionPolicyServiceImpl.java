@@ -34,10 +34,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public DataPermissionPolicy create(DataPermissionPolicyCreateRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         String pid = UniqueIdGenerator.generate();
@@ -84,10 +81,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public DataPermissionPolicy update(String pid, DataPermissionPolicyCreateRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         DataPermissionPolicy existing = policyMapper.findByPid(tenantId, pid);
@@ -115,10 +109,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void delete(String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.deleteByPolicyPid(tenantId, pid);
@@ -128,10 +119,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void enable(String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         policyMapper.updateEnabled(tenantId, pid, true);
@@ -140,10 +128,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void disable(String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         policyMapper.updateEnabled(tenantId, pid, false);
@@ -152,10 +137,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void bindToRole(String policyPid, String rolePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.insertBinding(tenantId, policyPid, rolePid);
@@ -164,10 +146,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "dataPermissionRowFilter", allEntries = true),
-            @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
-    })
+    @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void unbindFromRole(String policyPid, String rolePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.deleteBinding(tenantId, policyPid, rolePid);
