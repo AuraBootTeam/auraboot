@@ -195,6 +195,7 @@
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
+| `run-bpm-release-image-gate.sh` | 1 | 2026-09-03 | CI-only BPM release-image gate (L6): builds the OSS platform runtime image at the pinned ref, boots it against an ephemeral Postgres stack, requires green health. |
 | `run-wf-e2e.sh` | 1 | 2026-06-22 | Thin wrapper over oss-test.sh for BPM / workflow-designer E2E suites. |
 | `seed-acp-runtime-test.sh` | 1 | 2026-05-09 |  |
 | `seed-marketplace.sh` | 5 | 2026-05-17 |  |
