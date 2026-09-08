@@ -117,7 +117,7 @@ test.describe('CRM Agent UI smoke', () => {
         {
           crm_cmp_account_id: account.recordId,
           crm_cmp_date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-          crm_cmp_type: 'product_quality',
+          crm_cmp_type: 'quality',
           crm_cmp_severity: 'high',
           crm_cmp_description: complaintDescription,
         },
