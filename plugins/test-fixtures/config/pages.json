@@ -1907,22 +1907,6 @@
       "type": "grid",
       "cols": 12
     },
-    "blocks": [],
-    "columns": [
-      {
-        "field": "e2et_crm_opp_name",
-        "label": {
-          "zh-CN": "商机名称",
-          "en-US": "Name"
-        }
-      },
-      {
-        "field": "e2et_crm_opp_stage",
-        "label": {
-          "zh-CN": "销售阶段",
-          "en-US": "Stage"
-        }
-      }
-    ]
+    "blocks": []
   }
 ]
