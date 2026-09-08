@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/observability-real-stack}"
 COMPOSE=(docker compose -f "$PROJECT_ROOT/docker-compose.observability.yml" -p aura-ci-observability --profile acceptance)
+FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 RUN_ID="obs-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 TRACE_ID=""
 RUNTIME_STARTED=0
@@ -17,6 +18,7 @@ export AURA_OBS_TEMPO_PORT="${AURA_OBS_TEMPO_PORT:-23200}"
 export AURA_OBS_ZIPKIN_PORT="${AURA_OBS_ZIPKIN_PORT:-29411}"
 export AURA_OBS_GRAFANA_PORT="${AURA_OBS_GRAFANA_PORT:-23000}"
 export AURA_OBS_APP_PORT="${AURA_OBS_APP_PORT:-26443}"
+export AURA_OBS_POSTGRES_PORT="${AURA_OBS_POSTGRES_PORT:-25432}"
 mkdir -p "$ARTIFACTS"
 
 invalid() {
@@ -65,8 +67,13 @@ command -v docker >/dev/null 2>&1 || invalid 'docker is unavailable'
 command -v curl >/dev/null 2>&1 || invalid 'curl is unavailable'
 command -v node >/dev/null 2>&1 || invalid 'node is unavailable'
 command -v java >/dev/null 2>&1 || invalid 'java is unavailable'
+command -v timeout >/dev/null 2>&1 || invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || invalid 'Docker daemon is unavailable'
+if ! docker image inspect "$FLYWAY_IMAGE" >/dev/null 2>&1; then
+  timeout 10m docker pull "$FLYWAY_IMAGE" \
+    || invalid "cannot pull immutable Flyway image within 10 minutes: $FLYWAY_IMAGE"
+fi
 
 # Exact-ref CI checkouts may be created under a restrictive umask. Bind-mounted
 # configuration must remain readable by the non-root users in the observability
@@ -86,7 +93,27 @@ find \
   > "$ARTIFACTS/bootjar.log" 2>&1
 RUNTIME_STARTED=1
 trap on_exit EXIT
-"${COMPOSE[@]}" up -d --build observability-postgres app prometheus alertmanager \
+"${COMPOSE[@]}" up -d --wait observability-postgres
+FLYWAY_ARGS=(
+  -url="jdbc:postgresql://127.0.0.1:$AURA_OBS_POSTGRES_PORT/aura_boot"
+  -user=auraboot
+  -password=auraboot-observability-ci
+  -locations=filesystem:/flyway/sql
+  -table=ab_flyway_schema_history
+  -baselineOnMigrate=false
+  -validateMigrationNaming=true
+  -cleanDisabled=true
+)
+run_flyway() {
+  docker run --rm --network host \
+    -v "$PROJECT_ROOT/platform/src/main/resources/db/migration/core:/flyway/sql:ro" \
+    "$FLYWAY_IMAGE" "${FLYWAY_ARGS[@]}" "$1"
+}
+run_flyway migrate > "$ARTIFACTS/flyway-migrate.log" 2>&1 \
+  || { printf '[observability-real-stack] product-failure: Flyway migrate failed\n' >&2; exit 1; }
+run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1 \
+  || { printf '[observability-real-stack] product-failure: Flyway validate failed\n' >&2; exit 1; }
+"${COMPOSE[@]}" up -d --build app prometheus alertmanager \
   observability-canary-receiver pushgateway loki tempo grafana
 "${COMPOSE[@]}" ps --all > "$ARTIFACTS/compose-ps.txt"
 

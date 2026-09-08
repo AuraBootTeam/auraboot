@@ -19,7 +19,7 @@ test('real-stack runner proves every observability acceptance surface', () => {
   }
   for (const token of ['observability-postgres:', 'app:']) assert.match(compose, new RegExp(token));
   assert.match(compose, /GF_AUTH_ANONYMOUS_ENABLED: "true"/);
-  for (const port of ['APP', 'PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
+  for (const port of ['APP', 'POSTGRES', 'PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
     assert.match(compose, new RegExp(`127\\.0\\.0\\.1:\\$\\{AURA_OBS_${port}_PORT`));
   }
   for (const proof of ['notificationDeduplicated', 'loki-query.json', 'tempo-trace.json', 'grafana-dashboards.json', 'AuraBootAvailabilitySloBurn', 'restart prometheus loki tempo']) {
@@ -44,6 +44,10 @@ test('real-stack runner proves every observability acceptance surface', () => {
   assert.match(runner, /compose-ps-after-close\.txt/);
   assert.match(runner, /runtime-closure\.json/);
   assert.match(runner, /stop --timeout 30/);
+  assert.match(runner, /run_flyway migrate/);
+  assert.match(runner, /run_flyway validate/);
+  assert.match(runner, /ab_flyway_schema_history/);
+  assert.match(runner, /up -d --wait observability-postgres/);
   assert.doesNotMatch(runner, /docker compose[^\n]*down|down --volumes/);
 });
 
