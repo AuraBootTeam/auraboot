@@ -679,5 +679,45 @@
     "extension": {
       "renderComponent": "signature"
     }
+  },
+  {
+    "code": "e2et_crm_opp_name",
+    "displayName:zh-CN": "商机名称",
+    "displayName:en": "Opportunity Name",
+    "dataType": "string",
+    "description": "Opportunity display name (title field)",
+    "constraints": {
+      "maxLength": 120,
+      "required": true
+    }
+  },
+  {
+    "code": "e2et_crm_opp_stage",
+    "displayName:zh-CN": "销售阶段",
+    "displayName:en": "Sales Stage",
+    "dataType": "enum",
+    "description": "Pipeline stage driving the stage-rail block; values mirror CRM crm_opp_stage",
+    "dictCode": "e2et_crm_opp_stage",
+    "defaultValue": "discovery",
+    "constraints": {
+      "required": true
+    }
+  },
+  {
+    "code": "e2et_crm_opp_amount",
+    "displayName:zh-CN": "商机金额",
+    "displayName:en": "Opportunity Amount",
+    "dataType": "decimal",
+    "description": "Deal size for context next to the stage rail",
+    "defaultValue": 0,
+    "constraints": {
+      "precision": 14,
+      "scale": 2,
+      "min": 0
+    },
+    "extension": {
+      "format": "currency",
+      "unit": "元"
+    }
   }
 ]

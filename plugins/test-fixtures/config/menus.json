@@ -107,5 +107,25 @@
         "mobile"
       ]
     }
+  },
+  {
+    "code": "e2et_crm_opp_list",
+    "parentCode": "e2et_menu",
+    "name:zh-CN": "商机演示",
+    "name:en": "Demo Opportunity",
+    "path": "/p/e2et_crm_opp",
+    "component": null,
+    "icon": "Flag",
+    "type": 1,
+    "permissionCode": "e2et.order.read",
+    "orderNo": 61,
+    "visible": true,
+    "pageKey": "e2et_crm_opp_list",
+    "extension": {
+      "platforms": [
+        "web",
+        "mobile"
+      ]
+    }
   }
 ]

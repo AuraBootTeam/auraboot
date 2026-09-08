@@ -1798,5 +1798,115 @@
         }
       }
     ]
+  },
+  {
+    "pageKey": "e2et_crm_opp_detail",
+    "name:zh-CN": "商机演示详情",
+    "name:en": "Demo Opportunity Detail",
+    "modelCode": "e2et_crm_opp",
+    "description": "Stage-rail golden fixture: carries the stage-rail block from plugins/crm/config/pages/crm_opportunity_common_detail.json (OSS #1614) with the stages/title/terminalStages config kept verbatim; stageField points at this fixture model's own stage field (e2et_crm_opp_stage) so mobile golden tests exercise the real CRM block config without importing the CRM plugin.",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "crm_opp_stage_rail",
+        "blockType": "stage-rail",
+        "detailPlacement": "header",
+        "context": "${record}",
+        "stageField": "e2et_crm_opp_stage",
+        "title": {
+          "zh-CN": "销售阶段",
+          "en-US": "Sales Stage"
+        },
+        "stages": [
+          {
+            "value": "discovery",
+            "label": {
+              "zh-CN": "需求发现",
+              "en-US": "Discovery"
+            }
+          },
+          {
+            "value": "qualification",
+            "label": {
+              "zh-CN": "资格确认",
+              "en-US": "Qualification"
+            }
+          },
+          {
+            "value": "proposal",
+            "label": {
+              "zh-CN": "方案报价",
+              "en-US": "Proposal"
+            }
+          },
+          {
+            "value": "negotiation",
+            "label": {
+              "zh-CN": "商务谈判",
+              "en-US": "Negotiation"
+            }
+          },
+          {
+            "value": "closed_won",
+            "label": {
+              "zh-CN": "赢单",
+              "en-US": "Won"
+            }
+          }
+        ],
+        "terminalStages": [
+          {
+            "value": "closed_lost",
+            "label": {
+              "zh-CN": "已丢单",
+              "en-US": "Lost"
+            },
+            "tone": "red"
+          }
+        ]
+      },
+      {
+        "id": "section_opp_detail",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Info"
+        },
+        "columns": 2,
+        "fields": [
+          {
+            "field": "e2et_crm_opp_name",
+            "span": 2
+          },
+          {
+            "field": "e2et_crm_opp_stage",
+            "span": 1
+          },
+          {
+            "field": "e2et_crm_opp_amount",
+            "span": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "e2et_crm_opp_list",
+    "name:zh-CN": "商机演示列表",
+    "name:en": "Demo Opportunity List",
+    "modelCode": "e2et_crm_opp",
+    "description": "List page for the stage-rail golden fixture model; rows deep-link into e2et_crm_opp_detail.",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": []
   }
 ]

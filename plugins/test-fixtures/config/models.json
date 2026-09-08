@@ -184,5 +184,26 @@
         ]
       }
     }
+  },
+  {
+    "code": "e2et_crm_opp",
+    "displayName:zh-CN": "商机演示",
+    "displayName:en": "Demo Opportunity",
+    "description": "Minimal opportunity model carrying the verbatim CRM stage-rail block (OSS #1614) so mobile golden tests exercise the real CRM pipeline-stage config without importing the CRM plugin.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "titleField": "e2et_crm_opp_name",
+      "importPolicy": {
+        "enabled": true,
+        "modes": [
+          "insert"
+        ]
+      }
+    },
+    "semantic_description": "Stage-rail golden fixture model. Serves BACKLOG-MOB-IOS stage-rail rendering family.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Stage field advances discovery → qualification → proposal → negotiation → closed_won (or terminal closed_lost)."
   }
 ]
