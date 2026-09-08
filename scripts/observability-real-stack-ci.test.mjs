@@ -49,6 +49,10 @@ test('real-stack runner proves every observability acceptance surface', () => {
   assert.match(runner, /run_flyway validate/);
   assert.match(runner, /ab_flyway_schema_history/);
   assert.match(runner, /up -d --wait observability-postgres/);
+  assert.match(runner, /api\/tenant-selection\/my-spaces/);
+  assert.match(runner, /spaceType === "platform"/);
+  assert.match(runner, /api\/tenant-selection\/process/);
+  assert.match(runner, /platform tenant selection returned no JWT/);
   assert.doesNotMatch(runner, /docker compose[^\n]*down|down --volumes/);
 });
 

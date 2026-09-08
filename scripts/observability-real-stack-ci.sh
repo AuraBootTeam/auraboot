@@ -164,6 +164,35 @@ process.stdin.on("end", () => {
   process.stdout.write(value);
 });')" || { printf '[observability-real-stack] product-failure: login returned no JWT\n' >&2; exit 1; }
 unset LOGIN_RESPONSE
+SPACES_RESPONSE="$(curl --fail --silent --show-error \
+  -H "Authorization: Bearer $JWT" \
+  "http://127.0.0.1:$AURA_OBS_APP_PORT/api/tenant-selection/my-spaces")"
+PLATFORM_TENANT_ID="$(printf '%s' "$SPACES_RESPONSE" | node -e '
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", chunk => input += chunk);
+process.stdin.on("end", () => {
+  const spaces = JSON.parse(input)?.data ?? [];
+  const value = spaces.find(space => space?.spaceType === "platform")?.tenantId;
+  if (!value) process.exit(1);
+  process.stdout.write(String(value));
+});')" || { printf '[observability-real-stack] product-failure: bootstrap admin has no platform tenant\n' >&2; exit 1; }
+unset SPACES_RESPONSE
+SELECT_RESPONSE="$(curl --fail --silent --show-error -X POST \
+  -H "Authorization: Bearer $JWT" \
+  -H 'Content-Type: application/json' \
+  --data "{\"action\":\"select\",\"tenantId\":\"$PLATFORM_TENANT_ID\"}" \
+  "http://127.0.0.1:$AURA_OBS_APP_PORT/api/tenant-selection/process")"
+JWT="$(printf '%s' "$SELECT_RESPONSE" | node -e '
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", chunk => input += chunk);
+process.stdin.on("end", () => {
+  const value = JSON.parse(input)?.data?.jwt;
+  if (!value) process.exit(1);
+  process.stdout.write(value);
+});')" || { printf '[observability-real-stack] product-failure: platform tenant selection returned no JWT\n' >&2; exit 1; }
+unset SELECT_RESPONSE PLATFORM_TENANT_ID
 curl --fail --silent --show-error -D "$ARTIFACTS/application-response.headers" \
   -H "Authorization: Bearer $JWT" \
   "http://127.0.0.1:$AURA_OBS_APP_PORT/api/observability/snapshot" \
