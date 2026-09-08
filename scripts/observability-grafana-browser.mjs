@@ -7,7 +7,9 @@ if (![grafanaUrl, traceId, artifacts, playwrightModule].every(Boolean)) {
   throw new Error('usage: observability-grafana-browser.mjs <grafana-url> <trace-id> <artifacts> <playwright-module>');
 }
 
-const { chromium } = await import(pathToFileURL(playwrightModule).href);
+const playwright = await import(pathToFileURL(playwrightModule).href);
+const chromium = playwright.chromium ?? playwright.default?.chromium;
+if (!chromium) throw new Error(`Playwright module does not export chromium: ${playwrightModule}`);
 fs.mkdirSync(artifacts, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
