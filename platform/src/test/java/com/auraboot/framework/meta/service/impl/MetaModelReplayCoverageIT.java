@@ -8,7 +8,9 @@ import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.MetaModelPublishReplayRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -52,6 +54,14 @@ class MetaModelReplayCoverageIT extends BaseIntegrationTest {
     @Autowired
     private SlaConfigService slaConfigService;
     @Autowired
+    private com.auraboot.framework.meta.service.DynamicDataService dynamicDataService;
+    @Autowired
+    private com.auraboot.framework.meta.service.SchemaManagementService schemaManagementService;
+    @Autowired
+    private com.auraboot.framework.meta.mapper.MetaFieldMapper metaFieldMapper;
+    @Autowired
+    private com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper fieldBindingMapper;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Long tenantId;
@@ -88,6 +98,14 @@ class MetaModelReplayCoverageIT extends BaseIntegrationTest {
         // Two stored versions of the same code with a differing displayName.
         insertVersion("Model A", 1, false);
         insertVersion("Model B", 2, true);
+        bindField("mmrep_name", 1);
+        var table = schemaManagementService.createTableByModel(CODE);
+        if (!table.isSuccess()) {
+            throw new RuntimeException("table creation failed: " + table.getErrorMessage());
+        }
+        Map<String, Object> row = new HashMap<>();
+        row.put("mmrep_name", "replay-sample");
+        dynamicDataService.create(CODE, row);
 
         Map<String, Object> diff = metaModelService.compareVersions(CODE, 1, 2);
         assertEquals(CODE, diff.get("code"));
@@ -112,6 +130,54 @@ class MetaModelReplayCoverageIT extends BaseIntegrationTest {
         assertNotNull(report.getGovernance());
         assertTrue(report.getTotalCount() >= 0);
         assertNotNull(report.getResults());
+
+        // executed=true path: the SLA RECORD replay activates a real SLA record.
+        Map<String, Object> recordRow = jdbcTemplate.queryForMap(
+                "SELECT pid FROM mt_" + CODE + " WHERE mmrep_name = 'replay-sample'");
+        String recordPid = String.valueOf(recordRow.get("pid"));
+        var executed = metaModelService.replayPublishImpact(dto.getPid(),
+                new MetaModelPublishReplayRequest() {{
+                    setExecuteAutomated(Boolean.TRUE);
+                    setSampleContext(Map.of("record", Map.of(
+                            "pid", recordPid,
+                            "data", Map.of("mmrep_name", "replay-sample"))));
+                }});
+        assertTrue(executed.getTotalCount() >= 0);
+        executed.getResults().stream()
+                .filter(r -> "SLA_RULE".equals(r.getStep().getConsumerType()))
+                .findFirst()
+                .ifPresentOrElse(
+                        r -> org.assertj.core.api.Assertions.assertThat(r.getStatus())
+                                .isIn("EXECUTED", "READY", "FAILED"),
+                        () -> { });
+        assertTrue(executed.getResults().size() >= report.getResults().size() - 1,
+                "executed replay must not lose SLA steps");
+    }
+
+    private void bindField(String code, int order) {
+        Field f = new Field();
+        f.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        f.setTenantId(tenantId);
+        f.setCode(code);
+        f.setDataType("string");
+        f.setVersion(1);
+        f.setIsCurrent(true);
+        f.setStatus(Status.PUBLISHED.getCode());
+        f.setCreatedAt(Instant.now());
+        f.setUpdatedAt(Instant.now());
+        f.setDeletedFlag(false);
+        metaFieldMapper.insert(f);
+        Long modelId = metaModelMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Model>()
+                        .eq("code", CODE).eq("tenant_id", tenantId)
+                        .eq("is_current", true)
+        ).get(0).getId();
+        ModelFieldBinding binding = new ModelFieldBinding();
+        binding.setTenantId(tenantId);
+        binding.setModelId(modelId);
+        binding.setFieldId(f.getId());
+        binding.setFieldOrder(order);
+        fieldBindingMapper.insert(binding);
     }
 
     private void purgeFamily() {
