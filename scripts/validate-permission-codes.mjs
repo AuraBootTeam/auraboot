@@ -147,6 +147,88 @@ function walk(dir, predicate, hits = []) {
   return hits
 }
 
+// Baseline dynamic-API actions every published model gets (CommandActionDeriver
+// DEFAULT_DYNAMIC_ACTIONS). "read" is always granted via the baseline set even
+// when a plugin also registers it explicitly in permissions.json.
+const BASELINE_MODEL_ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'import']
+const STANDARD_COMMAND_EXEC_TYPES = new Set(['create', 'update', 'delete'])
+const SKIPPED_COMMAND_EXEC_TYPES = new Set(['query'])
+
+function extractCommandVerb(commandCode, modelCode) {
+  if (!commandCode) return null
+  const withoutNs = commandCode.includes(':')
+    ? commandCode.slice(commandCode.indexOf(':') + 1)
+    : commandCode
+  let verb = withoutNs
+  const modelParts = modelCode.split('_')
+  for (let i = 0; i < modelParts.length; i++) {
+    const suffix = '_' + modelParts.slice(i).join('_')
+    if (withoutNs.endsWith(suffix) && withoutNs.length > suffix.length) {
+      verb = withoutNs.slice(0, withoutNs.length - suffix.length)
+      break
+    }
+  }
+  if (STANDARD_COMMAND_EXEC_TYPES.has(verb) || SKIPPED_COMMAND_EXEC_TYPES.has(verb)) return null
+  return verb
+}
+
+function collectPluginModelCodes(root) {
+  const results = []
+  const modelFiles = walk(root, (f) => f.endsWith('/config/models.json'))
+  for (const modelFile of modelFiles) {
+    const pluginDir = path.dirname(path.dirname(modelFile))
+    let models
+    try {
+      models = readJson(modelFile)
+    } catch {
+      continue
+    }
+    const arr = Array.isArray(models) ? models : models.models ?? []
+    const codes = arr.map((m) => m.code).filter(Boolean)
+    if (codes.length === 0) continue
+    const codeSet = new Set(codes)
+
+    // Commands of this plugin → derived verbs per CommandActionDeriver rules
+    const derivedByModel = new Map()
+    const commandFiles = walk(pluginDir, (f) =>
+      f.endsWith('/config/commands.json') || (f.includes(`${path.sep}config${path.sep}commands${path.sep}`) && f.endsWith('.json'))
+    )
+    for (const cf of commandFiles) {
+      let cmds
+      try {
+        cmds = readJson(cf)
+      } catch {
+        continue
+      }
+      const arr = Array.isArray(cmds) ? cmds : cmds.commands ?? []
+      for (const cmd of arr) {
+        if (!cmd || !cmd.code || !cmd.modelCode || !codeSet.has(cmd.modelCode)) continue
+        let execType = null
+        const cfg = cmd.executionConfig
+        if (cfg && typeof cfg === 'object' && cfg.type != null) execType = String(cfg.type).toLowerCase()
+        else if (cfg && typeof cfg === 'string') {
+          try {
+            const parsed = JSON.parse(cfg)
+            if (parsed && parsed.type != null) execType = String(parsed.type).toLowerCase()
+          } catch { /* plain string without type — treat as unset */ }
+        } else if (typeof cmd.type === 'string') execType = cmd.type.toLowerCase()
+        if (!execType || SKIPPED_COMMAND_EXEC_TYPES.has(execType)) continue
+        const verb = STANDARD_COMMAND_EXEC_TYPES.has(execType)
+          ? execType
+          : extractCommandVerb(cmd.code, cmd.modelCode)
+        if (!verb) continue
+        if (!derivedByModel.has(cmd.modelCode)) derivedByModel.set(cmd.modelCode, new Set())
+        derivedByModel.get(cmd.modelCode).add(verb)
+      }
+    }
+
+    const derivedActions = new Set()
+    for (const verbs of derivedByModel.values()) for (const v of verbs) derivedActions.add(v)
+    results.push({ codes: codeSet, derivedActions, source: modelFile })
+  }
+  return results
+}
+
 function collectRegisteredCodes() {
   const codes = new Set()
   const sources = []
@@ -169,6 +251,18 @@ function collectRegisteredCodes() {
       const arr = Array.isArray(data) ? data : data.permissions ?? []
       for (const p of arr) if (p.code) codes.add(p.code)
       sources.push(f)
+    }
+    // Model action permissions are generated at runtime for every model a plugin
+    // provides (PluginImportServiceImpl.createResourcePermissions via
+    // CommandActionDeriver): baseline dynamic-API actions for all models, plus
+    // verbs derived from the plugin's command exec types. Registering them here
+    // mirrors that runtime rule; anything else still fails as drift.
+    for (const modelCodes of collectPluginModelCodes(root)) {
+      for (const modelCode of modelCodes.codes) {
+        for (const action of BASELINE_MODEL_ACTIONS) codes.add(`model.${modelCode}.${action}`)
+        for (const action of modelCodes.derivedActions) codes.add(`model.${modelCode}.${action}`)
+      }
+      sources.push(modelCodes.source)
     }
   }
 
