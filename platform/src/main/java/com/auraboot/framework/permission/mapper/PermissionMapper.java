@@ -32,10 +32,11 @@ public interface PermissionMapper extends BaseMapper<Permission> {
     @Select("""
         SELECT *
         FROM ab_permission
-        WHERE (deleted_flag = false OR deleted_flag IS NULL)
+        WHERE tenant_id = #{tenantId}
+          AND (deleted_flag = false OR deleted_flag IS NULL)
         ORDER BY created_at DESC
         """)
-    List<Permission> findResolvableDefinitions();
+    List<Permission> findResolvableDefinitions(@Param("tenantId") Long tenantId);
 
     /**
      * Find permission by code

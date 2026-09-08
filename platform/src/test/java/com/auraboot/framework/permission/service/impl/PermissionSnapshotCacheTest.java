@@ -94,20 +94,20 @@ class PermissionSnapshotCacheTest {
     @Test
     void permissionCatalogLoadsOnceAndIncludesNegativeLookups() {
         Permission permission = permission(50L, "Model.User.Read");
-        when(permissionMapper.findResolvableDefinitions()).thenReturn(List.of(permission));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission));
 
         assertThat(cache.resolvePermissionId(100L, "model.user.read")).isEqualTo(50L);
         assertThat(cache.resolvePermissionId(100L, "MODEL.USER.READ")).isEqualTo(50L);
         assertThat(cache.resolvePermissionId(100L, "missing.code")).isNull();
         assertThat(cache.resolvePermissionId(100L, "missing.code")).isNull();
 
-        verify(permissionMapper, times(1)).findResolvableDefinitions();
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
     }
 
     @Test
     void permissionCodesPreserveCanonicalDatabaseCase() {
         Permission permission = permission(50L, "Model.User.Read");
-        when(permissionMapper.findResolvableDefinitions()).thenReturn(List.of(permission));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission));
 
         assertThat(cache.resolvePermissionCodes(100L, Set.of(50L)))
                 .containsExactly("Model.User.Read");
@@ -117,21 +117,22 @@ class PermissionSnapshotCacheTest {
     void permissionCatalogPreservesTheCompleteDefinitionForPolicyEvaluation() {
         Permission permission = permission(50L, "model.user.read");
         permission.setPolicySchema(Map.of("maxRows", Map.of("type", "number")));
-        when(permissionMapper.findResolvableDefinitions()).thenReturn(List.of(permission));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission));
 
         Permission resolved = cache.resolvePermissionDefinition(100L, "MODEL.USER.READ");
 
         assertThat(resolved).isSameAs(permission);
         assertThat(resolved.getPolicySchema()).isEqualTo(permission.getPolicySchema());
-        verify(permissionMapper, times(1)).findResolvableDefinitions();
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
     }
 
     @Test
     void permissionCatalogKeysAreTenantIsolated() {
         Permission tenantOnePermission = permission(50L, "tenant.one.read");
         Permission tenantTwoPermission = permission(60L, "tenant.two.read");
-        when(permissionMapper.findResolvableDefinitions())
-                .thenReturn(List.of(tenantOnePermission))
+        when(permissionMapper.findResolvableDefinitions(100L))
+                .thenReturn(List.of(tenantOnePermission));
+        when(permissionMapper.findResolvableDefinitions(200L))
                 .thenReturn(List.of(tenantTwoPermission));
 
         assertThat(cache.resolvePermissionId(100L, "tenant.one.read")).isEqualTo(50L);
@@ -139,13 +140,28 @@ class PermissionSnapshotCacheTest {
         assertThat(cache.resolvePermissionId(200L, "tenant.two.read")).isEqualTo(60L);
         assertThat(cache.resolvePermissionId(200L, "tenant.one.read")).isNull();
 
-        verify(permissionMapper, times(2)).findResolvableDefinitions();
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
+        verify(permissionMapper, times(1)).findResolvableDefinitions(200L);
+    }
+
+    @Test
+    void permissionCatalogIgnoresDefinitionsOwnedByOtherTenants() {
+        // Regression: the catalog used to load every tenant's definitions globally and
+        // resolve a code to the globally newest row, silently invalidating role bindings
+        // that referenced the caller-tenant row. Only the caller-tenant row may resolve.
+        Permission foreign = permission(51L, "model.org_position.read");
+        foreign.setTenantId(999L);
+        Permission own = permission(50L, "model.org_position.read");
+        own.setTenantId(100L);
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(own, foreign));
+
+        assertThat(cache.resolvePermissionId(100L, "model.org_position.read")).isEqualTo(50L);
     }
 
     @Test
     void permissionCatalogEvictionRefreshesPreviouslyMissingCode() {
         Permission permission = permission(50L, "new.permission");
-        when(permissionMapper.findResolvableDefinitions())
+        when(permissionMapper.findResolvableDefinitions(100L))
                 .thenReturn(List.of())
                 .thenReturn(List.of(permission));
 
@@ -153,7 +169,7 @@ class PermissionSnapshotCacheTest {
         cache.evictPermissionCatalog(100L);
         assertThat(cache.resolvePermissionId(100L, "new.permission")).isEqualTo(50L);
 
-        verify(permissionMapper, times(2)).findResolvableDefinitions();
+        verify(permissionMapper, times(2)).findResolvableDefinitions(100L);
     }
 
     @Test
