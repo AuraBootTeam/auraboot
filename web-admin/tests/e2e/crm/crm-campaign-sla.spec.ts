@@ -102,7 +102,7 @@ async function navigateToCrmSubmenu(
 // Constants
 // ---------------------------------------------------------------------------
 
-const UID = uniqueId('crmsla');
+const UID = uniqueId('活动SLA');
 
 // Track IDs created via API for use across tests
 let campaignId: string;

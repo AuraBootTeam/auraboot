@@ -36,7 +36,7 @@ import {
 const MODEL_CODE = 'crm_opportunity_common';
 const PAGE_KEY = 'crm_opportunity_common';
 
-const UID = uniqueId('OppCur');
+const UID = uniqueId('商机币种');
 const USD_OPP_NAME = `USD_Opp_${UID}`;
 const EUR_OPP_NAME = `EUR_Opp_${UID}`;
 const CNY_OPP_NAME = `CNY_Opp_${UID}`;

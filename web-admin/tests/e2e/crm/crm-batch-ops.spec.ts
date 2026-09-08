@@ -24,7 +24,7 @@ import {
 test.describe('CRM Batch Operations Smoke @smoke', () => {
   test.setTimeout(60000);
 
-  const uid = uniqueId('batch');
+  const uid = uniqueId('批量操作');
 
   async function waitForSelectableRows(page: import('@playwright/test').Page) {
     const rowCheckboxes = page.locator('tbody tr td:first-child input[type="checkbox"]');

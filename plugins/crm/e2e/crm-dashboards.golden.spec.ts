@@ -492,6 +492,15 @@ test.beforeAll(async () => {
   const body = assertOk(login, 'API login');
   adminJwt = String(findValue(body?.data, ['jwt']) || '');
   expect(adminJwt).toBeTruthy();
+  // The sales home renders menu favorites INSTEAD of the config-baseline
+  // shortcuts whenever any exist, and other suites (smart-shortcuts
+  // personalization, menu-favorite tests) leave favorites behind. Reset the
+  // shared admin state so this golden asserts the authored defaults
+  // regardless of which suites ran before it.
+  const leftoverFavorites = await api('/api/user-engagement?engagementType=favorite&targetType=menu');
+  for (const favorite of leftoverFavorites.data ?? []) {
+    await api(`/api/user-engagement/${favorite.id}`, { method: 'DELETE' });
+  }
   if (REUSE_DATA) {
     expectedOwnerDisplayName = process.env.CRM_DASHBOARD_EXPECTED_OWNER || '华东区销售代表';
     if (SEED_RECEIPT) recordIds.seedReceipt = SEED_RECEIPT;

@@ -67,7 +67,7 @@ test.describe('CRM Agent UI smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60_000);
 
-  const uid = uniqueId('crmagentui');
+  const uid = uniqueId('Agent界面');
   const leadCompany = `Agent UI Lead ${uid}`;
   const leadContact = `Agent UI Contact ${uid}`;
   const complaintDescription = `Agent UI complaint ${uid}`;

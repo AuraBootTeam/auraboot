@@ -18,7 +18,7 @@ import { uniqueId, queryFilteredList } from '../helpers/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const uid = uniqueId('lc');
+const uid = uniqueId('入站生命周期');
 const channelName = `Lifecycle_${uid}`;
 const leadCompany = `LifecycleCorp_${uid}`;
 const leadName = `John_${uid}`;
