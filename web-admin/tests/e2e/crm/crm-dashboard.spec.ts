@@ -21,7 +21,7 @@ test.describe('CRM Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('CRMDash');
+  const uid = uniqueId('销售仪表盘');
 
   // =========================================================================
   // DATA SETUP — Create seed data for dashboard to display

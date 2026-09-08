@@ -27,7 +27,7 @@ import { uniqueId } from '../helpers/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const uid = uniqueId('mq');
+const uid = uniqueId('合并队列');
 const channelName = `MergeQ_${uid}`;
 const companyName = `FuzzyMatchCorp_${uid}`;
 

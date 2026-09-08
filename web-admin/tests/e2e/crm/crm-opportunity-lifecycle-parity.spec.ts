@@ -108,7 +108,7 @@ async function confirmCommand(page: Page, command: string): Promise<{ response: 
 }
 
 async function seed(page: Page): Promise<OpportunityFixture> {
-  const uid = uniqueId('opp_parity');
+  const uid = uniqueId('商机生命周期');
   const account = await executeCommandViaApi(
     page,
     'crm:create_account',

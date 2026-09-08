@@ -27,7 +27,7 @@ test.describe('CRM Inline Edit @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(90000);
 
-  const uid = uniqueId('IE');
+  const uid = uniqueId('行内编辑');
   const initialCompany = `InlineEditLead_${uid}`;
   const updatedCompany = `Updated_${uid}`;
   const initialOwner = `Owner_${uid}`;

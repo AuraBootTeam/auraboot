@@ -64,7 +64,7 @@ async function navigateToCrmPage(page: Page, leafName: string, modelCode: string
 // Constants
 // ---------------------------------------------------------------------------
 
-const UID = uniqueId('crmce');
+const UID = uniqueId('核心实体');
 
 // ---------------------------------------------------------------------------
 // Test suite

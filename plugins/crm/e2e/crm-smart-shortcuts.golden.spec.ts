@@ -59,6 +59,11 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  // Restore the config-baseline shortcuts: this test REPLACES the admin's
+  // shortcut list with two favorites. Without the sweep below, every suite
+  // that runs afterwards and expects the default sales home (e.g. the CRM
+  // dashboards golden) fails on personalization state this test created.
+  if (adminJwt) await clearMenuFavorites();
   const favorites = adminJwt
     ? await api('/api/user-engagement?engagementType=favorite&targetType=menu')
     : { data: [] };

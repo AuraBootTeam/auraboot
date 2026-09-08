@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '../../fixtures';
 import { executeCommandViaApi, uniqueId } from '../helpers';
 
-const uid = uniqueId('CrmOpenCore');
+const uid = uniqueId('开放核边界');
 const opportunityName = `OSS Win ${uid}`;
 let opportunityPid = '';
 

@@ -21,7 +21,7 @@ import { uniqueId } from '../helpers/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const uid = uniqueId('inb');
+const uid = uniqueId('入站渠道');
 const channelName = `Webhook_${uid}`;
 const channelNameEdited = `Webhook_Upd_${uid}`;
 const channelNameForDelete = `DeleteMe_${uid}`;

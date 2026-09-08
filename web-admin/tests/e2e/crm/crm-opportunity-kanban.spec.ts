@@ -32,7 +32,7 @@ test.describe('CRM Opportunity Kanban @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('OppKanban');
+  const uid = uniqueId('商机看板');
   let accountPid = '';
 
   // =========================================================================

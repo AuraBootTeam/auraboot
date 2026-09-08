@@ -92,7 +92,7 @@ test.describe('CRM Email Log @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('ELog');
+  const uid = uniqueId('邮件日志');
   let logRecordId = '';
 
   // Setup: create a seed email log record via API
@@ -207,7 +207,7 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('ELogTx');
+  const uid = uniqueId('邮件日志事务');
   let sendRecordId = '';
 
   // Setup: create a draft email log to send
@@ -306,7 +306,7 @@ test.describe('CRM Email Template @critical', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('ETmpl');
+  const uid = uniqueId('邮件模板');
   let templateRecordId = '';
 
   // Setup: create seed email templates

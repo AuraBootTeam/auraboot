@@ -24,7 +24,7 @@ import { uniqueId } from '../helpers/index';
 // Constants
 // ---------------------------------------------------------------------------
 
-const uid = uniqueId('wf');
+const uid = uniqueId('网页表单');
 const formName = `E2E_Form_${uid}`;
 const channelName = `E2E_WFChannel_${uid}`;
 

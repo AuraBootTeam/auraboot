@@ -21,7 +21,7 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60000);
 
-  const uid = uniqueId('DashE');
+  const uid = uniqueId('增强仪表盘');
   let accountPid: string;
 
   // =========================================================================
