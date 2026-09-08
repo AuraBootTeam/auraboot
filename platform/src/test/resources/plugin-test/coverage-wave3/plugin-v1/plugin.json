@@ -1,0 +1,44 @@
+{
+  "pluginId": "com.test.covwave3.plugin",
+  "namespace": "covw3",
+  "version": "1.0.0",
+  "displayName": "Coverage Wave3 Plugin v1",
+  "description": "Fixture: minimal cross-reference-free plugin for import/rollback coverage.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    {
+      "code": "covw3_name",
+      "displayName": "Name",
+      "dataType": "string"
+    }
+  ],
+  "models": [
+    {
+      "code": "covw3_model",
+      "displayName": "CovW3 Model",
+      "modelType": "entity"
+    }
+  ],
+  "modelFieldBindings": [
+    {
+      "modelCode": "covw3_model",
+      "fieldCode": "covw3_name",
+      "sequence": 10
+    }
+  ],
+  "permissions": [
+    {
+      "code": "covw3:view",
+      "name": "View CovW3"
+    }
+  ],
+  "menus": [
+    {
+      "code": "covw3_menu",
+      "path": "/covw3",
+      "type": 1,
+      "name": "CovW3"
+    }
+  ]
+}
