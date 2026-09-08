@@ -8,9 +8,27 @@ import type { WorkbenchData } from '../services/bpmWorkbenchService';
 interface TaskStatsCardsProps {
   data: WorkbenchData | null;
   slaWarningCount?: number;
+  /** True while the workbench data is being fetched — renders pulse skeletons
+   *  instead of zero-valued cards so the first paint reads as "loading". */
+  loading?: boolean;
 }
 
-export function TaskStatsCards({ data, slaWarningCount }: TaskStatsCardsProps) {
+export function TaskStatsCards({ data, slaWarningCount, loading }: TaskStatsCardsProps) {
+  if (loading && !data) {
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4" aria-busy="true">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-card border-border bg-panel shadow-card animate-pulse border p-5"
+          >
+            <div className="bg-subtle mb-2 h-4 w-20 rounded" />
+            <div className="bg-subtle mt-2 h-7 w-14 rounded" />
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
       <StatCard
