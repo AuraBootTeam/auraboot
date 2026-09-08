@@ -129,7 +129,8 @@ export default function WorkbenchPage() {
     }
   }, [dashboard, locale, t, showSuccessToast, showErrorToast]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  // Follow the active UI locale so the date never mixes English into the zh UI.
+  const todayLabel = new Date().toLocaleDateString(locale || 'en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const headerBand = (
     <header className="flex items-end justify-between mb-6">
