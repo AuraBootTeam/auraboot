@@ -1,6 +1,7 @@
 package com.auraboot.framework.inbox.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.service.TaskService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.inbox.dto.InboxItemResponse;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
@@ -31,6 +32,7 @@ import java.util.Set;
 public class InboxController {
 
     private final InboxService inboxService;
+    private final TaskService taskService;
     private static final Set<String> REJECTION_ACTIONS = Set.of("reject", "rejected");
 
     /**
@@ -181,8 +183,36 @@ public class InboxController {
         if (rejectionValidation != null) {
             return rejectionValidation;
         }
+        completeSourceBpmTaskIfNeeded(id, userId, tenantId, resolvedAction, resolvedComment);
         inboxService.markActed(id, userId, tenantId, resolvedAction);
         return ApiResponse.success(Map.of("status", resolvedAction, "actedAt", Instant.now().toString()));
+    }
+
+    /**
+     * Drive the approval into the process engine before the inbox item is marked acted.
+     *
+     * Mobile approve/reject used to only flip the inbox item ("acted") while the SmartEngine
+     * task stayed pending — a silent no-op approval. BPM-sourced items carry the task
+     * instance id in sourceId; complete it so the process actually advances. Completion
+     * happens first: if it fails the item stays pending and the user can retry, instead of
+     * an acted item hiding a dead approval.
+     */
+    private void completeSourceBpmTaskIfNeeded(
+            Long itemId, Long userId, Long tenantId, String resolvedAction, String resolvedComment) {
+        boolean approval = "approved".equals(resolvedAction) || "approve".equals(resolvedAction);
+        boolean rejection = REJECTION_ACTIONS.contains(resolvedAction);
+        if (!approval && !rejection) {
+            return;
+        }
+        InboxItem item = inboxService.getItem(itemId, userId, tenantId);
+        if (item == null || !"bpm".equals(item.getSourceType()) || item.getSourceId() == null) {
+            return;
+        }
+        if (approval) {
+            taskService.approveTask(item.getSourceId(), resolvedComment, Map.of());
+        } else {
+            taskService.rejectTask(item.getSourceId(), resolvedComment, Map.of());
+        }
     }
 
     /**
