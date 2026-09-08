@@ -20,6 +20,7 @@ class ReliableIntegrationMetricsTest {
         when(mapper.oldestUndeliveredAgeSeconds()).thenReturn(301L);
 
         ReliableIntegrationMetrics metrics = new ReliableIntegrationMetrics(registry, mapper);
+        metrics.record("claimed");
         metrics.record("retry_scheduled");
         metrics.record("attacker-controlled-value");
 
@@ -28,6 +29,8 @@ class ReliableIntegrationMetricsTest {
         assertThat(registry.get("auraboot_reliable_delivery_oldest_pending_age_seconds").gauge().value())
                 .isEqualTo(301);
         assertThat(registry.get("auraboot_reliable_delivery_unhealthy").gauge().value()).isEqualTo(1);
+        assertThat(registry.get("auraboot_integration_events_total")
+                .tag("outcome", "claimed").counter().count()).isEqualTo(1);
         assertThat(registry.get("auraboot_integration_events_total")
                 .tag("outcome", "retry_scheduled").counter().count()).isEqualTo(1);
         assertThat(registry.get("auraboot_integration_events_total")

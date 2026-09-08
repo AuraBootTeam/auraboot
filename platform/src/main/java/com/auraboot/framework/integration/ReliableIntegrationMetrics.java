@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentMap;
 public class ReliableIntegrationMetrics {
 
     private static final Set<String> OUTCOMES = Set.of(
-            "enqueued", "delivered", "lease_fence_lost", "dead_lettered", "retry_scheduled",
+            "enqueued", "claimed", "delivered", "lease_fence_lost", "dead_lettered", "retry_scheduled",
             "replayed", "lease_recovered", "duplicate_suppressed", "receipt_applied", "other");
 
     private final MeterRegistry registry;
