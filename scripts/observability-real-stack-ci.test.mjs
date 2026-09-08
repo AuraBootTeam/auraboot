@@ -18,6 +18,7 @@ test('real-stack runner proves every observability acceptance surface', () => {
     assert.match(compose, new RegExp(`${token}:`));
   }
   for (const token of ['observability-postgres:', 'app:']) assert.match(compose, new RegExp(token));
+  assert.match(compose, /observability-postgres:[\s\S]*image: pgvector\/pgvector:pg16/);
   assert.match(compose, /GF_AUTH_ANONYMOUS_ENABLED: "true"/);
   for (const port of ['APP', 'POSTGRES', 'PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
     assert.match(compose, new RegExp(`127\\.0\\.0\\.1:\\$\\{AURA_OBS_${port}_PORT`));

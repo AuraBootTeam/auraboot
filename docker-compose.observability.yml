@@ -1,6 +1,6 @@
 services:
   observability-postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     profiles:
       - acceptance
     ports:
