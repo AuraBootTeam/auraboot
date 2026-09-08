@@ -131,6 +131,9 @@ async function seedAndSubmitLeave(
   const submitResp = await request.post(
     '/api/meta/commands/execute/wd:submit_leave_request',
     {
+      // Cold-start submit can exceed the 5s global actionTimeout (Drools +
+      // BPM engine first-run); see notification-task.spec.ts same fix.
+      timeout: 30_000,
       headers: { Authorization: `Bearer ${adminToken}` },
       data: {
         targetRecordPid: pid,

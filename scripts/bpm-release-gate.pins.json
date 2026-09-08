@@ -26,6 +26,11 @@
       "id": "l5-pr004-no-started-instances",
       "pattern": "PR-004 -- My Started tab shows instances",
       "reason": "环境条件跳过:「我发起的」tab 无实例数据(暂无实例/空态)时诚实 skip;同文件 PR-002/003/005-010 全量运行硬性覆盖 ProcessTable 渲染与行级断言。2026-09-07 首次触发(数据时序),非产品断言失败"
+    },
+    {
+      "id": "l5-lc01-env-conditional",
+      "pattern": "BPM-LC01: Process management list page via menu",
+      "reason": "环境条件跳过:菜单导航到流程管理列表的壳层检查在页面未及时渲染时诚实 skip(LC01 于 2026-09-08 首次触发);列表本体由 PD-001..PD-014 全量运行硬性覆盖"
     }
   ],
   "flips": []
