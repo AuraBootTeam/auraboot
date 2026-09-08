@@ -175,7 +175,11 @@ export function TaskCenter() {
       </div>
 
       {/* Statistics Cards */}
-      <TaskStatsCards data={tc.workbenchData} slaWarningCount={tc.slaWarningCount} />
+      <TaskStatsCards
+        data={tc.workbenchData}
+        slaWarningCount={tc.slaWarningCount}
+        loading={tc.loading}
+      />
 
       {/* Task Tabs */}
       <div className="rounded-card border-border bg-panel shadow-card border">
