@@ -35,7 +35,10 @@ class RolePermissionServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private RoleService roleService;
 
-    private static final String RUN_ID = String.valueOf(System.currentTimeMillis() % 100000);
+    // Run-unique: millis%100000 wraps every ~28h, and an interrupted run's committed
+        // permission rows survive its cleanup — a wrapped RUN_ID then collides on
+        // uq_permission_code (seen as rp_99794_P1). nanoTime hex cannot repeat.
+        private static final String RUN_ID = Long.toHexString(System.nanoTime());
     private static Long testRoleId;
     private static Long permId1;
     private static Long permId2;

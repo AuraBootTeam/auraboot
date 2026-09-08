@@ -1,0 +1,58 @@
+{
+  "pluginId": "com.test.covwave3.plugin",
+  "namespace": "covw3",
+  "version": "1.0.1",
+  "displayName": "Coverage Wave3 Plugin v1.0.1",
+  "description": "Fixture: same plugin with an extra bound field to exercise the OVERWRITE update-diff path.",
+  "minPlatformVersion": "1.0.0",
+  "pluginType": "config",
+  "fields": [
+    {
+      "code": "covw3_name",
+      "displayName": "Name",
+      "dataType": "string"
+    },
+    {
+      "code": "covw3_note",
+      "displayName": "Note",
+      "dataType": "string"
+    }
+  ],
+  "models": [
+    {
+      "code": "covw3_model",
+      "displayName": "CovW3 Model",
+      "modelType": "entity"
+    }
+  ],
+  "modelFieldBindings": [
+    {
+      "modelCode": "covw3_model",
+      "fieldCode": "covw3_name",
+      "sequence": 10
+    },
+    {
+      "modelCode": "covw3_model",
+      "fieldCode": "covw3_note",
+      "sequence": 20
+    }
+  ],
+  "permissions": [
+    {
+      "code": "covw3:view",
+      "name": "View CovW3"
+    },
+    {
+      "code": "covw3:manage",
+      "name": "Manage CovW3"
+    }
+  ],
+  "menus": [
+    {
+      "code": "covw3_menu",
+      "path": "/covw3",
+      "type": 1,
+      "name": "CovW3"
+    }
+  ]
+}

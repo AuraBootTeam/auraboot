@@ -279,9 +279,29 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     }
 
     private void createFields() {
+        purgeFieldResidue();
         bindField("pid",     "string",  true,  false, -1);
         bindField("counter", "integer", false, true,   1);
         bindField("cap",     "integer", false, true,   2);
+    }
+
+    /**
+     * uq_meta_field_code_ver is (tenant_id, code, version) — model-independent. The
+     * generic codes this fixture seeds collide with rows left by any interrupted
+     * earlier run (soft-deleted, unbound, or bound to an old ai_ctr_* model that a
+     * new run's time-based modelCode no longer matches). Purge exactly this family's
+     * residue before inserting; live non-ai_ctr fields with those codes are kept.
+     */
+    private void purgeFieldResidue() {
+        Long tenantId = getTestTenant().getId();
+        jdbcTemplate.update(
+                "DELETE FROM ab_meta_field WHERE tenant_id = ? AND code IN ('pid', 'counter', 'cap') "
+                + "AND (deleted_flag = TRUE "
+                + "OR id NOT IN (SELECT field_id FROM ab_meta_model_field_binding) "
+                + "OR id IN (SELECT b.field_id FROM ab_meta_model_field_binding b "
+                + "JOIN ab_meta_model m ON m.id = b.model_id "
+                + "WHERE m.tenant_id = ? AND m.code LIKE 'ai_ctr_%'))",
+                tenantId, tenantId);
     }
 
     private void bindField(String code, String dataType, boolean primaryKey, boolean required, int order) {

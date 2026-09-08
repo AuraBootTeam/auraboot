@@ -25,6 +25,13 @@ const webContributionsStub: Plugin = {
 
 export default defineConfig({
   plugins: [tsconfigPaths(), webContributionsStub],
+  // Node resolution conditions: server-only deps (e.g. @react-router/express) gate
+  // their entry on the `node` condition; without it Vitest's import analysis fails,
+  // the coverage provider falls back to parsing raw TS with a JS parser, and the file
+  // is silently dropped from the coverage denominator.
+  resolve: {
+    conditions: ['node'],
+  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -64,6 +71,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: './coverage',
+      // Generate the report (and run the thresholds gate) even when tests fail:
+      // the default false meant any red test silently skipped the coverage gate,
+      // so a broken pipeline looked identical to an unmeasured one.
+      reportOnFailure: true,
       include: ['app/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
       exclude: [
         'node_modules',

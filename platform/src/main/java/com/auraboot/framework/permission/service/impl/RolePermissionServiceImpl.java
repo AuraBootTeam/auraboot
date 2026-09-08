@@ -72,9 +72,29 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
-                  
-                  
-            
+
+            // Idempotency: ab_role_permission has no unique constraint on (role_id,
+            // permission_id), so a blind batchInsert re-inserted the full set on every
+            // repeated bootstrap — the tenant_member baseline accumulated 17 identical
+            // links. Skip pairs that are already bound.
+            java.util.Set<Long> alreadyBound = getPermissionIdsByRoleId(roleId);
+            List<Long> pending = permissionIds.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .filter(id -> !alreadyBound.contains(id))
+                    .distinct()
+                    .toList();
+            if (pending.isEmpty()) {
+                log.info("Role already holds all requested permissions, skipping: roleId={}",
+                        roleId);
+                // Preserve the observable side effect of a no-op assignment: listeners
+                // still get the change event (nothing changed, but the contract is
+                // "assignment attempted → event"), matching the pre-idempotency flow.
+                eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                        this, tenantId, roleId, null, "UPDATE"));
+                return true;
+            }
+            permissionIds = pending;
+
             // Build bindings — batchInsert uses ON CONFLICT DO UPDATE for duplicates
             Instant now = Instant.now();
             List<RolePermission> bindings = new ArrayList<>(permissionIds.size());

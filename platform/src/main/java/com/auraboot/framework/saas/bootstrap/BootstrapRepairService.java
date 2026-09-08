@@ -482,10 +482,25 @@ public class BootstrapRepairService {
                         "default tenant already has billing_account_id=" + existing);
             }
 
-            // Create a new billing account for the default tenant
-            Long accountId = billingAccountIdentityService.createAccount(
-                    "default",
-                    "Default Billing Account");
+            // Create a new billing account for the default tenant. When a 'default'
+            // account already exists (a previous run created it but the tenant bind did
+            // not persist — e.g. rolled back or cleared), a blind INSERT crashes on the
+            // account_code unique constraint and poisons the surrounding transaction,
+            // leaving the repair permanently stuck. Re-bind the existing account instead.
+            Long accountId;
+            try {
+                accountId = billingAccountIdentityService.createAccount(
+                        "default",
+                        "Default Billing Account");
+            } catch (org.springframework.dao.DataIntegrityViolationException alreadyThere) {
+                accountId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM ab_billing_account WHERE account_code = 'default' AND deleted_flag = FALSE",
+                        Long.class);
+                if (accountId == null) {
+                    throw alreadyThere;
+                }
+                log.info("repairDefaultBillingAccount: reusing orphaned default billing account id={}", accountId);
+            }
 
             // Bind: UPDATE ab_tenant SET billing_account_id = ? WHERE id = ? AND billing_account_id IS NULL
             int updated = jdbcTemplate.update(

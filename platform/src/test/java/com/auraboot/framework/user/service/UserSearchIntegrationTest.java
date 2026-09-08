@@ -116,7 +116,10 @@ class UserSearchIntegrationTest extends BaseIntegrationTest {
     @Order(3)
     @DisplayName("US-03: blank keyword returns tenant members")
     void search_blankKeywordReturnsAll() {
-        List<UserSearchDTO> results = userService.searchInTenant(getTestTenant().getId(), "", 50);
+        // The shared test tenant accumulates members across suites; request the max page
+        // size (US-05 covers the [1,200] clamp separately) so the seeded users cannot fall
+        // off the first page.
+        List<UserSearchDTO> results = userService.searchInTenant(getTestTenant().getId(), "", 200);
 
         // At least our two seeded users should be present
         assertThat(results)

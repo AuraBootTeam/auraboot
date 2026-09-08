@@ -38,6 +38,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class SystemPermissionInitializer {
 
+
     private final PermissionMapper permissionMapper;
 
     // ========================================================================
@@ -240,7 +241,7 @@ public class SystemPermissionInitializer {
                 LEVEL_MODULE, null,
                 allPermissions, counts
             );
-            Long moduleId = moduleNode != null ? moduleNode.getId() : resolveExistingId("module", moduleKey, null);
+            Long moduleId = moduleNode != null ? moduleNode.getId() : resolveExistingId(tenantId, "module", moduleKey, null);
 
             // Level 2 + 3: Resource and Action nodes
             for (ResourceDef rd : resources) {
@@ -253,7 +254,7 @@ public class SystemPermissionInitializer {
                     LEVEL_RESOURCE, moduleId,
                     allPermissions, counts
                 );
-                Long resourceId = resourceNode != null ? resourceNode.getId() : resolveExistingId("system", resourceCode, null);
+                Long resourceId = resourceNode != null ? resourceNode.getId() : resolveExistingId(tenantId, "system", resourceCode, null);
 
                 // Level 3: Action nodes
                 for (String action : rd.actions()) {
@@ -270,7 +271,7 @@ public class SystemPermissionInitializer {
 
         // Internal system model permissions (model.sys_user.read, …) — parented
         // under the existing "platform" module so the tree remains navigable.
-        Long platformModuleId = resolveExistingId("module", "platform", null);
+        Long platformModuleId = resolveExistingId(tenantId, "module", "platform", null);
         for (InternalSystemModel m : INTERNAL_SYSTEM_MODELS) {
             // Level 2: model.{code} resource node
             Permission resourceNode = createOrSkipPermission(
@@ -282,7 +283,7 @@ public class SystemPermissionInitializer {
             );
             Long resourceId = resourceNode != null
                 ? resourceNode.getId()
-                : resolveExistingId("model", m.code(), null);
+                : resolveExistingId(tenantId, "model", m.code(), null);
 
             // Level 3: action nodes
             for (String action : m.actions()) {
@@ -354,7 +355,7 @@ public class SystemPermissionInitializer {
 
         String code = buildCode(resourceType, resourceCode, action);
 
-        Permission existing = permissionMapper.findByCode(code);
+        Permission existing = permissionMapper.findByTenantIdAndCode(tenantId, code);
         if (existing != null) {
             log.debug("System permission exists, skipping: code={}, id={}", code, existing.getId());
             // Still add to collector so callers get a complete list
@@ -403,9 +404,9 @@ public class SystemPermissionInitializer {
     /**
      * Resolve the ID of an existing permission by code (for parent references).
      */
-    private Long resolveExistingId(String resourceType, String resourceCode, String action) {
+    private Long resolveExistingId(Long tenantId, String resourceType, String resourceCode, String action) {
         String code = buildCode(resourceType, resourceCode, action);
-        Permission existing = permissionMapper.findByCode(code);
+        Permission existing = permissionMapper.findByTenantIdAndCode(tenantId, code);
         return existing != null ? existing.getId() : null;
     }
 

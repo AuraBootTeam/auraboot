@@ -278,7 +278,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
                 throw new TemplateValidationException("权限编码不能为空");
             }
             
-            Permission existing = permissionMapper.findByCode(code);
+            Permission existing = permissionMapper.findByTenantIdAndCode(tenantId, code);
             if (existing != null) {
                 created.add(existing);
                 log.debug("模板Permission已存在,纳入绑定候选: code={}, id={}", logSafe(code), existing.getId());
