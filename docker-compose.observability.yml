@@ -28,6 +28,7 @@ services:
       DATABASE_URL: jdbc:postgresql://observability-postgres:5432/aura_boot?charSet=UTF8
       DATABASE_USERNAME: auraboot
       DATABASE_PASSWORD: auraboot-observability-ci
+      JWT_SECRET: observability-acceptance-only-secret-minimum-32-characters
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://tempo:4318/v1/traces
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_NAME: auraboot-observability-acceptance
