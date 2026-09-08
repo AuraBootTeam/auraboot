@@ -99,7 +99,7 @@ export function ShortcutsWidget({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-  const displayTitle = title ? t(title) : t(I18N_KEYS.title);
+  const displayTitle = title ? t(title) : t(I18N_KEYS.title, undefined, '快捷方式');
   const menuShortcuts = React.useMemo(() => {
     const menus = ((rootData?.menus as UiMenuItem[] | undefined) ?? []);
     return flattenMenus(menus)
@@ -242,7 +242,7 @@ export function ShortcutsWidget({
             onClick={toggleEditing}
             className="text-xs text-gray-400 transition-colors hover:text-blue-500"
           >
-            {editing ? t(I18N_KEYS.done) : t(I18N_KEYS.edit)}
+            {editing ? t(I18N_KEYS.done, undefined, '完成') : t(I18N_KEYS.edit, undefined, '编辑')}
           </button>
         )}
       </div>
@@ -284,7 +284,7 @@ export function ShortcutsWidget({
                     type="button"
                     onClick={(e) => handleRemove(item.engagementId!, e)}
                     className="flex h-5 w-5 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    aria-label={t(I18N_KEYS.edit)}
+                    aria-label={t(I18N_KEYS.edit, undefined, '编辑')}
                   >
                     &times;
                   </button>
@@ -311,7 +311,7 @@ export function ShortcutsWidget({
                 +
               </span>
               <span className="text-[13px] font-medium text-gray-400">
-                {t(I18N_KEYS.addShortcut)}
+                {t(I18N_KEYS.addShortcut, undefined, '添加快捷方式')}
               </span>
             </button>
           </li>
@@ -327,7 +327,7 @@ export function ShortcutsWidget({
             className="text-[10px] text-gray-300 transition-colors hover:text-blue-400"
             data-testid="shortcuts-customize-button"
           >
-            {t(I18N_KEYS.customize)}
+            {t(I18N_KEYS.customize, undefined, '自定义')}
           </button>
         </div>
       )}
