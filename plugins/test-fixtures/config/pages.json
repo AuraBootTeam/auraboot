@@ -1959,7 +1959,8 @@
           },
           {
             "field": "e2et_crm_opp_stage",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_crm_opp_amount",
