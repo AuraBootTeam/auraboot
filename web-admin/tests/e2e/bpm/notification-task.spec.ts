@@ -206,6 +206,9 @@ async function seedLeaveDraft(
   const submitResp = await request.post(
     '/api/meta/commands/execute/wd:submit_leave_request',
     {
+      // First submit after a fresh backend boot runs Drools + BPM cold paths
+      // and can exceed the 5s global actionTimeout (seen twice in full gates).
+      timeout: 30_000,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
         targetRecordPid: recordId,
