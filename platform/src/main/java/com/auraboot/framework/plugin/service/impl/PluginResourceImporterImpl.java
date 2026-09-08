@@ -1347,6 +1347,34 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
     }
 
+    /**
+     * Re-resolve the role's declared permission codes and bind any that resolve now but
+     * did not at the ROLE import stage. Generated model actions (model.&lt;code&gt;.create/
+     * update/... and command verbs) are created by post-import auto-assignment, which runs
+     * AFTER the ROLE stage, so on a first import updateRolePermissions silently skipped
+     * them ("Permission not found for role binding") and business roles ended up without
+     * model write access. Called once model post-processing has generated every action.
+     */
+    @Override
+    public boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId) {
+        if (dto == null || dto.getCode() == null || dto.getCode().isBlank()) {
+            return false;
+        }
+        Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
+        if (roleId == null) {
+            log.warn("Role not found for permission reconciliation: {}", logSafe(dto.getCode()));
+            return false;
+        }
+        int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
+        updateRolePermissions(roleId, dto, tenantId, null);
+        int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
+        if (after > before) {
+            log.info("Role permission reconciliation bound {} additional codes for role {}",
+                    after - before, logSafe(dto.getCode()));
+        }
+        return after > before;
+    }
+
     private void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid) {
         List<String> permissionCodes = dto.getPermissions();
         if (permissionCodes == null || permissionCodes.isEmpty()) {

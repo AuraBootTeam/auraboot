@@ -74,17 +74,57 @@ public class CommandActionDeriver {
         return new ArrayList<>(actions);
     }
 
+    /**
+     * Derive the action set for a model from plugin-manifest commands — the pre-import
+     * equivalent of {@link #deriveActions(String)}, usable while commands are not yet
+     * persisted. Semantics are identical: baseline actions plus standard exec types plus
+     * verbs extracted from non-standard command codes.
+     *
+     * @param modelCode             the model code to derive actions for
+     * @param execTypeByCommandCode command code → exec type for every command the
+     *                              importing plugin declares on any model
+     * @return ordered list of unique action strings
+     */
+    public List<String> deriveActionsFromCommandExecTypes(String modelCode,
+                                                          Map<String, String> execTypeByCommandCode) {
+        Set<String> actions = new LinkedHashSet<>(DEFAULT_DYNAMIC_ACTIONS);
+        if (execTypeByCommandCode == null || execTypeByCommandCode.isEmpty()) {
+            return new ArrayList<>(actions);
+        }
+        execTypeByCommandCode.forEach((commandCode, execType) -> {
+            if (execType == null || SKIP_EXEC_TYPES.contains(execType)) {
+                return;
+            }
+            if (STANDARD_EXEC_TYPES.contains(execType)) {
+                actions.add(execType);
+            } else {
+                String verb = extractVerb(commandCode, modelCode);
+                if (verb != null && !verb.isBlank()) {
+                    actions.add(verb);
+                }
+            }
+        });
+        return new ArrayList<>(actions);
+    }
+
     private String extractExecType(CommandDefinition cmd) {
-        String configJson = cmd.getExecutionConfig();
+        return resolveExecType(cmd.getCode(), cmd.getExecutionConfig(), null);
+    }
+
+    /**
+     * Resolve the exec type from a command's executionConfig JSON "type" entry,
+     * falling back to an explicit type value when the config carries none.
+     */
+    private String resolveExecType(String commandCode, String configJson, String fallbackType) {
         if (configJson == null || configJson.isBlank()) {
-            return null;
+            return fallbackType != null ? fallbackType.toLowerCase() : null;
         }
         try {
             Map<String, Object> config = objectMapper.readValue(configJson, MAP_TYPE_REF);
             Object type = config.get("type");
             return type != null ? type.toString().toLowerCase() : null;
         } catch (Exception e) {
-            log.warn("Failed to parse executionConfig for command {}: {}", cmd.getCode(), e.getMessage());
+            log.warn("Failed to parse executionConfig for command {}: {}", commandCode, e.getMessage());
             return null;
         }
     }

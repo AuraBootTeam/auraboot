@@ -48,6 +48,15 @@ public interface PluginResourceImporter {
     PluginResource importRole(RoleDefinitionDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
 
+    /**
+     * Re-resolve a role's declared permission codes and bind any that resolve now but
+     * did not at the ROLE import stage (generated model actions are created after that
+     * stage). Idempotent: existing bindings are left untouched.
+     *
+     * @return true if at least one new binding was created
+     */
+    boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId);
+
     PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
 
