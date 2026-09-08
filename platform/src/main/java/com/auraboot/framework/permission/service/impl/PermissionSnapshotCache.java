@@ -274,9 +274,14 @@ public class PermissionSnapshotCache {
         return lookup.roleId();
     }
 
+    /**
+     * The catalog is tenant-scoped: permission definitions are owned by the tenant whose
+     * import/publish created them, and resolving a code to another tenant's newest row
+     * silently invalidates that tenant's role bindings.
+     */
     private PermissionCatalog getPermissionCatalog(Long tenantId) {
         return getOrLoad(PERMISSION_CATALOG_CACHE, new PermissionCatalogKey(tenantId), () -> {
-            List<Permission> permissions = permissionMapper.findResolvableDefinitions();
+            List<Permission> permissions = permissionMapper.findResolvableDefinitions(tenantId);
             if (permissions == null || permissions.isEmpty()) {
                 return new PermissionCatalog(Map.of(), Map.of());
             }
