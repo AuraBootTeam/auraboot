@@ -1907,6 +1907,66 @@
       "type": "grid",
       "cols": 12
     },
-    "blocks": []
+    "blocks": [
+      {
+        "id": "block_opp_toolbar",
+        "blockType": "toolbar",
+        "title": {
+          "zh-CN": "工具栏",
+          "en-US": "Toolbar"
+        },
+        "actions": [
+          {
+            "code": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "New"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "e2et_crm_opp_form"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "e2et_crm_opp_form",
+    "name:zh-CN": "商机演示表单",
+    "name:en": "Demo Opportunity Form",
+    "modelCode": "e2et_crm_opp",
+    "description": "Create/edit form for the stage-rail fixture model.",
+    "kind": "form",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "section_opp_basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Info"
+        },
+        "columns": 2,
+        "fields": [
+          {
+            "field": "e2et_crm_opp_name",
+            "span": 2,
+            "required": true
+          },
+          {
+            "field": "e2et_crm_opp_stage",
+            "span": 1
+          },
+          {
+            "field": "e2et_crm_opp_amount",
+            "span": 1
+          }
+        ]
+      }
+    ]
   }
 ]
