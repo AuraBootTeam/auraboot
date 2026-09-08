@@ -7,6 +7,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.Search;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +37,7 @@ public class ObservabilityController {
 
     @GetMapping("/snapshot")
     @RequirePermission(MetaPermission.SYSTEM_MANAGEMENT)
+    @Observed(name = "observability.snapshot", contextualName = "observability-snapshot")
     public ApiResponse<Map<String, Object>> getMetricsSnapshot() {
         Map<String, Object> snapshot = new LinkedHashMap<>();
 

@@ -1,4 +1,44 @@
 services:
+  observability-postgres:
+    image: postgres:16-alpine
+    profiles:
+      - acceptance
+    environment:
+      POSTGRES_USER: auraboot
+      POSTGRES_PASSWORD: auraboot-observability-ci
+      POSTGRES_DB: aura_boot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    volumes:
+      - observability_postgres_data:/var/lib/postgresql/data
+
+  app:
+    profiles:
+      - acceptance
+    build:
+      context: ./platform
+      dockerfile: Dockerfile.runtime
+    ports:
+      - "${AURA_OBS_APP_PORT:-26443}:6443"
+    environment:
+      SPRING_PROFILES_ACTIVE: community
+      DATABASE_URL: jdbc:postgresql://observability-postgres:5432/aura_boot?charSet=UTF8
+      DATABASE_USERNAME: auraboot
+      DATABASE_PASSWORD: auraboot-observability-ci
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://tempo:4318/v1/traces
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_NAME: auraboot-observability-acceptance
+      MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
+    depends_on:
+      observability-postgres:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.51.0
     ports:
@@ -155,6 +195,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  observability_postgres_data:
   prometheus_data:
   grafana_data:
   postgres_data:
