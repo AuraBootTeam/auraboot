@@ -53,6 +53,25 @@ public interface PermissionMapper extends BaseMapper<Permission> {
     Permission findByCode(@Param("code") String code);
 
     /**
+     * Tenant-scoped variant of {@link #findByCode(String)}: {@code findByCode} searches
+     * across ALL tenants (newest first), so on a shared multi-tenant database a
+     * bootstrap seeding per-tenant permission rows would find another tenant's row,
+     * skip creating this tenant's copy, and bind the foreign id — silently
+     * under-seeding the tenant and duplicating codes in the role's code list.
+     * Seed paths must resolve candidates with this method instead.
+     */
+    @Select("""
+        SELECT * FROM ab_permission
+        WHERE tenant_id = #{tenantId}
+          AND LOWER(code) = LOWER(#{code})
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+        ORDER BY created_at DESC
+        LIMIT 1
+        """)
+    Permission findByTenantIdAndCode(@Param("tenantId") Long tenantId,
+                                     @Param("code") String code);
+
+    /**
      * Find permissions by resource type
      *
      * @param resourceType Resource type (MODEL, PAGE, QUERY, etc.)
