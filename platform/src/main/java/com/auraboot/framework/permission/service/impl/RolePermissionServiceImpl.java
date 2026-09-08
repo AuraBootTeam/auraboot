@@ -86,6 +86,11 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             if (pending.isEmpty()) {
                 log.info("Role already holds all requested permissions, skipping: roleId={}",
                         roleId);
+                // Preserve the observable side effect of a no-op assignment: listeners
+                // still get the change event (nothing changed, but the contract is
+                // "assignment attempted → event"), matching the pre-idempotency flow.
+                eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                        this, tenantId, roleId, null, "UPDATE"));
                 return true;
             }
             permissionIds = pending;

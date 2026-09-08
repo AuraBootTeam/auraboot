@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,7 +25,7 @@ class SystemPermissionInitializerTest {
 
     @Test
     void generatedPermissionsAreActiveNotLegacyNullDeletedFlag() {
-        when(permissionMapper.findByCode(any())).thenReturn(null);
+        lenient().when(permissionMapper.findByTenantIdAndCode(any(), any())).thenReturn(null);
 
         AtomicLong nextId = new AtomicLong(1000);
         doAnswer(invocation -> {
