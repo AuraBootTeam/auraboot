@@ -363,5 +363,55 @@
         "status": "enabled"
       }
     ]
+  },
+  {
+    "code": "e2et_crm_opp_stage",
+    "name": "Opportunity Stage",
+    "name:zh-CN": "商机阶段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "discovery",
+        "label": "Discovery",
+        "label:zh-CN": "需求发现",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "qualification",
+        "label": "Qualification",
+        "label:zh-CN": "资格确认",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "proposal",
+        "label": "Proposal",
+        "label:zh-CN": "方案报价",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "negotiation",
+        "label": "Negotiation",
+        "label:zh-CN": "商务谈判",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "closed_won",
+        "label": "Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "closed_lost",
+        "label": "Lost",
+        "label:zh-CN": "已丢单",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
   }
 ]
