@@ -40,9 +40,13 @@ try {
   if (!sourceHref) throw new Error('Grafana rendered no derived Tempo link');
   await page.screenshot({ path: path.join(artifacts, 'grafana-loki-derived-trace-link.png'), fullPage: true });
 
-  await traceLink.click();
-  await page.waitForURL(url => url.href.includes('tempo') || url.href.includes(traceId), { timeout: 30_000 });
-  await page.getByText(/observability-snapshot|trace/i).first().waitFor({ timeout: 60_000 });
+  const sourceUrl = page.url();
+  await Promise.all([
+    page.waitForURL(url => url.href !== sourceUrl && url.href.includes('tempo'), { timeout: 30_000 }),
+    traceLink.click(),
+  ]);
+  if (!page.url().includes('tempo')) throw new Error(`Grafana did not navigate to Tempo: ${page.url()}`);
+  await page.getByText(traceId, { exact: false }).first().waitFor({ timeout: 60_000 });
   await page.screenshot({ path: path.join(artifacts, 'grafana-tempo-trace.png'), fullPage: true });
   fs.writeFileSync(path.join(artifacts, 'grafana-browser-summary.json'), JSON.stringify({
     contractVersion: 1,

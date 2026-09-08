@@ -7,6 +7,7 @@ ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/observability-r
 COMPOSE=(docker compose -f "$PROJECT_ROOT/docker-compose.observability.yml" -p aura-ci-observability --profile acceptance)
 RUN_ID="obs-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 TRACE_ID=""
+RUNTIME_STARTED=0
 export AURA_OBS_PROMETHEUS_PORT="${AURA_OBS_PROMETHEUS_PORT:-29090}"
 export AURA_OBS_ALERTMANAGER_PORT="${AURA_OBS_ALERTMANAGER_PORT:-29093}"
 export AURA_OBS_CANARY_PORT="${AURA_OBS_CANARY_PORT:-28080}"
@@ -21,6 +22,43 @@ mkdir -p "$ARTIFACTS"
 invalid() {
   printf '[observability-real-stack] environment-invalid: %s\n' "$*" >&2
   exit 2
+}
+
+close_runtime() {
+  (( RUNTIME_STARTED == 1 )) || return 0
+  local close_rc=0
+  local running=""
+  "${COMPOSE[@]}" stop --timeout 30 > "$ARTIFACTS/compose-stop.log" 2>&1 || close_rc=$?
+  "${COMPOSE[@]}" ps --all > "$ARTIFACTS/compose-ps-after-close.txt" 2>&1 || close_rc=$?
+  running="$("${COMPOSE[@]}" ps --status running --services 2>> "$ARTIFACTS/compose-stop.log")" || close_rc=$?
+  if [[ -n "$running" ]]; then
+    printf '%s\n' "$running" >> "$ARTIFACTS/compose-stop.log"
+    close_rc=1
+  fi
+  node - "$ARTIFACTS/runtime-closure.json" "$RUN_ID" "$close_rc" <<'NODE'
+const fs = require('node:fs');
+const [file, runId, closeCode] = process.argv.slice(2);
+fs.writeFileSync(file, JSON.stringify({
+  contractVersion: 1,
+  runId,
+  status: closeCode === '0' ? 'closed' : 'close-failed',
+  processesAndPortsReleased: closeCode === '0',
+  evidenceVolumesRetained: true,
+}, null, 2) + '\n');
+NODE
+  RUNTIME_STARTED=0
+  return "$close_rc"
+}
+
+on_exit() {
+  local run_rc=$?
+  trap - EXIT
+  if ! close_runtime; then
+    printf '[observability-real-stack] environment-invalid: runtime close failed; see %s\n' \
+      "$ARTIFACTS/compose-stop.log" >&2
+    (( run_rc == 0 )) && run_rc=2
+  fi
+  exit "$run_rc"
 }
 
 command -v docker >/dev/null 2>&1 || invalid 'docker is unavailable'
@@ -46,6 +84,8 @@ find \
 "${COMPOSE[@]}" config --quiet
 "$PROJECT_ROOT/platform/gradlew" -p "$PROJECT_ROOT/platform" bootJar --no-daemon -x test \
   > "$ARTIFACTS/bootjar.log" 2>&1
+RUNTIME_STARTED=1
+trap on_exit EXIT
 "${COMPOSE[@]}" up -d --build observability-postgres app prometheus alertmanager \
   observability-canary-receiver pushgateway loki tempo grafana
 "${COMPOSE[@]}" ps --all > "$ARTIFACTS/compose-ps.txt"
@@ -280,8 +320,8 @@ summary.checks.grafanaBrowserNavigation = true;
 fs.writeFileSync(file, JSON.stringify(summary, null, 2) + '\n');
 NODE
 
-# Retention is proved across bounded service restarts. The project and volumes remain available
-# for evidence inspection; the CI runtime owner can remove them after its retention TTL.
+# Retention is proved across bounded service restarts. Closing the runtime stops containers and
+# releases ports while preserving the project, volumes, and immutable artifacts for its TTL.
 "${COMPOSE[@]}" restart prometheus loki tempo
 wait_http prometheus "http://127.0.0.1:$AURA_OBS_PROMETHEUS_PORT/-/ready"
 wait_http loki "http://127.0.0.1:$AURA_OBS_LOKI_PORT/ready"
@@ -299,4 +339,5 @@ const traceIds = (tempo.batches ?? []).flatMap(batch =>
     (scope.spans ?? []).map(span => Buffer.from(span.traceId ?? '', 'base64').toString('hex'))));
 if (!traceIds.includes(traceId)) process.exit(1);
 NODE
-printf '[observability-real-stack] PASS run=%s trace=%s artifacts=%s runtime=retained\n' "$RUN_ID" "$TRACE_ID" "$ARTIFACTS"
+close_runtime || invalid "runtime close failed; see $ARTIFACTS/compose-stop.log"
+printf '[observability-real-stack] PASS run=%s trace=%s artifacts=%s runtime=closed evidence=retained\n' "$RUN_ID" "$TRACE_ID" "$ARTIFACTS"

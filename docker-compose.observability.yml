@@ -22,7 +22,7 @@ services:
       context: ./platform
       dockerfile: Dockerfile.runtime
     ports:
-      - "${AURA_OBS_APP_PORT:-26443}:6443"
+      - "127.0.0.1:${AURA_OBS_APP_PORT:-26443}:6443"
     environment:
       SPRING_PROFILES_ACTIVE: community
       DATABASE_URL: jdbc:postgresql://observability-postgres:5432/aura_boot?charSet=UTF8
@@ -43,7 +43,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.0
     ports:
-      - "${AURA_OBS_PROMETHEUS_PORT:-9090}:9090"
+      - "127.0.0.1:${AURA_OBS_PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml
@@ -57,7 +57,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     ports:
-      - "${AURA_OBS_ALERTMANAGER_PORT:-19093}:9093"
+      - "127.0.0.1:${AURA_OBS_ALERTMANAGER_PORT:-19093}:9093"
     volumes:
       - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
@@ -69,7 +69,7 @@ services:
   observability-canary-receiver:
     image: python:3.12-alpine
     ports:
-      - "${AURA_OBS_CANARY_PORT:-18080}:8080"
+      - "127.0.0.1:${AURA_OBS_CANARY_PORT:-18080}:8080"
     volumes:
       - ./docker/observability-canary/receiver.py:/app/receiver.py:ro
       - observability_canary_data:/data
@@ -79,13 +79,13 @@ services:
   pushgateway:
     image: prom/pushgateway:v1.9.0
     ports:
-      - "${AURA_OBS_PUSHGATEWAY_PORT:-19091}:9091"
+      - "127.0.0.1:${AURA_OBS_PUSHGATEWAY_PORT:-19091}:9091"
     restart: unless-stopped
 
   loki:
     image: grafana/loki:3.1.1
     ports:
-      - "${AURA_OBS_LOKI_PORT:-13100}:3100"
+      - "127.0.0.1:${AURA_OBS_LOKI_PORT:-13100}:3100"
     volumes:
       - ./docker/loki/loki.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
@@ -95,8 +95,8 @@ services:
   tempo:
     image: grafana/tempo:2.6.0
     ports:
-      - "${AURA_OBS_TEMPO_PORT:-13200}:3200"
-      - "${AURA_OBS_ZIPKIN_PORT:-19411}:9411"
+      - "127.0.0.1:${AURA_OBS_TEMPO_PORT:-13200}:3200"
+      - "127.0.0.1:${AURA_OBS_ZIPKIN_PORT:-19411}:9411"
     volumes:
       - ./docker/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
@@ -106,11 +106,15 @@ services:
   grafana:
     image: grafana/grafana:10.4.0
     ports:
-      - "${AURA_OBS_GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:${AURA_OBS_GRAFANA_PORT:-3000}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-auraboot-observability-ci}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # The acceptance stack is loopback-only and disposable. Anonymous Admin keeps a derived
+      # Explore link in the same browser flow instead of redirecting it through a second login.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning
