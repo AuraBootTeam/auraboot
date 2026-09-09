@@ -4,6 +4,9 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.event.BpmEvent;
 import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
+import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
@@ -18,6 +21,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -41,6 +45,8 @@ public class InboxEventListener {
     private final InboxService inboxService;
     private final ObjectMapper objectMapper;
     private final UserService userService;
+    private final RoleMapper roleMapper;
+    private final UserRoleMapper userRoleMapper;
 
     // ───────── BPM Events ─────────
 
@@ -91,10 +97,18 @@ public class InboxEventListener {
 
             for (String assigneeIdStr : assigneeIds) {
                 Long assigneeUserId = resolveUserIdFromString(assigneeIdStr, tenantId);
-                if (assigneeUserId == null) continue;
-
-                MetaContext.setContext(tenantId, assigneeUserId, null, null);
-                createApprovalInboxItem(event, assigneeUserId, tenantId);
+                if (assigneeUserId != null) {
+                    MetaContext.setContext(tenantId, assigneeUserId, null, null);
+                    createApprovalInboxItem(event, assigneeUserId, tenantId);
+                    continue;
+                }
+                // Group assignee (role code, e.g. "wd_manager"): fan out to every
+                // active member of that role within the tenant. Without this the
+                // whole task silently produced zero inbox items (F5).
+                for (Long groupUserId : expandGroupAssignees(assigneeIdStr, tenantId)) {
+                    MetaContext.setContext(tenantId, groupUserId, null, null);
+                    createApprovalInboxItem(event, groupUserId, tenantId);
+                }
             }
         } finally {
             MetaContext.clear();
@@ -534,6 +548,23 @@ public class InboxEventListener {
         Long numericId = parseLong(userIdStr);
         if (numericId != null) return numericId;
         return resolveUserIdByPid(userIdStr, tenantId);
+    }
+
+    /**
+     * Expand a group-style assignee (a role code such as "wd_manager") to the user
+     * IDs of its active members within the tenant. Returns an empty list when the
+     * code is not a known role, so non-role garbage stays a silent skip.
+     */
+    private List<Long> expandGroupAssignees(String groupCode, Long tenantId) {
+        if (groupCode == null || groupCode.isBlank()) return List.of();
+        Role role = roleMapper.findByTenantIdAndCode(tenantId, groupCode);
+        if (role == null) {
+            log.debug("Group assignee {} is not a role in tenant {}, skipping", groupCode, tenantId);
+            return List.of();
+        }
+        List<Long> userIds = userRoleMapper.findUserIdsByRoleIdAndTenantId(role.getId(), tenantId);
+        log.debug("Group assignee {} expanded to {} user(s) in tenant {}", groupCode, userIds.size(), tenantId);
+        return userIds == null ? List.of() : userIds;
     }
 
     private Long parseLong(Object value) {
