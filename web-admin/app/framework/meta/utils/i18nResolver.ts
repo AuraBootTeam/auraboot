@@ -316,6 +316,15 @@ export function resolveConfirmDialog(
   const content = t(contentKey);
 
   const fallback = CONFIRM_DIALOG_FALLBACKS[messageKey];
+  if (title === titleKey && content === contentKey && !fallback) {
+    // The value is not a recognized i18n key. DSL `confirm` fields may carry a
+    // literal message (e.g. "将按通知明细生成收货入库单…是否继续?") — using it
+    // verbatim beats rendering an empty dialog body. Key-shaped strings
+    // (no whitespace/CJK) keep the empty-content fallback for their tests.
+    if (/[\s\u4e00-\u9fff]/.test(messageKey)) {
+      return { title: '确认', content: messageKey };
+    }
+  }
   return {
     title: title !== titleKey ? title : (fallback?.title ?? '确认'),
     content: content !== contentKey ? content : (fallback?.content ?? ''),
