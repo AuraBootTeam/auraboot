@@ -570,10 +570,30 @@ public class ProcessEngineService {
     }
 
     private String resolveProcessDefinitionVersion(String processDefinitionId, String tenantId) {
+        // Prefer tenant-scoped deployed metadata: the engine cache spans ALL tenants,
+        // so a higher version deployed by another tenant would otherwise hijack this
+        // resolution and start() would fail with "No ProcessDefinition found" for a
+        // version never deployed for the caller's tenant.
+        Long tenantIdLong = parseTenantId(tenantId);
+        if (tenantIdLong != null) {
+            try {
+                String tenantVersion = processDefinitionMapper
+                        .findAllVersions(tenantIdLong, processDefinitionId).stream()
+                        .filter(def -> "deployed".equals(def.getStatus()))
+                        .map(BpmProcessDefinition::getVersion)
+                        .filter(java.util.Objects::nonNull)
+                        .max(Integer::compareTo)
+                        .map(v -> v + ".0.0")
+                        .orElse(null);
+                if (StringUtils.hasText(tenantVersion)) {
+                    return tenantVersion;
+                }
+            } catch (Exception e) {
+                log.warn("Tenant-scoped version resolution failed for {}: {}",
+                        processDefinitionId, e.getMessage());
+            }
+        }
         RepositoryQueryService repositoryQueryService = smartEngine.getRepositoryQueryService();
-        // SmartEngine does not associate tenantId with deployed process definitions,
-        // so we only filter by processDefinitionId. Tenant isolation is enforced at the
-        // database/controller level via TenantLineInterceptor and @RequirePermission.
         return repositoryQueryService.getAllCachedProcessDefinition()
                 .stream()
                 .filter(definition -> processDefinitionId.equals(definition.getId()))
@@ -582,7 +602,6 @@ public class ProcessEngineService {
                 .max(this::compareVersion)
                 .orElse(null);
     }
-
     private int compareVersion(String left, String right) {
         List<Integer> leftParts = parseVersionParts(left);
         List<Integer> rightParts = parseVersionParts(right);
