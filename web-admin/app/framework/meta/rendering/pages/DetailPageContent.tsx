@@ -2108,12 +2108,12 @@ function DetailBlockRenderer({
                   >
                     <div className="text-text-2 text-xs font-medium">{label}</div>
                     {isLongText ? (
-                      <p className="text-text mt-2 text-sm leading-6 whitespace-pre-line">
+                      <p className="text-text mt-2 text-sm leading-6 whitespace-pre-line break-all">
                         {valueText}
                       </p>
                     ) : (
                       <span
-                        className={`mt-2 inline-flex w-fit max-w-full items-center rounded-md border px-2.5 py-1 text-sm font-medium ${getDetailValueTone(valueText)}`}
+                        className={`mt-2 inline-flex w-fit max-w-full items-center rounded-md border px-2.5 py-1 text-sm font-medium break-all ${getDetailValueTone(valueText)}`}
                       >
                         {valueText}
                       </span>
