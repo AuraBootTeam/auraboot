@@ -10,6 +10,8 @@ import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.im.service.ImMessageService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
 import com.auraboot.framework.test.dto.FixtureResult;
@@ -61,6 +63,9 @@ public class TestFixtureController {
     private TenantService tenantService;
 
     @Autowired
+    private TenantMemberService tenantMemberService;
+
+    @Autowired
     private UserService userService;
 
     @Autowired
@@ -102,6 +107,15 @@ public class TestFixtureController {
                         user.getPid(),
                         user.getEmail()
                 );
+                // CommandAuthorizationPhase resolves role permissions by the tenant MEMBER id
+                // (ab_tenant_member), not the user pid. Without it getUserPermissionIds is
+                // empty and every role-gated command — plugin-imported permissions included —
+                // is denied even though the role bindings exist.
+                TenantMember member = tenantMemberService.findByTenantIdAndUserId(
+                        tenant.getId(), user.getId());
+                if (member != null) {
+                    MetaContext.setMemberId(member.getId());
+                }
                 contextSet = true;
             }
         } catch (Exception e) {
