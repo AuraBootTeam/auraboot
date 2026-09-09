@@ -75,6 +75,7 @@ public class BpmStartupReDeployer {
         int skipped = 0;
         int failed = 0;
 
+        reportCrossTenantVersionConflicts(deployed);
         for (BpmProcessDefinition def : deployed) {
             try {
                 DeployOutcome outcome = reDeployOne(def, queryService);
@@ -99,6 +100,31 @@ public class BpmStartupReDeployer {
     /**
      * Deploy a single process definition into SmartEngine if not already cached.
      */
+    /**
+     * B1 self-check: warn when the same process_key is deployed by more than one
+     * tenant with DIFFERENT max versions. ProcessEngineService resolves the start
+     * version from the global engine cache, so divergent cross-tenant versions can
+     * make one tenant's start fail with "No ProcessDefinition found" — surface the
+     * conflict loudly at startup instead of failing at first use.
+     */
+    void reportCrossTenantVersionConflicts(List<BpmProcessDefinition> deployed) {
+        java.util.Map<String, java.util.List<BpmProcessDefinition>> byKey = new java.util.LinkedHashMap<>();
+        for (BpmProcessDefinition def : deployed) {
+            if (def.getProcessKey() == null) continue;
+            byKey.computeIfAbsent(def.getProcessKey(), k -> new java.util.ArrayList<>()).add(def);
+        }
+        for (java.util.Map.Entry<String, java.util.List<BpmProcessDefinition>> e : byKey.entrySet()) {
+            java.util.List<BpmProcessDefinition> rows = e.getValue();
+            long tenants = rows.stream().map(BpmProcessDefinition::getTenantId).distinct().count();
+            long versions = rows.stream().map(BpmProcessDefinition::getVersion).distinct().count();
+            if (tenants > 1 && versions > 1) {
+                log.warn("Cross-tenant deployment version conflict for process key {}: tenants={} versions={} — "
+                        + "version resolution is global and the highest version wins; align or archive stale deployments",
+                        e.getKey(), tenants, versions);
+            }
+        }
+    }
+
     DeployOutcome reDeployOne(BpmProcessDefinition def, RepositoryQueryService queryService) {
         String processKey = def.getProcessKey();
 

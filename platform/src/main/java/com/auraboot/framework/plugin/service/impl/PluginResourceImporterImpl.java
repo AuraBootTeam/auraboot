@@ -2237,9 +2237,24 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             }
 
             transitionNamedQueryStatus(existingEntity.getPid(), targetStatus);
+
+            // A6: the status dance (ensure editable → update → republish) can restore
+            // from_sql on ab_named_query from a stale version snapshot, silently
+            // reverting the imported SQL. Re-assert the imported fromSql after the
+            // transition so the executed query matches the plugin source; skip the
+            // write when they already agree.
             NamedQuery updated = namedQueryMapper.findByCode(dto.getCode());
+            if (updated != null
+                    && dto.getFromSql() != null
+                    && !dto.getFromSql().equals(updated.getFromSql())) {
+                updated.setFromSql(dto.getFromSql());
+                namedQueryMapper.updateById(updated);
+            }
+
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.NAMED_QUERY,
-                    updated.getPid(), updated.getId(), dto.getCode(), dto.getEffectiveTitle(),
+                    updated != null ? updated.getPid() : null,
+                    updated != null ? updated.getId() : null,
+                    dto.getCode(), dto.getEffectiveTitle(),
                     ResourceAction.UPDATE, null, currentState);
             }
         }
