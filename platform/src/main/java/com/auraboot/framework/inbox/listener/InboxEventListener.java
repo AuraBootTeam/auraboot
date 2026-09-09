@@ -51,7 +51,10 @@ public class InboxEventListener {
     // ───────── BPM Events ─────────
 
     @Async("eventTaskExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    // fallbackExecution: SmartEngine callbacks may publish outside any Spring
+    // transaction; without this the AFTER_COMMIT listener silently drops those
+    // events and group-assigned tasks never reach any inbox.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onBpmEvent(BpmEvent event) {
         try {
             String bpmType = event.getBpmEventType();
@@ -237,6 +240,16 @@ public class InboxEventListener {
         String claimerClientItemId = "bpm_task_" + taskInstanceId + "_" + claimerId;
         inboxService.closeByClientItemIdPrefixExcluding(prefix, claimerClientItemId, "claimed_by_other");
 
+        // A4: guarantee the claimer sees the task. Group-assigned tasks may have no
+        // item at all (assignment fan-out skipped them); createItem dedupes by
+        // clientItemId so this is safe when an item already exists.
+        MetaContext.setContext(tenantId, claimerId, null, null);
+        try {
+            createApprovalInboxItem(event, claimerId, tenantId);
+        } finally {
+            MetaContext.setContext(tenantId, null, null, null);
+        }
+
         log.debug("Inbox items closed for task_claimed: task={}, claimer={}", taskInstanceId, claimerId);
     }
 
@@ -328,7 +341,7 @@ public class InboxEventListener {
     // ───────── Command Events ─────────
 
     @Async("eventTaskExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onCommandCompleted(CommandCompletedEvent event) {
         try {
             // Only create inbox items for state transitions (meaningful business events)
