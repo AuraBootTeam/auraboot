@@ -28,7 +28,7 @@ import { uploadCommandFile } from '~/framework/meta/utils/promptUpload';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
-import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
+import { buildConstraintFieldMessage, buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
@@ -1621,7 +1621,11 @@ export function FormPageContent(props: PageContentProps) {
             Number.isFinite(rule.maxLength)
           ) {
             if (value.length > Number(rule.maxLength)) {
-              nextFieldErrors[rawField.field] = `${label} exceeds max length ${rule.maxLength}`;
+              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                label,
+                { type: 'maxLength', maxLength: Number(rule.maxLength) },
+                { locale, t },
+              );
               break;
             }
           }
@@ -1640,7 +1644,11 @@ export function FormPageContent(props: PageContentProps) {
             try {
               const regex = new RegExp(rule.pattern);
               if (!regex.test(value)) {
-                nextFieldErrors[rawField.field] = `${label} format is invalid`;
+                nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                  label,
+                  { type: 'pattern' },
+                  { locale, t },
+                );
                 break;
               }
             } catch {
@@ -1650,14 +1658,22 @@ export function FormPageContent(props: PageContentProps) {
           if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
             const num = Number(value);
             if (Number.isFinite(num) && num < rule.minValue!) {
-              nextFieldErrors[rawField.field] = `${label} must be at least ${rule.minValue}`;
+              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                label,
+                { type: 'minValue', minValue: rule.minValue },
+                { locale, t },
+              );
               break;
             }
           }
           if (rule.type === 'maxValue' && Number.isFinite(rule.maxValue)) {
             const num = Number(value);
             if (Number.isFinite(num) && num > rule.maxValue!) {
-              nextFieldErrors[rawField.field] = `${label} must be at most ${rule.maxValue}`;
+              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                label,
+                { type: 'maxValue', maxValue: rule.maxValue },
+                { locale, t },
+              );
               break;
             }
           }
