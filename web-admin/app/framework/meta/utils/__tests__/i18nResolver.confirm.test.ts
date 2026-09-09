@@ -29,6 +29,24 @@ describe('resolveConfirmDialog', () => {
     });
   });
 
+  it('treats a literal (non-key) string confirm as the dialog content', () => {
+    // WMS-UX-05: DSL `confirm: "将按通知明细生成收货入库单…是否继续?"` is plain
+    // copy, not an i18n key — the dialog must show it verbatim, not an empty body.
+    expect(
+      resolveConfirmDialog('将按通知明细生成收货入库单（草稿，收货位默认取本仓收货位）。是否继续?', missingTranslation),
+    ).toEqual({
+      title: '确认',
+      content: '将按通知明细生成收货入库单（草稿，收货位默认取本仓收货位）。是否继续?',
+    });
+  });
+
+  it('keeps key-shaped strings on the i18n path', () => {
+    expect(resolveConfirmDialog('confirm.someUnknownKey', missingTranslation)).toEqual({
+      title: '确认',
+      content: '',
+    });
+  });
+
   it('accepts localized inline confirm content from page DSL', () => {
     expect(
       resolveConfirmDialog(
