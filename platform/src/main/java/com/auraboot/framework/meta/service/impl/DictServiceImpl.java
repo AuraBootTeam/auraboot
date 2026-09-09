@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -287,6 +288,10 @@ public class DictServiceImpl implements DictService {
 
 
     @Override
+    // Command-path hot read (per-field dict resolution): this method is hit ~120x per
+    // create_and_submit command, each miss costing two queries (dict + items). The
+    // dictData cache is already evicted by every write path below.
+    @Cacheable(value = "dictData", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #code", unless = "#result == null")
     public DictDTO findByCode(String code) {
         if (!StringUtils.hasText(code)) {
             return null;
@@ -297,6 +302,7 @@ public class DictServiceImpl implements DictService {
     }
 
     @Override
+    @Cacheable(value = "dictData", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':items:' + #dictId", unless = "#result == null || #result.isEmpty()")
     public List<DictItem> findEnabledItems(Long dictId) {
         if (dictId == null) {
             return List.of();
