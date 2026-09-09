@@ -711,5 +711,37 @@
     "permissions": [
       "e2et.order.manage"
     ]
+  },
+  {
+    "code": "e2et_crm_opp.create",
+    "displayName:zh-CN": "新建商机演示",
+    "displayName:en": "Create Demo Opportunity",
+    "description": "Create a stage-rail fixture opportunity (required name and stage)",
+    "type": "create",
+    "modelCode": "e2et_crm_opp",
+    "inputFields": [
+      "e2et_crm_opp_name",
+      "e2et_crm_opp_stage",
+      "e2et_crm_opp_amount"
+    ],
+    "permissions": [
+      "e2et.order.manage"
+    ]
+  },
+  {
+    "code": "e2et_crm_opp.update",
+    "displayName:zh-CN": "更新商机演示",
+    "displayName:en": "Update Demo Opportunity",
+    "description": "Update a stage-rail fixture opportunity (drives the edit entry and stage persistence)",
+    "type": "update",
+    "modelCode": "e2et_crm_opp",
+    "inputFields": [
+      "e2et_crm_opp_name",
+      "e2et_crm_opp_stage",
+      "e2et_crm_opp_amount"
+    ],
+    "permissions": [
+      "e2et.order.manage"
+    ]
   }
 ]
