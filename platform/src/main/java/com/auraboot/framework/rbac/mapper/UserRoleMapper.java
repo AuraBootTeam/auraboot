@@ -107,4 +107,13 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
     @Select("SELECT DISTINCT member_id FROM ab_user_role " +
             "WHERE role_id = #{roleId} AND status = 'active' AND deleted_flag = false")
     List<Long> findMemberIdsByRoleId(@Param("roleId") Long roleId);
+    /**
+     * Resolve the user IDs of all active members holding this role within the tenant.
+     * Joins the role assignment to the tenant membership so group-style assignees
+     * (role codes on BPM tasks) can fan out to concrete approvers.
+     */
+    @Select("SELECT tm.user_id FROM ab_user_role ur " +
+            "INNER JOIN ab_tenant_member tm ON tm.id = ur.member_id AND tm.status = 'active' AND tm.deleted_flag = false " +
+            "WHERE ur.role_id = #{roleId} AND ur.tenant_id = #{tenantId} AND ur.deleted_flag = false")
+    List<Long> findUserIdsByRoleIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 }
