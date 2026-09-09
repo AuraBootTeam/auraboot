@@ -2384,7 +2384,6 @@ export function FormPageContent(props: PageContentProps) {
   // ruler, designer panels). Rendered above the form-section blocks so
   // operators see the visualization first.
   const customBlocks = allBlocks.filter((block: any) => block.blockType === 'custom');
-  const toolbarBlocks = allBlocks.filter((block: any) => block.blockType === 'toolbar');
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
@@ -2406,6 +2405,10 @@ export function FormPageContent(props: PageContentProps) {
     'custom',
     'form-buttons',
     'sub-table',
+    // Toolbar blocks render through the kernel ToolbarBlockRenderer (emitting
+    // toolbar-btn-* testids, matching detail pages and e2e). Rendering them
+    // here as well duplicated the same DSL buttons twice on the page.
+    'toolbar',
   ]);
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
@@ -2514,54 +2517,6 @@ export function FormPageContent(props: PageContentProps) {
                         <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
                       </div>
                     ))}
-                  {toolbarBlocks.length > 0 &&
-                    toolbarBlocks.map((block: any) => {
-                      if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
-                        return null;
-                      }
-                      const buttons = Array.isArray(block.buttons) ? block.buttons : [];
-                      if (buttons.length === 0) return null;
-                      return (
-                        <div
-                          key={block.id}
-                          className="border-border bg-muted/30 mb-5 flex flex-wrap items-center justify-end gap-2 rounded-lg border px-4 py-3"
-                          data-block-id={block.id}
-                          data-testid={block.id ? `form-toolbar-${block.id}` : 'form-toolbar'}
-                        >
-                          {buttons.map((button: any) => {
-                            if (!canRenderFormButton(button, hasPermission)) return null;
-                            if (
-                              button.visibleWhen &&
-                              !evaluateCondition(button.visibleWhen, pageContext)
-                            ) {
-                              return null;
-                            }
-                            const isPrimary = button.primary || button.variant === 'primary';
-                            return (
-                              <button
-                                type="button"
-                                key={button.code}
-                                data-testid={`form-toolbar-btn-${button.code}`}
-                                data-ab-testid={buttonTestId(
-                                  'form-toolbar',
-                                  schema?.modelCode || tableName,
-                                  button.code,
-                                )}
-                                onClick={() => handleFormAction(button)}
-                                disabled={loading || submitting || !mainRecordLoaded}
-                                className={`rounded-control px-3 py-1.5 text-sm font-medium ${
-                                  isPrimary
-                                    ? 'bg-accent hover:bg-accent-hover text-white disabled:bg-blue-400'
-                                    : 'border-border-strong bg-panel text-text-2 hover:bg-hover border disabled:bg-gray-100'
-                                } ${button.danger ? 'bg-red-600 text-white hover:bg-red-700' : ''} disabled:cursor-not-allowed`}
-                              >
-                                {resolveFormButtonContent(button, locale, t)}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
                   {customBlocks.length > 0 &&
                     customBlocks.map((block: any) => {
                       // Honour DSL visibility condition (matches form-section behavior below).
