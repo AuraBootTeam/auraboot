@@ -26,10 +26,12 @@ public class SkillSpiException extends RootUnCheckedException {
     private final SkillErrorCode errorCode;
     private final String fieldPath;
 
+    @SuppressWarnings("this-escape")
     public SkillSpiException(SkillErrorCode errorCode, String message) {
         this(errorCode, message, null, null);
     }
 
+    @SuppressWarnings("this-escape")
     public SkillSpiException(SkillErrorCode errorCode, String message, String fieldPath) {
         this(errorCode, message, fieldPath, null);
     }

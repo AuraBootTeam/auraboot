@@ -23,13 +23,15 @@ class InboxEventListenerTest {
 
     @Mock
     private InboxService inboxService;
+    @Mock private com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+    @Mock private com.auraboot.framework.rbac.mapper.UserRoleMapper userRoleMapper;
 
     @Mock
     private UserService userService;
 
     @Test
     void createsReadableAssignmentTitleWithoutStateFallbackMarkers() {
-        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService);
+        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService, roleMapper, userRoleMapper);
         CommandCompletedEvent event = buildStateTransitionEvent(
                 "crm:activate_campaign",
                 Map.of()
@@ -55,7 +57,7 @@ class InboxEventListenerTest {
 
     @Test
     void createsStateTransitionTitleWhenFromAndToStatesExist() {
-        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService);
+        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService, roleMapper, userRoleMapper);
         Map<String, Object> payload = new HashMap<>();
         payload.put("fromState", "draft");
         payload.put("toState", "active");
@@ -73,7 +75,7 @@ class InboxEventListenerTest {
 
     @Test
     void ignoresNonStateTransitionCommandEvents() {
-        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService);
+        InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService, roleMapper, userRoleMapper);
         CommandCompletedEvent event = new CommandCompletedEvent(
                 100L,
                 "01KTESTCAMPAIGN",

@@ -57,6 +57,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -289,6 +292,55 @@ class PluginResourceImporterImplCoreTest {
                 ImportRequest.ConflictStrategy.ERROR))
                 .isInstanceOf(PluginException.class)
                 .hasMessageContaining("Named query already exists");
+    }
+
+    @Test
+    @DisplayName("importNamedQuery update re-asserts the imported fromSql after republish (A6)")
+    void importNamedQuery_update_reassertsFromSqlAfterRepublish() {
+        // Existing PUBLISHED query whose stored SQL is the OLD one.
+        String oldSql = "SELECT 1 AS old";
+        String newSql = "SELECT t.comment AS comment FROM se_task_instance t";
+
+        com.auraboot.framework.meta.entity.NamedQuery entity =
+                new com.auraboot.framework.meta.entity.NamedQuery();
+        entity.setId(42L);
+        entity.setPid("nq-pid");
+        entity.setCode("user.list");
+        entity.setStatus("draft");
+        entity.setFromSql(oldSql);
+
+        // Mutable state DTO backing the ensure/transition status dance.
+        com.auraboot.framework.meta.dto.NamedQueryDTO state =
+                new com.auraboot.framework.meta.dto.NamedQueryDTO();
+        state.setPid("nq-pid");
+        state.setStatus("published");
+
+        when(namedQueryService.findByCode("user.list")).thenReturn(state);
+        when(namedQueryService.findByPid("nq-pid")).thenAnswer(inv -> state);
+        doAnswer(inv -> {
+            state.setStatus(((String) inv.getArgument(1)).toLowerCase());
+            return state;
+        }).when(namedQueryService).updateStatus(eq("nq-pid"), anyString());
+        when(namedQueryMapper.findByCode("user.list")).thenReturn(entity);
+
+        org.mockito.ArgumentCaptor<com.auraboot.framework.meta.entity.NamedQuery> persisted =
+                org.mockito.ArgumentCaptor.forClass(com.auraboot.framework.meta.entity.NamedQuery.class);
+
+        NamedQueryDefinitionDTO dto = NamedQueryDefinitionDTO.builder()
+                .code("user.list")
+                .title("User List")
+                .build();
+        dto.setFromSql(newSql);
+        dto.setStatus("published");
+
+        importer.importNamedQuery(dto, "plugin-1", "imp-1", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        // A6 regression: the LAST write to the query must carry the imported SQL —
+        // the republish transition restores from_sql from the stale version snapshot
+        // otherwise, silently reverting the import.
+        verify(namedQueryMapper).updateById(persisted.capture());
+        org.assertj.core.api.Assertions.assertThat(persisted.getValue().getFromSql()).isEqualTo(newSql);
     }
 
     @Test

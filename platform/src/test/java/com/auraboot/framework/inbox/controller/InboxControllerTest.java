@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.inbox.dto.InboxItemResponse;
 import com.auraboot.framework.inbox.model.InboxItem;
+import com.auraboot.framework.bpm.service.TaskService;
 import com.auraboot.framework.inbox.service.InboxService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -29,6 +30,7 @@ class InboxControllerTest {
 
     @Mock
     private InboxService inboxService;
+    @Mock private TaskService taskService;
 
     @AfterEach
     void tearDown() {
@@ -45,7 +47,7 @@ class InboxControllerTest {
         page.setRecords(List.of(item));
         when(inboxService.listByUser(101L, 202L, "approval", "pending", 1, 20)).thenReturn(page);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<IPage<InboxItemResponse>> response = controller.list("approval", "pending", 1, 20);
 
         assertTrue(response.isSuccess());
@@ -71,7 +73,7 @@ class InboxControllerTest {
         InboxItem item = buildInboxItem();
         when(inboxService.getItem(1001L, 101L, 202L)).thenReturn(item);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<InboxItemResponse> response = controller.getItem(1001L);
 
         assertTrue(response.isSuccess());
@@ -90,7 +92,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Object>> response =
                 controller.submitApprovalAction(1001L, null, "reject", null);
 
@@ -104,7 +106,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Object>> response = controller.submitApprovalAction(
                 1001L,
                 Map.of("action", "rejected", "comment", "Duplicate request"),
@@ -122,7 +124,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Void> response = controller.markActed(1001L, null, "rejected", " ");
 
         assertFalse(response.isSuccess());
@@ -135,7 +137,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Void> response = controller.markActed(
                 1001L,
                 Map.of("action", "reject", "comment", "Needs corrected data"),
@@ -151,7 +153,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Integer>> response =
                 controller.batchReject(Map.of("ids", List.of(1001L), "comment", " "), null);
 
@@ -165,7 +167,7 @@ class InboxControllerTest {
         MetaContext.setCurrentUserId(101L);
         MetaContext.setCurrentTenantId(202L);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Integer>> response =
                 controller.batchAct(Map.of("ids", List.of(1001L)), "rejected", null);
 
@@ -180,7 +182,7 @@ class InboxControllerTest {
         MetaContext.setCurrentTenantId(202L);
         when(inboxService.batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected")).thenReturn(2);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Integer>> response = controller.batchAct(
                 Map.of("ids", List.of(1001L, 1002L), "action", "rejected", "comment", "Reject selected requests"),
                 null,
@@ -198,7 +200,7 @@ class InboxControllerTest {
         MetaContext.setCurrentTenantId(202L);
         when(inboxService.batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected")).thenReturn(2);
 
-        InboxController controller = new InboxController(inboxService);
+        InboxController controller = new InboxController(inboxService, taskService);
         ApiResponse<Map<String, Integer>> response = controller.batchReject(
                 Map.of("ids", List.of(1001L, 1002L), "comment", "Reject selected requests"),
                 null);
