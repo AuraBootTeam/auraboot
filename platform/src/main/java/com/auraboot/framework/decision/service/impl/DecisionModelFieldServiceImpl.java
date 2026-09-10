@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -87,6 +88,10 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         requireTenant();
         DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
         List<DecisionFactEntityDTO> entities = new ArrayList<>();
+        // Per-invocation memo for dict option loads: many fields share a dictCode and
+        // each miss costs two queries (dict + items). Scoped to this catalog build so
+        // nothing leaks across evaluations.
+        Map<String, List<DecisionFactOptionDTO>> dictMemo = new HashMap<>();
 
         for (Model model : metaModelMapper.findCurrentByTenant()) {
             if (model == null || !"published".equalsIgnoreCase(String.valueOf(model.getStatus()))) {
@@ -95,7 +100,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             if (hasText(modelCode) && !modelCode.equals(model.getCode())) {
                 continue;
             }
-            DecisionFactEntityDTO entity = buildModelEntity(model);
+            DecisionFactEntityDTO entity = buildModelEntity(model, dictMemo);
             if (!entity.getFacts().isEmpty()) {
                 entities.add(entity);
             }
@@ -150,7 +155,8 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         return fieldCode.startsWith("data.") ? fieldCode : "data." + fieldCode;
     }
 
-    private DecisionFactEntityDTO buildModelEntity(Model model) {
+    private DecisionFactEntityDTO buildModelEntity(Model model,
+            Map<String, List<DecisionFactOptionDTO>> dictMemo) {
         DecisionFactEntityDTO entity = new DecisionFactEntityDTO();
         entity.setScope("record");
         entity.setEntityCode(model.getCode());
@@ -170,14 +176,15 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
                 continue;
             }
             existingFieldCodes.add(field.getCode());
-            entity.getFacts().add(buildFieldFact(model, field, fieldPermissions));
+            entity.getFacts().add(buildFieldFact(model, field, fieldPermissions, dictMemo));
         }
         appendDeclaredVirtualFieldFacts(model, entity, existingFieldCodes);
         entity.getFacts().sort(Comparator.comparing(DecisionFactDTO::getFactKey));
         return entity;
     }
 
-    private DecisionFactDTO buildFieldFact(Model model, MetaFieldDTO field, FieldPermissionSet fieldPermissions) {
+    private DecisionFactDTO buildFieldFact(Model model, MetaFieldDTO field,
+            FieldPermissionSet fieldPermissions, Map<String, List<DecisionFactOptionDTO>> dictMemo) {
         String dataType = normalizeDataType(field.getDataType());
         DecisionFactDTO fact = new DecisionFactDTO();
         fact.setScope("record");
@@ -189,7 +196,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         fact.setDataType(dataType);
         fact.setOperators(operatorsFor(dataType));
         fact.setDictCode(field.getDictCode());
-        fact.setAllowedValues(loadDictOptions(field.getDictCode()));
+        fact.setAllowedValues(loadDictOptions(field.getDictCode(), dictMemo));
         fact.setReference(field.getRefTarget());
         fact.setRequired(field.getRequired());
         fact.setVisible(field.getVisible());
@@ -377,9 +384,14 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         return null;
     }
 
-    private List<DecisionFactOptionDTO> loadDictOptions(String dictCode) {
+    private List<DecisionFactOptionDTO> loadDictOptions(String dictCode,
+            Map<String, List<DecisionFactOptionDTO>> memo) {
         if (!hasText(dictCode)) {
             return List.of();
+        }
+        List<DecisionFactOptionDTO> memoed = memo.get(dictCode);
+        if (memoed != null) {
+            return memoed;
         }
         Dict dict = dictMapper.findCurrentByCode(dictCode);
         if (dict == null || dict.getId() == null || !"published".equalsIgnoreCase(String.valueOf(dict.getStatus()))) {
@@ -394,6 +406,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             option.setDisabled(!"enabled".equalsIgnoreCase(String.valueOf(item.getStatus())));
             options.add(option);
         }
+        memo.put(dictCode, options);
         return options;
     }
 
