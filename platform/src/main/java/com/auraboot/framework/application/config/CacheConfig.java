@@ -54,6 +54,7 @@ public class CacheConfig {
         cacheManager.setCacheNames(Arrays.asList(
             // Dict caches
             "dictData",
+            "modelFieldBindings",
             "cascadeDict",
             "cascadeTree",
 
