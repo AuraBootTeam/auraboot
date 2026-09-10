@@ -42,6 +42,15 @@ public class DictVersionServiceImpl implements DictVersionService {
     private final DictItemMapper dictItemMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Self-proxy: internal callers (batch load, cache prewarm) must reach
+     * loadDictByStrategy through the Spring proxy, otherwise the dictData cache is
+     * bypassed and every call hits the database (735 mapper hits per command measured).
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private DictVersionServiceImpl self;
+
     // ==================== 版本策略管理 ====================
 
     @Override
@@ -126,10 +135,9 @@ public class DictVersionServiceImpl implements DictVersionService {
         log.info("批量根据版本策略加载字典数据: count={}", requests.size());
         
         return requests.parallelStream()
-                .map(request -> loadDictByStrategy(
-
-                    request.getCode(), 
-                    request.getVersionStrategy(), 
+                .map(request -> self.loadDictByStrategy(
+                    request.getCode(),
+                    request.getVersionStrategy(),
                     request.getPinnedVersion()
                 ))
                 .collect(Collectors.toList());
@@ -453,6 +461,7 @@ public class DictVersionServiceImpl implements DictVersionService {
     }
 
     @Override
+    @Cacheable(value = "dictData", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':current:' + #code", unless = "#result == null")
     public Dict getCurrentVersion(    String code) {
         return dictMapper.findCurrentByCode(   code);
     }
@@ -543,7 +552,7 @@ public class DictVersionServiceImpl implements DictVersionService {
         // 并行预热缓存
         targetCodes.parallelStream().forEach(code -> {
             try {
-                loadDictByStrategy(   code, "latest", null);
+                self.loadDictByStrategy(   code, "latest", null);
             } catch (Exception e) {
                 log.warn("预热字典缓存失败: code={}", code, e);
             }
