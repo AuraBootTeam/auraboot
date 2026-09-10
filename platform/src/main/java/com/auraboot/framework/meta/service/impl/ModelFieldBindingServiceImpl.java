@@ -19,6 +19,8 @@ import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.auraboot.framework.common.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
+    /** Cache name for per-model field lists (reads cached, evicted by every mutation below). */
+    public static final String CACHE_MODEL_FIELDS = "modelFieldBindings";
+
     private final MetaModelMapper metaModelMapper;
     private final MetaFieldMapper metaFieldMapper;
     private final MetaModelFieldBindingMapper bindingMapper;
@@ -50,6 +55,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public MetaModelFieldBindingDTO bindFieldToModel(
             String modelPid,
             String fieldPid,
@@ -109,6 +115,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public boolean unbindFieldFromModel(String modelPid, String fieldPid) {
         log.info("Unbinding field {} from model {}", fieldPid, modelPid);
         
@@ -139,6 +146,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
     }
 
     @Override
+    @Cacheable(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public List<MetaFieldDTO> getModelFields(String modelPid) {
         log.debug("Getting fields for model {}", modelPid);
 
@@ -237,6 +245,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public int reorderFields(String modelPid, Map<String, Integer> fieldOrders) {
         log.info("Reordering fields for model {}", modelPid);
         
@@ -278,6 +287,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public MetaModelFieldBindingDTO updateFieldConfig(
             String modelPid,
             String fieldPid,
@@ -326,6 +336,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public int batchBindFields(String modelPid, List<String> fieldPids) {
         log.info("Batch binding {} fields to model {}", fieldPids.size(), modelPid);
         
@@ -357,6 +368,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public MetaModelFieldBindingDTO bindFieldWithConfig(String modelPid, FieldBindingRequest request) {
         log.info("Binding field {} to model {} with full configuration", request.getFieldPid(), modelPid);
         
@@ -424,6 +436,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = CACHE_MODEL_FIELDS, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelPid")
     public List<MetaModelFieldBindingDTO> batchBindFieldsWithConfig(
             String modelPid, 
             BatchFieldBindingRequest request) {
