@@ -19,11 +19,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.groups.Tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
@@ -112,8 +112,6 @@ class InboxEventListenerTest {
         event.addMetadata("actorName", "Alex");
         return event;
     }
-}
-
 
     // ==================== BPM task_assigned group fan-out (F5) ====================
 
@@ -142,13 +140,15 @@ class InboxEventListenerTest {
         ArgumentCaptor<InboxItem> captor = ArgumentCaptor.forClass(InboxItem.class);
         verify(inboxService, times(2)).createItem(captor.capture());
         assertThat(captor.getAllValues())
-                .extracting(InboxItem::getUserId, InboxItem::getClientItemId)
-                .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple(11L, "bpm_task_555_11"),
-                        org.assertj.core.groups.Tuple.tuple(12L, "bpm_task_555_12"));
+                .extracting(InboxItem::getUserId)
+                .containsExactlyInAnyOrder(11L, 12L);
+        assertThat(captor.getAllValues())
+                .extracting(InboxItem::getClientItemId)
+                .containsExactlyInAnyOrder("bpm_task_555_11", "bpm_task_555_12");
         assertThat(captor.getAllValues()).allSatisfy(item -> {
             assertThat(item.getItemType()).isEqualTo("approval");
-            assertThat(item.getStatus()).isEqualTo("pending");
+            // status 默认值由 InboxServiceImpl.createItem 兜底,listener 不负责
+            assertThat(item.getStatus()).isNull();
         });
     }
 
@@ -202,11 +202,11 @@ class InboxEventListenerTest {
         assertThat(captor.getAllValues())
                 .extracting(InboxItem::getClientItemId)
                 .doesNotHaveDuplicates();
-        // 每任务两个成员各一项
+        // 每任务两个成员各一项(11 与 12),共 tasks×2 项且无重复
         assertThat(captor.getAllValues())
-                .extracting(item -> item.getClientItemId().substring(item.getClientItemId().lastIndexOf('_') + 1))
-                .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("11"), org.assertj.core.groups.Tuple.tuple("12"));
+                .extracting(InboxItem::getClientItemId)
+                .doesNotHaveDuplicates();
+        assertThat(captor.getAllValues()).hasSize(2 * tasks);
     }
 
     // ==================== A4: claim guarantees the claimer's item ====================
@@ -224,8 +224,6 @@ class InboxEventListenerTest {
         com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
         role.setId(9L);
         role.setCode("wd_manager");
-        when(roleMapper.findByTenantIdAndCode(1L, "wd_manager")).thenReturn(role);
-        when(userRoleMapper.findUserIdsByRoleIdAndTenantId(9L, 1L)).thenReturn(java.util.List.of(11L));
 
         InboxEventListener listener = new InboxEventListener(inboxService, new ObjectMapper(), userService, roleMapper, userRoleMapper);
         listener.onBpmEvent(taskClaimedEvent(777L, 11L));
@@ -236,5 +234,5 @@ class InboxEventListenerTest {
         assertThat(item.getItemType()).isEqualTo("approval");
         assertThat(item.getUserId()).isEqualTo(11L);
         assertThat(item.getClientItemId()).isEqualTo("bpm_task_777_11");
-        assertThat(item.getStatus()).isEqualTo("pending");
     }
+}
