@@ -15,7 +15,8 @@ async function upload(bytes: number) {
   ]) as any;
   req.headers = { authorization: 'Bearer fixture', 'content-type': `multipart/form-data; boundary=${boundary}` };
   req.setTimeout = vi.fn();
-  const handler = router.stack.find((layer: any) => layer.route?.path === '/file/upload')!.route.stack[0].handle;
+  const handler = router.stack.find((layer: any) => layer.route?.path === '/file/upload')?.route?.stack?.[0]?.handle;
+  if (!handler) throw new Error('upload route handler not registered');
   return new Promise<{ status: number; body: any }>((resolve, reject) => {
     const res = {
       headersSent: false,
@@ -23,7 +24,7 @@ async function upload(bytes: number) {
       status(code: number) { this.statusCode = code; return this; },
       json(body: any) { this.headersSent = true; resolve({ status: this.statusCode, body }); return this; },
     };
-    Promise.resolve(handler(req, res, reject)).catch(reject);
+    Promise.resolve(handler(req, res as any, reject)).catch(reject);
   });
 }
 

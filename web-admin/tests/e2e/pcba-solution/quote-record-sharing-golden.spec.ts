@@ -12,7 +12,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   test.setTimeout(180_000);
   const quote = await seedBomPriceManualReviewQuote(page);
   for (const user of recipients) await ensureQuoteRoleUser(page, user);
-  const viewers = [];
+  const viewers: Awaited<ReturnType<typeof openQuoteRolePage>>[] = [];
   for (const user of recipients) viewers.push(await openQuoteRolePage(browser, user));
   const root = `/api/dynamic/qo_quote_common/${quote.quoteId}`;
   const shareParams = `resourceCode=qo_quote_common&recordPid=${quote.quoteId}`;

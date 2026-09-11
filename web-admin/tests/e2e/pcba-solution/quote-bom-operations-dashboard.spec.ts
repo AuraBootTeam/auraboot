@@ -92,7 +92,7 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
         rendered.points[i][0] + (end[0] - rendered.points[i][0]) * fraction,
         rendered.points[i][1] + (end[1] - rendered.points[i][1]) * fraction,
       ]));
-    await expect.poll(() => chart.evaluate((element, positions) => {
+    await expect.poll(() => chart.evaluate((element, positions: number[][]) => {
       const canvases = [...element.querySelectorAll('canvas')];
       return positions.filter(([x, y]) => canvases.some((canvas) => {
         const scaleX = canvas.width / canvas.clientWidth;
