@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-06T15:53:15.979Z",
+  "generatedAt": "2026-09-11T14:50:24.835Z",
   "accepted": [
     {
       "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|List<Map<String, Object>> options = new ArrayList<>();",
@@ -136,6 +136,15 @@
       "line": 22,
       "field": "recordId",
       "evidence": "const recordPid = params.recordPid ?? params.recordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK|plugins/workflow-demo/config/named-queries.json|$[0].fromSql|sql|SELECT t.process_definition_activity_id AS \"nodeId\", COALESCE( (SELECT (regexp_match(def.bpmn_content, '<userTask id=\"' || t.process_definition_activity_id || '\"[^>]*name=\"([^\"]*)\"",
+      "code": "S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK",
+      "category": "named-query-export",
+      "file": "plugins/workflow-demo/config/named-queries.json",
+      "jsonPath": "$[0].fromSql",
+      "field": "sql",
+      "evidence": "SELECT t.process_definition_activity_id AS \"nodeId\", COALESCE( (SELECT (regexp_match(def.bpmn_content, '<userTask id=\"' || t.process_definition_activity_id || '\"[^>]*name=\"([^\"]*)\""
     }
   ]
 }
