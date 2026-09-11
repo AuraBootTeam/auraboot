@@ -19,6 +19,8 @@ export AURA_OBS_ZIPKIN_PORT="${AURA_OBS_ZIPKIN_PORT:-29411}"
 export AURA_OBS_GRAFANA_PORT="${AURA_OBS_GRAFANA_PORT:-23000}"
 export AURA_OBS_APP_PORT="${AURA_OBS_APP_PORT:-26443}"
 export AURA_OBS_POSTGRES_PORT="${AURA_OBS_POSTGRES_PORT:-25432}"
+OBS_GRAFANA_USER="${GRAFANA_ADMIN_USER:-admin}"
+OBS_GRAFANA_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-auraboot-observability-ci}"
 mkdir -p "$ARTIFACTS"
 
 invalid() {
@@ -328,9 +330,9 @@ done
 
 curl --fail --silent --show-error --get --data-urlencode 'query={service="auraboot-application"}' \
   "http://127.0.0.1:$AURA_OBS_LOKI_PORT/loki/api/v1/query_range" > "$ARTIFACTS/loki-query.json"
-curl --fail --silent --show-error -u admin:auraboot-observability-ci \
+curl --fail --silent --show-error -u "${OBS_GRAFANA_USER}:${OBS_GRAFANA_PASSWORD}" \
   "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT/api/datasources" > "$ARTIFACTS/grafana-datasources.json"
-curl --fail --silent --show-error -u admin:auraboot-observability-ci \
+curl --fail --silent --show-error -u "${OBS_GRAFANA_USER}:${OBS_GRAFANA_PASSWORD}" \
   "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT/api/search?type=dash-db" > "$ARTIFACTS/grafana-dashboards.json"
 
 node - "$ARTIFACTS" "$RUN_ID" "$TRACE_ID" <<'NODE'

@@ -120,7 +120,7 @@ export function ReferenceCreateDialog({
             {t('common.loading') || '...'}
           </div>
         ) : (
-          <DslFormRenderer form={form} />
+          <DslFormRenderer form={form} onCancel={onClose} />
         )}
       </DialogContent>
     </Dialog>

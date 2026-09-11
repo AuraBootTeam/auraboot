@@ -65,3 +65,7 @@ regexes = [
 [[allowlists]]
 description = "Historical local observability canary (commit 322ed0c49c, removed from main): containerized Grafana local-stack basic auth on 127.0.0.1:3000, a CI test-stack default rather than a real credential."
 commits = ['322ed0c49cf2d04fe95642a20e6f6f594d211d22']
+
+[[allowlists]]
+description = "Historical local observability acceptance stack (commit 742eb6d397): fixed Grafana basic auth was scoped to a disposable 127.0.0.1 CI container and has since been replaced with environment-derived credentials."
+commits = ['742eb6d3974f2a46b3fbd7e7992bedb7fefef90e']

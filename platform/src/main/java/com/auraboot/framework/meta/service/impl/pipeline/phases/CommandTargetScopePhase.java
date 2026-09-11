@@ -71,7 +71,20 @@ public class CommandTargetScopePhase implements CommandPhase {
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
-                || isHandlerManagedTarget(ctx);
+                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null);
+    }
+
+    /** Server-owned command metadata; callers cannot turn a write into a read. */
+    private String targetRecordAction(CommandPipelineContext ctx) {
+        Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (!(params instanceof Map<?, ?> values)) return null;
+        Object action = values.get("targetRecordAction");
+        if (action == null) return null;
+        String value = String.valueOf(action);
+        if (!java.util.Set.of("read", "update", "delete").contains(value)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Invalid target record action policy");
+        }
+        return value;
     }
 
     private boolean isHandlerManagedTarget(CommandPipelineContext ctx) {
@@ -176,7 +189,19 @@ public class CommandTargetScopePhase implements CommandPhase {
         if (!result.granted()) {
             log.debug("target-scope deny reason: command={} reason={}", ctx.getCommandCode(), result.reason());
         }
-        return result.granted();
+        if (!result.granted()) return false;
+        String action = targetRecordAction(ctx);
+        if (action == null || "read".equals(action)) return true;
+        // RBAC already authorizes this business command. Preserve ordinary row scope, but do
+        // not let a read-only ReBAC exception authorize a write on someone else's record.
+        var scope = applicationContext.getBean(
+                com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)
+                .evaluate(memberId, modelCode, "read", record);
+        if (scope == null || scope.verdict() !=
+                com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY) return true;
+        return applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)
+                .isSharedByPid(ctx.getTenantId(), modelCode, recordId, memberId,
+                        MetaContext.getCurrentUserPid(), action);
     }
 
     private Long resolveRecordVersion(Map<String, Object> record) {

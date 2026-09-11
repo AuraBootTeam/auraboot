@@ -64,7 +64,7 @@ test.describe('Contextual authoring PC Web golden', () => {
     const runtimeMain = page.getByRole('main').first();
     await expect(runtimeMain.getByRole('heading', { name: gatePage.title })).toBeVisible();
     await expect(runtimeMain.getByText(gatePage.recordMarker)).toBeVisible();
-    await runtimeMain.getByRole('button', { name: '配置此页' }).click();
+    await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
 
     const surface = page.getByTestId('contextual-authoring-surface');
     const canvas = page.getByTestId('contextual-authoring-canvas');
@@ -94,7 +94,7 @@ test.describe('Contextual authoring PC Web golden', () => {
   }, testInfo) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openRuntimeFromMenu(page);
-    await page.getByRole('main').first().getByRole('button', { name: '配置此页' }).click();
+    await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
     await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
 
     await page.getByTestId('authoring-inspector-open').click();
@@ -140,7 +140,7 @@ test.describe('Contextual authoring PC Web golden', () => {
   }, testInfo) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await openRuntimeFromMenu(page);
-    await page.getByRole('main').first().getByRole('button', { name: '配置此页' }).click();
+    await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
 
     await expect(page.getByTestId('authoring-outline')).toBeVisible();
     await expect(page.getByTestId('authoring-inspector')).toBeVisible();
@@ -168,7 +168,7 @@ test.describe('Contextual authoring PC Web golden', () => {
 
       const runtimeMain = actor.page.getByRole('main').first();
       await expect(runtimeMain.getByText(gatePage.recordMarker)).toBeVisible();
-      await expect(runtimeMain.getByRole('button', { name: '配置此页' })).toHaveCount(0);
+      await expect(page.getByRole('banner').getByRole('button', { name: '配置此页' })).toHaveCount(0);
       await expect(actor.page.getByTestId('contextual-authoring-enter')).toHaveCount(0);
 
       const denied = await actor.page.request.post('/api/authoring/sessions', {
@@ -206,7 +206,7 @@ test.describe('Contextual authoring PC Web golden', () => {
     expect(effectiveViewport).toEqual({ devicePixelRatio: 2, height: 450, width: 720 });
 
     const runtimeMain = page.getByRole('main').first();
-    await runtimeMain.getByRole('button', { name: '配置此页' }).focus();
+    await page.getByRole('banner').getByRole('button', { name: '配置此页' }).focus();
     await page.keyboard.press('Enter');
 
     const surface = page.getByTestId('contextual-authoring-surface');

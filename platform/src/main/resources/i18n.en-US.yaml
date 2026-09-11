@@ -1140,6 +1140,11 @@ common:
     format: Format
 
 record_share:
+  subject_type: Share with
+  subject_member: Members
+  subject_role: Roles
+  role_hint: Includes current and future role members. Business permissions still apply.
+  no_roles: No roles available
   title: Record collaboration
   subtitle: Invite tenant members to view or maintain this record with you
   close: Close collaboration dialog

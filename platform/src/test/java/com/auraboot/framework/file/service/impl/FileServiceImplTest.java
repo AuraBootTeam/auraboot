@@ -16,6 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.util.unit.DataSize;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -63,11 +66,15 @@ class FileServiceImplTest {
     @Mock
     private CdnUrlRewriter cdnUrlRewriter;
 
+    @Spy
+    private MultipartProperties multipartProperties = new MultipartProperties();
+
     @InjectMocks
     private FileServiceImpl fileService;
 
     @BeforeEach
     void setUp() {
+        multipartProperties.setMaxFileSize(DataSize.ofMegabytes(100));
         ReflectionTestUtils.setField(fileService, "baseUrl", "http://localhost:8080");
         // cdnUrlRewriter is @Autowired(required=false); InjectMocks will set it.
         // Explicit null-out to default to "no CDN" for most tests.
@@ -84,6 +91,19 @@ class FileServiceImplTest {
         }
         TransactionSynchronizationManager.setActualTransactionActive(false);
         MetaContext.clear();
+    }
+
+    @Test
+    void uploadFile_obeysConfiguredMultipartLimitIncludingExactBoundary() {
+        multipartProperties.setMaxFileSize(DataSize.ofBytes(4));
+        MultipartFile exact = new MockMultipartFile("file", "gerber.zip", "application/zip", new byte[4]);
+        MultipartFile oversized = new MockMultipartFile("file", "gerber.zip", "application/zip", new byte[5]);
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString())).thenReturn("/uploads/gerber.zip");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+        assertThat(fileService.uploadFile(exact, 42L).getFileId()).isNotBlank();
+        assertThatThrownBy(() -> fileService.uploadFile(oversized, 42L))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("File too large");
+        verify(storageProvider, org.mockito.Mockito.times(1)).upload(anyString(), any(), anyLong(), anyString());
     }
 
     // ----- uploadFile -----

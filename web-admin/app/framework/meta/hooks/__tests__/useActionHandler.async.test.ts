@@ -266,6 +266,104 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
   });
 
+  it('refreshes a versioned record before opening command inputs and pins that version through submit', async () => {
+    const oldRecord = { pid: 'quote-1', row_version: 2, count: 1 };
+    const freshRecord = { pid: 'quote-1', row_version: 4, count: 3 };
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: freshRecord });
+    fetchResultMock.mockResolvedValueOnce({ code: '41001', message: 'Version conflict' });
+    let defaults: Record<string, unknown> = {};
+    const listener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      defaults = detail.defaults;
+      // A concurrent writer after the dialog opens must still cause a conflict;
+      // never fetch a newer version at submit or replay the command automatically.
+      detail.onSubmit({ count: 5 });
+    });
+    window.addEventListener('dialog:form', listener);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime({ form: oldRecord }),
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'en-US',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { data: oldRecord, loadData: vi.fn() } as any,
+      }),
+    );
+    try {
+      await act(async () =>
+        result.current.handleAction({
+          code: 'edit',
+          action: {
+            type: 'command',
+            command: 'qo_quote_common:recompute_quantities',
+            inputFields: [
+              { field: 'count', type: 'number', label: 'Count', defaultValue: '${form.count}' },
+            ],
+          },
+        } as unknown as ButtonConfig),
+      );
+      expect(listener).toHaveBeenCalledOnce();
+      expect(defaults.count).toBe(3);
+      expect(fetchResultMock).toHaveBeenNthCalledWith(
+        1,
+        '/api/dynamic/qo_quote_common/quote-1',
+        expect.anything(),
+      );
+      expect(fetchResultMock).toHaveBeenNthCalledWith(
+        2,
+        '/api/meta/commands/execute/qo_quote_common:recompute_quantities',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            expectedVersion: 4,
+            payload: expect.objectContaining({ count: 5 }),
+          }),
+        }),
+      );
+      expect(fetchResultMock).toHaveBeenCalledTimes(2);
+      expect(result.current.error).toBeTruthy();
+    } finally {
+      window.removeEventListener('dialog:form', listener);
+    }
+  });
+
+  it('refreshes an unconfirmed page action after a background write without retrying conflicts', async () => {
+    const oldRecord = { pid: 'quote-1', row_version: 1 };
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { ...oldRecord, row_version: 2 } });
+    fetchResultMock.mockResolvedValueOnce({ code: '41001', message: 'Version conflict' });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime({ form: oldRecord }),
+        navigate: vi.fn() as any,
+        tableName: 'qo_quote_common',
+        locale: 'en-US',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { data: oldRecord, loadData: vi.fn() } as any,
+      }),
+    );
+    await act(async () =>
+      result.current.handleAction({
+        code: 'recompute',
+        action: {
+          type: 'command',
+          command: 'qo_quote_common:compute_process_fee',
+        },
+      } as unknown as ButtonConfig),
+    );
+    expect(fetchResultMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/dynamic/qo_quote_common/quote-1',
+      expect.anything(),
+    );
+    expect(fetchResultMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/meta/commands/execute/qo_quote_common:compute_process_fee',
+      expect.objectContaining({ params: expect.objectContaining({ expectedVersion: 2 }) }),
+    );
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toBeTruthy();
+  });
+
   it('collects command inputFields and merges them into the command payload', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
