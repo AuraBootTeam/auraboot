@@ -11,7 +11,9 @@
   "author": "AuraBoot Team",
   "homepage": "https://auraboot.io/plugins/crm",
   "minPlatformVersion": "1.0.0",
-  "dependencies": ["com.auraboot.org-management"],
+  "dependencies": [
+    "com.auraboot.org-management"
+  ],
   "backend": {
     "jarPath": "backend/build/libs/crm-plugin-1.2.0.jar",
     "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
@@ -284,12 +286,12 @@
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
-    "validateReferences": true,
+    "validateReferences": false,
+    "deferReferenceValidation": true,
     "autoPublishModels": true,
-    "autoPublishFields": true,
-    "autoPublishCommands": true,
     "autoPublishPages": true,
-    "autoDeployProcesses": false,
+    "autoPublishCommands": true,
+    "autoPublishFields": true,
     "createResourcePermissions": true
   }
 }
