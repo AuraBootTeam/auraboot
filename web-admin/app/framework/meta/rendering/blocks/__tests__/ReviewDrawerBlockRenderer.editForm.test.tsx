@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -613,6 +613,35 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     expect(confirmCall.args.payload).toEqual({ previewId: 'RP2' });
     expect(confirmCall.args.payload).not.toHaveProperty('unitPrice');
     expect(confirmCall.args.reload).toEqual(['lines', 'evidence']);
+  });
+
+  it.each(['close', 'switch'])('preserves the user selection after %s during pending confirmation', async (interaction) => {
+    let finishConfirmation!: (value: unknown) => void;
+    executeSimpleWorkbenchAction
+      .mockResolvedValueOnce({ previewId: 'RP2', status: 'ready', confirmable: true })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishConfirmation = resolve; }));
+    const runtime = makeRuntime(LINE, { lines: [LINE] });
+    const context = runtime.getContext() as any;
+    const updateState = vi.fn((_scope: string, key: string, value: unknown) => {
+      context.state[key] = value;
+    });
+    runtime.getStateManager = () => ({ updateState, getContext: () => context }) as any;
+    const config = twoPhaseBlock() as any;
+    config.editForm.afterConfirmSelections = [{ dataSource: 'lines', keyField: 'pid', resultField: 'lineId', bind: 'selectedLine' }];
+    const view = render(<ReviewDrawerBlockRenderer block={config} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+    await waitFor(() => expect(screen.getByTestId('review-drawer-edit-confirm')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('review-drawer-edit-confirm'));
+    await waitFor(() => expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(2));
+    if (interaction === 'close') fireEvent.click(screen.getByRole('button', { name: '关闭复核浮层' }));
+    else context.state.selectedLine = { pid: 'L2', material_label: 'Other line' };
+    const selectedAfterInteraction = context.state.selectedLine;
+    updateState.mockClear();
+    view.rerender(<ReviewDrawerBlockRenderer block={config} runtime={runtime} />);
+    await act(async () => { finishConfirmation({ confirmed: true, lineId: 'L1' }); });
+    expect(context.state.selectedLine).toBe(selectedAfterInteraction);
+    expect(updateState).not.toHaveBeenCalledWith('scope-1', 'selectedLine', LINE);
   });
 
   it('selects one of multiple independent product candidates before confirming', async () => {

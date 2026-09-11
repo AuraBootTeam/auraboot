@@ -754,8 +754,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!confirmed) return;
             }
             const runtimeContext = (runtime?.getContext?.() ?? {}) as Record<string, unknown>;
-            const actionRecord = record || context.record || context.data;
-            const actionRuntimeContext = actionRecord
+            let actionRecord = record || context.record || context.data;
+            let actionRuntimeContext = actionRecord
               ? {
                   ...runtimeContext,
                   record: actionRecord,
@@ -785,6 +785,47 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             const inputFieldsSubmitLabel =
               (actionDef as any).inputFieldsSubmitLabel ??
               (normalizedButton as any).inputFieldsSubmitLabel;
+            // Pin a fresh snapshot before opening inputs or invoking a page action. Reusing
+            // the page snapshot after background writes causes false CAS conflicts;
+            // fetching at submit would instead hide edits made while the dialog is open.
+            // Explicit row actions and confirmations retain the snapshot the user reviewed.
+            if (
+              (inputFields.length > 0 || (!record && !confirmKey)) &&
+              targetRecordPid &&
+              tableName &&
+              !offboardingAction &&
+              resolveTargetExpectedVersion(targetRecordPid, actionRecord) != null
+            ) {
+              const freshResult = await fetchResult(
+                `/api/dynamic/${encodeURIComponent(tableName)}/${encodeURIComponent(targetRecordPid)}`,
+                { method: 'get', token },
+              );
+              if (!ResultHelper.isSuccess(freshResult)) {
+                throw new Error(resolveCommandErrorMessage(freshResult, normalizedButton.code, t));
+              }
+              const freshRecord = (freshResult as any)?.data?.data ?? (freshResult as any)?.data;
+              if (resolveTargetExpectedVersion(targetRecordPid, freshRecord) == null) {
+                throw new Error(
+                  t('error.data_load_failed', undefined, 'Unable to load the current record'),
+                );
+              }
+              actionRecord = freshRecord;
+              actionRuntimeContext = {
+                ...actionRuntimeContext,
+                record: freshRecord,
+                row: freshRecord,
+                ...(getLegacyCompatibleRecordPid(runtimeContext.form as any) === targetRecordPid
+                  ? { form: freshRecord }
+                  : {}),
+              };
+              payload = {
+                ...freshRecord,
+                ...resolveCommandPayload(
+                  actionDef as unknown as Record<string, unknown>,
+                  actionRuntimeContext,
+                ),
+              };
+            }
             let transferRequired = false;
             if (offboardingAction && targetRecordPid) {
               const impactResult = await fetchResult(
@@ -936,7 +977,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   targetRecordPid,
                   operationType,
                   (effectiveCommand as any)?.modelCode,
-                  record || context.data,
+                  actionRecord,
                   token,
                 ),
               },

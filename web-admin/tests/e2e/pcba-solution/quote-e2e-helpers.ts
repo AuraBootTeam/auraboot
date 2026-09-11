@@ -2052,3 +2052,76 @@ export function writeMiniBoardZip(
   );
   return filePath;
 }
+
+/** Known geometry fixture; only inputs are seeded, all metering is executed through UI. */
+export async function seedProcessFeeGeometryQuote(page: Page): Promise<CreatedRows> {
+  const inspection = {
+    padHistogram: [
+      { area_mm2: 4, count: 20 },
+      { area_mm2: 8, count: 2 },
+    ],
+    holeHistogram: [
+      { diameter_mm: 1.2, count: 2 },
+      { diameter_mm: 2, count: 1 },
+    ],
+    padDetail: [
+      { refdes: "EMPTY1", padCount: 2, areaTotalMm2: 200, pads: [{ areaMm2: 100, count: 2 }] },
+      {
+        refdes: 'C1',
+        padCount: 11,
+        areaTotalMm2: 48,
+        pads: [
+          { areaMm2: 4, count: 10 },
+          { areaMm2: 8, count: 1 },
+        ],
+      },
+      { refdes: 'C2', padCount: 11, areaTotalMm2: 48,
+        pads: [{ areaMm2: 4, count: 10 }, { areaMm2: 8, count: 1 }] },
+    ],
+    holeDetail: [
+      {
+        refdes: 'J1',
+        holeCount: 3,
+        holes: [
+          { diameterMm: 1.2, count: 2 },
+          { diameterMm: 2, count: 1 },
+        ],
+      },
+    ],
+  };
+  return seedQuoteScaffold(page, 'GEOMETRY', [
+    {
+      sourceRef: 'GEOMETRY-SMT',
+      sourceRowNo: 2,
+      description: 'Known SMT geometry',
+      refdes: 'C1,C2',
+      mpn: 'GEOMETRY-SMT',
+      packageName: 'CUSTOM',
+      qty: 2,
+      unitCost: 1,
+      lineCost: 1,
+      linePrice: 1,
+      smtPoints: 0,
+      thtPoints: 0,
+      gerberParseStatus: 'parsed',
+      gerberInspection: inspection,
+    },
+    {
+      sourceRef: 'GEOMETRY-DIP',
+      sourceRowNo: 3,
+      description: 'Known DIP geometry',
+      refdes: 'J1',
+      mpn: 'GEOMETRY-DIP',
+      packageName: 'CUSTOM',
+      qty: 1,
+      unitCost: 1,
+      lineCost: 1,
+      linePrice: 1,
+      smtPoints: 0,
+      thtPoints: 0,
+    },
+    { sourceRef: 'GEOMETRY-MISSING', sourceRowNo: 4, description: 'No associated geometry',
+      refdes: 'P5', mpn: 'GEOMETRY-MISSING', packageName: 'CUSTOM', qty: 1,
+      unitCost: 1, lineCost: 1, linePrice: 1, smtPoints: 0, thtPoints: 0 },
+  ]);
+}

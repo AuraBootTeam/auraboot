@@ -20,6 +20,15 @@ describe('validateUploadFile', () => {
     expect(r).toEqual({ code: 'maxSize', params: { max: 10 } });
   });
 
+  it('accepts the exact configured 100 MB limit and rejects one extra byte', () => {
+    const opts = { maxSize: 100, accept: '.zip,.rar,.7z' };
+    expect(validateUploadFile(file('gerber.zip', 100 * 1024 * 1024), opts)).toBeNull();
+    expect(validateUploadFile(file('gerber.zip', 100 * 1024 * 1024 + 1), opts)).toEqual({
+      code: 'maxSize',
+      params: { max: 100 },
+    });
+  });
+
   it('rejects a disallowed extension with a fileType code + accept param', () => {
     const r = validateUploadFile(file('a.exe', 100, 'application/octet-stream'), {
       maxSize: 10,

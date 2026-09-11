@@ -1745,6 +1745,7 @@ function DrawerEditForm({
   onOpenChange,
   renderTriggerInHost = false,
   triggerHost,
+  isRecordSelected,
 }: {
   config: any;
   record: any;
@@ -1754,6 +1755,7 @@ function DrawerEditForm({
   onOpenChange?: (open: boolean) => void;
   renderTriggerInHost?: boolean;
   triggerHost?: HTMLElement | null;
+  isRecordSelected?: () => boolean;
 }) {
   const fields: any[] = Array.isArray(config?.fields) ? config.fields : [];
   const [open, setOpen] = useState(false);
@@ -1905,6 +1907,8 @@ function DrawerEditForm({
           reload: Array.isArray(config.reload) ? config.reload : [],
         },
       });
+      // A delayed reload must not reopen a closed drawer or replace a newly selected row.
+      if (isRecordSelected && !isRecordSelected()) return;
       for (const selection of Array.isArray(config.afterConfirmSelections)
         ? config.afterConfirmSelections
         : []) {
@@ -2936,6 +2940,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         onOpenChange={setIsEditFormOpen}
         renderTriggerInHost={renderEditTriggerInCandidatesHeader}
         triggerHost={editTriggerHost}
+        isRecordSelected={() => {
+          const current = resolveRuntimeValue(runtime, contextExpression);
+          return current != null && Object.keys(current).length > 0
+            && String(readPath(current, contextKeyField)) === String(contextRecordKey);
+        }}
       />
 
       <div

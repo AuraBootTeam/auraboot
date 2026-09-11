@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  getBomUploadReviewError,
   canRenderFormButton,
   collectFormFieldDataTypes,
   getJsonFormValueError,
@@ -698,5 +699,28 @@ describe('resolveFormSubmitEndpoint', () => {
         {},
       ),
     ).toEqual({ endpoint: '/api/custom/a%2Fb', method: 'patch' });
+  });
+});
+
+describe('BOM review submission validation', () => {
+  const review = (valid: boolean, roles: string[]) => ({
+    file: new File(['bom'], 'bom.csv'),
+    valid,
+    validationMessage: valid ? '' : 'Choose one quantity column',
+    payload: { bom_selected_columns: roles.map((role, index) => ({ role, index })) },
+  });
+  it('rejects an ambiguous ERP quantity projection before upload or command dispatch', () => {
+    expect(
+      getBomUploadReviewError(review(false, ['quantity', 'mpn', 'quantity']), 'Invalid BOM'),
+    ).toBe('Choose one quantity column');
+    expect(getBomUploadReviewError(review(true, ['quantity', 'quantity']), 'Invalid BOM')).toBe(
+      'Invalid BOM',
+    );
+    expect(getBomUploadReviewError(review(true, ['mpn']), 'Invalid BOM')).toBe('Invalid BOM');
+  });
+  it('accepts a reviewed single-quantity projection and leaves ordinary fields alone', () => {
+    expect(getBomUploadReviewError(review(true, ['mpn', 'quantity']), 'Invalid BOM')).toBeNull();
+    expect(getBomUploadReviewError(null, 'Invalid BOM')).toBeNull();
+    expect(getBomUploadReviewError('file-id', 'Invalid BOM')).toBeNull();
   });
 });

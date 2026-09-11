@@ -453,6 +453,11 @@ common:
 #  validation_description_length: 描述长度不能超过500个字符
 
 record_share:
+  subject_type: 共享对象
+  subject_member: 指定人员
+  subject_role: 指定角色
+  role_hint: 共享给角色的当前及后续成员，成员仍须具备相应业务权限。
+  no_roles: 暂无可共享的角色
   title: 记录协作
   subtitle: 邀请租户成员共同查看或维护这条记录
   close: 关闭协作窗口
