@@ -97,11 +97,15 @@ function detectHeaderRow(rows: string[][]): number {
   return bestIndex;
 }
 
-function columnsFor(rows: string[][], headerRowIndex: number): ColumnChoice[] {
+export function buildBomReviewColumns(rows: string[][], headerRowIndex: number): ColumnChoice[] {
   const header = rows[headerRowIndex] || [];
-  let width = header.length;
-  for (const row of rows.slice(headerRowIndex + 1, headerRowIndex + 11)) {
-    width = Math.max(width, row?.length || 0);
+  // Spreadsheet styles can expand !ref to thousands of empty columns. Keep
+  // original indexes, including interior gaps, but exclude trailing empty cells.
+  let width = 0;
+  for (const row of rows.slice(headerRowIndex)) {
+    let last = row.length - 1;
+    while (last >= width && text(row[last]) === '') last -= 1;
+    width = Math.max(width, last + 1);
   }
   return Array.from({ length: width }, (_, index) => {
     const rawHeader = text(header[index]);
@@ -188,7 +192,7 @@ export default function BomUploadReviewField({
         (Array.isArray(row) ? row : []).map((cell) => text(cell)),
       );
       const detectedHeader = detectHeaderRow(stringRows);
-      const detectedColumns = columnsFor(stringRows, detectedHeader);
+      const detectedColumns = buildBomReviewColumns(stringRows, detectedHeader);
       setSheetName(nextSheet);
       setRows(stringRows);
       setHeaderRowIndex(detectedHeader);
@@ -235,7 +239,7 @@ export default function BomUploadReviewField({
   );
 
   const updateHeader = (nextHeader: number) => {
-    const nextColumns = columnsFor(rows, nextHeader);
+    const nextColumns = buildBomReviewColumns(rows, nextHeader);
     setHeaderRowIndex(nextHeader);
     setColumns(nextColumns);
     publish(file, sheetName, nextHeader, nextColumns);

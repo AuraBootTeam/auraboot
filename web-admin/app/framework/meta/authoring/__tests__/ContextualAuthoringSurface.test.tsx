@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ContextualAuthoringSurface,
   contextualAuthoringTestUtils,
@@ -94,7 +94,11 @@ const schema: UnifiedSchema = {
 };
 
 describe('ContextualAuthoringSurface', () => {
+  afterEach(() => document.getElementById('page-configuration-actions')?.remove());
   beforeEach(() => {
+    const header = document.createElement('header');
+    header.id = 'page-configuration-actions';
+    document.body.appendChild(header);
     vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.mocked(loadAuthoringRecoveryPolicy).mockResolvedValue('PERSISTENT');
@@ -239,14 +243,31 @@ describe('ContextualAuthoringSurface', () => {
     vi.mocked(storeAuthoringConflictTransfer).mockReturnValue('a'.repeat(32));
   });
 
+  it('places configuration in the application header, outside the business page', async () => {
+    const view = renderSurface(vi.fn(), vi.fn());
+    const entry = await screen.findByTestId('contextual-authoring-enter');
+    expect(entry.closest('header')).toBe(document.getElementById('page-configuration-actions'));
+    expect(view.container).not.toContainElement(entry);
+    fireEvent.click(entry);
+    await waitFor(() => expect(openAuthoringSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('contextual-authoring-enter')).not.toBeInTheDocument();
+  });
+
+  it('hides configuration for editors without designer administration permission', async () => {
+    permissionMock.canAdmin = false;
+    renderSurface(vi.fn(), vi.fn());
+    expect(screen.queryByTestId('contextual-authoring-enter')).not.toBeInTheDocument();
+    expect(openAuthoringSession).not.toHaveBeenCalled();
+  });
+
   it('enters from the runtime page, separates modes and exposes independent counters', async () => {
     const unsafeAction = vi.fn();
     const safeTab = vi.fn();
     renderSurface(unsafeAction, safeTab);
 
     const entry = screen.getByTestId('contextual-authoring-enter');
-    expect(entry).toHaveClass('bottom-24');
-    expect(entry).not.toHaveClass('bottom-6');
+    expect(entry).not.toHaveClass('fixed');
+    expect(entry.closest('header')).not.toBeNull();
     fireEvent.click(entry);
     expect(await screen.findByTestId('contextual-authoring-surface')).toHaveAttribute(
       'data-mode',

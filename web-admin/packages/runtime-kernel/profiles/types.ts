@@ -39,6 +39,8 @@ export interface PageContentProps {
   // --- L1 SDK extensions ---
   initialValues?: Record<string, any>;
   fieldPermissions?: Record<string, 'editable' | 'readonly' | 'hidden'>;
+  /** Close an embedded form without navigating away from its host. */
+  onCancelOverride?: () => void;
   onSubmitOverride?: (data: Record<string, any>) => Promise<void>;
 }
 

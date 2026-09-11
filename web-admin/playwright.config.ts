@@ -65,6 +65,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-bom-price-ladder-moq',
   'quote-bom-price-deepseek-suggestions',
   'quote-process-fee-review',
+  'quote-record-sharing-golden',
   'quote-gerber-runtime',
   'quote-excel-download',
   'quote-bulk-import-price-cache-golden',

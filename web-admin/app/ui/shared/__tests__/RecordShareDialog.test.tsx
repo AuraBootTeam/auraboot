@@ -25,6 +25,7 @@ vi.mock('~/ui/smart/picker/MemberPicker', () => ({
 const I18N = {
   common: { loading: '加载中…' },
   record_share: {
+    subject_type: '共享对象', subject_member: '指定人员', subject_role: '指定角色', role_hint: '角色成员', no_roles: '暂无角色',
     title: '记录协作',
     subtitle: '邀请租户成员共同查看或维护这条记录',
     close: '关闭协作窗口',
@@ -246,7 +247,7 @@ describe('RecordShareDialog', () => {
       resourceCode: 'crm_account_common',
       recordPid: 'account-pid',
       subjectType: 'member',
-      subjectPid: 'member-pid',
+      subjectPids: ['member-pid'],
       permissionMask: 'read,update',
       expiresAt: null,
     });
