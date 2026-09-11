@@ -329,6 +329,41 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(permissionFacade);
     }
 
+    @Test
+    void explicitWritePolicyRejectsReadOnlyShareBeforeHandlerDispatch() {
+        MetaContext.setContext(1L, 42L, "caller-pid", "Caller");
+        CommandTargetScopePhase phase = phase();
+        givenRecordIsReadable(true);
+        var scope = org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class);
+        var shares = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RecordShareService.class);
+        when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)).thenReturn(scope);
+        when(applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)).thenReturn(shares);
+        when(scope.evaluate(eq(99L), eq("qo_quote_common"), eq("read"), any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("DataScope",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY, "Not owner"));
+        var ctx = context("qo_quote_common", "REC-1");
+        ctx.setExecConfig(Map.of("handlerParams", Map.of("targetRecordAction", "update")));
+        assertThat(phase.shouldSkip(ctx)).isFalse();
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+        when(shares.isSharedByPid(eq(1L), eq("qo_quote_common"), eq("REC-1"), eq(99L), any(), eq("update")))
+                .thenReturn(true);
+        phase.execute(ctx);
+        assertThat(ctx.getTargetRecordReadable()).isTrue();
+    }
+
+    @Test
+    void explicitReadPolicyDoesNotRequireAnUpdateShare() {
+        CommandTargetScopePhase phase = phase();
+        givenRecordIsReadable(true);
+        var ctx = context("qo_quote_common", "REC-1");
+        ctx.setExecConfig(Map.of("handlerParams", Map.of("targetRecordAction", "read")));
+        phase.execute(ctx);
+        assertThat(ctx.getTargetRecordReadable()).isTrue();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSharingContext() { MetaContext.clear(); }
+
     private CommandTargetScopePhase phase() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(transactionStatus);

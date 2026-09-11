@@ -23,6 +23,7 @@ export function sanitizeHtml(html: string): string {
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
       'pre', 'code', 'blockquote',
+      'details', 'summary',
       'sub', 'sup', 'small',
       // SVG primitives — diagram support
       'svg', 'g', 'defs', 'marker',

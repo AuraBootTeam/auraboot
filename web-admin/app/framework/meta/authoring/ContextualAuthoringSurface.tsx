@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { createPortal } from 'react-dom';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   AlertTriangle,
   ChevronRight,
   Eye,
+  FilePenLine,
   GitCompare,
   Layers3,
   LockKeyhole,
@@ -114,7 +117,12 @@ export function ContextualAuthoringSurface({
   const canManageDesigner = usePermission('meta.designer.update');
   const canAdministerDesigner = usePermission('meta.designer.admin');
   const { user } = useUser();
-  const canConfigure = canReadDesigner && canManageDesigner;
+  const canConfigure = canReadDesigner && canManageDesigner && canAdministerDesigner;
+  const { t, locale } = useI18n();
+  const [headerActions, setHeaderActions] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setHeaderActions(document.getElementById('page-configuration-actions'));
+  }, []);
   const [session, setSession] = useState<AuthoringSession | null>(null);
   const [workingSchema, setWorkingSchema] = useState<UnifiedSchema>(schema);
   const [pendingEdits, setPendingEdits] = useState<Map<string, PendingAuthoringEdit>>(
@@ -1262,28 +1270,51 @@ export function ContextualAuthoringSurface({
     return (
       <div className="relative" data-testid="contextual-authoring-runtime">
         {children}
-        {canConfigure && !localRecoveryAvailable ? (
-          <button
-            type="button"
-            onClick={enter}
-            onPointerDown={captureEntryInteraction}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') captureEntryInteraction();
-            }}
-            disabled={opening}
-            className="border-border-strong bg-panel text-text hover:bg-hover fixed right-6 bottom-24 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
-            data-testid="contextual-authoring-enter"
-          >
-            <Settings2 className="h-4 w-4" />
-            {opening
-              ? '正在进入配置模式…'
-              : recoveryPolicyError
-                ? '重试安全策略并配置'
-                : recoveryPolicy
-                  ? '配置此页'
-                  : '正在读取恢复策略…'}
-          </button>
-        ) : null}
+        {canConfigure && !localRecoveryAvailable && headerActions
+          ? createPortal(
+              <button
+                type="button"
+                onClick={enter}
+                onPointerDown={captureEntryInteraction}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') captureEntryInteraction();
+                }}
+                disabled={opening}
+                className="border-border-strong bg-panel text-text hover:bg-hover focus-visible:ring-primary inline-flex h-8 items-center gap-2 rounded-md border px-3 text-sm font-medium focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
+                data-testid="contextual-authoring-enter"
+              >
+                <FilePenLine className="h-4 w-4" aria-hidden="true" />
+                {opening
+                  ? t(
+                      'authoring.entering',
+                      undefined,
+                      locale.startsWith('zh') ? '正在进入配置模式…' : 'Opening configuration…',
+                    )
+                  : recoveryPolicyError
+                    ? t(
+                        'authoring.retryPolicy',
+                        undefined,
+                        locale.startsWith('zh')
+                          ? '重试安全策略并配置'
+                          : 'Retry configuration policy',
+                      )
+                    : recoveryPolicy
+                      ? t(
+                          'authoring.configurePage',
+                          undefined,
+                          locale.startsWith('zh') ? '配置此页' : 'Configure page',
+                        )
+                      : t(
+                          'authoring.loadingPolicy',
+                          undefined,
+                          locale.startsWith('zh')
+                            ? '正在读取恢复策略…'
+                            : 'Loading recovery policy…',
+                        )}
+              </button>,
+              headerActions,
+            )
+          : null}
         {localRecoveryAvailable ? (
           <div
             role="alert"

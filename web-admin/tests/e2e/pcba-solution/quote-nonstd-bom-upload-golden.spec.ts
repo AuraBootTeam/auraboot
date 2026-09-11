@@ -436,19 +436,19 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     const processPointsTab = page.getByRole('tab', { name: /加工点数|Process Points/i });
     await expect(processPointsTab).toBeVisible();
     await processPointsTab.click();
-    await expect(page.getByTestId('metric-strip-qo_process_fee_metrics')).toBeVisible({
+    await expect(page.getByTestId('metric-strip-qo_quote_header_summary')).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByTestId('metric-strip-item-total_points')).toBeVisible();
+    await expect(page.getByTestId('metric-strip-item-total_points')).toContainText('5');
 
     const resistorHitRow = page
       .locator('[data-testid^="table-row-"]')
       .filter({ hasText: 'WMF2400TEE' });
     await expect(resistorHitRow).toHaveCount(1, { timeout: 20_000 });
-    await expect(resistorHitRow).toContainText(/完全匹配|Matched/i);
-    // Gerber-only caliber: the row shows the real Gerber fact (3 paste pads of
-    // 0.283mm2) instead of a stage column; 工序/依据 retired with the caliber.
-    await expect(resistorHitRow).toContainText('焊盘 0.283mm² × 3(合计 0.85mm²)');
+    // Only R1 has Gerber facts; R2/R3 remain unresolved and require review.
+    await expect(resistorHitRow).toContainText(/需人工复核|Manual Review/i);
+    // The separate placement column and grouped facts retain the three real R1 pads.
+    await expect(resistorHitRow).toContainText('(0.283 mm² × 3) × 1 位号');
 
     // The review drawer is retired; the flat seven-column table carries the facts
     // (qty/unit points/total points live only in the combined 数量/点数 column).

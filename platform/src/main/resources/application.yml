@@ -195,7 +195,7 @@ spring:
     multipart:
       enabled: true
       max-file-size: 100MB        # 单个文件最大大小
-      max-request-size: 100MB     # 整个请求最大大小
+      max-request-size: 101MB     # Allow multipart framing around a 100MB file
       file-size-threshold: 2KB    # 文件写入磁盘的阈值
       location: ${java.io.tmpdir} # 临时文件存储位置
       resolve-lazily: false       # 是否延迟解析

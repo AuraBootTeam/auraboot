@@ -317,6 +317,13 @@ export default function Header({
               )}
             </div>
 
+            {!simplified && (
+              <div
+                id="page-configuration-actions"
+                className="border-border-strong ms-2 flex items-center border-s ps-3 empty:hidden"
+              />
+            )}
+
             {/* Account menu lives in UserMenuWidget (bottom-start corner) */}
             {!user && (
               <div className="flex items-center space-x-3">

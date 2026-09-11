@@ -67,6 +67,7 @@ public class RecordShareController {
     private final UserService userService;
     private final NotificationService notificationService;
     private final I18nService i18nService;
+    private final com.auraboot.framework.rbac.service.RoleService roleService;
 
     private static final Set<String> PUBLIC_PERMISSION_MASKS = Set.of("read", "read,update");
 
@@ -106,55 +107,89 @@ public class RecordShareController {
                 canManageRecordShares(resourceCode, recordPid)));
     }
 
-    /**
-     * Share a record with another active member of the current tenant.
-     *
-     * @param request share request body
-     * @return success
-     */
+    /** Only owners/admins may discover tenant roles for this record's share picker. */
+    @GetMapping("/roles")
+    public ApiResponse<List<ShareRoleOption>> listShareRoles(
+            @RequestParam @NotBlank String resourceCode,
+            @RequestParam @NotBlank String recordPid) {
+        assertCanManageRecordShares(resourceCode, recordPid);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        return ApiResponse.success(roleService.findByTenantId(tenantId).stream()
+                .filter(role -> isActiveTenantRole(role, tenantId))
+                .map(role -> new ShareRoleOption(role.getPid(), role.getName())).toList());
+    }
+
+    private static boolean isActiveTenantRole(com.auraboot.framework.rbac.entity.Role role, Long tenantId) {
+        return role != null && java.util.Objects.equals(tenantId, role.getTenantId())
+                && !Boolean.TRUE.equals(role.getDeletedFlag()) && "ACTIVE".equalsIgnoreCase(role.getStatus());
+    }
+
+    public record ShareRoleOption(String pid, String name) {}
+
+    /** Validate every recipient before writing any grant; a batch is atomic. */
     @PostMapping
-    @Operation(summary = "Share a record with a subject")
+    @org.springframework.transaction.annotation.Transactional
+    @Operation(summary = "Share a record with tenant members or roles")
     public ApiResponse<Void> shareRecord(@Valid @RequestBody RecordShareRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        log.info("Sharing record: resourceCode={}, recordPid={}, subjectType={}, subjectId={}, subjectPid={}, tenantId={}",
-                request.getResourceCode(), request.getRecordPid(),
-                request.getSubjectType(), null, request.getSubjectPid(), tenantId);
-
         if (!StringUtils.hasText(request.getRecordPid())) {
             throw new RootUnCheckedException(BadParam, "recordPid is required");
         }
-        if (!"member".equalsIgnoreCase(request.getSubjectType())) {
-            throw new RootUnCheckedException(BadParam, "Public record sharing currently supports tenant members only");
+        String type = request.getSubjectType().toLowerCase(java.util.Locale.ROOT);
+        if (!Set.of("member", "role").contains(type)) {
+            throw new RootUnCheckedException(BadParam, "subjectType must be member or role");
         }
-        if (!StringUtils.hasText(request.getSubjectPid())) {
-            throw new RootUnCheckedException(BadParam, "subjectPid is required");
+        if (request.getSubjectPids() != null && StringUtils.hasText(request.getSubjectPid())) {
+            throw new RootUnCheckedException(BadParam, "Use subjectPid or subjectPids, not both");
         }
+        List<String> subjects = request.getSubjectPids() != null ? request.getSubjectPids()
+                : (StringUtils.hasText(request.getSubjectPid()) ? List.of(request.getSubjectPid()) : List.of());
+        if (subjects.isEmpty() || subjects.size() > 100 || subjects.stream().anyMatch(pid -> !StringUtils.hasText(pid))) {
+            throw new RootUnCheckedException(BadParam, "Choose between 1 and 100 recipients");
+        }
+        subjects = subjects.stream().map(String::trim).distinct().toList();
         String permissionMask = normalizePermissionMask(request.getPermissionMask());
         if (!PUBLIC_PERMISSION_MASKS.contains(permissionMask)) {
             throw new RootUnCheckedException(BadParam, "permissionMask must be read or read,update");
         }
         assertFutureExpiry(request.getExpiresAt());
         assertCanManageRecordShares(request.getResourceCode(), request.getRecordPid());
-        UserSearchDTO subject = userService.findInTenantByPid(tenantId, request.getSubjectPid().trim());
-        if (subject == null) {
-            throw new RootUnCheckedException(BadParam, "Share subject is not an active member of this tenant");
+        Map<String, User> members = new java.util.LinkedHashMap<>();
+        Map<String, com.auraboot.framework.rbac.entity.Role> roles = new java.util.LinkedHashMap<>();
+        for (String pid : subjects) {
+            if ("role".equals(type)) {
+                var role = roleService.findByPid(pid);
+                if (!isActiveTenantRole(role, tenantId)) {
+                    throw new RootUnCheckedException(BadParam, "Share role must be active and belong to this tenant");
+                }
+                roles.put(pid, role);
+            } else {
+                UserSearchDTO subject = userService.findInTenantByPid(tenantId, pid);
+                if (subject == null) {
+                    throw new RootUnCheckedException(BadParam, "Share subject is not an active member of this tenant");
+                }
+                User recipient = userService.findByPid(subject.getPid());
+                if (recipient == null || recipient.getId() == null
+                        || !(recipient.getUserType() == null || "human".equalsIgnoreCase(recipient.getUserType()))
+                        || !recipient.isEnabled()) {
+                    throw new RootUnCheckedException(BadParam, "Share subject must be an enabled human member");
+                }
+                members.put(pid, recipient);
+            }
         }
-        User recipient = userService.findByPid(subject.getPid());
-        if (recipient == null || recipient.getId() == null
-                || !(recipient.getUserType() == null || "human".equalsIgnoreCase(recipient.getUserType()))
-                || !recipient.isEnabled()) {
-            throw new RootUnCheckedException(BadParam, "Share subject must be an enabled human member");
+        for (String pid : subjects) {
+            if ("role".equals(type)) {
+                var role = roles.get(pid);
+                recordShareService.shareRecordByPid(tenantId, request.getResourceCode(), request.getRecordPid(),
+                        type, role.getId(), role.getPid(), permissionMask, request.getExpiresAt());
+            } else {
+                recordShareService.shareRecordByPid(tenantId, request.getResourceCode(), request.getRecordPid(),
+                        type, pid, permissionMask, request.getExpiresAt());
+            }
         }
-        recordShareService.shareRecordByPid(
-                tenantId,
-                request.getResourceCode(),
-                request.getRecordPid(),
-                "member",
-                subject.getPid(),
-                permissionMask,
-                request.getExpiresAt());
-        notifyShareRecipient(recipient, request.getResourceCode(), request.getRecordPid(), permissionMask);
-
+        for (User recipient : members.values()) {
+            notifyShareRecipient(recipient, request.getResourceCode(), request.getRecordPid(), permissionMask);
+        }
         return ApiResponse.success();
     }
 
@@ -180,7 +215,7 @@ public class RecordShareController {
         assertFutureExpiry(request.getExpiresAt());
         recordShareService.updateByPid(
                 tenantId, sharePid, permissionMask, request.getExpiresAt());
-        notifyShareRecipientByPid(
+        if ("member".equalsIgnoreCase(share.getSubjectType())) notifyShareRecipientByPid(
                 tenantId,
                 share.getSubjectPid(),
                 share.getResourceCode(),
@@ -358,6 +393,10 @@ public class RecordShareController {
             UserSearchDTO member = userService.findInTenantByPid(tenantId, share.getSubjectPid());
             subjectName = member != null ? member.getDisplayName() : null;
         }
+        if ("role".equalsIgnoreCase(share.getSubjectType())) {
+            var role = roleService.findByPid(share.getSubjectPid());
+            subjectName = role != null && java.util.Objects.equals(tenantId, role.getTenantId()) ? role.getName() : null;
+        }
         return new RecordShareResponse(
                 share.getPid(),
                 share.getSubjectType(),
@@ -440,12 +479,16 @@ public class RecordShareController {
         /** Stable public record PID */
         private String recordPid;
 
-        /** Public subject type. Only "member" is accepted by this endpoint. */
+        /** Public subject type. Accepts "member" or "role". */
         @NotBlank
         private String subjectType;
 
         /** Stable public subject PID */
         private String subjectPid;
+
+        /** Public recipient PIDs for atomic batch sharing. */
+        @Size(min = 1, max = 100)
+        private List<@NotBlank String> subjectPids;
 
         /** Optional permission mask (e.g. "read", "read,update"). Defaults to "read". */
         private String permissionMask = "read";

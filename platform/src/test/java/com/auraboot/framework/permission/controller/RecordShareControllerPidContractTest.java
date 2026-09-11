@@ -154,6 +154,6 @@ class RecordShareControllerPidContractTest {
                 metaModelService,
                 userService,
                 notificationService,
-                i18nService);
+                i18nService, org.mockito.Mockito.mock(com.auraboot.framework.rbac.service.RoleService.class));
     }
 }

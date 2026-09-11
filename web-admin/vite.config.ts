@@ -1,6 +1,7 @@
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { defineConfig, normalizePath, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -24,6 +25,13 @@ const viteCacheDir = process.env.AURA_VITE_CACHE_DIR || `.vite/${viteCacheKey}`;
 const coreWebAdminRoot = path.resolve(
   process.env.AURA_CORE_WEB_ADMIN_ROOT || process.cwd(),
 );
+// Resolve ECharts' transitive renderer through one physical path. Otherwise
+// dependency optimization can retain both pnpm's symlink and real paths: line
+// shapes then fail the canvas painter's `instanceof Path` check and vanish.
+const chartRequire = createRequire(path.join(coreWebAdminRoot, 'package.json'));
+const zrenderRoot = fs.realpathSync(path.dirname(chartRequire.resolve('zrender/package.json', {
+  paths: [path.dirname(chartRequire.resolve('echarts/package.json'))],
+})));
 const WEB_CONTRIBUTIONS_MODULE = 'virtual:auraboot-web-contributions';
 const RESOLVED_WEB_CONTRIBUTIONS_MODULE = `\0${WEB_CONTRIBUTIONS_MODULE}`;
 const contributionRoots = (process.env.AURA_WEB_CONTRIBUTION_ROOTS || '')
@@ -131,6 +139,7 @@ export default defineConfig({
   ].filter((plugin): plugin is Plugin => Boolean(plugin)),
   resolve: {
     dedupe: ['react', 'react-dom'],
+    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }],
   },
   server: {
     host: '0.0.0.0',

@@ -45,6 +45,8 @@ export interface DslFormRendererProps {
    * @default true
    */
   showButtons?: boolean;
+  /** Close an embedded form instead of navigating to its model list. */
+  onCancel?: () => void;
   /**
    * Compact layout mode — reduces spacing for use in drawers and modals.
    * @default false
@@ -73,6 +75,7 @@ export function DslFormRenderer({
   showButtons: _showButtons = true,
   compact: _compact = false,
   className,
+  onCancel,
 }: DslFormRendererProps) {
   const { loading, error, schema, rendererProps } = form;
 
@@ -175,7 +178,10 @@ export function DslFormRenderer({
       <DslFormFillProvider setFieldValue={form.setFieldValue} lockedFields={lockedFields}>
         <div className={className} data-testid="dsl-form-renderer">
           <Suspense fallback={suspenseFallback}>
-            <PageContent {...rendererProps} />
+            <PageContent
+              {...rendererProps}
+              onCancelOverride={onCancel ?? rendererProps.onCancelOverride}
+            />
           </Suspense>
         </div>
       </DslFormFillProvider>

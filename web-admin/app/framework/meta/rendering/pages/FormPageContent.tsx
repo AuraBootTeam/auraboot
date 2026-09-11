@@ -297,9 +297,25 @@ async function expandBomUploadReviewPayload(
   return { expansions, reviewedFields };
 }
 
+export function getBomUploadReviewError(value: unknown, fallback: string): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const review = value as BomUploadReviewValueLike;
+  if (!(review.file instanceof File) || !review.payload) return null;
+  const columns = review.payload.bom_selected_columns;
+  if (
+    review.valid !== true ||
+    !Array.isArray(columns) ||
+    columns.filter((column) => column.role === 'quantity').length !== 1
+  ) {
+    return review.validationMessage || fallback;
+  }
+  return null;
+}
+
 interface BomUploadReviewValueLike {
   file: File;
   valid: boolean;
+  validationMessage?: string;
   payload: {
     bom_sheet_name: string;
     bom_header_row_index: number;
@@ -1048,7 +1064,15 @@ function mergeFieldValidationRules(
  * expression-driven visibility, and action dispatch.
  */
 export function FormPageContent(props: PageContentProps) {
-  const { schema, tableName, token, initialValues, fieldPermissions, onSubmitOverride } = props;
+  const {
+    schema,
+    tableName,
+    token,
+    initialValues,
+    fieldPermissions,
+    onSubmitOverride,
+    onCancelOverride,
+  } = props;
 
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const showToast = useCallback(
@@ -1586,6 +1610,16 @@ export function FormPageContent(props: PageContentProps) {
         }
 
         const value = submissionData[rawField.field];
+        const reviewError = getBomUploadReviewError(
+          value,
+          locale.startsWith('zh')
+            ? '请确认 BOM 识别列，并且只选择一个单套用量列。'
+            : 'Review the BOM columns and select exactly one quantity column.',
+        );
+        if (reviewError) {
+          nextFieldErrors[rawField.field] = reviewError;
+          continue;
+        }
         const jsonValueError = getJsonFormValueError(
           value,
           rawField.dataType || meta?.dataType,
@@ -1757,6 +1791,15 @@ export function FormPageContent(props: PageContentProps) {
   // so that save_draft/submit use CREATE instead of UPDATE
   const handleFormAction = useCallback(
     async (button: { commandCode?: string; [key: string]: any }) => {
+      const leaveActions = ['cancel', 'back', 'close'];
+      if (
+        onCancelOverride &&
+        (leaveActions.includes(resolveActionType(button.action).toLowerCase()) ||
+          leaveActions.includes(String(button.code || '').toLowerCase()))
+      ) {
+        onCancelOverride();
+        return;
+      }
       // L1 SDK: delegate to external submit handler when provided
       if (onSubmitOverride) {
         const actionType = resolveActionType(button.action);
@@ -2087,6 +2130,7 @@ export function FormPageContent(props: PageContentProps) {
       modelFields,
       navigate,
       onSubmitOverride,
+      onCancelOverride,
       notifyValidationFailure,
       recordPid,
       schema?.modelCode,
@@ -2449,7 +2493,16 @@ export function FormPageContent(props: PageContentProps) {
                 <h2 className="text-text text-lg font-medium">
                   {getLocalizedText(schema.title, locale, t)}
                 </h2>
-                {backLink ? (
+                {onCancelOverride ? (
+                  <button
+                    type="button"
+                    onClick={onCancelOverride}
+                    data-testid="form-back-link"
+                    className="text-accent text-sm hover:text-blue-800"
+                  >
+                    {t('action.back')}
+                  </button>
+                ) : backLink ? (
                   <Link
                     to={backLink}
                     data-testid="form-back-link"
