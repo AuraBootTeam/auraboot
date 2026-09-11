@@ -1,4 +1,22 @@
 groups:
+  - name: auraboot_acceptance_canary
+    rules:
+      - alert: AuraBootObservabilityCanary
+        expr: auraboot_observability_canary == 1
+        labels:
+          severity: critical
+          acceptance: reliability-tracing
+        annotations:
+          summary: "Controlled AuraBoot observability canary is firing"
+
+      - alert: AuraBootAvailabilitySloBurn
+        expr: auraboot_sli_availability_ratio < 0.99
+        labels:
+          severity: warning
+          acceptance: reliability-tracing
+        annotations:
+          summary: "AuraBoot availability SLI is below the declared 99% objective"
+
   - name: auraboot_infrastructure
     rules:
       - alert: HighCpuUsage

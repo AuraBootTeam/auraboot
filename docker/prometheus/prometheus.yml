@@ -1,7 +1,12 @@
 # Prometheus config — Monolith mode
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
 
 rule_files:
   - 'alerts.yml'
@@ -21,3 +26,8 @@ scrape_configs:
       - targets: ['host.docker.internal:5173']
         labels:
           service: 'bff'
+
+  - job_name: 'auraboot-observability-canary'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

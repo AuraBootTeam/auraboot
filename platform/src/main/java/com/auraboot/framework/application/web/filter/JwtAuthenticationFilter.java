@@ -291,6 +291,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
+            if (SecurityContextHolder.getContext().getAuthentication() != null) {
+                // Deliberately log only bounded request metadata. The structured formatter adds
+                // traceId/spanId plus the tenant/user MDC fields installed above; credentials,
+                // query strings, headers and request bodies never enter this record.
+                log.info("HTTP request completed method={} path={} status={}",
+                        request.getMethod(), request.getRequestURI(), response.getStatus());
+            }
             MetaContext.clear();
             MDC.remove("tenantId");
             MDC.remove("userId");

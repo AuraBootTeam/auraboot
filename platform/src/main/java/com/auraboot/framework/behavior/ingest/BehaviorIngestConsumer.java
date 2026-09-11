@@ -4,9 +4,12 @@ import com.auraboot.framework.infrastructure.mq.MqProvider;
 import com.auraboot.framework.observability.W3cTraceparent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -30,38 +33,43 @@ public class BehaviorIngestConsumer {
     private final BehaviorEventPersister persister;
     private final ObjectMapper objectMapper;
     private final BehaviorIngestMetrics metrics;
+    private final Tracer tracer;
     private final String group;
 
     @Autowired
     public BehaviorIngestConsumer(MqProvider mqProvider,
                                   BehaviorEventPersister persister,
                                   ObjectMapper objectMapper,
-                                  BehaviorIngestMetrics metrics) {
-        this(mqProvider, persister, objectMapper, metrics, CONSUMER_GROUP);
+                                  BehaviorIngestMetrics metrics,
+                                  ObjectProvider<Tracer> tracerProvider) {
+        this(mqProvider, persister, objectMapper, metrics,
+                tracerProvider.getIfAvailable(() -> Tracer.NOOP), CONSUMER_GROUP);
     }
 
     BehaviorIngestConsumer(MqProvider mqProvider,
                            BehaviorEventPersister persister,
                            ObjectMapper objectMapper) {
-        this(mqProvider, persister, objectMapper, BehaviorIngestMetrics.noop(), CONSUMER_GROUP);
+        this(mqProvider, persister, objectMapper, BehaviorIngestMetrics.noop(), Tracer.NOOP, CONSUMER_GROUP);
     }
 
     BehaviorIngestConsumer(MqProvider mqProvider,
                            BehaviorEventPersister persister,
                            ObjectMapper objectMapper,
                            String group) {
-        this(mqProvider, persister, objectMapper, BehaviorIngestMetrics.noop(), group);
+        this(mqProvider, persister, objectMapper, BehaviorIngestMetrics.noop(), Tracer.NOOP, group);
     }
 
     BehaviorIngestConsumer(MqProvider mqProvider,
                            BehaviorEventPersister persister,
                            ObjectMapper objectMapper,
                            BehaviorIngestMetrics metrics,
+                           Tracer tracer,
                            String group) {
         this.mqProvider = mqProvider;
         this.persister = persister;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
+        this.tracer = tracer;
         this.group = group;
     }
 
@@ -74,17 +82,46 @@ public class BehaviorIngestConsumer {
     }
 
     void onMessage(String topic, String body, Map<String, String> headers) {
-        BehaviorIngestEnvelope env;
-        try {
-            env = objectMapper.readValue(body, BehaviorIngestEnvelope.class);
-        } catch (JsonProcessingException e) {
-            log.error("Dropping unparseable behavior ingest envelope: {}", e.getMessage());
+        Span consumerSpan = startConsumerSpan(topic, headers);
+        try (Tracer.SpanInScope ignored = tracer.withSpan(consumerSpan)) {
+            BehaviorIngestEnvelope env;
+            try {
+                env = objectMapper.readValue(body, BehaviorIngestEnvelope.class);
+            } catch (JsonProcessingException e) {
+                consumerSpan.error(e);
+                log.error("Dropping unparseable behavior ingest envelope: {}", e.getMessage());
+                metrics.recordConsumerLag(topic, group, 0);
+                return;
+            }
+            backfillTraceparent(env, headers);
+            persister.persistBatch(env);
             metrics.recordConsumerLag(topic, group, 0);
-            return;
+        } catch (RuntimeException e) {
+            consumerSpan.error(e);
+            throw e;
+        } finally {
+            consumerSpan.end();
         }
-        backfillTraceparent(env, headers);
-        persister.persistBatch(env);
-        metrics.recordConsumerLag(topic, group, 0);
+    }
+
+    private Span startConsumerSpan(String topic, Map<String, String> headers) {
+        Span.Builder builder = tracer.spanBuilder()
+                .name("behavior.ingest.consume")
+                .kind(Span.Kind.CONSUMER)
+                .tag("messaging.system", "aura-mq")
+                .tag("messaging.destination.name", topic)
+                .tag("messaging.consumer.group.name", group);
+        W3cTraceparent.TraceIds parent = headers == null
+                ? null
+                : W3cTraceparent.parse(headers.get(W3cTraceparent.HEADER));
+        if (parent != null) {
+            builder.setParent(tracer.traceContextBuilder()
+                    .traceId(parent.traceId())
+                    .spanId(parent.spanId())
+                    .sampled(parent.sampled())
+                    .build());
+        }
+        return builder.start();
     }
 
     private void backfillTraceparent(BehaviorIngestEnvelope env, Map<String, String> headers) {

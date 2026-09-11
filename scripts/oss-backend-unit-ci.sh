@@ -2,15 +2,45 @@
 
 # Self-contained Linux CI runner for the complete Gradle `test` task. Some
 # historical tests still use the fixed skills-c2 PostgreSQL/Redis ports, while
-# newer smoke tests use Testcontainers. Provision both paths and always clean
-# the dedicated Compose project before returning.
+# newer smoke tests use Testcontainers. Provision both paths and retain the
+# dedicated Compose project after returning for owner evidence inspection.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_PROJECT="aura-ci-oss-backend"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-unit-ci}"
+RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
+COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
+
+free_port() {
+  local candidate="$1" limit="$2"
+  while (( candidate <= limit )); do
+    if ! ss -H -ltn "sport = :$candidate" | grep -q .; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    candidate=$((candidate + 1))
+  done
+  return 1
+}
+
+command -v ss >/dev/null 2>&1 || { printf '[oss-backend-unit-ci] environment-invalid: ss is unavailable\n' >&2; exit 2; }
+if [[ -z "${AURA_OSS_CI_POSTGRES_PORT:-}" ]]; then
+  AURA_OSS_CI_POSTGRES_PORT="$(free_port 25000 25999)" \
+    || { printf '[oss-backend-unit-ci] environment-invalid: no free PostgreSQL CI port\n' >&2; exit 2; }
+fi
+if [[ -z "${AURA_OSS_CI_REDIS_PORT:-}" ]]; then
+  AURA_OSS_CI_REDIS_PORT="$(free_port 26000 26999)" \
+    || { printf '[oss-backend-unit-ci] environment-invalid: no free Redis CI port\n' >&2; exit 2; }
+fi
+if [[ -z "${AURA_OSS_CI_KAFKA_PORT:-}" ]]; then
+  AURA_OSS_CI_KAFKA_PORT="$(free_port 27000 27999)" \
+    || { printf '[oss-backend-unit-ci] environment-invalid: no free Kafka CI port\n' >&2; exit 2; }
+fi
+export AURA_OSS_CI_POSTGRES_PORT AURA_OSS_CI_REDIS_PORT AURA_OSS_CI_KAFKA_PORT
+export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
+export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
   -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
@@ -31,7 +61,8 @@ cleanup() {
   status=$?
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  docker compose "${COMPOSE_ARGS[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  printf '[oss-backend-unit-ci] runtime retained: compose_project=%s artifacts=%s\n' \
+    "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }
 trap cleanup EXIT HUP INT TERM
@@ -83,8 +114,8 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
   environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
 fi
 
-if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis; then
-  environment_invalid 'skills-c2 PostgreSQL/Redis stack did not become healthy'
+if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
+  environment_invalid 'skills-c2 PostgreSQL/Redis/Kafka stack did not become healthy'
 fi
 
 # The PostgreSQL image reports healthy while its temporary init server may still
@@ -107,7 +138,7 @@ if [[ "$postgres_initialized" != true ]]; then
 fi
 
 FLYWAY_ARGS=(
-  -url=jdbc:postgresql://127.0.0.1:25442/aura_boot
+  -url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot
   -user=auraboot
   -password=auraboot_dev
   -locations=filesystem:/flyway/sql
@@ -163,16 +194,19 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
-TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
 TEST_DATABASE_USERNAME='auraboot' \
 TEST_DATABASE_PASSWORD='auraboot_dev' \
-DATABASE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
 DATABASE_USERNAME='auraboot' \
 DATABASE_PASSWORD='auraboot_dev' \
-SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:25442/aura_boot?charSet=UTF8' \
+SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot?charSet=UTF8" \
 SPRING_DATASOURCE_USERNAME='auraboot' \
 SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
-SPRING_DATA_REDIS_PORT='26389' \
-SPRING_DATA_REDIS_URL='redis://127.0.0.1:26389' \
+SPRING_DATA_REDIS_PORT="$AURA_OSS_CI_REDIS_PORT" \
+SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
+SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
+AURA_CI_REQUIRE_KAFKA='1' \
+AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest

@@ -67,7 +67,9 @@ class AllAdminControllersGuardIntegrationTest extends BaseIntegrationTest {
             // CloudConfigController
             "/api/admin/cloud-config",
             // LoginChannelManageController
-            "/api/admin/login-channels"
+            "/api/admin/login-channels",
+            // ReliableIntegrationOperatorController
+            "/api/admin/reliable-integration/dead-letters"
     })
     void nonAdminBlocked(String url) throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();

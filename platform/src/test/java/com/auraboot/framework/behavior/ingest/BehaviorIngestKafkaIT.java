@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -44,7 +45,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @ActiveProfiles("integration-test")
 class BehaviorIngestKafkaIT {
 
-    private static final String BOOTSTRAP = "localhost:9092";
+    private static final String BOOTSTRAP = System.getenv().getOrDefault(
+            "AURA_CI_KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
     private static final long TENANT = 990_301L;
     private static final long USER = 990_302L;
 
@@ -61,7 +63,12 @@ class BehaviorIngestKafkaIT {
 
     @BeforeEach
     void setup() throws Exception {
-        assumeTrue(kafkaAvailable(), "Kafka broker not available at " + BOOTSTRAP);
+        boolean available = kafkaAvailable();
+        if ("1".equals(System.getenv("AURA_CI_REQUIRE_KAFKA"))) {
+            assertTrue(available, "CI requires Kafka broker at " + BOOTSTRAP);
+        } else {
+            assumeTrue(available, "Kafka broker not available at " + BOOTSTRAP);
+        }
         ensureTables();
         cleanup();
 

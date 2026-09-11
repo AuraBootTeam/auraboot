@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -352,7 +353,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         // Record publish/deprecate timestamps
-        Instant now = Instant.now();
+        // PostgreSQL persists timestamps with microsecond precision. Normalize before returning
+        // the first response so a later re-read cannot appear to move publishedAt by 1 μs.
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         if (targetStatus == NamedQueryStatus.PUBLISHED) {
             if (entity.getPublishedAt() == null) {
                 entity.setPublishedAt(now);

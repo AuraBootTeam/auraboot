@@ -177,8 +177,31 @@ stage_requested_backend_jars() {
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
+    # JAR manifests fold physical lines after 72 bytes. Reassemble continuation
+    # lines before comparing a long fully-qualified Plugin-Class value.
     jar_entry_class="$(unzip -p "$jar_path" META-INF/MANIFEST.MF 2>/dev/null \
-      | tr -d '\r' | awk '$1 == "Plugin-Class:" { print $2; exit }')"
+      | tr -d '\r' \
+      | awk '
+          /^Plugin-Class:[[:space:]]*/ {
+            sub(/^Plugin-Class:[[:space:]]*/, "")
+            value = $0
+            collecting = 1
+            next
+          }
+          collecting && /^ / {
+            sub(/^ /, "")
+            value = value $0
+            next
+          }
+          collecting {
+            print value
+            collecting = 0
+            exit
+          }
+          END {
+            if (collecting) print value
+          }
+        ')"
     [ "$jar_entry_class" = "$entry_class" ] \
       || die "plugin backend entryClass mismatch for $plugin_name: declared=$entry_class jar=${jar_entry_class:-missing}"
     entry_class_path="$(printf '%s' "$entry_class" | tr '.' '/').class"

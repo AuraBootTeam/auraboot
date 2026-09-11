@@ -50,6 +50,7 @@ class ReliableIntegrationRuntimeIT {
     @Autowired private OutboxEventMapper outboxMapper;
     @Autowired private OutboxWorkerImpl worker;
     @Autowired private ReliableIntegrationStateService stateService;
+    @Autowired private ReliableIntegrationOperatorService operatorService;
     @Autowired private ReliableIntegrationHealth health;
     @Autowired private MeterRegistry meterRegistry;
     @Autowired private PilotInventoryConsumer pilotConsumer;
@@ -84,6 +85,7 @@ class ReliableIntegrationRuntimeIT {
     }
 
     private void cleanupRows() {
+        jdbc.update("DELETE FROM ab_integration_dead_letter_replay WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_integration_dead_letter WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_integration_receipt WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_outbox WHERE tenant_id = ?", TENANT_ID);
@@ -156,12 +158,44 @@ class ReliableIntegrationRuntimeIT {
         assertStatus("evt-poison", "failed");
         assertThat(countDeadLetter("evt-poison", "open")).isEqualTo(1);
         assertThat(health.health().getStatus()).isEqualTo(Status.DOWN);
+        assertThat(operatorService.list(TENANT_ID, "open", EVENT_TYPE,
+                "corr-PO-POISON", 1, 20).getTotal()).isEqualTo(1L);
+        assertThatThrownBy(() -> operatorService.detail(TENANT_ID + 1, "evt-poison"))
+                .isInstanceOf(java.util.NoSuchElementException.class)
+                .hasMessage("dead letter not found");
 
         pilotConsumer.poisonEnabled.set(false);
-        long poisonOutboxId = jdbc.queryForObject(
-                "SELECT id FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
-                Long.class, TENANT_ID, "evt-poison");
-        assertThat(worker.replay(poisonOutboxId, "amos-t01-it")).isTrue();
+        ReliableIntegrationOperatorContracts.ReplayResult replay = operatorService.replay(
+                TENANT_ID, "evt-poison", "01M1AMOSOPERATOR00000000000", "pilot consumer recovered", 0);
+        assertThat(replay.status()).isEqualTo("pending");
+        assertThat(replay.replayCount()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_integration_dead_letter_replay "
+                        + "WHERE tenant_id = ? AND event_id = ? AND replay_attempt = 1 "
+                        + "AND requested_by_pid = ? AND reason = ? AND correlation_id = ?",
+                Integer.class, TENANT_ID, "evt-poison", "01M1AMOSOPERATOR00000000000",
+                "pilot consumer recovered", "corr-PO-POISON")).isEqualTo(1);
+        ReliableIntegrationOperatorContracts.DeadLetterDetail replayedDetail =
+                operatorService.detail(TENANT_ID, "evt-poison");
+        assertThat(replayedDetail.replayHistory()).singleElement().satisfies(history -> {
+            assertThat(history.attempt()).isEqualTo(1);
+            assertThat(history.reason()).isEqualTo("pilot consumer recovered");
+            assertThat(history.requestedBy()).isEqualTo("01M1AMOSOPERATOR00000000000");
+        });
+        ReliableIntegrationOperatorContracts.ReplayResult exactRetry = operatorService.replay(
+                TENANT_ID, "evt-poison", "01M1AMOSOPERATOR00000000000", "pilot consumer recovered", 0);
+        assertThat(exactRetry.eventId()).isEqualTo(replay.eventId());
+        assertThat(exactRetry.status()).isEqualTo(replay.status());
+        assertThat(exactRetry.replayCount()).isEqualTo(replay.replayCount());
+        assertThat(exactRetry.requestedBy()).isEqualTo(replay.requestedBy());
+        assertThat(exactRetry.reason()).isEqualTo(replay.reason());
+        assertThat(exactRetry.correlationId()).isEqualTo(replay.correlationId());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_integration_dead_letter_replay "
+                        + "WHERE tenant_id = ? AND event_id = ?", Integer.class,
+                TENANT_ID, "evt-poison")).isEqualTo(1);
+        assertThatThrownBy(() -> operatorService.replay(
+                TENANT_ID, "evt-poison", "01M1AMOSOPERATOR00000000000", "duplicate retry", 0))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("dead letter changed or is not open");
         worker.pollAndDispatch();
         assertStatus("evt-poison", "delivered");
         assertThat(countDeadLetter("evt-poison", "replayed")).isEqualTo(1);
