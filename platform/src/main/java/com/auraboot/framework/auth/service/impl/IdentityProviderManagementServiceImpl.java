@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.IdentityProviderSummary;
 import com.auraboot.framework.auth.entity.IdentityProviderInstance;
 import com.auraboot.framework.auth.mapper.IdentityProviderInstanceMapper;
 import com.auraboot.framework.auth.service.IdentityProviderManagementService;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
@@ -30,6 +31,7 @@ public class IdentityProviderManagementServiceImpl implements IdentityProviderMa
 
     private final IdentityProviderInstanceMapper mapper;
     private final ObjectMapper objectMapper;
+    private final FederatedIdentityFeatureGate featureGate;
 
     @Override
     public List<IdentityProviderSummary> list(String applicationCode, Long tenantId) {
@@ -41,6 +43,9 @@ public class IdentityProviderManagementServiceImpl implements IdentityProviderMa
     public IdentityProviderSummary save(IdentityProviderSaveRequest request, Long tenantId) {
         Long ownerTenantId = requireTenant(tenantId);
         validate(request);
+        if ("active".equals(request.getStatus())) {
+            featureGate.requireEnabled(request.getProviderType());
+        }
         String applicationCode = normalize(request.getApplicationCode(), "business-web");
         Long applicationId = mapper.findApplicationId(applicationCode);
         if (applicationId == null) {
@@ -111,6 +116,9 @@ public class IdentityProviderManagementServiceImpl implements IdentityProviderMa
                 pid, requireTenant(tenantId));
         if (instance == null) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "Editable identity provider not found");
+        }
+        if ("active".equals(normalizedStatus)) {
+            featureGate.requireEnabled(instance.getProviderType());
         }
         instance.setStatus(normalizedStatus);
         mapper.updateById(instance);

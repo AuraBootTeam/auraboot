@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.dto.FederatedLoginContext;
 import com.auraboot.framework.auth.entity.ExternalIdentityLink;
 import com.auraboot.framework.auth.mapper.ExternalIdentityLinkMapper;
 import com.auraboot.framework.auth.mapper.IdentityProviderInstanceMapper;
+import com.auraboot.framework.auth.service.FederatedIdentityFeatureGate;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,8 @@ class FederatedIdentityRegistryServiceImplTest {
     private ExternalIdentityLinkMapper externalIdentityLinkMapper;
     @Mock
     private SystemModeService systemModeService;
+    @Mock
+    private FederatedIdentityFeatureGate featureGate;
 
     private FederatedIdentityRegistryServiceImpl service;
 
@@ -39,7 +42,12 @@ class FederatedIdentityRegistryServiceImplTest {
         service = new FederatedIdentityRegistryServiceImpl(
                 identityProviderInstanceMapper,
                 externalIdentityLinkMapper,
-                systemModeService);
+                systemModeService,
+                featureGate);
+        org.mockito.Mockito.lenient().when(featureGate.isEnabled(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(true);
+        org.mockito.Mockito.lenient().doCallRealMethod().when(featureGate)
+                .requireEnabled(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -90,6 +98,21 @@ class FederatedIdentityRegistryServiceImplTest {
                 "business-web", "supplier-portal", "supplier-sso", 2L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("No active identity provider");
+    }
+
+    @Test
+    void configuredProviderStillFailsClosedWhenFeatureIsDisabled() {
+        FederatedLoginContext resolved = context(2L, 31L);
+        when(systemModeService.isSingleTenant()).thenReturn(false);
+        when(identityProviderInstanceMapper.resolveFederatedContext(
+                "business-web", "default-business-web", "company-oidc", 2L))
+                .thenReturn(resolved);
+        when(featureGate.isEnabled("wechat_web")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.resolveLoginContext(
+                "business-web", "default-business-web", "company-oidc", 2L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not enabled");
     }
 
     @Test
