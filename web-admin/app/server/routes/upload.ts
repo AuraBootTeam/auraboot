@@ -337,9 +337,10 @@ router.post('/file/upload', async (req: Request, res: Response) => {
       .json({ success: false, message: 'Content-Type must be multipart/form-data' });
   }
 
+  const maxFileBytes = 100 * 1024 * 1024;
   const busboy = Busboy({
     headers: req.headers,
-    limits: { fileSize: 100 * 1024 * 1024, files: 1, fields: 10 },
+    limits: { fileSize: maxFileBytes + 1, files: 1, fields: 10 },
   });
 
   let fileProcessed = false;
@@ -361,8 +362,16 @@ router.post('/file/upload', async (req: Request, res: Response) => {
       try {
         // Collect chunks and forward as multipart to Spring Boot
         const chunks: Buffer[] = [];
+        let bytes = 0;
         for await (const chunk of fileStream) {
-          chunks.push(chunk as Buffer);
+          bytes += (chunk as Buffer).length;
+          if (bytes <= maxFileBytes) chunks.push(chunk as Buffer);
+        }
+        // Busboy truncates at its limit. Retain one extra byte so exactly 100 MB
+        // is accepted while oversized streams are rejected before forwarding.
+        if (bytes > maxFileBytes) {
+          res.status(413).json({ success: false, message: 'File exceeds the 100 MB limit' });
+          return;
         }
         const fileBuffer = Buffer.concat(chunks);
         const form = new FormData();

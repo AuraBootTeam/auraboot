@@ -54,6 +54,7 @@ class RecordShareControllerAuthzTest {
     @Mock private UserService userService;
     @Mock private NotificationService notificationService;
     @Mock private I18nService i18nService;
+    @Mock private com.auraboot.framework.rbac.service.RoleService roleService;
 
     @InjectMocks private RecordShareController controller;
 
@@ -65,6 +66,45 @@ class RecordShareControllerAuthzTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    @Test
+    void roleShareUsesTenantValidatedRoleIdentity() {
+        stubBusinessOwner(CALLER_PID);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        role.setId(23L); role.setPid("role-pid"); role.setTenantId(TENANT_ID); role.setStatus("ACTIVE");
+        when(roleService.findByPid("role-pid")).thenReturn(role);
+        var request = shareRequest();
+        request.setSubjectType("role"); request.setSubjectPid("role-pid");
+        controller.shareRecord(request);
+        verify(recordShareService).shareRecordByPid(TENANT_ID, RESOURCE, RECORD_PID,
+                "role", 23L, "role-pid", "read", null);
+        org.mockito.Mockito.verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void roleShareRejectsCrossTenantAndInactiveRole() {
+        stubBusinessOwner(CALLER_PID);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        role.setId(23L); role.setPid("role-pid"); role.setTenantId(99L); role.setStatus("ACTIVE");
+        when(roleService.findByPid("role-pid")).thenReturn(role);
+        var request = shareRequest(); request.setSubjectType("role"); request.setSubjectPid("role-pid");
+        assertThrows(RootUnCheckedException.class, () -> controller.shareRecord(request));
+        role.setTenantId(TENANT_ID); role.setStatus("INACTIVE");
+        assertThrows(RootUnCheckedException.class, () -> controller.shareRecord(request));
+        org.mockito.Mockito.verifyNoInteractions(recordShareService);
+    }
+
+    @Test
+    void batchWithInvalidRecipientWritesNothing() {
+        stubBusinessOwner(CALLER_PID);
+        stubSubject();
+        User recipient = new User(); recipient.setId(19L); recipient.setEnabled(true);
+        when(userService.findByPid(SUBJECT_PID)).thenReturn(recipient);
+        var request = shareRequest(); request.setSubjectPid(null);
+        request.setSubjectPids(java.util.List.of(SUBJECT_PID, "outside-tenant"));
+        assertThrows(RootUnCheckedException.class, () -> controller.shareRecord(request));
+        org.mockito.Mockito.verifyNoInteractions(recordShareService, notificationService);
     }
 
     @Test

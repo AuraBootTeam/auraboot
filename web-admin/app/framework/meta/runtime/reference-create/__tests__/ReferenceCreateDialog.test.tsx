@@ -23,16 +23,39 @@ vi.mock('~/framework/meta/hooks/useDslForm', () => ({
   useDslForm: formHook.useDslForm,
 }));
 vi.mock('~/framework/meta/rendering/DslFormRenderer', () => ({
-  DslFormRenderer: ({ form }: any) => (
-    <button data-testid="dsl-submit" onClick={() => form.submit()}>
-      submit
-    </button>
+  DslFormRenderer: ({ form, onCancel }: any) => (
+    <>
+      <button onClick={onCancel}>cancel embedded form</button>
+      <button data-testid="dsl-submit" onClick={() => form.submit()}>
+        submit
+      </button>
+    </>
   ),
 }));
 
 describe('ReferenceCreateDialog', () => {
   beforeEach(() => {
     formHook.useDslForm.mockClear();
+  });
+
+  it('closes the embedded form on cancel without creating or selecting a record', () => {
+    const onClose = vi.fn();
+    const onCreated = vi.fn();
+    const executeCommand = vi.fn();
+    render(
+      <ReferenceCreateDialog
+        open
+        targetModel="customer"
+        createCommand="customer:create"
+        onClose={onClose}
+        onCreated={onCreated}
+        executeCommand={executeCommand}
+      />,
+    );
+    fireEvent.click(screen.getByText('cancel embedded form'));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(executeCommand).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
   });
 
   it('runs the create command and resolves {value,label} from the result pid', async () => {

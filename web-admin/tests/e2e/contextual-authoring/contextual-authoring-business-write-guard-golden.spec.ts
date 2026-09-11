@@ -63,7 +63,7 @@ test.describe('Contextual authoring PC business-write guard golden', () => {
         response.request().method() === 'POST' &&
         new URL(response.url()).pathname === '/api/authoring/sessions',
     );
-    await page.getByRole('main').first().getByRole('button', { name: '配置此页' }).click();
+    await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
     const session = await expectApiData<AuthoringSession>(
       await sessionResponse,
       'enter announcement authoring',

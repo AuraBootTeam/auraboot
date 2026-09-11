@@ -293,36 +293,18 @@ async function adoptEvidence(
   }
 }
 
-/** Close a review drawer left open by the previous pricing step and require a
- * stable hidden window — a completed reprice can briefly rebind the same
- * selected line after the first close, reopening the drawer and intercepting
- * the next tab click. Do not force-click through a visible overlay, because
- * that would hide a real user-facing obstruction. */
+/** A single close must survive completion of any pending pricing refresh. */
 async function settleReviewDrawer(page: Page): Promise<void> {
-  const drawerClose = page.getByRole('button', {
-    name: /关闭复核浮层|Close review drawer/,
-  });
   const drawer = page.getByTestId('review-drawer');
-  const closeDeadline = Date.now() + 10_000;
-  let hiddenSince = 0;
-  await expect
-    .poll(
-      async () => {
-        if (Date.now() >= closeDeadline) return false;
-        if (await drawer.isVisible().catch(() => false)) {
-          await expect(drawerClose).toBeVisible({ timeout: 2_000 });
-          await drawerClose.click();
-          await expect(drawer).toBeHidden({ timeout: 2_000 });
-          hiddenSince = 0;
-          return false;
-        }
-        if (hiddenSince === 0) hiddenSince = Date.now();
-        return Date.now() - hiddenSince >= 1_000;
-      },
-      { timeout: 10_000, intervals: [100, 200, 200, 500] },
-    )
-    .toBe(true);
+  if (await drawer.isVisible()) {
+    await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
+  }
   await expect(drawer).toBeHidden({ timeout: 2_000 });
+  const closedAt = Date.now();
+  await expect.poll(async () => {
+    expect(await drawer.isVisible()).toBe(false);
+    return Date.now() - closedAt >= 1_000;
+  }, { timeout: 3_000, intervals: [100, 200] }).toBe(true);
 }
 
 async function generateAndValidateWorkbook(

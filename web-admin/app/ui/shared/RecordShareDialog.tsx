@@ -79,7 +79,25 @@ function MemberRecordShareDialog({
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [shares, setShares] = useState<ShareEntry[]>([]);
-  const [subjectPid, setSubjectPid] = useState<string>();
+  const [subjectPid, setSubjectPid] = useState<string[]>();
+  const [subjectType, setSubjectType] = useState<'member' | 'role'>('member');
+  const [roles, setRoles] = useState<Array<{pid: string; name: string}>>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState(false);
+  useEffect(() => {
+    if (!open || subjectType !== 'role' || !resourceCode || !recordPid) return;
+    let cancelled = false;
+    setRolesLoading(true);
+    setRolesError(false);
+    const params = new URLSearchParams({resourceCode, recordPid});
+    fetch(`/api/record-share/roles?${params}`).then(async response => {
+      const body = await response.json();
+      if (!response.ok || !ResultHelper.isSuccess(body)) throw new Error('Role lookup failed');
+      if (!cancelled) setRoles(body.data);
+    }).catch(() => { if (!cancelled) setRolesError(true); })
+      .finally(() => { if (!cancelled) setRolesLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, subjectType, resourceCode, recordPid]);
   const [permissionMask, setPermissionMask] = useState('read');
   const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>('never');
   const [customExpiry, setCustomExpiry] = useState('');
@@ -171,7 +189,7 @@ function MemberRecordShareDialog({
   }, []);
 
   const saveShare = useCallback(async () => {
-    if (!resourceCode || !recordPid || (!editingShare && !subjectPid)) return;
+    if (!resourceCode || !recordPid || (!editingShare && !subjectPid?.length)) return;
     if (expiryPreset === 'custom' && !customExpiry) return;
     setAdding(true);
     try {
@@ -189,8 +207,8 @@ function MemberRecordShareDialog({
               : {
                   resourceCode,
                   recordPid,
-                  subjectType: 'member',
-                  subjectPid,
+                  subjectType,
+                  subjectPids: subjectPid,
                   permissionMask,
                   expiresAt,
                 },
@@ -228,6 +246,7 @@ function MemberRecordShareDialog({
     showErrorToast,
     showSuccessToast,
     subjectPid,
+    subjectType,
     t,
     resetEditor,
   ]);
@@ -360,15 +379,37 @@ function MemberRecordShareDialog({
                   </div>
                 </div>
               ) : (
-                <MemberPicker
-                  key={pickerVersion}
-                  label={t('record_share.member_label', undefined, 'Tenant member')}
-                  onChange={(value) =>
-                    setSubjectPid(typeof value === 'string' ? value : value?.[0])
-                  }
-                  placeholder={t('record_share.member_placeholder', undefined, 'Choose a member')}
-                  value={subjectPid}
-                />
+                <div className="space-y-3">
+                  <div className="flex gap-2" role="group" aria-label={t('record_share.subject_type')}>
+                    {(['member', 'role'] as const).map(type => (
+                      <button key={type} type="button" aria-pressed={subjectType === type}
+                        className={subjectType === type ? 'rounded border border-accent bg-accent-weak px-3 py-2 text-accent' : 'rounded border border-border px-3 py-2'}
+                        onClick={() => { setSubjectType(type); setSubjectPid(undefined); }}>
+                        {t(`record_share.subject_${type}`)}
+                      </button>
+                    ))}
+                  </div>
+                  {subjectType === 'member' ? <MemberPicker
+                    key={pickerVersion} multiple
+                    label={t('record_share.member_label')}
+                    onChange={value => setSubjectPid(typeof value === 'string' ? [value] : value)}
+                    placeholder={t('record_share.member_placeholder')}
+                    value={subjectPid}
+                  /> : <div className="space-y-2">
+                    <p className="text-sm text-text-3">{t('record_share.role_hint')}</p>
+                    {rolesLoading ? <p role="status">{t('common.loading')}</p> : rolesError ?
+                      <p role="alert">{t('record_share.load_failed')}</p> :
+                      <div className="max-h-48 overflow-auto rounded border border-border p-3">
+                        {roles.length === 0 && <p>{t('record_share.no_roles')}</p>}
+                        {roles.map(role => <label key={role.pid} className="flex items-center gap-2 py-1">
+                          <input type="checkbox" checked={subjectPid?.includes(role.pid) || false}
+                            onChange={event => setSubjectPid(current => event.target.checked
+                              ? [...(current || []), role.pid] : current?.filter(pid => pid !== role.pid))} />
+                          {role.name}
+                        </label>)}
+                      </div>}
+                  </div>}
+                </div>
               )}
             </div>
 
@@ -491,7 +532,7 @@ function MemberRecordShareDialog({
                 data-testid="record-share-add-btn"
                 disabled={
                   adding ||
-                  (!editingShare && !subjectPid) ||
+                  (!editingShare && !subjectPid?.length) ||
                   !resourceCode ||
                   !recordPid ||
                   (expiryPreset === 'custom' && !customExpiry)

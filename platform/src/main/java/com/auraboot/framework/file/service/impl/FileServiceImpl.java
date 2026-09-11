@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -49,15 +50,13 @@ public class FileServiceImpl implements FileService {
     private final FileMapper fileMapper;
     private final FileRelationMapper fileRelationMapper;
     private final StorageProvider storageProvider;
+    private final MultipartProperties multipartProperties;
 
     @Autowired(required = false)
     private CdnUrlRewriter cdnUrlRewriter;
 
     @Value("${file.download.base-url:/222}")
     private String baseUrl;
-
-    /** Max upload size: 50 MB */
-    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
 
     private static final Pattern GENERATED_STORAGE_FILE_NAME =
             Pattern.compile("[0-9A-HJKMNP-TV-Z]{26}(\\.[A-Za-z0-9]{1,16})?");
@@ -116,8 +115,9 @@ public class FileServiceImpl implements FileService {
             }
 
             // Validate file size
-            if (file.getSize() > MAX_FILE_SIZE) {
-                throw new BusinessException("File too large: max " + (MAX_FILE_SIZE / 1024 / 1024) + "MB");
+            long maxFileSize = multipartProperties.getMaxFileSize().toBytes();
+            if (maxFileSize >= 0 && file.getSize() > maxFileSize) {
+                throw new BusinessException("File too large: max " + (maxFileSize / 1024 / 1024) + "MB");
             }
 
             // Validate file extension

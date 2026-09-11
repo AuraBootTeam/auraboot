@@ -74,7 +74,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   const hiddenTranslate = isRTL ? 'translate-x-full' : '-translate-x-full';
   const sidebarClasses = `
     fixed inset-y-0 ltr:left-0 rtl:right-0 z-50 ${widthClass} bg-white dark:bg-gray-800 ltr:border-r rtl:border-l border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out
-    flex flex-col overflow-hidden
+    flex flex-col overflow-visible
     lg:translate-x-0 lg:static lg:inset-0
     ${sidebarOpen ? 'translate-x-0' : hiddenTranslate}
   `;
@@ -107,15 +107,6 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
         >
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
-      </div>
-
-      {/* Account entry — full-width footer row (moved out of the header toolbar) */}
-      <div
-        className={`flex-shrink-0 border-t border-gray-200 dark:border-gray-700 ${
-          collapsed ? 'px-2 py-2' : 'px-3 py-2'
-        }`}
-      >
-        <UserMenuWidget variant="sidebar" collapsed={collapsed} />
       </div>
 
       {/* Navigation */}
@@ -163,6 +154,15 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
           </div>
         ))}
       </nav>
+
+      {/* Account entry — full-width footer row (moved out of the header toolbar) */}
+      <div
+        className={`flex-shrink-0 border-t border-gray-200 dark:border-gray-700 ${
+          collapsed ? 'px-2 py-2' : 'px-3 py-2'
+        }`}
+      >
+        <UserMenuWidget variant="sidebar" collapsed={collapsed} />
+      </div>
     </div>
   );
 }
