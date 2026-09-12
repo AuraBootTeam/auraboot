@@ -318,4 +318,16 @@ class SemanticAggregateAdapterTest {
         SemanticQueryRequest sem = adapter.translate(req, "sales");
         assertThat(sem.getDimensions()).containsExactly("region", "order_date__month");
     }
+    @Test
+    void preservesTimeRangeAndPropagatesExecutionFailure() {
+        AggregateQueryRequest request = baseRequest();
+        request.setMetrics(List.of(metric("revenue", null)));
+        request.setTimeRange(new SemanticQueryRequest.TimeRange("created", "mtd", null, null));
+        assertThat(adapter.translate(request, "sales").getTimeRange()).isEqualTo(request.getTimeRange());
+        when(queryService.executeQuery(any(), any()))
+                .thenThrow(new org.springframework.jdbc.BadSqlGrammarException("query", "invalid", new java.sql.SQLException()));
+        assertThatThrownBy(() -> adapter.execute(request))
+                .isInstanceOf(org.springframework.jdbc.BadSqlGrammarException.class);
+    }
+
 }

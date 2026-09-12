@@ -15,9 +15,6 @@ import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -74,14 +71,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Report Designer export renderer backed by the PageSchema extension payload.
+ * Report Designer export renderer backed by the canonical report-definition store.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReportExportServiceImpl implements ReportExportService {
 
-    private static final String REPORT_DSL_EXTENSION_KEY = "reportDsl";
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final String PDF_CONTENT_TYPE = "application/pdf";
@@ -117,7 +113,6 @@ public class ReportExportServiceImpl implements ReportExportService {
             "reportingCurrency"
     );
 
-    private final PageSchemaMapper pageSchemaMapper;
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
@@ -314,62 +309,20 @@ public class ReportExportServiceImpl implements ReportExportService {
                 .build());
     }
 
-    /**
-     * Load the ReportDsl for a report, preferring the first-class {@code ab_report} store and
-     * falling back to the legacy page-schema {@code extension.reportDsl} (Phase 4 slice 2b-2).
-     *
-     * <p>Since slice 2b-1 the report designer dual-writes every save into {@code ab_report} keyed
-     * by the SAME pid, so a report saved after that slice is in both stores and the {@code dsl}
-     * stored in {@code ab_report} is the EXACT same ReportDsl JSON the page-schema holds — the
-     * parsed map is structurally identical regardless of source. Reports created before the
-     * dual-write (not yet backfilled into {@code ab_report}) are read from the page-schema; that
-     * fallback is preserved verbatim so no report becomes unreadable. The page-schema read is
-     * removed in a later slice after the backfill.
-     */
+    /** Read a report definition under the current tenant; there is no secondary store. */
     private Map<String, Object> loadReportDsl(String reportPid) {
         ReportEntity report = reportStorageService.findByPid(reportPid);
-        if (report != null && StringUtils.hasText(report.getDsl())) {
-            return parseAbReportDsl(report.getDsl(), reportPid);
+        if (report == null || !java.util.Objects.equals(MetaContext.getCurrentTenantId(), report.getTenantId())) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found");
         }
-        return loadReportDslFromPageSchema(reportPid);
-    }
-
-    /**
-     * Parse the {@code ab_report.dsl} jsonb String into the same {@code Map<String,Object>} shape
-     * {@code loadReportDsl} returns from the page-schema path. The stored value is the exact
-     * ReportDsl JSON written by the dual-write, so the parsed map mirrors the page-schema read.
-     */
-    private Map<String, Object> parseAbReportDsl(String dsl, String reportPid) {
+        if (!StringUtils.hasText(report.getDsl())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report DSL not found");
+        }
         try {
-            return objectMapper.readValue(dsl, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            // ab_report.dsl is a jsonb column, so it is always syntactically valid JSON; a parse
-            // failure here is a server fault, not a client validation error.
-            log.error("Failed to parse ab_report dsl: reportPid={}", reportPid, e);
-            throw new ValidationException(ResponseCode.SystemError,
-                    "Stored report dsl is not valid JSON: " + reportPid);
+            return objectMapper.readValue(report.getDsl(), new TypeReference<Map<String, Object>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ValidationException(ResponseCode.SystemError, "Stored report DSL is invalid");
         }
-    }
-
-    /**
-     * Legacy read path: the report's DSL lives in the page-schema {@code extension.reportDsl}.
-     * Unchanged from before slice 2b-2; retained as the fallback for reports not yet in
-     * {@code ab_report}.
-     */
-    private Map<String, Object> loadReportDslFromPageSchema(String reportPid) {
-        PageSchema page = pageSchemaMapper.selectByPid(reportPid);
-        if (page == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found: " + reportPid);
-        }
-
-        ExtensionBean extension = page.getExtension();
-        Object reportDsl = extension != null ? extension.get(REPORT_DSL_EXTENSION_KEY) : null;
-        if (reportDsl == null) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "Report DSL not found in page extension: " + reportPid);
-        }
-
-        return objectMapper.convertValue(reportDsl, new TypeReference<Map<String, Object>>() {});
     }
 
     @SuppressWarnings("unchecked")

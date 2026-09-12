@@ -195,3 +195,18 @@ describe('ResultContractView', () => {
     expect(screen.getByText(/5 more rows/)).toBeInTheDocument();
   });
 });
+
+it('renders analytics payloads through the chart card even when the query is empty', () => {
+  render(
+    <ResultContractView
+      contract={{
+        ...baseContract,
+        skillCode: 'aurabot:chat-bi',
+        renderHint: 'card',
+        data: { success: true, data: { chartType: 'table', records: [], columns: [], total: 0 } },
+      }}
+    />,
+  );
+  expect(screen.getByTestId('chatbi-result-card')).toBeInTheDocument();
+  expect(screen.queryByTestId('rc-card')).not.toBeInTheDocument();
+});

@@ -12,13 +12,10 @@ import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.branding.DeploymentBrandingProvider;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -71,9 +68,6 @@ class ReportExportServiceTest {
     private Path tempDirectory;
 
     @Mock
-    private PageSchemaMapper pageSchemaMapper;
-
-    @Mock
     private DynamicDataService dynamicDataService;
 
     @Mock
@@ -92,7 +86,7 @@ class ReportExportServiceTest {
 
     @BeforeEach
     void setUp() {
-        reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
+        reportExportService = new ReportExportServiceImpl(new ObjectMapper(),
                 dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
                 reportRenderClient, BrandingIdentity::community);
         // A successful export records an audit event sourced from MetaContext (set on every real
@@ -107,12 +101,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withStaticTableData_rendersWorkbookArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-001")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-001")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-001");
@@ -142,11 +135,10 @@ class ReportExportServiceTest {
 
     @Test
     void exportArtifacts_useDeploymentBrandingProvider() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-branded")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-branded")).thenReturn(page);
 
         Path brandingConfig = tempDirectory.resolve("branding.json");
         Files.writeString(brandingConfig, """
@@ -175,7 +167,6 @@ class ReportExportServiceTest {
                         .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", "SO-2026-001"),
                 new ObjectMapper());
         ReportExportServiceImpl brandedService = new ReportExportServiceImpl(
-                pageSchemaMapper,
                 new ObjectMapper(),
                 dynamicDataService,
                 namedQueryService,
@@ -203,94 +194,28 @@ class ReportExportServiceTest {
         }
     }
 
-    // ---------- Phase 4 slice 2b-2: read ab_report first, fall back to page-schema ----------
-
     @Test
-    void loadReportDsl_readsAbReportFirst_whenShadowRowPresent() throws Exception {
-        // ab_report has the report (the dual-write shadow): the export must read it from there and
-        // must NOT touch the page-schema for the dsl.
-        ReportEntity shadow = new ReportEntity();
-        shadow.setPid("rpt-shadow");
-        shadow.setDsl(new ObjectMapper().writeValueAsString(reportDsl()));
-        when(reportStorageService.findByPid("rpt-shadow")).thenReturn(shadow);
-
+    void exportRejectsMissingOrOtherTenantReport() {
         ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-shadow");
-
-        ReportExportFile file = reportExportService.exportExcel(request);
-
-        // same export content as the page-schema path produces — proves the ab_report dsl shape
-        // is structurally identical to the page-schema reportDsl shape.
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
-            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
-            var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Region");
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
-            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
-        }
-
-        // the page-schema mapper was never consulted for the dsl (ab_report won)
-        verify(pageSchemaMapper, never()).selectByPid(any());
-    }
-
-    @Test
-    void loadReportDsl_fallsBackToPageSchema_whenNoShadowRow() throws Exception {
-        // ab_report has NO row for this pid (pre-dual-write report): export must fall back to the
-        // legacy page-schema extension.reportDsl, unchanged.
-        when(reportStorageService.findByPid("rpt-legacy")).thenReturn(null);
-
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-legacy")).thenReturn(page);
-
-        ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-legacy");
-
-        ReportExportFile file = reportExportService.exportExcel(request);
-
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
-            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
-            var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
-            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
-        }
-    }
-
-    @Test
-    void loadReportDsl_fallsBackToPageSchema_whenShadowRowHasBlankDsl() throws Exception {
-        // Defensive: a shadow row exists but its dsl is blank (never legitimately happens since the
-        // create() default is "{}", but guard the read path) → fall back to page-schema.
-        ReportEntity blankShadow = new ReportEntity();
-        blankShadow.setPid("rpt-blank");
-        blankShadow.setDsl("");
-        when(reportStorageService.findByPid("rpt-blank")).thenReturn(blankShadow);
-
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-blank")).thenReturn(page);
-
-        ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-blank");
-
-        ReportExportFile file = reportExportService.exportJson(request);
-
-        Map<String, Object> payload = new ObjectMapper().readValue(file.getBytes(), new TypeReference<>() {});
-        Map<String, Object> exportedDsl = castMap(payload.get("reportDsl"));
-        assertThat(exportedDsl.get("title")).isEqualTo("Operations Export");
+        request.setReportPid("unavailable");
+        assertThatThrownBy(() -> reportExportService.exportJson(request))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+        ReportEntity other = new ReportEntity();
+        other.setTenantId(999L);
+        other.setDsl("{}");
+        when(reportStorageService.findByPid("unavailable")).thenReturn(other);
+        assertThatThrownBy(() -> reportExportService.exportJson(request))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+        verify(auditTrailService, never()).recordAudit(any());
     }
 
     @Test
     void exportPdf_withStaticTableData_rendersPdfArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-pdf");
@@ -356,12 +281,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportPdf_withPageSettings_preservesMediaBoxMarginsAndTextHierarchy() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", visualFidelityReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(visualFidelityReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-visual-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-visual-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-visual-pdf");
@@ -388,12 +312,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportJson_withReportDslAndResolvedRows_rendersRoundTripArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-json")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-json")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-json");
@@ -425,12 +348,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withStaticNonTableBlocks_rendersSemanticWorkbookSheets() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-table-xlsx")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-table-xlsx")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-non-table-xlsx");
@@ -490,11 +412,10 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_chartBlock_embedsNativeChart() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-chart-native")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-chart-native")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-chart-native");
@@ -518,12 +439,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withModelNamedQueryAndApiDataSources_rendersResolvedRows() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonStaticDataSourceReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonStaticDataSourceReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-static")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-static")).thenReturn(page);
         when(dynamicDataService.list(eq("rpt_case_model"), any(DynamicQueryRequest.class)))
                 .thenReturn(PaginationResult.of(
                         List.of(Map.of("source", "Model", "cases", 31)),
@@ -577,12 +497,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportPdf_withStaticNonTableBlocks_rendersSemanticTextArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-table-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-table-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-non-table-pdf");
@@ -613,9 +532,9 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withoutReportDsl_throwsValidationException() {
-        PageSchema page = new PageSchema();
-        page.setExtension(new ExtensionBean());
-        when(pageSchemaMapper.selectByPid("rpt-missing")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        when(reportStorageService.findByPid("rpt-missing")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-missing");
@@ -681,9 +600,9 @@ class ReportExportServiceTest {
     @Test
     void export_withoutReportDsl_recordsNoAudit() {
         // A failed export (missing dsl) must NOT emit an audit event — audit only fires on success.
-        PageSchema page = new PageSchema();
-        page.setExtension(new ExtensionBean());
-        when(pageSchemaMapper.selectByPid("rpt-no-audit")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        when(reportStorageService.findByPid("rpt-no-audit")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-no-audit");
@@ -694,11 +613,10 @@ class ReportExportServiceTest {
     }
 
     private void stubReportDsl(String reportPid) {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid(reportPid)).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
+        when(reportStorageService.findByPid(reportPid)).thenReturn(page);
     }
 
     private byte[] createPdf(String text) throws IOException {

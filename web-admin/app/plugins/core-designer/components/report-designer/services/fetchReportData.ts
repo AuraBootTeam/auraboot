@@ -15,7 +15,7 @@ interface FetchResult {
 }
 
 async function fetchModelData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
-  if (!ds.modelCode) return [];
+  if (!ds.modelCode) throw new Error('Model data source requires modelCode');
 
   const params = new URLSearchParams({ pageNum: '1', pageSize: '500' });
   if (ds.filters?.length) {
@@ -39,11 +39,14 @@ async function fetchModelData(ds: ReportDataSource): Promise<Record<string, unkn
   if (!response.ok) throw new Error(`Failed to fetch model data: ${response.status}`);
 
   const result: FetchResult = await response.json();
-  return result.data?.records || [];
+  const code = Number(result.code);
+  if (code !== 0 && code !== 200) throw new Error(result.message || 'Model query failed');
+  if (!Array.isArray(result.data?.records)) throw new Error('Invalid model data response');
+  return result.data.records;
 }
 
 async function fetchNamedQueryData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
-  if (!ds.queryCode) return [];
+  if (!ds.queryCode) throw new Error('Named query data source requires queryCode');
 
   const params = new URLSearchParams({
     datasourceId: `nq:${ds.queryCode}`,
@@ -58,20 +61,25 @@ async function fetchNamedQueryData(ds: ReportDataSource): Promise<Record<string,
   const code = typeof result.code === 'string' ? parseInt(result.code, 10) : result.code;
   if (code !== 0 && code !== 200) throw new Error(result.desc || result.message || 'Query failed');
 
-  return result.data?.records || result.data || [];
+  const rows = result.data?.records ?? result.data;
+  if (!Array.isArray(rows)) throw new Error('Invalid named query response');
+  return rows;
 }
 
 async function fetchApiData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
-  if (!ds.url) return [];
+  if (!ds.url) throw new Error('API data source requires url');
 
   const response = await fetch(ds.url);
   if (!response.ok) throw new Error(`Failed to fetch API data: ${response.status}`);
 
   const result = await response.json();
   if (Array.isArray(result)) return result;
-  if (result.data?.records) return result.data.records;
-  if (Array.isArray(result.data)) return result.data;
-  return [];
+  if ('code' in result && Number(result.code) !== 0 && Number(result.code) !== 200) {
+    throw new Error('API data source returned an error');
+  }
+  const rows = result.data?.records ?? result.data;
+  if (!Array.isArray(rows)) throw new Error('Invalid API data response');
+  return rows;
 }
 
 async function fetchStaticData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
@@ -89,26 +97,21 @@ export async function fetchReportData(
   const entries = Object.entries(report.dataSources);
 
   const fetches = entries.map(async ([key, ds]) => {
-    try {
-      switch (ds.type) {
-        case 'model':
-          results[key] = await fetchModelData(ds);
-          break;
-        case 'namedQuery':
-          results[key] = await fetchNamedQueryData(ds);
-          break;
-        case 'api':
-          results[key] = await fetchApiData(ds);
-          break;
-        case 'static':
-          results[key] = await fetchStaticData(ds);
-          break;
-        default:
-          results[key] = [];
-      }
-    } catch (error) {
-      console.error(`Failed to fetch data source "${key}":`, error);
-      results[key] = [];
+    switch (ds.type) {
+      case 'model':
+        results[key] = await fetchModelData(ds);
+        break;
+      case 'namedQuery':
+        results[key] = await fetchNamedQueryData(ds);
+        break;
+      case 'api':
+        results[key] = await fetchApiData(ds);
+        break;
+      case 'static':
+        results[key] = await fetchStaticData(ds);
+        break;
+      default:
+        throw new Error('Unsupported report data source');
     }
   });
 

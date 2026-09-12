@@ -277,31 +277,12 @@ public class ChatToolResolver {
     private static final LlmChatRequest.Tool PLATFORM_CHAT_BI_TOOL =
             LlmChatRequest.Tool.builder()
                     .name("aurabot_chat-bi")
-                    .description("Aggregate a published business model and return a chart, governed and "
-                            + "zero-setup. Use when the user asks to see data / counts / totals / a chart "
-                            + "(e.g. \"leads by status\", \"orders per month\"). Prefer this over "
-                            + "platform_execute_sql for aggregation. Group by the dimension field(s) and "
-                            + "choose the metric aggregation; use the model's primary key with count for "
-                            + "row counts.")
-                    .inputSchema(Map.of("type", "object",
-                            "properties", Map.of(
-                                    "modelCode", Map.of("type", "string",
-                                            "description", "The model to aggregate (e.g. crm_lead_common)."),
-                                    "dimensions", Map.of("type", "array",
-                                            "items", Map.of("type", "string"),
-                                            "description", "Group-by fields (category axis / pie slices). Omit for a single KPI."),
-                                    "metrics", Map.of("type", "array",
-                                            "items", Map.of("type", "object",
-                                                    "properties", Map.of(
-                                                            "field", Map.of("type", "string"),
-                                                            "aggregation", Map.of("type", "string",
-                                                                    "enum", List.of("count", "count_distinct", "sum", "avg", "max", "min"))),
-                                                    "required", List.of("field", "aggregation"))),
-                                    "chartType", Map.of("type", "string",
-                                            "enum", List.of("bar", "line", "pie", "table")),
-                                    "interpretation", Map.of("type", "string",
-                                            "description", "One-line restatement of the question for the result header.")),
-                            "required", List.of("modelCode", "metrics")))
+                    .description("Analyze business data within AuraBot. First use action=catalog for governed metrics, "
+                            + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. "
+                            + "Ask the user to clarify ambiguous metrics. Preserve timeRange, orderBy and limit. "
+                            + "Raw model aggregation is available for explicit ad-hoc exploration; do not substitute "
+                            + "raw aggregates for unavailable governed KPIs.")
+                    .inputSchema(com.auraboot.framework.aurabot.skill.builtin.ChatBiSkill.inputSchema())
                     .build();
 
     /**

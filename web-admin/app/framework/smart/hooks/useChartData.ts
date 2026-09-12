@@ -297,6 +297,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         parameters: currentDataSource.parameters,
         orderBy: currentDataSource.orderBy,
         limit: currentDataSource.limit,
+        timeRange: currentDataSource.timeRange,
         drillFilters: currentDrillFilters,
         // When a semantic model is configured, pass it through so the backend
         // delegates to SemanticQueryService instead of the raw SQL path.

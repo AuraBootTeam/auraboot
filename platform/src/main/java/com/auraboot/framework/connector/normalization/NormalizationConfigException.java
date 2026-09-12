@@ -5,7 +5,7 @@ package com.auraboot.framework.connector.normalization;
  * is structurally invalid, contains an unrecognised rule type, or is missing
  * required fields.
  *
- * <p>Pattern mirrors {@code com.auraboot.framework.chatbi.v2.compiler.TokenCompileException}:
+ * <p>Pattern mirrors {@code com.auraboot.framework.semantic.compiler.MetricCompileException}:
  * a stable {@code code} for programmatic handling plus a human-readable message.
  * Callers should translate the code to an appropriate HTTP 400 or configuration-error
  * response rather than surfacing the raw exception message.

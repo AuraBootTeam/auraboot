@@ -15,6 +15,7 @@
  * @since 1.0.0
  */
 
+import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 import type { ResultContract, ResultContractStatus } from '../types/ResultContract';
 
@@ -22,11 +23,14 @@ import type { ResultContract, ResultContractStatus } from '../types/ResultContra
 // Helpers
 // ============================================================================
 
-const STATUS_STYLE: Record<ResultContractStatus, { color: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  success:         { color: 'text-green-600',  Icon: CheckCircle },
+const STATUS_STYLE: Record<
+  ResultContractStatus,
+  { color: string; Icon: React.ComponentType<{ className?: string }> }
+> = {
+  success: { color: 'text-green-600', Icon: CheckCircle },
   partial_success: { color: 'text-yellow-600', Icon: AlertCircle },
-  failed:          { color: 'text-red-600',    Icon: XCircle },
-  unknown:         { color: 'text-gray-500',   Icon: AlertCircle },
+  failed: { color: 'text-red-600', Icon: XCircle },
+  unknown: { color: 'text-gray-500', Icon: AlertCircle },
 };
 
 function truncate(val: unknown, max = 60): string {
@@ -65,11 +69,11 @@ function TableView({ rows }: { rows: Array<Record<string, unknown>> }) {
   const cols = Object.keys(rows[0]);
   return (
     <div className="overflow-x-auto" data-testid="rc-table">
-      <table className="min-w-full text-sm border border-gray-200">
+      <table className="min-w-full border border-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
             {cols.map((c) => (
-              <th key={c} className="text-left px-2 py-1 border-b border-gray-200 font-medium">
+              <th key={c} className="border-b border-gray-200 px-2 py-1 text-left font-medium">
                 {c}
               </th>
             ))}
@@ -79,7 +83,7 @@ function TableView({ rows }: { rows: Array<Record<string, unknown>> }) {
           {rows.slice(0, 20).map((row, i) => (
             <tr key={i} className={i % 2 ? 'bg-gray-50' : ''}>
               {cols.map((c) => (
-                <td key={c} className="px-2 py-1 border-b border-gray-100">
+                <td key={c} className="border-b border-gray-100 px-2 py-1">
                   {truncate(row[c])}
                 </td>
               ))}
@@ -88,7 +92,7 @@ function TableView({ rows }: { rows: Array<Record<string, unknown>> }) {
         </tbody>
       </table>
       {rows.length > 20 && (
-        <div className="text-xs text-gray-500 mt-1">…{rows.length - 20} more rows</div>
+        <div className="mt-1 text-xs text-gray-500">…{rows.length - 20} more rows</div>
       )}
     </div>
   );
@@ -117,9 +121,9 @@ function SummaryView({ contract }: { contract: ResultContract }) {
 function CardView({ contract }: { contract: ResultContract }) {
   const entries = contract.data ? Object.entries(contract.data) : [];
   return (
-    <div className="rounded border border-gray-200 p-3 bg-white" data-testid="rc-card">
+    <div className="rounded border border-gray-200 bg-white p-3" data-testid="rc-card">
       {contract.textSummary && (
-        <div className="font-medium text-sm mb-2">{contract.textSummary}</div>
+        <div className="mb-2 text-sm font-medium">{contract.textSummary}</div>
       )}
       {entries.length > 0 && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
@@ -144,7 +148,7 @@ interface TimelineEvent {
 function TimelineView({ contract }: { contract: ResultContract }) {
   const events = (contract.data?.events as TimelineEvent[] | undefined) ?? [];
   return (
-    <ol className="relative border-l border-gray-200 pl-4 space-y-2" data-testid="rc-timeline">
+    <ol className="relative space-y-2 border-l border-gray-200 pl-4" data-testid="rc-timeline">
       {events.map((e, i) => (
         <li key={i} className="text-sm">
           <div className="text-gray-900">{e.label ?? `Event ${i + 1}`}</div>
@@ -157,7 +161,10 @@ function TimelineView({ contract }: { contract: ResultContract }) {
 
 function JsonFallback({ contract }: { contract: ResultContract }) {
   return (
-    <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto" data-testid="rc-json">
+    <pre
+      className="overflow-x-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs"
+      data-testid="rc-json"
+    >
       {JSON.stringify(contract.data ?? {}, null, 2)}
     </pre>
   );
@@ -172,6 +179,20 @@ export interface ResultContractViewProps {
 }
 
 export function ResultContractView({ contract }: ResultContractViewProps) {
+  // AuraBot skills return an execution envelope; render the analytics data, not protocol fields.
+  if (contract.skillCode === 'aurabot:chat-bi' && contract.status === 'success') {
+    const envelope = contract.data;
+    const candidate = envelope?.data ?? envelope;
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      'records' in candidate &&
+      Array.isArray(candidate.records)
+    ) {
+      return <ChatBiResultCard result={candidate as ChatBiResult} />;
+    }
+  }
+
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);
@@ -179,7 +200,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
   return (
     <div className="space-y-2" data-testid="result-contract">
       <div className="flex items-center gap-2 text-xs text-gray-600">
-        <Icon className={`w-4 h-4 ${color}`} />
+        <Icon className={`h-4 w-4 ${color}`} />
         <span className={`font-medium ${color}`}>{contract.status}</span>
         {contract.skillCode && (
           <>
@@ -190,7 +211,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         {typeof contract.durationMs === 'number' && (
           <>
             <span className="text-gray-400">·</span>
-            <Clock className="w-3 h-3" />
+            <Clock className="h-3 w-3" />
             <span>{contract.durationMs}ms</span>
           </>
         )}
@@ -234,25 +255,26 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         )}
       </div>
 
-      {contract.renderHint === 'table' || contract.renderHint === 'chart_table'
-        ? <TableView rows={resolveTableRows(contract)} />
-        : contract.renderHint === 'summary'
-          ? <SummaryView contract={contract} />
-          : contract.renderHint === 'card'
-            ? <CardView contract={contract} />
-            : contract.renderHint === 'timeline'
-              ? <TimelineView contract={contract} />
-              : contract.textSummary
-                ? <SummaryView contract={contract} />
-                : <JsonFallback contract={contract} />
-      }
+      {contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
+        <TableView rows={resolveTableRows(contract)} />
+      ) : contract.renderHint === 'summary' ? (
+        <SummaryView contract={contract} />
+      ) : contract.renderHint === 'card' ? (
+        <CardView contract={contract} />
+      ) : contract.renderHint === 'timeline' ? (
+        <TimelineView contract={contract} />
+      ) : contract.textSummary ? (
+        <SummaryView contract={contract} />
+      ) : (
+        <JsonFallback contract={contract} />
+      )}
 
       {contract.suggestedActions && contract.suggestedActions.length > 0 && (
         <div className="flex flex-wrap gap-1 pt-1" data-testid="rc-suggested-actions">
           {contract.suggestedActions.map((a, i) => (
             <span
               key={i}
-              className="inline-block text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200"
+              className="inline-block rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
             >
               {a.label}
             </span>

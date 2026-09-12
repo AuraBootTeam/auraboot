@@ -43,6 +43,9 @@ public class AggregateQueryRequest {
      */
     private String semanticModelCode;
 
+    /** Semantic time range; preserved when an analysis is saved as a dashboard. */
+    private com.auraboot.framework.semantic.compiler.SemanticQueryRequest.TimeRange timeRange;
+
     /**
      * The named query code to execute.
      * Required for namedQuery type queries.

@@ -8,9 +8,7 @@ import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderProperties;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.branding.BrandingIdentity;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -51,8 +49,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ReportDeliveryLiveIT {
 
-    @Mock
-    private PageSchemaMapper pageSchemaMapper;
     @Mock
     private DynamicDataService dynamicDataService;
     @Mock
@@ -104,17 +100,16 @@ class ReportDeliveryLiveIT {
         ReportRenderClient renderClient = new ReportRenderClient(new ObjectMapper(), props);
 
         ReportExportServiceImpl exportService = new ReportExportServiceImpl(
-                pageSchemaMapper, new ObjectMapper(), dynamicDataService, namedQueryService,
+                new ObjectMapper(), dynamicDataService, namedQueryService,
                 reportStorageService, auditTrailService, renderClient, BrandingIdentity::community);
 
         ReportDeliveryServiceImpl deliveryService = new ReportDeliveryServiceImpl(exportService);
         ReflectionTestUtils.setField(deliveryService, "mailSender", mailSender);
 
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", chartReportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-deliver")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(7L);
+        page.setDsl(new ObjectMapper().valueToTree(chartReportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-deliver")).thenReturn(page);
         when(mailSender.createMimeMessage()).thenAnswer(inv -> new MimeMessage((Session) null));
 
         ReportSchedule schedule = new ReportSchedule();

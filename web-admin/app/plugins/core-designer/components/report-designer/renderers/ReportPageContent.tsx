@@ -1,3 +1,4 @@
+import { useSmartText } from '~/utils/i18n';
 /**
  * ReportPageContent — runtime report viewer
  * Loads report DSL, fetches data, renders the report, and provides export options
@@ -23,6 +24,7 @@ interface ReportPageContentProps {
 }
 
 export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey }) => {
+  const text = useSmartText();
   const [report, setReport] = useState<ReportDsl | null>(null);
   const [reportPid, setReportPid] = useState<string | null>(null);
   const [dataSets, setDataSets] = useState<Record<string, Record<string, unknown>[]>>({});
@@ -42,6 +44,8 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     let mounted = true;
 
     async function load() {
+      setLoading(true);
+      setError(null);
       try {
         const result = await reportDesignerService.loadByPageKey(pageKey);
         if (!mounted) return;
@@ -73,8 +77,11 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
   const handleApplyParams = useCallback(async () => {
     if (!report) return;
     setLoading(true);
+    setError(null);
     try {
       await loadData(report, paramValues);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Report data failed');
     } finally {
       setLoading(false);
     }
@@ -84,7 +91,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     if (!report || !reportPid) return;
     setExporting(true);
     try {
-      const blob = await reportDesignerService.exportPdf(reportPid);
+      const blob = await reportDesignerService.exportPdf(reportPid, paramValues);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -99,14 +106,22 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     } finally {
       setExporting(false);
     }
-  }, [report, reportPid]);
+  }, [report, reportPid, paramValues]);
 
   const handlePrint = useCallback(() => {
     window.print();
   }, []);
 
   if (loading && !report) return <ReportPageSkeleton />;
-  if (error) return <div className="mx-auto max-w-4xl p-8 text-red-600">Error: {error}</div>;
+  if (error)
+    return (
+      <div role="alert" className="mx-auto max-w-4xl p-8 text-red-600">
+        {text({
+          zh: '报表加载失败，请检查数据源和访问权限后重新打开。',
+          en: 'Report could not be loaded. Check the data source and access permissions, then reopen the report.',
+        })}
+      </div>
+    );
   if (!report) return <div className="mx-auto max-w-4xl p-8 text-gray-500">Report not found</div>;
 
   return (
@@ -145,6 +160,12 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         />
       )}
 
+      <p className="mb-4 text-sm text-gray-500 print:hidden">
+        {text({
+          zh: '模型和命名查询数据源最多显示 500 行；下载请使用服务端导出。',
+          en: 'Model and named-query sources show up to 500 rows. Use server export to download.',
+        })}
+      </p>
       {/* Report content */}
       <div className="rounded-lg bg-white p-8 shadow-sm print:p-0 print:shadow-none">
         {/* Header */}

@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         // including previously hand-enumerated nested packages such as
         // connector.jdbc.mapper, connector.saas.oauth.mapper, connector.airflow.mapper,
         // connector.airflow.secret.mapper, aurabot.skill.mapper, agent.trace.mapper,
-        // chatbi.v2.mapper, plugin.marketplace.mapper, billing.*.mapper,
+        // plugin.marketplace.mapper, billing.*.mapper,
         // dataquality.ge.mapper, promotion.reference.dao.mapper, saas.*.mapper, etc.
         "com.auraboot.framework.**.mapper",
         // Leaf is 'dao', not 'mapper' — not covered by **.mapper above.

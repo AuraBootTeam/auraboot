@@ -78,8 +78,6 @@ class ProviderNeutralArchitectureTest {
     private static boolean allowed(Path path) {
         String normalized = path.toString().replace('\\', '/');
         return normalized.contains("/agent/provider/")
-                || normalized.endsWith("/chatbi/v2/provider/OpenAiLlmProvider.java")
-                || normalized.endsWith("/chatbi/v2/provider/AnthropicLlmProvider.java")
                 || normalized.endsWith("/application/bootstrap/seeder/CloudConfigSeeder.java")
                 || normalized.endsWith("/observability/GenAiPricing.java");
     }

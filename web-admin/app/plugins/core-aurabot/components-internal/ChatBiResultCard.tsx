@@ -23,7 +23,8 @@ interface ChatBiMetric {
   alias?: string;
 }
 
-interface ChatBiResult {
+export interface ChatBiResult {
+  dataSource?: ChartDataSource;
   interpretation?: string;
   modelCode?: string;
   chartType?: string;
@@ -222,15 +223,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { t } = useI18n();
   const [showSql, setShowSql] = useState(false);
 
-  const {
-    interpretation,
-    chartConfig,
-    columns = [],
-    records = [],
-    total,
-    sql,
-    truncated,
-  } = result;
+  const { interpretation, chartConfig, columns = [], records = [], total, sql, truncated } = result;
 
   const effectiveColumns =
     columns.length > 0 ? columns : records.length > 0 ? Object.keys(records[0]) : [];
@@ -250,7 +243,8 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { modelCode, dimensions = [], metrics = [] } = result;
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
-  const canSave = !!modelCode && metrics.length > 0 && records.length > 0 && !savedPid;
+  const dataSource = result.dataSource;
+  const canSave = !!dataSource && records.length > 0 && !savedPid;
 
   const handleSaveDashboard = async () => {
     if (!canSave || saving) return;
@@ -269,7 +263,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           title,
           config: {
             title,
-            dataSource: { type: 'aggregate', modelCode, dimensions, metrics },
+            dataSource,
           },
         },
       ];
@@ -343,7 +337,10 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         {(canSave || savedPid) && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
             {savedPid ? (
-              <span data-testid="chatbi-saved-dashboard" className="text-xs font-medium text-green-600 dark:text-green-400">
+              <span
+                data-testid="chatbi-saved-dashboard"
+                className="text-xs font-medium text-green-600 dark:text-green-400"
+              >
                 {t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板')} ✓
               </span>
             ) : (
@@ -353,7 +350,13 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
                 disabled={saving}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
               >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <rect x="3" y="3" width="7" height="7" />
                   <rect x="14" y="3" width="7" height="7" />
                   <rect x="14" y="14" width="7" height="7" />

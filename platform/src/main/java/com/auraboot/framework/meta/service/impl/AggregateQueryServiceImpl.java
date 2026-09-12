@@ -133,8 +133,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // semantic layer (PRD 16 §6 W4 D4). Bit-identical legacy behaviour
         // preserved when either is absent — existing widgets do not regress.
         if (request.getSemanticModelCode() != null
-                && !request.getSemanticModelCode().isBlank()
-                && semanticAggregateAdapter != null) {
+                && !request.getSemanticModelCode().isBlank()) {
+            if (semanticAggregateAdapter == null) {
+                throw new MetaServiceException("Semantic query service is unavailable");
+            }
             return semanticAggregateAdapter.execute(request);
         }
 

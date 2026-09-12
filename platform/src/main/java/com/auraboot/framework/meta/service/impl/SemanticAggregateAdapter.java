@@ -93,6 +93,7 @@ public class SemanticAggregateAdapter {
 
     SemanticQueryRequest translate(AggregateQueryRequest request, String modelCode) {
         SemanticQueryRequest sem = new SemanticQueryRequest();
+        sem.setTimeRange(request.getTimeRange());
         if (request.getMetrics() != null) {
             for (MetricConfig m : request.getMetrics()) {
                 String code = pickMetricCode(m);

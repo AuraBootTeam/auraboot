@@ -1,3 +1,4 @@
+import { useSmartText } from '~/utils/i18n';
 /**
  * Report Designer Main Component
  *
@@ -22,7 +23,7 @@ import { fetchReportData } from './services/fetchReportData';
 import { reportDesignerService } from './services/reportDesignerService';
 import { createEmptyReport } from './types';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
-import { pageSchemaVersionService } from '~/shared/versioning/versionService';
+import { reportVersionService } from '~/shared/versioning/versionService';
 
 const AUTO_SAVE_DELAY = 30000; // 30 seconds
 
@@ -32,6 +33,8 @@ interface ReportDesignerProps {
 }
 
 const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+  const text = useSmartText();
+  const [loadFailed, setLoadFailed] = React.useState(false);
   const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
     isSaving,
@@ -52,14 +55,15 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   const loadReportById = useCallback(
     async (pid: string) => {
       setLoading(true);
+      setLoadFailed(false);
       try {
         const result = await reportDesignerService.loadByPid(pid);
         loadDocument(result.dsl);
         setPageId(result.pid);
         setLoading(false);
-      } catch (error) {
+      } catch {
         setLoading(false);
-        throw error;
+        setLoadFailed(true);
       }
     },
     [loadDocument, setPageId, setLoading],
@@ -92,7 +96,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Version history management
   const versioning = useVersioning({
-    service: pageSchemaVersionService,
+    service: reportVersionService,
     resourcePid: pageId || undefined,
     onRollbackComplete: () => {
       // Reload report after rollback
@@ -258,6 +262,16 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     }
   }, [report, pageId]);
 
+  if (loadFailed)
+    return (
+      <div role="alert" className="p-8 text-red-600">
+        {text({
+          zh: '报表加载失败，请检查访问权限后重新打开。',
+          en: 'Report could not be loaded. Check access permissions and reopen it.',
+        })}
+      </div>
+    );
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -334,16 +348,22 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = (props) => {
  * Preview content fetches data and renders runtime view
  */
 const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ report }) => {
+  const text = useSmartText();
+  const [failed, setFailed] = React.useState(false);
   const [dataSets, setDataSets] = React.useState<Record<string, Record<string, unknown>[]>>({});
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let mounted = true;
+    setLoading(true);
+    setFailed(false);
     fetchReportData(report)
       .then((data) => {
         if (mounted) setDataSets(data);
       })
-      .catch(console.error)
+      .catch(() => {
+        if (mounted) setFailed(true);
+      })
       .finally(() => {
         if (mounted) setLoading(false);
       });
@@ -360,8 +380,24 @@ const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ rep
     );
   }
 
+  if (failed)
+    return (
+      <div role="alert" className="m-8 text-red-600">
+        {text({
+          zh: '报表数据加载失败，请检查数据源和访问权限后重新预览。',
+          en: 'Report data could not be loaded. Check the data source and access permissions, then reopen preview.',
+        })}
+      </div>
+    );
+
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+      <p className="mb-4 text-sm text-gray-500">
+        {text({
+          zh: '模型和命名查询数据源最多预览 500 行；下载请使用服务端导出。',
+          en: 'Model and named-query sources preview up to 500 rows. Use server export to download.',
+        })}
+      </p>
       {report.header && (
         <>
           <div className="mb-4">
