@@ -748,7 +748,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
 
         // Count total
-        // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
+        // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
         String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);

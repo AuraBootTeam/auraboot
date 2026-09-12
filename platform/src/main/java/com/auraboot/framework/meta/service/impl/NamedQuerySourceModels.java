@@ -15,10 +15,11 @@ import java.util.regex.Pattern;
 public class NamedQuerySourceModels {
     private final MetaModelMapper mapper;
     private final SecureSqlRewriter sql;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
     Map<String, String> resolve(Long tenant, String fromSql, List<com.auraboot.framework.meta.entity.NamedQueryField> fields) {
-        if (tenant == null) throw new AccessDeniedException("Export source requires a tenant");
+        if (tenant == null || tenant <= 0) throw new AccessDeniedException("Export source requires a tenant");
         Map<String, Set<String>> catalog = new HashMap<>();
         for (var model : mapper.findCurrentForTenant(tenant)) {
             String table = model.getTableName();
@@ -33,6 +34,11 @@ public class NamedQuerySourceModels {
             String key = identity(table);
             Set<String> candidates = catalog.getOrDefault(key, Set.of());
             if (candidates.size() != 1) throw new AccessDeniedException("Export source model is unknown or ambiguous");
+            Boolean tenantColumn = jdbc.queryForObject(
+                    "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_attribute WHERE attrelid = to_regclass(?) AND attname = 'tenant_id' AND attnum > 0 AND NOT attisdropped)",
+                    Boolean.class, key);
+            if (!Boolean.TRUE.equals(tenantColumn))
+                throw new AccessDeniedException("Named query source has no tenant isolation column");
             result.put(key, candidates.iterator().next());
         }
         return Collections.unmodifiableMap(result);

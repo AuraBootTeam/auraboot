@@ -278,7 +278,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         sql = fieldProtection.rewrite(protection, sql);
 
-        // Use tenant-bypass method since tenant isolation is handled inside the NamedQuery's fromSql.
+        // The shared source rewrite already applies tenant and row scopes to each physical input.
         // This avoids JSqlParser failures on complex PostgreSQL-specific syntax.
         List<Map<String, Object>> rawRows = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
         // Filter out null entries that MyBatis can return for all-NULL aggregate rows

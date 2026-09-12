@@ -13,7 +13,11 @@ import static org.mockito.Mockito.*;
 class NamedQuerySourceModelsTest {
     private final MetaModelMapper mapper = mock(MetaModelMapper.class);
     private final SecureSqlRewriter sql = mock(SecureSqlRewriter.class);
-    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql);
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
+    private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc);
+    @org.junit.jupiter.api.BeforeEach void tenantMetadata() {
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), anyString())).thenReturn(true);
+    }
     private Model model(String code, String table) {
         Model model = new Model(); model.setCode(code); model.setTableName(table); return model;
     }
@@ -35,6 +39,11 @@ class NamedQuerySourceModelsTest {
     }
     @Test void ambiguousPhysicalMappingIsDenied() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null), model("shadow", "mt_orders")));
+        assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
+    }
+    @Test void sourcesWithoutTenantColumnsAreDenied() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null)));
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), anyString())).thenReturn(false);
         assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
     }
     @Test void quotedIdentifiersRetainCaseAndEmbeddedDots() {

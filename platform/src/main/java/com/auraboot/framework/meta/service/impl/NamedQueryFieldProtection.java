@@ -51,7 +51,7 @@ public class NamedQueryFieldProtection {
                 String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
                 String row = permit != null ? permit : policies.buildRowFilter(MetaContext.getCurrentTenantId(), model, "read", MetaContext.getCurrentUserId());
                 String domain = domains.buildDomainFilter(model, MetaContext.getCurrentUserId());
-                return java.util.stream.Stream.of(row, domain).filter(value -> value != null && !value.isBlank())
+                return java.util.stream.Stream.of("tenant_id = " + MetaContext.getCurrentTenantId(), row, domain).filter(value -> value != null && !value.isBlank())
                         .map(value -> "(" + value.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "") + ")")
                         .collect(java.util.stream.Collectors.joining(" AND "));
             });

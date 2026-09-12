@@ -39,7 +39,8 @@ class NamedQueryFieldProtectionAuthorizationTest {
     @Test void everyPhysicalSourceUsesCurrentMemberIdentity() {
         when(permissions.canAction(30L, "orders", "read")).thenReturn(true);
         when(permissions.canAction(30L, "customers", "read")).thenReturn(true);
-        assertNotNull(protection.prepare(query, List.of(), "list"));
+        var plan = protection.prepare(query, List.of(), "list");
+        assertEquals(Map.of("orders", "(tenant_id = 10)", "customers", "(tenant_id = 10)"), plan.sourceScopes());
         verify(permissions).canAction(30L, "orders", "read");
         verify(permissions).canAction(30L, "customers", "read");
         verify(permissions, never()).canAction(eq(20L), anyString(), anyString());
