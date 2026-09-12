@@ -14,6 +14,7 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
   page.on('console', (message) => {
     if (message.type() === 'error') console.log('[analytics-console-error]', message.text());
   });
+  const funnelFrom = new Date().toISOString();
   const title = `Analytics fixture ${Date.now()}`;
   const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
     data: {
@@ -223,6 +224,24 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
   } finally {
     await usedProof.end();
   }
+  const funnel = await page.request.get('/api/analytics/behavior/analysis-funnel', {
+    params: { from: funnelFrom, to: new Date().toISOString() },
+  });
+  expect(funnel.status()).toBe(200);
+  const funnelData = (await funnel.json()).data;
+  expect(funnelData.definitionVersion).toBe('analysis-task-funnel-v1');
+  expect(funnelData.records.map((stage: { tasks: number }) => stage.tasks)).toEqual([
+    1, 1, 1, 1, 1,
+  ]);
+  expect(funnelData.records.map((stage: { overallRate: number }) => stage.overallRate)).toEqual([
+    1, 1, 1, 1, 1,
+  ]);
+  expect(funnelData.quality).toMatchObject({
+    missingCorrelationEvents: 0,
+    withoutWindowEntryTasks: 0,
+    unmatchedStageEvents: 0,
+    sampledEvents: 0,
+  });
   await page.screenshot({
     path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-reopened.png`,
     fullPage: true,
