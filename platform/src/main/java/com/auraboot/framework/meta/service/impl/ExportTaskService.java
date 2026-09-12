@@ -74,6 +74,18 @@ public class ExportTaskService {
             throw new MetaServiceException("Named query is not executable: " + queryCode);
         }
 
+        ExportTask task = newTask(queryCode, request, tenantId, userId);
+
+        exportTaskMapper.insert(task);
+
+        // Kick off async processing
+        processExportAsync(task.getId(), tenantId);
+
+        return toDTO(task);
+    }
+
+    private ExportTask newTask(String queryCode, NamedQueryDataExportRequest request,
+                               Long tenantId, Long userId) {
         ExportTask task = new ExportTask();
         task.setPid(UlidGenerator.generate());
         task.setTenantId(tenantId);
@@ -88,12 +100,28 @@ public class ExportTaskService {
 
         task.setRequestParams(objectMapper.valueToTree(request));
 
+        return task;
+    }
+
+    /** Synchronous exports use the same owner-scoped artifact lifecycle as background exports. */
+    public ExportResult exportSync(String queryCode, NamedQueryDataExportRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            throw new MetaServiceException("Authenticated export owner is required");
+        }
+        ExportResult result = namedQueryService.exportData(queryCode, request);
+        if (!Boolean.TRUE.equals(result.getSuccess())) return result;
+        ExportTask task = newTask(queryCode, request, tenantId, userId);
+        try {
+            completeArtifact(task, result);
+        } catch (java.io.IOException e) {
+            throw new MetaServiceException("Failed to store export artifact");
+        }
         exportTaskMapper.insert(task);
-
-        // Kick off async processing
-        processExportAsync(task.getId(), tenantId);
-
-        return toDTO(task);
+        result.setDownloadUrl(toDTO(task).getDownloadUrl());
+        result.setFilePath(null);
+        return result;
     }
 
     /**
@@ -112,7 +140,7 @@ public class ExportTaskService {
      */
     public String getFileKey(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
-        if (task == null || !belongsToCurrentOwner(task)) {
+        if (task == null || !belongsToCurrentOwner(task) || !isDownloadable(task)) {
             return null;
         }
         return task.getFileKey();
@@ -174,6 +202,15 @@ public class ExportTaskService {
                 failTask(task, result.getErrorMessage());
                 return;
             }
+            completeArtifact(task, result);
+            exportTaskMapper.updateById(task);
+        } catch (Exception e) {
+            log.error("Export task failed: taskId={}", taskId, e);
+            failTask(task, e.getMessage());
+        }
+    }
+
+    private void completeArtifact(ExportTask task, ExportResult result) throws java.io.IOException {
             java.nio.file.Path source = java.nio.file.Path.of(result.getFilePath());
             String extension = source.getFileName().toString();
             extension = extension.substring(extension.lastIndexOf('.'));
@@ -187,11 +224,12 @@ public class ExportTaskService {
             task.setProgress(100);
             task.setStatus(ExportTask.STATUS_COMPLETED);
             task.setCompletedAt(Instant.now());
-            exportTaskMapper.updateById(task);
-        } catch (Exception e) {
-            log.error("Export task failed: taskId={}", taskId, e);
-            failTask(task, e.getMessage());
-        }
+    }
+
+    private boolean isDownloadable(ExportTask task) {
+        return ExportTask.STATUS_COMPLETED.equals(task.getStatus())
+                && task.getExpiresAt() != null && task.getExpiresAt().isAfter(Instant.now())
+                && task.getFileKey() != null;
     }
 
     /**
@@ -237,7 +275,7 @@ public class ExportTaskService {
         dto.setFormat(entity.getFormat());
         dto.setErrorMessage(entity.getErrorMessage());
 
-        if (ExportTask.STATUS_COMPLETED.equals(entity.getStatus()) && entity.getFileKey() != null) {
+        if (isDownloadable(entity)) {
             dto.setDownloadUrl("/api/meta/named-queries/export-tasks/" + entity.getPid() + "/download");
         }
 

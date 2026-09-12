@@ -1,6 +1,8 @@
 /** Real export ownership: a same-tenant administrator cannot retrieve another user's artifact. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
+import { PG_CONN } from '../helpers/environments';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
@@ -42,6 +44,34 @@ test('async export task and file belong to their creator', async ({ request }) =
   expect(download.status(), await download.text()).toBe(200);
   expect((await download.body()).subarray(0, 2).toString()).toBe('PK');
 
+  const synchronous = await request.post(`/api/meta/named-queries/${code}/export-data`, {
+    data: { format: 'CSV' },
+  });
+  expect(synchronous.status(), await synchronous.text()).toBe(200);
+  const syncUrl = (await synchronous.json()).data.downloadUrl;
+  expect(syncUrl).toMatch(/^\/api\/meta\/named-queries\/export-tasks\/[^/]+\/download$/);
+  const syncFile = await request.get(syncUrl);
+  expect(syncFile.status()).toBe(200);
+  const db = new Client(PG_CONN);
+  await db.connect();
+  try {
+    const stored = await db.query('SELECT file_key FROM ab_export_task WHERE pid = $1', [
+      syncUrl.split('/').at(-2),
+    ]);
+    expect(stored.rows).toHaveLength(1);
+    const fileKey = stored.rows[0].file_key;
+    const rawNamed = await request.get(`/api/meta/named-queries/${code}/download`, {
+      params: { file: fileKey },
+    });
+    expect(rawNamed.status()).toBe(404);
+    const rawDynamic = await request.get('/api/dynamic/e2et_order/download', {
+      params: { file: fileKey },
+    });
+    expect(rawDynamic.status()).toBe(403);
+  } finally {
+    await db.end();
+  }
+
   const email = `export-${randomUUID()}@e2e.local`;
   const password = `Aa7!${randomUUID()}`;
   const user = await request.post('/api/admin/users', {
@@ -65,12 +95,15 @@ test('async export task and file belong to their creator', async ({ request }) =
   try {
     const allowed = await peer.get(`/api/meta/named-queries/${queryPid}`);
     expect(allowed.status(), await allowed.text()).toBe(200);
-    for (const target of [path, `${path}/download`]) {
+    for (const target of [path, `${path}/download`, syncUrl]) {
       const denied = await peer.get(target);
       expect(denied.status(), await denied.text()).toBe(400);
       expect(await denied.text()).toContain('Export task not found');
       expect(await denied.text()).not.toContain('fileKey');
     }
+    const syncAgain = await request.get(syncUrl);
+    expect(syncAgain.status()).toBe(200);
+    expect(await syncAgain.body()).toEqual(await syncFile.body());
     const ownerAgain = await request.get(`${path}/download`);
     expect(ownerAgain.status()).toBe(200);
     expect(await ownerAgain.body()).toEqual(await download.body());

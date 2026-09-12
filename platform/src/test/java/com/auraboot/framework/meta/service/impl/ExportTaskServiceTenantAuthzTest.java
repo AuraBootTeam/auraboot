@@ -47,6 +47,7 @@ class ExportTaskServiceTenantAuthzTest {
         t.setCreatedBy(100L);
         t.setFileKey(fileKey);
         t.setStatus("completed");
+        t.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
         return t;
     }
 
@@ -103,5 +104,14 @@ class ExportTaskServiceTenantAuthzTest {
                 .thenReturn(java.util.List.of(task(1L, "/tmp/own.xlsx")));
         assertEquals(1, service.getRecentTasks("query", 2).size());
         org.mockito.Mockito.verify(exportTaskMapper).findByQueryCode("query", 1L, 100L, 2);
+    }
+    @Test
+    void expiredArtifactIsUnavailableBeforeScheduledCleanup() {
+        MetaContext.setContext(1L, 100L, "owner", "user");
+        ExportTask expired = task(1L, "/tmp/expired.xlsx");
+        expired.setExpiresAt(java.time.Instant.now().minusSeconds(1));
+        when(exportTaskMapper.findByPid("expired")).thenReturn(expired);
+        assertNull(service.getFileKey("expired"));
+        assertNull(service.getTaskStatus("expired").getDownloadUrl());
     }
 }
