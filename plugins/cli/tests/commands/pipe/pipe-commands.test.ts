@@ -104,7 +104,7 @@ describe('pipe commands', () => {
     it('should list all templates with required fields', () => {
       const templates = listTemplates();
 
-      expect(templates.length).toBeGreaterThanOrEqual(4);
+      expect(templates.length).toBeGreaterThanOrEqual(2);
 
       for (const t of templates) {
         expect(t.name).toBeTruthy();

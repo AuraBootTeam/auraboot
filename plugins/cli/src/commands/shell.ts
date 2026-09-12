@@ -4,10 +4,6 @@ import { resolveToken, resolveBaseUrl } from '../client/auth.js';
 
 const COMMANDS: Record<string, string> = {
   'help':       'Show available commands',
-  'crm leads':  'List CRM leads',
-  'crm opps':   'List opportunities',
-  'crm accounts': 'List accounts',
-  'crm dashboard': 'CRM KPI summary',
   'project list': 'List projects',
   'project tasks': 'List tasks',
   'project dashboard': 'PM KPI summary',

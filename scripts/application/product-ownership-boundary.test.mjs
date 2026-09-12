@@ -168,6 +168,17 @@ test('core runtime gates never seed or execute BPM/CRM product journeys', () => 
   assert.doesNotMatch(scripts, /(?:plugins\/|import[_ -]?plugins[^\n]*)(?:crm|core-bpm|workflow-demo)/i);
 });
 
+test('core CLI ships no executable CRM workflow defaults or shell shortcuts', () => {
+  const shell = readFileSync(resolve(ROOT, 'plugins/cli/src/commands/shell.ts'), 'utf8');
+  const templates = joined(resolve(ROOT, 'plugins/cli/src/pipe/templates'),
+    (path) => /\.ya?ml$/.test(path));
+
+  assert.doesNotMatch(shell, /['"]crm\s+(?:leads|opps|accounts|dashboard)['"]/i);
+  assert.doesNotMatch(templates, /\bcrm_(?:lead|opportunity|account|activity)_common\b/i);
+  assert.equal(existsSync(resolve(ROOT, 'plugins/cli/src/pipe/templates/new-leads-digest.yaml')), false);
+  assert.equal(existsSync(resolve(ROOT, 'plugins/cli/src/pipe/templates/daily-sales-report.yaml')), false);
+});
+
 test('public source-facade npm exports resolve to typed source files', () => {
   const dslRuntime = JSON.parse(readFileSync(resolve(ROOT, 'packages/dsl-runtime/package.json'), 'utf8'));
   const designerSdk = JSON.parse(readFileSync(resolve(ROOT, 'packages/designer-sdk/package.json'), 'utf8'));
