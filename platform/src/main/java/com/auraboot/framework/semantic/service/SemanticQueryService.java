@@ -211,6 +211,7 @@ public class SemanticQueryService {
             resolvePhysicalModelRef(model);
             return model;
         } catch (Exception e) {
+            if (e instanceof AccessDeniedException denied) throw denied;
             if (e instanceof MetricCompileException metricCompileException) {
                 throw metricCompileException;
             }
@@ -230,6 +231,8 @@ public class SemanticQueryService {
         try {
             String tableName = metaModelService.getTableName(modelCode);
             model.getSemanticModel().setModelRef(tableName);
+        } catch (AccessDeniedException denied) {
+            throw denied;
         } catch (RuntimeException e) {
             throw new MetricCompileException(
                     "UNKNOWN_MODEL_REF",

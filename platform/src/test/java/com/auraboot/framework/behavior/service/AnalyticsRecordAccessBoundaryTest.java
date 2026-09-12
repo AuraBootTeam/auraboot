@@ -46,4 +46,20 @@ class AnalyticsRecordAccessBoundaryTest {
         assertThatThrownBy(() -> data.getById(AnalyticsSuggestionCommandHandler.ADOPTION, "pid"))
                 .isInstanceOf(AccessDeniedException.class);
     }
+    @Test void semanticResolutionBlocksPrivateModelsAndAlwaysClosesScope() throws Throwable {
+        var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+        when(metadata.getTableName("order")).thenReturn("mt_order");
+        var factory = new AspectJProxyFactory(metadata);
+        factory.addAspect(boundary);
+        com.auraboot.framework.meta.service.MetaModelService guarded = factory.getProxy();
+        var operation = mock(org.aspectj.lang.ProceedingJoinPoint.class);
+        when(operation.proceed()).thenAnswer(call -> {
+            assertThat(guarded.getTableName("order")).isEqualTo("mt_order");
+            return guarded.getTableName(AnalyticsSuggestionCommandHandler.VERSION);
+        });
+        assertThatThrownBy(() -> boundary.semanticOperation(operation)).isInstanceOf(AccessDeniedException.class);
+        verify(metadata, never()).getTableName(AnalyticsSuggestionCommandHandler.VERSION);
+        guarded.getTableName(AnalyticsSuggestionCommandHandler.VERSION);
+        verify(metadata).getTableName(AnalyticsSuggestionCommandHandler.VERSION);
+    }
 }

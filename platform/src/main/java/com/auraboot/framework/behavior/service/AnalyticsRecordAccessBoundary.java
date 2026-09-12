@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class AnalyticsRecordAccessBoundary {
     private final ThreadLocal<Principal> domainRead = new ThreadLocal<>();
     private record Principal(Long tenant, Long user) {}
+    private final ThreadLocal<Boolean> semanticRead = new ThreadLocal<>();
 
     @Around("execution(* com.auraboot.framework.behavior.service.AnalyticsSuggestionCommandHandler.execute(..))"
             + " || execution(* com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.resolve(..))"
@@ -50,6 +51,27 @@ public class AnalyticsRecordAccessBoundary {
             // Raw facts are not business-query sources, even inside a suggestion operation.
             throw denied();
         }
+        return call.proceed();
+    }
+
+    @Around("execution(* com.auraboot.framework.semantic.service.SemanticQueryService.executeQuery(..))"
+            + " || execution(* com.auraboot.framework.semantic.service.SemanticQueryService.explainQuery(..))"
+            + " || execution(* com.auraboot.framework.semantic.service.SemanticQueryService.validateQuery(..))")
+    public Object semanticOperation(ProceedingJoinPoint call) throws Throwable {
+        Boolean previous = semanticRead.get();
+        semanticRead.set(true);
+        try {
+            return call.proceed();
+        } finally {
+            if (previous == null) semanticRead.remove();
+            else semanticRead.set(previous);
+        }
+    }
+
+    @Around("execution(* com.auraboot.framework.meta.service.MetaModelService+.getTableName(..))")
+    public Object resolveSemanticSource(ProceedingJoinPoint call) throws Throwable {
+        if (Boolean.TRUE.equals(semanticRead.get()) && call.getArgs()[0] instanceof String model
+                && protectedModel(model)) throw denied();
         return call.proceed();
     }
 
