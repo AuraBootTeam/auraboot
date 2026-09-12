@@ -44,7 +44,7 @@ export interface ReportDataSource {
   queryCode?: string;
   url?: string;
   data?: Record<string, unknown>[];
-  filters?: Array<{ field: string; operator: string; value: string }>;
+  filters?: Array<{ field: string; operator: string; value?: string | number; values?: string[] }>;
   sortBy?: Array<{ field: string; order: 'asc' | 'desc' }>;
 }
 

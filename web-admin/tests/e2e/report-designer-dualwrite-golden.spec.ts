@@ -1,5 +1,5 @@
 /** Report definition save/read integration; replaces the retired dual-write contract. */
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '../../tests/fixtures';
 
 test.use({
@@ -249,4 +249,119 @@ test('report menu previews and exports the same filtered model rows', async ({ p
     ['Title', 'Customer'],
     [orderTitle, 'Report Export Customer'],
   ]);
+});
+
+test('report export API applies declared model parameters and rejects missing required values', async ({
+  page,
+}) => {
+  const { executeCommandViaApi } = await import('./helpers');
+  const title = `ReportParams${Date.now()}`;
+  for (const suffix of ['A', 'B']) {
+    const created = await executeCommandViaApi(
+      page,
+      'e2et:create_order',
+      {
+        e2et_order_title: `${title}${suffix}`,
+        e2et_order_type: 'normal',
+        e2et_order_customer: `Customer ${suffix}`,
+        e2et_order_urgent: false,
+      },
+      undefined,
+      'create',
+    );
+    expect(created.code).toBe('0');
+  }
+  const dsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    parameters: [
+      {
+        name: 'order',
+        label: 'Order',
+        type: 'text',
+        required: true,
+        defaultValue: `${title}A`,
+        bindTo: { dataSource: 'orders', field: 'e2et_order_title', operator: 'EQ' },
+      },
+    ],
+    dataSources: { orders: { type: 'model', modelCode: 'e2et_order' } },
+    body: [
+      {
+        id: 'orders',
+        blockType: 'table',
+        title: 'Orders',
+        dataSource: 'orders',
+        showHeader: true,
+        columns: [{ field: 'e2et_order_title', label: 'Title' }],
+      },
+    ],
+  };
+  const created = await page.request.post('/api/report-definitions', {
+    data: { code: title.toLowerCase(), title, profile: 'paged-media', dsl },
+  });
+  expect(created.status()).toBe(200);
+  const { pid } = (await created.json()).data;
+
+  await page.goto('/home');
+  await page.locator('a[href="/p/c/report_management"]').first().click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: title })
+    .getByRole('button', { name: /打开|Open/ })
+    .click();
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByRole('cell', { name: `${title}A`, exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: `${title}B`, exact: true })).toHaveCount(0);
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-default.png`,
+    fullPage: true,
+  });
+  for (const [parameters, expected] of [
+    [undefined, `${title}A`],
+    [{ order: `${title}B` }, `${title}B`],
+  ] as const) {
+    const response = await page.request.post('/api/reports/export/json', {
+      data: { reportPid: pid, parameters },
+    });
+    expect(response.status()).toBe(200);
+    const payload = await response.json();
+    expect(payload.reportDsl).toEqual(dsl);
+    expect(payload.dataSets.orders).toHaveLength(1);
+    expect(payload.dataSets.orders[0].e2et_order_title).toBe(expected);
+  }
+  const XLSX = await import('xlsx');
+  const excel = await page.request.post('/api/reports/export/excel', {
+    data: { reportPid: pid, parameters: { order: `${title}B` } },
+  });
+  expect(excel.status()).toBe(200);
+  const workbook = XLSX.read(await excel.body(), { type: 'buffer' });
+  expect(XLSX.utils.sheet_to_json(workbook.Sheets.Orders, { header: 1 })).toEqual([
+    ['Orders'],
+    ['Title'],
+    [`${title}B`],
+  ]);
+  const pdf = await page.request.post('/api/reports/export/pdf', {
+    data: { reportPid: pid, parameters: { order: `${title}B` } },
+  });
+  expect(pdf.status()).toBe(200);
+  await writeFile(`${process.env.AURA_EVIDENCE_DIR}/report-parameter.pdf`, await pdf.body());
+  await writeFile(`${process.env.AURA_EVIDENCE_DIR}/report-parameter-expected.txt`, `${title}B`);
+  for (const format of ['json', 'excel', 'pdf']) {
+    const missing = await page.request.post(`/api/reports/export/${format}`, {
+      data: { reportPid: pid, parameters: { order: '' } },
+    });
+    expect(missing.status()).toBe(422);
+    const unknown = await page.request.post(`/api/reports/export/${format}`, {
+      data: { reportPid: pid, parameters: { unexpected: 'value' } },
+    });
+    expect(unknown.status()).toBe(422);
+  }
+  const stored = await page.request.get(`/api/report-definitions/${pid}`);
+  expect((await stored.json()).data.dsl).toEqual(dsl);
 });

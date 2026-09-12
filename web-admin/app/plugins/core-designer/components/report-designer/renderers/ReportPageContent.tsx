@@ -35,8 +35,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
 
   const loadData = useCallback(async (dsl: ReportDsl, params?: Record<string, string>) => {
     // Apply parameter bindings to data source filters
-    const dslWithFilters = applyParameterBindings(dsl, params || {});
-    const data = await fetchReportData(dslWithFilters);
+    const data = await fetchReportData(dsl, params);
     setDataSets(data);
   }, []);
 
@@ -227,29 +226,3 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     </div>
   );
 };
-
-/**
- * Apply parameter bindings to data source filters
- * Creates a modified copy of the DSL with parameter values injected as filters
- */
-function applyParameterBindings(dsl: ReportDsl, paramValues: Record<string, string>): ReportDsl {
-  const params = dsl.parameters || [];
-  const boundParams = params.filter((p) => p.bindTo && paramValues[p.name]);
-
-  if (boundParams.length === 0) return dsl;
-
-  const modifiedDs = { ...dsl.dataSources };
-  for (const param of boundParams) {
-    const { dataSource, field, operator } = param.bindTo!;
-    const value = paramValues[param.name];
-    if (!value || !modifiedDs[dataSource]) continue;
-
-    const ds = { ...modifiedDs[dataSource] };
-    const filters = [...(ds.filters || [])];
-    filters.push({ field, operator, value });
-    ds.filters = filters;
-    modifiedDs[dataSource] = ds;
-  }
-
-  return { ...dsl, dataSources: modifiedDs };
-}

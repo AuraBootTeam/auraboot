@@ -133,7 +133,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             CellStyle titleStyle = createTitleStyle(workbook);
             CellStyle headerStyle = createHeaderStyle(workbook);
-            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
+            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters()));
             int renderedBlocks = renderBody(workbook, reportDsl, dataSets, titleStyle, headerStyle);
 
             if (renderedBlocks == 0) {
@@ -166,7 +166,7 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
         String title = stringValue(reportDsl.get("title"), "report");
-        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters()));
 
         byte[] pdfBytes = applyPdfBranding(renderPdf(reportDsl, dataSets, title), title);
         ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
@@ -265,7 +265,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             payload.put("format", "auraboot.report.export.v1");
             payload.put("reportPid", request.getReportPid());
             payload.put("reportDsl", reportDsl);
-            payload.put("dataSets", resolveDataSets(reportDsl));
+            payload.put("dataSets", resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters())));
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
             ReportExportFile file = new ReportExportFile(
                     bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);

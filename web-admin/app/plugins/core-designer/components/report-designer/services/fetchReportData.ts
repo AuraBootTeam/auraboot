@@ -4,6 +4,7 @@
  */
 
 import type { ReportDsl, ReportDataSource } from '../types';
+import { applyReportParameters } from './applyReportParameters';
 
 interface FetchResult {
   code: number | string;
@@ -26,6 +27,7 @@ async function fetchModelData(ds: ReportDataSource): Promise<Record<string, unkn
           fieldName: f.field,
           operator: f.operator,
           value: f.value,
+          values: f.values,
         })),
       ),
     );
@@ -92,9 +94,10 @@ async function fetchStaticData(ds: ReportDataSource): Promise<Record<string, unk
  */
 export async function fetchReportData(
   report: ReportDsl,
+  parameters: Record<string, string> = {},
 ): Promise<Record<string, Record<string, unknown>[]>> {
   const results: Record<string, Record<string, unknown>[]> = {};
-  const entries = Object.entries(report.dataSources);
+  const entries = Object.entries(applyReportParameters(report, parameters).dataSources);
 
   const fetches = entries.map(async ([key, ds]) => {
     switch (ds.type) {
