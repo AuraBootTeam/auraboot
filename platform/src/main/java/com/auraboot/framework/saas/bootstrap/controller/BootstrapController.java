@@ -1,6 +1,7 @@
 package com.auraboot.framework.saas.bootstrap.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.application.bootstrap.PlatformSeedService;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
 import com.auraboot.framework.saas.bootstrap.constant.BootstrapMissingPart;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
@@ -32,6 +33,7 @@ public class BootstrapController {
 
     private final BootstrapEngineService bootstrapEngineService;
     private final SystemConfigService systemConfigService;
+    private final PlatformSeedService platformSeedService;
 
     @GetMapping("/status")
     public ApiResponse<BootstrapStatusResponse> getStatus() {
@@ -53,6 +55,7 @@ public class BootstrapController {
         if (systemConfigService.isInitialized()) {
             return ApiResponse.error(ERR_ALREADY_INITIALIZED);
         }
+        platformSeedService.seed();
         var result = bootstrapEngineService.execute(request);
         if (result.success()) {
             return ApiResponse.success(Map.of(
