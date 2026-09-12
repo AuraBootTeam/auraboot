@@ -861,7 +861,7 @@ class ReportExportServiceTest {
         modelDataSource.put("modelCode", "rpt_case_model");
         modelDataSource.put("maxItems", 20);
         modelDataSource.put("filters", List.of(Map.of(
-                "fieldName", "e2et_order_title",
+                "field", "e2et_order_title",
                 "operator", "EQ",
                 "value", "Model"
         )));

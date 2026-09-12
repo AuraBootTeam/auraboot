@@ -812,9 +812,9 @@ public class ReportExportServiceImpl implements ReportExportService {
                 }
                 conditions = objectMapper.readValue(filterText, new TypeReference<List<QueryCondition>>() {});
             } else if (filters instanceof List<?>) {
-                conditions = objectMapper.convertValue(filters, new TypeReference<List<QueryCondition>>() {});
+                conditions = ((List<?>) filters).stream().map(this::reportModelCondition).toList();
             } else if (filters instanceof Map<?, ?>) {
-                QueryCondition condition = objectMapper.convertValue(filters, QueryCondition.class);
+                QueryCondition condition = reportModelCondition(filters);
                 conditions = List.of(condition);
             } else {
                 throw new IllegalArgumentException("unsupported filters payload");
@@ -824,6 +824,20 @@ public class ReportExportServiceImpl implements ReportExportService {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Report model dataSource filters must be a QueryCondition array");
         }
+    }
+
+    /** Translate the report DSL field binding into the dynamic query contract. */
+    private QueryCondition reportModelCondition(Object filter) {
+        Map<String, Object> binding = objectMapper.convertValue(filter,
+                new TypeReference<LinkedHashMap<String, Object>>() {});
+        Object reportField = binding.remove("field");
+        if (reportField != null) {
+            Object queryField = binding.putIfAbsent("fieldName", reportField);
+            if (queryField != null && !queryField.equals(reportField)) {
+                throw new IllegalArgumentException("Conflicting report filter fields");
+            }
+        }
+        return objectMapper.convertValue(binding, QueryCondition.class);
     }
 
     private int resolveRowLimit(Map<String, Object> dataSource, Map<String, Object> params) {

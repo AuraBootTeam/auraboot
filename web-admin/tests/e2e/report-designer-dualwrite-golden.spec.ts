@@ -114,3 +114,117 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     fullPage: true,
   });
 });
+
+test('report menu previews and exports the same filtered model rows', async ({ page }) => {
+  test.setTimeout(120_000);
+  const { executeCommandViaApi } = await import('./helpers');
+  const title = `ReportData${Date.now()}`;
+  const orderTitle = `${title} Order`;
+  const createdOrder = await executeCommandViaApi(
+    page,
+    'e2et:create_order',
+    {
+      e2et_order_title: orderTitle,
+      e2et_order_type: 'normal',
+      e2et_order_customer: 'Report Export Customer',
+      e2et_order_urgent: false,
+    },
+    undefined,
+    'create',
+  );
+  expect(createdOrder.code).toBe('0');
+  expect(createdOrder.recordId).toBeTruthy();
+  const dsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      orders: {
+        type: 'model',
+        modelCode: 'e2et_order',
+        filters: [{ field: 'e2et_order_title', operator: 'EQ', value: orderTitle }],
+      },
+    },
+    body: [
+      {
+        id: 'orders',
+        blockType: 'table',
+        title: 'Orders',
+        dataSource: 'orders',
+        showHeader: true,
+        columns: [
+          { field: 'e2et_order_title', label: 'Title' },
+          { field: 'e2et_order_customer', label: 'Customer' },
+        ],
+      },
+    ],
+  };
+  const setup = await page.request.post('/api/report-definitions', {
+    data: {
+      code: title.toLowerCase(),
+      title,
+      profile: 'paged-media',
+      dsl,
+    },
+  });
+  expect(setup.status()).toBe(200);
+  const { pid } = (await setup.json()).data;
+  await page.goto('/home');
+  await page.locator('a[href="/p/c/report_management"]').first().click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: title })
+    .getByRole('button', { name: /打开|Open/ })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${pid}`));
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByRole('cell', { name: orderTitle, exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Report Export Customer', exact: true })).toHaveCount(
+    1,
+  );
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-model-preview.png`,
+    fullPage: true,
+  });
+  const jsonResponse = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === '/api/reports/export/json',
+  );
+  const jsonDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  expect((await jsonResponse).status()).toBe(200);
+  const json = await jsonDownload;
+  const jsonPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.json`;
+  await json.saveAs(jsonPath);
+  const payload = JSON.parse(await readFile(jsonPath, 'utf8'));
+  expect(payload.reportDsl).toEqual(dsl);
+  expect(payload.dataSets.orders).toHaveLength(1);
+  expect(payload.dataSets.orders[0]).toMatchObject({
+    e2et_order_title: orderTitle,
+    e2et_order_customer: 'Report Export Customer',
+  });
+  const excelDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export Excel', exact: true }).click();
+  const excel = await excelDownload;
+  expect(excel.suggestedFilename()).toBe(`${title}.xlsx`);
+  const excelPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.xlsx`;
+  await excel.saveAs(excelPath);
+  const pdfDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
+  const pdf = await pdfDownload;
+  expect(pdf.suggestedFilename()).toBe(`${title}.pdf`);
+  const pdfPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.pdf`;
+  await pdf.saveAs(pdfPath);
+  expect((await readFile(pdfPath)).subarray(0, 5).toString()).toBe('%PDF-');
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(await readFile(excelPath), { type: 'buffer' });
+  expect(XLSX.utils.sheet_to_json(workbook.Sheets.Orders, { header: 1 })).toEqual([
+    ['Orders'],
+    ['Title', 'Customer'],
+    [orderTitle, 'Report Export Customer'],
+  ]);
+});
