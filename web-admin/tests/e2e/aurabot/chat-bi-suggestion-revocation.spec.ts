@@ -388,6 +388,29 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       expect(bypassBody).toContain('Analytics execution permission required');
       await assertNoExecution();
       await grant('analytics.suggestion.execute', true);
+      const peerUser = makeRoleUser(`${code}_peer`, [code]);
+      await ensureRoleUser(admin, peerUser);
+      const peer = await openAsRole(browser, peerUser.email, peerUser.password, 'zh-CN');
+      try {
+        const peerSnapshot = await fetchRoleSnapshot(peer.page);
+        for (const permission of codes)
+          expect(peerSnapshot.permissionCodes).toContain(permission);
+        expect(peerSnapshot.roleCodes).not.toContain('tenant_admin');
+        const foreignExecution = await peer.page.request.post('/api/ai/aurabot/chat/stream', {
+          data: {
+            sessionId: randomUUID(),
+            clientMsgId: randomUUID(),
+            message: 'Execute adopted suggestion',
+            analyticsExecution: { adoptionPid, requestId: randomUUID() },
+          },
+        });
+        const foreignBody = await foreignExecution.text();
+        expect(foreignBody).toContain('event:error');
+        expect(foreignBody).toContain('Analytics execution source is unavailable to this user');
+        await assertNoExecution();
+      } finally {
+        await peer.context.close();
+      }
       await reopen();
       await latest.getByRole('button', { name: '发起执行', exact: true }).click();
       const restoredExecution = page.waitForResponse(
