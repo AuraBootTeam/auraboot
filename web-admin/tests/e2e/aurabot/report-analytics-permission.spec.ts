@@ -11,6 +11,11 @@ test('report export requires model read permission in addition to artifact permi
   browser,
 }, testInfo) => {
   test.setTimeout(180_000);
+  const actorResponse = await page.request.get('/api/auth/me');
+  expect(actorResponse.status()).toBe(200);
+  const actor = (await actorResponse.json()).data.user;
+  expect(actor.name).toBeTruthy();
+  expect(actor.pid).toBeTruthy();
   const key = `rpt_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const order = await executeCommandViaApi(
     page,
@@ -203,6 +208,21 @@ test('report export requires model read permission in addition to artifact permi
       await session.page.getByRole('button', { name: '版本历史', exact: true }).click();
       await session.page.getByRole('button', { name: /^v1\b/ }).click();
       await expect(session.page.getByTestId('report-version-preview')).toBeVisible();
+      const history = session.page.getByTestId('version-history-panel');
+      await expect(history).toContainText(actor.name);
+      await expect(history).not.toContainText(actor.pid);
+      await expect(session.page.getByText('正在查询报表数据…', { exact: true })).toHaveCount(0);
+      if (hasModelRead) {
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+      } else {
+        await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+      }
+      await session.page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR}/report-reader-history-${hasModelRead ? 'allowed' : 'denied'}.png`,
+        fullPage: true,
+      });
+
       await expect(session.page.getByRole('button', { name: /^(回滚|Rollback)$/ })).toHaveCount(0);
       await session.page.getByRole('button', { name: '返回当前报表', exact: true }).click();
       await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();

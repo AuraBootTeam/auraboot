@@ -10,6 +10,11 @@ test.use({
 test('report menu supports save, reopen, version rollback and canonical JSON download', async ({
   page,
 }) => {
+  const actorResponse = await page.request.get('/api/auth/me');
+  expect(actorResponse.status()).toBe(200);
+  const actor = (await actorResponse.json()).data.user;
+  expect(actor.name).toBeTruthy();
+  expect(actor.pid).toBeTruthy();
   await page.goto('/home');
   const entry = page.locator('a[href="/p/c/report_management"]').first();
   await expect(entry).toBeVisible();
@@ -19,7 +24,10 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   const title = `Analytics report ${Date.now()}`;
   await page.getByPlaceholder('报表标题').fill(title);
   await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
-  await page.getByTestId('report-designer-toolbar').getByRole('button', { name: '设置', exact: true }).click();
+  await page
+    .getByTestId('report-designer-toolbar')
+    .getByRole('button', { name: '设置', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: '页面设置' })).toBeVisible();
   await expect(page.getByText('页边距（毫米）', { exact: true })).toBeVisible();
   await page.screenshot({
@@ -97,6 +105,20 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: '版本历史' }).click();
   await page.getByRole('button', { name: /^v1\b/ }).click();
   const historical = page.getByTestId('report-version-preview');
+  const versionListResponse = await page.request.get(
+    `/api/report-definitions/${created.pid}/versions`,
+  );
+  expect(versionListResponse.status()).toBe(200);
+  const versionEntries = (await versionListResponse.json()).data;
+  expect(versionEntries.length).toBeGreaterThan(0);
+  for (const version of versionEntries) {
+    expect(version.operationBy).toBe(actor.pid);
+    expect(version.operationByDisplayName).toBe(actor.name);
+  }
+  const historyPanel = page.getByTestId('version-history-panel');
+  await expect(historyPanel).toContainText(actor.name);
+  await expect(historyPanel).not.toContainText(actor.pid);
+
   await expect(historical).toContainText('Original analysis conclusion');
   await expect(historical).not.toContainText('Revised analysis conclusion');
   await expect(page.getByPlaceholder('报表标题')).toHaveCount(0);

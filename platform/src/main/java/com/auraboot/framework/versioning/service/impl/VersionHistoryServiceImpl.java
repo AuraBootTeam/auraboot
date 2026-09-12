@@ -2,6 +2,7 @@ package com.auraboot.framework.versioning.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.versioning.VersionableResource;
 import com.auraboot.framework.versioning.dto.DesignVersionDTO;
 import com.auraboot.framework.versioning.entity.DesignVersionHistory;
@@ -33,6 +34,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     private final DesignVersionHistoryMapper versionHistoryMapper;
     private final Map<String, VersionableResource> resourceStrategies;
+    private final UserMapper userMapper;
 
     /**
      * Spring auto-collects all VersionableResource beans into a map keyed by bean name.
@@ -92,7 +94,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         log.info("Recorded version {} for {} {}: operation={}",
                 version, resourceType, resourceId, operation);
 
-        return toDTO(history, false);
+        return toDTO(history, false, resolveActorNames(tenantId, List.of(history)));
     }
 
     @Override
@@ -102,8 +104,9 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         List<DesignVersionHistory> versions = versionHistoryMapper.findByResource(
                 tenantId, resourceType, resourceId);
 
+        Map<String, String> actorNames = resolveActorNames(tenantId, versions);
         return versions.stream()
-                .map(v -> toDTO(v, false))
+                .map(v -> toDTO(v, false, actorNames))
                 .collect(Collectors.toList());
     }
 
@@ -115,7 +118,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         if (version == null) {
             return null;
         }
-        return toDTO(version, true);
+        return toDTO(version, true, resolveActorNames(tenantId, List.of(version)));
     }
 
     @Override
@@ -173,7 +176,21 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         return deleted;
     }
 
-    private DesignVersionDTO toDTO(DesignVersionHistory entity, boolean includeSnapshot) {
+    private Map<String, String> resolveActorNames(Long tenantId, List<DesignVersionHistory> versions) {
+        List<String> pids = versions.stream().map(DesignVersionHistory::getOperationBy)
+                .filter(pid -> pid != null && !pid.isBlank()).distinct().toList();
+        if (pids.isEmpty()) return Map.of();
+        Map<String, String> names = new java.util.HashMap<>();
+        for (Map<String, Object> row : userMapper.findDisplayNamesByPidsInTenant(tenantId, pids)) {
+            if (row.get("display_name") instanceof String name && !name.isBlank()) {
+                names.put((String) row.get("pid"), name);
+            }
+        }
+        return names;
+    }
+
+    private DesignVersionDTO toDTO(DesignVersionHistory entity, boolean includeSnapshot,
+                                   Map<String, String> actorNames) {
         return DesignVersionDTO.builder()
                 .pid(entity.getPid())
                 .resourceType(entity.getResourceType())
@@ -181,6 +198,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
                 .version(entity.getVersion())
                 .operation(entity.getOperation())
                 .operationBy(entity.getOperationBy())
+                .operationByDisplayName(entity.getOperationBy() == null ? null : actorNames.get(entity.getOperationBy()))
                 .operationAt(entity.getOperationAt())
                 .description(entity.getDescription())
                 .parentVersionId(entity.getParentVersionId())

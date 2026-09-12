@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 import type { VersionEntry } from './types';
 import { getOperationConfig } from './types';
@@ -39,6 +40,7 @@ interface VersionItemProps {
 }
 
 function VersionItem({ version, isActive, isLatest, onClick, labels }: VersionItemProps) {
+  const text = useSmartText();
   const opConfig = getOperationConfig(version.operation);
 
   return (
@@ -68,7 +70,9 @@ function VersionItem({ version, isActive, isLatest, onClick, labels }: VersionIt
         <span>{formatDate(version.operationAt)}</span>
         {version.operationBy && (
           <span className="ml-2">
-            {labels.by} {version.operationBy}
+            {labels.by}{' '}
+            {version.operationByDisplayName ||
+              text({ zh: '操作人不可用', en: 'Actor unavailable' })}
           </span>
         )}
       </div>

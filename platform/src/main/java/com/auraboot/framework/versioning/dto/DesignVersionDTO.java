@@ -26,6 +26,7 @@ public class DesignVersionDTO {
     private String version;
     private String operation;
     private String operationBy;
+    private String operationByDisplayName;
     private Instant operationAt;
     private String description;
     private String parentVersionId;

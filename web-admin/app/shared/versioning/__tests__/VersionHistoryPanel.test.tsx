@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { VersionHistoryPanel } from '../VersionHistoryPanel';
+import type { VersionEntry } from '../types';
 
 const versionHistoryTranslations = {
   'version.history.title': '版本历史',
@@ -12,13 +13,13 @@ const versionHistoryTranslations = {
   'version.history.footer.empty': '暂无可用版本',
 };
 
-function renderPanel() {
+function renderPanel(versions: VersionEntry[] = []) {
   render(
     <I18nProvider initialLocale="zh-CN" initialData={versionHistoryTranslations}>
       <VersionHistoryPanel
         isOpen
         onClose={vi.fn()}
-        versions={[]}
+        versions={versions}
         isLoading={false}
         viewingVersionPid={null}
         onPreview={vi.fn()}
@@ -41,6 +42,28 @@ describe('VersionHistoryPanel', () => {
     expect(screen.queryByText('Version History')).not.toBeInTheDocument();
     expect(screen.queryByText('No versions yet')).not.toBeInTheDocument();
     expect(screen.queryByText('Save to create the first version')).not.toBeInTheDocument();
+  });
+
+  it('shows resolved actor names and never substitutes internal identifiers', () => {
+    const base = {
+      resourceType: 'report',
+      resourceId: 'report',
+      operation: 'update',
+      operationAt: '2026-09-12T00:00:00Z',
+    };
+    renderPanel([
+      {
+        ...base,
+        pid: 'v1',
+        version: '1',
+        operationBy: 'INTERNAL_ACTOR_A',
+        operationByDisplayName: '张敏',
+      },
+      { ...base, pid: 'v2', version: '2', operationBy: 'INTERNAL_ACTOR_B' },
+    ]);
+    expect(screen.getByText(/张敏/)).toBeInTheDocument();
+    expect(screen.getByText(/操作人不可用/)).toBeInTheDocument();
+    expect(screen.queryByText(/INTERNAL_ACTOR/)).not.toBeInTheDocument();
   });
 
   it('anchors the drawer below the app header so the title remains visible', () => {
