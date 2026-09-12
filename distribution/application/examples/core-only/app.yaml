@@ -1,0 +1,22 @@
+schemaVersion: 1
+app:
+  id: auraboot-core-only
+  name: AuraBoot Core Only
+  version: 1.0.0
+  defaultRoute: /admin
+platform:
+  runtime: 1.0.0
+  pluginApi: 1.0.0
+  webShell: 1.0.0
+  pluginSdk: 1.0.0
+  dslSchema: 4
+backend:
+  plugins: []
+  migrationSets:
+    - core
+frontend:
+  contributions: []
+config:
+  importOrder:
+    - core-meta
+    - platform-admin
