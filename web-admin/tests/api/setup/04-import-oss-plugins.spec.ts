@@ -15,13 +15,6 @@ const BACKEND_PLUGIN_ROOT =
 
 const REQUIRED_OSS_PLUGINS = [
   {
-    name: 'core-bpm',
-    pluginId: 'com.auraboot.core-bpm',
-    probeModelCode: 'bpm_process_definition',
-    probeCommandCode: '__menu_only__',
-    probeMenuCode: 'bpm_management',
-  },
-  {
     name: 'platform-admin',
     pluginId: 'com.auraboot.platform-admin',
     probeModelCode: 'tenant_member',

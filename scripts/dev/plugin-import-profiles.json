@@ -1,7 +1,6 @@
 {
   "core": [
     "core-meta",
-    "core-bpm",
     "platform-admin",
     "core-decisionops",
     "core-aurabot",
@@ -10,22 +9,18 @@
   ],
   "demo": [
     "core-meta",
-    "core-bpm",
     "platform-admin",
     "core-decisionops",
     "core-aurabot",
     "page-manager",
     "org-management",
     "core-ownership",
-    "crm",
     "showcase",
     "agent-control-plane",
-    "workflow-demo",
     "core-dashboard"
   ],
   "e2e": [
     "core-meta",
-    "core-bpm",
     "platform-admin",
     "core-decisionops",
     "core-announcement",
@@ -38,15 +33,12 @@
     "asset-management",
     "project-management",
     "core-ownership",
-    "crm",
     "hr-essentials",
     "simple-inventory",
-    "workflow-demo",
     "test-fixtures"
   ],
   "default": [
     "core-meta",
-    "core-bpm",
     "platform-admin",
     "core-decisionops",
     "core-announcement",

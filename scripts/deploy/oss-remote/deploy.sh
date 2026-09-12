@@ -233,10 +233,6 @@ seed(){
       SHOWCASE_DEFAULT_DASHBOARD_CODE="$SHOWCASE_DEFAULT_DASHBOARD_CODE" \
       node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
         --output-prefix="$(dirname "$ss")/seed" $SEED_PHASES dashboard-default )
-  log "seed: workflow-demo leave balances (best-effort)"
-  ( cd "$WEB_ADMIN" && PLAYWRIGHT_BASE_URL="$PUBLIC_URL" PW_ADMIN_STORAGE_STATE="$ss" \
-      node scripts/seed-workflow-demo.mjs --base-url="$PUBLIC_URL" --storage-state="$ss" ) || \
-      log "seed: workflow-demo leave requests skipped (BPM rule) — non-fatal"
   rm -rf "$(dirname "$ss")"
   log "seed: OK"
 }

@@ -8,7 +8,7 @@
 #   1. brings up a FRESH, slot-isolated host-first stack (zero docker, safe
 #      alongside concurrent sessions, never oss-reset-and-init's global pkill);
 #   2. imports the OSS demo plugins + the internal test-fixtures plugin;
-#   3. runs the FULL showcase seed sequence + the workflow-demo seed, so the
+#   3. runs the full platform showcase seed sequence, so the
 #      ~28 seed-data-dependent specs are green rather than red-for-want-of-data;
 #   4. runs a meaningful, currently-green OSS regression slice under the exact
 #      env contract a real OSS run needs (PW_PROFILE=oss --project=oss);
@@ -269,10 +269,10 @@ resolve_default_dashboard
 export SHOWCASE_DEFAULT_DASHBOARD_CODE
 log "    default dashboard target: $SHOWCASE_DEFAULT_DASHBOARD_CODE"
 
-# --- 3. full showcase seed + workflow-demo seed ------------------------------
+# --- 3. full platform showcase seed ------------------------------------------
 # The gate's default scope includes seed-data-dependent specs; a minimal
 # bootstrap alone leaves ~28 of them red. Seed loudly-or-die.
-log "3/5 seed: full showcase sequence + workflow-demo (loud on failure)"
+log "3/5 seed: full platform showcase sequence (loud on failure)"
 SEED_LOG_DIR="$AURA_EVIDENCE_ROOT/seed/oss-e2e-gate"
 mkdir -p "$SEED_LOG_DIR"
 (
@@ -281,16 +281,13 @@ mkdir -p "$SEED_LOG_DIR"
   node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
        --output-prefix="$SEED_LOG_DIR/showcase" \
        data extended workflow ai arsenal supplement 2>&1 | tee "$SEED_LOG_DIR/showcase-seed.log" || exit 91
-  # workflow-demo carries its own leave balances/requests/approval tasks; without a
-  # balance row wd_leave_validation rejects every request the demo can submit.
-  node scripts/seed-workflow-demo.mjs --base-url="$PLAYWRIGHT_BASE_URL" 2>&1 | tee "$SEED_LOG_DIR/workflow-demo-seed.log" || exit 92
   # finalization: default dashboard + invariant assertions over what was seeded.
   node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
        --output-prefix="$SEED_LOG_DIR/showcase" \
-       dashboard-default invariants 2>&1 | tee "$SEED_LOG_DIR/showcase-finalize.log" || exit 93
+       dashboard-default invariants 2>&1 | tee "$SEED_LOG_DIR/showcase-finalize.log" || exit 92
 )
 SEED_RC=$?
-[[ "$SEED_RC" == 0 ]] || die_env "showcase/workflow-demo seed failed (rc=$SEED_RC) — see $SEED_LOG_DIR/*.log"
+[[ "$SEED_RC" == 0 ]] || die_env "platform showcase seed failed (rc=$SEED_RC) — see $SEED_LOG_DIR/*.log"
 log "    seed OK"
 
 # --- 4. run the gate slice under the OSS env contract ------------------------

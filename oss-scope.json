@@ -36,9 +36,7 @@
     "asset-management",
     "core-announcement",
     "core-aurabot",
-    "core-bpm",
     "core-meta",
-    "crm",
     "golden-path",
     "hr-essentials",
     "org-management",
@@ -46,8 +44,7 @@
     "platform-admin",
     "project-management",
     "showcase",
-    "simple-inventory",
-    "workflow-demo"
+    "simple-inventory"
   ],
   "internal_test_plugins": ["test-fixtures"],
   "tooling_dirs": ["acp-showcase", "cli", "schemas", "scripts"],

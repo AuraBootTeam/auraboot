@@ -427,10 +427,9 @@ BOOT_JAR="$(resolve_boot_jar)"
 # populated at ApplicationReadyEvent from @Extension classes discovered via the
 # plugin jar's META-INF/extensions.idx. Config-only directory imports never load
 # backend classes, so a plugin whose commands declare `handler:` refs (today:
-# crm) fails import with ~50 unregistered-handler errors unless its jar was
-# loaded at startup. Build it from source (cached, up-to-date after first run)
-# and stage it into the boot-relative plugins dir (aura.plugins.dir defaults to
-# "plugins" resolved from the platform cwd).
+# Hybrid plugins fail import when their handler JAR is absent at startup. Build
+# platform-owned hybrids from source and stage them into the boot-relative
+# plugins directory when a caller explicitly requests one.
 mkdir -p "$PLATFORM_DIR/plugins"
 stage_plugin_jar() {
     local plugin_name="$1"
@@ -460,7 +459,6 @@ stage_plugin_jar() {
     fi
     [ "$staged" = "yes" ]
 }
-stage_plugin_jar "crm"
 
 aura_reset_assert_port_available "backend" "$BE_PORT"
 BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env \
@@ -819,16 +817,6 @@ WHERE u.email = 'admin@auraboot.com'
         run_seed_step "Showcase seed sequence (${seed_phases[*]})" "$SEED_LOG_DIR/showcase-seed-sequence.log" \
             node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
                 --output-prefix="$SEED_LOG_DIR/showcase" "${seed_phases[@]}"
-
-        # workflow-demo carries its own business data (leave balances + requests + approval
-        # tasks). Without a balance row, wd_leave_validation rejects every annual leave
-        # request the demo can submit, so this is part of a usable demo, not an extra.
-        if command_definition_exists "wd:create_leave_balance"; then
-            run_seed_step "Workflow-demo seed (leave balances + requests)" "$SEED_LOG_DIR/workflow-demo-seed.log" \
-                node scripts/seed-workflow-demo.mjs --base-url="$AURA_VITE_BASE"
-        else
-            echo -e "${YELLOW}   Workflow-demo seed skipped: workflow-demo plugin is not imported.${NC}"
-        fi
 
         select_default_showcase_dashboard
         export SHOWCASE_DEFAULT_DASHBOARD_CODE

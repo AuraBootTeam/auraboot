@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 function read(path) {
@@ -240,7 +240,6 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   ]);
   assert.deepEqual(profiles.core, [
     'core-meta',
-    'core-bpm',
     'platform-admin',
     'core-decisionops',
     'core-aurabot',
@@ -350,7 +349,6 @@ test('Product Catalog smoke fails closed on list PID and current DOM business-ce
 test('host-side build scripts never fall back to the system Gradle executable', () => {
   const scripts = [
     'scripts/oss-golden-stack.sh',
-    'scripts/p1-verify-in-docker.sh',
     'scripts/mes-wms-golden-run.sh',
     'plugins/scripts/build-plugin.sh',
   ];
@@ -471,18 +469,10 @@ test('Docker quickstart CI always runs on main and manual dispatch, and detects 
   assert.ok(workflow.includes('scripts/docker-bootstrap\\.sh'));
 });
 
-test('Gradle resolves SmartEngine artifacts from Maven Central before Aliyun mirrors', () => {
+test('Core Gradle declares no product-owned SmartEngine dependency or repository exception', () => {
   const build = read('platform/build.gradle');
-  const smartEngineCentral = build.indexOf("name = 'Maven Central SmartEngine'");
-  const aliyunPublic = build.indexOf("https://maven.aliyun.com/repository/public");
-
-  assert.ok(smartEngineCentral >= 0, 'SmartEngine artifacts need a dedicated Maven Central repository block');
-  assert.ok(aliyunPublic >= 0, 'Aliyun public mirror repository should still be declared');
-  assert.ok(
-    smartEngineCentral < aliyunPublic,
-    'SmartEngine artifacts must resolve from Maven Central before Aliyun mirror stickiness can cache partial syncs',
-  );
-  assert.match(build, /includeGroup ['"]com\.auraboot\.smart\.framework['"]/);
+  assert.doesNotMatch(build, /com\.auraboot\.smart\.framework/);
+  assert.doesNotMatch(build, /Maven Central SmartEngine/);
 });
 
 test('Gradle plugin markers resolve from Maven Central before Gradle Plugin Portal', () => {
@@ -524,83 +514,6 @@ test('markdownlint MD025 ignores frontmatter title without disabling single-h1 c
 
   assert.match(config, /"MD025"\s*:\s*\{\s*"front_matter_title"\s*:\s*""\s*\}/);
   assert.doesNotMatch(config, /"MD025"\s*:\s*false/);
-});
-
-test('seeded CS agent declares only official CRM tools that can be imported', () => {
-  const seed = read('scripts/seed-cs-agent.sql');
-  const officialTools = [
-    'get:crm_account_common,',
-    'get:crm_contact_common,',
-    'list:crm_activity_common,',
-    'get:crm_activity_common,',
-  ];
-  for (const staleReference of officialTools.map((tool) => tool.replace('_common', ''))) {
-    assert.doesNotMatch(seed, new RegExp(staleReference), `${staleReference} is a removed CRM starter alias`);
-  }
-
-  const models = JSON.parse(read('plugins/crm/config/models.json'));
-  const modelCodes = new Set(models.map((model) => model.code));
-
-  const commandCodes = new Set();
-  for (const file of readdirSync('plugins/crm/config/commands')) {
-    if (!file.endsWith('.json')) continue;
-    for (const command of JSON.parse(read(`plugins/crm/config/commands/${file}`))) {
-      commandCodes.add(command.code);
-    }
-  }
-
-  const namedQueryCodes = new Set(
-    JSON.parse(read('plugins/crm/config/named-queries.json')).map((query) => query.code),
-  );
-
-  const toolsMatch = seed.match(/'([^']*custom:send_customer_reply[^']*)',\s*\n\s*120,/);
-  assert.ok(toolsMatch, 'seed-cs-agent.sql must define the cs_agent tools list');
-  const declaredTools = toolsMatch[1].split(',').map((tool) => tool.trim()).filter(Boolean);
-
-  for (const tool of declaredTools) {
-    if (tool.startsWith('cmd:')) {
-      assert.ok(commandCodes.has(tool.slice(4)), `${tool} must exist in official CRM commands`);
-    } else if (tool.startsWith('get:') || tool.startsWith('list:')) {
-      assert.ok(modelCodes.has(tool.slice(tool.indexOf(':') + 1)), `${tool} must reference an official CRM model`);
-    } else if (tool.startsWith('nq:')) {
-      assert.ok(namedQueryCodes.has(tool.slice(3)), `${tool} must exist in official CRM named queries`);
-    } else if (tool === 'custom:send_customer_reply') {
-      assert.match(seed, /'send_customer_reply'/);
-    } else {
-      assert.fail(`Unexpected cs_agent tool declaration: ${tool}`);
-    }
-  }
-
-  assert.match(
-    seed,
-    /\[\{"type":"role","roleCode":"tenant_admin"\}\]/,
-    'cs_agent approval policy must use the bootstrap role code tenant_admin',
-  );
-});
-
-test('customer service agent integration scenario follows official CRM activity flow', () => {
-  const integrationTest = read('platform/src/test/java/com/auraboot/framework/agent/CustomerServiceAgentIntegrationTest.java');
-  const officialReferences = [
-    '"mt_crm_account_common"',
-    '"mt_crm_contact_common"',
-    '"mt_crm_activity_common"',
-    'get:crm_account_common\\"',
-    'get:crm_contact_common\\"',
-    'list:crm_activity_common\\"',
-  ];
-  for (const staleReference of officialReferences.map((reference) => reference.replace('_common', ''))) {
-    assert.doesNotMatch(
-      integrationTest,
-      new RegExp(staleReference),
-      `${staleReference} belongs to the removed CRM starter contract`,
-    );
-  }
-
-  assert.match(integrationTest, /mt_crm_account_common/);
-  assert.match(integrationTest, /mt_crm_contact_common/);
-  assert.match(integrationTest, /mt_crm_activity_common/);
-  assert.match(integrationTest, /cmd:crm:create_activity/);
-  assert.match(integrationTest, /custom:send_customer_reply/);
 });
 
 test('direct schema init includes agent observability and command audit correlation tables', () => {

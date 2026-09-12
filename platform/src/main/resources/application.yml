@@ -119,8 +119,8 @@ auraboot:
   platform:
     version: 1.0.0
   bootstrap:
-    # Phase 3: when true, the demo profile of built-in plugins (crm,
-    # showcase, agent-control-plane, workflow-demo) is imported in addition to
+    # Phase 3: when true, the platform demo profile (showcase,
+    # agent-control-plane) is imported in addition to
     # the always-on core profile. Default false — prod-safe.
     demo-seed: ${AURABOOT_DEMO_SEED:false}
   entitlement:
