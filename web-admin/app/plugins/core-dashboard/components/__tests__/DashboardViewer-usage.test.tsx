@@ -24,7 +24,17 @@ function Probe() {
   );
 }
 const widgets: Widget[] = [
-  { id: 'widget', type: 'smart-table-chart', x: 0, y: 0, w: 6, h: 4, config: {} },
+  {
+    id: 'widget',
+    type: 'smart-table-chart',
+    componentType: 'smart-table-chart',
+    props: {},
+    x: 0,
+    y: 0,
+    w: 6,
+    h: 4,
+    config: { title: 'Orders' },
+  },
 ];
 it('keeps one visit while rendering and starts a new visit on each dashboard switch', () => {
   const view = (dashboardPid: string) => (
