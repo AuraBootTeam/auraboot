@@ -27,7 +27,7 @@ public class NamedQuerySourceModels {
             catalog.computeIfAbsent(identity(table), ignored -> new HashSet<>()).add(model.getCode());
         }
         String source = fromSql.trim();
-        if (source.regionMatches(true, 0, "SELECT", 0, 6)) source = "(" + source + ") _nq";
+        if (NamedQuerySqlSource.isQuery(source)) source = "(" + source + ") _nq";
         Map<String, String> result = new TreeMap<>();
         String projections = fields.stream().map(field -> field.getColumnExpr() + " AS " + field.getFieldCode()).collect(java.util.stream.Collectors.joining(", "));
         for (String table : sql.referencedTables("SELECT " + projections + " FROM " + source)) {

@@ -36,8 +36,30 @@ class NamedQuerySourceScopeRewriterTest {
         assertTrue(sql.contains("#{params.pid}"), sql);
         assertFalse(sql.contains("__nq_scope_parameter"), sql);
     }
-    @Test void unknownAndCteSourcesCannotEscapeCoverage() {
+    @Test void unknownAndRecursiveSourcesCannotEscapeCoverage() {
         assertThrows(AccessDeniedException.class, () -> rewriter.rewrite("SELECT * FROM orders JOIN secret ON 1=1", scopes));
-        assertThrows(AccessDeniedException.class, () -> rewriter.rewrite("WITH c AS (SELECT * FROM customers) SELECT * FROM c", scopes));
+        assertThrows(AccessDeniedException.class, () -> rewriter.rewrite("WITH RECURSIVE c AS (SELECT * FROM customers) SELECT * FROM c", scopes));
+    }
+
+    @Test void chainedCtesScopeOnlyTheirPhysicalInputs() {
+        String sql = rewriter.rewrite("WITH c AS (SELECT * FROM customers), d AS (SELECT * FROM c) SELECT * FROM d", scopes);
+        assertEquals(1, sql.split("created_by = 20", -1).length - 1, sql);
+        assertTrue(sql.contains("FROM c"), sql);
+    }
+    @Test void sameNamedCteAndSchemaQualifiedTableRemainDistinct() {
+        String sql = rewriter.rewrite("WITH customers AS (SELECT * FROM customers) SELECT c.pid FROM customers c JOIN public.customers p ON c.pid=p.pid", scopes);
+        assertEquals(2, sql.split("created_by = 20", -1).length - 1, sql);
+    }
+    @Test void forwardNameAndNestedShadowingStillScopePhysicalSources() {
+        String sql = rewriter.rewrite("WITH c AS (SELECT * FROM customers), customers AS (SELECT * FROM orders) SELECT x.pid FROM (WITH c AS (SELECT * FROM customers) SELECT * FROM c) x JOIN c y ON x.pid=y.pid", scopes);
+        assertEquals(1, sql.split("created_by = 20", -1).length - 1, sql);
+        assertTrue(sql.contains("WITH c AS (SELECT * FROM customers)"), sql);
+    }
+    @Test void physicalSourceCollectionUsesTheSameLexicalRules() {
+        var collector = new com.auraboot.framework.meta.service.SecureSqlRewriter();
+        assertEquals(java.util.Set.of("customers", "orders", "public.customers"), collector.referencedTables(
+                "WITH c AS (SELECT * FROM customers), customers AS (SELECT * FROM orders) SELECT c.pid FROM c JOIN public.customers p ON c.pid=p.pid"));
+        assertEquals(java.util.Set.of("customers"), collector.referencedTables(
+                "WITH customers AS (SELECT * FROM customers) SELECT * FROM customers"));
     }
 }

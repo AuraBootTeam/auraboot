@@ -685,7 +685,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         String fromSql = query.getFromSql().trim();
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(String.join(", ", selectColumns));
-        if (fromSql.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(fromSql)) {
             sql.append(" FROM (").append(fromSql).append(") AS _nq");
         } else {
             sql.append(" FROM ").append(fromSql);
@@ -913,7 +913,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             String exportFromSql = query.getFromSql().trim();
             StringBuilder sql = new StringBuilder("SELECT ");
             sql.append(String.join(", ", selectColumns));
-            if (exportFromSql.toUpperCase().startsWith("SELECT ")) {
+            if (NamedQuerySqlSource.isQuery(exportFromSql)) {
                 sql.append(" FROM (").append(exportFromSql).append(") AS _nq");
             } else {
                 sql.append(" FROM ").append(exportFromSql);
@@ -967,7 +967,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     exportFieldCodes.stream().map(fieldMap::get).toList());
 
             // 8. Execute query
-            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(fieldProtection.rewrite(protection, sql.toString()), params);
+            // Physical source scopes already enforce tenant isolation, including CTE bodies.
+            List<Map<String, Object>> data = dynamicDataMapper.selectByQueryWithoutTenant(fieldProtection.rewrite(protection, sql.toString()), params);
             data = fieldProtection.apply(protection, data);
 
             // 9. Generate export file
@@ -1278,11 +1279,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
         }
 
-        if (sqlToValidate.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(sqlToValidate)) {
             // Full SELECT statement — validate for forbidden DML/DDL keywords
             // (allows nested subqueries, window functions, COALESCE, CASE, etc.)
             try {
-                SqlSafetyUtils.validateSelectOnlySql(sqlToValidate);
+                SqlSafetyUtils.validateSelectOnlySql("SELECT * FROM (" + sqlToValidate + ") _validation");
             } catch (IllegalArgumentException e) {
                 throw new MetaServiceException("FROM SQL contains dangerous patterns: " + e.getMessage());
             }

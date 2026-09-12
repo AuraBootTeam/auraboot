@@ -390,7 +390,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         // FROM clause: use Named Query's fromSql as subquery
-        // Tenant isolation is handled by MyBatis tenant interceptor or fromSql definition
+        // The shared physical-source rewrite applies mandatory server tenant scopes.
         String fromSql = query.getFromSql().trim();
         if (fromSql.startsWith("(")) {
             // fromSql is already a subquery — use directly with alias to avoid double-wrapping
@@ -400,7 +400,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 fromSql = fromSql.substring(0, lastParen + 1);
             }
             sql.append(" FROM ").append(fromSql).append(" AS _nq");
-        } else if (fromSql.toUpperCase().startsWith("SELECT")) {
+        } else if (NamedQuerySqlSource.isQuery(fromSql)) {
             // fromSql is a full SELECT statement — wrap as subquery
             sql.append(" FROM (").append(fromSql).append(") AS _nq");
         } else {

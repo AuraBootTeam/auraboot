@@ -204,7 +204,7 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
             title: 'Nested field protection',
             status: 'published',
             ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
-            fromSql: `SELECT renamed, pid FROM (SELECT ${expression} AS renamed, pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}) source`,
+            fromSql: `WITH source(renamed, record_id) AS (SELECT ${expression} AS original_title, pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}), projected AS (SELECT renamed, record_id AS pid FROM source) SELECT renamed, pid FROM projected`,
             fields: [
               {
                 fieldCode: 'display_title',
@@ -227,6 +227,7 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
           );
         } else {
           expect(result.status(), await result.text()).toBe(200);
+          expect((await result.json()).code, await result.text()).toBe('0');
           expect((await result.json()).data.recordCount).toBe(1);
           const artifact = await owner.get((await result.json()).data.downloadUrl);
           expect(artifact.status()).toBe(200);
@@ -254,7 +255,12 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
           status: 'published',
           ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
           fromSql:
-            'SELECT o.pid, o.created_by, o.e2et_order_title AS order_title, c.e2et_cust_name AS customer_name, c.pid AS customer_pid FROM mt_e2et_order o JOIN mt_e2et_customer c ON c.pid = #{params.customerPid} WHERE o.pid = #{params.orderPid}',
+            (boundary === 'inferred'
+              ? 'WITH o AS (SELECT * FROM mt_e2et_order), c AS (SELECT * FROM mt_e2et_customer) '
+              : '') +
+            'SELECT o.pid, o.created_by, o.e2et_order_title AS order_title, c.e2et_cust_name AS customer_name, c.pid AS customer_pid FROM ' +
+            (boundary === 'inferred' ? 'o JOIN c' : 'mt_e2et_order o JOIN mt_e2et_customer c') +
+            ' ON c.pid = #{params.customerPid} WHERE o.pid = #{params.orderPid}',
           fields: [
             { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
             {

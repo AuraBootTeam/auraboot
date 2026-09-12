@@ -7,7 +7,7 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.util.deparser.ExpressionDeParser;
-import net.sf.jsqlparser.util.deparser.SelectDeParser;
+import com.auraboot.framework.meta.service.ScopedSelectDeParser;
 import org.springframework.security.access.AccessDeniedException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -50,8 +50,9 @@ final class NamedQuerySourceScopeRewriter {
                     return super.visit(column, context);
                 }
             };
-            SelectDeParser selects = new SelectDeParser(expressions, output) {
+            ScopedSelectDeParser selects = new ScopedSelectDeParser(expressions, output) {
                 @Override public <S> StringBuilder visit(Table table, S context) {
+                    if (isCte(table)) return super.visit(table, context);
                     String identity = NamedQuerySourceModels.identity(table.getFullyQualifiedName());
                     if (!scopes.containsKey(identity)) throw new AccessDeniedException("Unresolved scoped query source");
                     String condition = scopes.get(identity);
@@ -62,9 +63,6 @@ final class NamedQuerySourceScopeRewriter {
                             .append(" WHERE (").append(condition).append("))");
                     output.append(table.getAlias() != null ? table.getAlias().toString() : " AS " + table.getName());
                     return output;
-                }
-                @Override public <S> StringBuilder visit(WithItem<?> item, S context) {
-                    throw new AccessDeniedException("Scoped CTE sources require explicit resolution");
                 }
                 @Override public <S> StringBuilder visit(TableFunction function, S context) {
                     throw new AccessDeniedException("Scoped table functions require explicit resolution");

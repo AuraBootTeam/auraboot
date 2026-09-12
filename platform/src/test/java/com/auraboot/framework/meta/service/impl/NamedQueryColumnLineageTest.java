@@ -48,4 +48,23 @@ class NamedQueryColumnLineageTest {
         assertThrows(MetaServiceException.class, () -> resolver.resolve("mt_orders", List.of(field("(SELECT name FROM mt_users LIMIT 1)"))));
         assertThrows(MetaServiceException.class, () -> resolver.resolve("mt_orders", List.of(field("coalesce((SELECT name FROM mt_users LIMIT 1), title)"))));
     }
+
+    @Test void chainedCteColumnAliasesPreserveProtectedOrigin() {
+        var origin = resolver.resolve("WITH a(renamed) AS (SELECT title FROM mt_orders), b AS (SELECT renamed AS label FROM a) SELECT label FROM b",
+                List.of(field("label"))).get("display_title");
+        assertEquals(Set.of(new NamedQueryColumnLineage.PhysicalColumn("mt_orders", "title")), origin.columns());
+        assertTrue(origin.direct());
+    }
+    @Test void cteShadowingAndForwardPhysicalNamesResolveLexically() {
+        var origin = resolver.resolve("WITH a AS (SELECT title FROM mt_orders), mt_orders AS (SELECT name AS title FROM mt_users) SELECT label FROM (WITH a AS (SELECT title AS label FROM mt_orders) SELECT label FROM a) x",
+                List.of(field("label"))).get("display_title");
+        assertEquals(Set.of(new NamedQueryColumnLineage.PhysicalColumn("mt_users", "name")), origin.columns());
+        var physical = resolver.resolve("WITH mt_orders AS (SELECT title FROM mt_orders) SELECT title FROM mt_orders",
+                List.of(field("title"))).get("display_title");
+        assertEquals(Set.of(new NamedQueryColumnLineage.PhysicalColumn("mt_orders", "title")), physical.columns());
+    }
+    @Test void recursiveAndWildcardColumnListsAreExplicitlyRejected() {
+        assertThrows(MetaServiceException.class, () -> resolver.resolve("WITH RECURSIVE c AS (SELECT title FROM mt_orders) SELECT title FROM c", List.of(field("title"))));
+        assertThrows(MetaServiceException.class, () -> resolver.resolve("WITH c(label) AS (SELECT * FROM mt_orders) SELECT label FROM c", List.of(field("label"))));
+    }
 }
