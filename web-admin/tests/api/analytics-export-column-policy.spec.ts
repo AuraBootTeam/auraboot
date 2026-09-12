@@ -1,6 +1,7 @@
 /** Stored artifacts must reauthorize their source before streaming bytes. */
 import { test, expect, request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import * as XLSX from 'xlsx';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
@@ -33,10 +34,12 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
     collect((await tree.json()).data);
     const sourcePermission = permissions.get('model.e2et_order.read');
     expect(sourcePermission).toBeTruthy();
-    const grants = ['meta.query.read', 'model.e2et_order.read'].map((key) => {
-      expect(permissions.get(key), key).toBeTruthy();
-      return { permissionId: permissions.get(key), granted: true };
-    });
+    const grants = ['meta.query.read', 'model.e2et_order.read', 'model.e2et_customer.read'].map(
+      (key) => {
+        expect(permissions.get(key), key).toBeTruthy();
+        return { permissionId: permissions.get(key), granted: true };
+      },
+    );
     expect(
       (await request.put(`/api/permissions/matrix/${rolePid}/batch`, { data: grants })).status(),
     ).toBe(200);
@@ -175,6 +178,131 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
           expect((await artifact.text()).trim().split(/\r?\n/)).toHaveLength(2);
         }
       }
+      const customerTitle = `customer_${randomUUID().replaceAll('-', '')}`;
+      const customer = await request.post('/api/dynamic/e2et_customer/create', {
+        data: {
+          e2et_cust_code: customerTitle,
+          e2et_cust_name: customerTitle,
+          e2et_cust_region: 'east',
+          e2et_cust_active: true,
+        },
+      });
+      expect(customer.status(), await customer.text()).toBe(200);
+      const customerPid = (await customer.json()).data.pid;
+      const joinCode = `${code}_join`;
+      const joined = await request.post('/api/meta/named-queries', {
+        data: {
+          code: joinCode,
+          title: 'Independent source field protection',
+          status: 'published',
+          ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
+          fromSql:
+            'SELECT o.pid, o.created_by, o.e2et_order_title AS order_title, c.e2et_cust_name AS customer_name, c.pid AS customer_pid FROM mt_e2et_order o JOIN mt_e2et_customer c ON c.pid = #{params.customerPid} WHERE o.pid = #{params.orderPid}',
+          fields: [
+            { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
+            {
+              fieldCode: 'customer_key',
+              columnExpr: 'customer_pid',
+              dataType: 'string',
+              operators: ['eq'],
+            },
+            {
+              fieldCode: 'order_label',
+              columnExpr: 'order_title',
+              dataType: 'string',
+              operators: ['eq'],
+            },
+            {
+              fieldCode: 'customer_label',
+              columnExpr: 'customer_name',
+              dataType: 'string',
+              operators: ['eq'],
+            },
+          ],
+        },
+      });
+      expect(joined.status(), await joined.text()).toBe(200);
+      const exportJoin = async (format: string, asynchronous: boolean, customerHidden: boolean) => {
+        const response = await owner.post(
+          `/api/meta/named-queries/${joinCode}/${asynchronous ? 'export-async' : 'export-data'}`,
+          {
+            data: { format, parameters: { orderPid: fixturePid, customerPid } },
+          },
+        );
+        expect(response.status(), await response.text()).toBe(200);
+        const result = (await response.json()).data;
+        let downloadUrl = result.downloadUrl;
+        if (asynchronous) {
+          const path = `/api/meta/named-queries/export-tasks/${result.pid}`;
+          await expect
+            .poll(
+              async () => {
+                const status = await owner.get(path);
+                expect(status.status(), await status.text()).toBe(200);
+                const task = (await status.json()).data;
+                expect(task.status, task.errorMessage).not.toBe('failed');
+                if (task.status === 'completed') expect(task.processedRows).toBe(1);
+                return task.status;
+              },
+              { timeout: 15000 },
+            )
+            .toBe('completed');
+          downloadUrl = `${path}/download`;
+        } else {
+          expect(result.recordCount).toBe(1);
+        }
+        const file = await owner.get(downloadUrl);
+        expect(file.status(), await file.text()).toBe(200);
+        let rows: Record<string, unknown>[];
+        if (format === 'JSON') {
+          rows = JSON.parse(await file.text());
+        } else {
+          const workbook = XLSX.read(await file.body(), { type: 'buffer', raw: true });
+          expect(workbook.SheetNames).toHaveLength(1);
+          rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {
+            defval: null,
+          });
+        }
+        expect(rows).toEqual([
+          {
+            record_key: fixturePid,
+            customer_key: customerPid,
+            order_label: null,
+            customer_label: customerHidden ? null : customerTitle,
+          },
+        ]);
+        return downloadUrl;
+      };
+      const modes = ['CSV', 'JSON', 'EXCEL'].flatMap((format) =>
+        [false, true].map((asynchronous) => ({ format, asynchronous })),
+      );
+      const priorFiles: string[] = [];
+      for (const mode of modes)
+        priorFiles.push(await exportJoin(mode.format, mode.asynchronous, false));
+      const customerPolicy = await request.post('/api/meta/data-permissions', {
+        data: {
+          name: `Hide customer ${code}`,
+          modelCode: 'e2et_customer',
+          policyType: 'column',
+          fieldCode: 'e2et_cust_name',
+          maskType: 'hide',
+          enabled: true,
+        },
+      });
+      expect(customerPolicy.status(), await customerPolicy.text()).toBe(200);
+      const customerPolicyPid = (await customerPolicy.json()).data.pid;
+      const customerBinding = await request.post(
+        `/api/meta/data-permissions/${customerPolicyPid}/roles/${rolePid}`,
+      );
+      expect(customerBinding.status(), await customerBinding.text()).toBe(200);
+      const customerDetail = await owner.get(`/api/dynamic/e2et_customer/${customerPid}`);
+      expect(customerDetail.status(), await customerDetail.text()).toBe(200);
+      expect((await customerDetail.json()).data.e2et_cust_name).toBeNull();
+      for (const url of priorFiles) {
+        const staleJoin = await owner.get(url);
+        expect(staleJoin.status(), await staleJoin.text()).toBe(403);
+      }
+      for (const mode of modes) await exportJoin(mode.format, mode.asynchronous, true);
       await testInfo.attach('column-policy-observation', {
         contentType: 'application/json',
         body: JSON.stringify({
