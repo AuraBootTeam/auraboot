@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
@@ -46,6 +47,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class ReportExportServiceLiveIT {
+
+    @Mock
+    private UserPermissionService userPermissionService;
 
     @Mock
     private DynamicDataService dynamicDataService;
@@ -97,7 +101,7 @@ class ReportExportServiceLiveIT {
 
         ReportExportServiceImpl service = new ReportExportServiceImpl(
                 new ObjectMapper(), dynamicDataService, namedQueryService,
-                reportStorageService, auditTrailService, client, BrandingIdentity::community);
+                reportStorageService, auditTrailService, client, BrandingIdentity::community, userPermissionService);
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
 
         ReportEntity page = new ReportEntity();

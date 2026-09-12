@@ -9,7 +9,7 @@
     "component": null,
     "icon": "database",
     "type": 0,
-    "permissionCode": "meta_management",
+    "permissionCode": null,
     "orderNo": 10,
     "visible": true,
     "extension": {

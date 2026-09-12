@@ -13,6 +13,8 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.SortField;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -121,6 +123,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final AuditTrailService auditTrailService;
     private final ReportRenderClient reportRenderClient;
     private final BrandingProvider brandingProvider;
+    private final UserPermissionService userPermissionService;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -320,9 +323,32 @@ public class ReportExportServiceImpl implements ReportExportService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "Report DSL not found");
         }
         try {
-            return objectMapper.readValue(report.getDsl(), new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> dsl = objectMapper.readValue(report.getDsl(), new TypeReference<Map<String, Object>>() {});
+            requireModelReadPermissions(dsl);
+            return dsl;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new ValidationException(ResponseCode.SystemError, "Stored report DSL is invalid");
+        }
+    }
+
+    /** Enforce the same model-read boundary used by the preview API before querying any source. */
+    private void requireModelReadPermissions(Map<String, Object> reportDsl) {
+        Object rawSources = reportDsl.get("dataSources");
+        if (!(rawSources instanceof Map<?, ?> sources)) return;
+        for (Object rawSource : sources.values()) {
+            if (!(rawSource instanceof Map<?, ?> source)) continue;
+            if (!(DATA_SOURCE_MODEL.equals(source.get("type")) || DATA_SOURCE_TABLE.equals(source.get("type")))) continue;
+            Map<String, Object> dataSource = toStringObjectMap(source);
+            String modelCode = stringValue(firstPresent(dataSource, "modelCode", "model", "entityCode"), "");
+            if (!modelCode.matches("[a-zA-Z][a-zA-Z0-9_]*")) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid report model code");
+            }
+            String permission = "model." + modelCode + ".read";
+            Long userId = MetaContext.getCurrentUserId();
+            if (userId == null || !userPermissionService.hasPermission(userId, permission)) {
+                throw new PermissionDeniedException(ResponseCode.PermissionDenied, permission,
+                        "You do not have permission to read this report data source.");
+            }
         }
     }
 

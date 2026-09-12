@@ -7,6 +7,7 @@ import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderProperties;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -48,6 +49,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class ReportDeliveryLiveIT {
+
+    @Mock
+    private UserPermissionService userPermissionService;
 
     @Mock
     private DynamicDataService dynamicDataService;
@@ -101,7 +105,7 @@ class ReportDeliveryLiveIT {
 
         ReportExportServiceImpl exportService = new ReportExportServiceImpl(
                 new ObjectMapper(), dynamicDataService, namedQueryService,
-                reportStorageService, auditTrailService, renderClient, BrandingIdentity::community);
+                reportStorageService, auditTrailService, renderClient, BrandingIdentity::community, userPermissionService);
 
         ReportDeliveryServiceImpl deliveryService = new ReportDeliveryServiceImpl(exportService);
         ReflectionTestUtils.setField(deliveryService, "mailSender", mailSender);

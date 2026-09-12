@@ -5,6 +5,7 @@ import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderException;
@@ -68,6 +69,9 @@ class ReportExportServiceTest {
     private Path tempDirectory;
 
     @Mock
+    private UserPermissionService userPermissionService;
+
+    @Mock
     private DynamicDataService dynamicDataService;
 
     @Mock
@@ -86,9 +90,10 @@ class ReportExportServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(userPermissionService.hasPermission(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
         reportExportService = new ReportExportServiceImpl(new ObjectMapper(),
                 dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
-                reportRenderClient, BrandingIdentity::community);
+                reportRenderClient, BrandingIdentity::community, userPermissionService);
         // A successful export records an audit event sourced from MetaContext (set on every real
         // authenticated request, like the controller's MetaContext.getCurrentTenantId()); simulate it.
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
@@ -173,7 +178,7 @@ class ReportExportServiceTest {
                 reportStorageService,
                 auditTrailService,
                 reportRenderClient,
-                customerBranding);
+                customerBranding, userPermissionService);
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-branded");
 
@@ -895,6 +900,22 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
         assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
         assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+    }
+
+    @Test
+    void modelPermissionDenialStopsEveryExportBeforeDataRead() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders")), "body", List.of())));
+        when(reportStorageService.findByPid("denied")).thenReturn(report);
+        when(userPermissionService.hasPermission(99L, "model.orders.read")).thenReturn(false);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("denied");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService);
     }
 
     private Map<String, Object> nonStaticDataSourceReportDsl() {
