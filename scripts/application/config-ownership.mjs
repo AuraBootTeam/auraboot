@@ -11,8 +11,47 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function isBpmOwnedConfigResource(resource) {
-  return BPM_LITERAL.test(JSON.stringify(resource));
+function resourceIdentity(resource, relativePath, bpmExclusiveFieldCodes = new Set()) {
+  if (relativePath.endsWith('i18n.json')) return JSON.stringify(resource);
+  if (relativePath.endsWith('models.json') || relativePath.endsWith('dicts.json')
+      || relativePath.endsWith('permissions.json') || relativePath.endsWith('capabilities.json')) {
+    return resource.code ?? resource.key ?? '';
+  }
+  if (relativePath.endsWith('fields.json')) {
+    return bpmExclusiveFieldCodes.has(resource.code) ? 'bpm' : '';
+  }
+  if (relativePath.endsWith('bindings.json')) {
+    return resource.modelCode ?? '';
+  }
+  if (relativePath.endsWith('commands.json')) {
+    return `${resource.modelCode ?? ''} ${resource.code ?? ''}`;
+  }
+  if (relativePath.endsWith('pages.json')) {
+    return `${resource.modelCode ?? ''} ${resource.pageKey ?? ''}`;
+  }
+  if (relativePath.endsWith('menus.json')) {
+    return `${resource.code ?? ''} ${resource.path ?? ''} ${resource.pageKey ?? ''} ${resource.permissionCode ?? ''}`;
+  }
+  if (relativePath.endsWith('bindingRules.json')) {
+    return resource.commandCode ?? '';
+  }
+  return '';
+}
+
+export function isBpmOwnedConfigResource(resource, relativePath, bpmExclusiveFieldCodes) {
+  return BPM_LITERAL.test(resourceIdentity(resource, relativePath, bpmExclusiveFieldCodes));
+}
+
+function stripNestedBpmEntries(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => !BPM_LITERAL.test(JSON.stringify(entry)))
+      .map(stripNestedBpmEntries);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, stripNestedBpmEntries(child)]));
+  }
+  return value;
 }
 
 /**
@@ -29,6 +68,14 @@ export function writePlatformAdminConfigSplit(sourceRoot, outputRoot) {
   cpSync(sourceRoot, bpmRoot, { recursive: true });
 
   const sourceManifest = readJson(resolve(sourceRoot, 'plugin.json'));
+  const bindings = readJson(resolve(sourceRoot, sourceManifest.resourceDirs.modelFieldBindings));
+  const bpmFieldCodes = new Set(bindings
+    .filter((binding) => BPM_LITERAL.test(binding.modelCode ?? ''))
+    .map((binding) => binding.fieldCode));
+  const coreFieldCodes = new Set(bindings
+    .filter((binding) => !BPM_LITERAL.test(binding.modelCode ?? ''))
+    .map((binding) => binding.fieldCode));
+  const bpmExclusiveFieldCodes = new Set([...bpmFieldCodes].filter((code) => !coreFieldCodes.has(code)));
   writeJson(resolve(coreRoot, 'plugin.json'), {
     ...sourceManifest,
     description: 'DSL-driven administration pages for AuraBoot platform capabilities',
@@ -50,8 +97,14 @@ export function writePlatformAdminConfigSplit(sourceRoot, outputRoot) {
     if (!Array.isArray(resources)) {
       throw new Error(`platform-admin resource must be an array: ${relativePath}`);
     }
-    const core = resources.filter((resource) => !isBpmOwnedConfigResource(resource));
-    const bpm = resources.filter(isBpmOwnedConfigResource);
+    const core = resources
+      .filter((resource) => !isBpmOwnedConfigResource(resource, relativePath, bpmExclusiveFieldCodes))
+      .map(stripNestedBpmEntries);
+    const bpm = resources.filter((resource) => isBpmOwnedConfigResource(
+      resource,
+      relativePath,
+      bpmExclusiveFieldCodes,
+    ));
     writeJson(resolve(coreRoot, relativePath), core);
     writeJson(resolve(bpmRoot, relativePath), bpm);
     manifest.push({
