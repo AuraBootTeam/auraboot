@@ -49,16 +49,15 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
             }
             var stored = createConversationTaskRow(ctx, legacyRequest);
             String taskPid = stored.taskPid();
-            if (!stored.created()) {
-                String message = "This execution request already has a task. Check its current status before retrying execution.";
-                sink.onDone(message, null);
-                return new TurnOutcome.Success(message, Map.of("taskPid", taskPid, "reused", true));
-            }
             log.info("Durable conversation run dispatch: tenantId={}, turnId={}, taskPid={}",
                     ctx.tenantId(), ctx.turnId(), taskPid);
-            RunOutcome runOutcome = agentRunService.executeTaskSync(
-                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
+            RunOutcome runOutcome = legacyRequest != null && legacyRequest.getAnalyticsExecution() != null
+                    ? agentRunService.executeInitialAnalyticsTaskSync(ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT)
+                    : agentRunService.executeTaskSync(ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
             return mapRunToTurnOutcome(runOutcome, sink);
+        } catch (com.auraboot.framework.agent.service.AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
+            sink.onDone(admitted.getMessage(), null);
+            return new TurnOutcome.Success(admitted.getMessage(), Map.of("reused", true));
         } catch (Exception e) {
             log.error("Durable conversation run dispatch failed: {}", e.getMessage(), e);
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();

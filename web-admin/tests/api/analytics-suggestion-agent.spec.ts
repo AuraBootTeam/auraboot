@@ -201,9 +201,15 @@ test('AuraBot tool confirmation persists an AI suggestion without adopting it', 
           analyticsExecution: execution,
         },
       });
-    const started = await launch();
-    expect(started.status()).toBe(200);
-    const startedEvents = parseEvents(await started.text());
+    const concurrent = await Promise.all([launch(), launch()]);
+    const bodies = await Promise.all(
+      concurrent.map(async (response) => {
+        expect(response.status()).toBe(200);
+        return response.text();
+      }),
+    );
+    expect(bodies.filter((body) => body.includes('already has a task'))).toHaveLength(1);
+    const startedEvents = bodies.flatMap(parseEvents);
     expect(
       startedEvents.some((event) => event.event === 'error'),
       JSON.stringify(startedEvents),

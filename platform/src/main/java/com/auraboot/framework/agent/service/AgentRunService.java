@@ -408,6 +408,16 @@ public class AgentRunService {
      */
     public RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
                                       String resumeFromRunPid, String existingRunPid) {
+        return executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid, existingRunPid, false);
+    }
+
+    /** Retries unadmitted analytics tasks without creating another execution attempt. */
+    public RunOutcome executeInitialAnalyticsTaskSync(Long tenantId, String taskPid, String agentCode) {
+        return executeTaskSync(tenantId, taskPid, agentCode, null, null, true);
+    }
+
+    private RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
+                                       String resumeFromRunPid, String existingRunPid, boolean initialAnalytics) {
         if (!agentProperties.isEnabled()) {
             log.warn("Agent runtime is disabled, skipping task: {}", taskPid);
             return new RunOutcome.Skipped("Agent runtime disabled");
@@ -433,7 +443,11 @@ public class AgentRunService {
             if (agentDef == null) {
                 String agentMissingMsg = "Agent not found: " + agentCode;
                 if (existingRunPid == null) {
-                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt);
+                    if (initialAnalytics) {
+                        runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt, true);
+                    } else {
+                        runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt);
+                    }
                 }
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, agentMissingMsg);
                 return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
@@ -459,7 +473,11 @@ public class AgentRunService {
             // so we don't double-write a parallel un-linked run record for the
             // same logical execution.
             if (existingRunPid == null) {
-                runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+                if (initialAnalytics) {
+                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt, true);
+                } else {
+                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+                }
             } else {
                 // Refresh model + updated_at so the pre-seeded row reflects the
                 // executor's resolved configuration. run_status stays 'running'.
@@ -783,6 +801,11 @@ public class AgentRunService {
 
             return terminalOutcome;
 
+        } catch (AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
+            // No new run exists: never fail or mutate the already admitted attempt.
+            try { aiTraceService.endTrace(traceCtx, null, "skipped"); }
+            catch (RuntimeException traceError) { log.debug("Failed to end duplicate admission trace", traceError); }
+            throw admitted;
         } catch (AgentApprovalPendingException e) {
             log.info("Run {} paused for approval (approvalPid={}): {}",
                     runPid, e.getApprovalPid(), e.getMessage());

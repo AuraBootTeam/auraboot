@@ -59,6 +59,11 @@ public class RunLifecycleService {
 
     void createRunRecord(Long tenantId, String runPid, String taskPid, String agentCode,
                          String model, LocalDateTime startedAt) {
+        createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt, false);
+    }
+
+    void createRunRecord(Long tenantId, String runPid, String taskPid, String agentCode,
+                         String model, LocalDateTime startedAt, boolean initialAnalytics) {
         Map<String, Object> run = new HashMap<>();
         run.put("pid", runPid);
         run.put("tenant_id", tenantId);
@@ -87,7 +92,11 @@ public class RunLifecycleService {
         run.put("updated_at", startedAt);
 
         Map<String, Object> taskUpdate = Map.of("task_status", "in_progress", "started_at", startedAt, "updated_at", LocalDateTime.now());
-        terminalStore.create(tenantId, runPid, taskPid, run, taskUpdate);
+        if (initialAnalytics) {
+            terminalStore.createInitialAnalyticsRun(tenantId, runPid, taskPid, run, taskUpdate);
+        } else {
+            terminalStore.create(tenantId, runPid, taskPid, run, taskUpdate);
+        }
     }
 
     void recordExecutionStarted(Long tenantId, String runPid, String taskPid) {

@@ -32,6 +32,24 @@ public class AgentRunTerminalStore {
     @Transactional
     public void create(Long tenantId, String runPid, String taskPid,
                        Map<String, Object> run, Map<String, Object> taskUpdate) {
+        createScoped(tenantId, runPid, taskPid, run, taskUpdate, false);
+    }
+
+    /** Admits only the first run, including recovery after task creation without dispatch. */
+    @Transactional
+    public void createInitialAnalyticsRun(Long tenantId, String runPid, String taskPid,
+                                          Map<String, Object> run, Map<String, Object> taskUpdate) {
+        createScoped(tenantId, runPid, taskPid, run, taskUpdate, true);
+    }
+
+    public static final class AnalyticsRunAlreadyAdmitted extends RuntimeException {
+        public AnalyticsRunAlreadyAdmitted() {
+            super("This execution request already has a task with a run. Check its current status before retrying execution.");
+        }
+    }
+
+    private void createScoped(Long tenantId, String runPid, String taskPid,
+                              Map<String, Object> run, Map<String, Object> taskUpdate, boolean initialAnalytics) {
         if (!java.util.Objects.equals(tenantId, run.get("tenant_id"))
                 || !java.util.Objects.equals(runPid, run.get("pid"))
                 || !java.util.Objects.equals(taskPid, run.get("task_id"))) {
@@ -45,6 +63,17 @@ public class AgentRunTerminalStore {
         if (tasks.size() != 1) throw new IllegalStateException("Run task is unavailable");
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Run creation requires a transaction");
+        }
+        if (initialAnalytics) {
+            var bindings = jdbc.queryForList("""
+                    SELECT task_pid FROM ab_analytics_task_execution WHERE tenant_id = ? AND task_pid = ?
+                    """, tenantId, taskPid);
+            if (bindings.size() != 1) throw new IllegalStateException("Analytics task provenance is unavailable");
+            // The owning task lock serializes this check with every run insertion.
+            var admitted = jdbc.queryForList("""
+                    SELECT pid FROM ab_agent_run WHERE tenant_id = ? AND task_id = ? LIMIT 1
+                    """, tenantId, taskPid);
+            if (!admitted.isEmpty()) throw new AnalyticsRunAlreadyAdmitted();
         }
         if (data.insert("ab_agent_run", run) != 1
                 || data.update("ab_agent_task", taskUpdate,

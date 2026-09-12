@@ -64,6 +64,30 @@ class AgentRunTerminalStoreTest {
         assertThatThrownBy(() -> store.started(7L, "run", "task")).hasMessageContaining("server-owned");
         verifyNoInteractions(outcomes);
     }
+    @Test void initialAdmissionRecoversAnExistingTaskWithNoRun() {
+        when(jdbc.queryForList(contains("FROM ab_agent_task"), eq(7L), eq("task")))
+                .thenReturn(List.of(Map.of("pid", "task")));
+        when(jdbc.queryForList(contains("FROM ab_analytics_task_execution"), eq(7L), eq("task")))
+                .thenReturn(List.of(Map.of("task_pid", "task")));
+        when(jdbc.queryForList(contains("FROM ab_agent_run"), eq(7L), eq("task"))).thenReturn(List.of());
+        when(data.insert(eq("ab_agent_run"), anyMap())).thenReturn(1);
+        when(data.update(eq("ab_agent_task"), anyMap(), anyMap())).thenReturn(1);
+        store.createInitialAnalyticsRun(7L, "new-run", "task",
+                Map.of("tenant_id", 7L, "pid", "new-run", "task_id", "task"), Map.of("task_status", "in_progress"));
+        verify(data).insert(eq("ab_agent_run"), anyMap());
+    }
+    @Test void anAlreadyAdmittedAnalyticsTaskCannotCreateOrFailAnotherRun() {
+        when(jdbc.queryForList(contains("FROM ab_agent_task"), eq(7L), eq("task")))
+                .thenReturn(List.of(Map.of("pid", "task")));
+        when(jdbc.queryForList(contains("FROM ab_analytics_task_execution"), eq(7L), eq("task")))
+                .thenReturn(List.of(Map.of("task_pid", "task")));
+        when(jdbc.queryForList(contains("FROM ab_agent_run"), eq(7L), eq("task")))
+                .thenReturn(List.of(Map.of("pid", "existing-run")));
+        assertThatThrownBy(() -> store.createInitialAnalyticsRun(7L, "new-run", "task",
+                Map.of("tenant_id", 7L, "pid", "new-run", "task_id", "task"), Map.of()))
+                .isInstanceOf(AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted.class);
+        verifyNoInteractions(data, outcomes);
+    }
     @Test void completionPersistsScopedPairAndDefersSignalUntilCommit() {
         row("running");
         when(data.update(anyString(), anyMap(), anyMap())).thenReturn(1);
