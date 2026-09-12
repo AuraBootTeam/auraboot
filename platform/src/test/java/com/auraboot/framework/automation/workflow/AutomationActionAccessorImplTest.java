@@ -1,4 +1,4 @@
-package com.auraboot.framework.automation.bpm;
+package com.auraboot.framework.automation.workflow;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;

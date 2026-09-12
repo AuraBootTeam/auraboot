@@ -57,8 +57,8 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
     void seedTestData() throws Exception {
         tenantId = getTestTenant().getId();
 
-        // Seed command definition for crm:create_lead
-        insertCommandDef(tenantId, "crm:create_lead", "crm_lead_common",
+        // Seed a neutral platform command; product-specific capabilities belong to applications.
+        insertCommandDef(tenantId, "core:create_project", "pm_project",
                 objectMapper.writeValueAsString(Map.of("type", "create")));
     }
 
@@ -69,14 +69,14 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         String runId = UniqueIdGenerator.generate();
 
         AgentToolDefinition toolDef = AgentToolDefinition.builder()
-                .name("crm:create_lead")
+                .name("core:create_project")
                 .riskLevel("L1")
                 .build();
 
         String actionPid = actionRecorder.recordAction(
-                tenantId, runId, "crm:create_lead",
+                tenantId, runId, "core:create_project",
                 toolDef,
-                Map.of("crm_lead_company", "RiskTestCo"),
+                Map.of("name", "RiskTestProject"),
                 null, null, null, null
         );
 
@@ -96,9 +96,9 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         String runId = UniqueIdGenerator.generate();
 
         String actionPid = actionRecorder.recordAction(
-                tenantId, runId, "crm:create_lead",
+                tenantId, runId, "core:create_project",
                 null,
-                Map.of("crm_lead_company", "DeviationTestCo"),
+                Map.of("name", "DeviationTestProject"),
                 null, null, null, null
         );
 
@@ -139,17 +139,17 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
     // ========== Capability Layer Tests ==========
 
     @Test
-    void testCapabilityRouter_crmQueryMatch() {
+    void testCapabilityRouter_platformProjectQueryMatch() {
         // Seed capability
-        insertCapability(tenantId, "test_crm.query", "CRM Query",
-                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead_common.query\"]");
+        insertCapability(tenantId, "test_project.query", "Project Query",
+                "[\"query\",\"analyze\"]", "[\"pm_*\"]", "[\"pm_project.query\"]");
 
         // Seed skill so loadSkill returns non-null
-        insertSkill(tenantId, "crm_lead_common.query", "CRM Lead Query", "atomic");
+        insertSkill(tenantId, "pm_project.query", "Project Query", "atomic");
 
-        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead_common");
+        List<String> skills = capabilityRouter.route(tenantId, "query", "pm_project");
         assertThat(skills).isNotEmpty();
-        assertThat(skills).contains("crm_lead_common.query");
+        assertThat(skills).contains("pm_project.query");
     }
 
     @Test
@@ -179,41 +179,41 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         ensureSkill(tenantId, "dsl.query", "DSL Query", "atomic");
 
         // Seed capability with create intent only
-        insertCapability(tenantId, "test_crm.create_only", "CRM Create Only",
-                "[\"create\"]", "[\"crm_*\"]", "[\"crm_lead_common.create\"]");
+        insertCapability(tenantId, "test_project.create_only", "Project Create Only",
+                "[\"create\"]", "[\"pm_*\"]", "[\"pm_project.create\"]");
 
-        insertSkill(tenantId, "crm_lead_common.create", "CRM Lead Create", "atomic");
+        insertSkill(tenantId, "pm_project.create", "Project Create", "atomic");
 
         // Route with "query" intent — does NOT match the seeded "create" capability,
         // but DOES match the platform-default CAP_GENERIC_QUERY which routes any
         // "query" intent to "dsl.query".
-        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead_common");
+        List<String> skills = capabilityRouter.route(tenantId, "query", "pm_project");
         // Hermetic: the actual intent of this test is (a) the generic query fallback
         // is wired AND (b) the create-only capability does NOT contribute on a "query"
         // intent. Assert exactly that. containsExactly was non-hermetic: a sibling
-        // test (testCapabilityRouter_crmQueryMatch) commits a crm_* "query" capability
-        // (NOT_SUPPORTED → persists), so crm_lead_common can legitimately match additional
-        // crm query skills — which must not fail this test.
+        // test (testCapabilityRouter_platformProjectQueryMatch) commits a pm_* "query"
+        // capability (NOT_SUPPORTED → persists), so pm_project can legitimately match
+        // additional project query skills — which must not fail this test.
         assertThat(skills).contains("dsl.query");
-        assertThat(skills).doesNotContain("crm_lead_common.create");
+        assertThat(skills).doesNotContain("pm_project.create");
     }
 
     @Test
     void testGroundingWithCapability_routesViaCapability() {
-        // Seed capability + skill for CRM query
-        insertCapability(tenantId, "test_crm.ground_query", "CRM Ground Query",
-                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead_common.query\"]");
+        // Seed capability + skill for a neutral platform model.
+        insertCapability(tenantId, "test_project.ground_query", "Project Ground Query",
+                "[\"query\",\"analyze\"]", "[\"pm_*\"]", "[\"pm_project.query\"]");
 
-        insertSkill(tenantId, "crm_lead_common.query", "CRM Lead Query", "atomic");
+        insertSkill(tenantId, "pm_project.query", "Project Query", "atomic");
 
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder().build();
-        BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下CRM线索", ctx);
+        BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下项目", ctx);
 
         assertThat(bif).isNotNull();
         assertThat(bif.getIntent()).isEqualTo("query");
-        assertThat(bif.getObject()).isEqualTo("crm_lead_common");
+        assertThat(bif.getObject()).isEqualTo("pm_project");
         assertThat(bif.getCandidateSkills()).isNotEmpty();
-        assertThat(bif.getCandidateSkills()).contains("crm_lead_common.query");
+        assertThat(bif.getCandidateSkills()).contains("pm_project.query");
     }
 
     // ========== Seed Helpers ==========
@@ -247,7 +247,7 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         row.put("tenant_id", tenantId);
         row.put("capability_code", code);
         row.put("capability_name", name);
-        row.put("domain", "crm");
+        row.put("domain", "platform");
         row.put("intent_patterns", intentPatterns);
         row.put("object_patterns", objectPatterns);
         row.put("skills", skills);
@@ -268,7 +268,7 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         row.put("skill_code", skillCode);
         row.put("skill_name", skillName);
         row.put("skill_level", level);
-        row.put("skill_category", "crm");
+        row.put("skill_category", "platform");
         row.put("skill_status", "active");
         row.put("is_builtin", false);
         row.put("deleted_flag", false);

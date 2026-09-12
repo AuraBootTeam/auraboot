@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration test for D1 Grounding layer:
  * IntentParser, ObjectResolver, RiskEvaluator, GroundingService (full pipeline).
- * Requires ab_object_alias seed data (tenant_id = -1) and published meta models.
+ * Requires neutral platform ab_object_alias seed data (tenant_id = -1).
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
@@ -44,14 +44,14 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void testIntentParser_queryIntent() {
-        IntentParser.IntentResult result = intentParser.parse("看看客户情况");
+        IntentParser.IntentResult result = intentParser.parse("看看项目情况");
         assertThat(result.getIntent()).isEqualTo("query");
         assertThat(result.getConfidence()).isGreaterThanOrEqualTo(0.8);
     }
 
     @Test
     void testIntentParser_createIntent() {
-        IntentParser.IntentResult result = intentParser.parse("帮我创建一个新线索");
+        IntentParser.IntentResult result = intentParser.parse("帮我创建一个新项目");
         assertThat(result.getIntent()).isEqualTo("create");
         assertThat(result.getConfidence()).isGreaterThanOrEqualTo(0.8);
     }
@@ -75,16 +75,16 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     void testObjectResolver_aliasMatch() {
         Long tenantId = getTestTenant().getId();
-        ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "查一下客户列表");
-        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
+        ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "查一下项目列表");
+        assertThat(result.getModelCode()).isEqualTo("pm_project");
         assertThat(result.getMatchType()).isEqualTo("alias");
     }
 
     @Test
-    void testObjectResolver_leadAlias() {
+    void testObjectResolver_taskAlias() {
         Long tenantId = getTestTenant().getId();
-        ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "线索有多少");
-        assertThat(result.getModelCode()).isEqualTo("crm_lead_common");
+        ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "任务有多少");
+        assertThat(result.getModelCode()).isEqualTo("pm_task");
     }
 
     @Test
@@ -115,10 +115,10 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
         Long tenantId = getTestTenant().getId();
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder().build();
 
-        BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下CRM线索", ctx);
+        BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下项目", ctx);
 
         assertThat(bif.getIntent()).isEqualTo("query");
-        assertThat(bif.getObject()).isEqualTo("crm_lead_common");
+        assertThat(bif.getObject()).isEqualTo("pm_project");
         assertThat(bif.getConfidence()).isNotNull();
         assertThat(bif.getConfidence().getOverall()).isGreaterThan(0.5);
         assertThat(bif.getRiskLevel()).isEqualTo("L0");

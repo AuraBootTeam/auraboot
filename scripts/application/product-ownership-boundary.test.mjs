@@ -83,6 +83,13 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/tests/e2e/email/email-crm-timeline.spec.ts',
     'web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts',
     'web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts',
+    'platform/src/test/java/com/auraboot/framework/meta/contribution/CrmOpportunityPageContributionContractTest.java',
+    'platform/src/test/java/com/auraboot/framework/automation/bpm',
+    'platform/src/test/java/com/auraboot/framework/automation/AutomationServiceIntegrationTest.java',
+    'platform/src/test/java/com/auraboot/framework/automation/AutomationIntegrationTest.java',
+    'platform/src/test/java/com/auraboot/framework/automation/AutomationSendNotificationIntegrationTest.java',
+    'platform/src/test/java/com/auraboot/framework/automation/QualityAutoCapaChainGoldenIT.java',
+    'platform/src/test/java/com/auraboot/framework/automation/iot/IotRuleSmartEngineIntegrationTest.java',
   ]) {
     assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
   }
