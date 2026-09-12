@@ -26,6 +26,11 @@ for command_name in curl docker git node openssl pnpm python3 sha256sum tar; do 
 [[ "$(uname -s)" == Linux ]] || fatal 'release images must be built on the admitted Linux CI host'
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
+MUTATION="${AURA_RELEASE_MUTATION:-}"
+case "$MUTATION" in
+  ''|locked-plugin-byte) ;;
+  *) fatal "unsupported release mutation: $MUTATION" ;;
+esac
 
 CORE_ROOT="$(cd "$AURA_CORE_PROJECT_ROOT" && pwd)"
 PRODUCT_ROOT="$(cd "$AURA_PRODUCT_PROJECT_ROOT" && pwd)"
@@ -104,6 +109,27 @@ AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
   --platform-artifacts "$CORE_RELEASE" --output "$PRODUCT_RELEASE" \
   >"$ARTIFACTS/logs/product-artifacts.log" 2>&1 \
   || fail 'product artifact build failed; see logs/product-artifacts.log'
+
+if [[ "$MUTATION" == locked-plugin-byte ]]; then
+  MUTATION_TARGET="$(node -e "const l=require(process.argv[1]); const a=l.artifacts.find(x=>x.type==='plugin'); if(!a)process.exit(2); process.stdout.write(a.localPath)" "$PRODUCT_RELEASE/application.lock")" \
+    || fatal 'controlled mutation could not resolve the locked plugin artifact'
+  printf '\nAURA_CONTROLLED_RELEASE_MUTATION\n' >>"$PRODUCT_RELEASE/$MUTATION_TARGET"
+  if node "$PRODUCT_RELEASE/bin/application/application-artifact-verifier.mjs" \
+      --lock "$PRODUCT_RELEASE/application.lock" --artifact-root "$PRODUCT_RELEASE" \
+      >"$ARTIFACTS/logs/mutation-verifier.log" 2>&1; then
+    fatal 'controlled locked-plugin mutation was not rejected'
+  fi
+  grep -q 'checksum mismatch' "$ARTIFACTS/logs/mutation-verifier.log" \
+    || fatal 'controlled mutation failed for a reason other than checksum mismatch'
+  node - "$ARTIFACTS/mutation-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$MUTATION_TARGET" <<'NODE'
+const [path, product, coreCommit, productCommit, target] = process.argv.slice(2);
+const receipt = { schemaVersion: 1, status: 'EXPECTED_RED', mutation: 'locked-plugin-byte',
+  detectedBy: 'application-artifact-verifier', reason: 'checksum mismatch', product,
+  coreCommit, productCommit, target, releaseImagePushed: false, finishedAt: new Date().toISOString() };
+require('node:fs').writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
+NODE
+  fail 'controlled locked-plugin mutation was correctly rejected (expected red)'
+fi
 
 OCI_TAR="$WORK_ROOT/product-image.oci.tar"
 tar -C "$PRODUCT_RELEASE/$AURA_PRODUCT_IMAGE_LAYOUT" -cf "$OCI_TAR" .
