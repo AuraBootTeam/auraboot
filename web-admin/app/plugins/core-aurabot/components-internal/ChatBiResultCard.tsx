@@ -16,6 +16,7 @@ import { useSmartText } from '~/utils/i18n';
 import { reportDesignerService } from '~/plugins/core-designer/components/report-designer/services/reportDesignerService';
 import { createEmptyReport } from '~/plugins/core-designer/components/report-designer/types';
 import { useAnalyticsResultView } from './useAnalyticsResultView';
+import { AnalyticsSuggestions } from './AnalyticsSuggestions';
 import { useI18n } from '~/contexts/I18nContext';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
@@ -29,6 +30,7 @@ interface ChatBiMetric {
 
 export interface ChatBiResult {
   analysisId?: string;
+  historyRefreshed?: boolean;
   dataSource?: ChartDataSource;
   interpretation?: string;
   modelCode?: string;
@@ -363,6 +365,15 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         </div>
 
         {/* Interpretation */}
+        {result.historyRefreshed && (
+          <p className="mb-2 text-xs text-gray-500">
+            {text({
+              'zh-CN': '已按当前权限重新查询；建议仍关联原分析。',
+              'en-US':
+                'Data refreshed with current permissions; suggestions remain linked to the original analysis.',
+            })}
+          </p>
+        )}
         {interpretation && (
           <div className="border-b border-gray-100 px-3 py-2 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
             {interpretation}
@@ -386,6 +397,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           )}
         </div>
 
+        {result.analysisId && dataSource?.type === 'aggregate' && (
+          <AnalyticsSuggestions analysisId={result.analysisId} query={dataSource} />
+        )}
         {/* Actions: ad-hoc → persisted bridge (save this chart as a dashboard widget) */}
         {(canSave || savedPid || canSaveReport || savedReportPid) && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">

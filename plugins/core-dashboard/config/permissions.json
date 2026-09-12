@@ -12,5 +12,12 @@
     "name:en": "Adopt analysis suggestions",
     "resourceType": "operation",
     "module": "analytics"
+  },
+  {
+    "code": "analytics.suggestion.read",
+    "name:zh-CN": "\u67e5\u770b\u4e2a\u4eba\u5206\u6790\u5efa\u8bae",
+    "name:en": "Read personal analysis suggestions",
+    "resourceType": "data",
+    "module": "analytics"
   }
 ]

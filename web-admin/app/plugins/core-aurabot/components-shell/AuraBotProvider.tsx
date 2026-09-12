@@ -230,11 +230,7 @@ const initialState: AuraBotState = {
  */
 export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMessage[] {
   const sender: SimpleMessage['sender'] =
-    message.sender === 'user'
-      ? 'user'
-      : message.sender === 'system'
-        ? 'system'
-        : 'bot';
+    message.sender === 'user' ? 'user' : message.sender === 'system' ? 'system' : 'bot';
 
   const normalizedType: SimpleMessage['type'] =
     message.type === 'system'
@@ -251,9 +247,9 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
   // check here prevents an empty-string column drift from ever rendering an
   // empty reasoning pane in the UI.
   if (
-    sender === 'bot'
-    && typeof message.thinkingContent === 'string'
-    && message.thinkingContent.length > 0
+    sender === 'bot' &&
+    typeof message.thinkingContent === 'string' &&
+    message.thinkingContent.length > 0
   ) {
     out.push({
       id: `db-${message.id}-thinking`,
@@ -275,6 +271,16 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
     traceId: message.traceId || undefined,
     retrievalEvidence: message.retrievalEvidence,
   });
+  for (const [index, contract] of (message.resultContracts ?? []).entries()) {
+    out.push({
+      id: `db-${message.id}-result-${index}`,
+      type: 'result_contract',
+      sender,
+      timestamp: baseTimestamp,
+      content: '',
+      resultContract: contract,
+    });
+  }
   return out;
 }
 
@@ -574,7 +580,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       const items = await auraBotApi.listConversations();
       const summaries = items.map(toSessionSummary);
       setSessions(summaries);
-      if (!currentConversationIdRef.current && summaries.length > 0 && state.messages.length === 0) {
+      if (
+        !currentConversationIdRef.current &&
+        summaries.length > 0 &&
+        state.messages.length === 0
+      ) {
         // Only auto-restore when we have an explicit remembered conversation id
         // that still exists on the server. Avoid arbitrarily resuming a random
         // historical conversation (breaks welcome-state UX and E2E tests that
@@ -612,7 +622,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   }, [state.panelState, refreshConversations]);
 
   useEffect(() => {
-    rememberConversationId(state.currentConversationId);
+    if (state.currentConversationId !== null) rememberConversationId(state.currentConversationId);
   }, [state.currentConversationId]);
 
   // Sync pageContext from route changes
@@ -931,14 +941,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                     toolName,
                     toolInput: input,
                     pendingTurnId,
-                    skillName:
-                      (extension?.skillName as string | undefined) ?? toolName,
-                    skillPreview:
-                      (extension?.preview as Record<string, any> | undefined) ?? {},
-                    previewToken:
-                      (extension?.previewToken as string | undefined) ?? '',
-                    riskLevel:
-                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                    skillName: (extension?.skillName as string | undefined) ?? toolName,
+                    skillPreview: (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken: (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel: (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
                   },
                 });
                 dispatch({ type: 'set_loading', payload: false });
@@ -1011,8 +1017,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // C-5 T7: skill_preview_card carries the same pendingTurnId field.
       const confirmCard = state.messages.find(
         (m) =>
-          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
-          m.toolId === toolId,
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
@@ -1020,7 +1025,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         // by the SSE handler that set pendingTurnId.
         dispatch({
           type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: 'Missing pendingTurnId for confirmTool' },
+          payload: {
+            id: botMsgId,
+            type: 'error',
+            content: 'Missing pendingTurnId for confirmTool',
+          },
         });
         dispatch({ type: 'set_loading', payload: false });
         return;
@@ -1086,14 +1095,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                     toolName: tname,
                     toolInput: input,
                     pendingTurnId,
-                    skillName:
-                      (extension?.skillName as string | undefined) ?? tname,
-                    skillPreview:
-                      (extension?.preview as Record<string, any> | undefined) ?? {},
-                    previewToken:
-                      (extension?.previewToken as string | undefined) ?? '',
-                    riskLevel:
-                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                    skillName: (extension?.skillName as string | undefined) ?? tname,
+                    skillPreview: (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken: (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel: (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
                   },
                 });
                 dispatch({ type: 'set_loading', payload: false });
@@ -1163,8 +1168,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // C-5 T7: include skill_preview_card so skill cancels echo back too.
       const confirmCard = state.messages.find(
         (m) =>
-          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
-          m.toolId === toolId,
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {

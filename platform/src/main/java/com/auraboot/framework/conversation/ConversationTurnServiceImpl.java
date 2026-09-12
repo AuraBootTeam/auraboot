@@ -455,7 +455,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()), route);
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()), route);
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller,
             // but the failure must not vanish silently (P-006).
@@ -599,7 +599,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
                     TurnRoute.resumedAfterConfirmation());
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
@@ -728,7 +728,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             // ACP approval resume: continuation executes on the durable engine.
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
                     new TurnRoute(
                             TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW.name(),
                             "RESUMED_AFTER_APPROVAL",

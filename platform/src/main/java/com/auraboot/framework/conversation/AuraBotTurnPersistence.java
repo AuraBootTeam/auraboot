@@ -173,13 +173,15 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
                 : AuraBotAgentResolver.DEFAULT_AGENT_CODE;
         long agentId = agentResolver.resolve(ctx.tenantId(), resolveCode);
         String persistedPayload = cardPayload;
-        if (artifacts != null && !artifacts.retrievalEvidence().isEmpty()) {
+        var analyticsReferences = com.auraboot.framework.behavior.service.AnalyticsResultHistory.references(artifacts.resultContracts());
+        if (!analyticsReferences.isEmpty() || !artifacts.retrievalEvidence().isEmpty()) {
             try {
                 java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
                 if (ctx.traceId() != null) {
                     metadata.put("traceId", ctx.traceId());
                 }
                 metadata.put("retrievalEvidence", artifacts.retrievalEvidence());
+                metadata.put("analyticsReferences", analyticsReferences);
                 persistedPayload = objectMapper.writeValueAsString(metadata);
             } catch (Exception e) {
                 throw new IllegalStateException("Could not serialize retrieval evidence", e);

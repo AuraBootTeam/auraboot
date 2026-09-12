@@ -33,6 +33,9 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     private final List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
             retrievalEvidence = new ArrayList<>();
     private String lastSignature;
+    private final List<ResultContract> resultContracts = new ArrayList<>();
+
+    public List<ResultContract> capturedResultContracts() { return List.copyOf(resultContracts); }
 
     public ThinkingCapturingResponseSink(ResponseSink delegate) {
         this.delegate = delegate;
@@ -113,6 +116,7 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
 
     @Override
     public void onResultContract(ResultContract contract) {
+        if (contract != null) resultContracts.add(contract);
         delegate.onResultContract(contract);
     }
 

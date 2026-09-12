@@ -2,6 +2,7 @@ import React from 'react';
 import type { ChartDataSource } from '~/framework/smart/types/chart';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => false }));
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
   dashboardService: {
