@@ -403,6 +403,55 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
       const restoredFile = await owner.get(priorFiles[0]);
       expect(restoredFile.status(), await restoredFile.text()).toBe(200);
       expect(await restoredFile.text()).toContain(customerTitle);
+      const setCustomerScope = async (scopeType: string) => {
+        const scoped = await request.put(`/api/permissions/matrix/${rolePid}/scope`, {
+          data: {
+            resourceCode: 'e2et_customer',
+            actionCode: 'read',
+            scopeType,
+            mergeStrategy: 'MAX',
+          },
+        });
+        expect(scoped.status(), await scoped.text()).toBe(200);
+      };
+      await setCustomerScope('self');
+      try {
+        const customerAccess = await owner.get(`/api/dynamic/e2et_customer/${customerPid}`);
+        expect(customerAccess.status(), await customerAccess.text()).toBe(403);
+        const parameters = { orderPid: fixturePid, customerPid };
+        const scopedList = await owner.post(`/api/meta/named-queries/${joinCode}/execute`, {
+          data: { page: 1, size: 5, parameters },
+        });
+        expect(scopedList.status(), await scopedList.text()).toBe(200);
+        expect.soft((await scopedList.json()).data.records).toEqual([]);
+        expect.soft((await scopedList.json()).data.total).toBe(0);
+        const scopedChart = await owner.post('/api/meta/chart-data', {
+          data: {
+            type: 'namedQuery',
+            queryCode: joinCode,
+            dimensions: ['record_key', 'customer_key'],
+            metrics: [],
+            parameters,
+          },
+        });
+        expect(scopedChart.status(), await scopedChart.text()).toBe(200);
+        expect.soft((await scopedChart.json()).data.rows).toEqual([]);
+        const scopedExport = await owner.post(`/api/meta/named-queries/${joinCode}/export-data`, {
+          data: { format: 'JSON', parameters },
+        });
+        expect(scopedExport.status(), await scopedExport.text()).toBe(200);
+        expect.soft((await scopedExport.json()).data.recordCount).toBe(0);
+        const scopedFile = await owner.get((await scopedExport.json()).data.downloadUrl);
+        expect(scopedFile.status(), await scopedFile.text()).toBe(200);
+        expect.soft(JSON.parse(await scopedFile.text())).toEqual([]);
+        const staleScope = await owner.get(priorFiles[0]);
+        expect.soft(staleScope.status(), await staleScope.text()).toBe(403);
+      } finally {
+        await setCustomerScope('all');
+      }
+      const scopeRestored = await owner.get(priorFiles[0]);
+      expect(scopeRestored.status(), await scopeRestored.text()).toBe(200);
+      expect(await scopeRestored.text()).toContain(customerTitle);
       const customerPolicy = await request.post('/api/meta/data-permissions', {
         data: {
           name: `Hide customer ${code}`,
