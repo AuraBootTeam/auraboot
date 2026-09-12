@@ -415,7 +415,8 @@ test('report exports all 201 matching records and rejects an undersized export l
             e2et_order_title: orderTitle,
             e2et_order_type: 'normal',
             e2et_order_customer: title,
-            e2et_order_urgent: false,
+            e2et_order_urgent: Number(orderTitle.slice(-3)) % 2 === 0,
+            e2et_order_remark: 'Report sorting verification',
           },
           undefined,
           'create',
@@ -438,6 +439,10 @@ test('report exports all 201 matching records and rejects an undersized export l
       orders: {
         type: 'model',
         modelCode: 'e2et_order',
+        sortBy: [
+          { field: 'e2et_order_urgent', order: 'desc' },
+          { field: 'e2et_order_title', order: 'asc' },
+        ],
         filters: [{ field: 'e2et_order_customer', operator: 'EQ', value: title }],
       },
     },
@@ -466,6 +471,13 @@ test('report exports all 201 matching records and rejects an undersized export l
     .click();
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(page.getByRole('cell', { name: new RegExp(`^${title}-`) })).toHaveCount(201);
+  const expectedOrder = [
+    ...titles.filter((_, i) => i % 2 === 0),
+    ...titles.filter((_, i) => i % 2 === 1),
+  ];
+  expect(
+    await page.getByRole('cell', { name: new RegExp(`^${title}-`) }).allTextContents(),
+  ).toEqual(expectedOrder);
   const downloads: Record<string, string> = {};
   for (const format of ['JSON', 'Excel', 'PDF']) {
     const event = page.waitForEvent('download');
@@ -477,20 +489,15 @@ test('report exports all 201 matching records and rejects an undersized export l
   }
   const json = JSON.parse(await readFile(downloads.JSON, 'utf8'));
   expect(
-    json.dataSets.orders.map((row: { e2et_order_title: string }) => row.e2et_order_title).sort(),
-  ).toEqual(titles);
+    json.dataSets.orders.map((row: { e2et_order_title: string }) => row.e2et_order_title),
+  ).toEqual(expectedOrder);
   const XLSX = await import('xlsx');
   const workbook = XLSX.read(await readFile(downloads.Excel), { type: 'buffer' });
   const rows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Orders, { header: 1 });
-  expect(
-    rows
-      .slice(2)
-      .map((row) => row[0])
-      .sort(),
-  ).toEqual(titles);
+  expect(rows.slice(2).map((row) => row[0])).toEqual(expectedOrder);
   await writeFile(
     `${process.env.AURA_EVIDENCE_DIR}/report-201-expected.json`,
-    JSON.stringify(titles),
+    JSON.stringify(expectedOrder),
   );
   const limited = await page.request.put(`/api/report-definitions/${pid}`, {
     data: {

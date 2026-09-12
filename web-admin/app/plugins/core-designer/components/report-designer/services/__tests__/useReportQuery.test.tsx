@@ -48,9 +48,12 @@ describe('report query snapshots', () => {
     fetchData.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const a = createEmptyReport('A'),
       b = createEmptyReport('B');
-    const { result, rerender } = renderHook(({ report }) => useReportQuery(report), {
-      initialProps: { report: a },
-    });
+    const { result, rerender } = renderHook(
+      ({ report }: { report: ReturnType<typeof createEmptyReport> }) => useReportQuery(report),
+      {
+        initialProps: { report: a },
+      },
+    );
     rerender({ report: b });
     await act(async () => second.resolve({ rows: [{ value: 'B' }] }));
     await act(async () => first.resolve({ rows: [{ value: 'A' }] }));

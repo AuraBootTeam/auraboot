@@ -488,6 +488,12 @@ class ReportExportServiceTest {
         verify(dynamicDataService).list(eq("rpt_case_model"), modelRequestCaptor.capture());
         DynamicQueryRequest modelRequest = modelRequestCaptor.getValue();
         assertThat(modelRequest.getConditions()).hasSize(1);
+        assertThat(modelRequest.getSortFields()).hasSize(2);
+        assertThat(modelRequest.getSortFields().get(0).getFieldName()).isEqualTo("e2et_order_type");
+        assertThat(modelRequest.getSortFields().get(0).getDirection().name()).isEqualTo("DESC");
+        assertThat(modelRequest.getSortFields().get(1).getFieldName()).isEqualTo("e2et_order_title");
+        assertThat(modelRequest.getSortFields().get(1).getDirection().name()).isEqualTo("ASC");
+        assertThat(modelRequest.getSortFields().get(1).getPriority()).isEqualTo(1);
         assertThat(modelRequest.getConditions().get(0).getFieldName()).isEqualTo("e2et_order_title");
         assertThat(modelRequest.getConditions().get(0).getOperator()).isEqualTo(QueryCondition.Operator.EQ);
         assertThat(modelRequest.getConditions().get(0).getValue()).isEqualTo("Model");
@@ -896,6 +902,8 @@ class ReportExportServiceTest {
         modelDataSource.put("type", "model");
         modelDataSource.put("modelCode", "rpt_case_model");
         modelDataSource.put("maxItems", 20);
+        modelDataSource.put("sortBy", List.of(Map.of("field", "e2et_order_type", "order", "desc"),
+                Map.of("field", "e2et_order_title", "order", "asc")));
         modelDataSource.put("filters", List.of(Map.of(
                 "field", "e2et_order_title",
                 "operator", "EQ",

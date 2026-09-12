@@ -12,6 +12,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.SortField;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -729,6 +730,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                 .pageSize(resolveRowLimit(dataSource, params))
                 .keyword(stringValue(firstPresent(dataSource, "keyword"), null))
                 .conditions(resolveModelConditions(dataSource, params))
+                .sortFields(resolveModelSort(dataSource))
                 .extraParams(removeControlParams(params))
                 .build();
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
@@ -838,6 +840,31 @@ public class ReportExportServiceImpl implements ReportExportService {
             }
         }
         return objectMapper.convertValue(binding, QueryCondition.class);
+    }
+
+    private List<SortField> resolveModelSort(Map<String, Object> dataSource) {
+        Object raw = dataSource.get("sortBy");
+        if (raw == null) return null;
+        if (!(raw instanceof List<?> entries) || entries.size() > 5) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report sortBy supports up to 5 fields");
+        }
+        List<SortField> fields = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Object entry : entries) {
+            if (!(entry instanceof Map<?, ?> sort)) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid report sort entry");
+            }
+            String field = stringValue(sort.get("field"), "");
+            String order = stringValue(sort.get("order"), "");
+            if (!field.matches("[a-zA-Z_][a-zA-Z0-9_]*") || !seen.add(field.toLowerCase(java.util.Locale.ROOT))
+                    || !("asc".equals(order) || "desc".equals(order))) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid or duplicate report sort field or direction");
+            }
+            fields.add(SortField.builder().fieldName(field)
+                    .direction("asc".equals(order) ? SortField.SortDirection.ASC : SortField.SortDirection.DESC)
+                    .priority(fields.size()).build());
+        }
+        return fields.isEmpty() ? null : fields;
     }
 
     private List<Map<String, Object>> completeExportRows(

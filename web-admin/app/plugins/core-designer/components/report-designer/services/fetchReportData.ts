@@ -33,8 +33,17 @@ async function fetchModelData(ds: ReportDataSource): Promise<Record<string, unkn
     );
   }
   if (ds.sortBy?.length) {
-    params.set('sortField', ds.sortBy[0].field);
-    params.set('sortOrder', ds.sortBy[0].order);
+    if (
+      ds.sortBy.length > 5 ||
+      ds.sortBy.some(
+        (sort) =>
+          !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sort.field) || !['asc', 'desc'].includes(sort.order),
+      ) ||
+      new Set(ds.sortBy.map((sort) => sort.field.toLowerCase())).size !== ds.sortBy.length
+    ) {
+      throw new Error('Invalid report sort fields');
+    }
+    params.set('sortFields', ds.sortBy.map((sort) => `${sort.field}:${sort.order}`).join(','));
   }
 
   const response = await fetch(`/api/dynamic/${ds.modelCode}/list?${params.toString()}`);
