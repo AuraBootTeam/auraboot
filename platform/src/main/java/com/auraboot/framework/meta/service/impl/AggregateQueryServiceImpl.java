@@ -20,7 +20,6 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -120,11 +119,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(
-            value = "aggregateQuery",
-            key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getDataAccessContextSuffix() + ':' + #request.hashCode()",
-            unless = "#result == null || #result.getRows() == null || #result.getRows().isEmpty()"
-    )
+    // Authorization and data scopes are evaluated inside this method. A method-level
+    // result cache would bypass them on hits, including after permission revocation.
     public AggregateQueryResponse execute(AggregateQueryRequest request) {
         validateRequest(request);
 
