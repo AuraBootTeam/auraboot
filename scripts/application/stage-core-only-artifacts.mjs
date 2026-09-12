@@ -78,7 +78,7 @@ function catalogArtifact({ type, id, version, path, output, repository, commit }
 
 function packPluginSdk(repoRoot, destination) {
   mkdirSync(destination, { recursive: true });
-  const buildRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-plugin-sdk-build-'));
+  const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-plugin-sdk-pack-'));
   try {
     run(
       'pnpm',
@@ -88,19 +88,43 @@ function packPluginSdk(repoRoot, destination) {
         '-p',
         'packages/plugin-sdk/tsconfig.json',
         '--tsBuildInfoFile',
-        resolve(buildRoot, 'tsconfig.tsbuildinfo'),
+        resolve(packageRoot, 'tsconfig.tsbuildinfo'),
       ],
       { cwd: repoRoot, capture: false },
     );
-    const output = run(
-      'pnpm',
-      ['--dir', resolve(repoRoot, 'packages/plugin-sdk'), 'pack', '--pack-destination', destination],
-      { cwd: repoRoot },
+    const sourceRoot = resolve(repoRoot, 'packages/plugin-sdk');
+    cpSync(resolve(sourceRoot, 'dist'), resolve(packageRoot, 'dist'), { recursive: true });
+    cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
+    copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
+    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
+    packageManifest.main = './dist/index.js';
+    packageManifest.module = './dist/index.js';
+    packageManifest.types = './dist/index.d.ts';
+    packageManifest.exports = {
+      '.': {
+        types: './dist/index.d.ts',
+        import: './dist/index.js',
+        default: './dist/index.js',
+      },
+    };
+    packageManifest.dependencies = Object.fromEntries(
+      Object.entries(packageManifest.dependencies ?? {}).map(([name, range]) => {
+        if (!range.startsWith('workspace:')) return [name, range];
+        const directory = name === '@auraboot/dsl-types' ? 'dsl-types' : name === '@auraboot/nav-model' ? 'nav-model' : null;
+        if (!directory) throw new Error(`unknown plugin SDK workspace dependency: ${name}`);
+        const dependencyManifest = JSON.parse(
+          readFileSync(resolve(repoRoot, `packages/${directory}/package.json`), 'utf8'),
+        );
+        return [name, dependencyManifest.version];
+      }),
     );
+    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
+    const output = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
     const tarball = output.split('\n').at(-1);
     return requirePath(resolve(tarball), 'plugin SDK tarball');
   } finally {
-    rmSync(buildRoot, { recursive: true, force: true });
+    rmSync(packageRoot, { recursive: true, force: true });
   }
 }
 
@@ -198,6 +222,25 @@ function main() {
   writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
   writeFileSync(resolve(output, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
   writeFileSync(resolve(output, 'app.resolved.yaml'), YAML.stringify(manifest));
+  writeFileSync(
+    resolve(output, 'release-receipt.json'),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      source: sourceRecord(repository, commit),
+      application: lock.application,
+      manifestDigest: lock.manifestDigest,
+      lockIdentity: lock.identity,
+      graphDigest: lock.composition.graphDigest,
+      verification: { resolver: 'application-contract-v1', checksum: 'sha256', result: 'PASS' },
+      artifacts: lock.artifacts.map(({ type, id, version: artifactVersion, digest, localPath }) => ({
+        type,
+        id,
+        version: artifactVersion,
+        digest,
+        localPath,
+      })),
+    }, null, 2)}\n`,
+  );
   writeFileSync(
     resolve(output, 'staging-summary.json'),
     `${JSON.stringify({
