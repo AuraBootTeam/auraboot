@@ -42,12 +42,17 @@ function parseArgs(argv) {
 }
 
 function run(command, args, options = {}) {
-  const output = execFileSync(command, args, {
-    cwd: options.cwd,
-    encoding: 'utf8',
-    stdio: options.capture === false ? 'inherit' : ['ignore', 'pipe', 'pipe'],
-  });
-  return typeof output === 'string' ? output.trim() : '';
+  try {
+    const output = execFileSync(command, args, {
+      cwd: options.cwd,
+      encoding: 'utf8',
+      stdio: options.capture === false ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+    });
+    return typeof output === 'string' ? output.trim() : '';
+  } catch (error) {
+    const stderr = typeof error.stderr === 'string' ? error.stderr.trim() : '';
+    throw new Error(`${command} ${args.join(' ')} failed${stderr ? `: ${stderr}` : ''}`, { cause: error });
+  }
 }
 
 function requirePath(path, label) {
@@ -158,6 +163,24 @@ function packWebShell(repoRoot, destination, version) {
     packageManifest.name = '@auraboot/web-shell';
     packageManifest.version = version;
     packageManifest.private = false;
+    const internalVersions = {
+      '@auraboot/core': version,
+      '@auraboot/dsl-types': '0.0.1',
+      '@auraboot/nav-model': '0.0.1',
+      '@auraboot/plugin-sdk': '0.0.1',
+      '@auraboot/runtime-kernel': version,
+      '@auraboot/track': version,
+      '@auraboot/ui': '1.0.0',
+    };
+    packageManifest.dependencies = Object.fromEntries(
+      Object.entries(packageManifest.dependencies).map(([name, range]) => [
+        name,
+        range.startsWith('workspace:') ? internalVersions[name] : range,
+      ]),
+    );
+    if (Object.values(packageManifest.dependencies).some((range) => range === undefined)) {
+      throw new Error('Web Shell contains an undeclared internal workspace dependency');
+    }
     packageManifest.scripts = {
       build: 'pnpm typecheck && react-router build && pnpm verify:production-react-runtime',
       typecheck: packageManifest.scripts.typecheck,
