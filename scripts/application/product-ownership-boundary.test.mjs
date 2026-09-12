@@ -58,3 +58,14 @@ test('core build declares no SmartEngine, Drools or KIE artifact dependency', ()
   const build = readFileSync(resolve(ROOT, 'platform/build.gradle'), 'utf8');
   assert.doesNotMatch(build, /com\.auraboot\.smart\.framework|org\.drools|org\.kie|kie-/i);
 });
+
+test('public source-facade npm exports resolve to typed source files', () => {
+  const dslRuntime = JSON.parse(readFileSync(resolve(ROOT, 'packages/dsl-runtime/package.json'), 'utf8'));
+  const designerSdk = JSON.parse(readFileSync(resolve(ROOT, 'packages/designer-sdk/package.json'), 'utf8'));
+
+  assert.equal(dslRuntime.exports['./contexts/*'], './src/contexts/*.tsx');
+  assert.equal(dslRuntime.exports['./shared/services/*'], './src/shared/services/*.ts');
+  assert.equal(dslRuntime.exports['./shared/*'], './src/shared/*.ts');
+  assert.equal(designerSdk.exports['./flow-designer-sdk'], './src/flow-designer-sdk/index.ts');
+  assert.equal(designerSdk.exports['./flow-designer-sdk/store/*'], './src/flow-designer-sdk/store/*.ts');
+});

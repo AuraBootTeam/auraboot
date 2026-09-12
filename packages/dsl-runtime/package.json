@@ -4,7 +4,22 @@
   "description": "Public Web runtime facade for AuraBoot product contributions",
   "license": "Apache-2.0",
   "type": "module",
-  "exports": { "./*": "./src/*" },
+  "exports": {
+    "./contexts/*": "./src/contexts/*.tsx",
+    "./framework/meta/hooks/*": "./src/framework/meta/hooks/*.ts",
+    "./framework/meta/rendering/*": "./src/framework/meta/rendering/*.tsx",
+    "./framework/meta/schemas/*": "./src/framework/meta/schemas/*.ts",
+    "./shared/decision/api/*": "./src/shared/decision/api/*.ts",
+    "./shared/decision/ui/*": "./src/shared/decision/ui/*.ts",
+    "./shared/services/*": "./src/shared/services/*.ts",
+    "./shared/versioning/*": "./src/shared/versioning/*.ts",
+    "./shared/*": "./src/shared/*.ts",
+    "./ui/smart/decision/*": "./src/ui/smart/decision/*.tsx",
+    "./ui/smart/picker/*": "./src/ui/smart/picker/*.tsx",
+    "./ui/ui/*": "./src/ui/ui/*.tsx",
+    "./ui/*": "./src/ui/*.tsx",
+    "./utils/*": "./src/utils/*.ts"
+  },
   "files": ["src"],
   "peerDependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
   "publishConfig": { "access": "public" }
