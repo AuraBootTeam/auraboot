@@ -110,7 +110,7 @@ test('AuraBot tool confirmation persists an AI suggestion without adopting it', 
         clientMsgId: randomUUID(),
         context: { modelCode: 'core_dashboard_suggestion', pageType: 'custom' },
         message:
-          '创建 core_dashboard_suggestion 建议版本。\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+          '创建分析建议版本。\n@@AURABOOT_STUB_TOOL_USE@@ ' +
           JSON.stringify({
             id: toolId,
             name: 'cmd_core_dashboard_propose_suggestion',

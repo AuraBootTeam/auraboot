@@ -145,7 +145,7 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       requestId: randomUUID(),
     };
     await input.fill(
-      '创建 core_dashboard_suggestion 建议版本。\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+      '创建分析建议版本。\n@@AURABOOT_STUB_TOOL_USE@@ ' +
         JSON.stringify({
           id: randomUUID(),
           name: 'cmd_core_dashboard_propose_suggestion',
