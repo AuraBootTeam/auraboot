@@ -193,12 +193,15 @@ export const auraBotApi = {
     return result.data || [];
   },
 
-  async ensureConversation(agentCode?: string): Promise<AuraBotConversationItem> {
+  async ensureConversation(
+    agentCode?: string,
+    newConversation = false,
+  ): Promise<AuraBotConversationItem> {
     const response = await fetch(`${API_BASE_URL}/conversations`, {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ agentCode }),
+      body: JSON.stringify({ agentCode, newConversation }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();

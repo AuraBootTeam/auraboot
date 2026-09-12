@@ -83,10 +83,17 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
         },
       }),
   );
+  const newConversationResponse = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().endsWith('/api/ai/aurabot/conversations'),
+  );
   const queryResponse = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().endsWith('/api/ai/aurabot/chat/stream'),
   );
   await input.press('Enter');
+  const createdConversation = await newConversationResponse;
+  expect(createdConversation.request().postDataJSON().newConversation).toBe(true);
+  expect(createdConversation.status()).toBe(200);
+  const firstConversationId = (await createdConversation.json()).data.conversationId;
   await (await queryResponse).finished();
   await page.waitForFunction(() => typeof (window as any).__analyticsStream === 'string');
   const queryStream: string = await page.evaluate(() => (window as any).__analyticsStream);
@@ -297,7 +304,9 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     await expect(executionMessage).toContainText(marker);
     await executionMessage.scrollIntoViewIfNeeded();
     await expect(executionMessage).toBeInViewport();
-    await expect(panel.getByTestId('chat-msg-agent').filter({ hasText: 'tool-output' })).toHaveCount(0);
+    await expect(
+      panel.getByTestId('chat-msg-agent').filter({ hasText: 'tool-output' }),
+    ).toHaveCount(0);
     await shot('ai-executed');
     await suggestions.getByRole('button', { name: '刷新建议', exact: true }).click();
     await expect(version.getByTestId('analytics-execution-status')).toContainText('执行成功');
@@ -318,7 +327,40 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       .getByTestId('analytics-execution-status');
     await expect(restored).toContainText('执行成功', { timeout: 15000 });
     await restored.scrollIntoViewIfNeeded();
+    await expect(
+      panel.getByTestId('chat-msg-agent').filter({ hasText: 'tool-output' }),
+    ).toHaveCount(0);
     await shot('ai-status');
+    await panel.getByTestId('aurabot-history-trigger').click();
+    await panel.getByTestId('aurabot-new-session').click();
+    const secondConversationResponse = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && r.url().endsWith('/api/ai/aurabot/conversations'),
+    );
+    await input.fill('Start an independent analysis conversation.');
+    const secondTurn = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && r.url().endsWith('/api/ai/aurabot/chat/stream'),
+    );
+    await input.press('Enter');
+    const secondCreated = await secondConversationResponse;
+    expect(secondCreated.status()).toBe(200);
+    expect(secondCreated.request().postDataJSON().newConversation).toBe(true);
+    const secondConversationId = (await secondCreated.json()).data.conversationId;
+    expect(secondConversationId).not.toBe(firstConversationId);
+    await (await secondTurn).finished();
+    await expect(panel.getByTestId('chatbi-result-card')).toHaveCount(0);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await page.getByTestId('ai-panel-toggle').click();
+    await expect(panel.getByTestId('chat-msg-user')).toHaveText(
+      'Start an independent analysis conversation.',
+    );
+    await expect(panel.getByTestId('chatbi-result-card')).toHaveCount(0);
+    await shot('new-isolated');
+    await panel.getByTestId('aurabot-history-trigger').click();
+    await panel.getByTestId(`aurabot-session-${firstConversationId}`).click();
+    await expect(restored).toContainText('执行成功');
+    await restored.scrollIntoViewIfNeeded();
+    await shot('history-restored');
   } finally {
     await db.end();
   }

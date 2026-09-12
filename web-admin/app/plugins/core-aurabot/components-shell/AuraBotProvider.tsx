@@ -749,13 +749,14 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       };
     }
 
-    const conversation = await auraBotApi.ensureConversation(state.selectedAgentCode);
+    const conversation = await auraBotApi.ensureConversation(state.selectedAgentCode, true);
     const summary = toSessionSummary(conversation);
     setSessions((prev) => {
       const filtered = prev.filter((item) => item.conversationId !== summary.conversationId);
       return [summary, ...filtered];
     });
     rememberConversationId(summary.conversationId);
+    currentConversationIdRef.current = summary.conversationId;
     dispatch({ type: 'set_current_conversation', payload: summary.conversationId });
     return {
       conversationId: summary.conversationId,

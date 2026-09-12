@@ -71,10 +71,10 @@ public class AuraBotConversationService {
     }
 
     @Transactional
-    public AuraBotConversationItem ensureConversation(Long tenantId, Long memberId, String agentCode) {
+    public AuraBotConversationItem ensureConversation(Long tenantId, Long memberId, String agentCode, boolean newConversation) {
         String resolvedAgentCode = (agentCode == null || agentCode.isBlank()) ? "aurabot" : agentCode.trim();
 
-        List<Long> conversationIds = memberMapper.findConversationIdsByMember(
+        List<Long> conversationIds = newConversation ? List.of() : memberMapper.findConversationIdsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, memberId);
         for (Long conversationId : conversationIds) {
             ImConversation existing = conversationMapper.selectById(conversationId);
