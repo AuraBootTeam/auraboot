@@ -5174,143 +5174,148 @@ function ListPageContentInner(props: PageContentProps) {
                 </div>
               )}
 
-              <ListToolbar
-                keyword={keyword}
-                onKeywordChange={setKeyword}
-                onSearch={() => {
-                  // Enter is an explicit commit. Do not rely on flush(): the
-                  // debounce may already have fired (or been consumed by a
-                  // concurrent list-state update), in which case flush is a
-                  // no-op and a stale URL writer can drop the keyword. Commit
-                  // from the synchronous ref with a functional update so
-                  // pagination/filter params changed in the same tick survive.
-                  syncKeywordToUrl.cancel();
-                  setSearchParams(
-                    (prev) => {
-                      const p = new URLSearchParams(prev);
-                      const value = keywordRef.current.trim();
-                      if (value) p.set('keyword', value);
-                      else p.delete('keyword');
-                      return p;
-                    },
-                    { replace: true },
-                  );
-                  debouncedSearch.cancel();
-                  loadData({ page: 0, size: pagination.pageSize });
-                }}
-                filterFormVisible={filterFormVisible}
-                onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
-                hasFilterBlock={
-                  !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
-                }
-                chips={quickFilterChips}
-                activeQuickFilter={activeQuickFilter}
-                currentViewPid={currentView?.pid ?? null}
-                onActivateChip={handleActivateChip}
-                onSaveActivePreset={handleSaveActivePreset}
-                activeSorts={activeSorts}
-                onSortsChange={setLocalActiveSorts}
-                sortableColumns={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
-                  .map((c: ColumnConfig) => ({
-                    field: c.field,
-                    label: resolveColumnLabel(c),
-                    valueType: c.valueType || c.sorter,
-                  }))}
-                rowHeight={effectiveViewConfig?.rowHeight}
-                onRowHeightChange={handleRowHeightChange}
-                onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
-                onAnalysisOpen={
-                  namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
-                }
-                chipFilters={chipFilters}
-                onChipFiltersChange={(nextChipFilters) => {
-                  chipFiltersRef.current = nextChipFilters;
-                  setLocalChipFilters(nextChipFilters);
-                  void loadData({
-                    page: 0,
-                    size: pagination.pageSize,
-                    filters,
-                    chipFilters: nextChipFilters,
-                  });
-                }}
-                fieldMetadata={filterFieldMetadata}
-                resolveChipValueLabel={(filter) => {
-                  if (filter.isExpression && filter.expression) {
-                    if (
-                      filter.expression === '#currentUser' ||
-                      filter.expression === '${system.currentUser}'
-                    ) {
-                      return (
-                        user?.name ||
-                        user?.nickname ||
-                        user?.username ||
-                        translateCommon('common.current_user', '当前用户')
-                      );
-                    }
-                    if (
-                      filter.expression === '#currentDepartmentOwners' ||
-                      filter.expression === '${system.currentDepartmentOwners}'
-                    ) {
-                      return translateCommon('common.current_department', '当前部门');
-                    }
-                    if (
-                      filter.expression === '#currentSharedRecords' ||
-                      filter.expression === '${system.currentSharedRecords}'
-                    ) {
-                      return translateCommon('common.collaborative_records', '协作记录');
-                    }
-                    return filter.expression;
+              {!schemaExtension.hideListToolbar && (
+                <ListToolbar
+                  keyword={keyword}
+                  onKeywordChange={setKeyword}
+                  onSearch={() => {
+                    // Enter is an explicit commit. Do not rely on flush(): the
+                    // debounce may already have fired (or been consumed by a
+                    // concurrent list-state update), in which case flush is a
+                    // no-op and a stale URL writer can drop the keyword. Commit
+                    // from the synchronous ref with a functional update so
+                    // pagination/filter params changed in the same tick survive.
+                    syncKeywordToUrl.cancel();
+                    setSearchParams(
+                      (prev) => {
+                        const p = new URLSearchParams(prev);
+                        const value = keywordRef.current.trim();
+                        if (value) p.set('keyword', value);
+                        else p.delete('keyword');
+                        return p;
+                      },
+                      { replace: true },
+                    );
+                    debouncedSearch.cancel();
+                    loadData({ page: 0, size: pagination.pageSize });
+                  }}
+                  filterFormVisible={filterFormVisible}
+                  onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
+                  hasFilterBlock={
+                    !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
                   }
-                  const dc = filterFieldMetadata.find(
-                    (field) => field.fieldCode === filter.fieldCode,
-                  )?.dictCode;
-                  if (!dc) return undefined;
-                  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-                  const items = dictDataCache.current.get(dc);
-                  const labels = values.map(
-                    (value) =>
-                      items?.find((item) => String(item.value) === String(value))?.label ??
-                      String(value),
-                  );
-                  return labels.join('、');
-                }}
-                onAddFilter={(e?: React.MouseEvent) => {
-                  const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-                  setFieldPickerAnchor(
-                    rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
-                  );
-                  setFieldPickerOpen(true);
-                }}
-                onChipClick={(idx, e) => {
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
-                  setEditingChipIdx(idx);
-                }}
-                onClearAll={() => {
-                  chipFiltersRef.current = [];
-                  setLocalChipFilters([]);
-                  setLocalActiveSorts([]);
-                  void loadData({
-                    page: 0,
-                    size: pagination.pageSize,
-                    filters,
-                    sorts: [],
-                    chipFilters: [],
-                  });
-                }}
-                hideQuickFilters={hideQuickFilters}
-                hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
-                hideColumnSettings={
-                  listExtensions?.hideColumnSettings ?? Boolean(schemaExtension.hideColumnSettings)
-                }
-                hideRowHeight={
-                  listExtensions?.hideRowHeight ?? Boolean(schemaExtension.hideRowHeight)
-                }
-                hideFilterChips={
-                  listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
-                }
-              />
+                  chips={quickFilterChips}
+                  activeQuickFilter={activeQuickFilter}
+                  currentViewPid={currentView?.pid ?? null}
+                  onActivateChip={handleActivateChip}
+                  onSaveActivePreset={handleSaveActivePreset}
+                  activeSorts={activeSorts}
+                  onSortsChange={setLocalActiveSorts}
+                  sortableColumns={tableColumns
+                    .filter(
+                      (c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false,
+                    )
+                    .map((c: ColumnConfig) => ({
+                      field: c.field,
+                      label: resolveColumnLabel(c),
+                      valueType: c.valueType || c.sorter,
+                    }))}
+                  rowHeight={effectiveViewConfig?.rowHeight}
+                  onRowHeightChange={handleRowHeightChange}
+                  onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                  onAnalysisOpen={
+                    namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                  }
+                  chipFilters={chipFilters}
+                  onChipFiltersChange={(nextChipFilters) => {
+                    chipFiltersRef.current = nextChipFilters;
+                    setLocalChipFilters(nextChipFilters);
+                    void loadData({
+                      page: 0,
+                      size: pagination.pageSize,
+                      filters,
+                      chipFilters: nextChipFilters,
+                    });
+                  }}
+                  fieldMetadata={filterFieldMetadata}
+                  resolveChipValueLabel={(filter) => {
+                    if (filter.isExpression && filter.expression) {
+                      if (
+                        filter.expression === '#currentUser' ||
+                        filter.expression === '${system.currentUser}'
+                      ) {
+                        return (
+                          user?.name ||
+                          user?.nickname ||
+                          user?.username ||
+                          translateCommon('common.current_user', '当前用户')
+                        );
+                      }
+                      if (
+                        filter.expression === '#currentDepartmentOwners' ||
+                        filter.expression === '${system.currentDepartmentOwners}'
+                      ) {
+                        return translateCommon('common.current_department', '当前部门');
+                      }
+                      if (
+                        filter.expression === '#currentSharedRecords' ||
+                        filter.expression === '${system.currentSharedRecords}'
+                      ) {
+                        return translateCommon('common.collaborative_records', '协作记录');
+                      }
+                      return filter.expression;
+                    }
+                    const dc = filterFieldMetadata.find(
+                      (field) => field.fieldCode === filter.fieldCode,
+                    )?.dictCode;
+                    if (!dc) return undefined;
+                    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+                    const items = dictDataCache.current.get(dc);
+                    const labels = values.map(
+                      (value) =>
+                        items?.find((item) => String(item.value) === String(value))?.label ??
+                        String(value),
+                    );
+                    return labels.join('、');
+                  }}
+                  onAddFilter={(e?: React.MouseEvent) => {
+                    const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+                    setFieldPickerAnchor(
+                      rect ? { x: rect.left, y: rect.bottom + 4 } : { x: 300, y: 200 },
+                    );
+                    setFieldPickerOpen(true);
+                  }}
+                  onChipClick={(idx, e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setValuePopoverAnchor({ x: rect.left, y: rect.bottom + 4 });
+                    setEditingChipIdx(idx);
+                  }}
+                  onClearAll={() => {
+                    chipFiltersRef.current = [];
+                    setLocalChipFilters([]);
+                    setLocalActiveSorts([]);
+                    void loadData({
+                      page: 0,
+                      size: pagination.pageSize,
+                      filters,
+                      sorts: [],
+                      chipFilters: [],
+                    });
+                  }}
+                  hideQuickFilters={hideQuickFilters}
+                  hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
+                  hideColumnSettings={
+                    listExtensions?.hideColumnSettings ??
+                    Boolean(schemaExtension.hideColumnSettings)
+                  }
+                  hideRowHeight={
+                    listExtensions?.hideRowHeight ?? Boolean(schemaExtension.hideRowHeight)
+                  }
+                  hideFilterChips={
+                    listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
+                  }
+                />
+              )}
 
               <ViewAnalysisDrawer
                 open={analysisOpen}
