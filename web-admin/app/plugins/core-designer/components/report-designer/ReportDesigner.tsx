@@ -215,6 +215,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Excel Export
   const handleExportExcel = useCallback(async () => {
+    if (isDirty || isSaving) return;
     if (!pageId) {
       alert('Please save the report before exporting to Excel.');
       return;
@@ -233,10 +234,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Excel export failed:', error);
       alert(error instanceof Error ? error.message : 'Excel export failed');
     }
-  }, [report, pageId]);
+  }, [report, pageId, isDirty, isSaving]);
 
   // JSON Export
   const handleExportJson = useCallback(async () => {
+    if (isDirty || isSaving) return;
     if (!pageId) {
       alert('Please save the report before exporting to JSON.');
       return;
@@ -255,10 +257,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('JSON export failed:', error);
       alert(error instanceof Error ? error.message : 'JSON export failed');
     }
-  }, [report, pageId]);
+  }, [report, pageId, isDirty, isSaving]);
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
+    if (isDirty || isSaving) return;
     if (!pageId) {
       alert('Please save the report before exporting to PDF.');
       return;
@@ -277,7 +280,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('PDF export failed:', error);
       alert(error instanceof Error ? error.message : 'PDF export failed');
     }
-  }, [report, pageId]);
+  }, [report, pageId, isDirty, isSaving]);
 
   const historyPanel = (
     <VersionHistoryPanel

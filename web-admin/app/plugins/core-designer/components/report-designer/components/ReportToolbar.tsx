@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { Settings, FileJson, FileSpreadsheet, History } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
 import { useReportDocument } from '../state/ReportDocumentProvider';
@@ -29,20 +30,15 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onToggleVersionHistory,
   versionCount,
 }) => {
-  const { isSaving, previewMode } = useReportStore();
-  const {
-    report,
-    isDirty,
-    updateTitle,
-    updatePageSettings,
-    canUndo,
-    canRedo,
-    undo,
-    redo,
-  } = useReportDocument();
+  const { isSaving, previewMode, pageId } = useReportStore();
+  const text = useSmartText();
+  const { report, isDirty, updateTitle, updatePageSettings, canUndo, canRedo, undo, redo } =
+    useReportDocument();
   const [showSettings, setShowSettings] = useState(false);
 
   if (!report) return null;
+
+  const exportDisabled = isDirty || isSaving || !pageId;
 
   const titleInput = (
     <input
@@ -70,7 +66,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       >
         <button
           onClick={() => setShowSettings(true)}
-          className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           title="Page Settings"
         >
           <Settings className="h-4 w-4" />
@@ -90,7 +86,9 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
 
         <button
           onClick={onExportPdf}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          disabled={exportDisabled}
+          aria-describedby={exportDisabled ? 'report-export-status' : undefined}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Export PDF
         </button>
@@ -98,7 +96,9 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         {onExportExcel && (
           <button
             onClick={onExportExcel}
-            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            disabled={exportDisabled}
+            aria-describedby={exportDisabled ? 'report-export-status' : undefined}
+            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileSpreadsheet className="h-4 w-4" />
             Export Excel
@@ -108,7 +108,9 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         {onExportJson && (
           <button
             onClick={onExportJson}
-            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            disabled={exportDisabled}
+            aria-describedby={exportDisabled ? 'report-export-status' : undefined}
+            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileJson className="h-4 w-4" />
             Export JSON
@@ -118,7 +120,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         {onToggleVersionHistory && (
           <button
             onClick={onToggleVersionHistory}
-            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             title="Version History"
           >
             <History className="h-4 w-4" />
@@ -128,6 +130,19 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
           </button>
         )}
       </DesignerToolbar>
+
+      {exportDisabled && (
+        <p
+          id="report-export-status"
+          role="status"
+          className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        >
+          {text({
+            zh: '请先保存当前修改，再导出报表。导出使用已保存的报表定义。',
+            en: 'Save current changes before exporting. Exports use the saved report definition.',
+          })}
+        </p>
+      )}
 
       {/* Settings Dialog */}
       {showSettings && (
@@ -218,7 +233,7 @@ const PageSettingsDialog: React.FC<{
         <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>

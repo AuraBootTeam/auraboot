@@ -75,6 +75,17 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
   expect((await updatedResponse).status()).toBe(200);
   await page.getByPlaceholder('Report Title').fill(`${title} unsaved`);
+  for (const format of ['PDF', 'Excel', 'JSON']) {
+    await expect(
+      page.getByRole('button', { name: `Export ${format}`, exact: true }),
+    ).toBeDisabled();
+  }
+  await expect(page.getByRole('status')).toContainText('请先保存当前修改');
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-draft-export-disabled.png`,
+    fullPage: true,
+  });
+
   await page.getByRole('button', { name: 'Version History' }).click();
   await page.getByRole('button', { name: /^v1\b/ }).click();
   const historical = page.getByTestId('report-version-preview');
@@ -191,6 +202,17 @@ test('report menu previews and exports the same filtered model rows', async ({ p
     path: `${process.env.AURA_EVIDENCE_DIR}/report-model-preview.png`,
     fullPage: true,
   });
+  await page.getByPlaceholder('Report Title').fill(`${title} current`);
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
+  const savedDefinition = page.waitForResponse(
+    (r) =>
+      r.request().method() === 'PUT' &&
+      new URL(r.url()).pathname === `/api/report-definitions/${pid}`,
+  );
+  await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
+  expect((await savedDefinition).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  dsl.title = `${title} current`;
   const jsonResponse = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/reports/export/json',
   );
@@ -210,13 +232,13 @@ test('report menu previews and exports the same filtered model rows', async ({ p
   const excelDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Excel', exact: true }).click();
   const excel = await excelDownload;
-  expect(excel.suggestedFilename()).toBe(`${title}.xlsx`);
+  expect(excel.suggestedFilename()).toBe(`${title} current.xlsx`);
   const excelPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.xlsx`;
   await excel.saveAs(excelPath);
   const pdfDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
   const pdf = await pdfDownload;
-  expect(pdf.suggestedFilename()).toBe(`${title}.pdf`);
+  expect(pdf.suggestedFilename()).toBe(`${title} current.pdf`);
   const pdfPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.pdf`;
   await pdf.saveAs(pdfPath);
   expect((await readFile(pdfPath)).subarray(0, 5).toString()).toBe('%PDF-');
