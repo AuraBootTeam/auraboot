@@ -17,6 +17,7 @@ import {
 } from '~/ui/ui/dialog';
 import type { ChartDataSource } from '~/framework/smart/types/chart';
 import { toast } from 'sonner';
+import { useAuraBot } from '../components-shell/AuraBotProvider';
 
 type Suggestion = {
   pid: string;
@@ -39,6 +40,9 @@ export function AnalyticsSuggestions({
   analysisId: string;
   query: ChartDataSource;
 }) {
+  const { state: conversationState, sendMessage } = useAuraBot();
+  const executionPermission = usePermission('analytics.suggestion.execute');
+  const [executionConfirmation, setExecutionConfirmation] = useState<Suggestion | null>(null);
   const canRead = usePermission('analytics.suggestion.read');
   const canExecute = usePermission('meta.command.execute');
   const proposalPermission = usePermission('analytics.suggestion.propose');
@@ -294,6 +298,19 @@ export function AnalyticsSuggestions({
                   </Button>
                 )
               )}
+              {row.adoptionPid && row.executionGoal && executionPermission && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={conversationState.isLoading}
+                  onClick={() => {
+                    rememberOpener();
+                    setExecutionConfirmation(row);
+                  }}
+                >
+                  {l('发起执行', 'Start execution')}
+                </Button>
+              )}
               {canPropose && latest.has(row.pid) && (
                 <Button size="sm" variant="ghost" onClick={() => openForm(row)}>
                   {l('修订建议', 'Revise suggestion')}
@@ -422,6 +439,56 @@ export function AnalyticsSuggestions({
             </Button>
             <Button disabled={busy} onClick={() => void adopt()}>
               {busy ? l('保存中…', 'Saving…') : l('确认采纳', 'Confirm adoption')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!executionConfirmation}
+        onOpenChange={(open) => {
+          if (!open) setExecutionConfirmation(null);
+        }}
+      >
+        <DialogContent onCloseAutoFocus={restoreFocus}>
+          <DialogHeader>
+            <DialogTitle>{l('执行已采纳建议', 'Execute adopted suggestion')}</DialogTitle>
+            <DialogDescription>
+              {l(
+                '确认后将按此版本的目标发起任务。进展和错误会显示在对话中；执行结果不代表业务收益。',
+                'Start a task using this version’s goal. Progress and errors appear in the conversation; execution results do not establish business benefit.',
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm font-medium break-words">{executionConfirmation?.title}</p>
+          <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
+            {executionConfirmation?.executionGoal}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExecutionConfirmation(null)}>
+              {l('取消', 'Cancel')}
+            </Button>
+            <Button
+              disabled={conversationState.isLoading || !executionPermission}
+              onClick={() => {
+                if (
+                  !executionConfirmation?.adoptionPid ||
+                  conversationState.isLoading ||
+                  !executionPermission
+                )
+                  return;
+                const selected = executionConfirmation;
+                setExecutionConfirmation(null);
+                sendMessage(
+                  l('执行已采纳建议：', 'Execute adopted suggestion: ') + selected.title,
+                  undefined,
+                  {
+                    adoptionPid: selected.adoptionPid!,
+                    requestId: crypto.randomUUID(),
+                  },
+                );
+              }}
+            >
+              {l('确认执行', 'Confirm execution')}
             </Button>
           </DialogFooter>
         </DialogContent>

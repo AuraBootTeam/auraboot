@@ -3,6 +3,9 @@ import type { ChartDataSource } from '~/framework/smart/types/chart';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => false }));
+vi.mock('../../components-shell/AuraBotProvider', () => ({
+  useAuraBot: () => ({ state: { isLoading: false }, sendMessage: vi.fn() }),
+}));
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
   dashboardService: {

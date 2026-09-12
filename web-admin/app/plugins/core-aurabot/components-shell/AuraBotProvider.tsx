@@ -444,7 +444,11 @@ interface AuraBotContextValue {
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
-  sendMessage: (content: string, attachments?: ChatImageAttachment[]) => void;
+  sendMessage: (
+    content: string,
+    attachments?: ChatImageAttachment[],
+    analyticsExecution?: { adoptionPid: string; requestId: string },
+  ) => void;
   confirmTool: (toolId: string) => void;
   cancelTool: (toolId: string) => void;
   clearMessages: () => void;
@@ -765,7 +769,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Send message — wired to SSE streaming
   const sendMessage = useCallback(
-    async (content: string, attachments?: ChatImageAttachment[]) => {
+    async (
+      content: string,
+      attachments?: ChatImageAttachment[],
+      analyticsExecution?: { adoptionPid: string; requestId: string },
+    ) => {
       const hasAttachments = !!attachments && attachments.length > 0;
       // Allow empty text when image attachments are present — the model can
       // still answer the implicit "what is this?". Without attachments, we
@@ -802,6 +810,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             // Phase B.1: server-side persistence wiring.
             conversationId,
             clientMsgId: userMsgId,
+            analyticsExecution,
             knowledgeBaseIds:
               state.selectedKnowledgeBaseIds.length > 0
                 ? state.selectedKnowledgeBaseIds

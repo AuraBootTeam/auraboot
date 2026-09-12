@@ -462,6 +462,7 @@ export const auraBotApi = {
       history?: Array<{ role: string; content: string }>;
       conversationId?: number;
       clientMsgId?: string;
+      analyticsExecution?: { adoptionPid: string; requestId: string };
       attachments?: Array<{ mediaType: string; data: string; name?: string }>;
     },
     callbacks: ChatStreamOptions,

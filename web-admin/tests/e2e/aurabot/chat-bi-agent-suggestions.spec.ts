@@ -55,10 +55,7 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     }
   });
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => {
-    const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
-    return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
-  });
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
   const panel = page.getByTestId('aurabot-panel');
   const toggle = page.getByTestId('ai-panel-toggle');
   await expect(toggle).toHaveClass(/text-gray-500/);
@@ -217,6 +214,80 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       event_name: 'analytics_suggestion_adopted',
       payload: { decisionMode: 'ai_assisted', suggestionVersionPid: row.pid },
     });
+    const launch = version.getByRole('button', { name: '发起执行', exact: true });
+    await expect(launch).toBeVisible();
+    let executionRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        request.url().endsWith('/api/ai/aurabot/chat/stream') &&
+        request.postDataJSON()?.analyticsExecution
+      )
+        executionRequests++;
+    });
+    await launch.click();
+    const executionDialog = page.getByRole('dialog');
+    await expect(executionDialog).toContainText(proposal.executionIntent.goal);
+    await shot('ai-execute-confirm');
+    await executionDialog.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(launch).toBeFocused();
+    expect(executionRequests).toBe(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await launch.click();
+    await expect(
+      executionDialog.getByRole('button', { name: '确认执行', exact: true }),
+    ).toBeVisible();
+    await shot('ai-execute-narrow');
+    await executionDialog.getByRole('button', { name: '取消', exact: true }).click();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await launch.click();
+    const executionResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().endsWith('/api/ai/aurabot/chat/stream') &&
+        !!response.request().postDataJSON()?.analyticsExecution,
+    );
+    await executionDialog.getByRole('button', { name: '确认执行', exact: true }).click();
+    const executed = await executionResponse;
+    expect(executed.status()).toBe(200);
+    const adoptionPid = (await adoption.json()).data.data.record.pid;
+    expect(executed.request().postDataJSON().analyticsExecution).toEqual({
+      adoptionPid,
+      requestId: expect.any(String),
+    });
+    await executed.finished();
+    expect(await executed.text()).not.toContain('event:error');
+    expect(executionRequests).toBe(1);
+    const linked = await db.query(
+      `SELECT t.description, r.pid, r.run_status, a.binding
+      FROM ab_analytics_task_execution a JOIN ab_agent_task t ON t.pid=a.task_pid AND t.tenant_id=a.tenant_id
+      JOIN ab_agent_run r ON r.task_id=t.pid AND r.tenant_id=t.tenant_id WHERE a.adoption_pid=$1`,
+      [adoptionPid],
+    );
+    expect(linked.rows).toHaveLength(1);
+    expect(linked.rows[0]).toMatchObject({
+      description: proposal.executionIntent.goal,
+      run_status: 'success',
+      binding: { adoptionPid, versionPid: row.pid },
+    });
+    const started = await db.query(
+      "SELECT caused_by_event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name='agent_execution_started'",
+      [linked.rows[0].pid],
+    );
+    expect(started.rows).toHaveLength(1);
+    const adoptedEvent = await db.query(
+      "SELECT event_id FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_suggestion_adopted'",
+      [analysisId],
+    );
+    expect(started.rows[0].caused_by_event_id).toBe(adoptedEvent.rows[0].event_id);
+    await expect(input).toBeEnabled();
+    const executionMessage = panel
+      .getByTestId('chat-msg-user')
+      .filter({ hasText: '执行已采纳建议：' + marker });
+    await expect(executionMessage).toContainText(marker);
+    await executionMessage.scrollIntoViewIfNeeded();
+    await expect(executionMessage).toBeInViewport();
+    await shot('ai-executed');
   } finally {
     await db.end();
   }
