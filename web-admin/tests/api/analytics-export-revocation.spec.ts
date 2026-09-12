@@ -73,7 +73,8 @@ for (const boundary of ['resource', 'root'] as const) {
         status: 'published',
         ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
         policy: exportPolicy,
-        fromSql: 'SELECT pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}',
+        fromSql:
+          'SELECT pid, created_by FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}',
         fields: [
           { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
         ],
@@ -155,6 +156,31 @@ for (const boundary of ['resource', 'root'] as const) {
         data: { policy: exportPolicy },
       });
       expect(resetPolicy.status(), await resetPolicy.text()).toBe(200);
+      if (boundary === 'resource') {
+        const scoped = await request.put(`/api/permissions/matrix/${rolePid}/default-scope`, {
+          data: { scopeType: 'self' },
+        });
+        expect(scoped.status(), await scoped.text()).toBe(200);
+        const oldScope = await owner.get(url);
+        expect(oldScope.status(), await oldScope.text()).toBe(403);
+        expect(await oldScope.text()).toContain('Export query definition has changed');
+        const restricted = await owner.post(`/api/meta/named-queries/${code}/export-data`, {
+          data: { format: 'CSV', parameters: { marker: code, rootPid: fixturePid } },
+        });
+        expect(restricted.status(), await restricted.text()).toBe(200);
+        expect((await restricted.json()).data.recordCount).toBe(0);
+        const restrictedFile = await owner.get((await restricted.json()).data.downloadUrl);
+        expect(restrictedFile.status(), await restrictedFile.text()).toBe(200);
+        expect((await restrictedFile.text()).trim().split(/\r?\n/)).toHaveLength(1);
+        expect(await restrictedFile.text()).not.toContain(fixturePid);
+        const unscoped = await request.put(`/api/permissions/matrix/${rolePid}/default-scope`, {
+          data: { scopeType: 'all' },
+        });
+        expect(unscoped.status(), await unscoped.text()).toBe(200);
+        const allAgain = await owner.get(url);
+        expect(allAgain.status(), await allAgain.text()).toBe(200);
+        expect(await allAgain.body()).toEqual(await original.body());
+      }
       if (boundary === 'root') {
         const deleted = await request.delete(`/api/dynamic/e2et_order/${fixturePid}`);
         expect(deleted.status(), await deleted.text()).toBe(200);

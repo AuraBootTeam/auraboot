@@ -832,8 +832,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new AccessDeniedException("Export query is no longer available");
         }
         authorizeDeclaredResource(query);
+        List<String> currentScope = new ArrayList<>();
+        appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope);
         JsonNode currentDefinition = NamedQueryExportDefinition.capture(query,
-                namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code));
+                namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code), currentScope);
         if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
             throw new AccessDeniedException("Export query definition has changed; create a new export");
         }
@@ -923,7 +925,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             params.put("currentUserId", userId != null ? userId.toString() : null);
             authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
 
-            appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+            List<String> exportScope = new ArrayList<>();
+            appendDeclaredDataScopeClause(query, tenantId, userId, exportScope);
+            whereClauses.addAll(exportScope);
 
             if (!whereClauses.isEmpty()) {
                 sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -975,7 +979,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             long fileSize = java.nio.file.Files.size(tempFile);
             return ExportResult.builder()
                     .success(true)
-                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields))
+                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields, exportScope))
                     .filePath(tempFile.toString())
                     .recordCount((long) data.size())
                     .fileSize(fileSize)

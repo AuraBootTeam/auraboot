@@ -48,4 +48,11 @@ class NamedQueryExportDefinitionTest {
         var json = new com.fasterxml.jackson.databind.ObjectMapper();
         assertEquals(snapshot, json.readTree(json.writeValueAsBytes(snapshot)));
     }
+    @Test
+    void effectiveRowScopeChangeInvalidatesDefinition() {
+        NamedQuery query = new NamedQuery();
+        var all = NamedQueryExportDefinition.capture(query, List.of(), List.of());
+        var self = NamedQueryExportDefinition.capture(query, List.of(), List.of("created_by = 123"));
+        assertNotEquals(all, self);
+    }
 }
