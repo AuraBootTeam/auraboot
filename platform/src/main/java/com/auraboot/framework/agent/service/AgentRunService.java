@@ -662,6 +662,27 @@ public class AgentRunService {
                 }
             }
 
+            // Recommendations write a separate analytics model; retain provider permission
+            // checks and the agent scope filter below when discovering that exact command.
+            if (bif != null && ("recommend".equals(bif.getIntent()) || "analyze".equals(bif.getIntent()))) {
+                ToolDiscoveryContext analytics = ToolDiscoveryContext.builder()
+                        .tenantId(tenantId).userId(currentActorUserId()).agentCode(agentCode)
+                        .modelHint("core_dashboard_suggestion").intentHint("create").maxResults(20).build();
+                List<AgentToolDefinition> proposals = toAgentToolDefinitions(
+                        toolProviderRegistry.discoverAll(analytics).stream()
+                                .filter(tool -> "cmd:core_dashboard:propose_suggestion".equals(tool.getToolCode()))
+                                .toList());
+                List<AgentToolDefinition> merged = new ArrayList<>(tools);
+                Set<String> names = tools.stream().map(AgentToolDefinition::getName)
+                        .collect(java.util.stream.Collectors.toSet());
+                for (AgentToolDefinition proposal : proposals) {
+                    if (names.add(proposal.getName())) {
+                        merged.add(proposal);
+                    }
+                }
+                tools = merged;
+            }
+
             // B4: the allowed_models / allowed_operations guardrails restrict what the
             // assembled tool list may contain. The tool list is the enforcement
             // boundary on this engine — ToolLoopService rejects any call not in it —
