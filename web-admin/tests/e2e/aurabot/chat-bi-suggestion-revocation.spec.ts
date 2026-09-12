@@ -393,8 +393,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       const peer = await openAsRole(browser, peerUser.email, peerUser.password, 'zh-CN');
       try {
         const peerSnapshot = await fetchRoleSnapshot(peer.page);
-        for (const permission of codes)
-          expect(peerSnapshot.permissionCodes).toContain(permission);
+        for (const permission of codes) expect(peerSnapshot.permissionCodes).toContain(permission);
         expect(peerSnapshot.roleCodes).not.toContain('tenant_admin');
         const foreignExecution = await peer.page.request.post('/api/ai/aurabot/chat/stream', {
           data: {
@@ -408,6 +407,33 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(foreignBody).toContain('event:error');
         expect(foreignBody).toContain('Analytics execution source is unavailable to this user');
         await assertNoExecution();
+        const foreignRead = await peer.page.request.get(
+          `/api/dynamic/core_dashboard_adoption/${adoptionPid}`,
+        );
+        expect(foreignRead.status(), 'Generic reads must not expose another user adoption').toBe(
+          403,
+        );
+        for (const model of ['core_dashboard_suggestion', 'core_dashboard_adoption']) {
+          const rawList = await peer.page.request.get(`/api/dynamic/${model}/list`);
+          expect(rawList.status(), `Raw ${model} list must remain private`).toBe(403);
+          const rawExport = await peer.page.request.post(`/api/dynamic/${model}/export`, {
+            data: { format: 'CSV' },
+          });
+          expect(rawExport.status(), `Raw ${model} export must remain private`).toBe(403);
+          const rawAggregate = await peer.page.request.post('/api/meta/chart-data', {
+            data: {
+              type: 'aggregate',
+              modelCode: model,
+              metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
+              limit: 5,
+            },
+          });
+          expect(rawAggregate.status(), `Raw ${model} aggregate must remain private`).toBe(403);
+        }
+        const ownerRaw = await page.request.get(
+          `/api/dynamic/core_dashboard_adoption/${adoptionPid}`,
+        );
+        expect(ownerRaw.status(), 'Owners must also use the authorized projection').toBe(403);
       } finally {
         await peer.context.close();
       }

@@ -148,8 +148,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     expect(revised.core_dashboard_group_key).toBe(first.core_dashboard_group_key);
     expect(revised.core_dashboard_previous_pid).toBe(first.pid);
     const original = await request.get(`/api/dynamic/core_dashboard_suggestion/${first.pid}`);
-    expect(original.status()).toBe(200);
-    expect((await original.json()).data.core_dashboard_content).toBe(proposal.content);
+    expect(original.status()).toBe(403);
     const decision = { versionPid: first.pid, requestId: randomUUID() };
     const adopted = await execute('adopt_suggestion', decision);
     expect(adopted.core_dashboard_version_pid).toBe(first.pid);
@@ -177,6 +176,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       pageSize: 1,
       records: [{ pid: first.pid, version: 1, adoptionPid: adopted.pid, decisionMode: 'human' }],
     });
+    expect(pageData.records[0].content).toBe(proposal.content);
     expect(Object.keys(pageData.records[0]).sort()).toEqual(
       [
         'pid',
@@ -218,15 +218,22 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     const genericCreate = await request.post('/api/dynamic/core_dashboard_suggestion/create', {
       data: { ...first, pid: undefined, id: undefined },
     });
-    expect(genericCreate.status(), await genericCreate.text()).toBeGreaterThanOrEqual(400);
+    expect(genericCreate.status(), await genericCreate.text()).toBe(403);
     expect(await genericCreate.text()).toContain(
-      'can only be created through an authorized command',
+      'Raw analytics records require the authorized analytics service',
     );
     const changed = await request.put(`/api/dynamic/core_dashboard_suggestion/${first.pid}`, {
       data: { core_dashboard_content: 'Forged replacement' },
     });
-    expect(changed.status(), await changed.text()).toBeGreaterThanOrEqual(400);
-    expect(await changed.text()).toContain('immutable');
+    expect(changed.status(), await changed.text()).toBe(403);
+    expect(await changed.text()).toContain(
+      'Raw analytics records require the authorized analytics service',
+    );
+    const preserved = await request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysis.analysisId, page: 2, pageSize: 1 },
+    });
+    expect(preserved.status()).toBe(200);
+    expect((await preserved.json()).data.records[0].content).toBe(proposal.content);
     const facts = await db.query(
       'SELECT event_id, event_name, caused_by_event_id, target_key, payload FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 ORDER BY id',
       [analysis.analysisId],
