@@ -184,6 +184,7 @@ function packWebShell(repoRoot, destination, version) {
       packageManager: rootManifest.packageManager,
       engines: { node: '>=20' },
       devDependencies: rootManifest.devDependencies,
+      pnpm: rootManifest.pnpm,
       scripts: { build: 'pnpm --dir web-admin build' },
       files: [
         'LICENSE.txt',
