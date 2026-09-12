@@ -210,3 +210,57 @@ describe('SmartTableChart - widget config columns + i18n', () => {
     ]);
   });
 });
+
+describe('API enum and unavailable value presentation', () => {
+  it('distinguishes an immature null from observed zero without leaking enum codes', async () => {
+    mockFetchResult.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [
+          { state: 'immature', rate: null },
+          { state: 'observed', rate: 0 },
+        ],
+      },
+    });
+    render(
+      <SmartTableChart
+        dataSource={{ type: 'api', url: '/api/retention' }}
+        table={{
+          columns: [
+            {
+              field: 'state',
+              label: '状态',
+              valueLabels: {
+                immature: { 'zh-CN': '观察中', en: 'Pending' },
+                observed: { 'zh-CN': '已观测', en: 'Observed' },
+              },
+            },
+            {
+              field: 'rate',
+              label: '留存率',
+              format: 'percent',
+              nullLabel: { 'zh-CN': '尚未计算', en: 'Not calculated' },
+            },
+          ],
+        }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('观察中')).toBeInTheDocument());
+    expect(screen.getByText('尚未计算')).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.queryByText('immature')).not.toBeInTheDocument();
+  });
+  it('provides the configured recovery message for an empty API cohort', async () => {
+    mockFetchResult.mockResolvedValue({ code: '0', data: { records: [] } });
+    render(
+      <SmartTableChart
+        dataSource={{ type: 'api', url: '/api/empty-cohort' }}
+        emptyMessage={{
+          'zh-CN': '打开分析看板后观察再次使用',
+          en: 'Open a dashboard to start observing use',
+        }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('打开分析看板后观察再次使用')).toBeInTheDocument());
+  });
+});

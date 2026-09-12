@@ -12,6 +12,8 @@
  */
 
 import React, { Suspense, useMemo } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import {
@@ -77,6 +79,7 @@ export function resolveRecordParams(
 }
 
 export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
+  const { locale } = useI18n();
   const props = (block as any).props || {};
   const chartType = (block.chartType as string) || props.chartType || 'bar';
   const ChartComponent = getChartComponent(chartType);
@@ -105,7 +108,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     }
 
     return {
-      title: typeof block.title === 'string' ? block.title : undefined,
+      title: block.title ? getLocalizedText(block.title, locale) : undefined,
       // Visualization props (new unified format)
       ...visualization,
       // Legacy chartConfig (backward compat)
@@ -127,6 +130,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     props.height,
     props.refreshInterval,
     runtime,
+    locale,
   ]);
 
   if (!ChartComponent) {

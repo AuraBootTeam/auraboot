@@ -42,6 +42,10 @@ export interface SmartTableChartColumn {
   align?: 'left' | 'right' | 'center';
   /** Business display formatting for model/API table values. */
   format?: 'date' | 'datetime' | 'number' | 'currency' | 'percent';
+  /** Localized labels for enum values returned by an API. */
+  valueLabels?: Record<string, string | LocalizedText>;
+  /** Missing values remain distinct from numeric zero. */
+  nullLabel?: string | LocalizedText;
   currency?: string;
   precision?: number;
   prefix?: string;
@@ -50,6 +54,7 @@ export interface SmartTableChartColumn {
 
 export interface SmartTableChartProps {
   title?: string;
+  emptyMessage?: string | LocalizedText;
   /**
    * Optional. Standard chart datasource (aggregate/namedQuery/static). When
    * omitted, the component falls back to `modelCode` + `table.columns` for the
@@ -112,6 +117,7 @@ function isDataSourceConfigured(
 
 export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   title,
+  emptyMessage,
   dataSource,
   modelCode,
   table,
@@ -131,10 +137,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   style,
 }) => {
   const { locale } = useI18n();
-  const l = useCallback(
-    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
-    [locale],
-  );
+  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
   const tableColumns = table?.columns;
   const isConfigured = isDataSourceConfigured(dataSource, modelCode, tableColumns);
 
@@ -253,9 +256,9 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return () => {
       cancelled = true;
     };
-  // `modelFiltersKey` / `modelSortKey` are stable value keys. Dashboard config
-  // objects may be reconstructed by the renderer without changing semantics.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `modelFiltersKey` / `modelSortKey` are stable value keys. Dashboard config
+    // objects may be reconstructed by the renderer without changing semantics.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useModelBranch, modelCode, pageSize, modelFiltersKey, modelSortKey]);
 
   const data = useChartBranch
@@ -284,9 +287,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
 
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(defaultSort?.field ?? null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
-    defaultSort?.order ?? 'asc',
-  );
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSort?.order ?? 'asc');
 
   /**
    * Resolved column descriptors. Priority:
@@ -297,9 +298,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
    * Each entry carries the field code plus a pre-resolved header label so the
    * `<th>` render path can stay declarative.
    */
-  const columns = useMemo<
-    Array<SmartTableChartColumn & { label: string }>
-  >(() => {
+  const columns = useMemo<Array<SmartTableChartColumn & { label: string }>>(() => {
     if (tableColumns && tableColumns.length > 0) {
       return tableColumns.map((col) => {
         const resolvedLabel = col.label ? getLocalizedText(col.label, locale) : col.field;
@@ -507,7 +506,9 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
             {paginatedRows.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-400">
-                  {l('暂无数据', 'No data available')}
+                  {emptyMessage
+                    ? getLocalizedText(emptyMessage, locale)
+                    : l('暂无数据', 'No data available')}
                 </td>
               </tr>
             )}
@@ -558,15 +559,14 @@ function formatCell(
   value: unknown,
   locale: string,
 ): string {
+  if (value == null && column.nullLabel) return getLocalizedText(column.nullLabel, locale);
+  const configuredLabel = value == null ? undefined : column.valueLabels?.[String(value)];
+  if (configuredLabel) return getLocalizedText(configuredLabel, locale);
   const label = value == null ? undefined : labels[column.field]?.[String(value)];
   return label ?? formatCellValue(value, column, locale);
 }
 
-function formatCellValue(
-  value: unknown,
-  column: SmartTableChartColumn,
-  locale: string,
-): string {
+function formatCellValue(value: unknown, column: SmartTableChartColumn, locale: string): string {
   if (value === null || value === undefined) return '-';
   const activeLocale = locale === 'zh-CN' ? 'zh-CN' : 'en-US';
   if (column.format === 'date' || column.format === 'datetime') {
