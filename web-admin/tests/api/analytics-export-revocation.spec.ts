@@ -62,18 +62,17 @@ for (const boundary of ['resource', 'root'] as const) {
     });
     expect(fixture.status()).toBe(200);
     const fixturePid = (await fixture.json()).data.pid;
+    const exportPolicy =
+      boundary === 'root'
+        ? { rootAccess: { modelCode: 'e2et_order', pidParam: 'rootPid', actionCode: 'read' } }
+        : {};
     const query = await request.post('/api/meta/named-queries', {
       data: {
         code,
         title: 'Export source revocation',
         status: 'published',
-        ...(boundary === 'resource'
-          ? { resourceCode: 'e2et_order', actionCode: 'read' }
-          : {
-              policy: {
-                rootAccess: { modelCode: 'e2et_order', pidParam: 'rootPid', actionCode: 'read' },
-              },
-            }),
+        ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
+        policy: exportPolicy,
         fromSql: 'SELECT pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}',
         fields: [
           { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
@@ -138,6 +137,24 @@ for (const boundary of ['resource', 'root'] as const) {
       const activeAgain = await owner.get(url);
       expect(activeAgain.status()).toBe(200);
       expect(await activeAgain.body()).toEqual(await original.body());
+      const changed = await request.put(`/api/meta/named-queries/${queryPid}`, {
+        data: { policy: { exportMaxRows: 1 } },
+      });
+      expect(changed.status(), await changed.text()).toBe(200);
+      const stale = await owner.get(url);
+      expect(stale.status(), await stale.text()).toBe(403);
+      expect(await stale.text()).toContain('Export query definition has changed');
+      const fresh = await owner.post(`/api/meta/named-queries/${code}/export-data`, {
+        data: { format: 'CSV', parameters: { marker: code, rootPid: fixturePid } },
+      });
+      expect(fresh.status(), await fresh.text()).toBe(200);
+      const freshFile = await owner.get((await fresh.json()).data.downloadUrl);
+      expect(freshFile.status()).toBe(200);
+      expect(await freshFile.body()).toEqual(await original.body());
+      const resetPolicy = await request.put(`/api/meta/named-queries/${queryPid}`, {
+        data: { policy: exportPolicy },
+      });
+      expect(resetPolicy.status(), await resetPolicy.text()).toBe(200);
       if (boundary === 'root') {
         const deleted = await request.delete(`/api/dynamic/e2et_order/${fixturePid}`);
         expect(deleted.status(), await deleted.text()).toBe(200);

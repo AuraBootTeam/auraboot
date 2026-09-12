@@ -39,7 +39,7 @@ class ExportTaskWorkerTest {
         task.setCreatedBy(100L);
         task.setQueryCode("governed");
         task.setStatus("pending");
-        task.setRequestParams(json.valueToTree(Map.of("format", "CSV", "parameters", Map.of("marker", "unique"))));
+        task.setRequestParams(json.valueToTree(Map.of("request", Map.of("format", "CSV", "parameters", Map.of("marker", "unique")))));
         when(mapper.selectById(8L)).thenReturn(task);
         when(queries.exportData(eq("governed"), any())).thenAnswer(call -> {
             assertEquals(100L, MetaContext.getCurrentUserId());

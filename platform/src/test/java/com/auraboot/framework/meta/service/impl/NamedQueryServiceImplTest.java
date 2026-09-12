@@ -351,7 +351,7 @@ class NamedQueryServiceImplTest {
         when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
         when(permissionEvaluator.canAction(30L, "e2et_order", "read")).thenReturn(false);
         assertThatThrownBy(() -> service.authorizeExportDownload("order_summary",
-                new com.auraboot.framework.meta.dto.NamedQueryDataExportRequest()))
+                new com.auraboot.framework.meta.dto.NamedQueryDataExportRequest(), null))
                 .isInstanceOf(AccessDeniedException.class);
         org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
     }

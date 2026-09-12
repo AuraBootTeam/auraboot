@@ -50,7 +50,9 @@ class ExportTaskServiceTenantAuthzTest {
     private ExportTask task(Long tenantId, String fileKey) {
         ExportTask t = new ExportTask();
         t.setTenantId(tenantId);
-        t.setRequestParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        com.fasterxml.jackson.databind.node.ObjectNode metadata = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        metadata.set("request", com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        t.setRequestParams(metadata);
         t.setCreatedBy(100L);
         t.setFileKey(fileKey);
         t.setStatus("completed");

@@ -148,5 +148,5 @@ public interface NamedQueryService {
      */
     int countByFieldCode(String fieldCode);
     /** Reauthorize a persisted export against the current query resource and root record. */
-    void authorizeExportDownload(String code, NamedQueryDataExportRequest request);
+    void authorizeExportDownload(String code, NamedQueryDataExportRequest request, com.fasterxml.jackson.databind.JsonNode definitionSnapshot);
 }

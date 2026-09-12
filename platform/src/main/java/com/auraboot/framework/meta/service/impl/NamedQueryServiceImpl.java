@@ -826,12 +826,17 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     }
 
     @Override
-    public void authorizeExportDownload(String code, NamedQueryDataExportRequest request) {
+    public void authorizeExportDownload(String code, NamedQueryDataExportRequest request, JsonNode definitionSnapshot) {
         NamedQuery query = namedQueryMapper.findByCode(code);
         if (query == null || !query.isExecutable()) {
             throw new AccessDeniedException("Export query is no longer available");
         }
         authorizeDeclaredResource(query);
+        JsonNode currentDefinition = NamedQueryExportDefinition.capture(query,
+                namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code));
+        if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
+            throw new AccessDeniedException("Export query definition has changed; create a new export");
+        }
         Map<String, Object> params = new HashMap<>();
         if (request.getParameters() != null) params.putAll(request.getParameters());
         params.put("tenantId", getCurrentTenantId());
@@ -970,6 +975,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             long fileSize = java.nio.file.Files.size(tempFile);
             return ExportResult.builder()
                     .success(true)
+                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields))
                     .filePath(tempFile.toString())
                     .recordCount((long) data.size())
                     .fileSize(fileSize)

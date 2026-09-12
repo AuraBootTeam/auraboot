@@ -98,7 +98,9 @@ public class ExportTaskService {
         task.setCreatedAt(Instant.now());
         task.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS));
 
-        task.setRequestParams(objectMapper.valueToTree(request));
+        com.fasterxml.jackson.databind.node.ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.set("request", objectMapper.valueToTree(request));
+        task.setRequestParams(metadata);
 
         return task;
     }
@@ -144,9 +146,9 @@ public class ExportTaskService {
             return null;
         }
         NamedQueryDataExportRequest request = objectMapper.convertValue(
-                task.getRequestParams(), NamedQueryDataExportRequest.class);
+                task.getRequestParams().get("request"), NamedQueryDataExportRequest.class);
         if (request == null) throw new MetaServiceException("Export authorization request is missing");
-        namedQueryService.authorizeExportDownload(task.getQueryCode(), request);
+        namedQueryService.authorizeExportDownload(task.getQueryCode(), request, task.getRequestParams().get("definition"));
         return task.getFileKey();
     }
 
@@ -200,7 +202,7 @@ public class ExportTaskService {
             task.setStatus(ExportTask.STATUS_RUNNING);
             exportTaskMapper.updateById(task);
             NamedQueryDataExportRequest request = objectMapper.treeToValue(
-                    task.getRequestParams(), NamedQueryDataExportRequest.class);
+                    task.getRequestParams().get("request"), NamedQueryDataExportRequest.class);
             ExportResult result = namedQueryService.exportData(task.getQueryCode(), request);
             if (!Boolean.TRUE.equals(result.getSuccess())) {
                 failTask(task, result.getErrorMessage());
@@ -215,6 +217,8 @@ public class ExportTaskService {
     }
 
     private void completeArtifact(ExportTask task, ExportResult result) throws java.io.IOException {
+        if (result.getDefinitionSnapshot() == null) throw new MetaServiceException("Export definition evidence is missing");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) task.getRequestParams()).set("definition", result.getDefinitionSnapshot());
             java.nio.file.Path source = java.nio.file.Path.of(result.getFilePath());
             String extension = source.getFileName().toString();
             extension = extension.substring(extension.lastIndexOf('.'));
