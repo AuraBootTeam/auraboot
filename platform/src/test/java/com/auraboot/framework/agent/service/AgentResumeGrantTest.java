@@ -35,4 +35,25 @@ class AgentResumeGrantTest {
         assertThat(gate.consumeResumeGrant(7L, null, "approval", "write", Map.of())).isFalse();
         verifyNoInteractions(data);
     }
+    @Test void requiredApprovalWithoutPolicyDeniesInsteadOfReturningPermission() {
+        when(data.selectByQuery(anyString(), anyMap())).thenReturn(java.util.List.of());
+        assertThatThrownBy(() -> gate.checkAndRequestApproval(7L, "run", "task", "write", "Write", Map.of(), true))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessageContaining("no matching policy");
+        verify(data, never()).updateByQuery(anyString(), anyMap());
+        verify(data, never()).insert(anyString(), anyMap());
+    }
+
+    @Test void ordinaryToolGateClaimsOnlyTheCurrentPayload() {
+        when(data.selectByQuery(anyString(), anyMap())).thenReturn(java.util.List.of(Map.of(
+                "pid", "policy", "trigger_rules", "[{\"type\":\"tool_call\",\"pattern\":\"write\"}]")));
+        when(data.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        var input = Map.<String, Object>of("recipient", "current");
+        assertThat(gate.checkAndRequestApproval(7L, "run", "task", "write", "Write", input, true)).isNull();
+        @SuppressWarnings("unchecked") ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
+        verify(data).updateByQuery(contains("plan_snapshot::jsonb"), params.capture());
+        assertThat(params.getValue()).containsEntry("payload", "{\"recipient\":\"current\"}");
+        verify(data, never()).insert(anyString(), anyMap());
+    }
+
 }

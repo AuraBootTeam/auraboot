@@ -79,35 +79,13 @@ public class AgentApprovalGateService {
             return null;
         }
         if (toolRequiresApproval && matched == null) {
-            // Fail-secure：tool 要求审批但 tenant 未配置匹配的 policy → 拒绝创建 approval。
-            // 这会让调用方（CommandPipeline / SkillEngine）把 run 标失败，强制 tenant 补齐 policy。
-            // 理由：policy_id=null 的 approval 谁能批？之前的 fail-open 允许任意 tenant 用户批是严重漏洞。
-            log.error("Tool requires approval but no matching approval policy configured. " +
-                            "Refusing to create approval (fail-secure). tenant={}, tool={}, run={}. " +
-                            "Action: tenant admin must configure an ab_approval_policy with a tool_call " +
-                            "trigger_rule matching this tool.",
-                    tenantId, toolCode, runId);
-            return null;
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Required tool approval has no matching policy: " + toolCode);
         }
 
-        // F8 (execution-architecture review, 2026-07-20): an APPROVED approval for
-        // this task+tool GRANTS execution — do not gate again.
-        //
-        // Live-reproduced infinite approval loop: approving a pending request
-        // resumes the task as a NEW run, whose idempotency key ({newRunId}:{tool})
-        // misses the approved row, so the gate minted yet another pending approval —
-        // forever, and the approved action never executed. Human approval that does
-        // not actually authorize anything is worse than no gate: the user thinks
-        // they approved, nothing happens, and the audit trail fills with orphans.
-        //
-        // Scoped by task_id (stable across the resume hop, unlike run_id) + tool
-        // code, and consumed exactly once: the row is stamped consumed_at so a later
-        // run cannot replay the same grant (double-execution guard, mirroring
-        // approveAndExecute's already-APPROVED block).
-        String grantedPid = findConsumableGrant(tenantId, taskId, toolCode);
-        if (grantedPid != null) {
-            log.info("Approval grant consumed: pid={}, tool={}, task={} — proceeding with execution",
-                    grantedPid, toolCode, taskId);
+        // Both new tool calls and saved steps require the same exact grant.
+        if (consumeResumeGrant(tenantId, taskId, null, toolCode, requestData)) {
+            log.info("Exact approval grant consumed: tool={}, task={}", toolCode, taskId);
             return null;
         }
 
@@ -166,16 +144,7 @@ public class AgentApprovalGateService {
         }
     }
 
-    /**
-     * F8: find an APPROVED, not-yet-consumed approval for this task+tool and claim
-     * it. Returns the pid when this caller won the claim (execution may proceed),
-     * null otherwise.
-     *
-     * <p>The claim is a conditional UPDATE ({@code consumed_at IS NULL}) so two
-     * concurrent runs racing on the same grant cannot both execute — the loser
-     * sees 0 rows updated and falls through to the normal gate.
-     */
-    /** Claims one exact approved payload before a saved step may bypass its approval gate. */
+    /** Claims one exact approved payload before a tool call or saved step may bypass its approval gate. */
     public boolean consumeResumeGrant(Long tenantId, String taskId, String approvalPid,
                                       String toolCode, Map<String, Object> input) {
         if (tenantId == null || taskId == null || toolCode == null || input == null) return false;
@@ -206,37 +175,6 @@ public class AgentApprovalGateService {
         }
         claim += " ORDER BY updated_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED)";
         return dynamicDataMapper.updateByQuery(claim, params) == 1;
-    }
-
-    private String findConsumableGrant(Long tenantId, String taskId, String toolCode) {
-        if (taskId == null || taskId.isBlank()) {
-            return null;
-        }
-        // Claim in ONE statement: the WHERE carries the unconsumed predicate, so two
-        // concurrent runs racing on the same grant cannot both win (the loser updates
-        // 0 rows). A read-then-write pair would leave a TOCTOU window, and the
-        // map-based updater cannot express "consumed_at IS NULL" (null keys are
-        // rejected / would render as `= NULL`, which never matches).
-        String claimSql = "UPDATE ab_agent_approval SET consumed_at = NOW(), updated_at = NOW() "
-                + "WHERE pid = ( "
-                + "  SELECT pid FROM ab_agent_approval "
-                + "   WHERE tenant_id = #{params.tenantId} AND task_id = #{params.taskId} "
-                + "     AND approval_status = 'approved' AND consumed_at IS NULL "
-                + "     AND approval_description = #{params.toolDesc} "
-                + "   ORDER BY updated_at DESC LIMIT 1 "
-                + "  FOR UPDATE SKIP LOCKED )";
-        Map<String, Object> params = Map.of(
-                "tenantId", tenantId, "taskId", taskId, "toolDesc", "Tool: " + toolCode);
-        int claimed = dynamicDataMapper.updateByQuery(claimSql, params);
-        if (claimed <= 0) {
-            return null;
-        }
-        String pidSql = "SELECT pid FROM ab_agent_approval "
-                + "WHERE tenant_id = #{params.tenantId} AND task_id = #{params.taskId} "
-                + "AND approval_description = #{params.toolDesc} AND consumed_at IS NOT NULL "
-                + "ORDER BY consumed_at DESC LIMIT 1";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(pidSql, params);
-        return rows.isEmpty() ? null : (String) rows.get(0).get("pid");
     }
 
     /** Immutable holder for a matched policy — used for both timeout and policy_id linkage. */
