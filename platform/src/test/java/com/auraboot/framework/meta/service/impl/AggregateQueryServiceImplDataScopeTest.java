@@ -164,4 +164,21 @@ class AggregateQueryServiceImplDataScopeTest {
         query.setActionCode("read");
         return query;
     }
+    @Test
+    void semanticSourceDoesNotRequireAnUnrelatedDynamicModel() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("revenue");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.execute(request))
+                .hasMessage("Semantic query service is unavailable");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
+    }
+
+    @Test
+    void invalidSemanticSourceCannotReachAnExecutor() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("invalid;source");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.execute(request))
+                .hasMessage("Invalid semantic model code format");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
+    }
 }

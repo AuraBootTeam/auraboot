@@ -47,8 +47,6 @@ metrics:
     const chart = await request.post('/api/meta/chart-data', {
       data: {
         type: 'aggregate',
-        // An ordinary transport model hint must not authorize the semantic source.
-        modelCode: 'e2et_order',
         semanticModelCode: code,
         metrics: [{ field: 'total', aggregation: 'count', alias: 'total' }],
         limit: 5,

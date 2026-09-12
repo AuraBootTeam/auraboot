@@ -79,6 +79,9 @@ metrics:
     { region: 'East', revenue: 120 },
     { region: 'West', revenue: 80 },
   ];
+  const chart = await request.post('/api/meta/chart-data', { data: query });
+  expect(chart.status(), await chart.text()).toBe(200);
+  expect(normalized((await chart.json()).data.rows)).toEqual(expected);
   const { type: queryType, ...toolQuery } = query;
   expect(queryType).toBe('aggregate');
   const chat = await request.post('/api/ai/aurabot/chat/stream', {
@@ -175,17 +178,15 @@ metrics:
   const artifact = await exported.json();
   expect(normalized(artifact.dataSets.revenue)).toEqual(expected);
   expect(artifact.reportDsl.dataSources.revenue.aggregateQuery).toEqual(analysis.dataSource);
-  await test
-    .info()
-    .attach('semantic-artifact-consistency', {
-      body: JSON.stringify({
-        key,
-        dashboardPid,
-        reportPid,
-        expected,
-        query: analysis.dataSource,
-        artifact,
-      }),
-      contentType: 'application/json',
-    });
+  await test.info().attach('semantic-artifact-consistency', {
+    body: JSON.stringify({
+      key,
+      dashboardPid,
+      reportPid,
+      expected,
+      query: analysis.dataSource,
+      artifact,
+    }),
+    contentType: 'application/json',
+  });
 });

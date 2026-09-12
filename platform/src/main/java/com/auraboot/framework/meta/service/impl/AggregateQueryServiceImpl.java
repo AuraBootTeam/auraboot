@@ -749,7 +749,11 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             throw new MetaServiceException("Aggregate query request cannot be null");
         }
 
-        if ("namedQuery".equals(request.getType())) {
+        if (request.getSemanticModelCode() != null && !request.getSemanticModelCode().isBlank()) {
+            if (!IDENTIFIER_PATTERN.matcher(request.getSemanticModelCode()).matches()) {
+                throw new MetaServiceException("Invalid semantic model code format");
+            }
+        } else if ("namedQuery".equals(request.getType())) {
             if (request.getQueryCode() == null || request.getQueryCode().isBlank()) {
                 throw new MetaServiceException("Query code is required for named queries");
             }
