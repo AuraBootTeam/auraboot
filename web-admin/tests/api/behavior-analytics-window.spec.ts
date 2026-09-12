@@ -123,6 +123,11 @@ test('anonymous site-key collect rejects server provenance and records a genuine
   request,
   playwright,
 }) => {
+  const me = await request.get('/api/auth/me');
+  expect(me.status()).toBe(200);
+  const userId = (await me.json()).data.user.id;
+  expect(typeof userId).toBe('string');
+  expect(userId).toMatch(/^\d+$/);
   const name = `Provenance ${randomUUID()}`;
   const created = await request.post('/api/meta/commands/execute/behavior_site_key:create', {
     data: { payload: { name } },
@@ -153,7 +158,7 @@ test('anonymous site-key collect rejects server provenance and records a genuine
       eventCategory: 'navigation',
       source: 'web',
       schemaVersion: '1',
-      anonId: randomUUID(),
+      anonId: userId,
       clientSessionId: randomUUID(),
       occurredAt: params.from,
     };
@@ -188,6 +193,34 @@ test('anonymous site-key collect rejects server provenance and records a genuine
         return (await response.json()).data.records[0];
       })
       .toEqual({ totalEvents: 1, pageViews: 1, uniqueVisitors: 1, sessions: 1 });
+    const authenticated = await request.post('/api/collect', {
+      data: {
+        events: [
+          { ...client, eventId: randomUUID() },
+          { ...client, anonId: randomUUID(), eventId: randomUUID() },
+        ],
+      },
+    });
+    expect(authenticated.status()).toBe(200);
+    expect((await authenticated.json()).accepted).toBe(2);
+    const otherVisitor = await anonymous.post('/api/collect/keyed', {
+      headers,
+      data: { events: [{ ...client, anonId: randomUUID(), eventId: randomUUID() }] },
+    });
+    expect(otherVisitor.status()).toBe(200);
+    expect((await otherVisitor.json()).accepted).toBe(1);
+    await expect
+      .poll(async () => {
+        const response = await request.get('/api/analytics/behavior/overview', { params });
+        expect(response.status()).toBe(200);
+        return (await response.json()).data.records[0];
+      })
+      .toEqual({ totalEvents: 4, pageViews: 4, uniqueVisitors: 3, sessions: 3 });
+    const daily = await request.get('/api/analytics/behavior/daily', { params });
+    expect(daily.status()).toBe(200);
+    expect(await daily.json()).toEqual([
+      { day: params.from.slice(0, 10), totalEvents: 4, pageViews: 4, uniqueVisitors: 3 },
+    ]);
     const unknown = await anonymous.post('/api/collect/keyed', {
       headers: { ...headers, 'X-Site-Key': `abk_${randomUUID().replaceAll('-', '')}` },
       data: { events: [{ ...client, eventId: randomUUID() }] },
