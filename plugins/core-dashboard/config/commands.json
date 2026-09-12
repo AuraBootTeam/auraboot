@@ -1,0 +1,101 @@
+[
+  {
+    "code": "core_dashboard:propose_suggestion",
+    "modelCode": "core_dashboard_suggestion",
+    "type": "custom",
+    "displayName:zh-CN": "\u5f62\u6210\u5efa\u8bae\u7248\u672c",
+    "displayName:en": "Create suggestion version",
+    "handler": "core_dashboard:propose_suggestion",
+    "handlerParams": {
+      "dslPersistence": false
+    },
+    "permissions": [
+      "analytics.suggestion.propose"
+    ],
+    "idempotent": true,
+    "cmd_risk_level": "L2",
+    "agent_hint": "Persist an explicit, source-verified suggestion version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "analysisId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Use the analysisId returned by a successful analysis owned by the current user."
+        },
+        "query": {
+          "type": "object",
+          "description": "The exact dataSource returned by that analysis; never invent or edit the query.",
+          "additionalProperties": true
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "previousPid": {
+          "type": "string",
+          "minLength": 26,
+          "maxLength": 26
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "A stable caller-generated UUID reused only for an exact retry."
+        }
+      },
+      "required": [
+        "analysisId",
+        "query",
+        "title",
+        "content",
+        "requestId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "code": "core_dashboard:adopt_suggestion",
+    "modelCode": "core_dashboard_adoption",
+    "type": "custom",
+    "displayName:zh-CN": "\u91c7\u7eb3\u5efa\u8bae\u7248\u672c",
+    "displayName:en": "Adopt suggestion version",
+    "handler": "core_dashboard:adopt_suggestion",
+    "handlerParams": {
+      "dslPersistence": false
+    },
+    "permissions": [
+      "analytics.suggestion.adopt"
+    ],
+    "idempotent": true,
+    "cmd_risk_level": "L2",
+    "agent_hint": "User confirmation only. Agent execution principals cannot adopt suggestions. Adoption does not execute the suggestion.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "versionPid": {
+          "type": "string",
+          "minLength": 26,
+          "maxLength": 26,
+          "description": "The exact immutable version the user explicitly confirms."
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "A stable caller-generated UUID reused only for an exact retry."
+        }
+      },
+      "required": [
+        "versionPid",
+        "requestId"
+      ],
+      "additionalProperties": false
+    }
+  }
+]
