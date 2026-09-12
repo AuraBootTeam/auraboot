@@ -19,6 +19,7 @@ interface ReportToolbarProps {
   onExportJson?: () => void;
   onToggleVersionHistory?: () => void;
   versionCount?: number;
+  exportReady?: boolean;
 }
 
 export const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -29,6 +30,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onExportJson,
   onToggleVersionHistory,
   versionCount,
+  exportReady = true,
 }) => {
   const { isSaving, previewMode, pageId } = useReportStore();
   const text = useSmartText();
@@ -38,7 +40,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
 
   if (!report) return null;
 
-  const exportDisabled = isDirty || isSaving || !pageId;
+  const exportDisabled = isDirty || isSaving || !pageId || !exportReady;
 
   const titleInput = (
     <input
@@ -131,7 +133,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         )}
       </DesignerToolbar>
 
-      {exportDisabled && (
+      {(isDirty || isSaving || !pageId) && (
         <p
           id="report-export-status"
           role="status"

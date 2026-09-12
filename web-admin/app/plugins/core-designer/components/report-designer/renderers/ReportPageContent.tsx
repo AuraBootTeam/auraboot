@@ -8,11 +8,11 @@ import { useSmartText } from '~/utils/i18n';
 import React, { useEffect, useState, useCallback } from 'react';
 import type { ReportDsl } from '../types';
 import { reportDesignerService } from '../services/reportDesignerService';
-import { fetchReportData } from '../services/fetchReportData';
+import { useReportQuery } from '../services/useReportQuery';
+import { ReportQueryControls } from '../components/ReportQueryControls';
 import { ReportTableBlockRenderer } from './ReportTableBlockRenderer';
 import { ReportBandRenderer } from './ReportBandRenderer';
 import { ReportPageSkeleton } from './ReportPageSkeleton';
-import { ParametersBar } from '../components/ParametersBar';
 import { ReportGroupedTableBlock } from '../blocks/ReportGroupedTableBlock';
 import { ReportStatCardBlock } from '../blocks/ReportStatCardBlock';
 import { ReportRichTextBlock } from '../blocks/ReportRichTextBlock';
@@ -27,17 +27,11 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
   const text = useSmartText();
   const [report, setReport] = useState<ReportDsl | null>(null);
   const [reportPid, setReportPid] = useState<string | null>(null);
-  const [dataSets, setDataSets] = useState<Record<string, Record<string, unknown>[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [paramValues, setParamValues] = useState<Record<string, string>>({});
-
-  const loadData = useCallback(async (dsl: ReportDsl, params?: Record<string, string>) => {
-    // Apply parameter bindings to data source filters
-    const data = await fetchReportData(dsl, params);
-    setDataSets(data);
-  }, []);
+  const query = useReportQuery(report);
+  const { dataSets } = query;
 
   useEffect(() => {
     let mounted = true;
@@ -50,15 +44,6 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         if (!mounted) return;
         setReport(result.dsl);
         setReportPid(result.pid);
-
-        // Initialize default param values
-        const defaults: Record<string, string> = {};
-        (result.dsl.parameters || []).forEach((p) => {
-          if (p.defaultValue) defaults[p.name] = p.defaultValue;
-        });
-        setParamValues(defaults);
-
-        await loadData(result.dsl, defaults);
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof Error ? err.message : 'Failed to load report');
@@ -71,26 +56,13 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     return () => {
       mounted = false;
     };
-  }, [pageKey, loadData]);
-
-  const handleApplyParams = useCallback(async () => {
-    if (!report) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await loadData(report, paramValues);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Report data failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [report, paramValues, loadData]);
+  }, [pageKey]);
 
   const handleExportPdf = useCallback(async () => {
-    if (!report || !reportPid) return;
+    if (!report || !reportPid || !query.canExport) return;
     setExporting(true);
     try {
-      const blob = await reportDesignerService.exportPdf(reportPid, paramValues);
+      const blob = await reportDesignerService.exportPdf(reportPid, query.appliedParameters);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -105,7 +77,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     } finally {
       setExporting(false);
     }
-  }, [report, reportPid, paramValues]);
+  }, [report, reportPid, query.canExport, query.appliedParameters]);
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -131,7 +103,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         <div className="flex gap-2">
           <button
             onClick={handleExportPdf}
-            disabled={exporting}
+            disabled={exporting || !query.canExport}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {exporting ? 'Exporting...' : 'Export PDF'}
@@ -149,15 +121,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
         <p className="mb-6 text-sm text-gray-600 print:hidden">{report.description}</p>
       )}
 
-      {/* Parameters Bar */}
-      {report.parameters && report.parameters.length > 0 && (
-        <ParametersBar
-          parameters={report.parameters}
-          values={paramValues}
-          onChange={setParamValues}
-          onApply={handleApplyParams}
-        />
-      )}
+      <ReportQueryControls report={report} query={query} />
 
       <p className="mb-4 text-sm text-gray-500 print:hidden">
         {text({

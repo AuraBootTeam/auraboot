@@ -322,6 +322,38 @@ test('report export API applies declared model parameters and rejects missing re
     path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-default.png`,
     fullPage: true,
   });
+
+  const downloadCurrent = async (expected: string, label: string) => {
+    const event = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+    const artifact = await event;
+    const path = `${process.env.AURA_EVIDENCE_DIR}/report-parameters-${label}.json`;
+    await artifact.saveAs(path);
+    const payload = JSON.parse(await readFile(path, 'utf8'));
+    expect(payload.dataSets.orders).toHaveLength(1);
+    expect(payload.dataSets.orders[0].e2et_order_title).toBe(expected);
+  };
+  await page.getByRole('textbox', { name: 'Order', exact: true }).fill(`${title}B`);
+  await expect(page.getByRole('cell', { name: `${title}A`, exact: true })).toBeVisible();
+  await downloadCurrent(`${title}A`, 'draft');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.getByRole('cell', { name: `${title}B`, exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: `${title}A`, exact: true })).toHaveCount(0);
+  await downloadCurrent(`${title}B`, 'applied');
+  await page.getByRole('textbox', { name: 'Order', exact: true }).fill('');
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('查询未成功');
+  await expect(page.getByRole('textbox', { name: 'Order', exact: true })).toHaveValue('');
+  await expect(page.getByRole('cell', { name: `${title}B`, exact: true })).toBeVisible();
+  await downloadCurrent(`${title}B`, 'rejected');
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-parameter-error-recovery.png`,
+    fullPage: true,
+  });
+  await page.getByRole('textbox', { name: 'Order', exact: true }).fill(`${title}A`);
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await expect(page.getByRole('cell', { name: `${title}A`, exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
   for (const [parameters, expected] of [
     [undefined, `${title}A`],
     [{ order: `${title}B` }, `${title}B`],

@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { ReportParameter } from '../types';
 
 interface ParametersBarProps {
@@ -11,6 +12,7 @@ interface ParametersBarProps {
   values: Record<string, string>;
   onChange: (values: Record<string, string>) => void;
   onApply: () => void;
+  disabled?: boolean;
 }
 
 export const ParametersBar: React.FC<ParametersBarProps> = ({
@@ -18,7 +20,9 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
   values,
   onChange,
   onApply,
+  disabled = false,
 }) => {
+  const text = useSmartText();
   if (parameters.length === 0) return null;
 
   const handleChange = (name: string, value: string) => {
@@ -36,7 +40,8 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
             </label>
             {param.type === 'select' ? (
               <select
-                value={values[param.name] || param.defaultValue || ''}
+                aria-label={param.label}
+                value={values[param.name] ?? param.defaultValue ?? ''}
                 onChange={(e) => handleChange(param.name, e.target.value)}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
@@ -49,8 +54,9 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
               </select>
             ) : param.type === 'date' ? (
               <input
+                aria-label={param.label}
                 type="date"
-                value={values[param.name] || param.defaultValue || ''}
+                value={values[param.name] ?? param.defaultValue ?? ''}
                 onChange={(e) => handleChange(param.name, e.target.value)}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
@@ -58,6 +64,7 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
               <div className="flex items-center gap-1">
                 <input
                   type="date"
+                  aria-label={`${param.label} start`}
                   value={values[`${param.name}_start`] || ''}
                   onChange={(e) => handleChange(`${param.name}_start`, e.target.value)}
                   className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -65,6 +72,7 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
                 <span className="text-xs text-gray-400">to</span>
                 <input
                   type="date"
+                  aria-label={`${param.label} end`}
                   value={values[`${param.name}_end`] || ''}
                   onChange={(e) => handleChange(`${param.name}_end`, e.target.value)}
                   className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -72,15 +80,17 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
               </div>
             ) : param.type === 'number' ? (
               <input
+                aria-label={param.label}
                 type="number"
-                value={values[param.name] || param.defaultValue || ''}
+                value={values[param.name] ?? param.defaultValue ?? ''}
                 onChange={(e) => handleChange(param.name, e.target.value)}
                 className="w-32 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             ) : (
               <input
+                aria-label={param.label}
                 type="text"
-                value={values[param.name] || param.defaultValue || ''}
+                value={values[param.name] ?? param.defaultValue ?? ''}
                 onChange={(e) => handleChange(param.name, e.target.value)}
                 className="w-48 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 placeholder={param.label}
@@ -90,9 +100,10 @@ export const ParametersBar: React.FC<ParametersBarProps> = ({
         ))}
         <button
           onClick={onApply}
-          className="flex-shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700"
+          disabled={disabled}
+          className="flex-shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Apply
+          {text({ zh: '应用', en: 'Apply' })}
         </button>
       </div>
     </div>

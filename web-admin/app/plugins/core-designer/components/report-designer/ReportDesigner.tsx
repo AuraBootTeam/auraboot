@@ -27,7 +27,8 @@ import { ReportBarcodeBlock } from './blocks/ReportBarcodeBlock';
 import { ReportWatermarkBlock } from './blocks/ReportWatermarkBlock';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
-import { fetchReportData } from './services/fetchReportData';
+import { useReportQuery, type ReportQuery } from './services/useReportQuery';
+import { ReportQueryControls } from './components/ReportQueryControls';
 import { reportDesignerService } from './services/reportDesignerService';
 import { createEmptyReport, type ReportDsl } from './types';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
@@ -111,6 +112,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       if (pageId) loadReportById(pageId);
     },
   });
+
+  const previewQuery = useReportQuery(report, previewMode && !versioning.viewingVersionPid);
 
   // Load or create on mount
   useEffect(() => {
@@ -215,13 +218,16 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Excel Export
   const handleExportExcel = useCallback(async () => {
-    if (isDirty || isSaving) return;
+    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to Excel.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportExcel(pageId);
+      const blob = await reportDesignerService.exportExcel(
+        pageId,
+        previewMode ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -234,17 +240,28 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Excel export failed:', error);
       alert(error instanceof Error ? error.message : 'Excel export failed');
     }
-  }, [report, pageId, isDirty, isSaving]);
+  }, [
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    previewMode,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
 
   // JSON Export
   const handleExportJson = useCallback(async () => {
-    if (isDirty || isSaving) return;
+    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to JSON.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportJson(pageId);
+      const blob = await reportDesignerService.exportJson(
+        pageId,
+        previewMode ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -257,17 +274,28 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('JSON export failed:', error);
       alert(error instanceof Error ? error.message : 'JSON export failed');
     }
-  }, [report, pageId, isDirty, isSaving]);
+  }, [
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    previewMode,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
-    if (isDirty || isSaving) return;
+    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to PDF.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportPdf(pageId);
+      const blob = await reportDesignerService.exportPdf(
+        pageId,
+        previewMode ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -280,7 +308,15 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('PDF export failed:', error);
       alert(error instanceof Error ? error.message : 'PDF export failed');
     }
-  }, [report, pageId, isDirty, isSaving]);
+  }, [
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    previewMode,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
 
   const historyPanel = (
     <VersionHistoryPanel
@@ -359,6 +395,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     return (
       <div className="flex h-screen flex-col bg-gray-50">
         <ReportToolbar
+          exportReady={previewQuery.canExport}
           onSave={handleSave}
           onPreview={handlePreview}
           onExportPdf={handleExportPdf}
@@ -368,7 +405,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
           versionCount={versioning.versions.length}
         />
         <div className="flex-1 overflow-auto">
-          <PreviewContent report={report} />
+          <PreviewContent report={report} query={previewQuery} />
         </div>
         {historyPanel}
       </div>
@@ -409,51 +446,18 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = (props) => {
 /**
  * Preview content fetches data and renders runtime view
  */
-const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ report }) => {
+const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
+  report,
+  query: supplied,
+}) => {
   const text = useSmartText();
-  const [failed, setFailed] = React.useState(false);
-  const [dataSets, setDataSets] = React.useState<Record<string, Record<string, unknown>[]>>({});
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setFailed(false);
-    fetchReportData(report)
-      .then((data) => {
-        if (mounted) setDataSets(data);
-      })
-      .catch(() => {
-        if (mounted) setFailed(true);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [report]);
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (failed)
-    return (
-      <div role="alert" className="m-8 text-red-600">
-        {text({
-          zh: '报表数据加载失败，请检查数据源和访问权限后重新预览。',
-          en: 'Report data could not be loaded. Check the data source and access permissions, then reopen preview.',
-        })}
-      </div>
-    );
+  const internal = useReportQuery(report, !supplied);
+  const query = supplied ?? internal;
+  const { dataSets } = query;
 
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+      <ReportQueryControls report={report} query={query} />
       <p className="mb-4 text-sm text-gray-500">
         {text({
           zh: '模型和命名查询数据源最多预览 500 行；下载请使用服务端导出。',
