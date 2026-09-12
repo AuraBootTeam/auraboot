@@ -21,7 +21,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   AUTOMATION: '自动化',
   SLA_RULE: 'SLA 规则',
   EVENT_POLICY: '事件策略',
-  BPM_PROCESS: 'BPM 流程',
+  WORKFLOW_PROCESS: 'BPM 流程',
   DECISION_VERSION: '决策版本',
   NAMED_QUERY: '命名查询',
   PERMISSION: '权限策略',

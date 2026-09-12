@@ -173,9 +173,6 @@ springdoc:
     - group: auth
       paths-to-match: /api/auth/**
       display-name: Authentication
-    - group: bpm
-      paths-to-match: /api/bpm/**
-      display-name: BPM / Workflow
     - group: connectors
       paths-to-match: /api/connectors/**
       display-name: API Connectors
@@ -513,10 +510,6 @@ aura:
     #   username: guest
     #   password: guest
     #   exchange: aura-exchange
-
-  # BPM engine abstraction layer (GAP-027)
-  bpm:
-    engine: smartengine  # smartengine | camunda | flowable
 
   # Event bus transport layer (GAP-105)
   event:

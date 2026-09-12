@@ -231,8 +231,8 @@ class AutomationDecisionIntegrationTest {
     }
 
     private static org.springframework.beans.factory.ObjectProvider<
-            com.auraboot.framework.automation.bpm.AutomationProcessRuntime> emptyRuntimeProvider() {
+            com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime> emptyRuntimeProvider() {
         return new org.springframework.beans.factory.support.StaticListableBeanFactory()
-                .getBeanProvider(com.auraboot.framework.automation.bpm.AutomationProcessRuntime.class);
+                .getBeanProvider(com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.class);
     }
 }

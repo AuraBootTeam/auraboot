@@ -33,6 +33,8 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
@@ -200,13 +202,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         safeTrigger.run();
     }
 
-    // Lazy lookup (mirrors getAutomationTriggerService) for F3 record-level SLA activation.
-    private com.auraboot.framework.bpm.listener.SlaActivationListener getSlaActivationListener() {
-        return applicationContext.getBean(com.auraboot.framework.bpm.listener.SlaActivationListener.class);
-    }
-
     private PermissionFacade getPermissionFacade() {
         return applicationContext.getBean(PermissionFacade.class);
+    }
+
+    private WorkflowCapabilityRegistry getWorkflowCapabilityRegistry() {
+        return applicationContext.getBean(WorkflowCapabilityRegistry.class);
     }
 
     private PermissionAuditService getPermissionAuditService() {
@@ -1539,12 +1540,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 () -> getAutomationTriggerService()
                         .onRecordCreate(modelCode, recordIdValue, automationRecord));
 
-        // F3: activate record-level SLA (targetType=RECORD) for this model, if any.
-        try {
-            getSlaActivationListener().onRecordCreate(modelCode, recordIdValue, createdRecord);
-        } catch (Exception e) {
-            log.error("Failed to activate record-level SLA for create: model={}, id={}: {}",
-                    logSafe(modelCode), logSafe(recordIdValue), logSafe(e.getMessage()), e);
+        // Optional product lifecycle hook. The platform remains valid without a workflow provider.
+        WorkflowCapabilityRegistry workflowCapabilities = getWorkflowCapabilityRegistry();
+        if (workflowCapabilities.available("record.created")) {
+            try {
+                workflowCapabilities.execute("record.created", new WorkflowCapability.WorkflowRequest(
+                        MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), Map.of(
+                        "modelCode", modelCode,
+                        "recordPid", recordIdValue,
+                        "record", automationRecord)));
+            } catch (Exception e) {
+                log.error("Failed to dispatch optional record lifecycle capability: model={}, id={}: {}",
+                        logSafe(modelCode), logSafe(recordIdValue), logSafe(e.getMessage()), e);
+            }
         }
 
         return createdRecord;

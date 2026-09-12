@@ -15,6 +15,7 @@ import {
 } from '~/shared/decision/api/decisionApi';
 import { decisionStatusLabel } from '~/shared/decision/ui/statusLabels';
 import { valueLabel } from '~/shared/decision/ui/displayLabels';
+import { getKernel } from '~/framework/bootstrap';
 
 interface ExecutionLogTraceBlockProps {
   block?: {
@@ -443,27 +444,19 @@ function permissionAuditHref(log: DecisionLogRecord): string | undefined {
   return `/enterprise/permissions?${params.toString()}`;
 }
 
-function slaConfigHref(log: DecisionLogRecord): string | undefined {
-  const callerRef = stringValue(log.callerRef);
-  if (!callerRef || !isSlaLog(log)) return undefined;
-  return `/p/sla_config/view/${encodeURIComponent(callerRef)}`;
-}
-
 function automationHref(log: DecisionLogRecord): string | undefined {
   const callerRef = stringValue(log.callerRef);
   if (!callerRef || !isAutomationLog(log)) return undefined;
   return `/automation/${encodeURIComponent(callerRef)}`;
 }
 
-function bpmProcessStatusHref(log: DecisionLogRecord): string | undefined {
-  if (!isBpmLog(log)) return undefined;
-  const correlationId = stringValue(log.correlationId);
-  if (!correlationId?.startsWith('bpm-')) return undefined;
-  const marker = correlationId.lastIndexOf('-');
-  if (marker <= 'bpm-'.length) return undefined;
-  const processInstanceId = correlationId.slice('bpm-'.length, marker);
-  if (!processInstanceId) return undefined;
-  return `/bpm/process-status?processInstanceId=${encodeURIComponent(processInstanceId)}`;
+function contributedTraceLink(log: DecisionLogRecord): { href: string; label: string } | undefined {
+  const provider = getKernel().contributionRegistry.getPrimaryService(
+    'aura.decision.trace-navigation',
+  )?.provider as
+    | { resolveLink?: (log: DecisionLogRecord) => { href: string; label: string } | undefined }
+    | undefined;
+  return provider?.resolveLink?.(log);
 }
 
 function eventPolicyCode(log: DecisionLogRecord): string | undefined {
@@ -822,14 +815,6 @@ function isAutomationLog(log: DecisionLogRecord): boolean {
 
 function isPermissionLog(log: DecisionLogRecord): boolean {
   return String(log.callerType ?? '').toUpperCase() === 'PERMISSION';
-}
-
-function isSlaLog(log: DecisionLogRecord): boolean {
-  return String(log.callerType ?? '').toUpperCase() === 'SLA';
-}
-
-function isBpmLog(log: DecisionLogRecord): boolean {
-  return String(log.callerType ?? '').toUpperCase() === 'BPM';
 }
 
 function orderedPayloadEntries(payload?: Record<string, unknown>) {
@@ -1507,22 +1492,17 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   打开权限审计
                 </a>
               ) : null}
-              {slaConfigHref(selectedLog) ? (
-                <a data-testid="elta-open-sla-config" href={slaConfigHref(selectedLog)}>
-                  打开 SLA 配置
-                </a>
-              ) : null}
               {automationHref(selectedLog) ? (
                 <a data-testid="elta-open-automation" href={automationHref(selectedLog)}>
                   打开自动化
                 </a>
               ) : null}
-              {bpmProcessStatusHref(selectedLog) ? (
+              {contributedTraceLink(selectedLog) ? (
                 <a
-                  data-testid="elta-open-bpm-process-status"
-                  href={bpmProcessStatusHref(selectedLog)}
+                  data-testid="elta-open-product-trace"
+                  href={contributedTraceLink(selectedLog)?.href}
                 >
-                  打开流程状态
+                  {contributedTraceLink(selectedLog)?.label}
                 </a>
               ) : null}
               {eventPolicyDetailHref(selectedLog) ? (

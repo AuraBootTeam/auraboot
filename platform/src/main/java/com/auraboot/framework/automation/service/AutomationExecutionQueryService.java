@@ -10,7 +10,7 @@ import java.util.List;
  *
  * <p>Powers the designer's runtime overlay — given an {@code ab_automation_log.id},
  * returns the per-node execution rows that the
- * {@link com.auraboot.framework.automation.bpm.AutomationActionServiceTaskDelegate}
+ * {@link com.auraboot.framework.automation.workflow.AutomationActionAccessorImpl}
  * wrote during the run. Tenant filtering is mandatory and resolved from
  * {@link com.auraboot.framework.application.tenant.MetaContext}.
  */

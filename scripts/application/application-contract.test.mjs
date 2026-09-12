@@ -24,6 +24,7 @@ function manifest() {
     app: { id: 'aura-crm', name: 'Aura CRM', version: '1.0.0', defaultRoute: '/crm' },
     platform: {
       runtime: '1.3.0',
+      baseImage: { id: 'auraboot-runtime', version: '1.3.0' },
       pluginApi: '1.3.0',
       webShell: '1.3.0',
       pluginSdk: '1.3.0',
@@ -53,6 +54,7 @@ function catalog() {
   return {
     artifacts: [
       artifact('runtime', 'com.auraboot:runtime', '1.3.0', '1'),
+      artifact('oci', 'auraboot-runtime', '1.3.0', 'c'),
       { ...artifact('maven', 'com.auraboot:platform-plugin-api', '1.3.0', '2'), uri: 'maven:com.auraboot:platform-plugin-api:1.3.0' },
       artifact('npm', '@auraboot/web-shell', '1.3.0', '3'),
       artifact('npm', '@auraboot/plugin-sdk', '1.3.0', '4'),
@@ -97,7 +99,7 @@ describe('AuraBoot application contract', () => {
     const second = resolveFixture();
 
     assert.deepEqual(first, second);
-    assert.equal(first.artifacts.length, 11);
+    assert.equal(first.artifacts.length, 12);
     assert.match(first.identity, /^sha256:[0-9a-f]{64}$/);
     assert.doesNotThrow(() => validateLock(first));
   });

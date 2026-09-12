@@ -11,7 +11,7 @@ import java.util.Map;
  * {@code ab_agent_run + ab_agent_observation} rows.
  */
 public record ExtractionSignal(
-        String type,            // "tool_call" | "tool_response" | "bpm_event"
+        String type,            // "tool_call" | "tool_response" | "workflow_event"
         String name,            // tool name / event type
         Map<String, Object> payload  // arbitrary structured data
 ) {

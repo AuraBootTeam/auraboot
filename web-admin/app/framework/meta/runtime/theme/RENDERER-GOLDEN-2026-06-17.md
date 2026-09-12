@@ -377,7 +377,7 @@ import was driven via the platform endpoint (`ListModals` wires the same API):
 3. Real import (`POST /api/meta/excel/import/crm_account`) =
    `successCount:2, createdCount:2, errorCount:0`.
 4. DB count **6 → 8**; the 2 imported rows (`IMP-001 Imported Wayne Enterprises`,
-   `IMP-002 Imported Cyberdyne Systems`) appear in `mt_crm_account` AND in the
+   `IMP-002 Imported Cyberdyne Systems`) appear in the product-owned account table AND in the
    reloaded list UI (`/tmp/cg-7-list-after-import.png`, 8 rows).
 
 **No permission 403** (unlike the T9 export gap): the import endpoint is

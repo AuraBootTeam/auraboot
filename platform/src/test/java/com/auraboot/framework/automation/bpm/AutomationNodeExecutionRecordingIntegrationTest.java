@@ -1,5 +1,7 @@
 package com.auraboot.framework.automation.bpm;
 
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
+
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.dto.AutomationNodeExecutionDTO;
 import com.auraboot.framework.automation.entity.Automation;
@@ -30,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * G5 — node-execution recording end-to-end IT.
  *
- * <p>Drives a real SmartEngine run through {@link AutomationProcessRuntime} with a
+ * <p>Drives a real SmartEngine run through {@link AutomationWorkflowRuntime} with a
  * marker action executor, then asserts that
  * {@link com.auraboot.framework.automation.entity.AutomationNodeExecution} rows
  * were persisted with the right tenant_id, automation_log_id, and status —
@@ -38,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code status='failed'} with the error message preserved.
  *
  * <p>Runs against the real (isolated) PostgreSQL stack, exactly like
- * {@link AutomationProcessRuntimeIntegrationTest}.
+ * {@link AutomationWorkflowRuntimeIntegrationTest}.
  */
 @Slf4j
 @DisplayName("Automation node-execution recording (G5)")
@@ -68,7 +70,7 @@ public class AutomationNodeExecutionRecordingIntegrationTest extends BaseIntegra
     }
 
     @Autowired
-    private AutomationProcessRuntime runtime;
+    private AutomationWorkflowRuntime runtime;
 
     @Autowired
     private AutomationNodeExecutionMapper nodeExecutionMapper;

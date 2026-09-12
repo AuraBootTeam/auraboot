@@ -34,13 +34,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         @ComponentScan.Filter(
             type = FilterType.REGEX,
             pattern = {
-                "com\\.auraboot\\.framework\\.action\\.executor\\.BpmActionExecutor",
-                "com\\.auraboot\\.framework\\.automation\\.bpm(\\..*)?",
-                "com\\.auraboot\\.framework\\.automation\\.executor\\.impl\\.(CcTaskActionExecutor|StartProcessActionExecutor)",
-                "com\\.auraboot\\.framework\\.eventpolicy\\.executor\\.handler\\.(CcTaskActionHandler|StartProcessActionHandler)",
-                "com\\.auraboot\\.framework\\.inbox\\.(controller\\.InboxController|listener\\.InboxEventListener)",
-                "com\\.auraboot\\.framework\\.meta\\.handler\\.BuiltinStartApprovalHandler",
-                "com\\.auraboot\\.framework\\.notification\\.listener\\.TaskPushNotificationListener"
+                "com\\.auraboot\\.framework\\.automation\\.bpm(\\..*)?"
             }
         )
     }

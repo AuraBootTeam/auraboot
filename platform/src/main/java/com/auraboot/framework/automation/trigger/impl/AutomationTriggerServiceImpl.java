@@ -1,7 +1,7 @@
 package com.auraboot.framework.automation.trigger.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.automation.bpm.AutomationProcessRuntime;
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.entity.AutomationLog;
@@ -55,7 +55,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
-    private final ObjectProvider<AutomationProcessRuntime> automationProcessRuntimeProvider;
+    private final ObjectProvider<AutomationWorkflowRuntime> automationProcessRuntimeProvider;
 
     /**
      * Optional DecisionRuntime integration (M4): when an automation's trigger_config has a
@@ -87,7 +87,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
             AutomationLogMapper automationLogMapper,
-            ObjectProvider<AutomationProcessRuntime> automationProcessRuntimeProvider) {
+            ObjectProvider<AutomationWorkflowRuntime> automationProcessRuntimeProvider) {
         this.automationMapper = automationMapper;
         this.automationLogMapper = automationLogMapper;
         this.automationProcessRuntimeProvider = automationProcessRuntimeProvider;
@@ -249,12 +249,12 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @Override
     @Async("eventTaskExecutor")
     public void onBpmEvent(String eventType, String processKey, String instanceId, Map<String, Object> payload) {
-        log.debug("BPM event: eventType={}, processKey={}, instanceId={}", eventType, processKey, instanceId);
+        log.debug("workflow event: eventType={}, processKey={}, instanceId={}", eventType, processKey, instanceId);
 
         // SmartEngine task events can carry "processKey:version"; automation rules store the bare process key.
         String automationModelCode = normalizeBpmProcessKey(processKey);
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
-                automationModelCode, "on_bpm_event");
+                automationModelCode, "on_workflow_event");
 
         for (Automation automation : automations) {
             try {
@@ -268,7 +268,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 }
 
                 Map<String, Object> triggerPayload = new HashMap<>();
-                triggerPayload.put("event", "bpm_event");
+                triggerPayload.put("event", "workflow_event");
                 triggerPayload.put("eventType", eventType);
                 triggerPayload.put("processKey", processKey);
                 triggerPayload.put("instanceId", instanceId);
@@ -281,7 +281,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                     executeAutomationAsync(automation, instanceId, matchedPayload);
                 }
             } catch (Exception e) {
-                log.error("Error processing automation {} for BPM event: {}",
+                log.error("Error processing automation {} for workflow event: {}",
                         automation.getPid(), e.getMessage(), e);
             }
         }
@@ -312,7 +312,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         // ride a JWT-exempt path (the webhook receiver) or an @Async worker thread arrive with
         // no MetaContext, so the AutomationLogMapper insert/updateStatus and the tenant-scoped
         // command pipeline would fail with "MetaContext not initialized". The previous code
-        // relied on AutomationProcessRuntime.run() setting then clearing MetaContext internally,
+        // relied on AutomationWorkflowRuntime.run() setting then clearing MetaContext internally,
         // which left updateStatus() below it uncovered. Scope the whole method here; clear in
         // finally only when we are the one who set it.
         MetaContextSnapshot metaContextSnapshot = null;
@@ -342,12 +342,12 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             // sequential executor has been removed.
             List<ActionResult> actionResults = List.of();
             try {
-                // Pass the log id through so AutomationActionServiceTaskDelegate can persist
+                // Pass the log id through so AutomationActionAccessorImpl can persist
                 // per-node execution rows linked to this run (G5 runtime overlay).
-                actionResults = requireAutomationProcessRuntime().run(
+                actionResults = requireAutomationWorkflowRuntime().run(
                         automation, recordPid, executionPayload, logEntry.getId());
                 logEntry.setStatus(StatusConstants.SUCCESS);
-            } catch (AutomationProcessRuntime.AutomationProcessRunException e) {
+            } catch (AutomationWorkflowRuntime.AutomationWorkflowRunException e) {
                 actionResults = e.getActionResults();
                 log.error("Automation run failed: pid={}, error={}",
                         automation.getPid(), e.getMessage(), e);
@@ -371,8 +371,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
     }
 
-    private AutomationProcessRuntime requireAutomationProcessRuntime() {
-        AutomationProcessRuntime runtime = automationProcessRuntimeProvider.getIfAvailable();
+    private AutomationWorkflowRuntime requireAutomationWorkflowRuntime() {
+        AutomationWorkflowRuntime runtime = automationProcessRuntimeProvider.getIfAvailable();
         if (runtime == null) {
             throw new IllegalStateException("BPM application capability is required to execute automations");
         }

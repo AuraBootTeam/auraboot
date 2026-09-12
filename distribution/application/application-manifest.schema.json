@@ -21,9 +21,18 @@
     "platform": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["runtime", "pluginApi", "webShell", "pluginSdk", "webPackages", "dslSchema"],
+      "required": ["runtime", "baseImage", "pluginApi", "webShell", "pluginSdk", "webPackages", "dslSchema"],
       "properties": {
         "runtime": { "$ref": "#/definitions/releaseVersion" },
+        "baseImage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "version": { "$ref": "#/definitions/releaseVersion" }
+          }
+        },
         "pluginApi": { "$ref": "#/definitions/releaseVersion" },
         "webShell": { "$ref": "#/definitions/releaseVersion" },
         "pluginSdk": { "$ref": "#/definitions/releaseVersion" },

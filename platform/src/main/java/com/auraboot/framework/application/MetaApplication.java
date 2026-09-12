@@ -22,12 +22,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         "com.auraboot.framework.**.mapper",
         // Leaf is 'dao', not 'mapper' — not covered by **.mapper above.
         "com.auraboot.framework.*.dao",
-        // Retained for safety: leaf is 'connector', not 'mapper'.
-        "com.auraboot.framework.bpm.connector",
         // Non-framework packages — must be listed explicitly.
         "com.auraboot.module.*.mapper",
-        "com.auraboot.module.meta.excel.mapper",
-        "com.auraboot.smart.framework.engine.persister.database"})
+        "com.auraboot.module.meta.excel.mapper"})
 @EnableTransactionManagement
 @EnableScheduling
 public class MetaApplication {

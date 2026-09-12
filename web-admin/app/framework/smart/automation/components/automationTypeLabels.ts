@@ -37,6 +37,6 @@ export const TRIGGER_TYPE_I18N_KEYS: Record<string, string> = {
   on_state_change: '$i18n:automation.trigger.stateChange',
   scheduled: '$i18n:automation.trigger.scheduled',
   webhook: '$i18n:automation.trigger.webhook',
-  on_bpm_event: '$i18n:automation.trigger.bpmEvent',
+  on_workflow_event: '$i18n:automation.trigger.workflowEvent',
   on_inactivity: '$i18n:automation.trigger.inactivity',
 };

@@ -1,6 +1,6 @@
 package com.auraboot.framework.decision.service.impl;
 
-import com.auraboot.framework.decision.adapter.DroolsDmnAdapter;
+import com.auraboot.framework.decision.adapter.WorkflowDmnAdapter;
 import com.auraboot.framework.decision.ast.DataType;
 import com.auraboot.framework.decision.ast.Operand;
 import com.auraboot.framework.decision.ast.Operator;
@@ -52,10 +52,11 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
     private static final String DEFAULT_NAMESPACE = "https://auraboot/dmn/decision-table";
 
     private final ObjectMapper mapper;
-    private final DroolsDmnAdapter dmnAdapter = new DroolsDmnAdapter();
+    private final WorkflowDmnAdapter dmnAdapter;
 
-    public DecisionTableDmnXmlServiceImpl(ObjectMapper mapper) {
+    public DecisionTableDmnXmlServiceImpl(ObjectMapper mapper, WorkflowDmnAdapter dmnAdapter) {
         this.mapper = mapper;
+        this.dmnAdapter = dmnAdapter;
     }
 
     @Override

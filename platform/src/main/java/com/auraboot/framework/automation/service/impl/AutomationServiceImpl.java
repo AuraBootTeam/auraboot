@@ -50,7 +50,7 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
     private final AutomationTriggerService automationTriggerService;
-    private final ObjectProvider<com.auraboot.framework.automation.bpm.AutomationProcessRuntime> automationProcessRuntimeProvider;
+    private final ObjectProvider<com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime> automationProcessRuntimeProvider;
     private final AutomationFlowTriggerDeriver flowTriggerDeriver;
     private final DecisionUsageIndexService usageIndexService;
 
@@ -130,7 +130,7 @@ public class AutomationServiceImpl implements AutomationService {
         automationMapper.insertAutomation(automation);
         usageIndexService.refreshSource("AUTOMATION", automation.getPid());
         if (Boolean.TRUE.equals(automation.getEnabled())) {
-            requireAutomationProcessRuntime().deploy(automation);
+            requireAutomationWorkflowRuntime().deploy(automation);
         }
 
         log.info("Automation created: pid={}", automation.getPid());
@@ -312,7 +312,7 @@ public class AutomationServiceImpl implements AutomationService {
 
         // Trigger execution always goes through SmartEngine. The compiler supports both
         // visual flowConfig and flat actions[], so both shapes must be deployed on enable.
-        requireAutomationProcessRuntime().deploy(automation);
+        requireAutomationWorkflowRuntime().deploy(automation);
 
         log.info("Automation enabled: pid={}", pid);
         return toDTO(automation);
@@ -459,7 +459,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook", "on_bpm_event");
+                    "on_state_change", "scheduled", "webhook", "on_workflow_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 errors.add("Invalid trigger type: " + request.getTriggerType());
             }
@@ -510,7 +510,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook", "on_bpm_event");
+                    "on_state_change", "scheduled", "webhook", "on_workflow_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
                         "Invalid trigger type: " + request.getTriggerType());
@@ -518,7 +518,7 @@ public class AutomationServiceImpl implements AutomationService {
         }
     }
 
-    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime requireAutomationProcessRuntime() {
+    private com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime requireAutomationWorkflowRuntime() {
         var runtime = automationProcessRuntimeProvider.getIfAvailable();
         if (runtime == null) {
             throw new IllegalStateException("BPM application capability is required to enable automations");

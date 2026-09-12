@@ -6,14 +6,13 @@ import { route } from '@react-router/dev/routes';
 // index.ts) for menu / breadcrumb / permission gating.
 //
 // As of M3.6+M3.8, the following domains have migrated:
-//   - BPM, Designers, Automation, Organization, Meta, AuraBot,
+//   - Designers, Automation, Organization, Meta, AuraBot,
 //     AI Colleagues, Personal, Settings, Platform, Admin, Ops
 //
 // Routes that remain hardcoded below are runtime-engine routes
 // (/p/:pageKey, /dynamic/:tableName, /*) — these are kernel infrastructure
 // rather than feature pages and stay here intentionally.
 
-import { bpmRoutes } from '../../app/plugins/core-bpm/routes';
 import { designerRoutes } from '../../app/plugins/core-designer/routes';
 import { automationRoutes } from '../../app/plugins/core-automation/routes';
 import { organizationRoutes } from '../../app/plugins/core-organization/routes';
@@ -39,7 +38,6 @@ export function adminFeatureRoutes() {
     // Feature plugins (M3 migration).
     ...designerRoutes(),
     ...automationRoutes(),
-    ...bpmRoutes(),
     ...organizationRoutes(),
     ...metaRoutes(),
     ...aurabotRoutes(),

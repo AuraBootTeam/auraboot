@@ -1,5 +1,7 @@
 package com.auraboot.framework.automation.bpm;
 
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
+
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
@@ -28,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * End-to-end T2 slice 1c: compile an automation flow, deploy it to SmartEngine, and
  * run it in MEMORY mode — proving the full chain
  * {@code flowConfig → JsonToBpmnConverter → SmartEngine deploy → startProcess →
- * AutomationActionServiceTaskDelegate → CompositeActionExecutor → ActionExecutor}.
+ * AutomationActionAccessorImpl → CompositeActionExecutor → ActionExecutor}.
  *
  * <p>A marker {@link ActionExecutor} ({@code test_marker}) registered via
  * {@link MarkerConfig} records its invocation, so the assertion needs no model/seed
@@ -71,7 +73,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
     }
 
     @Autowired
-    private AutomationProcessRuntime runtime;
+    private AutomationWorkflowRuntime runtime;
 
     @Autowired
     private com.auraboot.framework.automation.trigger.AutomationTriggerService automationTriggerService;

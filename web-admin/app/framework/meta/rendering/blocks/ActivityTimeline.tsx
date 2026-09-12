@@ -44,14 +44,29 @@ export interface BusinessActivityDataSource {
   params?: Record<string, unknown>;
 }
 
+export interface BusinessActivityRecordMapping {
+  pid?: string;
+  occurredAt?: string;
+  status?: string;
+  priority?: string;
+  role?: string;
+  objectModel?: string;
+  objectRecord?: string;
+  activityType?: string;
+  subject?: string;
+  content?: string;
+  actorName?: string;
+}
+
 export interface ActivityTimelineProps {
   modelCode: string;
   recordPid: string;
   token?: string;
   locale?: string;
   t?: (key: string) => string;
-  /** Optional CRM business-activity query merged with the platform audit log. */
+  /** Optional product business-activity query merged with the platform audit log. */
   businessDataSource?: BusinessActivityDataSource;
+  businessRecordMapping?: BusinessActivityRecordMapping;
 }
 
 // Activity type → [icon, zh label, en label, dot color class]
@@ -79,6 +94,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   token,
   locale = 'zh-CN',
   businessDataSource,
+  businessRecordMapping,
 }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +140,8 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           : [];
       const businessRows =
         businessOutcome?.ok && ResultHelper.isSuccess(businessOutcome.value)
-          ? extractBusinessRecords(businessOutcome.value.data).map(normalizeBusinessActivity)
+          ? extractBusinessRecords(businessOutcome.value.data).map((row, index) =>
+              normalizeBusinessActivity(row, index, businessRecordMapping))
           : [];
       const merged = [...auditRows, ...businessRows].sort(
         (left, right) => dayjs(right.occurredAt).valueOf() - dayjs(left.occurredAt).valueOf(),
@@ -159,7 +176,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [businessDataSource, modelCode, recordPid, token, locale]);
+  }, [businessDataSource, businessRecordMapping, modelCode, recordPid, token, locale]);
 
   useEffect(() => {
     loadActivities();
@@ -688,34 +705,39 @@ function extractBusinessRecords(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
-function normalizeBusinessActivity(row: Record<string, unknown>, index: number): ActivityRecord {
-  const pid = String(row.pid ?? row.crm_act_pid ?? `row-${index}`);
+function normalizeBusinessActivity(
+  row: Record<string, unknown>,
+  index: number,
+  mapping: BusinessActivityRecordMapping = {},
+): ActivityRecord {
+  const read = (field: keyof BusinessActivityRecordMapping, fallback: string) =>
+    row[mapping[field] ?? fallback];
+  const pid = String(read('pid', 'pid') ?? `row-${index}`);
   const occurredAt = String(
-    row.crm_act_date ??
-      row.occurred_at ??
+    read('occurredAt', 'occurred_at') ??
       row.occurredAt ??
       row.created_at ??
       new Date(0).toISOString(),
   );
   const metadata = Object.fromEntries(
     [
-      ['status', row.crm_act_status ?? row.status],
-      ['priority', row.crm_act_priority ?? row.priority],
-      ['role', row.crm_act_role ?? row.role],
+      ['status', read('status', 'status')],
+      ['priority', read('priority', 'priority')],
+      ['role', read('role', 'role')],
     ].filter(([, value]) => value != null && String(value).trim() !== ''),
   );
 
   return {
     id: `business-${pid}`,
     pid,
-    objectModel: String(row.crm_act_object_type ?? 'crm_activity_common'),
-    objectRecord: String(row.crm_act_object_id ?? ''),
-    activityType: String(row.crm_act_type ?? row.activity_type ?? 'NOTE'),
-    subject: String(row.crm_act_subject ?? row.subject ?? '').trim() || null,
-    content: String(row.crm_act_content ?? row.content ?? row.description ?? '').trim() || null,
-    actorType: row.owner_name ? 'USER' : 'SYSTEM',
+    objectModel: String(read('objectModel', 'object_model') ?? ''),
+    objectRecord: String(read('objectRecord', 'object_record') ?? ''),
+    activityType: String(read('activityType', 'activity_type') ?? 'NOTE'),
+    subject: String(read('subject', 'subject') ?? '').trim() || null,
+    content: String(read('content', 'content') ?? row.description ?? '').trim() || null,
+    actorType: read('actorName', 'actor_name') ? 'USER' : 'SYSTEM',
     actorId: null,
-    actorName: String(row.owner_name ?? '').trim() || null,
+    actorName: String(read('actorName', 'actor_name') ?? '').trim() || null,
     commandCode: null,
     operationType: null,
     metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,

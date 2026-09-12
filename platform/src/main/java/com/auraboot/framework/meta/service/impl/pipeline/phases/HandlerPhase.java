@@ -27,6 +27,8 @@ import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
@@ -73,8 +75,8 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private BiTemporalService biTemporalService;
 
-    @Autowired(required = false)
-    private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
+    @Autowired
+    private WorkflowCapabilityRegistry workflowCapabilities;
 
     @Autowired(required = false)
     private LlmProviderFactory llmProviderFactory;
@@ -747,7 +749,7 @@ public class HandlerPhase implements CommandPhase {
     private void executeBpmTrigger(Map<String, Object> execConfig, CommandDefinition command,
                                     Map<String, Object> payload, CommandExecuteRequest request,
                                     Map<String, Object> handlerResults) {
-        if (execConfig == null || bpmIntegrationService == null) return;
+        if (execConfig == null) return;
 
         Object triggerObj = execConfig.get("bpmTrigger");
         if (triggerObj == null) return;
@@ -783,13 +785,18 @@ public class HandlerPhase implements CommandPhase {
         try {
             log.info("BPM trigger: starting process={} for command={}, businessKey={}",
                     processKey, command.getCode(), businessKey);
-            var processInstance = bpmIntegrationService.startBusinessProcess(processKey, businessKey, businessData, title);
-            if (processInstance != null) {
-                handlerResults.put("bpmProcessInstanceId", processInstance.getInstanceId());
-                log.info("BPM process started: processKey={}, instanceId={}", processKey, processInstance.getInstanceId());
+            Map<String, Object> started = workflowCapabilities.execute("start",
+                    new WorkflowCapability.WorkflowRequest(
+                            MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                            MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                            Map.of("processDefinitionKey", processKey, "businessKey", businessKey,
+                                    "variables", businessData, "title", title))).payload();
+            if (started.get("processInstanceId") != null) {
+                handlerResults.put("workflowProcessInstanceId", started.get("processInstanceId"));
+                log.info("workflow started: processKey={}, instanceId={}", processKey, started.get("processInstanceId"));
             }
         } catch (Exception e) {
-            log.error("Failed to start BPM process for command {}: {}", command.getCode(), e.getMessage(), e);
+            log.error("Failed to start workflow for command {}: {}", command.getCode(), e.getMessage(), e);
             throw new BusinessException(ResponseCode.BadParam,
                     "Failed to start approval process: " + e.getMessage());
         }

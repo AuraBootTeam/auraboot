@@ -272,15 +272,6 @@ public class PluginDirectoryLoader {
             }
         }
 
-        // Load processes (if any)
-        if (resourceDirs.containsKey("processes")) {
-            List<ProcessDefinitionDTO> processes = loadResourceList(
-                    resourcePath(pluginDir, resourceDirs, "processes"), ProcessDefinitionDTO.class);
-            if (!processes.isEmpty()) {
-                manifest.setProcesses(mergeList(manifest.getProcesses(), processes));
-            }
-        }
-
         // Load i18n resources
         if (resourceDirs.containsKey("i18n")) {
             List<I18nDefinitionDTO> i18n = loadResourceList(
@@ -341,18 +332,6 @@ public class PluginDirectoryLoader {
             }
         }
 
-        // Load rules (Drools)
-        if (resourceDirs.containsKey("rules")) {
-            List<BpmRuleDefinitionDTO> rules = loadResourceList(
-                    resourcePath(pluginDir, resourceDirs, "rules"), BpmRuleDefinitionDTO.class);
-            if (!rules.isEmpty()) {
-                for (BpmRuleDefinitionDTO rule : rules) {
-                    inlineDrlContent(pluginDir, rule);
-                }
-                manifest.setRules(mergeList(manifest.getRules(), rules));
-            }
-        }
-
         // Load Decision Runtime definitions
         if (resourceDirs.containsKey("decisionDefinitions")) {
             List<DecisionDefinitionSeedDTO> decisions = loadResourceList(
@@ -393,15 +372,6 @@ public class PluginDirectoryLoader {
             }
         }
 
-        // Load SLA configs
-        if (resourceDirs.containsKey("sla")) {
-            List<SlaConfigDefinitionDTO> slaConfigs = loadResourceList(
-                    resourcePath(pluginDir, resourceDirs, "sla"), SlaConfigDefinitionDTO.class);
-            if (!slaConfigs.isEmpty()) {
-                manifest.setSlaConfigs(mergeList(manifest.getSlaConfigs(), slaConfigs));
-            }
-        }
-
         if (resourceDirs.containsKey("semantic")) {
             List<PluginManifestExtended.SemanticResource> semanticResources =
                     loadSemanticResources(pluginDir,
@@ -432,34 +402,6 @@ public class PluginDirectoryLoader {
         List<AgentDefinitionDTO> agentDefinitions = loadResourceList(agentDefinitionsPath, AgentDefinitionDTO.class);
         if (!agentDefinitions.isEmpty()) {
             manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
-        }
-    }
-
-    /**
-     * If the rule declares a {@code ruleContentFile} and has no inline
-     * {@code ruleContent}, read the DRL file into {@code ruleContent}.
-     * Having both is an ambiguous source and rejected.
-     */
-    private void inlineDrlContent(Path pluginDir, BpmRuleDefinitionDTO rule) {
-        String relPath = rule.getRuleContentFile();
-        if (relPath == null || relPath.isBlank()) {
-            return;
-        }
-        boolean hasInline = rule.getRuleContent() != null && !rule.getRuleContent().isBlank();
-        if (hasInline) {
-            throw new PluginException("Rule '" + rule.getRuleCode()
-                    + "' declares both ruleContent and ruleContentFile — pick one");
-        }
-        Path drlPath = PathSafetyUtils.requireSafeChild(pluginDir, relPath, "ruleContentFile");
-        if (!Files.exists(drlPath)) {
-            throw new PluginException("Rule '" + rule.getRuleCode()
-                    + "' ruleContentFile not found: " + relPath);
-        }
-        try {
-            rule.setRuleContent(Files.readString(drlPath));
-        } catch (IOException e) {
-            throw new PluginException("Failed to read DRL file for rule '" + rule.getRuleCode()
-                    + "': " + e.getMessage(), e);
         }
     }
 
@@ -681,8 +623,6 @@ public class PluginDirectoryLoader {
         loadSourceResource(source, resourceDirs, "pageContributions", PageContributionDefinitionDTO.class,
                 manifest::getPageContributions, manifest::setPageContributions);
 
-        loadSourceResource(source, resourceDirs, "processes", ProcessDefinitionDTO.class,
-                manifest::getProcesses, manifest::setProcesses);
         loadSourceResource(source, resourceDirs, "i18n", I18nDefinitionDTO.class,
                 manifest::getI18nResources, manifest::setI18nResources);
         loadSourceResource(source, resourceDirs, "namedQueries", NamedQueryDefinitionDTO.class,
@@ -695,22 +635,6 @@ public class PluginDirectoryLoader {
                 manifest::getNotificationTemplates, manifest::setNotificationTemplates);
         loadSourceResource(source, resourceDirs, "dashboards", DashboardDefinitionDTO.class,
                 manifest::getDashboards, manifest::setDashboards);
-
-        // Rules (DRL-on-disk inlining via ruleContentFile)
-        if (resourceDirs.containsKey("rules")) {
-            List<BpmRuleDefinitionDTO> rules = loadResourceListFromSource(
-                    source, resourceDirs.get("rules"), BpmRuleDefinitionDTO.class);
-            if (!rules.isEmpty()) {
-                for (BpmRuleDefinitionDTO rule : rules) {
-                    inlineDrlContentFromSource(source, rule);
-                }
-                manifest.setRules(mergeList(manifest.getRules(), rules));
-            }
-        }
-
-        // SLA configs
-        loadSourceResource(source, resourceDirs, "sla", SlaConfigDefinitionDTO.class,
-                manifest::getSlaConfigs, manifest::setSlaConfigs);
 
         // Decision Runtime definitions
         loadSourceResource(source, resourceDirs, "decisionDefinitions", DecisionDefinitionSeedDTO.class,
@@ -755,28 +679,6 @@ public class PluginDirectoryLoader {
         List<AgentDefinitionDTO> agentDefinitions = objectMapper.readValue(json, listType);
         if (!agentDefinitions.isEmpty()) {
             manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
-        }
-    }
-
-    private void inlineDrlContentFromSource(PluginSource source, BpmRuleDefinitionDTO rule) {
-        String relPath = rule.getRuleContentFile();
-        if (relPath == null || relPath.isBlank()) {
-            return;
-        }
-        boolean hasInline = rule.getRuleContent() != null && !rule.getRuleContent().isBlank();
-        if (hasInline) {
-            throw new PluginException("Rule '" + rule.getRuleCode()
-                    + "' declares both ruleContent and ruleContentFile — pick one");
-        }
-        if (!source.exists(relPath)) {
-            throw new PluginException("Rule '" + rule.getRuleCode()
-                    + "' ruleContentFile not found: " + relPath);
-        }
-        try {
-            rule.setRuleContent(source.readString(relPath));
-        } catch (IOException e) {
-            throw new PluginException("Failed to read DRL file for rule '" + rule.getRuleCode()
-                    + "': " + e.getMessage(), e);
         }
     }
 

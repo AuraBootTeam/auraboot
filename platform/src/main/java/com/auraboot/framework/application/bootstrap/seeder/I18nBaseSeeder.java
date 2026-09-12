@@ -1,6 +1,5 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
-import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.mapper.I18nResourceMapper;
@@ -32,9 +31,6 @@ public class I18nBaseSeeder {
             List<I18nResource> resources = new ArrayList<>();
             for (Map<String, String> entry : entries) {
                 String key = entry.get("key");
-                if (ApplicationMode.isCoreOnly() && isProductEntry(entry)) {
-                    continue;
-                }
                 for (Map.Entry<String, String> langEntry : entry.entrySet()) {
                     if ("key".equals(langEntry.getKey())) continue;
                     I18nResource r = new I18nResource();
@@ -65,10 +61,5 @@ public class I18nBaseSeeder {
             log.error("I18nBaseSeeder: failed to seed i18n data", e);
             throw new RuntimeException("Failed to seed i18n base data", e);
         }
-    }
-
-    private boolean isProductEntry(Map<String, String> entry) {
-        return entry.values().stream().anyMatch(value -> value != null
-                && value.matches("(?is).*(^|[^a-z0-9])(crm|bpm|smartengine)([^a-z0-9]|$).*$"));
     }
 }

@@ -1,15 +1,11 @@
 package com.auraboot.framework.email.service;
 
-import com.auraboot.framework.email.mapper.EmailMessageMapper;
 import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
 import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.model.EmailMessage;
 import com.auraboot.framework.email.model.EmailRecordLink;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,10 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Service for linking email messages to CRM records.
+ * Service for linking email messages to arbitrary product records.
  *
- * <p>Auto-linking scans the email's participant addresses against known CRM contacts and leads.
- * Manual linking allows users to explicitly associate a message with any CRM record.
+ * <p>The platform owns generic manual links and thread inheritance. Product-specific participant
+ * matching is contributed by the product and is deliberately not coupled to a product schema here.
  *
  * @since 6.5.0
  */
@@ -30,67 +26,24 @@ import java.util.List;
 public class EmailRecordLinkService {
 
     private final EmailRecordLinkMapper emailRecordLinkMapper;
-    private final EmailMessageMapper    emailMessageMapper;
-    private final JdbcTemplate          jdbcTemplate;
-    private final ObjectMapper          objectMapper;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Auto-link
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Attempts to automatically link the given message to CRM records by matching
-     * participant email addresses against {@code mt_crm_contact_common} and
-     * {@code mt_crm_lead_common}.
-     *
-     * <p>Strategy:
-     * <ol>
-     *   <li>Collect participant addresses: inbound → from_address; outbound → to/cc.</li>
-     *   <li>Match each address against CRM Contact (crm_ct_email) and Lead (crm_lead_contact_email).</li>
-     *   <li>For matched Contacts, also find related Opportunities via opp_contact junction.</li>
-     *   <li>If no direct match, inherit thread-level links from sibling messages.</li>
-     *   <li>Create {@code ab_email_record_link} entries (auto type).</li>
-     * </ol>
+     * Inherits generic thread-level links from sibling messages. Product participant matching runs
+     * in product-owned handlers so the platform never queries a product table.
      *
      * @param message the inbound or outbound message to link
      */
     public void autoLink(EmailMessage message) {
-        List<String> addresses = extractParticipantAddresses(message);
-        if (addresses.isEmpty()) {
-            log.debug("autoLink: no participant addresses for messageId={}", message.getId());
-            return;
-        }
-
         List<EmailRecordLink> links = new ArrayList<>();
         Long tenantId  = message.getTenantId();
         Long messageId = message.getId();
         String threadId = message.getGmailThreadId();
 
-        for (String email : addresses) {
-            // Match against CRM Contact
-            List<String> contactPids = findCrmContactPidsByEmail(tenantId, email);
-            for (String contactPid : contactPids) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_contact_common", contactPid,
-                        EmailConstants.LINK_TYPE_AUTO));
-
-                // Also link to related Opportunities via opp_contact junction
-                List<String> oppPids = findRelatedOpportunityPids(tenantId, contactPid);
-                for (String oppPid : oppPids) {
-                    links.add(buildLink(tenantId, messageId, threadId, "crm_opportunity_common", oppPid,
-                            EmailConstants.LINK_TYPE_AUTO));
-                }
-            }
-
-            // Match against CRM Lead
-            List<String> leadPids = findCrmLeadPidsByEmail(tenantId, email);
-            for (String leadPid : leadPids) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_lead_common", leadPid,
-                        EmailConstants.LINK_TYPE_AUTO));
-            }
-        }
-
-        // If no direct matches, inherit thread-level links from sibling messages
-        if (links.isEmpty() && threadId != null && !threadId.isBlank()) {
+        if (threadId != null && !threadId.isBlank()) {
             List<EmailRecordLink> threadLinks = emailRecordLinkMapper.findByThread(tenantId, threadId);
             for (EmailRecordLink tl : threadLinks) {
                 if (tl.getMessageId() != null && !tl.getMessageId().equals(messageId)) {
@@ -152,77 +105,6 @@ public class EmailRecordLinkService {
     // ──────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ──────────────────────────────────────────────────────────────────────────
-
-    /** Extracts the relevant email addresses to match from this message. */
-    private List<String> extractParticipantAddresses(EmailMessage message) {
-        List<String> result = new ArrayList<>();
-
-        if (EmailConstants.DIRECTION_INBOUND.equals(message.getDirection())) {
-            // Inbound: the sender is the CRM contact candidate
-            if (message.getFromAddress() != null && !message.getFromAddress().isBlank()) {
-                result.add(message.getFromAddress().trim().toLowerCase());
-            }
-        } else {
-            // Outbound: recipients are the CRM contact candidates
-            result.addAll(parseJsonAddresses(message.getToAddresses()));
-            result.addAll(parseJsonAddresses(message.getCcAddresses()));
-        }
-
-        return result;
-    }
-
-    /** Parses a JSON array of email strings (e.g. {@code ["a@b.com","c@d.com"]}). */
-    private List<String> parseJsonAddresses(String json) {
-        if (json == null || json.isBlank() || json.equals("[]")) {
-            return List.of();
-        }
-        try {
-            List<String> parsed = objectMapper.readValue(json, new TypeReference<>() {});
-            return parsed.stream()
-                    .filter(s -> s != null && !s.isBlank())
-                    .map(s -> s.trim().toLowerCase())
-                    .toList();
-        } catch (Exception e) {
-            log.debug("Failed to parse address JSON '{}': {}", json, e.getMessage());
-            return List.of();
-        }
-    }
-
-    /** Queries the official CRM contact model for record pids with the given email address. */
-    private List<String> findCrmContactPidsByEmail(Long tenantId, String email) {
-        try {
-            return jdbcTemplate.queryForList(
-                    "SELECT pid::text FROM mt_crm_contact_common WHERE tenant_id = ? AND lower(crm_ct_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                    String.class, tenantId, email);
-        } catch (Exception e) {
-            log.debug("CRM contact lookup skipped (table may not exist): {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    /** Queries the official CRM lead model for record pids with the given email address. */
-    private List<String> findCrmLeadPidsByEmail(Long tenantId, String email) {
-        try {
-            return jdbcTemplate.queryForList(
-                    "SELECT pid::text FROM mt_crm_lead_common WHERE tenant_id = ? AND lower(crm_lead_contact_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                    String.class, tenantId, email);
-        } catch (Exception e) {
-            log.debug("CRM lead lookup skipped (table may not exist): {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    /** Finds Opportunity pids linked to the given contact via the opp_contact junction table. */
-    private List<String> findRelatedOpportunityPids(Long tenantId, String contactPid) {
-        try {
-            return jdbcTemplate.queryForList(
-                    "SELECT crm_oc_opportunity_id::text FROM mt_crm_opportunity_contact_common WHERE tenant_id = ? AND crm_oc_contact_id::text = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                    String.class, tenantId, contactPid);
-        } catch (Exception e) {
-            log.debug("Opportunity junction lookup skipped (table may not exist): {}", e.getMessage());
-            return List.of();
-        }
-    }
 
     private EmailRecordLink buildLink(Long tenantId, Long messageId, String threadId,
                                       String modelCode, String recordPid, String linkType) {

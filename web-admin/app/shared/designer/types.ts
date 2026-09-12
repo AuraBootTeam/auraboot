@@ -29,7 +29,7 @@ export type PropertyType =
   | 'formula'
   | 'page-select'
   | 'dashboard-select'
-  | 'process-select'
+  | 'workflow-select'
   | 'automation-select'
   | 'command-select'
   | 'rule-binding'

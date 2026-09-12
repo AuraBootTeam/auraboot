@@ -9,7 +9,6 @@ const SCRIPT_ROOT = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
 
 const BPM_TABLES = new Set([
-  'ab_automation_node_execution',
   'ab_bpm_audit_record',
   'ab_bpm_definition',
   'ab_bpm_domain_config',
@@ -30,6 +29,12 @@ const BPM_TABLES = new Set([
 
 const CRM_TABLES = new Set([
   'ab_calendar_event_map',
+  'ab_calendar_sync',
+  'ab_inbound_channel',
+  'ab_inbound_channel_stats',
+  'ab_inbound_form',
+  'ab_inbound_message',
+  'ab_lead_merge_queue',
   'mt_crm_complaint',
 ]);
 

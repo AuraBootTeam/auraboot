@@ -165,6 +165,7 @@ export function buildApplicationGraph(manifestInput, webContributionInputs = [],
   assertWebGraphIntegrity(webContributions);
   const nodes = [
     { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { kind: 'image', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version },
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { kind: 'web', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
@@ -264,6 +265,7 @@ export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {
 function requirements(manifest) {
   return [
     { type: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { type: 'oci', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version },
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },

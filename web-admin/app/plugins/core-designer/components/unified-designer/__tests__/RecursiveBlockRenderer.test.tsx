@@ -571,7 +571,7 @@ describe('RecursiveBlockRenderer', () => {
                 },
                 {
                   id: 'helper_bpm',
-                  blockType: 'bpm-panel',
+                  blockType: 'workflow-panel',
                   title: 'Approval',
                   props: {
                     status: 'pending',
@@ -764,7 +764,7 @@ describe('RecursiveBlockRenderer', () => {
             feedback: 'Live suggestions applied',
           };
         }
-        if (block.blockType === 'bpm-panel') {
+        if (block.blockType === 'workflow-panel') {
           return {
             source: 'named-query',
             status: 'approved',
@@ -825,7 +825,7 @@ describe('RecursiveBlockRenderer', () => {
                 },
                 {
                   id: 'helper_bpm_live',
-                  blockType: 'bpm-panel',
+                  blockType: 'workflow-panel',
                   dataSource: {
                     type: 'namedQuery',
                     executionMode: 'live',
@@ -1042,7 +1042,7 @@ describe('RecursiveBlockRenderer', () => {
                 },
                 {
                   id: 'helper_bpm_empty',
-                  blockType: 'bpm-panel',
+                  blockType: 'workflow-panel',
                   dataSource: {
                     type: 'namedQuery',
                     executionMode: 'live',

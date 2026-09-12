@@ -64,7 +64,7 @@ public class ImportRequest {
     private Boolean validateReferences = true;
 
     /**
-     * Whether to auto-deploy BPM processes.
+     * Whether to auto-deploy workflowes.
      */
     @JsonSetter(nulls = Nulls.SKIP)
     @Builder.Default

@@ -652,7 +652,7 @@ describe('resolveDirectSpecializedDetailBlocks', () => {
       { id: 'timeline', blockType: 'activity-timeline' },
       { id: 'comments', blockType: 'record-comments' },
       { id: 'history', blockType: 'field-history' },
-      { id: 'approval', blockType: 'bpm-panel' },
+      { id: 'approval', blockType: 'workflow-panel' },
       { id: 'chart', blockType: 'chart' },
     ] as any;
 

@@ -7,8 +7,7 @@ import com.auraboot.framework.automation.executor.ActionExecutionException;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.automation.mapper.AutomationNodeExecutionMapper;
 import com.auraboot.framework.common.constant.StatusConstants;
-import com.auraboot.smart.framework.engine.context.ExecutionContext;
-import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
+import com.auraboot.framework.automation.workflow.AutomationActionAccessorImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -27,42 +26,33 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * G5 — unit coverage for {@link AutomationActionServiceTaskDelegate}'s node-status
+ * G5 — unit coverage for {@link AutomationActionAccessorImpl}'s node-status
  * recording branch. Focus: insert-on-entry / update-on-exit / failure path
  * propagates the exception AFTER stamping the failed row + recording is no-op when
  * the log id / tenant id / mapper are absent (back-compat with existing call sites).
  */
-class AutomationActionServiceTaskDelegateG5RecordingTest {
+class AutomationActionAccessorImplG5RecordingTest {
 
     @AfterEach
     void clearMetaContext() {
         MetaContext.clear();
     }
 
-    private ExecutionContext contextWith(String nodeId, Map<String, Object> vars) {
-        IdBasedElement element = mock(IdBasedElement.class);
-        when(element.getId()).thenReturn(nodeId);
-        ExecutionContext ctx = mock(ExecutionContext.class);
-        when(ctx.getBaseElement()).thenReturn(element);
-        when(ctx.getRequest()).thenReturn(vars);
-        return ctx;
-    }
-
     private Map<String, Object> processVars(String nodeId, Long logId, Long tenantId) {
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 nodeId, Map.of("type", "send_notification", "config", Map.of())));
         if (logId != null) {
-            vars.put(AutomationActionServiceTaskDelegate.LOG_ID_VAR, logId);
+            vars.put(AutomationActionAccessorImpl.LOG_ID_VAR, logId);
         }
         if (tenantId != null) {
-            vars.put(AutomationActionServiceTaskDelegate.TENANT_ID_VAR, tenantId);
+            vars.put(AutomationActionAccessorImpl.TENANT_ID_VAR, tenantId);
         }
-        vars.put(AutomationActionServiceTaskDelegate.USER_ID_VAR, 11L);
-        vars.put(AutomationActionServiceTaskDelegate.USER_PID_VAR, "user-11");
-        vars.put(AutomationActionServiceTaskDelegate.USERNAME_VAR, "Automation Owner");
-        vars.put(AutomationActionServiceTaskDelegate.MEMBER_ID_VAR, 22L);
-        vars.put(AutomationActionServiceTaskDelegate.AUTOMATION_ID_VAR, "AUTO-1");
+        vars.put(AutomationActionAccessorImpl.USER_ID_VAR, 11L);
+        vars.put(AutomationActionAccessorImpl.USER_PID_VAR, "user-11");
+        vars.put(AutomationActionAccessorImpl.USERNAME_VAR, "Automation Owner");
+        vars.put(AutomationActionAccessorImpl.MEMBER_ID_VAR, 22L);
+        vars.put(AutomationActionAccessorImpl.AUTOMATION_ID_VAR, "AUTO-1");
         return vars;
     }
 
@@ -76,10 +66,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
             return 1;
         });
 
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor, mapper);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor, mapper);
 
-        delegate.execute(contextWith("a1", processVars("a1", 42L, 7L)));
+        delegate.execute("a1", null, processVars("a1", 42L, 7L));
 
         ArgumentCaptor<AutomationNodeExecution> insertCaptor =
                 ArgumentCaptor.forClass(AutomationNodeExecution.class);
@@ -113,10 +103,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         when(executor.execute(any(), any()))
                 .thenThrow(new RuntimeException("downstream blew up"));
 
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor, mapper);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor, mapper);
 
-        assertThatThrownBy(() -> delegate.execute(contextWith("a1", processVars("a1", 42L, 7L))))
+        assertThatThrownBy(() -> delegate.execute("a1", null, processVars("a1", 42L, 7L)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("downstream blew up");
 
@@ -145,18 +135,18 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
                                 "errorMessage", "No real SMS sender available"),
                         new IllegalStateException("No real SMS sender available")));
 
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor, mapper);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor, mapper);
         Map<String, Object> vars = processVars("a1", 42L, 7L);
-        vars.put(AutomationActionServiceTaskDelegate.ACTION_RESULTS_VAR, new ArrayList<ActionResult>());
+        vars.put(AutomationActionAccessorImpl.ACTION_RESULTS_VAR, new ArrayList<ActionResult>());
 
-        assertThatThrownBy(() -> delegate.execute(contextWith("a1", vars)))
+        assertThatThrownBy(() -> delegate.execute("a1", null, vars))
                 .isInstanceOf(ActionExecutionException.class)
                 .hasMessageContaining("No real SMS sender available");
 
         @SuppressWarnings("unchecked")
         List<ActionResult> actionResults =
-                (List<ActionResult>) vars.get(AutomationActionServiceTaskDelegate.ACTION_RESULTS_VAR);
+                (List<ActionResult>) vars.get(AutomationActionAccessorImpl.ACTION_RESULTS_VAR);
         assertThat(actionResults).hasSize(1);
         ActionResult result = actionResults.getFirst();
         assertThat(result.getStatus()).isEqualTo(StatusConstants.FAILED);
@@ -175,11 +165,11 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         ActionExecutor executor = mock(ActionExecutor.class);
         AutomationNodeExecutionMapper mapper = mock(AutomationNodeExecutionMapper.class);
 
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor, mapper);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor, mapper);
 
         // tenant id present, log id absent → recording disabled, action still runs.
-        delegate.execute(contextWith("a1", processVars("a1", null, 7L)));
+        delegate.execute("a1", null, processVars("a1", null, 7L));
 
         verify(executor).execute(any(), any());
         verify(mapper, never()).insert(any(AutomationNodeExecution.class));
@@ -192,10 +182,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         ActionExecutor executor = mock(ActionExecutor.class);
         AutomationNodeExecutionMapper mapper = mock(AutomationNodeExecutionMapper.class);
 
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor, mapper);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor, mapper);
 
-        delegate.execute(contextWith("a1", processVars("a1", 42L, null)));
+        delegate.execute("a1", null, processVars("a1", 42L, null));
 
         verify(executor).execute(any(), any());
         verify(mapper, never()).insert(any(AutomationNodeExecution.class));
@@ -207,10 +197,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         // Existing call sites that use the 1-arg ctor must keep working: recording
         // is silently disabled (mapper is null) but executor delegation is intact.
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor);
 
-        delegate.execute(contextWith("a1", processVars("a1", 42L, 7L)));
+        delegate.execute("a1", null, processVars("a1", 42L, 7L));
 
         verify(executor).execute(any(), any());
     }
@@ -227,10 +217,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
             assertThat(MetaContext.getCurrentMemberId()).isEqualTo(22L);
             return Map.of("ok", true);
         });
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor);
 
-        delegate.execute(contextWith("a1", processVars("a1", 42L, 7L)));
+        delegate.execute("a1", null, processVars("a1", 42L, 7L));
 
         assertThat(MetaContext.exists())
                 .as("delegate must restore the caller thread after temporary automation context")
@@ -247,10 +237,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
             assertThat(MetaContext.getCurrentMemberId()).isEqualTo(22L);
             return Map.of("ok", true);
         });
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor);
 
-        delegate.execute(contextWith("a1", processVars("a1", 42L, 7L)));
+        delegate.execute("a1", null, processVars("a1", 42L, 7L));
 
         assertThat(MetaContext.exists()).isTrue();
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
@@ -265,8 +255,8 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         MetaContext.setEnvironmentId(66L);
         MetaContext.setOtelTraceId("trace-previous");
         Map<String, Object> vars = processVars("a1", 42L, 7L);
-        vars.put(AutomationActionServiceTaskDelegate.USER_ID_VAR, 11L);
-        vars.put(AutomationActionServiceTaskDelegate.MEMBER_ID_VAR, 22L);
+        vars.put(AutomationActionAccessorImpl.USER_ID_VAR, 11L);
+        vars.put(AutomationActionAccessorImpl.MEMBER_ID_VAR, 22L);
         ActionExecutor executor = mock(ActionExecutor.class);
         when(executor.execute(any(), any())).thenAnswer(inv -> {
             assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
@@ -274,10 +264,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
             assertThat(MetaContext.getCurrentMemberId()).isEqualTo(22L);
             return Map.of("ok", true);
         });
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor);
 
-        delegate.execute(contextWith("a1", vars));
+        delegate.execute("a1", null, vars);
 
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(99L);
         assertThat(MetaContext.getCurrentUserId()).isEqualTo(88L);
@@ -293,10 +283,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
         MetaContext.setContext(99L, 88L, "previous-user", "Previous User");
         MetaContext.setMemberId(77L);
         Map<String, Object> vars = processVars("a1", 42L, 7L);
-        vars.put(AutomationActionServiceTaskDelegate.USER_ID_VAR, 0L);
-        vars.put(AutomationActionServiceTaskDelegate.USER_PID_VAR, "automation:AUTO-1");
-        vars.put(AutomationActionServiceTaskDelegate.USERNAME_VAR, "automation");
-        vars.remove(AutomationActionServiceTaskDelegate.MEMBER_ID_VAR);
+        vars.put(AutomationActionAccessorImpl.USER_ID_VAR, 0L);
+        vars.put(AutomationActionAccessorImpl.USER_PID_VAR, "automation:AUTO-1");
+        vars.put(AutomationActionAccessorImpl.USERNAME_VAR, "automation");
+        vars.remove(AutomationActionAccessorImpl.MEMBER_ID_VAR);
         ActionExecutor executor = mock(ActionExecutor.class);
         when(executor.execute(any(), any())).thenAnswer(inv -> {
             assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
@@ -306,10 +296,10 @@ class AutomationActionServiceTaskDelegateG5RecordingTest {
             assertThat(MetaContext.getCurrentMemberId()).isNull();
             return Map.of("ok", true);
         });
-        AutomationActionServiceTaskDelegate delegate =
-                new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate =
+                new AutomationActionAccessorImpl(executor);
 
-        delegate.execute(contextWith("a1", vars));
+        delegate.execute("a1", null, vars);
 
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(99L);
         assertThat(MetaContext.getCurrentUserId()).isEqualTo(88L);

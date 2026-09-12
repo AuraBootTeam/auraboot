@@ -1,7 +1,7 @@
 package com.auraboot.framework.automation;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.automation.bpm.AutomationProcessRuntime;
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
@@ -23,7 +23,6 @@ import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -60,13 +59,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Self-contained: synthetic defect/CAPA model pair (mirrors {@code qc_defect_record}/{@code qc_capa}
  * shape) published in-test, real PostgreSQL, no plugin import and no command permissions — same
- * harness as {@code CommandCreateRecordSideEffectIT} + {@code AutomationProcessRuntimeIntegrationTest}.
+ * harness as {@code CommandCreateRecordSideEffectIT} + {@code AutomationWorkflowRuntimeIntegrationTest}.
  */
-@Slf4j
 @DisplayName("S3 golden: quality defect → automation → create_capa command → CAPA row + audit log")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger(QualityAutoCapaChainGoldenIT.class);
 
     @Autowired private MetaModelService metaModelService;
     @Autowired private MetaModelMapper metaModelMapper;
@@ -75,7 +75,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
     @Autowired private DynamicDataMapper dynamicDataMapper;
     @Autowired private DynamicDataService dynamicDataService;
     @Autowired private CommandService commandService;
-    @Autowired private AutomationProcessRuntime runtime;
+    @Autowired private AutomationWorkflowRuntime runtime;
     @Autowired private AutomationTriggerService automationTriggerService;
     @Autowired private com.auraboot.framework.automation.mapper.AutomationLogMapper automationLogMapper;
     @Autowired private ObjectMapper objectMapper;
@@ -211,7 +211,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
         assertThat(persisted.getStatus()).isEqualTo("success");
         assertThat(persisted.getTriggerRecordPid()).isEqualTo(defectPid);
 
-        log.info("[S3 auto-CAPA] PASS — defect {} → CAPA {} ({}), log={}",
+        LOGGER.info("[S3 auto-CAPA] PASS — defect {} → CAPA {} ({}), log={}",
                 defectPid, capa.get("qcc_code"), capa.get("pid"), persisted.getPid());
     }
 
@@ -235,7 +235,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
         assertThat(capaCountForSource(defectPid))
                 .as("gated-out defect must not produce a CAPA")
                 .isZero();
-        log.info("[S3 auto-CAPA gating] PASS — minor defect {} correctly gated out", defectPid);
+        LOGGER.info("[S3 auto-CAPA gating] PASS — minor defect {} correctly gated out", defectPid);
     }
 
     // ------------------------------------------------------------------ fixtures
@@ -319,7 +319,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
                         getTestTenant().getId(), code);
             }
         } catch (Exception e) {
-            log.warn("[cleanup] meta cleanup for {} failed: {}", modelCode, e.getMessage());
+            LOGGER.warn("[cleanup] meta cleanup for {} failed: {}", modelCode, e.getMessage());
         }
     }
 
@@ -327,7 +327,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
         try {
             dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + tableName);
         } catch (Exception e) {
-            log.debug("[setup] drop {} skipped: {}", tableName, e.getMessage());
+            LOGGER.debug("[setup] drop {} skipped: {}", tableName, e.getMessage());
         }
     }
 

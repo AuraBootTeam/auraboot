@@ -23,8 +23,7 @@ import {
   validateManifest,
   verifyArtifacts,
 } from './application-contract.mjs';
-import { writeMigrationSplit } from './migration-ownership.mjs';
-import { writePlatformAdminConfigSplit } from './config-ownership.mjs';
+import { createOciImageLayout, prepareRootfs } from './oci-layout.mjs';
 
 const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
@@ -71,12 +70,17 @@ function sourceRecord(repository, commit) {
   return { repository, commit };
 }
 
+function uuidUrnFromSha256(digest) {
+  const hex = digest.replace(/^sha256:/, '').slice(0, 32);
+  return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 function catalogArtifact({ type, id, version, path, output, repository, commit }) {
   return {
     type,
     id,
     version,
-    uri: `artifact:${basename(path)}`,
+    uri: `${type === 'oci' ? 'oci' : 'artifact'}:${basename(path)}`,
     digest: sha256Path(path),
     localPath: path.slice(output.length + 1),
     source: sourceRecord(repository, commit),
@@ -313,6 +317,21 @@ function packUi(repoRoot, destination) {
   }
 }
 
+function packSourceFacade(repoRoot, destination, directory, label) {
+  mkdirSync(destination, { recursive: true });
+  const sourceRoot = resolve(repoRoot, 'packages', directory);
+  const packageRoot = mkdtempSync(resolve(tmpdir(), `auraboot-${directory}-pack-`));
+  try {
+    cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
+    copyFileSync(resolve(sourceRoot, 'package.json'), resolve(packageRoot, 'package.json'));
+    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    const packed = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
+    return requirePath(resolve(packed.split('\n').at(-1)), `${label} tarball`);
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true });
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const { repoRoot, output } = options;
@@ -350,13 +369,14 @@ function main() {
   const navModel = packCompiledPackage(repoRoot, npmRoot, 'nav-model', 'navigation model');
   const pluginSdk = packPluginSdk(repoRoot, npmRoot);
   const ui = packUi(repoRoot, npmRoot);
+  const dslRuntime = packSourceFacade(repoRoot, npmRoot, 'dsl-runtime', 'DSL runtime');
+  const designerSdk = packSourceFacade(repoRoot, npmRoot, 'designer-sdk', 'designer SDK');
+  const webTestkit = packSourceFacade(repoRoot, npmRoot, 'web-testkit', 'Web testkit');
   const webShell = packWebShell(repoRoot, npmRoot, version);
-  const migrationOutput = resolve(output, 'migrations');
-  writeMigrationSplit(
+  const coreMigrations = copyArtifact(
     resolve(repoRoot, 'platform/src/main/resources/db/migration/core'),
-    migrationOutput,
+    resolve(output, 'migrations/core'),
   );
-  const coreMigrations = requirePath(resolve(migrationOutput, 'core'), 'core-only migrations');
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
   const orgManagement = copyArtifact(
     resolve(repoRoot, 'plugins/org-management'),
@@ -366,11 +386,27 @@ function main() {
     resolve(repoRoot, 'plugins/core-ownership'),
     resolve(output, 'config/core-ownership'),
   );
-  const configSplit = writePlatformAdminConfigSplit(
+  const platformAdmin = copyArtifact(
     resolve(repoRoot, 'plugins/platform-admin'),
-    resolve(output, 'config-split'),
+    resolve(output, 'config/platform-admin'),
   );
-  const platformAdmin = copyArtifact(configSplit.coreRoot, resolve(output, 'config/platform-admin'));
+  const runtimeImage = resolve(output, 'oci/auraboot-runtime');
+  const runtimeRootfs = prepareRootfs([
+    { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
+    { source: resolve(output, 'app.yaml'), destination: '/opt/auraboot/app.yaml' },
+    { source: resolve(output, 'application.lock.pending'), destination: '/opt/auraboot/application.lock.pending' },
+  ].filter(({ source }) => existsSync(source)));
+  const runtimeImageDigest = createOciImageLayout({
+    output: runtimeImage,
+    rootfs: runtimeRootfs,
+    entrypoint: ['java', '-jar', '/opt/auraboot/runtime/application.jar'],
+    labels: {
+      'org.opencontainers.image.title': 'auraboot-runtime',
+      'org.opencontainers.image.version': version,
+      'org.opencontainers.image.revision': commit,
+    },
+  });
+  rmSync(runtimeRootfs, { recursive: true, force: true });
 
   const artifactInputs = [
     { type: 'runtime', id: 'com.auraboot:runtime', version, path: runtime },
@@ -380,11 +416,15 @@ function main() {
     { type: 'npm', id: '@auraboot/nav-model', version: '0.0.1', path: navModel },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk, path: pluginSdk },
     { type: 'npm', id: '@auraboot/ui', version: '1.0.0', path: ui },
+    { type: 'npm', id: '@auraboot/dsl-runtime', version, path: dslRuntime },
+    { type: 'npm', id: '@auraboot/designer-sdk', version, path: designerSdk },
+    { type: 'npm', id: '@auraboot/web-testkit', version, path: webTestkit },
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
     { type: 'config', id: 'platform-admin', version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'oci', id: 'auraboot-runtime', version, path: runtimeImage },
   ];
   const catalog = {
     schemaVersion: 1,
@@ -400,6 +440,20 @@ function main() {
   writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
   writeFileSync(resolve(output, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
   writeFileSync(resolve(output, 'app.resolved.yaml'), YAML.stringify(manifest));
+  const sbom = resolve(output, 'sbom.cdx.json');
+  writeFileSync(sbom, `${JSON.stringify({
+    bomFormat: 'CycloneDX',
+    specVersion: '1.5',
+    serialNumber: uuidUrnFromSha256(lock.identity),
+    version: 1,
+    metadata: { component: { type: 'application', name: 'auraboot-runtime', version } },
+    components: catalog.artifacts.map((artifact) => ({
+      type: artifact.type === 'npm' ? 'library' : 'file',
+      name: artifact.id,
+      version: artifact.version,
+      hashes: [{ alg: 'SHA-256', content: artifact.digest.slice('sha256:'.length) }],
+    })),
+  }, null, 2)}\n`);
   writeFileSync(
     resolve(output, 'release-receipt.json'),
     `${JSON.stringify({
@@ -410,6 +464,8 @@ function main() {
       lockIdentity: lock.identity,
       graphDigest: lock.composition.graphDigest,
       verification: { resolver: 'application-contract-v1', checksum: 'sha256', result: 'PASS' },
+      image: { id: 'auraboot-runtime', digest: runtimeImageDigest, layout: 'oci/auraboot-runtime' },
+      sbom: { format: 'CycloneDX-1.5', path: 'sbom.cdx.json', digest: sha256Path(sbom) },
       artifacts: lock.artifacts.map(({ type, id, version: artifactVersion, digest, localPath }) => ({
         type,
         id,

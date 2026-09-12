@@ -59,3 +59,24 @@ checksum-verified tarball. Source mode reads the same file from roots declared i
 The graph builder rejects duplicate route IDs, route paths, registry owners, plugin codes, activation cycles, and
 incompatible React/React DOM/router/Plugin SDK peer ranges. Client and SSR runs must produce the same graph digest.
 Source paths stay outside the graph identity and are never valid release inputs.
+
+## Publishing the AuraBoot platform artifact set
+
+Build the runtime and public plugin API, commit the exact source state, then stage a
+new immutable platform release directory:
+
+```bash
+cd platform
+../gradlew clean bootJar :platform-plugin-api:jar
+cd ..
+node scripts/application/stage-core-only-artifacts.mjs \
+  --output /absolute/new/path/to/auraboot-1.0.0
+```
+
+The staging command refuses a dirty worktree and emits the runtime JAR, public Maven
+API JAR, versioned npm tarballs, core migrations/config, an OCI image layout,
+`artifact-catalog.json`, `application.lock`, a CycloneDX SBOM, and a release receipt.
+Downstream applications consume only this directory (or the same bytes published to
+immutable Maven, npm, migration/config, and OCI registries). A downstream release
+must never resolve an AuraBoot sibling checkout, Maven Local, `workspace:` link,
+`SNAPSHOT`, `latest`, or branch reference.

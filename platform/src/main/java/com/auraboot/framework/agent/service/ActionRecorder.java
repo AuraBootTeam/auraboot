@@ -511,7 +511,7 @@ public class ActionRecorder {
             if (!rows.isEmpty()) {
                 String fromSql = (String) rows.get(0).get("from_sql");
                 if (fromSql != null) {
-                    // Extract mt_xxx from SQL (e.g., "SELECT ... FROM mt_crm_lead_common WHERE ...")
+                    // Extract mt_xxx from SQL (e.g., "SELECT ... FROM mt_sales_lead WHERE ...")
                     String upper = fromSql.toUpperCase();
                     int mtIdx = upper.indexOf("MT_");
                     if (mtIdx >= 0) {

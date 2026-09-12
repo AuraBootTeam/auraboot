@@ -4,6 +4,18 @@ import { ConditionFragmentLibraryBlock } from '../ConditionFragmentLibraryBlock'
 
 const get = vi.fn();
 const post = vi.fn();
+const resolveUsageLink = vi.fn();
+
+vi.mock('~/framework/bootstrap', () => ({
+  getKernel: () => ({
+    contributionRegistry: {
+      getPrimaryService: (token: string) =>
+        token === 'aura.decision.usage-navigation'
+          ? { provider: { resolveLink: resolveUsageLink } }
+          : undefined,
+    },
+  }),
+}));
 
 vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => ({
@@ -45,6 +57,12 @@ describe('ConditionFragmentLibraryBlock', () => {
   beforeEach(() => {
     get.mockReset();
     post.mockReset();
+    resolveUsageLink.mockReset();
+    resolveUsageLink.mockImplementation((ref: { sourcePid?: string }) =>
+      ref.sourcePid
+        ? { href: `/extensions/workflow/definitions/${encodeURIComponent(ref.sourcePid)}` }
+        : undefined,
+    );
     get.mockImplementation((endpoint: string) => {
       if (endpoint === '/decision/condition-fragments') {
         return Promise.resolve({
@@ -80,7 +98,7 @@ describe('ConditionFragmentLibraryBlock', () => {
                 sourceName: 'Manager Approval SLA',
               },
               {
-                sourceType: 'BPM_PROCESS',
+                sourceType: 'WORKFLOW_PROCESS',
                 sourceCode: 'wd_leave_approval',
                 sourcePid: 'bpm-process-pid',
                 sourceName: '请假审批',
@@ -108,7 +126,7 @@ describe('ConditionFragmentLibraryBlock', () => {
               {
                 decisionCode: 'approval_routing',
                 decisionName: '请假审批分派',
-                scopeType: 'BPM',
+                scopeType: 'WORKFLOW',
                 enabled: true,
               },
               {
@@ -199,15 +217,15 @@ describe('ConditionFragmentLibraryBlock', () => {
     expect(screen.getByTestId('cfl-versions')).not.toHaveTextContent('frag-pid-2');
     expect(screen.getByTestId('cfl-impact')).not.toHaveTextContent('wd_leave_approval');
     expect(screen.getByTestId('cfl-impact')).toHaveTextContent('SLA / 超时策略');
-    expect(screen.getByTestId('cfl-impact')).toHaveTextContent('BPM / 审批路由');
+    expect(screen.getByTestId('cfl-impact')).toHaveTextContent('工作流 / 审批路由');
     expect(screen.getByTestId('cfl-impact')).toHaveTextContent('权限策略');
     expect(screen.getByTestId('cfl-impact-link-SLA_RULE-sla-manager-pid')).toHaveAttribute(
       'href',
       '/p/sla_config/view/sla-manager-pid',
     );
-    expect(screen.getByTestId('cfl-impact-link-BPM_PROCESS-bpm-process-pid')).toHaveAttribute(
+    expect(screen.getByTestId('cfl-impact-link-WORKFLOW_PROCESS-bpm-process-pid')).toHaveAttribute(
       'href',
-      '/p/bpm_process_management/edit/bpm-process-pid',
+      '/extensions/workflow/definitions/bpm-process-pid',
     );
     expect(
       screen.getByTestId('cfl-impact-link-PERMISSION_POLICY-role-permission-pid'),
@@ -248,7 +266,7 @@ describe('ConditionFragmentLibraryBlock', () => {
       target: { value: '高金额审批条件' },
     });
     fireEvent.change(screen.getByTestId('fragment-scope-type'), {
-      target: { value: 'BPM' },
+      target: { value: 'WORKFLOW' },
     });
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith('/decision/definitions', { page: 1, size: 200 }),
@@ -278,7 +296,7 @@ describe('ConditionFragmentLibraryBlock', () => {
         expect.objectContaining({
           fragmentCode: 'approval_high_amount',
           fragmentName: '高金额审批条件',
-          scopeType: 'BPM',
+          scopeType: 'WORKFLOW',
           conditionSpec: expect.objectContaining({
             decisionBindings: [
               {
@@ -468,7 +486,7 @@ describe('ConditionFragmentLibraryBlock', () => {
                 sourceName: 'Manager Approval SLA',
               },
               {
-                sourceType: 'BPM_PROCESS',
+                sourceType: 'WORKFLOW_PROCESS',
                 sourceCode: 'wd_leave_approval',
                 sourcePid: 'bpm-process-pid',
                 sourceName: '请假审批',

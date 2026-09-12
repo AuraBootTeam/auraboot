@@ -144,7 +144,7 @@ function getReplayStatusLabel(status?: string): string {
     NEEDS_SAMPLE_CONTEXT: '需样本',
     AUTOMATION_UNAVAILABLE: '自动化不可用',
     PERMISSION_UNAVAILABLE: '权限服务不可用',
-    BPM_UNAVAILABLE: 'BPM 服务不可用',
+    WORKFLOW_UNAVAILABLE: '工作流服务不可用',
     FAILED: '失败',
   };
   return labels[status || ''] || status || '待复核';
@@ -160,7 +160,7 @@ function getReplayStatusClass(status?: string): string {
     status === 'FAILED' ||
     status === 'AUTOMATION_UNAVAILABLE' ||
     status === 'PERMISSION_UNAVAILABLE' ||
-    status === 'BPM_UNAVAILABLE'
+    status === 'WORKFLOW_UNAVAILABLE'
   ) {
     return 'bg-red-50 text-red-700';
   }
@@ -192,31 +192,31 @@ function getReplayResultMessage(result: ModelPublishReplayResult): string | null
     }
     return '决策版本复核已执行。';
   }
-  if (consumerType === 'BPM_PROCESS' && result.status === 'READY') {
-    return '可使用流程实例和业务记录样本执行 BPM 规则复核。';
+  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'READY') {
+    return '可使用流程实例和业务记录样本执行 工作流规则复核。';
   }
-  if (consumerType === 'BPM_PROCESS' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
-    return '补充流程样本和记录数据后，可执行 BPM 规则复核。';
+  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
+    return '补充流程样本和记录数据后，可执行 工作流规则复核。';
   }
-  if (consumerType === 'BPM_PROCESS' && result.status === 'BPM_UNAVAILABLE') {
-    return '当前运行态未启用 BPM 回放服务。';
+  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'WORKFLOW_UNAVAILABLE') {
+    return '当前运行态未启用 工作流回放服务。';
   }
-  if (consumerType === 'BPM_PROCESS' && result.status === 'FAILED') {
+  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'FAILED') {
     if (result.outputs?.failClosed === true || result.outputs?.fallbackApplied === true) {
-      return 'BPM 分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。';
+      return '工作流分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。';
     }
-    return 'BPM 规则复核失败，请检查规则绑定、流程样本和决策版本。';
+    return '工作流规则复核失败，请检查规则绑定、流程样本和决策版本。';
   }
-  if (consumerType === 'BPM_PROCESS' && result.status === 'EXECUTED') {
+  if (consumerType === 'WORKFLOW_PROCESS' && result.status === 'EXECUTED') {
     const hasAssignment =
       Array.isArray(result.outputs?.candidateUserIds) ||
       Array.isArray(result.outputs?.candidateGroupIds);
     if (hasAssignment) {
       return result.matched === false
-        ? 'BPM 分派规则复核已执行：未命中候选人规则。'
-        : 'BPM 分派规则复核已执行：已解析候选审批人。';
+        ? '工作流分派规则复核已执行：未命中候选人规则。'
+        : '工作流分派规则复核已执行：已解析候选审批人。';
     }
-    return result.matched === false ? 'BPM 规则复核结果：未命中。' : 'BPM 规则复核结果：命中。';
+    return result.matched === false ? '工作流规则复核结果：未命中。' : '工作流规则复核结果：命中。';
   }
   if (consumerType === 'SLA_RULE' && result.status === 'READY') {
     return '可使用流程实例、租户和任务样本执行 SLA 节点复核。';
@@ -444,14 +444,14 @@ function formatReplayOutputValue(key: string, value: unknown): string {
 function formatReplayError(error: string, result: ModelPublishReplayResult): string {
   const consumerType = result.step?.consumerType;
   const normalized = error.toLowerCase();
-  if (consumerType === 'BPM_PROCESS' && result.outputs?.failClosed === true) {
-    if (normalized === 'bpm_rule_binding_fail_closed') {
+  if (consumerType === 'WORKFLOW_PROCESS' && result.outputs?.failClosed === true) {
+    if (normalized === 'workflow_rule_binding_fail_closed') {
       return '规则绑定已失败关闭，未返回候选审批人或候选审批组';
     }
     return '决策执行失败，请检查绑定的决策版本、输入映射和兜底策略';
   }
   if (normalized === 'decision_evaluation_failed') return '决策执行失败';
-  if (normalized === 'bpm_rule_binding_fail_closed') return '规则绑定已失败关闭';
+  if (normalized === 'workflow_rule_binding_fail_closed') return '规则绑定已失败关闭';
   return error;
 }
 
@@ -556,11 +556,11 @@ export default function ModelDetailPage() {
   const [publishReplaySlaProcessKey, setPublishReplaySlaProcessKey] = useState('');
   const [publishReplaySlaRecordJson, setPublishReplaySlaRecordJson] = useState('{}');
   const [publishReplaySlaSampleError, setPublishReplaySlaSampleError] = useState<string | null>(null);
-  const [publishReplayBpmProcessInstanceId, setPublishReplayBpmProcessInstanceId] = useState('');
-  const [publishReplayBpmProcessKey, setPublishReplayBpmProcessKey] = useState('');
-  const [publishReplayBpmRecordPid, setPublishReplayBpmRecordPid] = useState('');
-  const [publishReplayBpmRecordJson, setPublishReplayBpmRecordJson] = useState('{}');
-  const [publishReplayBpmSampleError, setPublishReplayBpmSampleError] = useState<string | null>(null);
+  const [publishReplayWorkflowProcessInstanceId, setPublishReplayWorkflowProcessInstanceId] = useState('');
+  const [publishReplayWorkflowProcessKey, setPublishReplayWorkflowProcessKey] = useState('');
+  const [publishReplayWorkflowRecordPid, setPublishReplayWorkflowRecordPid] = useState('');
+  const [publishReplayWorkflowRecordJson, setPublishReplayWorkflowRecordJson] = useState('{}');
+  const [publishReplayWorkflowSampleError, setPublishReplayWorkflowSampleError] = useState<string | null>(null);
 
   // CRUD向导状态
   const [showCrudWizard, setShowCrudWizard] = useState(false);
@@ -615,10 +615,10 @@ export default function ModelDetailPage() {
     [publishPreview],
   );
 
-  const bpmReplayStep = useMemo(
+  const workflowReplayStep = useMemo(
     () =>
       publishPreview?.governance?.replayPlan?.find(
-        (step) => step.consumerType === 'BPM_PROCESS',
+        (step) => step.consumerType === 'WORKFLOW_PROCESS',
       ) || null,
     [publishPreview],
   );
@@ -949,11 +949,11 @@ export default function ModelDetailPage() {
       setPublishReplaySlaProcessKey('');
       setPublishReplaySlaRecordJson('{}');
       setPublishReplaySlaSampleError(null);
-      setPublishReplayBpmProcessInstanceId('');
-      setPublishReplayBpmProcessKey('');
-      setPublishReplayBpmRecordPid('');
-      setPublishReplayBpmRecordJson('{}');
-      setPublishReplayBpmSampleError(null);
+      setPublishReplayWorkflowProcessInstanceId('');
+      setPublishReplayWorkflowProcessKey('');
+      setPublishReplayWorkflowRecordPid('');
+      setPublishReplayWorkflowRecordJson('{}');
+      setPublishReplayWorkflowSampleError(null);
       setShowPublishConfirm(true);
     } catch (error) {
       console.error('Failed to preview DDL:', error);
@@ -1033,20 +1033,20 @@ export default function ModelDetailPage() {
       recordData = parsed as Record<string, unknown>;
     }
 
-    const bpm: Record<string, unknown> = {
+    const workflow: Record<string, unknown> = {
       processInstanceId,
       tenantId,
     };
     const taskId = publishReplaySlaTaskId.trim();
     if (taskId) {
-      bpm.taskId = taskId;
+      workflow.taskId = taskId;
     }
     const processKey = publishReplaySlaProcessKey.trim();
     if (processKey) {
-      bpm.processKey = processKey;
+      workflow.processKey = processKey;
     }
 
-    return { bpm, record: { data: recordData } };
+    return { workflow, record: { data: recordData } };
   }, [
     publishReplaySlaProcessInstanceId,
     publishReplaySlaProcessKey,
@@ -1055,18 +1055,18 @@ export default function ModelDetailPage() {
     publishReplaySlaTenantId,
   ]);
 
-  const buildBpmReplaySampleContext = useCallback(() => {
+  const buildWorkflowReplaySampleContext = useCallback(() => {
     let recordData: Record<string, unknown> = {};
-    const rawRecordJson = publishReplayBpmRecordJson.trim();
+    const rawRecordJson = publishReplayWorkflowRecordJson.trim();
     if (rawRecordJson) {
       let parsed: unknown;
       try {
         parsed = JSON.parse(rawRecordJson) as unknown;
       } catch {
-        throw new Error('BPM 记录数据必须是有效 JSON 对象');
+        throw new Error('工作流记录数据必须是有效 JSON 对象');
       }
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('BPM 记录数据必须是 JSON 对象');
+        throw new Error('工作流记录数据必须是 JSON 对象');
       }
       recordData = parsed as Record<string, unknown>;
     }
@@ -1074,37 +1074,37 @@ export default function ModelDetailPage() {
     const context: Record<string, Record<string, unknown>> = {
       record: { data: recordData },
     };
-    const recordPid = publishReplayBpmRecordPid.trim();
+    const recordPid = publishReplayWorkflowRecordPid.trim();
     if (recordPid) {
       context.record.pid = recordPid;
     }
 
-    const bpm: Record<string, unknown> = {};
-    const processInstanceId = publishReplayBpmProcessInstanceId.trim();
+    const workflow: Record<string, unknown> = {};
+    const processInstanceId = publishReplayWorkflowProcessInstanceId.trim();
     if (processInstanceId) {
-      bpm.processInstanceId = processInstanceId;
+      workflow.processInstanceId = processInstanceId;
     }
-    const processKey = publishReplayBpmProcessKey.trim();
+    const processKey = publishReplayWorkflowProcessKey.trim();
     if (processKey) {
-      bpm.processKey = processKey;
+      workflow.processKey = processKey;
     }
-    if (Object.keys(bpm).length > 0) {
-      context.bpm = bpm;
+    if (Object.keys(workflow).length > 0) {
+      context.workflow = workflow;
     }
     return context;
   }, [
-    publishReplayBpmProcessInstanceId,
-    publishReplayBpmProcessKey,
-    publishReplayBpmRecordJson,
-    publishReplayBpmRecordPid,
+    publishReplayWorkflowProcessInstanceId,
+    publishReplayWorkflowProcessKey,
+    publishReplayWorkflowRecordJson,
+    publishReplayWorkflowRecordPid,
   ]);
 
   const handlePublishReplay = useCallback(async (
-    replayMode: 'default' | 'permission' | 'sla-node' | 'bpm' = 'default',
+    replayMode: 'default' | 'permission' | 'sla-node' | 'workflow' = 'default',
   ) => {
     setPublishReplaySampleError(null);
     setPublishReplaySlaSampleError(null);
-    setPublishReplayBpmSampleError(null);
+    setPublishReplayWorkflowSampleError(null);
     let sampleContext: Record<string, Record<string, unknown>> | undefined;
     if (replayMode === 'permission') {
       try {
@@ -1122,12 +1122,12 @@ export default function ModelDetailPage() {
         setPublishReplaySlaSampleError(message);
         return;
       }
-    } else if (replayMode === 'bpm') {
+    } else if (replayMode === 'workflow') {
       try {
-        sampleContext = buildBpmReplaySampleContext();
+        sampleContext = buildWorkflowReplaySampleContext();
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'BPM 样本无效';
-        setPublishReplayBpmSampleError(message);
+        const message = error instanceof Error ? error.message : '工作流样本无效';
+        setPublishReplayWorkflowSampleError(message);
         return;
       }
     }
@@ -1141,8 +1141,8 @@ export default function ModelDetailPage() {
             ? `model-publish-${model.code}-permission`
             : replayMode === 'sla-node'
               ? `model-publish-${model.code}-sla-node`
-              : replayMode === 'bpm'
-                ? `model-publish-${model.code}-bpm`
+              : replayMode === 'workflow'
+                ? `model-publish-${model.code}-workflow`
               : `model-publish-${model.code}`,
         sampleContext,
       });
@@ -1152,8 +1152,8 @@ export default function ModelDetailPage() {
       const message = error instanceof Error ? error.message : '生成发布后复核报告失败';
       if (replayMode === 'sla-node') {
         setPublishReplaySlaSampleError(message);
-      } else if (replayMode === 'bpm') {
-        setPublishReplayBpmSampleError(message);
+      } else if (replayMode === 'workflow') {
+        setPublishReplayWorkflowSampleError(message);
       } else {
         setPublishReplaySampleError(message);
       }
@@ -1162,7 +1162,7 @@ export default function ModelDetailPage() {
       setPublishReplayLoading(false);
     }
   }, [
-    buildBpmReplaySampleContext,
+    buildWorkflowReplaySampleContext,
     buildPermissionReplaySampleContext,
     buildSlaNodeReplaySampleContext,
     model.code,
@@ -1198,11 +1198,11 @@ export default function ModelDetailPage() {
       setPublishReplaySlaProcessKey('');
       setPublishReplaySlaRecordJson('{}');
       setPublishReplaySlaSampleError(null);
-      setPublishReplayBpmProcessInstanceId('');
-      setPublishReplayBpmProcessKey('');
-      setPublishReplayBpmRecordPid('');
-      setPublishReplayBpmRecordJson('{}');
-      setPublishReplayBpmSampleError(null);
+      setPublishReplayWorkflowProcessInstanceId('');
+      setPublishReplayWorkflowProcessKey('');
+      setPublishReplayWorkflowRecordPid('');
+      setPublishReplayWorkflowRecordJson('{}');
+      setPublishReplayWorkflowSampleError(null);
       // Reload page to refresh model status
       window.location.reload();
     } catch (error) {
@@ -2388,22 +2388,22 @@ export default function ModelDetailPage() {
                           )}
                         </div>
                       )}
-                      {bpmReplayStep && (
+                      {workflowReplayStep && (
                         <div
-                          data-testid="model-publish-bpm-sample"
+                          data-testid="model-publish-workflow-sample"
                           className="mt-4 rounded border border-cyan-100 bg-cyan-50/80 p-3"
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-semibold text-cyan-950">BPM 流程样本复核</p>
+                              <p className="text-xs font-semibold text-cyan-950">工作流样本复核</p>
                               <p className="mt-1 text-xs text-cyan-900">
                                 用流程实例和业务记录样本复核网关条件、审批人分派等规则绑定。
                               </p>
                             </div>
                             <button
                               type="button"
-                              data-testid="model-publish-run-bpm-replay"
-                              onClick={() => handlePublishReplay('bpm')}
+                              data-testid="model-publish-run-workflow-replay"
+                              onClick={() => handlePublishReplay('workflow')}
                               className="rounded border border-cyan-300 bg-white px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={publishReplayLoading}
                             >
@@ -2414,11 +2414,11 @@ export default function ModelDetailPage() {
                             <label className="block text-xs font-medium text-gray-700">
                               流程实例 ID
                               <input
-                                data-testid="model-publish-bpm-process-instance-id"
-                                aria-label="bpm-replay-process-instance-id"
-                                value={publishReplayBpmProcessInstanceId}
+                                data-testid="model-publish-workflow-process-instance-id"
+                                aria-label="workflow-replay-process-instance-id"
+                                value={publishReplayWorkflowProcessInstanceId}
                                 onChange={(event) =>
-                                  setPublishReplayBpmProcessInstanceId(event.target.value)
+                                  setPublishReplayWorkflowProcessInstanceId(event.target.value)
                                 }
                                 className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
                               />
@@ -2426,13 +2426,13 @@ export default function ModelDetailPage() {
                             <label className="block text-xs font-medium text-gray-700">
                               流程标识
                               <input
-                                data-testid="model-publish-bpm-process-key"
-                                aria-label="bpm-replay-process-key"
-                                value={publishReplayBpmProcessKey}
-                                onChange={(event) => setPublishReplayBpmProcessKey(event.target.value)}
+                                data-testid="model-publish-workflow-process-key"
+                                aria-label="workflow-replay-process-key"
+                                value={publishReplayWorkflowProcessKey}
+                                onChange={(event) => setPublishReplayWorkflowProcessKey(event.target.value)}
                                 placeholder={
-                                  metadataString(bpmReplayStep.metadata, 'processKey') ||
-                                  bpmReplayStep.sourceCode ||
+                                  metadataString(workflowReplayStep.metadata, 'processKey') ||
+                                  workflowReplayStep.sourceCode ||
                                   'approval_flow'
                                 }
                                 className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
@@ -2441,31 +2441,31 @@ export default function ModelDetailPage() {
                             <label className="block text-xs font-medium text-gray-700">
                               记录 PID
                               <input
-                                data-testid="model-publish-bpm-record-pid"
-                                aria-label="bpm-replay-record-pid"
-                                value={publishReplayBpmRecordPid}
-                                onChange={(event) => setPublishReplayBpmRecordPid(event.target.value)}
+                                data-testid="model-publish-workflow-record-pid"
+                                aria-label="workflow-replay-record-pid"
+                                value={publishReplayWorkflowRecordPid}
+                                onChange={(event) => setPublishReplayWorkflowRecordPid(event.target.value)}
                                 className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
                               />
                             </label>
                             <label className="block text-xs font-medium text-gray-700 md:col-span-2">
                               记录数据 JSON
                               <textarea
-                                data-testid="model-publish-bpm-record-json"
-                                aria-label="bpm-replay-record-json"
-                                value={publishReplayBpmRecordJson}
-                                onChange={(event) => setPublishReplayBpmRecordJson(event.target.value)}
+                                data-testid="model-publish-workflow-record-json"
+                                aria-label="workflow-replay-record-json"
+                                value={publishReplayWorkflowRecordJson}
+                                onChange={(event) => setPublishReplayWorkflowRecordJson(event.target.value)}
                                 rows={3}
                                 className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 font-mono text-sm text-gray-900"
                               />
                             </label>
                           </div>
-                          {publishReplayBpmSampleError && (
+                          {publishReplayWorkflowSampleError && (
                             <p
-                              data-testid="model-publish-bpm-sample-error"
+                              data-testid="model-publish-workflow-sample-error"
                               className="mt-2 text-xs text-red-700"
                             >
-                              {publishReplayBpmSampleError}
+                              {publishReplayWorkflowSampleError}
                             </p>
                           )}
                         </div>
@@ -2749,11 +2749,11 @@ export default function ModelDetailPage() {
                   setPublishReplaySlaProcessKey('');
                   setPublishReplaySlaRecordJson('{}');
                   setPublishReplaySlaSampleError(null);
-                  setPublishReplayBpmProcessInstanceId('');
-                  setPublishReplayBpmProcessKey('');
-                  setPublishReplayBpmRecordPid('');
-                  setPublishReplayBpmRecordJson('{}');
-                  setPublishReplayBpmSampleError(null);
+                  setPublishReplayWorkflowProcessInstanceId('');
+                  setPublishReplayWorkflowProcessKey('');
+                  setPublishReplayWorkflowRecordPid('');
+                  setPublishReplayWorkflowRecordJson('{}');
+                  setPublishReplayWorkflowSampleError(null);
                 }}
                 className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
                 disabled={publishLoading}

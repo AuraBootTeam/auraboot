@@ -47,6 +47,8 @@ describe('application migration ownership', () => {
     assert.equal(classifyMigrationStatement('ALTER TABLE se_task_instance ADD COLUMN extra jsonb;').owner, 'bpm');
     assert.equal(classifyMigrationStatement('DROP INDEX IF EXISTS idx_bpm_notify_recipient;').owner, 'bpm');
     assert.equal(classifyMigrationStatement('CREATE TABLE mt_crm_complaint(id bigint);').owner, 'crm');
+    assert.equal(classifyMigrationStatement('CREATE TABLE ab_inbound_channel(id bigint);').owner, 'crm');
+    assert.equal(classifyMigrationStatement('CREATE TABLE ab_calendar_sync(id bigint);').owner, 'crm');
     assert.equal(
       classifyMigrationStatement("INSERT INTO ab_capability(code) VALUES ('crm.manage');").owner,
       'crm',

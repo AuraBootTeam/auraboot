@@ -2,8 +2,7 @@ package com.auraboot.framework.automation.bpm;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
-import com.auraboot.smart.framework.engine.context.ExecutionContext;
-import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
+import com.auraboot.framework.automation.workflow.AutomationActionAccessorImpl;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -21,32 +20,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link AutomationActionServiceTaskDelegate}: it resolves its node's
+ * Unit tests for {@link AutomationActionAccessorImpl}: it resolves its node's
  * action spec from the {@code _automation_actions} process variable and delegates to
  * the existing {@link ActionExecutor}.
  */
-class AutomationActionServiceTaskDelegateTest {
-
-    private ExecutionContext contextWith(String nodeId, Map<String, Object> vars) {
-        IdBasedElement element = mock(IdBasedElement.class);
-        when(element.getId()).thenReturn(nodeId);
-        ExecutionContext ctx = mock(ExecutionContext.class);
-        when(ctx.getBaseElement()).thenReturn(element);
-        when(ctx.getRequest()).thenReturn(vars);
-        return ctx;
-    }
+class AutomationActionAccessorImplTest {
 
     @Test
     void execute_resolvesActionSpecByNodeId_andDelegatesToActionExecutor() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "a1", Map.of("type", "send_notification", "config", Map.of("title", "hi"))));
         vars.put("recordPid", "rec-1");
 
-        delegate.execute(contextWith("a1", vars));
+        delegate.execute("a1", null, vars);
 
         ArgumentCaptor<AutomationAction> captor = ArgumentCaptor.forClass(AutomationAction.class);
         verify(executor).execute(captor.capture(), any());
@@ -57,9 +47,9 @@ class AutomationActionServiceTaskDelegateTest {
     @Test
     void execute_throwsWhenActionsVariableMissing() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
-        assertThatThrownBy(() -> delegate.execute(contextWith("a1", new HashMap<>())))
+        assertThatThrownBy(() -> delegate.execute("a1", null, new HashMap<>()))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -68,17 +58,17 @@ class AutomationActionServiceTaskDelegateTest {
     @Test
     void execute_loopWithEmptyCollection_doesNotInvokeExecutor() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "body", Map.of(
                         "type", "send_notification",
                         "config", Map.of(),
                         "loop", Map.of("collection", "items", "itemVariable", "item"))));
         vars.put("items", List.of());
 
-        delegate.execute(contextWith("body", vars));
+        delegate.execute("body", null, vars);
 
         verify(executor, never()).execute(any(), any());
     }
@@ -86,17 +76,17 @@ class AutomationActionServiceTaskDelegateTest {
     @Test
     void execute_loopWithMissingCollectionVariable_doesNotInvokeExecutor() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "body", Map.of(
                         "type", "send_notification",
                         "config", Map.of(),
                         "loop", Map.of("collection", "items", "itemVariable", "item"))));
         // "items" variable intentionally absent (null) — must not throw, must not fire.
 
-        delegate.execute(contextWith("body", vars));
+        delegate.execute("body", null, vars);
 
         verify(executor, never()).execute(any(), any());
     }
@@ -108,17 +98,17 @@ class AutomationActionServiceTaskDelegateTest {
         when(executor.execute(any(), any()))
                 .thenReturn(Map.of("ok", true))
                 .thenThrow(new RuntimeException("action failed on element b"));
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "body", Map.of(
                         "type", "send_notification",
                         "config", Map.of(),
                         "loop", Map.of("collection", "items", "itemVariable", "item"))));
         vars.put("items", List.of("a", "b", "c"));
 
-        assertThatThrownBy(() -> delegate.execute(contextWith("body", vars)))
+        assertThatThrownBy(() -> delegate.execute("body", null, vars))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("action failed on element b");
 
@@ -129,17 +119,17 @@ class AutomationActionServiceTaskDelegateTest {
     @Test
     void execute_loopBindsItemVariablePerIteration() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "body", Map.of(
                         "type", "send_notification",
                         "config", Map.of(),
                         "loop", Map.of("collection", "items", "itemVariable", "row"))));
         vars.put("items", List.of("a", "b"));
 
-        delegate.execute(contextWith("body", vars));
+        delegate.execute("body", null, vars);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -151,17 +141,17 @@ class AutomationActionServiceTaskDelegateTest {
     @Test
     void execute_loopReachesIterationContextDoesNotLeakBetweenIterations() {
         ActionExecutor executor = mock(ActionExecutor.class);
-        AutomationActionServiceTaskDelegate delegate = new AutomationActionServiceTaskDelegate(executor);
+        AutomationActionAccessorImpl delegate = new AutomationActionAccessorImpl(executor);
 
         Map<String, Object> vars = new HashMap<>();
-        vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
+        vars.put(AutomationActionAccessorImpl.ACTIONS_VAR, Map.of(
                 "body", Map.of(
                         "type", "send_notification",
                         "config", Map.of(),
                         "loop", Map.of("collection", "items", "itemVariable", "item"))));
         vars.put("items", List.of("x", "y"));
 
-        delegate.execute(contextWith("body", vars));
+        delegate.execute("body", null, vars);
 
         // The outer "vars" map must not have been mutated by the delegate — each iteration
         // works on a per-iteration copy. (Guards against subtle context bleed.)

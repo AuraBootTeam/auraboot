@@ -42,10 +42,9 @@ import java.util.regex.Pattern;
  * synchronous {@code rule_test} endpoint ({@link EmqxRuleTestService}) — the
  * broker evaluates the exact stored rule SQL, so the would-fire count is the
  * real production verdict, not a divergent Java re-implementation (§8). No
- * alarm/Kafka/BPM is ever written.
+ * downstream alarms, messages, or workflows are ever written.
  *
- * <p>{@code SMART_ENGINE}/{@code CHAIN} kinds are not production-functional today
- * (no driver loop / sink — see the BPM-external-events backlog); they throw a
+ * <p>Non-SQL provider kinds are not evaluated by this platform simulator; they throw a
  * structured {@code iot.error.rule_kind_not_production_evaluated:<kind>} rather
  * than fabricating a result.
  *
@@ -58,8 +57,6 @@ public class RuleSimulatorImpl implements BackgroundRuleSimulator {
     private static final long SYSTEM_USER_ID = 0L;
     /** Upper bound on devices enumerated for PRODUCT/TENANT scope (cost guard). */
     private static final int MAX_DEVICES = 1000;
-    private static final String SMART_ENGINE_BACKLOG =
-            " (SMART_ENGINE has no production driver loop/sink; see docs/backlog/2026-06-05-bpm-external-events-smartengine.md)";
     /** Extract {@code payload.<field>} references from the rule SQL. */
     private static final Pattern PAYLOAD_FIELD = Pattern.compile("payload\\.([A-Za-z_][A-Za-z0-9_]*)");
     /** Extract the {@code FROM "<topic-filter>"} clause from the rule SQL. */
@@ -118,9 +115,8 @@ public class RuleSimulatorImpl implements BackgroundRuleSimulator {
                 .orElseThrow(() -> new MetaServiceException("iot.error.rule_not_found:" + ruleCode));
 
         if (rule.kind() != BackgroundRuleAccessor.RuleKind.SQL) {
-            String suffix = rule.kind() == BackgroundRuleAccessor.RuleKind.SMART_ENGINE ? SMART_ENGINE_BACKLOG : "";
             throw new MetaServiceException(
-                    "iot.error.rule_kind_not_production_evaluated:" + rule.kind() + suffix);
+                    "iot.error.rule_kind_not_production_evaluated:" + rule.kind());
         }
 
         if (timeSeriesPort == null) {
@@ -171,7 +167,7 @@ public class RuleSimulatorImpl implements BackgroundRuleSimulator {
 
         String note = "evaluated " + checked + " telemetry frame(s) across " + devices.size()
                 + " device(s) via EMQX rule_test dry-run; "
-                + fires.size() + " would fire; no alarm/Kafka/BPM emitted"
+                + fires.size() + " would fire; no downstream side effect emitted"
                 + (devicesWithoutCodes > 0 ? "; " + devicesWithoutCodes + " device(s) skipped (no datapoint codes)" : "");
         log.info("[iot-rule-sim] rule={} tenant={} checked={} wouldFire={}",
                 rule.code(), tenantId, checked, fires.size());

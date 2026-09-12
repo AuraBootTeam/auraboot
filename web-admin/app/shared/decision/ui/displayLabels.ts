@@ -58,7 +58,7 @@ export const SCENARIO_SCOPE_LABELS: Record<string, string> = {
   SLA: 'SLA',
   SLA_RULE: 'SLA',
   BPM: 'BPM',
-  BPM_PROCESS: 'BPM',
+  WORKFLOW_PROCESS: 'BPM',
   WORKFLOW: 'BPM',
   AUTOMATION: '自动化',
   PERMISSION: '权限',

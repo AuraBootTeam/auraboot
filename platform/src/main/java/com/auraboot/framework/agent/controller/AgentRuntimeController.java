@@ -6,7 +6,7 @@ import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.eval.AgentOnlineEvalService;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
-import com.auraboot.framework.agent.service.AgentBpmBridge;
+import com.auraboot.framework.agent.service.AgentWorkflowBridge;
 import com.auraboot.framework.agent.service.AgentCollaborationService;
 import com.auraboot.framework.agent.service.AgentCostReportService;
 import com.auraboot.framework.agent.service.AgentHeartbeatService;
@@ -50,7 +50,7 @@ public class AgentRuntimeController {
 
     private final AgentProperties agentProperties;
     private final AgentApprovalGateService approvalGateService;
-    private final AgentBpmBridge bpmBridge;
+    private final AgentWorkflowBridge workflowBridge;
     private final AgentCollaborationService collaborationService;
     private final AgentContractDeriver contractDeriver;
     private final AgentDispatchHandler dispatchHandler;
@@ -618,10 +618,10 @@ public class AgentRuntimeController {
         return ApiResponse.success(contract);
     }
 
-    // ==================== Agent-BPM Bridge ====================
+    // ==================== Agent-Workflow Bridge ====================
 
     /** Delegate a BPM task to an Agent */
-    @PostMapping("/bpm/delegate-to-agent")
+    @PostMapping("/workflow/delegate-to-agent")
     @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> bpmDelegateToAgent(@RequestBody Map<String, Object> body) {
@@ -637,20 +637,20 @@ public class AgentRuntimeController {
             return ApiResponse.error("agentCode and title are required");
         }
 
-        String taskPid = bpmBridge.delegateToAgent(
+        String taskPid = workflowBridge.delegateToAgent(
                 tenantId, processInstanceId, activityId, agentCode, title, description, contextData);
         return ApiResponse.success(Map.of("taskPid", taskPid, "agentCode", agentCode));
     }
 
-    /** Poll agent task status (for BPM process to check) */
-    @GetMapping("/bpm/agent-task/{taskPid}/status")
+    /** Poll agent task status (for workflow to check) */
+    @GetMapping("/workflow/agent-task/{taskPid}/status")
     public ApiResponse<Map<String, Object>> pollAgentTask(@PathVariable String taskPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return ApiResponse.success(bpmBridge.pollAgentTaskStatus(tenantId, taskPid));
+        return ApiResponse.success(workflowBridge.pollAgentTaskStatus(tenantId, taskPid));
     }
 
-    /** Start a BPM process from an Agent */
-    @PostMapping("/bpm/start-process")
+    /** Start a workflow from an Agent */
+    @PostMapping("/workflow/start")
     @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> agentStartBpm(@RequestBody Map<String, Object> body) {
@@ -663,14 +663,14 @@ public class AgentRuntimeController {
             return ApiResponse.error("processCode is required");
         }
 
-        return ApiResponse.success(bpmBridge.startBpmProcess(tenantId, runPid, processCode, initiatorData));
+        return ApiResponse.success(workflowBridge.startWorkflow(tenantId, runPid, processCode, initiatorData));
     }
 
-    /** Poll BPM process status from Agent */
-    @GetMapping("/bpm/process/{instancePid}/status")
+    /** Poll workflow status from Agent */
+    @GetMapping("/workflow/{instancePid}/status")
     public ApiResponse<Map<String, Object>> pollBpmProcess(@PathVariable String instancePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return ApiResponse.success(bpmBridge.pollBpmProcessStatus(tenantId, instancePid));
+        return ApiResponse.success(workflowBridge.pollWorkflowStatus(tenantId, instancePid));
     }
 
     // ==================== Sandbox & Contract ====================

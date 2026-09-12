@@ -85,7 +85,7 @@ public class CapabilityMappingSupport {
             case "on_state_change" -> "Triggers when the state changes on " + modelCode;
             case "scheduled" -> "Triggers on a scheduled interval for " + modelCode;
             case "webhook" -> "Triggers when an external webhook is received for " + modelCode;
-            case "on_bpm_event" -> "Triggers when a BPM event occurs for " + modelCode;
+            case "on_workflow_event" -> "Triggers when a workflow event occurs for " + modelCode;
             case "on_inactivity" -> "Triggers when a record on " + modelCode + " has been inactive";
             default -> "Automation trigger on " + modelCode;
         };

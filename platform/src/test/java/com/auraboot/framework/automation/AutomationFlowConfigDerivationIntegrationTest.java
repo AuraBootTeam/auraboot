@@ -100,9 +100,9 @@ public class AutomationFlowConfigDerivationIntegrationTest extends BaseIntegrati
         String processKey = "derive-proc-" + runId;
         AutomationCreateRequest req = designerRequest(
                 "DeriveBpmEvent-" + runId,
-                "trigger-bpm-event",
+                "trigger-workflow-event",
                 Map.of(
-                        "triggerType", "on_bpm_event",
+                        "triggerType", "on_workflow_event",
                         "modelCode", processKey,
                         "eventTypes", List.of("process_started", "task_completed")));
 
@@ -110,7 +110,7 @@ public class AutomationFlowConfigDerivationIntegrationTest extends BaseIntegrati
         assertThat(created.getPid()).isNotNull();
 
         AutomationDTO reloaded = automationService.findByPid(created.getPid());
-        assertThat(reloaded.getTriggerType()).isEqualTo("on_bpm_event");
+        assertThat(reloaded.getTriggerType()).isEqualTo("on_workflow_event");
         assertThat(reloaded.getModelCode()).isEqualTo(processKey);
         assertThat(reloaded.getTriggerConfig()).isNotNull();
         assertThat(reloaded.getTriggerConfig().getEventTypes())

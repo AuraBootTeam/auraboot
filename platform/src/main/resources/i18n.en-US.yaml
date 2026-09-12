@@ -316,8 +316,8 @@ automation:
     scheduled.desc: Triggered according to Cron expression
     webhook: Webhook
     webhook.desc: Triggered when an external Webhook request is received
-    bpmEvent: On BPM Event
-    bpmEvent.desc: Triggered when a BPM process event occurs (process started, task completed, etc.)
+    workflowEvent: On Workflow Event
+    workflowEvent.desc: Triggered when a workflow event occurs (process started, task completed, etc.)
     inactivity: On Inactivity
     inactivity.desc: Triggered when a record has had no activity (no update) for the configured duration; driven by a scheduled sweep
 
@@ -414,7 +414,7 @@ automation:
     collection.desc: Array or list to iterate over
     itemVariable: Item Variable Name
     itemVariable.desc: Variable name for current element, default is item
-    bpmProcess: BPM Process
+    workflowProcess: Workflow
     eventTypes: Event Types
     eventTypes.desc: Leave empty to trigger on all event types
     eventTypes.process_started: Process Started

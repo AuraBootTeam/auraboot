@@ -5,7 +5,6 @@ import com.auraboot.framework.decision.adapter.DecisionTableAdapter;
 import com.auraboot.framework.decision.adapter.SimpleConditionAdapter;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.DefaultDecisionRuntime;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -42,15 +41,15 @@ public class DecisionRuntimeConfig {
     }
 
     @Bean
-    @ConditionalOnBean(com.auraboot.framework.bpm.rule.DroolsEngineService.class)
-    public com.auraboot.framework.decision.adapter.DroolsDrlAdapter droolsDrlAdapter(
-            com.auraboot.framework.bpm.rule.DroolsEngineService droolsEngineService) {
-        return new com.auraboot.framework.decision.adapter.DroolsDrlAdapter(droolsEngineService);
+    public com.auraboot.framework.decision.adapter.WorkflowDrlAdapter workflowDrlAdapter(
+            com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry workflowCapabilities) {
+        return new com.auraboot.framework.decision.adapter.WorkflowDrlAdapter(workflowCapabilities);
     }
 
     @Bean
-    public com.auraboot.framework.decision.adapter.DroolsDmnAdapter droolsDmnAdapter() {
-        return new com.auraboot.framework.decision.adapter.DroolsDmnAdapter();
+    public com.auraboot.framework.decision.adapter.WorkflowDmnAdapter workflowDmnAdapter(
+            com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry workflowCapabilities) {
+        return new com.auraboot.framework.decision.adapter.WorkflowDmnAdapter(workflowCapabilities);
     }
 
     /**

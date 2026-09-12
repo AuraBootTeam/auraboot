@@ -1,6 +1,6 @@
 package com.auraboot.framework.automation.iot;
 
-import com.auraboot.framework.automation.bpm.AutomationActionServiceTaskDelegate;
+import com.auraboot.framework.automation.workflow.AutomationActionAccessorImpl;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -208,10 +208,10 @@ class IotRuleNodeUnitTest {
 
             // Webhook-triggered flows merge the client body into the context, so
             // "tenantId" can be an attacker-controlled string. The automation's own
-            // tenant (Long, set by AutomationProcessRuntime) must win.
+            // tenant (Long, set by AutomationWorkflowRuntime) must win.
             Map<String, Object> ctx = new HashMap<>(Map.of(
                     IotRuleContextKeys.TENANT_ID, "999999",
-                    AutomationActionServiceTaskDelegate.TENANT_ID_VAR, 42L));
+                    AutomationActionAccessorImpl.TENANT_ID_VAR, 42L));
             node.execute(action("iot_action", Map.of("kind", "command", "payload", Map.of())), ctx);
 
             assertThat(capture).hasSize(1);

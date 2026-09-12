@@ -1,0 +1,470 @@
+package com.auraboot.framework.automation.workflow;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.entity.AutomationLog.ActionResult;
+import com.auraboot.framework.automation.entity.AutomationNodeExecution;
+import com.auraboot.framework.automation.executor.ActionExecutionException;
+import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.automation.mapper.AutomationNodeExecutionMapper;
+import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.plugin.extension.AutomationActionAccessor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Bridge between a SmartEngine {@code serviceTask} and the existing automation
+ * {@link ActionExecutor} chain.
+ *
+ * <p>Design (DDR-2026-05-23 Option B / T2): SmartEngine orchestrates the graph
+ * (sequence / gateways / loops); the actual action work stays in the already-tested
+ * {@code CompositeActionExecutor}. The compiler emits one generic serviceTask per
+ * automation action with {@code smart:class="automationActionServiceTaskDelegate"};
+ * each node's action spec ({@code type} + {@code config}) is passed at start time via
+ * the {@link #ACTIONS_VAR} process variable, keyed by node id. This keeps
+ * {@code JsonToBpmnConverter} unchanged and preserves full automation action semantics
+ * (multi-recipient notification, multi-field / {@code ${var}} update, LLM, command, …).
+ *
+ * <p>G5 — runtime status recording: when {@link #LOG_ID_VAR} is present in the process
+ * variables, the delegate writes one {@link AutomationNodeExecution} row per node
+ * entry (status=running) and updates it on exit (status=completed / failed). On
+ * failure the row is updated <strong>before</strong> the original exception is rethrown
+ * — exception propagation drives SmartEngine's failure semantics; the row is a
+ * pure observability artefact (red line §8 — no swallow, no fallback).
+ */
+@Slf4j
+@Component
+public class AutomationActionAccessorImpl implements AutomationActionAccessor {
+
+    /** {@code smart:class} bean name the compiler emits on every action serviceTask. */
+    public static final String BEAN_NAME = AutomationActionAccessor.DELEGATE_BEAN_NAME;
+
+    /** Process variable carrying per-node action specs: {@code nodeId -> {type, config}}. */
+    public static final String ACTIONS_VAR = AutomationActionAccessor.ACTIONS_VAR;
+
+    /** Process variable carrying user-facing action results for the parent AutomationLog. */
+    public static final String ACTION_RESULTS_VAR = AutomationActionAccessor.ACTION_RESULTS_VAR;
+
+    /** Process variable carrying the parent {@code ab_automation_log.id} (Long). */
+    public static final String LOG_ID_VAR = AutomationActionAccessor.LOG_ID_VAR;
+
+    /** Process variable carrying the {@code Automation.pid} (denormalised on rows). */
+    public static final String AUTOMATION_ID_VAR = AutomationActionAccessor.AUTOMATION_ID_VAR;
+
+    /** Process variable carrying the {@code tenant_id} for row-level scoping. */
+    public static final String TENANT_ID_VAR = AutomationActionAccessor.TENANT_ID_VAR;
+
+    /** Process variable carrying the automation actor's {@code ab_user.id}. */
+    public static final String USER_ID_VAR = AutomationActionAccessor.USER_ID_VAR;
+
+    /** Process variable carrying the automation actor's user pid. */
+    public static final String USER_PID_VAR = AutomationActionAccessor.USER_PID_VAR;
+
+    /** Process variable carrying the automation actor's display/login name. */
+    public static final String USERNAME_VAR = AutomationActionAccessor.USERNAME_VAR;
+
+    /** Process variable carrying the automation actor's tenant member id. */
+    public static final String MEMBER_ID_VAR = AutomationActionAccessor.MEMBER_ID_VAR;
+
+    private final ActionExecutor actionExecutor;
+
+    // Optional — null in slim contexts that don't load the mapper bean; in that case
+    // recording is silently disabled, the executor still runs.
+    private final AutomationNodeExecutionMapper nodeExecutionMapper;
+
+    @Autowired
+    public AutomationActionAccessorImpl(
+            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor,
+            @Autowired(required = false) AutomationNodeExecutionMapper nodeExecutionMapper) {
+        this.actionExecutor = actionExecutor;
+        this.nodeExecutionMapper = nodeExecutionMapper;
+    }
+
+    /**
+     * Back-compat ctor for unit tests that predate the G5 mapper dependency.
+     * Recording is disabled (mapper=null) — these tests only verify the executor
+     * delegation behaviour. Not used by Spring (no {@code @Autowired}).
+     */
+    public AutomationActionAccessorImpl(ActionExecutor actionExecutor) {
+        this(actionExecutor, null);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void execute(String nodeId, String processInstanceId, Map<String, Object> processVars) {
+        if (processVars == null) {
+            processVars = new HashMap<>();
+        }
+
+        Object actionsObj = processVars.get(ACTIONS_VAR);
+        if (!(actionsObj instanceof Map<?, ?> actionsMap)) {
+            throw new IllegalStateException(
+                    "automation action task: missing '" + ACTIONS_VAR + "' process variable");
+        }
+        Object specObj = actionsMap.get(nodeId);
+        if (!(specObj instanceof Map<?, ?>)) {
+            throw new IllegalStateException(
+                    "automation action task: no action spec for node '" + nodeId + "'");
+        }
+        Map<String, Object> spec = (Map<String, Object>) specObj;
+
+        String type = String.valueOf(spec.get("type"));
+        Object cfg = spec.get("config");
+        Map<String, Object> config =
+                cfg instanceof Map ? (Map<String, Object>) cfg : new HashMap<>();
+
+        AutomationAction action = AutomationAction.builder()
+                .type(type)
+                .config(config)
+                .build();
+        Integer sequence = resolveActionSequence(processVars, spec);
+        MetaContextSnapshot metaContextSnapshot = establishAutomationMetaContext(processVars);
+
+        try {
+            executeWithAutomationContext(processInstanceId, processVars, nodeId, type, spec, action, sequence);
+        } finally {
+            metaContextSnapshot.restore();
+        }
+    }
+
+    private void executeWithAutomationContext(String processInstanceId,
+                                              Map<String, Object> processVars,
+                                              String nodeId,
+                                              String type,
+                                              Map<String, Object> spec,
+                                              AutomationAction action,
+                                              Integer sequence) {
+        // G5: open a per-node execution row if a log id is in scope. null id ==
+        // recording disabled (no log id present, e.g. direct unit-test invocation).
+        Long executionRowId = beginNodeExecution(processVars, nodeId, processInstanceId);
+
+        // control-loop: this SmartEngine fork only expands multi-instance for userTask
+        // (会签), not collection-driven serviceTasks, so a loop body iterates here —
+        // once per collection element, with the element bound under itemVariable in an
+        // isolated per-iteration context copy.
+        Object loopObj = spec.get("loop");
+        if (loopObj instanceof Map<?, ?> loopMap) {
+            String collectionVar = String.valueOf(loopMap.get("collection"));
+            String itemVariable = loopMap.get("itemVariable") != null
+                    ? String.valueOf(loopMap.get("itemVariable")) : "item";
+            List<Object> items = resolveCollection(collectionVar, processVars);
+            log.info("AutomationActionDelegate: node={}, actionType={}, loop '{}' -> {} item(s)",
+                    nodeId, type, collectionVar, items.size());
+            ActionResult actionResult = newActionResult(sequence, type);
+            long startTime = System.currentTimeMillis();
+            List<Object> iterationResults = new ArrayList<>();
+            try {
+                for (Object element : items) {
+                    Map<String, Object> iterationContext = new HashMap<>(processVars);
+                    iterationContext.put(itemVariable, element);
+                    iterationResults.add(actionExecutor.execute(action, iterationContext));
+                }
+                completeActionResult(actionResult, StatusConstants.SUCCESS,
+                        Map.of("iterations", items.size(), "results", iterationResults),
+                        null, startTime);
+                appendActionResult(processVars, actionResult);
+                completeNodeExecution(executionRowId, StatusConstants.COMPLETED, null);
+            } catch (ActionExecutionException e) {
+                completeActionResult(actionResult, StatusConstants.FAILED,
+                        failurePayloadWithLoopEvidence(e, iterationResults),
+                        e.getMessage(), startTime);
+                appendActionResult(processVars, actionResult);
+                completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+                throw e;
+            } catch (RuntimeException e) {
+                // Record failure row first, then propagate. SmartEngine needs the
+                // exception for its failure semantics (red line §8: no swallow).
+                completeActionResult(actionResult, StatusConstants.FAILED,
+                        Map.of("iterationsCompleted", iterationResults.size(), "results", iterationResults),
+                        e.getMessage(), startTime);
+                appendActionResult(processVars, actionResult);
+                completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+                throw e;
+            }
+            return;
+        }
+
+        log.info("AutomationActionDelegate: node={}, actionType={}", nodeId, type);
+        ActionResult actionResult = newActionResult(sequence, type);
+        long startTime = System.currentTimeMillis();
+        try {
+            Object result = actionExecutor.execute(action, processVars);
+            completeActionResult(actionResult, StatusConstants.SUCCESS, result, null, startTime);
+            appendActionResult(processVars, actionResult);
+            completeNodeExecution(executionRowId, StatusConstants.COMPLETED, null);
+        } catch (ActionExecutionException e) {
+            completeActionResult(actionResult, StatusConstants.FAILED, e.resultPayload(), e.getMessage(), startTime);
+            appendActionResult(processVars, actionResult);
+            completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+            throw e;
+        } catch (RuntimeException e) {
+            completeActionResult(actionResult, StatusConstants.FAILED, null, e.getMessage(), startTime);
+            appendActionResult(processVars, actionResult);
+            completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+            throw e;
+        }
+    }
+
+    private Map<String, Object> failurePayloadWithLoopEvidence(ActionExecutionException error,
+                                                               List<Object> iterationResults) {
+        Map<String, Object> payload = new LinkedHashMap<>(error.resultPayload());
+        payload.put("iterationsCompleted", iterationResults.size());
+        payload.put("results", iterationResults);
+        return payload;
+    }
+
+    private MetaContextSnapshot establishAutomationMetaContext(Map<String, Object> processVars) {
+        Long tenantId = asLong(processVars.get(TENANT_ID_VAR));
+        boolean hasAutomationActorContext =
+                processVars.containsKey(USER_ID_VAR)
+                        || processVars.containsKey(USER_PID_VAR)
+                        || processVars.containsKey(USERNAME_VAR)
+                        || processVars.containsKey(MEMBER_ID_VAR);
+        if (!hasAutomationActorContext) {
+            boolean hasUsableContext = false;
+            if (MetaContext.exists()) {
+                Long currentUserId = MetaContext.getCurrentUserId();
+                Long currentMemberId = MetaContext.getCurrentMemberId();
+                hasUsableContext = currentUserId != null && currentMemberId != null;
+            }
+            if (hasUsableContext) {
+                return MetaContextSnapshot.noop();
+            }
+        }
+
+        if (tenantId == null && MetaContext.exists()) {
+            tenantId = MetaContext.getCurrentTenantId();
+        }
+        if (tenantId == null) {
+            return MetaContextSnapshot.noop();
+        }
+
+        MetaContextSnapshot snapshot = MetaContextSnapshot.capture();
+        Long userId = asLong(processVars.get(USER_ID_VAR));
+        String userPid = asString(processVars.get(USER_PID_VAR));
+        String username = asString(processVars.get(USERNAME_VAR));
+        Long memberId = asLong(processVars.get(MEMBER_ID_VAR));
+        MetaContext.setContext(tenantId, userId, userPid, username);
+        if (memberId != null) {
+            MetaContext.setMemberId(memberId);
+        } else {
+            MetaContext.clearMemberId();
+        }
+        return snapshot;
+    }
+
+    private Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String str && !str.isBlank()) {
+            return Long.parseLong(str);
+        }
+        return null;
+    }
+
+    private String asString(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private ActionResult newActionResult(Integer sequence, String actionType) {
+        ActionResult result = new ActionResult();
+        result.setSequence(sequence);
+        result.setActionType(actionType);
+        return result;
+    }
+
+    private void completeActionResult(ActionResult result, String status, Object payload,
+                                      String errorMessage, long startTime) {
+        result.setStatus(status);
+        result.setResult(payload);
+        result.setErrorMessage(errorMessage);
+        result.setDurationMs(System.currentTimeMillis() - startTime);
+    }
+
+    private Integer resolveActionSequence(Map<String, Object> processVars, Map<String, Object> spec) {
+        Object sequence = spec.get("sequence");
+        if (sequence instanceof Number number) {
+            return number.intValue();
+        }
+        Object resultsObj = processVars.get(ACTION_RESULTS_VAR);
+        if (resultsObj instanceof List<?> results) {
+            synchronized (results) {
+                return results.size() + 1;
+            }
+        }
+        return 1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendActionResult(Map<String, Object> processVars, ActionResult result) {
+        Object resultsObj = processVars.get(ACTION_RESULTS_VAR);
+        if (!(resultsObj instanceof List<?> results)) {
+            return;
+        }
+        synchronized (results) {
+            ((List<ActionResult>) results).add(result);
+        }
+    }
+
+    /**
+     * Insert a {@code status='running'} row for this node entry and return its id, or
+     * {@code null} when recording is disabled (no log id in scope, no tenant id, or
+     * no mapper bean).
+     *
+     * <p>The recording branch must not impair the action — if the insert itself fails
+     * we log and continue. Losing observability is strictly better than losing the
+     * user-facing execution. This narrow {@code Exception} catch is deliberate
+     * (observability-only, not action error handling — red line §8 still holds).
+     */
+    private Long beginNodeExecution(Map<String, Object> processVars, String nodeId,
+                                    String processInstanceId) {
+        if (nodeExecutionMapper == null) {
+            return null;
+        }
+        Object logIdObj = processVars.get(LOG_ID_VAR);
+        if (!(logIdObj instanceof Number logIdNum)) {
+            return null;
+        }
+        Object tenantIdObj = processVars.get(TENANT_ID_VAR);
+        Long tenantId = tenantIdObj instanceof Number n ? n.longValue() : null;
+        if (tenantId == null) {
+            log.debug("G5 node-status recording skipped: no tenant id (node={})", nodeId);
+            return null;
+        }
+        String automationId = String.valueOf(processVars.getOrDefault(AUTOMATION_ID_VAR, ""));
+        AutomationNodeExecution row = new AutomationNodeExecution();
+        row.setTenantId(tenantId);
+        row.setAutomationLogId(logIdNum.longValue());
+        row.setAutomationId(automationId);
+        row.setProcessInstanceId(processInstanceId);
+        row.setNodeId(nodeId);
+        row.setStatus(StatusConstants.RUNNING);
+        row.setStartedAt(Instant.now());
+        row.setCreatedAt(Instant.now());
+        try {
+            nodeExecutionMapper.insert(row);
+            return row.getId();
+        } catch (Exception e) {
+            log.warn("G5 node-status recording failed (insert) for node={}: {}",
+                    nodeId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void completeNodeExecution(Long rowId, String status, String errorMessage) {
+        if (rowId == null || nodeExecutionMapper == null) {
+            return;
+        }
+        try {
+            AutomationNodeExecution update = new AutomationNodeExecution();
+            update.setId(rowId);
+            update.setStatus(status);
+            update.setCompletedAt(Instant.now());
+            update.setErrorMessage(errorMessage);
+            nodeExecutionMapper.updateById(update);
+        } catch (Exception e) {
+            log.warn("G5 node-status recording failed (update) rowId={}: {}",
+                    rowId, e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve a loop collection reference to a list of elements. Accepts a bare process
+     * variable name or {@code ${var}} template; the value may be a {@link java.util.Collection},
+     * an array, or a comma-separated String. Missing / blank → empty (the loop is skipped).
+     */
+    private List<Object> resolveCollection(String expr, Map<String, Object> ctx) {
+        if (expr == null || expr.isBlank()) {
+            return List.of();
+        }
+        String varName = expr.trim();
+        if (varName.startsWith("${") && varName.endsWith("}")) {
+            varName = varName.substring(2, varName.length() - 1).trim();
+        }
+        Object value = ctx.get(varName);
+        if (value == null) {
+            return List.of();
+        }
+        if (value instanceof java.util.Collection<?> coll) {
+            return new java.util.ArrayList<>(coll);
+        }
+        if (value.getClass().isArray()) {
+            return java.util.Arrays.asList((Object[]) value);
+        }
+        String str = value.toString();
+        if (str.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(str.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> (Object) s)
+                .toList();
+    }
+
+    private record MetaContextSnapshot(
+            boolean changed,
+            boolean existed,
+            Long tenantId,
+            Long userId,
+            String userPid,
+            String username,
+            Set<Long> roleIds,
+            Long memberId,
+            Long environmentId,
+            String otelTraceId) {
+
+        private static MetaContextSnapshot noop() {
+            return new MetaContextSnapshot(false, false, null, null, null, null,
+                    Set.of(), null, null, null);
+        }
+
+        private static MetaContextSnapshot capture() {
+            if (!MetaContext.exists()) {
+                return new MetaContextSnapshot(true, false, null, null, null, null,
+                        Set.of(), null, null, null);
+            }
+            return new MetaContextSnapshot(true, true,
+                    MetaContext.getCurrentTenantId(),
+                    MetaContext.getCurrentUserId(),
+                    MetaContext.getCurrentUserPid(),
+                    MetaContext.getCurrentUsername(),
+                    MetaContext.getCurrentRoleIds(),
+                    MetaContext.getCurrentMemberId(),
+                    MetaContext.getCurrentEnvironmentId(),
+                    MetaContext.getOtelTraceId());
+        }
+
+        private void restore() {
+            if (!changed) {
+                return;
+            }
+            if (!existed) {
+                MetaContext.clear();
+                return;
+            }
+            MetaContext.clear();
+            MetaContext.setContext(tenantId, userId, userPid, username, roleIds);
+            if (memberId != null) {
+                MetaContext.setMemberId(memberId);
+            }
+            if (environmentId != null) {
+                MetaContext.setEnvironmentId(environmentId);
+            }
+            if (otelTraceId != null) {
+                MetaContext.setOtelTraceId(otelTraceId);
+            }
+        }
+    }
+}

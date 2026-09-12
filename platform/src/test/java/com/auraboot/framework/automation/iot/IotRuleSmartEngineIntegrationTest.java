@@ -1,7 +1,7 @@
 package com.auraboot.framework.automation.iot;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.automation.bpm.AutomationProcessRuntime;
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -65,7 +65,7 @@ public class IotRuleSmartEngineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Autowired
-    private AutomationProcessRuntime runtime;
+    private AutomationWorkflowRuntime runtime;
 
     @Autowired
     private ObjectMapper objectMapper;

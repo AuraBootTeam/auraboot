@@ -11,17 +11,24 @@ import { InboxWidget } from '~/plugins/core-dashboard/widgets/workbench/InboxWid
 import { RecentWidget } from '~/plugins/core-dashboard/widgets/workbench/RecentWidget';
 import { ShortcutsWidget } from '~/plugins/core-dashboard/widgets/workbench/ShortcutsWidget';
 import { StatsRowWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsRowWidget';
-import { MyProcessWidget } from '~/plugins/core-dashboard/widgets/workbench/MyProcessWidget';
-import { ProcessStatsWidget } from '~/plugins/core-dashboard/widgets/workbench/ProcessStatsWidget';
-import { PipelineWidget } from '~/plugins/core-dashboard/widgets/workbench/PipelineWidget';
-import { LeadsWidget } from '~/plugins/core-dashboard/widgets/workbench/LeadsWidget';
-import { ActivitiesWidget } from '~/plugins/core-dashboard/widgets/workbench/ActivitiesWidget';
+import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import { CalendarWidget } from '~/plugins/core-dashboard/widgets/workbench/CalendarWidget';
 import { AnnouncementWidget } from '~/plugins/core-dashboard/widgets/workbench/AnnouncementWidget';
 import { QuickNoteWidget } from '~/plugins/core-dashboard/widgets/workbench/QuickNoteWidget';
 import { StatsCardWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsCardWidget';
 
 type LazyComponent = React.LazyExoticComponent<React.ComponentType<any>>;
+
+const MyProcessWidget = (props: Record<string, unknown>) =>
+  React.createElement(LazyContributedComponent, { contributionId: 'workflow-my-process-widget', ...props });
+const ProcessStatsWidget = (props: Record<string, unknown>) =>
+  React.createElement(LazyContributedComponent, { contributionId: 'workflow-process-stats-widget', ...props });
+const PipelineWidget = (props: Record<string, unknown>) =>
+  React.createElement(LazyContributedComponent, { contributionId: 'sales-pipeline-widget', ...props });
+const LeadsWidget = (props: Record<string, unknown>) =>
+  React.createElement(LazyContributedComponent, { contributionId: 'sales-leads-widget', ...props });
+const ActivitiesWidget = (props: Record<string, unknown>) =>
+  React.createElement(LazyContributedComponent, { contributionId: 'sales-activities-widget', ...props });
 
 const CHART_REGISTRY = new Map<string, LazyComponent>();
 

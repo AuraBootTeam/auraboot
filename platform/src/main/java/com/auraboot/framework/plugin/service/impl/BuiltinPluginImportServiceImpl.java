@@ -62,11 +62,10 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
     private static final List<BuiltinPlugin> BUILTIN_PLUGINS = List.of(
             // ── Core profile (always imported) ──────────────────────────
             // Order matters: dependencies first. platform-admin's menus
-            // reference parents/permissions defined in core-meta and core-bpm,
-            // so those must import before platform-admin or validation fails
+            // reference parents/permissions defined in core-meta, so it must
+            // import before platform-admin or validation fails
             // ("Menu X references missing parent Y / missing permission Z").
             new BuiltinPlugin("core-meta",             "com.auraboot.core-meta",           Profile.CORE),
-            new BuiltinPlugin("core-bpm",              "com.auraboot.core-bpm",            Profile.CORE),
             new BuiltinPlugin("core-aurabot",          "com.auraboot.core-aurabot",        Profile.CORE),
             new BuiltinPlugin("page-manager",          "com.auraboot.page-manager",        Profile.CORE),
             new BuiltinPlugin("org-management",        "com.auraboot.org-management",      Profile.CORE),

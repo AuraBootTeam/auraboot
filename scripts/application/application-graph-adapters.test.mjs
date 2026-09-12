@@ -19,6 +19,7 @@ function manifest() {
     app: { id: 'aura-crm', name: 'Aura CRM', version: '1.0.0', defaultRoute: '/crm' },
     platform: {
       runtime: '1.0.0',
+      baseImage: { id: 'auraboot-runtime', version: '1.0.0' },
       pluginApi: '1.0.0',
       webShell: '1.0.0',
       pluginSdk: '1.0.0',
@@ -78,6 +79,7 @@ describe('application graph adapters', () => {
 
     const inputs = [
       ['runtime', 'com.auraboot:runtime', 'runtime/runtime.jar'],
+      ['oci', 'auraboot-runtime', 'oci/runtime.bin'],
       ['maven', 'com.auraboot:platform-plugin-api', 'maven/plugin-api.jar'],
       ['npm', '@auraboot/web-shell', 'npm/web-shell.tgz'],
       ['npm', '@auraboot/plugin-sdk', 'npm/plugin-sdk.tgz'],

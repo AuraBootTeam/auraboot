@@ -1093,7 +1093,7 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     repeater: repeaterFields,
     subform: subformFields,
     'ai-fill-banner': aiFillBannerFields,
-    'bpm-panel': bpmPanelFields,
+    'workflow-panel': bpmPanelFields,
     'activity-timeline': activityTimelineFields,
     'field-history': fieldHistoryFields,
     'metric-strip': metricStripFields,

@@ -7,7 +7,6 @@ export {
   createVersionService,
   dashboardVersionService,
   pageSchemaVersionService,
-  bpmnVersionService,
 } from './versionService';
 
 // Hook

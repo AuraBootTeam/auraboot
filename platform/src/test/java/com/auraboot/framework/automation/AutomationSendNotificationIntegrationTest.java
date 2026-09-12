@@ -1,7 +1,7 @@
 package com.auraboot.framework.automation;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.automation.bpm.AutomationProcessRuntime;
+import com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.entity.TriggerConfig;
@@ -61,7 +61,7 @@ class AutomationSendNotificationIntegrationTest extends BaseIntegrationTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    @Autowired private AutomationProcessRuntime runtime;
+    @Autowired private AutomationWorkflowRuntime runtime;
     @Autowired private AutomationTriggerService automationTriggerService;
     @Autowired private AutomationLogMapper automationLogMapper;
     @Autowired private JdbcTemplate jdbcTemplate;

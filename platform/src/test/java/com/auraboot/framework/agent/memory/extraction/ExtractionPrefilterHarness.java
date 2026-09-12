@@ -79,7 +79,7 @@ class ExtractionPrefilterHarness {
         // Phase 2 implementation:
         //   1. Pull N runs from ab_agent_run (last 30 days, status='completed')
         //   2. For each: rebuild signal list from
-        //        a. ab_agent_observation events of type tool_call / tool_response / bpm_event
+        //        a. ab_agent_observation events of type tool_call / tool_response / workflow_event
         //        b. result.lastResponse JSON parsing for tool_response fields
         //   3. Replay → List<ExtractedMemoryCandidate>
         //   4. Pull historical memories via source_run_id = run.pid

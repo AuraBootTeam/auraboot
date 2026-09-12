@@ -42,7 +42,7 @@ class AutomationTriggerServiceImplTest {
     private AutomationLogMapper automationLogMapper;
 
     @Mock
-    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+    private com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime automationProcessRuntime;
 
     @Mock
     private UserMapper userMapper;
@@ -55,7 +55,7 @@ class AutomationTriggerServiceImplTest {
     @BeforeEach
     void setUp() {
         @SuppressWarnings("unchecked")
-        org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.bpm.AutomationProcessRuntime>
+        org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime>
                 runtimeProvider = mock(org.springframework.beans.factory.ObjectProvider.class);
         lenient().when(runtimeProvider.getIfAvailable()).thenReturn(automationProcessRuntime);
         service = new AutomationTriggerServiceImpl(
@@ -513,20 +513,20 @@ class AutomationTriggerServiceImplTest {
         TriggerConfig config = new TriggerConfig();
         config.setEventTypes(List.of("task_assigned"));
         Automation automation = buildAutomation("auto-bpm-001", "e2et_payment_approval", null, config, List.of());
-        automation.setTriggerType("on_bpm_event");
+        automation.setTriggerType("on_workflow_event");
 
-        when(automationMapper.findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_bpm_event"))
+        when(automationMapper.findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_workflow_event"))
                 .thenReturn(List.of(automation));
 
         service.onBpmEvent("task_assigned", "e2et_payment_approval:1", "pi-001",
                 Map.of("taskInstanceId", "task-001"));
 
-        verify(automationMapper).findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_bpm_event");
+        verify(automationMapper).findEnabledByModelCodeAndTriggerType("e2et_payment_approval", "on_workflow_event");
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(automationProcessRuntime).run(eq(automation), eq("pi-001"), payloadCaptor.capture(), any());
         assertThat(payloadCaptor.getValue())
-                .containsEntry("event", "bpm_event")
+                .containsEntry("event", "workflow_event")
                 .containsEntry("eventType", "task_assigned")
                 .containsEntry("processKey", "e2et_payment_approval:1")
                 .containsEntry("instanceId", "pi-001")

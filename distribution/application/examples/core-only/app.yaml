@@ -6,6 +6,9 @@ app:
   defaultRoute: /admin
 platform:
   runtime: 1.0.0
+  baseImage:
+    id: auraboot-runtime
+    version: 1.0.0
   pluginApi: 1.0.0
   webShell: 1.0.0
   pluginSdk: 0.0.1
@@ -15,6 +18,10 @@ platform:
     - package: "@auraboot/nav-model"
       version: 0.0.1
     - package: "@auraboot/ui"
+      version: 1.0.0
+    - package: "@auraboot/dsl-runtime"
+      version: 1.0.0
+    - package: "@auraboot/designer-sdk"
       version: 1.0.0
   dslSchema: 4
 backend:

@@ -10,7 +10,7 @@
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO} - Permission definitions</li>
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO} - Role definitions</li>
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO} - Menu definitions</li>
- *   <li>{@link com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO} - BPM process definitions</li>
+ *   <li>{@link com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO} - workflow definitions</li>
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.PageSchemaDTO} - Page schema definitions</li>
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO} - Dictionary definitions</li>
  *   <li>{@link com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO} - Named query definitions</li>

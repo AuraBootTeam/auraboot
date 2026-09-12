@@ -1,21 +1,5 @@
 [
   {
-    "code": "admin_sla_config",
-    "name:zh-CN": "SLA 配置管理",
-    "name:en": "SLA Configuration Management",
-    "description": "Manage SLA configurations for BPM processes",
-    "resourceType": "operation",
-    "module": "bpm"
-  },
-  {
-    "code": "admin_bpm_domain_config",
-    "name:zh-CN": "BPM 域配置管理",
-    "name:en": "BPM Domain Configuration Management",
-    "description": "Manage BPM domain configurations",
-    "resourceType": "operation",
-    "module": "bpm"
-  },
-  {
     "code": "admin_data_permission",
     "name:zh-CN": "数据权限策略管理",
     "name:en": "Data Permission Policy Management",

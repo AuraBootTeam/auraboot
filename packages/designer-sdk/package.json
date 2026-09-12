@@ -1,0 +1,11 @@
+{
+  "name": "@auraboot/designer-sdk",
+  "version": "1.0.0",
+  "description": "Public graph and designer extension surface for AuraBoot products",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": { "./*": "./src/*" },
+  "files": ["src"],
+  "peerDependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "publishConfig": { "access": "public" }
+}

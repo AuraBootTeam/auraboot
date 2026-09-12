@@ -1,13 +1,13 @@
 package com.auraboot.framework.eventpolicy.executor.handler;
 
-import com.auraboot.framework.bpm.service.ProcessEngineService;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionHandler;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.eventpolicy.executor.ActionProviderDependency;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
-import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Production {@code START_PROCESS} {@link ActionHandler} (docs/2.md §7): starts a BPM process instance
+ * Production {@code START_PROCESS} {@link ActionHandler} (docs/2.md §7): starts a workflow instance
  * via the platform {@link ProcessEngineService} when a policy rule matches (e.g. open an approval
  * flow for a high-value case). Additive — reuses the BPM engine. {@code payload.processDefinitionId}
  * selects the process; the business key defaults to the event's record pid; {@code payload.variables}
@@ -28,7 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StartProcessActionHandler implements ActionHandler {
 
-    private final ProcessEngineService processEngineService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
 
     @Override
     public boolean supports(String actionType) {
@@ -76,9 +76,16 @@ public class StartProcessActionHandler implements ActionHandler {
         if (userId != null) {
             variables.putIfAbsent("_startUserId", String.valueOf(userId));
         }
-        ProcessInstance processInstance;
+        Map<String, Object> started;
         try {
-            processInstance = processEngineService.startProcess(processDefinitionId, businessKey, variables);
+            started = workflowCapabilities.execute("start",
+                    new WorkflowCapability.WorkflowRequest(
+                            com.auraboot.framework.application.tenant.MetaContext.exists()
+                                    ? com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId() : null,
+                            userId,
+                            Map.of("processDefinitionKey", processDefinitionId,
+                                    "businessKey", businessKey == null ? "" : businessKey,
+                                    "variables", variables))).payload();
         } catch (Exception e) {
             throw new ActionExecutionException("流程启动失败：流程未部署或流程标识不存在",
                     failurePayload("process_start_failed", null,
@@ -87,8 +94,8 @@ public class StartProcessActionHandler implements ActionHandler {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processDefinitionId", processDefinitionId);
         result.put("businessKey", businessKey);
-        if (processInstance != null && processInstance.getInstanceId() != null) {
-            result.put("processInstanceId", processInstance.getInstanceId());
+        if (started.get("processInstanceId") != null) {
+            result.put("processInstanceId", started.get("processInstanceId"));
         }
         if (recordPid != null) {
             result.put("recordPid", recordPid);
