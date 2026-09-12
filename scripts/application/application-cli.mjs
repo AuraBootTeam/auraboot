@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import {
+  buildApplicationGraph,
   readStructuredFile,
   resolveApplication,
   verifyArtifacts,
@@ -21,6 +22,7 @@ function parseArgs(argv) {
     else if (argument === '--lock') options.lock = resolve(rest[++index]);
     else if (argument === '--output') options.output = resolve(rest[++index]);
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
+    else if (argument === '--mode') options.mode = rest[++index];
     else throw new Error(`Unknown argument: ${argument}`);
   }
   return options;
@@ -59,7 +61,21 @@ function main() {
     process.stdout.write(`verified ${lock.artifacts.length} staged artifacts: ${lock.identity}\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts [options]');
+  if (options.command === 'graph') {
+    const mode = options.mode ?? 'artifact';
+    if (!['source', 'artifact'].includes(mode)) throw new Error('--mode must be source or artifact');
+    const manifest = readStructuredFile(required(options, 'manifest'));
+    const graph = buildApplicationGraph(manifest);
+    const output = options.output;
+    const envelope = { schemaVersion: 1, mode, ...graph };
+    if (output) {
+      mkdirSync(dirname(output), { recursive: true });
+      writeFileSync(output, `${JSON.stringify(envelope, null, 2)}\n`);
+    }
+    process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
+    return;
+  }
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph [options]');
 }
 
 try {

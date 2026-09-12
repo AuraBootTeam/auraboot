@@ -72,6 +72,34 @@ export function validateLock(lock) {
   return lock;
 }
 
+export function buildApplicationGraph(manifestInput) {
+  const manifest = validateManifest(manifestInput);
+  const nodes = [
+    { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
+    { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
+    { kind: 'web', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
+    ...manifest.backend.plugins.map((plugin) => ({ kind: 'plugin', id: plugin.id, version: plugin.version })),
+    ...manifest.backend.migrationSets.map((id) => ({ kind: 'migration', id })),
+    ...manifest.frontend.contributions.map((item) => ({
+      kind: 'web',
+      id: item.package,
+      version: item.version,
+    })),
+    ...manifest.config.importOrder.map((id) => ({ kind: 'config', id })),
+  ].map((node, order) => ({ ...node, order }));
+  const duplicateNodes = nodes
+    .map((node) => `${node.kind}:${node.id}`)
+    .filter((id, index, all) => all.indexOf(id) !== index);
+  if (duplicateNodes.length > 0) {
+    throw new Error(`application graph contains duplicate nodes: ${[...new Set(duplicateNodes)].join(', ')}`);
+  }
+  return {
+    graphDigest: sha256(canonicalJson(nodes)),
+    nodes,
+  };
+}
+
 export function verifyArtifacts(lockInput, { artifactRoot }) {
   const lock = validateLock(lockInput);
   const root = resolve(artifactRoot);
@@ -153,6 +181,7 @@ export function resolveApplication(manifestInput, catalog) {
     schemaVersion: 1,
     application: { id: manifest.app.id, version: manifest.app.version },
     manifestDigest: sha256(canonicalJson(manifest)),
+    composition: buildApplicationGraph(manifest),
     artifacts,
   };
   const lock = {

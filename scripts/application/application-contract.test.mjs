@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
+  buildApplicationGraph,
   resolveApplication,
   sha256,
   validateLock,
@@ -98,6 +99,15 @@ describe('AuraBoot application contract', () => {
     lock.artifacts[0].digest = digest('f');
 
     assert.throws(() => validateLock(lock), /identity mismatch/);
+  });
+
+  it('produces the same logical composition graph for source and artifact adapters', () => {
+    const sourceGraph = buildApplicationGraph(manifest());
+    const artifactGraph = buildApplicationGraph(manifest());
+
+    assert.deepEqual(sourceGraph, artifactGraph);
+    assert.equal(sourceGraph.nodes[0].kind, 'runtime');
+    assert.equal(sourceGraph.nodes.at(-1).id, 'crm');
   });
 
   it('verifies staged artifact bytes and fails after checksum mutation', () => {
