@@ -69,8 +69,10 @@ test('core production graph contains no product tables or product-owned HTTP rou
     && !path.includes('/__tests__/'));
   assert.doesNotMatch(java, /\b(?:ab_bpm_[a-z0-9_]*|mt_crm_[a-z0-9_]*)\b/i);
   assert.doesNotMatch(java, /["']\/api\/bpm(?:\/|["'])/i);
+  assert.doesNotMatch(java, /["']\/api\/crm(?:\/|["'])/i);
   assert.doesNotMatch(java, /modelCode\.startsWith\(["']crm_["']\)/);
   assert.doesNotMatch(web, /["']\/api\/bpm(?:\/|["'])/i);
+  assert.doesNotMatch(web, /["']\/api\/crm(?:\/|["'])/i);
   assert.doesNotMatch(web, /["']\/bpm\//i);
   assert.doesNotMatch(`${java}\n${web}`, /on_bpm_event|trigger-bpm-event|bpm-inline-approval|process-select/i);
 });
@@ -140,6 +142,8 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/tests/e2e/dashboard/designer-datasource-config-golden.spec.ts',
     'web-admin/tests/e2e/dashboard/aggregate-grain-orderby-golden.spec.ts',
     'web-admin/tests/e2e/dashboard/arsenal-live-datasource-golden.spec.ts',
+    'web-admin/tests/golden/g1-fixes-golden.spec.ts',
+    'web-admin/tests/golden/playwright.g1.config.ts',
     'web-admin/scripts/run-showcase-seed-sequence.mjs',
     'web-admin/scripts/run-showcase-seed-sequence.test.mjs',
     'web-admin/playwright.seed.config.ts',
