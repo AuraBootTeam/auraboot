@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 
 import Ajv from 'ajv';
 import YAML from 'yaml';
@@ -231,7 +231,32 @@ export function verifyArtifacts(lockInput, { artifactRoot }) {
       );
     }
   }
+  assertNoMigrationCollisions(lock.artifacts, { artifactRoot: root });
   return lock;
+}
+
+export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {
+  const versions = new Map();
+  const visit = (directory, artifact) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) visit(path, artifact);
+      else if (entry.isFile()) {
+        const match = /^V([^_]+(?:_[^_]+)*)__.+\.sql$/i.exec(basename(path));
+        if (!match) continue;
+        const version = match[1].replaceAll('_', '.');
+        const owner = `${artifact.id}:${relative(resolve(artifactRoot), path)}`;
+        const existing = versions.get(version);
+        if (existing) throw new Error(`migration version collision ${version}: ${existing} and ${owner}`);
+        versions.set(version, owner);
+      }
+    }
+  };
+  for (const artifact of artifacts.filter((item) => item.type === 'migration' && item.localPath)) {
+    const path = resolve(artifactRoot, artifact.localPath);
+    const stat = lstatSync(path);
+    if (stat.isDirectory()) visit(path, artifact);
+  }
 }
 
 function requirements(manifest) {

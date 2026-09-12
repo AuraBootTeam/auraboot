@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
   buildApplicationGraph,
+  assertNoMigrationCollisions,
   resolveApplication,
   sha256,
   sha256Path,
@@ -149,6 +150,11 @@ describe('AuraBoot application contract', () => {
     const lock = resolveFixture(manifest(), input);
     assert.doesNotThrow(() => verifyArtifacts(lock, { artifactRoot }));
 
+    const missingPath = join(artifactRoot, lock.artifacts[0].localPath);
+    renameSync(missingPath, `${missingPath}.missing`);
+    assert.throws(() => verifyArtifacts(lock, { artifactRoot }), /cannot be read/);
+    renameSync(`${missingPath}.missing`, missingPath);
+
     writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
     assert.throws(() => verifyArtifacts(lock, { artifactRoot }), /checksum mismatch/);
   });
@@ -180,6 +186,24 @@ describe('AuraBoot application contract', () => {
     assert.throws(
       () => buildApplicationGraph(manifest(), [duplicate], { requireContributions: true }),
       /duplicate owner IDs/,
+    );
+  });
+
+  it('fails closed when migration sets reuse a Flyway version', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'aura-migration-collision-'));
+    const core = join(artifactRoot, 'core');
+    const crm = join(artifactRoot, 'crm');
+    mkdirSync(core);
+    mkdirSync(crm);
+    writeFileSync(join(core, 'V20260912010000__core.sql'), 'select 1;');
+    writeFileSync(join(crm, 'V20260912010000__crm.sql'), 'select 2;');
+
+    assert.throws(
+      () => assertNoMigrationCollisions([
+        { type: 'migration', id: 'core', localPath: 'core' },
+        { type: 'migration', id: 'crm', localPath: 'crm' },
+      ], { artifactRoot }),
+      /migration version collision 20260912010000/,
     );
   });
 });
