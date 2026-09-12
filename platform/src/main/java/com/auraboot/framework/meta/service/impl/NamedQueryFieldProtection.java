@@ -18,14 +18,30 @@ public class NamedQueryFieldProtection {
     private final DataPermissionEngine policies;
     private final FieldMaskService masks;
     private final MetaModelService models;
+    private final NamedQuerySourceModels sources;
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 
-    public record Plan(JsonNode evidence, Map<String, String> aliases,
-                       List<FieldMaskRule> policies, List<FieldMaskConfig> configs) { }
+    public record Protection(Map<String, String> aliases,
+                             List<FieldMaskRule> policies, List<FieldMaskConfig> configs) { }
+    public record Plan(JsonNode evidence, List<Protection> protections) { }
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields) {
-        String resource = query.getResourceCode();
-        if (resource == null || resource.isBlank()) return empty();
+        var sourceModels = sources.resolve(MetaContext.getCurrentTenantId(), query.getFromSql(), fields);
+        Set<String> resources = new TreeSet<>(sourceModels.values());
+        if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
+        var evidence = JSON.createObjectNode();
+        evidence.set("sourceModels", JSON.valueToTree(sourceModels));
+        var groups = evidence.putObject("protections");
+        List<Protection> protections = new ArrayList<>();
+        for (String resource : resources) {
+            Plan group = prepareResource(query, fields, resource);
+            groups.set(resource, group.evidence());
+            protections.addAll(group.protections());
+        }
+        return new Plan(evidence, List.copyOf(protections));
+    }
+
+    private Plan prepareResource(NamedQuery query, List<NamedQueryField> fields, String resource) {
         Long user = MetaContext.getCurrentUserId();
         List<FieldMaskRule> rules = policies.getFieldMaskRules(MetaContext.getCurrentTenantId(), resource, user);
         List<FieldMaskConfig> configs = masks.getEffectiveConfigs(resource, user, "export");
@@ -35,14 +51,13 @@ public class NamedQueryFieldProtection {
         rules.forEach(rule -> protectedFields.add(rule.getFieldCode()));
         configs.forEach(config -> protectedFields.add(config.getFieldCode()));
         for (String field : protectedFields) protectedColumns.put(models.getColumnName(resource, field), field);
-        String table = unqualified(models.getTableName(resource));
+        String table = NamedQuerySourceModels.identity(models.getTableName(resource));
         Map<String, String> aliases = new LinkedHashMap<>();
         var origins = new NamedQueryColumnLineage().resolve(query.getFromSql(), fields);
         origins.forEach((alias, origin) -> {
             if (origin.opaqueFunction()) throw new AccessDeniedException("Protected export requires resolved function semantics");
             for (var column : origin.columns()) {
-                if (!unqualified(column.table()).equals(table))
-                    throw new AccessDeniedException("Protected export requires authorization for every source model");
+                if (!NamedQuerySourceModels.identity(column.table()).equals(table)) continue;
                 String field = protectedColumns.get(column.column());
                 if (field != null) {
                     if (!origin.direct() || origin.columns().size() != 1)
@@ -60,19 +75,19 @@ public class NamedQueryFieldProtection {
             configEvidence.add(value);
         }
         evidence.set("aliases", JSON.valueToTree(aliases));
-        return new Plan(evidence, Map.copyOf(aliases), List.copyOf(rules), List.copyOf(configs));
+        return new Plan(evidence, List.of(new Protection(Map.copyOf(aliases), List.copyOf(rules), List.copyOf(configs))));
     }
 
     public List<Map<String, Object>> apply(Plan plan, List<Map<String, Object>> records) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> record : records) {
             Map<String, Object> output = new LinkedHashMap<>(record);
-            plan.aliases().forEach((alias, field) -> {
+            for (Protection protection : plan.protections()) protection.aliases().forEach((alias, field) -> {
                 if (!output.containsKey(alias)) return;
                 Map<String, Object> input = new LinkedHashMap<>();
                 input.put(field, output.get(alias));
-                Object value = policies.applyFieldMasking(List.of(input), plan.policies()).get(0).get(field);
-                for (FieldMaskConfig config : plan.configs()) {
+                Object value = policies.applyFieldMasking(List.of(input), protection.policies()).get(0).get(field);
+                for (FieldMaskConfig config : protection.configs()) {
                     if (field.equals(config.getFieldCode()) && value != null) {
                         value = masks.maskValue(value.toString(), config.getMaskType(),
                                 config.getMaskPattern(), config.getReplacementChar());
@@ -85,9 +100,5 @@ public class NamedQueryFieldProtection {
         return result;
     }
 
-    private static Plan empty() { return new Plan(JSON.createObjectNode(), Map.of(), List.of(), List.of()); }
-    private static String unqualified(String table) {
-        String value = table.replace("\"", "");
-        return value.substring(value.lastIndexOf('.') + 1);
-    }
+    private static Plan empty() { return new Plan(JSON.createObjectNode(), List.of()); }
 }
