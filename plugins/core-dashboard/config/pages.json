@@ -81,8 +81,19 @@
                 "id": "behavior_scope",
                 "blockType": "rich-text",
                 "content": {
-                  "zh-CN": "<h2>分析使用与转化</h2><p>默认查看最近 30 天。漏斗按发起人的分析任务有序计数；留存按首次成功使用分析看板的 UTC 自然日分组，观察第 1、7、30 天是否再次使用。</p><p>“观察中”表示该观察日尚未结束，不计为零留存。这里只反映已收到的事件，不能据此认定投递完整、用户理解结果或产生业务收益。</p>",
-                  "en": "<h2>Analysis usage and conversion</h2><p>Defaults to the last 30 days. The funnel follows ordered tasks per initiator. Retention groups first successful analytics dashboard use by UTC calendar day and checks use on days 1, 7, and 30.</p><p>Pending observation days are not zero retention. Received events do not prove complete delivery, comprehension, or business outcomes.</p>"
+                  "zh-CN": "<h2>分析使用与转化</h2><p>所有图表使用下方已应用的时间范围。漏斗按发起人的分析任务有序计数；留存按首次成功使用分析看板的 UTC 自然日分组，观察第 1、7、30 天是否再次使用。</p><p>“观察中”表示该观察日尚未结束，不计为零留存。这里只反映已收到的事件，不能据此认定投递完整、用户理解结果或产生业务收益。</p>",
+                  "en": "<h2>Analysis usage and conversion</h2><p>All charts use the applied time range below. The funnel follows ordered tasks per initiator. Retention groups first successful analytics dashboard use by UTC calendar day and checks use on days 1, 7, and 30.</p><p>Pending observation days are not zero retention. Received events do not prove complete delivery, comprehension, or business outcomes.</p>"
+                }
+              },
+              {
+                "id": "behavior_time_window",
+                "blockType": "filters",
+                "props": {
+                  "timeWindow": {
+                    "stateKey": "analysisWindow",
+                    "defaultDays": 30,
+                    "maxDays": 366
+                  }
                 }
               },
               {
@@ -95,7 +106,8 @@
                   "en": "Page Views (PV)"
                 },
                 "chartConfig": {
-                  "metricField": "pageViews"
+                  "metricField": "pageViews",
+                  "paramsStateKey": "analysisWindow"
                 },
                 "layout": {
                   "col": 0,
@@ -112,7 +124,8 @@
                   "en": "Unique Visitors (UV)"
                 },
                 "chartConfig": {
-                  "metricField": "uniqueVisitors"
+                  "metricField": "uniqueVisitors",
+                  "paramsStateKey": "analysisWindow"
                 },
                 "layout": {
                   "col": 3,
@@ -129,7 +142,8 @@
                   "en": "Sessions"
                 },
                 "chartConfig": {
-                  "metricField": "sessions"
+                  "metricField": "sessions",
+                  "paramsStateKey": "analysisWindow"
                 },
                 "layout": {
                   "col": 6,
@@ -146,7 +160,8 @@
                   "en": "Total Events"
                 },
                 "chartConfig": {
-                  "metricField": "totalEvents"
+                  "metricField": "totalEvents",
+                  "paramsStateKey": "analysisWindow"
                 },
                 "layout": {
                   "col": 9,
@@ -265,7 +280,8 @@
                         }
                       }
                     ]
-                  }
+                  },
+                  "paramsStateKey": "analysisWindow"
                 }
               },
               {
@@ -357,7 +373,8 @@
                         }
                       }
                     ]
-                  }
+                  },
+                  "paramsStateKey": "analysisWindow"
                 }
               },
               {
@@ -449,7 +466,8 @@
                         }
                       }
                     ]
-                  }
+                  },
+                  "paramsStateKey": "analysisWindow"
                 }
               },
               {
@@ -517,7 +535,8 @@
                         }
                       }
                     ]
-                  }
+                  },
+                  "paramsStateKey": "analysisWindow"
                 }
               }
             ]

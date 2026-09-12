@@ -11,7 +11,7 @@
  *   "linkage": { ... }, "drillDown": { ... }, "refreshInterval": 60 }
  */
 
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useMemo, useSyncExternalStore } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
@@ -83,6 +83,13 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
   const props = (block as any).props || {};
   const chartType = (block.chartType as string) || props.chartType || 'bar';
   const ChartComponent = getChartComponent(chartType);
+  const paramsStateKey = (block as any).chartConfig?.paramsStateKey as string | undefined;
+  const store = runtime.getStateManager().getStore(runtime.getScopeId());
+  const windowParams = useSyncExternalStore(
+    store.subscribe,
+    () => (paramsStateKey ? store.getState().state?.[paramsStateKey] : undefined),
+    () => undefined,
+  );
 
   // Build chart props from DSL block config
   const chartProps = useMemo(() => {
@@ -107,6 +114,12 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       resolvedDataSource = { ...dataSource, parameters: (dataSource as any).params };
     }
 
+    if (paramsStateKey && windowParams && resolvedDataSource) {
+      resolvedDataSource = {
+        ...resolvedDataSource,
+        params: { ...(resolvedDataSource as any).params, ...windowParams },
+      };
+    }
     return {
       title: block.title ? getLocalizedText(block.title, locale) : undefined,
       // Visualization props (new unified format)
@@ -131,7 +144,11 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     props.refreshInterval,
     runtime,
     locale,
+    paramsStateKey,
+    windowParams,
   ]);
+
+  if (paramsStateKey && !windowParams) return <ChartLoadingFallback />;
 
   if (!ChartComponent) {
     return (
