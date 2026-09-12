@@ -15,6 +15,12 @@ need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 : "${AURA_PRODUCT_MIGRATION_OWNER:?AURA_PRODUCT_MIGRATION_OWNER is required}"
 : "${AURA_PRODUCT_IMAGE_LAYOUT:?AURA_PRODUCT_IMAGE_LAYOUT is required}"
 : "${AURA_PRODUCT_LIFECYCLE:?AURA_PRODUCT_LIFECYCLE is required}"
+: "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required}"
+: "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required}"
+: "${AURA_RELEASE_REGISTRY_PASSWORD_FILE:?AURA_RELEASE_REGISTRY_PASSWORD_FILE is required}"
+[[ -f "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" && ! -L "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" \
+  && -r "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" ]] \
+  || fatal 'release registry password file must be a readable regular non-symlink file'
 
 for command_name in curl docker git node openssl pnpm python3 tar; do need "$command_name"; done
 [[ "$(uname -s)" == Linux ]] || fatal 'release images must be built on the admitted Linux CI host'
@@ -47,6 +53,9 @@ PG_CONTAINER="$PROJECT-pg"
 APP_CONTAINER="$PROJECT-app"
 IMAGE_REF=''
 IMAGE_ID=''
+REGISTRY_IMAGE=''
+REGISTRY_DIGEST_REF=''
+DOCKER_CONFIG_ROOT="$WORK_ROOT/docker-config"
 
 cleanup() {
   local status=$?
@@ -56,8 +65,11 @@ cleanup() {
   fi
   docker rm -f "$APP_CONTAINER" "$PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
+  [[ -z "$REGISTRY_IMAGE" ]] || docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
+  [[ -z "$REGISTRY_DIGEST_REF" ]] || docker image rm "$REGISTRY_DIGEST_REF" >/dev/null 2>&1 || true
   [[ -z "$IMAGE_REF" ]] || docker image rm "$IMAGE_REF" >/dev/null 2>&1 || true
   [[ -z "$IMAGE_ID" ]] || docker image rm "$IMAGE_ID" >/dev/null 2>&1 || true
+  [[ ! -d "$DOCKER_CONFIG_ROOT" ]] || find "$DOCKER_CONFIG_ROOT" -depth -delete
   if [[ "$status" -eq 0 && -d "$WORK_ROOT" ]]; then find "$WORK_ROOT" -depth -delete; fi
   exit "$status"
 }
@@ -145,14 +157,43 @@ env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_
   pnpm --dir "$PRODUCT_ROOT" exec playwright test --config playwright.release.config.ts \
   >"$ARTIFACTS/logs/playwright.log" 2>&1 || fail 'release-image browser journey failed'
 
+REGISTRY_HOST="${AURA_RELEASE_REGISTRY%%/*}"
+REGISTRY_REPOSITORY="${AURA_RELEASE_REGISTRY%/}/$AURA_PRODUCT_ID"
+REGISTRY_IMAGE="$REGISTRY_REPOSITORY:${LAYOUT_DIGEST#sha256:}"
+install -d -m 0700 "$DOCKER_CONFIG_ROOT"
+docker --config "$DOCKER_CONFIG_ROOT" login "$REGISTRY_HOST" \
+  --username "$AURA_RELEASE_REGISTRY_USERNAME" --password-stdin \
+  <"$AURA_RELEASE_REGISTRY_PASSWORD_FILE" >"$ARTIFACTS/logs/docker-login.log" 2>&1 \
+  || fatal 'release registry login failed'
+docker tag "$IMAGE_REF" "$REGISTRY_IMAGE"
+docker --config "$DOCKER_CONFIG_ROOT" push "$REGISTRY_IMAGE" \
+  >"$ARTIFACTS/logs/docker-push.log" 2>&1 || fatal 'validated release image push failed'
+PUSH_DIGEST="$(sed -n 's/.*digest: \(sha256:[0-9a-f]\{64\}\).*/\1/p' "$ARTIFACTS/logs/docker-push.log" | tail -1)"
+[[ "$PUSH_DIGEST" == "$LAYOUT_DIGEST" ]] \
+  || fail "registry digest mismatch: layout=$LAYOUT_DIGEST pushed=${PUSH_DIGEST:-missing}"
+REGISTRY_DIGEST_REF="$REGISTRY_REPOSITORY@$PUSH_DIGEST"
+docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
+docker --config "$DOCKER_CONFIG_ROOT" pull "$REGISTRY_DIGEST_REF" \
+  >"$ARTIFACTS/logs/docker-pull.log" 2>&1 || fatal 'release image digest pull failed'
+PULLED_IMAGE_ID="$(docker image inspect "$REGISTRY_DIGEST_REF" --format '{{.Id}}')"
+[[ "$PULLED_IMAGE_ID" == "$IMAGE_ID" ]] \
+  || fail "registry pull changed image identity: loaded=$IMAGE_ID pulled=$PULLED_IMAGE_ID"
+docker run --rm --entrypoint sh "$REGISTRY_DIGEST_REF" -ec \
+  'test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json' \
+  >"$ARTIFACTS/logs/registry-payload-check.log" 2>&1 \
+  || fail 'registry-pulled image payload is incomplete'
+docker --config "$DOCKER_CONFIG_ROOT" logout "$REGISTRY_HOST" >/dev/null 2>&1 || true
+find "$DOCKER_CONFIG_ROOT" -depth -delete
+
 cp "$CORE_RELEASE/release-receipt.json" "$ARTIFACTS/core-build-receipt.json"
 cp "$PRODUCT_RELEASE/release-receipt.json" "$ARTIFACTS/product-build-receipt.json"
-python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" <<'PY'
+python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" <<'PY'
 import datetime, json, sys
-path, product, core, source, lock, layout, image_id, builder, job = sys.argv[1:]
+path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job = sys.argv[1:]
 json.dump({"schemaVersion": 1, "status": "PASS", "product": product,
            "coreCommit": core, "productCommit": source, "lockIdentity": lock,
            "ociLayoutDigest": layout, "loadedImageId": image_id, "builder": builder,
+           "registryImage": registry_image, "registryPulledImageId": pulled_id,
            "job": job, "freshDatabase": "PASS", "payload": "PASS",
            "readiness": "PASS", "browserJourney": "PASS",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()},

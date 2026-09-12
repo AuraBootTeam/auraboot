@@ -26,6 +26,11 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /uname -m.*x86_64/);
   assert.match(productImageGate, /AURA_OCI_BUILDER must be docker/);
   assert.match(productImageGate, /docker load --input/);
+  assert.match(productImageGate, /AURA_RELEASE_REGISTRY_PASSWORD_FILE/);
+  assert.match(productImageGate, /docker --config "\$DOCKER_CONFIG_ROOT" push/);
+  assert.match(productImageGate, /PUSH_DIGEST" == "\$LAYOUT_DIGEST/);
+  assert.match(productImageGate, /docker --config "\$DOCKER_CONFIG_ROOT" pull "\$REGISTRY_DIGEST_REF"/);
+  assert.match(productImageGate, /PULLED_IMAGE_ID" == "\$IMAGE_ID/);
   assert.match(productImageGate, /fresh database migration failed/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
   assert.match(productImageGate, /release-image-receipt\.json/);
