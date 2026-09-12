@@ -61,4 +61,27 @@ class AnalyticsJourneyServiceTest {
         assertThatThrownBy(service::requested).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(publisher);
     }
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void sameVisitRetainsSuccessfulQueriesAcrossUtcMidnight() {
+        MetaContext.setContext(42L, 7L, "viewer", "viewer");
+        var visit = java.util.UUID.randomUUID();
+        var before = java.time.Instant.parse("2026-09-12T23:59:59.999999Z");
+        var after = java.time.Instant.parse("2026-09-13T00:00:00Z");
+        try (var clock = mockStatic(java.time.Instant.class, CALLS_REAL_METHODS)) {
+            clock.when(java.time.Instant::now).thenReturn(before);
+            service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+            service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+            clock.when(java.time.Instant::now).thenReturn(after);
+            service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+        }
+        ArgumentCaptor<List<BehaviorEventInput>> batches = ArgumentCaptor.forClass((Class) List.class);
+        verify(publisher, times(3)).publish(eq(42L), eq(7L), batches.capture());
+        var events = batches.getAllValues().stream().map(List::getFirst).toList();
+        assertThat(events.get(0).getEventId()).isEqualTo(events.get(1).getEventId());
+        assertThat(events.get(2).getEventId()).isNotEqualTo(events.get(0).getEventId());
+        assertThat(events.get(0).getOccurredAt()).isEqualTo(before);
+        assertThat(events.get(2).getOccurredAt()).isEqualTo(after);
+    }
+
 }

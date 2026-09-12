@@ -242,6 +242,22 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
     unmatchedStageEvents: 0,
     sampledEvents: 0,
   });
+  const retention = await page.request.get('/api/analytics/behavior/retention', {
+    params: { unit: 'artifact', from: funnelFrom, to: new Date().toISOString() },
+  });
+  expect(retention.status()).toBe(200);
+  const retentionData = (await retention.json()).data;
+  expect(retentionData.unit).toBe('artifact');
+  expect(retentionData.records).toHaveLength(3);
+  expect(retentionData.records.map((point: { dayOffset: number }) => point.dayOffset)).toEqual([
+    1, 7, 30,
+  ]);
+  for (const point of retentionData.records) {
+    expect(point.cohortSize).toBe(1);
+    expect(point.status).toBe('immature');
+    expect(point.retained ?? null).toBeNull();
+    expect(point.retentionRate ?? null).toBeNull();
+  }
   await page.screenshot({
     path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-reopened.png`,
     fullPage: true,

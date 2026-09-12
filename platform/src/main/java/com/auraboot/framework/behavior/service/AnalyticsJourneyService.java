@@ -41,12 +41,14 @@ public class AnalyticsJourneyService {
 
     public void dashboardUsed(String analysisId, String dashboardPid, String widgetId,
                               UUID usageId, String queryHash, boolean originalQuery) {
+        Instant occurredAt = Instant.now();
         String identity = MetaContext.getCurrentTenantId() + ":" + MetaContext.getCurrentUserId()
-                + ":dashboard-used:" + dashboardPid + ":" + widgetId + ":" + usageId;
+                + ":dashboard-used:" + dashboardPid + ":" + widgetId + ":" + usageId
+                + ":" + occurredAt.atZone(java.time.ZoneOffset.UTC).toLocalDate();
         publish(analysisId, "analytics_dashboard_used", Map.of("targetType", "dashboard",
                 "targetKey", dashboardPid, "widgetId", widgetId, "queryHash", queryHash,
                 "originalQuery", originalQuery),
-                UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
+                UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(), occurredAt);
     }
 
     private void publish(String analysisId, String name, Map<String, Object> props) {
@@ -54,6 +56,10 @@ public class AnalyticsJourneyService {
     }
 
     private void publish(String analysisId, String name, Map<String, Object> props, String eventId) {
+        publish(analysisId, name, props, eventId, Instant.now());
+    }
+
+    private void publish(String analysisId, String name, Map<String, Object> props, String eventId, Instant occurredAt) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         if (tenantId == null || userId == null) {
@@ -66,7 +72,7 @@ public class AnalyticsJourneyService {
         event.setEventCategory("analytics");
         event.setSource("server");
         event.setIdentityQuality("authenticated");
-        event.setOccurredAt(Instant.now());
+        event.setOccurredAt(occurredAt);
         event.setInteractionId(analysisId);
         event.setSamplingProbability(BigDecimal.ONE);
         event.setProducerName("aurabot-analytics");

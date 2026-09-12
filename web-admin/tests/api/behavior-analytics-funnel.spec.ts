@@ -224,4 +224,22 @@ test('ordered analysis funnel counts 10 to 8 to 6 to 4 to 2 tasks', async ({ req
   expect((await read(from, to)).records.map((stage: { tasks: number }) => stage.tasks)).toEqual([
     10, 8, 6, 4, 2,
   ]);
+  const retention = await request.get('/api/analytics/behavior/retention', {
+    params: { unit: 'artifact', from, to },
+  });
+  expect(retention.status()).toBe(200);
+  const retained = (await retention.json()).data;
+  expect(retained.records).toHaveLength(3);
+  expect(retained.records.map((point: { dayOffset: number }) => point.dayOffset)).toEqual([
+    1, 7, 30,
+  ]);
+  for (const point of retained.records) {
+    expect(point.cohortSize).toBe(2);
+    expect(point.status).toBe('immature');
+    expect(point.retentionRate ?? null).toBeNull();
+  }
+  const invalidUnit = await request.get('/api/analytics/behavior/retention', {
+    params: { unit: 'tenant_id', from, to },
+  });
+  expect(invalidUnit.status()).toBe(400);
 });
