@@ -29,6 +29,8 @@ public class AgentApprovalGateService {
     private final AuraEventBus eventBus;
     private final AgentDispatchHandler dispatchHandler;
     private final ApprovalNotificationOutbox approvalNotificationOutbox;
+    @Autowired
+    private AgentRunTerminalStore terminalStore;
 
     @Autowired
     public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
@@ -688,7 +690,7 @@ public class AgentApprovalGateService {
                 tenantId, approvalPid, runPid, agentCode, "rejected", approverId));
 
         // Fail the associated agent run
-        failRunOnRejection(runPid, "Approval rejected by user");
+        failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval rejected by user");
 
         approval.put("approval_status", "rejected");
         return approval;
@@ -736,7 +738,7 @@ public class AgentApprovalGateService {
                 }
 
                 // Fail the associated agent run
-                failRunOnRejection(runPid, "Approval expired");
+                failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval expired");
 
                 log.info("Approval expired: pid={}, run_id={}, task_id={}", pid,
                         runPid, approval.get("task_id"));
@@ -820,27 +822,9 @@ public class AgentApprovalGateService {
     /**
      * Mark an agent run as FAILED due to rejection or expiry.
      */
-    private void failRunOnRejection(String runPid, String errorMessage) {
+    private void failRunOnRejection(Long tenantId, String runPid, String taskPid, String errorMessage) {
         if (runPid == null) return;
-
-        String sql = "SELECT run_status FROM ab_agent_run WHERE pid = #{params.pid}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of("pid", runPid));
-        if (rows.isEmpty()) return;
-
-        String status = (String) rows.get(0).get("run_status");
-        if (!"pending".equals(status)) {
-            log.info("Run {} is not PENDING (status={}), skipping fail-on-rejection", runPid, status);
-            return;
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> update = new HashMap<>();
-        update.put("run_status", "failed");
-        update.put("error_message", errorMessage);
-        update.put("completed_at", now);
-        update.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_run", update, Map.of("pid", runPid));
-        log.info("Run {} marked as FAILED: {}", runPid, errorMessage);
+        terminalStore.failPendingApproval(tenantId, runPid, taskPid, errorMessage);
     }
 
     /**

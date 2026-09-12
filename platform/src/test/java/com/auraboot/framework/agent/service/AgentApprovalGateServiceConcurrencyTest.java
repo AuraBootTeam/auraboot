@@ -107,8 +107,7 @@ class AgentApprovalGateServiceConcurrencyTest {
                         "tenant_id", 1L,
                         "run_id", "run-1",
                         "task_id", "task-1")))
-                .thenReturn(List.of(Map.of("agent_id", "agent-1")))
-                .thenReturn(List.of(Map.of("run_status", "pending")));
+                .thenReturn(List.of(Map.of("agent_id", "agent-1")));
 
         when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
 
@@ -118,17 +117,14 @@ class AgentApprovalGateServiceConcurrencyTest {
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> conditionCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper, times(2)).update(anyString(), updateCaptor.capture(), conditionCaptor.capture());
+        verify(dynamicDataMapper).update(anyString(), updateCaptor.capture(), conditionCaptor.capture());
         assertThat(updateCaptor.getAllValues().get(0))
                 .containsEntry("approval_status", "expired")
                 .containsEntry("rejection_reason", "Auto-expired: approval timeout exceeded");
         assertThat(conditionCaptor.getAllValues().get(0))
                 .containsEntry("pid", "apv-expired")
                 .containsEntry("approval_status", "pending");
-        assertThat(updateCaptor.getAllValues().get(1))
-                .containsEntry("run_status", "failed")
-                .containsEntry("error_message", "Approval expired");
-        assertThat(conditionCaptor.getAllValues().get(1)).containsEntry("pid", "run-1");
+        verify(terminalStore).failPendingApproval(1L, "run-1", "task-1", "Approval expired");
         verify(eventBus).publishAfterCommit(any());
     }
 
@@ -163,12 +159,16 @@ class AgentApprovalGateServiceConcurrencyTest {
         verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
     }
 
+    private final AgentRunTerminalStore terminalStore = org.mockito.Mockito.mock(AgentRunTerminalStore.class);
+
     private AgentApprovalGateService newService() {
-        return new AgentApprovalGateService(
+        AgentApprovalGateService service = new AgentApprovalGateService(
                 dynamicDataMapper,
                 new ObjectMapper(),
                 eventBus,
                 dispatchHandler);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "terminalStore", terminalStore);
+        return service;
     }
 
     private Map<String, Object> pendingApproval() {

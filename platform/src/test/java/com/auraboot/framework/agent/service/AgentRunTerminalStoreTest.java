@@ -119,6 +119,27 @@ class AgentRunTerminalStoreTest {
         assertThat(event.getValue().getCausedByEventId()).isEqualTo("start-event");
     }
 
+    @Test void pendingApprovalFailureCommitsTheTaskAndCausalTerminalFact() {
+        when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task")))
+                .thenReturn(List.of(Map.of("run_status", "pending", "actor_user_id", 91L,
+                        "started_event_id", "start", "started_interaction_id", "analysis")));
+        when(data.update(anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(outcomes.publish(any())).thenReturn(true);
+        assertThat(store.failPendingApproval(7L, "run", "task", "Rejected")).isTrue();
+        verify(data).update(eq("ab_agent_task"), argThat(update -> "blocked".equals(update.get("task_status"))),
+                eq(Map.of("tenant_id", 7L, "pid", "task")));
+        ArgumentCaptor<BehaviorOutcomeEvent> event = ArgumentCaptor.forClass(BehaviorOutcomeEvent.class);
+        verify(outcomes).publish(event.capture());
+        assertThat(event.getValue().getProps()).containsEntry("status", "failed");
+        assertThat(event.getValue().getCausedByEventId()).isEqualTo("start");
+        assertThat(event.getValue().getInteractionId()).isEqualTo("analysis");
+    }
+    @Test void pendingApprovalFailureCannotOverwriteAResumedRun() {
+        row("running");
+        assertThat(store.failPendingApproval(7L, "run", "task", "Rejected")).isFalse();
+        verifyNoInteractions(data, outcomes);
+    }
+
     @Test void cancelledRunCannotBeOverwrittenByLateSuccess() {
         row("cancelled");
         assertThat(store.complete(7L, "run", "task", run, task, signal)).isFalse();

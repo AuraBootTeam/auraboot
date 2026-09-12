@@ -1629,8 +1629,9 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     return;
                 }
             }
+            // Durable execution owns terminal task states; only close an unfinished conversation task.
             dynamicDataMapper.update("ab_agent_task", updates,
-                    java.util.Map.of("pid", taskPid));
+                    java.util.Map.of("tenant_id", ctx.tenantId(), "pid", taskPid, "task_status", "in_progress"));
         } catch (Exception e) {
             String msg = "Named-agent task close failed: " + safeExceptionMessage(e);
             log.warn("closeNamedAgentTask failed for taskPid={}: {}", taskPid, safeExceptionMessage(e));

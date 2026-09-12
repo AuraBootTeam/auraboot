@@ -145,6 +145,21 @@ public class AgentRunTerminalStore {
     public boolean complete(Long tenantId, String runPid, String taskPid,
                             Map<String, Object> runUpdate, Map<String, Object> taskUpdate,
                             Runnable committedSignal) {
+        return completeScoped(tenantId, runPid, taskPid, runUpdate, taskUpdate, committedSignal, false);
+    }
+
+    /** Completes an approval-paused run without overwriting a concurrently resumed run. */
+    @Transactional
+    public boolean failPendingApproval(Long tenantId, String runPid, String taskPid, String reason) {
+        var now = java.time.LocalDateTime.now();
+        return completeScoped(tenantId, runPid, taskPid,
+                Map.of("run_status", "failed", "error_message", reason, "completed_at", now, "updated_at", now),
+                Map.of("task_status", "blocked", "updated_at", now), () -> {}, true);
+    }
+
+    private boolean completeScoped(Long tenantId, String runPid, String taskPid,
+                                   Map<String, Object> runUpdate, Map<String, Object> taskUpdate,
+                                   Runnable committedSignal, boolean pendingApproval) {
         String status = String.valueOf(runUpdate.get("run_status"));
         String taskStatus = switch (status) {
             case "success" -> "done";
@@ -176,7 +191,11 @@ public class AgentRunTerminalStore {
         String previous = String.valueOf(row.get("run_status"));
         if (Set.of("success", "failed", "cancelled").contains(previous)) return false;
         if ("cancelled".equals(status) && !"running".equals(previous)) return false;
-        if (!"running".equals(previous)) throw new IllegalStateException("Run is not executing");
+        if (pendingApproval) {
+            if (!"pending".equals(previous)) return false;
+        } else if (!"running".equals(previous)) {
+            throw new IllegalStateException("Run is not executing");
+        }
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Run completion requires a transaction");
         }
