@@ -825,6 +825,21 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 query.getCode(), modelCode, recordPid);
     }
 
+    @Override
+    public void authorizeExportDownload(String code, NamedQueryDataExportRequest request) {
+        NamedQuery query = namedQueryMapper.findByCode(code);
+        if (query == null || !query.isExecutable()) {
+            throw new AccessDeniedException("Export query is no longer available");
+        }
+        authorizeDeclaredResource(query);
+        Map<String, Object> params = new HashMap<>();
+        if (request.getParameters() != null) params.putAll(request.getParameters());
+        params.put("tenantId", getCurrentTenantId());
+        Long userId = getCurrentUserId();
+        params.put("currentUserId", userId != null ? userId.toString() : null);
+        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+    }
+
     // ==================== Export ====================
 
     @Override

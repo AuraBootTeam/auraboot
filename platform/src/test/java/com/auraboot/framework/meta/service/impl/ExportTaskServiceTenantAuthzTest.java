@@ -33,6 +33,12 @@ class ExportTaskServiceTenantAuthzTest {
     @Mock
     private ExportTaskMapper exportTaskMapper;
 
+    @Mock
+    private com.auraboot.framework.meta.service.NamedQueryService namedQueryService;
+
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
     @InjectMocks
     private ExportTaskService service;
 
@@ -44,6 +50,7 @@ class ExportTaskServiceTenantAuthzTest {
     private ExportTask task(Long tenantId, String fileKey) {
         ExportTask t = new ExportTask();
         t.setTenantId(tenantId);
+        t.setRequestParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
         t.setCreatedBy(100L);
         t.setFileKey(fileKey);
         t.setStatus("completed");

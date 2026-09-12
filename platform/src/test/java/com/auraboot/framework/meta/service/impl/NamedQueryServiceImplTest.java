@@ -341,4 +341,18 @@ class NamedQueryServiceImplTest {
         query.setStatus("draft");
         return query;
     }
+    @Test
+    void exportDownloadRejectsRevokedResourceWithoutExecutingSql() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        MetaContext.setMemberId(30L);
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("e2et_order");
+        query.setActionCode("read");
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "e2et_order", "read")).thenReturn(false);
+        assertThatThrownBy(() -> service.authorizeExportDownload("order_summary",
+                new com.auraboot.framework.meta.dto.NamedQueryDataExportRequest()))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
 }

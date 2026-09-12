@@ -143,6 +143,10 @@ public class ExportTaskService {
         if (task == null || !belongsToCurrentOwner(task) || !isDownloadable(task)) {
             return null;
         }
+        NamedQueryDataExportRequest request = objectMapper.convertValue(
+                task.getRequestParams(), NamedQueryDataExportRequest.class);
+        if (request == null) throw new MetaServiceException("Export authorization request is missing");
+        namedQueryService.authorizeExportDownload(task.getQueryCode(), request);
         return task.getFileKey();
     }
 
