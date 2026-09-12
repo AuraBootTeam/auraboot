@@ -918,6 +918,41 @@ class ReportExportServiceTest {
         org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService);
     }
 
+    @Test
+    void namedQueryAndApiPermissionDenialStopsEveryExportBeforeDataRead() throws Exception {
+        when(userPermissionService.hasPermission(99L, "data.datasource.read")).thenReturn(false);
+        for (String type : List.of("namedQuery", "api")) {
+            ReportEntity report = new ReportEntity();
+            report.setTenantId(MetaContext.getCurrentTenantId());
+            report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                    Map.of("rows", Map.of("type", type, "queryCode", "protected_query")), "body", List.of())));
+            when(reportStorageService.findByPid(type)).thenReturn(report);
+            ReportExportRequest request = new ReportExportRequest();
+            request.setReportPid(type);
+            assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+            assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+            assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        }
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService);
+    }
+
+    @Test
+    void declaredResourceDenialRemainsAccessDeniedForEveryExport() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                Map.of("rows", Map.of("type", "namedQuery", "queryCode", "protected_query")), "body", List.of())));
+        when(reportStorageService.findByPid("protected")).thenReturn(report);
+        var denial = new org.springframework.security.access.AccessDeniedException("Protected resource");
+        when(namedQueryService.executeQuery(eq("protected_query"), any())).thenThrow(denial);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("protected");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isSameAs(denial);
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isSameAs(denial);
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isSameAs(denial);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, auditTrailService);
+    }
+
     private Map<String, Object> nonStaticDataSourceReportDsl() {
         Map<String, Object> modelDataSource = new LinkedHashMap<>();
         modelDataSource.put("type", "model");

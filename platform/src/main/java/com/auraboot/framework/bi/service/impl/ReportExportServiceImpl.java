@@ -57,6 +57,7 @@ import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.util.StringUtils;
 
 import java.awt.Color;
@@ -153,7 +154,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                     output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
             return file;
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as Excel: reportPid={}", request.getReportPid(), e);
@@ -206,7 +207,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
             return output.toByteArray();
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as PDF: title={}", title, e);
@@ -275,7 +276,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                     bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
             return file;
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as JSON: reportPid={}", request.getReportPid(), e);
@@ -324,31 +325,38 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
         try {
             Map<String, Object> dsl = objectMapper.readValue(report.getDsl(), new TypeReference<Map<String, Object>>() {});
-            requireModelReadPermissions(dsl);
+            requireDataSourceReadPermissions(dsl);
             return dsl;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new ValidationException(ResponseCode.SystemError, "Stored report DSL is invalid");
         }
     }
 
-    /** Enforce the same model-read boundary used by the preview API before querying any source. */
-    private void requireModelReadPermissions(Map<String, Object> reportDsl) {
+    /** Enforce the same source-read boundaries used by preview APIs before querying any source. */
+    private void requireDataSourceReadPermissions(Map<String, Object> reportDsl) {
         Object rawSources = reportDsl.get("dataSources");
         if (!(rawSources instanceof Map<?, ?> sources)) return;
         for (Object rawSource : sources.values()) {
             if (!(rawSource instanceof Map<?, ?> source)) continue;
+            if (DATA_SOURCE_NAMED_QUERY.equals(source.get("type")) || DATA_SOURCE_API.equals(source.get("type"))) {
+                requireReadPermission("data.datasource.read");
+                continue;
+            }
             if (!(DATA_SOURCE_MODEL.equals(source.get("type")) || DATA_SOURCE_TABLE.equals(source.get("type")))) continue;
             Map<String, Object> dataSource = toStringObjectMap(source);
             String modelCode = stringValue(firstPresent(dataSource, "modelCode", "model", "entityCode"), "");
             if (!modelCode.matches("[a-zA-Z][a-zA-Z0-9_]*")) {
                 throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid report model code");
             }
-            String permission = "model." + modelCode + ".read";
-            Long userId = MetaContext.getCurrentUserId();
-            if (userId == null || !userPermissionService.hasPermission(userId, permission)) {
-                throw new PermissionDeniedException(ResponseCode.PermissionDenied, permission,
-                        "You do not have permission to read this report data source.");
-            }
+            requireReadPermission("model." + modelCode + ".read");
+        }
+    }
+
+    private void requireReadPermission(String permission) {
+        Long userId = MetaContext.getCurrentUserId();
+        if (userId == null || !userPermissionService.hasPermission(userId, permission)) {
+            throw new PermissionDeniedException(ResponseCode.PermissionDenied, permission,
+                    "You do not have permission to read this report data source.");
         }
     }
 
