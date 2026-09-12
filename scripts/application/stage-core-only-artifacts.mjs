@@ -151,7 +151,7 @@ function packWebShell(repoRoot, destination, version) {
       'vitest.config.ts',
       'vitest.setup.ts',
     ]) {
-      cpSync(resolve(sourceRoot, entry), resolve(packageRoot, entry), {
+      cpSync(resolve(sourceRoot, entry), resolve(packageRoot, 'web-admin', entry), {
         recursive: true,
         errorOnExist: true,
         force: false,
@@ -159,46 +159,39 @@ function packWebShell(repoRoot, destination, version) {
           && !/\.tsbuildinfo$/.test(candidate),
       });
     }
-    const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
-    packageManifest.name = '@auraboot/web-shell';
-    packageManifest.version = version;
-    packageManifest.private = false;
-    const internalVersions = {
-      '@auraboot/core': version,
-      '@auraboot/dsl-types': '0.0.1',
-      '@auraboot/nav-model': '0.0.1',
-      '@auraboot/plugin-sdk': '0.0.1',
-      '@auraboot/runtime-kernel': version,
-      '@auraboot/track': version,
-      '@auraboot/ui': '1.0.0',
-    };
-    packageManifest.dependencies = Object.fromEntries(
-      Object.entries(packageManifest.dependencies).map(([name, range]) => [
-        name,
-        range.startsWith('workspace:') ? internalVersions[name] : range,
-      ]),
-    );
-    if (Object.values(packageManifest.dependencies).some((range) => range === undefined)) {
-      throw new Error('Web Shell contains an undeclared internal workspace dependency');
-    }
-    packageManifest.scripts = {
+    const webManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
+    webManifest.scripts = {
       build: 'pnpm typecheck && react-router build && pnpm verify:production-react-runtime',
-      typecheck: packageManifest.scripts.typecheck,
-      'verify:production-react-runtime': packageManifest.scripts['verify:production-react-runtime'],
+      typecheck: webManifest.scripts.typecheck,
+      'verify:production-react-runtime': webManifest.scripts['verify:production-react-runtime'],
     };
-    packageManifest.files = [
-      'app',
-      'packages',
-      'public',
-      'scripts',
-      'react-router.config.ts',
-      'tailwind.config.js',
-      'tsconfig.json',
-      'vite.config.ts',
-      'vitest.config.ts',
-      'vitest.setup.ts',
-    ];
-    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
+    writeFileSync(resolve(packageRoot, 'web-admin/package.json'), `${JSON.stringify(webManifest, null, 2)}\n`);
+
+    cpSync(resolve(repoRoot, 'packages'), resolve(packageRoot, 'packages'), {
+      recursive: true,
+      filter: (candidate) => !/(?:^|\/)(?:dist|node_modules)(?:\/|$)/.test(candidate)
+        && !/\.tsbuildinfo$/.test(candidate),
+    });
+    copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(packageRoot, 'pnpm-lock.yaml'));
+    copyFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), resolve(packageRoot, 'pnpm-workspace.yaml'));
+    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    const rootManifest = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
+    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify({
+      name: '@auraboot/web-shell',
+      version,
+      private: false,
+      type: 'module',
+      packageManager: rootManifest.packageManager,
+      engines: { node: '>=20' },
+      scripts: { build: 'pnpm --dir web-admin build' },
+      files: [
+        'LICENSE.txt',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        'packages',
+        'web-admin',
+      ],
+    }, null, 2)}\n`);
     const output = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
     const tarball = output.split('\n').at(-1);
     return requirePath(resolve(tarball), 'Web Shell tarball');
