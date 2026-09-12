@@ -280,6 +280,11 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       [analysisId],
     );
     expect(started.rows[0].caused_by_event_id).toBe(adoptedEvent.rows[0].event_id);
+    const terminal = await db.query(
+      "SELECT interaction_id, payload->>'status' AS status FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name='agent_execution_completed'",
+      [linked.rows[0].pid],
+    );
+    expect(terminal.rows).toEqual([{ interaction_id: analysisId, status: 'success' }]);
     await expect(input).toBeEnabled();
     const executionMessage = panel
       .getByTestId('chat-msg-user')
