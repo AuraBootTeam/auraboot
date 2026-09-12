@@ -110,7 +110,7 @@ test('report export requires model read permission in addition to artifact permi
     ).toBe(200);
     const user = makeRoleUser(code, [code]);
     await ensureRoleUser(page, user);
-    const session = await openAsRole(browser, user.email, user.password);
+    const session = await openAsRole(browser, user.email, user.password, 'zh-CN');
     try {
       const snapshot = await fetchRoleSnapshot(session.page);
       expect(snapshot.roleCodes).not.toContain('tenant_admin');
@@ -157,8 +157,8 @@ test('report export requires model read permission in addition to artifact permi
         .click();
 
       await expect(session.page.getByTestId('report-reader-toolbar')).toContainText('只读报表');
-      await expect(session.page.getByPlaceholder('Report Title')).toHaveCount(0);
-      for (const name of ['Preview', 'Edit', 'Settings', '保存'])
+      await expect(session.page.getByPlaceholder('报表标题')).toHaveCount(0);
+      for (const name of ['预览', '编辑', '设置', '保存'])
         await expect(session.page.getByRole('button', { name, exact: true })).toHaveCount(0);
       const writes: string[] = [];
       session.page.on('request', (request) => {
@@ -176,7 +176,7 @@ test('report export requires model read permission in addition to artifact permi
       if (hasModelRead) {
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         const event = session.page.waitForEvent('download');
-        await session.page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+        await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
         const artifact = await event;
         const path = `${process.env.AURA_EVIDENCE_DIR}/report-role-allowed.json`;
         await artifact.saveAs(path);
@@ -196,11 +196,11 @@ test('report export requires model read permission in addition to artifact permi
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
         for (const format of ['JSON', 'Excel', 'PDF'])
           await expect(
-            session.page.getByRole('button', { name: `Export ${format}`, exact: true }),
+            session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
           ).toBeDisabled();
       }
 
-      await session.page.getByRole('button', { name: 'Version History', exact: true }).click();
+      await session.page.getByRole('button', { name: '版本历史', exact: true }).click();
       await session.page.getByRole('button', { name: /^v1\b/ }).click();
       await expect(session.page.getByTestId('report-version-preview')).toBeVisible();
       await expect(session.page.getByRole('button', { name: /^(回滚|Rollback)$/ })).toHaveCount(0);
@@ -338,7 +338,7 @@ test('named-query reports require source and declared resource permissions', asy
     ).toBe(200);
     const user = makeRoleUser(code, [code]);
     await ensureRoleUser(page, user);
-    const session = await openAsRole(browser, user.email, user.password);
+    const session = await openAsRole(browser, user.email, user.password, 'zh-CN');
     try {
       const snapshot = await fetchRoleSnapshot(session.page);
       expect(snapshot.roleCodes).not.toContain('tenant_admin');
@@ -373,7 +373,7 @@ test('named-query reports require source and declared resource permissions', asy
       if (mode === 'allowed') {
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         const download = session.page.waitForEvent('download');
-        await session.page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+        await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
         const path = `${process.env.AURA_EVIDENCE_DIR}/report-named-allowed.json`;
         await (await download).saveAs(path);
         expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders).toEqual([
@@ -392,7 +392,7 @@ test('named-query reports require source and declared resource permissions', asy
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
         for (const format of ['JSON', 'Excel', 'PDF'])
           await expect(
-            session.page.getByRole('button', { name: `Export ${format}`, exact: true }),
+            session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
           ).toBeDisabled();
       }
       await session.page.screenshot({

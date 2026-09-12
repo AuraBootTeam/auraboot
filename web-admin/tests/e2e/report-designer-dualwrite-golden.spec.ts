@@ -17,8 +17,18 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   await page.getByRole('button', { name: /新建报表|New report/ }).click();
   await expect(page.getByTestId('report-canvas')).toBeVisible();
   const title = `Analytics report ${Date.now()}`;
-  await page.getByPlaceholder('Report Title').fill(title);
-  await expect(page.getByPlaceholder('Report Title')).toHaveValue(title);
+  await page.getByPlaceholder('报表标题').fill(title);
+  await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
+  await page.getByTestId('report-designer-toolbar').getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '页面设置' })).toBeVisible();
+  await expect(page.getByText('页边距（毫米）', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-settings.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '页面设置' })).toHaveCount(0);
+
   await page.getByRole('button', { name: /Rich Text/ }).click();
   await page.getByPlaceholder('Enter text content...').fill('Original analysis conclusion');
   await expect(page.getByTestId('report-canvas')).toContainText('Original analysis conclusion');
@@ -56,12 +66,12 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   });
   await row.getByRole('button', { name: /打开|Open/ }).click();
   await expect(page).toHaveURL(new RegExp(`/report-designer/${created.pid}`));
-  await expect(page.getByPlaceholder('Report Title')).toHaveValue(title);
+  await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
   await page.screenshot({
     path: `${process.env.AURA_EVIDENCE_DIR}/report-reopened.png`,
     fullPage: true,
   });
-  await page.getByPlaceholder('Report Title').fill(`${title} revised`);
+  await page.getByPlaceholder('报表标题').fill(`${title} revised`);
   await page
     .getByTestId('report-canvas')
     .getByText('Original analysis conclusion', { exact: true })
@@ -74,11 +84,9 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   );
   await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
   expect((await updatedResponse).status()).toBe(200);
-  await page.getByPlaceholder('Report Title').fill(`${title} unsaved`);
+  await page.getByPlaceholder('报表标题').fill(`${title} unsaved`);
   for (const format of ['PDF', 'Excel', 'JSON']) {
-    await expect(
-      page.getByRole('button', { name: `Export ${format}`, exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: `导出 ${format}`, exact: true })).toBeDisabled();
   }
   await expect(page.getByRole('status')).toContainText('请先保存当前修改');
   await page.screenshot({
@@ -86,12 +94,12 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     fullPage: true,
   });
 
-  await page.getByRole('button', { name: 'Version History' }).click();
+  await page.getByRole('button', { name: '版本历史' }).click();
   await page.getByRole('button', { name: /^v1\b/ }).click();
   const historical = page.getByTestId('report-version-preview');
   await expect(historical).toContainText('Original analysis conclusion');
   await expect(historical).not.toContainText('Revised analysis conclusion');
-  await expect(page.getByPlaceholder('Report Title')).toHaveCount(0);
+  await expect(page.getByPlaceholder('报表标题')).toHaveCount(0);
   await page.keyboard.press('ControlOrMeta+s');
   const unchanged = await page.request.get(`/api/report-definitions/${created.pid}`);
   expect((await unchanged.json()).data.dsl.title).toBe(`${title} revised`);
@@ -99,21 +107,28 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     path: `${process.env.AURA_EVIDENCE_DIR}/report-history-preview.png`,
   });
   await page.getByRole('button', { name: '返回当前报表', exact: true }).click();
-  await expect(page.getByPlaceholder('Report Title')).toHaveValue(`${title} unsaved`);
+  await expect(page.getByPlaceholder('报表标题')).toHaveValue(`${title} unsaved`);
   await expect(page.getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
   await page.getByRole('button', { name: /^v1\b/ }).click();
   await page.getByRole('button', { name: /^(回滚|Rollback)$/ }).click();
   const rollbackResponse = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().includes('/rollback'),
   );
-  await page.getByRole('button', { name: 'Confirm Rollback', exact: true }).click();
+  await expect(
+    page.getByText('确认回滚到此版本？回滚前会将当前状态保存为备份。', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-rollback-dialog.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: '确认回滚', exact: true }).click();
   expect((await rollbackResponse).status()).toBe(200);
-  await expect(page.getByPlaceholder('Report Title')).toHaveValue(title);
+  await expect(page.getByPlaceholder('报表标题')).toHaveValue(title);
   const restored = await page.request.get(`/api/report-definitions/${created.pid}`);
   expect((await restored.json()).data.dsl).toEqual(written.dsl);
   await page.getByRole('button', { name: /关闭版本面板|Close version/ }).click();
   const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  await page.getByRole('button', { name: '导出 JSON', exact: true }).click();
   const download = await downloadEvent;
   const exportedPath = `${process.env.AURA_EVIDENCE_DIR}/${created.pid}.report.json`;
   await download.saveAs(exportedPath);
@@ -193,7 +208,7 @@ test('report menu previews and exports the same filtered model rows', async ({ p
     .getByRole('button', { name: /打开|Open/ })
     .click();
   await expect(page).toHaveURL(new RegExp(`/report-designer/${pid}`));
-  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('button', { name: '预览', exact: true }).click();
   await expect(page.getByRole('cell', { name: orderTitle, exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Report Export Customer', exact: true })).toHaveCount(
     1,
@@ -202,8 +217,8 @@ test('report menu previews and exports the same filtered model rows', async ({ p
     path: `${process.env.AURA_EVIDENCE_DIR}/report-model-preview.png`,
     fullPage: true,
   });
-  await page.getByPlaceholder('Report Title').fill(`${title} current`);
-  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
+  await page.getByPlaceholder('报表标题').fill(`${title} current`);
+  await expect(page.getByRole('button', { name: '导出 JSON', exact: true })).toBeDisabled();
   const savedDefinition = page.waitForResponse(
     (r) =>
       r.request().method() === 'PUT' &&
@@ -211,13 +226,13 @@ test('report menu previews and exports the same filtered model rows', async ({ p
   );
   await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
   expect((await savedDefinition).status()).toBe(200);
-  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '导出 JSON', exact: true })).toBeEnabled();
   dsl.title = `${title} current`;
   const jsonResponse = page.waitForResponse(
     (r) => new URL(r.url()).pathname === '/api/reports/export/json',
   );
   const jsonDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  await page.getByRole('button', { name: '导出 JSON', exact: true }).click();
   expect((await jsonResponse).status()).toBe(200);
   const json = await jsonDownload;
   const jsonPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.json`;
@@ -230,13 +245,13 @@ test('report menu previews and exports the same filtered model rows', async ({ p
     e2et_order_customer: 'Report Export Customer',
   });
   const excelDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Excel', exact: true }).click();
+  await page.getByRole('button', { name: '导出 Excel', exact: true }).click();
   const excel = await excelDownload;
   expect(excel.suggestedFilename()).toBe(`${title} current.xlsx`);
   const excelPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.xlsx`;
   await excel.saveAs(excelPath);
   const pdfDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
+  await page.getByRole('button', { name: '导出 PDF', exact: true }).click();
   const pdf = await pdfDownload;
   expect(pdf.suggestedFilename()).toBe(`${title} current.pdf`);
   const pdfPath = `${process.env.AURA_EVIDENCE_DIR}/${pid}.model.pdf`;
@@ -315,7 +330,7 @@ test('report export API applies declared model parameters and rejects missing re
     .filter({ hasText: title })
     .getByRole('button', { name: /打开|Open/ })
     .click();
-  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('button', { name: '预览', exact: true }).click();
   await expect(page.getByRole('cell', { name: `${title}A`, exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: `${title}B`, exact: true })).toHaveCount(0);
   await page.screenshot({
@@ -325,7 +340,7 @@ test('report export API applies declared model parameters and rejects missing re
 
   const downloadCurrent = async (expected: string, label: string) => {
     const event = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+    await page.getByRole('button', { name: '导出 JSON', exact: true }).click();
     const artifact = await event;
     const path = `${process.env.AURA_EVIDENCE_DIR}/report-parameters-${label}.json`;
     await artifact.saveAs(path);
@@ -469,7 +484,7 @@ test('report exports all 201 matching records and rejects an undersized export l
     .filter({ hasText: title })
     .getByRole('button', { name: /打开|Open/ })
     .click();
-  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('button', { name: '预览', exact: true }).click();
   await expect(page.getByRole('cell', { name: new RegExp(`^${title}-`) })).toHaveCount(201);
   const expectedOrder = [
     ...titles.filter((_, i) => i % 2 === 0),
@@ -481,7 +496,7 @@ test('report exports all 201 matching records and rejects an undersized export l
   const downloads: Record<string, string> = {};
   for (const format of ['JSON', 'Excel', 'PDF']) {
     const event = page.waitForEvent('download');
-    await page.getByRole('button', { name: `Export ${format}`, exact: true }).click();
+    await page.getByRole('button', { name: `导出 ${format}`, exact: true }).click();
     const artifact = await event;
     downloads[format] =
       `${process.env.AURA_EVIDENCE_DIR}/report-201.${format === 'Excel' ? 'xlsx' : format.toLowerCase()}`;

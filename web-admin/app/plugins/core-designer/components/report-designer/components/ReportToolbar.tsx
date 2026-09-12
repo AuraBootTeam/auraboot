@@ -68,7 +68,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                       disabled={exportDisabled}
                       className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
                     >
-                      Export {format}
+                      {text({ zh: `导出 ${format}`, en: `Export ${format}` })}
                     </button>
                   ),
               )}
@@ -77,7 +77,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                 onClick={onToggleVersionHistory}
                 className="rounded-md border px-3 py-1.5 text-sm"
               >
-                Version History
+                {text({ zh: '版本历史', en: 'Version History' })}
               </button>
             )}
           </div>
@@ -97,7 +97,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       value={report.title}
       onChange={(e) => updateTitle(e.target.value)}
       className="w-64 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
-      placeholder="Report Title"
+      placeholder={text({ zh: '报表标题', en: 'Report Title' })}
     />
   );
 
@@ -118,10 +118,10 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         <button
           onClick={() => setShowSettings(true)}
           className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          title="Page Settings"
+          title={text({ zh: '页面设置', en: 'Page Settings' })}
         >
           <Settings className="h-4 w-4" />
-          Settings
+          {text({ zh: '设置', en: 'Settings' })}
         </button>
 
         <button
@@ -132,7 +132,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
               : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >
-          {previewMode ? 'Edit' : 'Preview'}
+          {previewMode ? text({ zh: '编辑', en: 'Edit' }) : text({ zh: '预览', en: 'Preview' })}
         </button>
 
         <button
@@ -141,7 +141,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
           aria-describedby={exportDisabled ? 'report-export-status' : undefined}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Export PDF
+          {text({ zh: '导出 PDF', en: 'Export PDF' })}
         </button>
 
         {onExportExcel && (
@@ -152,7 +152,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
             className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Export Excel
+            {text({ zh: '导出 Excel', en: 'Export Excel' })}
           </button>
         )}
 
@@ -164,7 +164,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
             className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileJson className="h-4 w-4" />
-            Export JSON
+            {text({ zh: '导出 JSON', en: 'Export JSON' })}
           </button>
         )}
 
@@ -172,7 +172,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
           <button
             onClick={onToggleVersionHistory}
             className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            title="Version History"
+            title={text({ zh: '版本历史', en: 'Version History' })}
           >
             <History className="h-4 w-4" />
             {versionCount != null && versionCount > 0 && (
@@ -215,24 +215,29 @@ const PageSettingsDialog: React.FC<{
   onSave: (settings: Partial<PageConfig>) => void;
   onClose: () => void;
 }> = ({ page, onSave, onClose }) => {
+  const text = useSmartText();
   const [size, setSize] = useState<PageSize>(page.size);
   const [orientation, setOrientation] = useState<PageOrientation>(page.orientation);
   const [margin, setMargin] = useState({ ...page.margin });
 
   return (
     <div
-      className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="w-[400px] rounded-lg bg-white shadow-xl">
         <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Page Settings</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {text({ zh: '页面设置', en: 'Page Settings' })}
+          </h2>
         </div>
         <div className="space-y-4 p-6">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Page Size</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              {text({ zh: '纸张尺寸', en: 'Page Size' })}
+            </label>
             <select
               value={size}
               onChange={(e) => setSize(e.target.value as PageSize)}
@@ -245,7 +250,9 @@ const PageSettingsDialog: React.FC<{
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Orientation</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              {text({ zh: '方向', en: 'Orientation' })}
+            </label>
             <div className="flex gap-4">
               {(['portrait', 'landscape'] as PageOrientation[]).map((o) => (
                 <label key={o} className="flex cursor-pointer items-center gap-2">
@@ -257,17 +264,28 @@ const PageSettingsDialog: React.FC<{
                     onChange={() => setOrientation(o)}
                     className="text-blue-600"
                   />
-                  <span className="text-sm">{o === 'portrait' ? 'Portrait' : 'Landscape'}</span>
+                  <span className="text-sm">
+                    {o === 'portrait'
+                      ? text({ zh: '纵向', en: 'Portrait' })
+                      : text({ zh: '横向', en: 'Landscape' })}
+                  </span>
                 </label>
               ))}
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Margins (mm)</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              {text({ zh: '页边距（毫米）', en: 'Margins (mm)' })}
+            </label>
             <div className="grid grid-cols-2 gap-3">
               {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
                 <div key={side}>
-                  <label className="mb-1 block text-xs text-gray-500 capitalize">{side}</label>
+                  <label className="mb-1 block text-xs text-gray-500 capitalize">
+                    {text({
+                      zh: { top: '上', right: '右', bottom: '下', left: '左' }[side],
+                      en: side,
+                    })}
+                  </label>
                   <input
                     type="number"
                     value={margin[side]}
@@ -286,13 +304,13 @@ const PageSettingsDialog: React.FC<{
             onClick={onClose}
             className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Cancel
+            {text({ zh: '取消', en: 'Cancel' })}
           </button>
           <button
             onClick={() => onSave({ size, orientation, margin })}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
           >
-            Apply
+            {text({ zh: '应用', en: 'Apply' })}
           </button>
         </div>
       </div>
