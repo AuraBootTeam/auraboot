@@ -27,6 +27,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   expect(imported.status()).toBe(200);
   expect((await imported.json()).success).toBe(true);
   const code = `suggestion_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  const executionGoal = `Review order ${code} and report findings.`;
   const role = await admin.request.post('/api/roles', {
     data: {
       code,
@@ -55,6 +56,9 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     'analytics.suggestion.read',
     'analytics.suggestion.propose',
     'analytics.suggestion.adopt',
+    'analytics.suggestion.execute',
+    'model.core_dashboard_suggestion.read',
+    'model.core_dashboard_adoption.read',
   ];
   const grants = codes.map((code) => {
     expect(permissions.get(code), code).toBeTruthy();
@@ -82,10 +86,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     const snapshot = await fetchRoleSnapshot(page);
     expect(snapshot.roleCodes).not.toContain('tenant_admin');
     for (const permission of codes) expect(snapshot.permissionCodes).toContain(permission);
-    await page.waitForFunction(() => {
-      const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
-      return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
-    });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     const panel = page.getByTestId('aurabot-panel');
     if (!(await panel.getByTestId('aurabot-input').isVisible()))
       await page.getByTestId('ai-panel-toggle').click();
@@ -130,6 +131,10 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
               ...saved.request().postDataJSON().payload,
               previousPid,
               content: `Review revision ${index}`,
+              executionIntent: {
+                type: 'agent_task',
+                goal: executionGoal,
+              },
               requestId: randomUUID(),
             },
           },
@@ -218,10 +223,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         /\/conversations\/\d+\/messages/.test(new URL(r.url()).pathname),
     );
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => {
-      const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
-      return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
-    });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     if (!(await panel.getByTestId('aurabot-input').isVisible()))
       await page.getByTestId('ai-panel-toggle').click();
     const history = await historyResponse;
@@ -255,10 +257,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       )
       .toBe(false);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => {
-      const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
-      return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
-    });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     if (!(await panel.getByTestId('aurabot-input').isVisible()))
       await page.getByTestId('ai-panel-toggle').click();
     await expect(card).toHaveAttribute('data-row-count', '1');
@@ -285,6 +284,134 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         [analysisId],
       );
       expect(facts.rows[0].count).toBe(0);
+      const grant = async (permission: string, granted: boolean) => {
+        const response = await admin.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+          data: [{ permissionId: permissions.get(permission), granted }],
+        });
+        expect(response.status()).toBe(200);
+        await expect
+          .poll(async () => (await fetchRoleSnapshot(page)).permissionCodes.includes(permission))
+          .toBe(granted);
+      };
+      const reopen = async () => {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+        await page.getByTestId('ai-panel-toggle').click();
+        await expect(suggestions.getByTestId('analytics-suggestion')).toHaveCount(5);
+      };
+      await grant('meta.command.execute', true);
+      await reopen();
+      const latest = suggestions.getByTestId('analytics-suggestion').filter({ hasText: '版本 6' });
+      await latest.getByRole('button', { name: '采纳此版本', exact: true }).click();
+      const adoptedResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().includes('/execute/core_dashboard:adopt_suggestion'),
+      );
+      await dialog.getByRole('button', { name: '确认采纳', exact: true }).click();
+      const adopted = await adoptedResponse;
+      expect(adopted.status(), await adopted.text()).toBe(200);
+      const adoptionPid = (await adopted.json()).data.data.record.pid;
+      await expect(latest).toContainText('已采纳');
+      await latest.getByRole('button', { name: '发起执行', exact: true }).click();
+      await expect(dialog).toContainText(executionGoal);
+      await grant('model.e2et_order.read', false);
+      const deniedExecution = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().endsWith('/api/ai/aurabot/chat/stream') &&
+          !!response.request().postDataJSON()?.analyticsExecution,
+      );
+      await dialog.getByRole('button', { name: '确认执行', exact: true }).click();
+      const denied = await deniedExecution;
+      expect(denied.request().postDataJSON().analyticsExecution.adoptionPid).toBe(adoptionPid);
+      const deniedBody = await denied.text();
+      expect(deniedBody).toContain('event:error');
+      expect(deniedBody).toContain('Report aggregate data access denied');
+      const feedback = panel.getByText(
+        '执行未完成。请刷新建议并检查权限后重试；已有任务的状态以服务器记录为准。',
+        { exact: true },
+      );
+      await expect(feedback).toBeVisible();
+      await feedback.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-ai-execute-denied.png`,
+        fullPage: true,
+      });
+      const assertNoExecution = async () => {
+        expect(
+          (
+            await db.query(
+              'SELECT count(*)::int AS count FROM ab_agent_task WHERE description=$1',
+              [executionGoal],
+            )
+          ).rows[0].count,
+        ).toBe(0);
+        expect(
+          (
+            await db.query(
+              'SELECT count(*)::int AS count FROM ab_analytics_task_execution WHERE adoption_pid=$1',
+              [adoptionPid],
+            )
+          ).rows[0].count,
+        ).toBe(0);
+        expect(
+          (
+            await db.query(
+              "SELECT count(*)::int AS count FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='agent_execution_started'",
+              [analysisId],
+            )
+          ).rows[0].count,
+        ).toBe(0);
+      };
+      await assertNoExecution();
+      await grant('model.e2et_order.read', true);
+      await grant('analytics.suggestion.execute', false);
+      await reopen();
+      await expect(latest).toContainText('已采纳');
+      await expect(latest.getByRole('button', { name: '发起执行', exact: true })).toHaveCount(0);
+      await latest.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-execute-permission-hidden.png`,
+        fullPage: true,
+      });
+      const bypass = await page.request.post('/api/ai/aurabot/chat/stream', {
+        data: {
+          sessionId: randomUUID(),
+          clientMsgId: randomUUID(),
+          message: 'Execute adopted suggestion',
+          analyticsExecution: { adoptionPid, requestId: randomUUID() },
+        },
+      });
+      const bypassBody = await bypass.text();
+      expect(bypassBody).toContain('event:error');
+      expect(bypassBody).toContain('Analytics execution permission required');
+      await assertNoExecution();
+      await grant('analytics.suggestion.execute', true);
+      await reopen();
+      await latest.getByRole('button', { name: '发起执行', exact: true }).click();
+      const restoredExecution = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().endsWith('/api/ai/aurabot/chat/stream') &&
+          !!response.request().postDataJSON()?.analyticsExecution,
+      );
+      await dialog.getByRole('button', { name: '确认执行', exact: true }).click();
+      const restoredResponse = await restoredExecution;
+      expect(await restoredResponse.text()).not.toContain('event:error');
+      await expect(latest.getByTestId('analytics-execution-status')).toContainText('执行成功', {
+        timeout: 15000,
+      });
+      const runs = await db.query(
+        'SELECT r.run_status FROM ab_analytics_task_execution a JOIN ab_agent_run r ON r.tenant_id=a.tenant_id AND r.task_id=a.task_pid WHERE a.adoption_pid=$1',
+        [adoptionPid],
+      );
+      expect(runs.rows).toEqual([{ run_status: 'success' }]);
+      await latest.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-execute-restored.png`,
+        fullPage: true,
+      });
     } finally {
       await db.end();
     }

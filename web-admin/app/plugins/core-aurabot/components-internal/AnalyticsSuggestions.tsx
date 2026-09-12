@@ -42,14 +42,18 @@ export function AnalyticsSuggestions({
   query: ChartDataSource;
 }) {
   const { state: conversationState, sendMessage } = useAuraBot();
-  const executionPermission = usePermission('analytics.suggestion.execute');
+  const executionActionPermission = usePermission('analytics.suggestion.execute');
+  const versionReadPermission = usePermission('model.core_dashboard_suggestion.read');
+  const adoptionReadPermission = usePermission('model.core_dashboard_adoption.read');
+  const executionPermission =
+    executionActionPermission && versionReadPermission && adoptionReadPermission;
   const [executionConfirmation, setExecutionConfirmation] = useState<Suggestion | null>(null);
   const canRead = usePermission('analytics.suggestion.read');
   const canExecute = usePermission('meta.command.execute');
   const proposalPermission = usePermission('analytics.suggestion.propose');
   const adoptionPermission = usePermission('analytics.suggestion.adopt');
   const canPropose = canExecute && proposalPermission;
-  const canAdopt = canExecute && adoptionPermission;
+  const canAdopt = canExecute && adoptionPermission && versionReadPermission;
   const { locale } = useI18n();
   const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const inputId = useId();

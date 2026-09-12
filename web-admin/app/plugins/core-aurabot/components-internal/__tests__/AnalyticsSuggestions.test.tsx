@@ -4,6 +4,7 @@ import { AnalyticsSuggestions } from '../AnalyticsSuggestions';
 
 const fixture = vi.hoisted(() => ({
   execute: true,
+  sourceRead: true,
   loading: false,
   row: {
     pid: 'version',
@@ -20,6 +21,10 @@ const fixture = vi.hoisted(() => ({
 vi.mock('~/contexts/AuthContext', () => ({
   usePermission: (code: string) =>
     code === 'analytics.suggestion.read' ||
+    (fixture.sourceRead &&
+      ['model.core_dashboard_suggestion.read', 'model.core_dashboard_adoption.read'].includes(
+        code,
+      )) ||
     (code === 'analytics.suggestion.execute' && fixture.execute),
 }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'zh-CN' }) }));
@@ -43,6 +48,7 @@ const show = async () => {
 };
 beforeEach(() => {
   fixture.execute = true;
+  fixture.sourceRead = true;
   fixture.loading = false;
   fixture.row.adoptionPid = 'adoption';
   fixture.row.executionGoal = 'Review the order';
@@ -62,6 +68,11 @@ describe('Analytics suggestion execution eligibility', () => {
     fixture.row.execution = { state: 'not_started', attempts: 0 };
     await show();
     expect(screen.getByRole('button', { name: '发起执行' })).toBeEnabled();
+  });
+  it('requires source-record read permissions even with execution permission', async () => {
+    fixture.sourceRead = false;
+    await show();
+    expect(screen.queryByRole('button', { name: '发起执行' })).not.toBeInTheDocument();
   });
   it('hides execution without the dedicated permission', async () => {
     fixture.execute = false;

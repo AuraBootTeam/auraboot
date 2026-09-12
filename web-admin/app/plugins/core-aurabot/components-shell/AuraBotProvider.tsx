@@ -16,6 +16,7 @@ import React, {
   useRef,
 } from 'react';
 import { useLocation, useParams } from 'react-router';
+import { useI18n } from '~/contexts/I18nContext';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -560,6 +561,7 @@ export interface AuraBotProviderProps {
 }
 
 export function AuraBotProvider({ children }: AuraBotProviderProps) {
+  const { locale } = useI18n();
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
   const location = useLocation();
@@ -774,6 +776,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       attachments?: ChatImageAttachment[],
       analyticsExecution?: { adoptionPid: string; requestId: string },
     ) => {
+      const analyticsError =
+        locale === 'zh-CN'
+          ? '执行未完成。请刷新建议并检查权限后重试；已有任务的状态以服务器记录为准。'
+          : 'Execution did not complete. Refresh suggestions and check permissions before retrying; server records determine the state of an existing task.';
       const hasAttachments = !!attachments && attachments.length > 0;
       // Allow empty text when image attachments are present — the model can
       // still answer the implicit "what is this?". Without attachments, we
@@ -849,7 +855,12 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             onError: (error: string, traceId?: string) => {
               dispatch({
                 type: 'update_message',
-                payload: { id: botMsgId, type: 'error', content: error, traceId },
+                payload: {
+                  id: botMsgId,
+                  type: 'error',
+                  content: analyticsExecution ? analyticsError : error,
+                  traceId,
+                },
               });
               dispatch({ type: 'set_loading', payload: false });
               refreshConversations().catch(() => {});
@@ -982,7 +993,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       } catch (e: any) {
         dispatch({
           type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: e.message || 'Chat failed' },
+          payload: {
+            id: botMsgId,
+            type: 'error',
+            content: analyticsExecution ? analyticsError : e.message || 'Chat failed',
+          },
         });
         dispatch({ type: 'set_loading', payload: false });
         // Phase B.1: server already attempted to persist; on transport failure
@@ -994,6 +1009,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     [
       ensureConversation,
       refreshConversations,
+      locale,
       state.isLoading,
       state.sessionId,
       state.selectedAgentCode,
