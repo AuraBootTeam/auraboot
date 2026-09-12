@@ -27,10 +27,15 @@ public class BehaviorOutcomeRelay {
     private final BehaviorIngestPublisher ingestPublisher;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.scheduling.annotation.Scheduled(
+            initialDelayString = "${behavior.outcome.relay.initial-delay-ms:1000}",
+            fixedDelayString = "${behavior.outcome.relay.fixed-delay-ms:1000}")
+    @org.springframework.transaction.annotation.Transactional
     public int publishPending() {
         return publishPending(DEFAULT_LIMIT);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public int publishPending(int limit) {
         int safeLimit = limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, DEFAULT_LIMIT);
         int published = 0;

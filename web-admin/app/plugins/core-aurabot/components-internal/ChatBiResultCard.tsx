@@ -244,6 +244,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { modelCode, dimensions = [], metrics = [] } = result;
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
+  const [savedCode, setSavedCode] = useState<string | null>(null);
   const dataSource = result.dataSource;
   const canSave = !!dataSource && records.length > 0 && !savedPid;
 
@@ -269,8 +270,15 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         },
       ];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dash: any = await dashboardService.create({ title, scope: 'personal', widgets } as any);
-      setSavedPid(dash?.pid || dash?.code || 'saved');
+      const dash: any = await dashboardService.create({
+        title,
+        scope: 'personal',
+        widgets,
+        sourceAnalysisId: result.analysisId,
+      } as any);
+      if (!dash?.pid || !dash?.code) throw new Error('Saved dashboard identity is missing');
+      setSavedPid(dash.pid);
+      setSavedCode(dash.code);
       toast.success(t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板'));
     } catch {
       toast.error(t('aurabot.chatbi.save_failed', undefined, '存为看板失败'));
@@ -339,12 +347,13 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         {(canSave || savedPid) && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
             {savedPid ? (
-              <span
+              <a
                 data-testid="chatbi-saved-dashboard"
-                className="text-xs font-medium text-green-600 dark:text-green-400"
+                href={`/dashboards/view/${encodeURIComponent(savedCode!)}`}
+                className="text-xs font-medium text-green-600 underline dark:text-green-400"
               >
                 {t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板')} ✓
-              </span>
+              </a>
             ) : (
               <button
                 data-testid="chatbi-save-dashboard"

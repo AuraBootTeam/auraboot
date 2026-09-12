@@ -250,7 +250,8 @@ public class ChatBiSkill implements AuraBotSkill {
             throw error;
         }
         ((ObjectNode) result.getPayload()).put("analysisId", analysisId);
-        journey.succeeded(analysisId, ((ObjectNode) result.getPayload()).path("rowCount").asInt());
+        journey.succeeded(analysisId, ((ObjectNode) result.getPayload()).path("rowCount").asInt(),
+                ((ObjectNode) result.getPayload()).path("dataSource"));
         return result;
     }
 

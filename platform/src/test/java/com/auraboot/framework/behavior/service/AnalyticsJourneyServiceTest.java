@@ -26,7 +26,8 @@ class AnalyticsJourneyServiceTest {
         MetaContext.setCurrentTenantId(42L);
         MetaContext.setCurrentUserId(7L);
         String id = service.requested();
-        service.succeeded(id, 3);
+        com.fasterxml.jackson.databind.JsonNode query = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("modelCode", "orders");
+        service.succeeded(id, 3, query);
         ArgumentCaptor<List<BehaviorEventInput>> batches = ArgumentCaptor.forClass((Class) List.class);
         verify(publisher, times(2)).publish(eq(42L), eq(7L), batches.capture());
         List<BehaviorEventInput> events = batches.getAllValues().stream().flatMap(List::stream).toList();
@@ -35,7 +36,7 @@ class AnalyticsJourneyServiceTest {
         assertThat(events).extracting(BehaviorEventInput::getInteractionId).containsOnly(id);
         assertThat(events).extracting(BehaviorEventInput::getEventId).doesNotHaveDuplicates();
         assertThat(events.get(0).getProps()).isEmpty();
-        assertThat(events.get(1).getProps()).isEqualTo(Map.of("rowCount", 3));
+        assertThat(events.get(1).getProps()).isEqualTo(Map.of("rowCount", 3, "queryHash", AnalyticsQueryFingerprint.of(query)));
     }
 
     @Test

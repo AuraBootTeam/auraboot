@@ -24,8 +24,8 @@ public class AnalyticsJourneyService {
         return analysisId;
     }
 
-    public void succeeded(String analysisId, int rowCount) {
-        publish(analysisId, "analytics_query_succeeded", Map.of("rowCount", rowCount));
+    public void succeeded(String analysisId, int rowCount, com.fasterxml.jackson.databind.JsonNode query) {
+        publish(analysisId, "analytics_query_succeeded", Map.of("rowCount", rowCount, "queryHash", AnalyticsQueryFingerprint.of(query)));
     }
 
     public void failed(String analysisId) {

@@ -226,7 +226,7 @@ class ChatBiSkillTest {
         assertThatThrownBy(() -> skill.execute(SkillRequest.builder().params(baseParams()).build()))
                 .isInstanceOf(IllegalStateException.class);
         verify(journey).failed("analysis-1");
-        org.mockito.Mockito.verify(journey, org.mockito.Mockito.never()).succeeded(any(), org.mockito.ArgumentMatchers.anyInt());
+        org.mockito.Mockito.verify(journey, org.mockito.Mockito.never()).succeeded(any(), org.mockito.ArgumentMatchers.anyInt(), any());
     }
 
 }

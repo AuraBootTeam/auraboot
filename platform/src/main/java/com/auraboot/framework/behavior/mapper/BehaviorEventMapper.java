@@ -65,4 +65,16 @@ public interface BehaviorEventMapper extends BaseMapper<BehaviorEvent> {
             LIMIT 1
             """)
     Long findIdByTenantAndEventId(@Param("tenantId") Long tenantId, @Param("eventId") String eventId);
+    @Select("""
+            SELECT props->>'queryHash'
+            FROM ab_behavior_event
+            WHERE tenant_id = #{tenantId} AND user_id = #{userId}
+              AND interaction_id = #{analysisId}
+              AND event_name = 'analytics_query_succeeded'
+              AND source = 'server' AND producer_name = 'aurabot-analytics'
+            ORDER BY occurred_at DESC, id DESC LIMIT 1
+            """)
+    String findSuccessfulQueryHash(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+                                   @Param("analysisId") String analysisId);
+
 }

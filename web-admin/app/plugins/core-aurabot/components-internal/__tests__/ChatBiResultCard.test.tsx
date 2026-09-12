@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
-  dashboardService: { create: vi.fn().mockResolvedValue({ pid: 'saved-dashboard' }) },
+  dashboardService: { create: vi.fn().mockResolvedValue({ pid: 'saved-dashboard', code: 'saved-dashboard-code' }) },
 }));
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 

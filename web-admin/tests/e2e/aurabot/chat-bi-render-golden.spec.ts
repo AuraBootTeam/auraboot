@@ -67,7 +67,10 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
       })
       .toEqual([
         { name: 'analytics_requested', props: null },
-        { name: 'analytics_query_succeeded', props: { rowCount: 1 } },
+        {
+          name: 'analytics_query_succeeded',
+          props: { rowCount: 1, queryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        },
       ]);
   } finally {
     await db.end();
@@ -81,9 +84,90 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
   expect(created.status()).toBe(200);
   const source = created.request().postDataJSON().widgets[0].config.dataSource;
   expect(source).toMatchObject({ type: 'aggregate', ...query });
+  const saved = (await created.json()).data;
+  expect(saved.extension.analyticsOrigin.analysisId).toBe(analysisId);
+  const persisted = await page.request.get(`/api/dashboards/${saved.pid}`);
+  expect(persisted.status()).toBe(200);
+  expect((await persisted.json()).data.extension.analyticsOrigin).toEqual(
+    saved.extension.analyticsOrigin,
+  );
+  const tampered = created.request().postDataJSON();
+  tampered.widgets[0].config.dataSource.limit = 4;
+  const rejected = await page.request.post('/api/dashboards', { data: tampered });
+  expect(rejected.status()).toBe(400);
+  const rewrittenOrigin = await page.request.put(`/api/dashboards/${saved.pid}`, {
+    data: {
+      extension: { analyticsOrigin: { analysisId: 'forged-analysis', queryHash: 'forged' } },
+    },
+  });
+  expect(rewrittenOrigin.status()).toBe(422);
+  const unchanged = await page.request.get(`/api/dashboards/${saved.pid}`);
+  expect(unchanged.status()).toBe(200);
+  expect((await unchanged.json()).data.extension.analyticsOrigin).toEqual(
+    saved.extension.analyticsOrigin,
+  );
+
+  const proof = new Client(PG_CONN);
+  await proof.connect();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const result = await proof.query(
+            "SELECT status, target_key FROM ab_behavior_outcome_outbox WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_saved'",
+            [analysisId],
+          );
+          return result.rows;
+        },
+        { timeout: 15000 },
+      )
+      .toEqual([{ status: 'published', target_key: saved.pid }]);
+    await expect
+      .poll(async () => {
+        const result = await proof.query(
+          "SELECT props FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_saved'",
+          [analysisId],
+        );
+        return result.rows;
+      })
+      .toEqual([
+        {
+          props: {
+            targetType: 'dashboard',
+            targetKey: saved.pid,
+            queryHash: saved.extension.analyticsOrigin.queryHash,
+          },
+        },
+      ]);
+  } finally {
+    await proof.end();
+  }
+
   await expect(card.getByTestId('chatbi-saved-dashboard')).toBeVisible();
   await page.screenshot({
     path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-saved.png`,
+    fullPage: true,
+  });
+  const requery = page.waitForResponse((response) => {
+    if (
+      new URL(response.url()).pathname !== '/api/meta/chart-data' ||
+      response.request().method() !== 'POST'
+    )
+      return false;
+    return response
+      .request()
+      .postDataJSON()
+      ?.filters?.some((filter: { value?: string }) => filter.value === title);
+  });
+  await card.getByTestId('chatbi-saved-dashboard').click();
+  await expect(page).toHaveURL(new RegExp(`/dashboards/view/${saved.code}$`));
+  const refreshed = await requery;
+  expect(refreshed.status()).toBe(200);
+  expect(refreshed.request().postDataJSON()).toMatchObject({ type: 'aggregate', ...query });
+  expect((await refreshed.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
+  await expect(page.locator('main').getByText(title, { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-reopened.png`,
     fullPage: true,
   });
 });
