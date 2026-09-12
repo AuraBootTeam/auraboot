@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { ensureSidebarExpanded } from '../helpers';
 
 const DETAIL_PATH = '/p/c/enterprise_info_detail';

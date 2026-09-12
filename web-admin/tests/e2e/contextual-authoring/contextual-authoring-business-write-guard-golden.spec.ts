@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { findRowByContent, uniqueId, waitForDynamicPageLoad } from '../helpers';
 
 type ApiEnvelope<T> = {

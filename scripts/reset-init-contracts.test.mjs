@@ -132,7 +132,7 @@ test('OSS CI runs reset init contract gate when reset or seed files change', () 
   assert.match(workflow, /bash scripts\/check-reset-init-contracts\.sh/);
 });
 
-test('OSS reset script fails fast and delegates showcase seeds through the ordered runner', () => {
+test('OSS reset stays platform-only and delegates product seed to independent apps', () => {
   const reset = read('scripts/oss-reset-and-init.sh');
 
   assert.match(reset, /set -o pipefail/);
@@ -141,8 +141,9 @@ test('OSS reset script fails fast and delegates showcase seeds through the order
   assert.doesNotMatch(reset, /bootstrap seedDemoData/);
   assert.doesNotMatch(reset, /\"seedDemoData\"/);
   assert.match(reset, /"\$SCRIPT_DIR\/seed-marketplace\.sh" 2>&1 \| tail -1/);
-  assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*"\$\{seed_phases\[@\]\}"/);
-  assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*dashboard-default invariants/);
+  assert.match(reset, /Product seed not run by Core/);
+  assert.doesNotMatch(reset, /seed-cs-agent|crm:create_quote|crm_dashboard|seed_phases/);
+  assert.doesNotMatch(reset, /node scripts\/run-showcase-seed-sequence\.mjs/);
   assert.doesNotMatch(reset, /npx playwright test tests\/api\/setup\/seed-showcase-/);
 });
 
@@ -598,28 +599,8 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
   );
 });
 
-test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
-  for (const file of [
-    'web-admin/tests/api/setup/seed-showcase-data.spec.ts',
-    'web-admin/tests/api/setup/seed-showcase-extended.spec.ts',
-  ]) {
-    const source = read(file);
-    assert.doesNotMatch(
-      source,
-      /crm_opp_expected_close_date:\s*dateTimeAt\(/,
-      `${file} must not feed datetime values into crm_opp_expected_close_date`,
-    );
-    assert.doesNotMatch(
-      source,
-      /closeDate:\s*dateTimeAt\(/,
-      `${file} must keep opportunity closeDate seed values date-only`,
-    );
-  }
-});
-
 test('deployment-neutral knowledge-base seeds use the configured embedding profile', () => {
   for (const path of [
-    'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
     'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
     'web-admin/tests/e2e/ai/knowledge-base-smoke.spec.ts',
   ]) {
@@ -627,12 +608,6 @@ test('deployment-neutral knowledge-base seeds use the configured embedding profi
     assert.doesNotMatch(source, /embeddingProvider:\s*['"]openai['"]/);
     assert.doesNotMatch(source, /embeddingModel:\s*['"]text-embedding-3-small['"]/);
   }
-
-  const aiSeed = read('web-admin/tests/api/setup/seed-showcase-ai.spec.ts');
-  assert.match(aiSeed, /\/api\/ai\/knowledge\/embedding-profiles/);
-  assert.match(aiSeed, /embeddingProfiles\.length[\s\S]*toBeGreaterThan\(0\)/);
-  assert.match(aiSeed, /embeddingProvider\)\.toBe\(expectedProfile\.providerCode\)/);
-  assert.match(aiSeed, /embeddingModel\)\.toBe\(expectedProfile\.defaultModel\)/);
 });
 
 test('Vite prebundles lazy rich-text form dependencies before an operator can type', () => {

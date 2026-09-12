@@ -63,11 +63,6 @@ async function getJson(api, path) {
   return body;
 }
 
-async function dynamicTotal(api, modelCode) {
-  const body = await getJson(api, `/api/dynamic/${modelCode}/list?pageSize=1`);
-  return Number(body?.data?.total ?? 0);
-}
-
 function assertAtLeast(results, label, actual, expected) {
   const ok = actual >= expected;
   results.push({ label, ok, actual, expected });
@@ -112,21 +107,6 @@ export async function main(argv = process.argv.slice(2)) {
     const pluginBody = await getJson(api, '/api/plugins?current=1&size=500');
     const pluginRecords = pluginBody?.data?.records ?? pluginBody?.data?.data ?? pluginBody?.data ?? [];
     assertAtLeast(results, 'installed OSS plugins', pluginRecords.length, expectedPlugins);
-    assertAtLeast(results, 'crm_account_common rows', await dynamicTotal(api, 'crm_account_common'), 20);
-    assertAtLeast(results, 'crm_contact_common rows', await dynamicTotal(api, 'crm_contact_common'), 80);
-    assertAtLeast(results, 'crm_lead_common rows', await dynamicTotal(api, 'crm_lead_common'), 100);
-    assertAtLeast(results, 'crm_opportunity_common rows', await dynamicTotal(api, 'crm_opportunity_common'), 40);
-    assertAtLeast(results, 'crm_activity_common rows', await dynamicTotal(api, 'crm_activity_common'), 300);
-    assertAtLeast(results, 'bpm_process_management rows', await dynamicTotal(api, 'bpm_process_management'), 1);
-    assertAtLeast(results, 'wd_leave_request rows', await dynamicTotal(api, 'wd_leave_request'), 8);
-    assertAtLeast(results, 'wd_leave_balance rows', await dynamicTotal(api, 'wd_leave_balance'), 1);
-
-    const todoBody = await getJson(api, '/api/bpm/tasks/todo?size=100');
-    const workflowTodo = (todoBody?.data ?? []).filter((task) =>
-      String(task?.processDefinitionIdAndVersion ?? '').startsWith('wd_leave_approval'),
-    ).length;
-    assertAtLeast(results, 'workflow-demo pending tasks', workflowTodo, 1);
-
     console.log('[oss-demo-invariants] summary');
     for (const result of results) {
       console.log(`  ok ${result.label}: ${result.actual} >= ${result.expected}`);

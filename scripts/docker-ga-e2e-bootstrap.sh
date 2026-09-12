@@ -13,7 +13,7 @@
 #   ./scripts/docker-ga-e2e-bootstrap.sh                    # e2e plugin profile
 #   PLUGIN_IMPORT_PROFILE=demo ./scripts/docker-ga-e2e-bootstrap.sh
 #   PLUGIN_IMPORT_PROFILE=enterprise-demo PLUGIN_IMPORT_EDITION=enterprise ./scripts/docker-ga-e2e-bootstrap.sh
-#   PLUGINS="showcase workflow-demo" ./scripts/docker-ga-e2e-bootstrap.sh
+#   PLUGINS="showcase test-fixtures" ./scripts/docker-ga-e2e-bootstrap.sh
 
 set -euo pipefail
 

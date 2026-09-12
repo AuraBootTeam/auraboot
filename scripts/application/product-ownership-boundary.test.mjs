@@ -101,6 +101,15 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'plugins/core-bpm',
     'plugins/workflow-demo',
     'web-admin/scripts/seed-workflow-demo.mjs',
+    'web-admin/tests/api/setup/seed-showcase-data.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-extended.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-commercial.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-supplement.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-invariants.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-dashboard-default.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-ownership.spec.ts',
+    'web-admin/tests/helpers/wd-fixtures.ts',
   ]) {
     assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
   }

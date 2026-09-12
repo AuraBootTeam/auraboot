@@ -15,7 +15,7 @@ import type { APIResponse, Browser, Locator, Page } from '@playwright/test';
 import { uniqueId, waitForDynamicPageLoad, waitForFormReady } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const CUSTOMER_FIELD = 'e2et_order_customer';
 const CUSTOMER_CREATE_COMMAND = '/api/meta/commands/execute/e2et:create_customer';

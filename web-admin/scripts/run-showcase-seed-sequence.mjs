@@ -7,31 +7,14 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 export const WEB_ADMIN_ROOT = resolve(scriptDir, '..');
 
 export const PHASES = [
-  ['data', 'tests/api/setup/seed-showcase-data.spec.ts'],
-  ['extended', 'tests/api/setup/seed-showcase-extended.spec.ts'],
   ['workflow', 'tests/api/setup/seed-showcase-workflow.spec.ts'],
-  ['ai', 'tests/api/setup/seed-showcase-ai.spec.ts'],
   ['arsenal', 'tests/api/setup/seed-showcase-arsenal.spec.ts'],
-  ['supplement', 'tests/api/setup/seed-showcase-supplement.spec.ts'],
-  ['commercial', 'tests/api/setup/seed-showcase-commercial.spec.ts'],
-  ['ownership', 'tests/api/setup/seed-showcase-ownership.spec.ts'],
-  ['dashboard-default', 'tests/api/setup/seed-showcase-dashboard-default.spec.ts'],
-  ['invariants', 'tests/api/setup/seed-showcase-invariants.spec.ts'],
 ].map(([name, spec]) => ({ name, spec }));
 
 export const KNOWN_PHASE_NAMES = PHASES.map((phase) => phase.name);
 export const DEFAULT_PHASE_ORDER = [
-  'data',
-  'extended',
   'workflow',
-  'ai',
   'arsenal',
-  'supplement',
-  // Ownership runs after every phase that creates CRM records — it rewrites the
-  // auto-assigned single owner into a real sales-team spread.
-  'ownership',
-  'dashboard-default',
-  'invariants',
 ];
 
 const phaseByName = new Map(PHASES.map((phase) => [phase.name, phase]));
@@ -96,7 +79,7 @@ function parseArgs(argv) {
 function printHelp() {
   console.log(`Usage: node scripts/run-showcase-seed-sequence.mjs [options] [phase...]
 
-Runs showcase seed specs in a deterministic sequence, one Playwright process per
+Runs legacy combined-application seed specs in a deterministic sequence, one Playwright process per
 phase. This avoids Playwright file sorting, grep matching, and accidental
 multi-spec parallelization changing seed dependencies.
 

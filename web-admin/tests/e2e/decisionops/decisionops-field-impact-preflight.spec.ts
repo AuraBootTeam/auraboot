@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Response, type TestInfo } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,

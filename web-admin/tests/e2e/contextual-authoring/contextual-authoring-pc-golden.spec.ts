@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { Client as PgClient } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const SOURCE_PAGE_KEY = 'e2et_record_list';
 const RUNTIME_ONLY_ROLE = 'e2e_contextual_authoring_runtime_only';

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BASE_URL } from '../../helpers/playwright-env';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 // Save/recovery goldens use the canonical E2E DSL page so every case is independently runnable.
 // Menu-to-special-fixture navigation remains covered by contextual-authoring-pc-golden.spec.ts.

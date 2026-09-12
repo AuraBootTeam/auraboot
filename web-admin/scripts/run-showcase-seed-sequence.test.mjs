@@ -12,17 +12,17 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  resolvePhases(['workflow', 'commercial']).map((phase) => phase.spec),
+  resolvePhases(['workflow', 'arsenal']).map((phase) => phase.spec),
   [
     'tests/api/setup/seed-showcase-workflow.spec.ts',
-    'tests/api/setup/seed-showcase-commercial.spec.ts',
+    'tests/api/setup/seed-showcase-arsenal.spec.ts',
   ],
 );
 
 assert.throws(() => resolvePhases(['missing']), /Unknown showcase seed phase "missing"/);
 
 assert.deepEqual(
-  buildPlaywrightArgs(resolvePhases(['data'])[0], {
+  buildPlaywrightArgs(resolvePhases(['arsenal'])[0], {
     config: 'custom.seed.config.ts',
     reporter: 'dot',
     outputPrefix: 'test-results/seed/check',
@@ -30,10 +30,10 @@ assert.deepEqual(
   [
     'playwright',
     'test',
-    'tests/api/setup/seed-showcase-data.spec.ts',
+    'tests/api/setup/seed-showcase-arsenal.spec.ts',
     '--config=custom.seed.config.ts',
     '--reporter=dot',
-    '--output=test-results/seed/check-data',
+    '--output=test-results/seed/check-arsenal',
   ],
 );
 

@@ -54,29 +54,21 @@ test('import required OSS plugins for OSS E2E profile', async ({ request }) => {
   const token = await login(request);
 
   for (const plugin of REQUIRED_OSS_PLUGINS) {
-    const probeMenuCode = 'probeMenuCode' in plugin ? plugin.probeMenuCode : undefined;
-    if (probeMenuCode) {
-      const menusRes = await request.get(`${BACKEND_URL}/api/menu/user`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (menusRes.ok() && (await menusRes.text()).includes(probeMenuCode)) continue;
-    } else {
-      const existingCommandsRes = await request.get(
-        `${BACKEND_URL}/api/meta/commands?modelCode=${encodeURIComponent(plugin.probeModelCode)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+    const existingCommandsRes = await request.get(
+      `${BACKEND_URL}/api/meta/commands?modelCode=${encodeURIComponent(plugin.probeModelCode)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
-      if (existingCommandsRes.ok()) {
-        const existingCommandsBody = (await existingCommandsRes.json()) as {
-          data?: Array<{ code?: string }>;
-        };
-        const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
-        if (commands.some((command) => command?.code === plugin.probeCommandCode)) {
-          continue;
-        }
+      },
+    );
+    if (existingCommandsRes.ok()) {
+      const existingCommandsBody = (await existingCommandsRes.json()) as {
+        data?: Array<{ code?: string }>;
+      };
+      const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
+      if (commands.some((command) => command?.code === plugin.probeCommandCode)) {
+        continue;
       }
     }
 

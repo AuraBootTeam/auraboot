@@ -316,11 +316,6 @@ public class TestSeedController {
                         "../../auraboot/plugins/test-fixtures",
                         "../plugins/test-fixtures"
                 );
-                // Mobile E2E (Android/iOS) targets crm_account_common as the canonical "real" model
-                // (see EndpointRegistryTest in apps/android and EndpointRegistryTests.swift in
-                // apps/ios). The CRM plugin lives in the enterprise overlay; importTestPlugin
-                // safely skips when the directory is absent (OSS-only checkouts).
-                importTestPlugin("../plugins/crm", "crm", tenant.getId());
             } catch (Exception e) {
                 log.warn("test-fixtures plugin install threw exception for tenant {}: {}",
                         tenant.getId(), e.getMessage());

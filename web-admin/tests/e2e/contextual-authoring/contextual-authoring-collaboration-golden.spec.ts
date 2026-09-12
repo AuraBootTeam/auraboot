@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BASE_URL } from '../../helpers/playwright-env';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const SOURCE_PAGE_KEY = 'e2et_record_list';
 const DEFAULT_PASSWORD = DEFAULT_TEST_ACCOUNT.password;

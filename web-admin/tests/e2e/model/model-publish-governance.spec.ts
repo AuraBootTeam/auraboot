@@ -2,7 +2,7 @@ import { test, expect, type APIResponse, type Page, type Request, type TestInfo 
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   createFieldBindingData,
   createFieldData,

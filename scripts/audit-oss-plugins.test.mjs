@@ -34,13 +34,12 @@ function collectValues(value, predicate, matches = []) {
 }
 
 describe('OSS plugin config audit', () => {
-  it('ships one official CRM plugin without legacy starter copies', () => {
-    assert.equal(fs.existsSync(path.join(repoRoot, 'plugins', 'crm', 'plugin.json')), true);
-    for (const legacyPlugin of ['crm-quick-start', 'crm-starter']) {
+  it('does not ship product-owned CRM or BPM plugins', () => {
+    for (const productPlugin of ['crm', 'crm-quick-start', 'crm-starter', 'core-bpm', 'workflow-demo']) {
       assert.equal(
-        fs.existsSync(path.join(repoRoot, 'plugins', legacyPlugin)),
+        fs.existsSync(path.join(repoRoot, 'plugins', productPlugin)),
         false,
-        `${legacyPlugin} must not coexist with the official CRM plugin.`,
+        `${productPlugin} must remain owned by an independent product repository.`,
       );
     }
   });
@@ -133,11 +132,20 @@ describe('OSS plugin config audit', () => {
   it('defines an enterprise-demo isolated-stack profile without OSS demo templates', () => {
     const plugins = readPluginProfile('enterprise-demo');
 
-    for (const forbidden of ['crm-quick-start', 'crm-starter', 'golden-path', 'hr-essentials', 'simple-inventory']) {
+    for (const forbidden of [
+      'crm',
+      'crm-quick-start',
+      'crm-starter',
+      'core-bpm',
+      'workflow-demo',
+      'golden-path',
+      'hr-essentials',
+      'simple-inventory',
+    ]) {
       assert.equal(plugins.includes(forbidden), false, `${forbidden} must not be in enterprise-demo.`);
     }
 
-    for (const required of ['project-management', 'crm', 'product-catalog', 'sales', 'procurement', 'pcba-solution']) {
+    for (const required of ['project-management', 'product-catalog', 'sales', 'procurement', 'pcba-solution']) {
       assert.equal(plugins.includes(required), true, `${required} must be in enterprise-demo.`);
     }
   });
