@@ -183,6 +183,7 @@ function packWebShell(repoRoot, destination, version) {
     });
     for (const file of [
       'application-cli.mjs',
+      'application-artifact-verifier.mjs',
       'application-contract.mjs',
       'application-graph-adapters.mjs',
     ]) {

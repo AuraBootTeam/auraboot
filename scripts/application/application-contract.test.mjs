@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -162,6 +163,33 @@ describe('AuraBoot application contract', () => {
 
     writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
     assert.throws(() => verifyArtifacts(lock, { artifactRoot }), /checksum mismatch/);
+  });
+
+  it('ships a dependency-free release verifier that detects checksum mutation', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'aura-release-verifier-'));
+    const input = catalog();
+    for (const [index, artifact] of input.artifacts.entries()) {
+      artifact.localPath = `${artifact.type}/${index}.bin`;
+      const path = join(artifactRoot, artifact.localPath);
+      mkdirSync(dirname(path), { recursive: true });
+      const bytes = Buffer.from(`${artifact.type}:${artifact.id}@${artifact.version}`);
+      writeFileSync(path, bytes);
+      artifact.digest = sha256(bytes);
+    }
+    const lock = resolveFixture(manifest(), input);
+    const lockPath = join(artifactRoot, 'application.lock');
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+    const verifier = new URL('./application-artifact-verifier.mjs', import.meta.url);
+    const args = [verifier.pathname, '--lock', lockPath, '--artifact-root', artifactRoot];
+
+    const pass = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    assert.equal(pass.status, 0, pass.stderr);
+    assert.match(pass.stdout, /verified 12 staged artifacts/);
+
+    writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
+    const fail = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    assert.notEqual(fail.status, 0);
+    assert.match(fail.stderr, /checksum mismatch/);
   });
 
   it('computes deterministic directory digests and detects nested mutations', () => {
