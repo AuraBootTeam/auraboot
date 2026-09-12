@@ -351,6 +351,7 @@ class AgentRunServiceSyncTest {
                 anyMap());
         // Plan loop must not have started
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -377,6 +378,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
                 any(), argThat(msg -> msg != null && msg.contains("No LLM provider configured")));
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -393,6 +395,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
                 any(), argThat(msg -> msg != null && msg.contains("LLM provider not available: provider-under-test")));
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -415,6 +418,7 @@ class AgentRunServiceSyncTest {
         verify(providerFactory, never()).resolveConfig(any(), anyString());
         verify(providerFactory, never()).getProvider(anyString());
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -442,6 +446,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, never()).countActiveRuns(any(), any(), any());
         verify(providerFactory, never()).resolveConfig(any(), anyString());
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -485,6 +490,18 @@ class AgentRunServiceSyncTest {
                 .contains("preferred-provider");
         verify(providerFactory, never()).getProvider("unrelated-provider");
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
+    }
+
+    @Test
+    void startFactFailureStopsBeforePlanOrToolExecution() {
+        primeHappyPath();
+        org.mockito.Mockito.doThrow(new IllegalStateException("execution fact unavailable"))
+                .when(runLifecycleService).recordExecutionStarted(any(), anyString(), anyString());
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage()).isEqualTo("execution fact unavailable");
+        verifyNoInteractions(planService, stepLoopService);
     }
 
     @Test
@@ -513,6 +530,7 @@ class AgentRunServiceSyncTest {
         assertThat(success.outputTokens()).isEqualTo(45);
         assertThat(success.totalCost()).isEqualTo(0.0123d);
         assertThat(success.runPid()).isNotBlank();
+        verify(runLifecycleService).recordExecutionStarted(TENANT_ID, success.runPid(), TASK_PID);
     }
 
     @Test

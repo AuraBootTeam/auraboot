@@ -83,6 +83,46 @@ class AgentRunTerminalStoreIT {
     private String runStatus() { return jdbc.queryForObject("SELECT run_status FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid); }
     private String taskStatus() { return jdbc.queryForObject("SELECT task_status FROM ab_agent_task WHERE tenant_id=? AND pid=?", String.class, tenant, taskPid); }
     private int events() { return jdbc.queryForObject("SELECT count(*) FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", Integer.class, tenant, runPid); }
+    @Test void admittedExecutionRecordsOneStartAndItsOwnTerminalFact() {
+        lifecycle(new AtomicInteger()).recordExecutionStarted(tenant, runPid, taskPid);
+        store.started(tenant, runPid, taskPid);
+        assertThat(events()).isEqualTo(1);
+        assertThat(jdbc.queryForMap("SELECT event_name, user_id, payload->>'principalType' AS principal FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?",
+                tenant, runPid)).containsEntry("event_name", "agent_execution_started")
+                .containsEntry("user_id", 91L).containsEntry("principal", "human_delegated");
+        store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, () -> {});
+        assertThat(events()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT c.caused_by_event_id = s.event_id FROM ab_behavior_outcome_outbox c JOIN ab_behavior_outcome_outbox s ON s.tenant_id=c.tenant_id AND s.run_id=c.run_id WHERE c.tenant_id=? AND c.run_id=? AND c.event_name='agent_execution_completed' AND s.event_name='agent_execution_started'",
+                Boolean.class, tenant, runPid)).isTrue();
+        assertThat(runStatus()).isEqualTo("success");
+        assertThat(taskStatus()).isEqualTo("done");
+    }
+
+    @Test void queuedOrPendingRunCannotProduceExecutionStart() {
+        for (String state : List.of("queued", "pending", "cancelled")) {
+            data.update("ab_agent_run", Map.of("run_status", state), Map.of("tenant_id", tenant, "pid", runPid));
+            assertThatThrownBy(() -> store.started(tenant, runPid, taskPid))
+                    .hasMessage("Run is not admitted for execution");
+            assertThat(events()).isZero();
+        }
+    }
+
+    @Test void startRejectsWrongTenantAndTask() {
+        assertThatThrownBy(() -> store.started(tenant + 1, runPid, taskPid))
+                .hasMessage("Run/task relationship is unavailable");
+        assertThatThrownBy(() -> store.started(tenant, runPid, "unrelated"))
+                .hasMessage("Run/task relationship is unavailable");
+        assertThat(events()).isZero();
+    }
+
+    @Test void startOutboxFailureRollsBackFactAndLeavesRunUnchanged() {
+        context.getBean(FaultPublisher.class).failNextInsert();
+        assertThatThrownBy(() -> store.started(tenant, runPid, taskPid))
+                .hasMessage("injected after real outbox insert");
+        assertThat(events()).isZero();
+        assertThat(runStatus()).isEqualTo("running");
+    }
+
     @Test void lifecycleCreationCommitsRunAndScopedTaskWithoutInventingStartFact() {
         String attempt = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
         data.update("ab_agent_task", Map.of("task_status", "todo"), Map.of("tenant_id", tenant, "pid", taskPid));

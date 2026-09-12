@@ -690,6 +690,9 @@ public class AgentRunService {
             runSetupUpdate.put("updated_at", LocalDateTime.now());
             dynamicDataMapper.update("ab_agent_run", runSetupUpdate, Map.of("pid", runPid));
 
+            // Admission and setup succeeded; persist the execution fact before plan work.
+            runLifecycleService.recordExecutionStarted(tenantId, runPid, taskPid);
+
             // Generate or load plan
             List<AgentPlanStep> plan;
             int startStep = 0;

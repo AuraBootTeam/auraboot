@@ -51,6 +51,33 @@ public class AgentRunTerminalStore {
         }
     }
 
+    /** Records admission to plan execution, independently from the earlier run-row creation. */
+    @Transactional
+    public void started(Long tenantId, String runPid, String taskPid) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT r.actor_user_id, r.principal_type, r.run_status
+                FROM ab_agent_run r JOIN ab_agent_task t
+                  ON t.pid = r.task_id AND t.tenant_id = r.tenant_id
+                WHERE r.tenant_id = ? AND r.pid = ? AND t.pid = ? AND t.deleted_flag = FALSE
+                FOR UPDATE OF r, t
+                """, tenantId, runPid, taskPid);
+        if (rows.size() != 1) throw new IllegalStateException("Run/task relationship is unavailable");
+        Map<String, Object> row = rows.get(0);
+        if (!"running".equals(row.get("run_status"))) {
+            throw new IllegalStateException("Run is not admitted for execution");
+        }
+        Object actor = row.get("actor_user_id");
+        outcomes.publish(BehaviorOutcomeEvent.builder()
+                .tenantId(tenantId).userId(actor == null ? null : Long.valueOf(actor.toString()))
+                .eventId(UUID.nameUUIDFromBytes((tenantId + ":" + runPid + ":started")
+                        .getBytes(StandardCharsets.UTF_8)).toString())
+                .eventName("agent_execution_started").runId(runPid)
+                .targetType("agent_run").targetKey(runPid)
+                .props(Map.of("taskPid", taskPid, "principalType",
+                        row.get("principal_type") == null ? "unknown" : row.get("principal_type")))
+                .build());
+    }
+
     @Transactional
     public boolean complete(Long tenantId, String runPid, String taskPid,
                             Map<String, Object> runUpdate, Map<String, Object> taskUpdate,
@@ -66,7 +93,11 @@ public class AgentRunTerminalStore {
             throw new IllegalArgumentException("Invalid run/task completion status pair");
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT r.run_status, r.actor_user_id, r.principal_type
+                SELECT r.run_status, r.actor_user_id, r.principal_type,
+                       (SELECT o.event_id FROM ab_behavior_outcome_outbox o
+                        WHERE o.tenant_id = r.tenant_id AND o.run_id = r.pid
+                          AND o.event_name = 'agent_execution_started'
+                        ORDER BY o.id LIMIT 1) AS started_event_id
                 FROM ab_agent_run r JOIN ab_agent_task t
                   ON t.pid = r.task_id AND t.tenant_id = r.tenant_id
                 WHERE r.tenant_id = ? AND r.pid = ? AND t.pid = ?
@@ -93,6 +124,7 @@ public class AgentRunTerminalStore {
         boolean inserted = outcomes.publish(BehaviorOutcomeEvent.builder()
                 .tenantId(tenantId).userId(actorId).eventId(eventId)
                 .eventName("agent_execution_completed").runId(runPid)
+                .causedByEventId((String) row.get("started_event_id"))
                 .targetType("agent_run").targetKey(runPid)
                 .props(Map.of("status", status, "taskPid", taskPid,
                         "principalType", row.get("principal_type") == null ? "unknown" : row.get("principal_type")))

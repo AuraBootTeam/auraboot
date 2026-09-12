@@ -90,6 +90,10 @@ public class RunLifecycleService {
         terminalStore.create(tenantId, runPid, taskPid, run, taskUpdate);
     }
 
+    void recordExecutionStarted(Long tenantId, String runPid, String taskPid) {
+        terminalStore.started(tenantId, runPid, taskPid);
+    }
+
     private String serializeContextEnvelope(ContextEnvelope envelope) {
         try {
             return objectMapper.writeValueAsString(envelope);
