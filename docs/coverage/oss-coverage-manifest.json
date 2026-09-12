@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "35c869e85",
+    "commit": "93d339e6c",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -273,8 +273,7 @@
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
-            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -634,8 +633,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
-            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -5453,10 +5451,6 @@
             "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
             "web-admin/tests/e2e/asset-management/asset-lifecycle.spec.ts",
             "web-admin/tests/e2e/asset-management/asset-management.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-quality-agent-entry.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-quality-agent-write.spec.ts",
             "web-admin/tests/e2e/auth/auth-complete.spec.ts",
             "web-admin/tests/e2e/automation/llm-call-node.spec.ts",
             "web-admin/tests/e2e/community/community-smoke.spec.ts",
