@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReportDsl } from '../types';
+import { ReportQueryError } from './ReportQueryError';
 import { fetchReportData } from './fetchReportData';
 
 type Parameters = Record<string, string>;
@@ -14,19 +15,23 @@ export function useReportQuery(report: ReportDsl | null, enabled = true) {
   const [draft, setDraft] = useState<Parameters>({});
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<'access' | 'parameters' | 'query' | null>(null);
   const generation = useRef(0);
   const run = useCallback(async (definition: ReportDsl, parameters: Parameters) => {
     const request = ++generation.current;
     const snapshot = { ...parameters };
     setLoading(true);
-    setFailed(false);
+    setFailure(null);
     try {
       const data = await fetchReportData(definition, snapshot);
       if (request === generation.current)
         setResult({ report: definition, parameters: snapshot, data });
-    } catch {
-      if (request === generation.current) setFailed(true);
+    } catch (error) {
+      if (request === generation.current) {
+        const kind = error instanceof ReportQueryError ? error.kind : 'query';
+        setFailure(kind);
+        if (kind === 'access') setResult(null);
+      }
     } finally {
       if (request === generation.current) setLoading(false);
     }
@@ -55,7 +60,8 @@ export function useReportQuery(report: ReportDsl | null, enabled = true) {
     setDraft,
     apply,
     loading,
-    failed,
+    failed: failure !== null,
+    failure,
     dataSets: current?.data ?? {},
     appliedParameters: current?.parameters ?? {},
     hasResult: !!current,

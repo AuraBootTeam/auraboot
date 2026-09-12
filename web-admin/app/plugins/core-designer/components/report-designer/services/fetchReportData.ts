@@ -4,6 +4,7 @@
  */
 
 import type { ReportDsl, ReportDataSource } from '../types';
+import { ReportQueryError, requireReportResponse } from './ReportQueryError';
 import { applyReportParameters } from './applyReportParameters';
 
 interface FetchResult {
@@ -47,7 +48,7 @@ async function fetchModelData(ds: ReportDataSource): Promise<Record<string, unkn
   }
 
   const response = await fetch(`/api/dynamic/${ds.modelCode}/list?${params.toString()}`);
-  if (!response.ok) throw new Error(`Failed to fetch model data: ${response.status}`);
+  requireReportResponse(response);
 
   const result: FetchResult = await response.json();
   const code = Number(result.code);
@@ -66,7 +67,7 @@ async function fetchNamedQueryData(ds: ReportDataSource): Promise<Record<string,
   });
 
   const response = await fetch(`/api/datasource/list?${params.toString()}`);
-  if (!response.ok) throw new Error(`Failed to fetch named query data: ${response.status}`);
+  requireReportResponse(response);
 
   const result = await response.json();
   const code = typeof result.code === 'string' ? parseInt(result.code, 10) : result.code;
@@ -81,7 +82,7 @@ async function fetchApiData(ds: ReportDataSource): Promise<Record<string, unknow
   if (!ds.url) throw new Error('API data source requires url');
 
   const response = await fetch(ds.url);
-  if (!response.ok) throw new Error(`Failed to fetch API data: ${response.status}`);
+  requireReportResponse(response);
 
   const result = await response.json();
   if (Array.isArray(result)) return result;
@@ -106,7 +107,13 @@ export async function fetchReportData(
   parameters: Record<string, string> = {},
 ): Promise<Record<string, Record<string, unknown>[]>> {
   const results: Record<string, Record<string, unknown>[]> = {};
-  const entries = Object.entries(applyReportParameters(report, parameters).dataSources);
+  let bound: ReportDsl;
+  try {
+    bound = applyReportParameters(report, parameters);
+  } catch {
+    throw new ReportQueryError('parameters', 'Invalid report parameters');
+  }
+  const entries = Object.entries(bound.dataSources);
 
   const fetches = entries.map(async ([key, ds]) => {
     switch (ds.type) {
@@ -127,6 +134,12 @@ export async function fetchReportData(
     }
   });
 
-  await Promise.all(fetches);
+  const outcomes = await Promise.allSettled(fetches);
+  const failures = outcomes.filter((outcome) => outcome.status === 'rejected');
+  const accessFailure = failures.find(
+    (outcome) => outcome.reason instanceof ReportQueryError && outcome.reason.kind === 'access',
+  );
+  if (accessFailure) throw accessFailure.reason;
+  if (failures.length) throw failures[0].reason;
   return results;
 }

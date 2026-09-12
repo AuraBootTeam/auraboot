@@ -185,6 +185,14 @@ test('report export requires model read permission in addition to artifact permi
         );
       } else {
         await expect(session.page.getByRole('alert')).toContainText('查询未成功');
+        await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+        const retried = session.page.waitForResponse(
+          (response) => response.url().includes('/list?') && response.status() === 403,
+        );
+        await session.page.getByRole('button', { name: '重新查询', exact: true }).click();
+        await retried;
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
         for (const format of ['JSON', 'Excel', 'PDF'])
           await expect(
@@ -373,6 +381,14 @@ test('named-query reports require source and declared resource permissions', asy
         ]);
       } else {
         await expect(session.page.getByRole('alert')).toContainText('查询未成功');
+        await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+        const retried = session.page.waitForResponse(
+          (response) => response.url().includes('/list?') && response.status() === 403,
+        );
+        await session.page.getByRole('button', { name: '重新查询', exact: true }).click();
+        await retried;
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
         for (const format of ['JSON', 'Excel', 'PDF'])
           await expect(

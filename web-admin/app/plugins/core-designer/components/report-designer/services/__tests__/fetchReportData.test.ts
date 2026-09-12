@@ -41,3 +41,31 @@ it('rejects duplicate sort fields before sending a query', async () => {
   await expect(fetchReportData(report)).rejects.toThrow('Invalid report sort fields');
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it.each([401, 403])('preserves access denial for HTTP %s', async (status) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+  const report = createEmptyReport('Protected');
+  report.dataSources = { rows: { type: 'model', modelCode: 'orders' } };
+  await expect(fetchReportData(report)).rejects.toMatchObject({ kind: 'access' });
+});
+
+it('prioritizes a later access denial over another source failure', async () => {
+  let deny!: (value: { ok: boolean; status: number }) => void;
+  const later = new Promise<{ ok: boolean; status: number }>((resolve) => {
+    deny = resolve;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValueOnce({ ok: false, status: 500 }).mockReturnValueOnce(later),
+  );
+  const report = createEmptyReport('Mixed sources');
+  report.dataSources = {
+    first: { type: 'model', modelCode: 'first' },
+    second: { type: 'model', modelCode: 'second' },
+  };
+  const result = fetchReportData(report);
+  const denied = expect(result).rejects.toMatchObject({ kind: 'access' });
+  await Promise.resolve();
+  deny({ ok: false, status: 403 });
+  await denied;
+});

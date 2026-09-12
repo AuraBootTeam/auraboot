@@ -28,12 +28,43 @@ export function ReportQueryControls({ report, query }: { report: ReportDsl; quer
         </p>
       )}
       {query.failed && (
-        <p role="alert" className="mb-3 text-sm text-red-700">
-          {text({
-            zh: '查询未成功，请检查必填参数、格式和访问权限后重新应用。已有结果及下载参数保持不变。',
-            en: 'Query failed. Check required parameters, formats and access, then apply again. Existing results and download parameters are unchanged.',
-          })}
-        </p>
+        <div role="alert" className="mb-3 text-sm text-red-700">
+          <p>
+            {query.failure === 'access'
+              ? text({
+                  zh: '查询未成功：当前账号无权读取报表数据，或登录已失效。请确认登录和访问权限。',
+                  en: 'Query failed: access was denied or your session expired. Check your sign-in and permissions.',
+                })
+              : query.failure === 'parameters'
+                ? text({
+                    zh: '查询未成功：请检查必填参数及输入格式。',
+                    en: 'Query failed: check required parameters and input formats.',
+                  })
+                : text({
+                    zh: '查询未成功，请重试；若持续失败，请联系管理员。',
+                    en: 'Query failed. Retry, or contact your administrator if the problem persists.',
+                  })}
+          </p>
+          <p className="mt-1">
+            {query.hasResult
+              ? text({
+                  zh: '当前显示上次成功查询的结果，下载仍使用该次已应用的参数。',
+                  en: 'Showing the last successful results. Downloads still use their applied parameters.',
+                })
+              : text({
+                  zh: '当前没有可用结果，下载已禁用。',
+                  en: 'No results are available. Downloads are disabled.',
+                })}
+          </p>
+          <button
+            type="button"
+            onClick={query.apply}
+            disabled={query.loading}
+            className="mt-2 rounded border border-current px-3 py-1 disabled:opacity-50"
+          >
+            {text({ zh: '重新查询', en: 'Retry query' })}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ReportQueryError } from '../ReportQueryError';
 import { useReportQuery } from '../useReportQuery';
 import { fetchReportData } from '../fetchReportData';
 import { createEmptyReport } from '../../types';
@@ -60,4 +61,22 @@ describe('report query snapshots', () => {
     expect(result.current.dataSets.rows).toEqual([{ value: 'B' }]);
     expect(result.current.canExport).toBe(true);
   });
+});
+
+it('clears successful data after access denial and restores it only after a successful query', async () => {
+  const report = createEmptyReport('Protected');
+  fetchData.mockResolvedValueOnce({ rows: [{ secret: 'visible' }] });
+  const { result } = renderHook(() => useReportQuery(report));
+  await waitFor(() => expect(result.current.hasResult).toBe(true));
+  fetchData.mockRejectedValueOnce(new ReportQueryError('access', 'denied'));
+  await act(async () => result.current.apply());
+  expect(result.current.failure).toBe('access');
+  expect(result.current.dataSets).toEqual({});
+  expect(result.current.hasResult).toBe(false);
+  expect(result.current.canExport).toBe(false);
+  fetchData.mockResolvedValueOnce({ rows: [{ secret: 'restored' }] });
+  await act(async () => result.current.apply());
+  expect(result.current.failure).toBeNull();
+  expect(result.current.dataSets.rows).toEqual([{ secret: 'restored' }]);
+  expect(result.current.canExport).toBe(true);
 });
