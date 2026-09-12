@@ -7,6 +7,7 @@ const root = resolve(import.meta.dirname, '../..');
 const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-artifacts.mjs'), 'utf8');
 const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env.sh'), 'utf8');
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
+const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
   assert.match(stage, /platform\/gradlew/);
@@ -43,4 +44,13 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
   assert.match(audit, /tablename ~ '\(\^\|_\)\(bpm\|crm\)\(_\|\$\)'/);
   assert.match(audit, /tablename LIKE 'se_%'/);
   assert.match(audit, /tablename LIKE 'ab_sla_%'/);
+});
+
+test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
+  assert.match(oci, /eclipse-temurin:21-jre@sha256:[0-9a-f]{64}/);
+  assert.match(oci, /execFileSync\('container', \['build'/);
+  assert.match(oci, /execFileSync\('container', \['image', 'save'/);
+  assert.match(oci, /'buildx', 'build'/);
+  assert.match(oci, /requires Apple container or Docker buildx/);
+  assert.doesNotMatch(oci, /application payload layer/);
 });

@@ -8,7 +8,7 @@ const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const LINUX_JRE_BASE = 'eclipse-temurin:21-jre@sha256:a80c51f2d09a3e7e00d521f1c817bbceb6b3be94109b4a784d46078099882dda';
 
 function commandExists(command) {
-  return spawnSync('command', ['-v', command], { shell: true, stdio: 'ignore' }).status === 0;
+  return spawnSync('which', [command], { stdio: 'ignore' }).status === 0;
 }
 
 function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
