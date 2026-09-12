@@ -8,7 +8,7 @@
  * fields.json / fields/, pages.json / pages/, bindings.json / bindings/ vary the
  * same way. A reader that knows only one layout silently returns nothing for the
  * other — the failure mode that made check-command-reachability report 19 false
- * positives against workflow-demo (directory pages) on its first run.
+ * positives against plugins that shard pages into a directory.
  *
  * So collect from both, always: `<base>.json` if present, plus every `.json`
  * under `<base>/` if that directory exists. A doc may itself be an array, a

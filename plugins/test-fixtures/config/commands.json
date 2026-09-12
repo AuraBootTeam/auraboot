@@ -713,32 +713,32 @@
     ]
   },
   {
-    "code": "e2et_crm_opp.create",
-    "displayName:zh-CN": "新建商机演示",
-    "displayName:en": "Create Demo Opportunity",
-    "description": "Create a stage-rail fixture opportunity (required name and stage)",
+    "code": "e2et_stage_record.create",
+    "displayName:zh-CN": "新建阶段记录",
+    "displayName:en": "Create Stage Record",
+    "description": "Create a stage-rail fixture record (required name and stage)",
     "type": "create",
-    "modelCode": "e2et_crm_opp",
+    "modelCode": "e2et_stage_record",
     "inputFields": [
-      "e2et_crm_opp_name",
-      "e2et_crm_opp_stage",
-      "e2et_crm_opp_amount"
+      "e2et_stage_record_name",
+      "e2et_stage_record_stage",
+      "e2et_stage_record_amount"
     ],
     "permissions": [
       "e2et.order.manage"
     ]
   },
   {
-    "code": "e2et_crm_opp.update",
-    "displayName:zh-CN": "更新商机演示",
-    "displayName:en": "Update Demo Opportunity",
-    "description": "Update a stage-rail fixture opportunity (drives the edit entry and stage persistence)",
+    "code": "e2et_stage_record.update",
+    "displayName:zh-CN": "更新阶段记录",
+    "displayName:en": "Update Stage Record",
+    "description": "Update a stage-rail fixture record (drives edit and stage persistence)",
     "type": "update",
-    "modelCode": "e2et_crm_opp",
+    "modelCode": "e2et_stage_record",
     "inputFields": [
-      "e2et_crm_opp_name",
-      "e2et_crm_opp_stage",
-      "e2et_crm_opp_amount"
+      "e2et_stage_record_name",
+      "e2et_stage_record_stage",
+      "e2et_stage_record_amount"
     ],
     "permissions": [
       "e2et.order.manage"

@@ -186,14 +186,14 @@
     }
   },
   {
-    "code": "e2et_crm_opp",
+    "code": "e2et_stage_record",
     "displayName:zh-CN": "商机演示",
     "displayName:en": "Demo Opportunity",
     "description": "Minimal opportunity model carrying the verbatim CRM stage-rail block (OSS #1614) so mobile golden tests exercise the real CRM pipeline-stage config without importing the CRM plugin.",
     "modelType": "entity",
     "modelCategory": "document",
     "extension": {
-      "titleField": "e2et_crm_opp_name",
+      "titleField": "e2et_stage_record_name",
       "importPolicy": {
         "enabled": true,
         "modes": [

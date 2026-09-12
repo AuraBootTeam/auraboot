@@ -66,6 +66,7 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'scripts/run-bpm-release-image-gate.sh',
     'scripts/run-wf-e2e.sh',
     'scripts/p1-verify-in-docker.sh',
+    'scripts/dev/run-p0-e2e-docker.sh',
     'scripts/crm-acceptance',
     'web-admin/playwright.bpm-regression.config.ts',
     'web-admin/playwright.workflow-demo.config.ts',
@@ -113,6 +114,11 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
   ]) {
     assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
   }
+});
+
+test('core repository publishing never reconstructs product source trees', () => {
+  const script = readFileSync(resolve(ROOT, 'scripts/publish-repos.sh'), 'utf8');
+  assert.doesNotMatch(script, /plugins\/(?:crm|core-bpm|workflow-demo)/);
 });
 
 test('public source-facade npm exports resolve to typed source files', () => {

@@ -94,7 +94,6 @@
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
 | `dev/rotate-license-keypair.sh` | 0 | 2026-05-09 | Rotate the AuraBoot commercial-license signing keypair. |
 | `dev/run-agent-runtime-backend-gate.sh` | 0 | 2026-07-23 | Focused backend gate for the generic agent runtime architecture. |
-| `dev/run-p0-e2e-docker.sh` | 0 | 2026-05-11 | run-p0-e2e-docker.sh — fully self-contained docker-only validation of the |
 | `dev/xxl-job-true-stack-smoke.sh` | 0 | 2026-06-07 |  |
 | `digital-employee-golden-run.sh` | 0 | 2026-07-23 | digital-employee-golden-run.sh — self-contained browser golden for the digital |
 | `docker-bootstrap.sh` | 0 | 2026-06-08 | docker-bootstrap.sh — Import plugins into an already-running Docker E2E backend. |

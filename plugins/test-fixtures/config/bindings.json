@@ -600,8 +600,8 @@
     }
   },
   {
-    "modelCode": "e2et_crm_opp",
-    "fieldCode": "e2et_crm_opp_name",
+    "modelCode": "e2et_stage_record",
+    "fieldCode": "e2et_stage_record_name",
     "sequence": 1,
     "required": true,
     "visible": true,
@@ -612,8 +612,8 @@
     }
   },
   {
-    "modelCode": "e2et_crm_opp",
-    "fieldCode": "e2et_crm_opp_stage",
+    "modelCode": "e2et_stage_record",
+    "fieldCode": "e2et_stage_record_stage",
     "sequence": 2,
     "required": true,
     "visible": true,
@@ -624,8 +624,8 @@
     }
   },
   {
-    "modelCode": "e2et_crm_opp",
-    "fieldCode": "e2et_crm_opp_amount",
+    "modelCode": "e2et_stage_record",
+    "fieldCode": "e2et_stage_record_amount",
     "sequence": 3,
     "required": false,
     "visible": true,

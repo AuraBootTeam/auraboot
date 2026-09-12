@@ -110,14 +110,9 @@
       "tinv:update_warehouse"
     ],
     "test-fixtures": [
+      "e2et_stage_record.update",
       "e2et:touch_order_noperm",
       "e2eto:create_e2et_order"
-    ],
-    "workflow-demo": [
-      "wd:create_leave_balance",
-      "wd:delete_leave_request",
-      "wd:update_leave_balance",
-      "wd:update_leave_request"
     ]
   }
 }

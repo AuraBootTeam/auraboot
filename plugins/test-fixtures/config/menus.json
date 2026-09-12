@@ -109,18 +109,18 @@
     }
   },
   {
-    "code": "e2et_crm_opp_list",
+    "code": "e2et_stage_record_list",
     "parentCode": "e2et_menu",
     "name:zh-CN": "商机演示",
     "name:en": "Demo Opportunity",
-    "path": "/p/e2et_crm_opp",
+    "path": "/p/e2et_stage_record",
     "component": null,
     "icon": "Flag",
     "type": 1,
     "permissionCode": "e2et.order.read",
     "orderNo": 61,
     "visible": true,
-    "pageKey": "e2et_crm_opp_list",
+    "pageKey": "e2et_stage_record_list",
     "extension": {
       "platforms": [
         "web",
