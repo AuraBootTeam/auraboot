@@ -9,6 +9,8 @@ import com.auraboot.framework.application.bootstrap.PlatformSeedService;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.scheduler.service.SchedulerEngine;
+import com.auraboot.framework.scheduler.service.impl.SystemTaskInitializer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -22,6 +24,8 @@ class BootstrapControllerExplicitSeedTest {
     @Mock private BootstrapEngineService bootstrapEngineService;
     @Mock private SystemConfigService systemConfigService;
     @Mock private PlatformSeedService platformSeedService;
+    @Mock private SystemTaskInitializer systemTaskInitializer;
+    @Mock private SchedulerEngine schedulerEngine;
 
     @InjectMocks private BootstrapController controller;
 
@@ -34,9 +38,12 @@ class BootstrapControllerExplicitSeedTest {
 
         controller.setup(request);
 
-        InOrder order = inOrder(platformSeedService, bootstrapEngineService);
+        InOrder order = inOrder(platformSeedService, bootstrapEngineService,
+                systemTaskInitializer, schedulerEngine);
         order.verify(platformSeedService).seed();
         order.verify(bootstrapEngineService).execute(request);
+        order.verify(systemTaskInitializer).initializeSystemTasks();
+        order.verify(schedulerEngine).reload();
     }
 
     @Test
@@ -48,5 +55,21 @@ class BootstrapControllerExplicitSeedTest {
 
         verify(platformSeedService, never()).seed();
         verify(bootstrapEngineService, never()).execute(request);
+        verify(systemTaskInitializer, never()).initializeSystemTasks();
+        verify(schedulerEngine, never()).reload();
+    }
+
+    @Test
+    void setupDoesNotInitializeTasksWhenBootstrapFails() {
+        BootstrapRequest request = new BootstrapRequest();
+        when(systemConfigService.isInitialized()).thenReturn(false);
+        when(bootstrapEngineService.execute(request))
+                .thenReturn(BootstrapEngineService.BootstrapResult.failure("failed"));
+
+        controller.setup(request);
+
+        verify(platformSeedService).seed();
+        verify(systemTaskInitializer, never()).initializeSystemTasks();
+        verify(schedulerEngine, never()).reload();
     }
 }

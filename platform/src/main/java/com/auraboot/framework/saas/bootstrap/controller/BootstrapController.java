@@ -9,6 +9,8 @@ import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapStatusResponse;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.BootstrapStatus;
+import com.auraboot.framework.scheduler.service.SchedulerEngine;
+import com.auraboot.framework.scheduler.service.impl.SystemTaskInitializer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,6 +36,8 @@ public class BootstrapController {
     private final BootstrapEngineService bootstrapEngineService;
     private final SystemConfigService systemConfigService;
     private final PlatformSeedService platformSeedService;
+    private final SystemTaskInitializer systemTaskInitializer;
+    private final SchedulerEngine schedulerEngine;
 
     @GetMapping("/status")
     public ApiResponse<BootstrapStatusResponse> getStatus() {
@@ -58,6 +62,8 @@ public class BootstrapController {
         platformSeedService.seed();
         var result = bootstrapEngineService.execute(request);
         if (result.success()) {
+            systemTaskInitializer.initializeSystemTasks();
+            schedulerEngine.reload();
             return ApiResponse.success(Map.of(
                     "success", true,
                     "tenantId", result.tenantId()
