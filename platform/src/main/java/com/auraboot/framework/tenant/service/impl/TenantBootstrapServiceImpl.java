@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.common.util.LogSanitizer;
+import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.permission.enums.RolePermissionTemplate;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
@@ -91,6 +92,9 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             
             // 1. 加载模板
             TenantBootstrapTemplate template = loadTemplate("default-bootstrap");
+            if (ApplicationMode.isCoreOnly()) {
+                removeProductOwnedEntries(template);
+            }
             log.info("模板加载成功: {}", logSafe(template.getName()));
             
             // 2. 验证模板
@@ -150,6 +154,61 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             // 清理并恢复MetaContext
             cleanupMetaContext(previousContext);
         }
+    }
+
+    /**
+     * Product permissions and routes stay in the product application artifacts. The source
+     * bootstrap template remains backwards compatible for the full composition, while a
+     * core-only process gets a deterministic projection without BPM/CRM ownership.
+     */
+    static void removeProductOwnedEntries(TenantBootstrapTemplate template) {
+        if (template.getPermissions() != null) {
+            template.setPermissions(template.getPermissions().stream()
+                .filter(permission -> !hasProductPrefix(permission.getCode()))
+                .toList());
+        }
+        if (template.getMenus() != null) {
+            template.setMenus(template.getMenus().stream()
+                .filter(menu -> !hasProductSignal(
+                    menu.getCode(), menu.getParentCode(), menu.getPath(),
+                    menu.getComponent(), menu.getPermissionCode()))
+                .toList());
+        }
+        if (template.getRolePermissionBindings() != null) {
+            for (com.auraboot.framework.tenant.dto.bootstrap.RolePermissionBinding binding
+                    : template.getRolePermissionBindings()) {
+                if (binding.getPermissionCodes() != null) {
+                    binding.setPermissionCodes(binding.getPermissionCodes().stream()
+                        .filter(code -> "*".equals(code) || !hasProductPrefix(code))
+                        .toList());
+                }
+            }
+        }
+    }
+
+    private static boolean hasProductPrefix(String value) {
+        if (value == null) {
+            return false;
+        }
+        String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+        return normalized.startsWith("bpm.")
+            || normalized.startsWith("crm.")
+            || normalized.startsWith("smartengine.");
+    }
+
+    private static boolean hasProductSignal(String... values) {
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String normalized = value.toLowerCase(java.util.Locale.ROOT);
+            if (normalized.contains("bpm")
+                    || normalized.contains("crm")
+                    || normalized.contains("smartengine")) {
+                return true;
+            }
+        }
+        return false;
     }
     
     @Override

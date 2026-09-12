@@ -274,4 +274,36 @@ class TenantBootstrapServiceImplTest {
 
         assertThrows(TemplateParseException.class, () -> service.loadTemplate("broken"));
     }
+
+    @Test
+    @DisplayName("core-only projection removes product permissions and explicit bindings")
+    void coreOnlyProjectionRemovesProductEntries() {
+        TenantBootstrapTemplate template = baseTemplate();
+        PermissionTemplate corePermission = new PermissionTemplate();
+        corePermission.setCode("meta.model.read");
+        PermissionTemplate bpmPermission = new PermissionTemplate();
+        bpmPermission.setCode("bpm.process.read");
+        PermissionTemplate crmPermission = new PermissionTemplate();
+        crmPermission.setCode("crm.customer.read");
+        template.setPermissions(new ArrayList<>(List.of(corePermission, bpmPermission, crmPermission)));
+
+        RolePermissionBinding memberBinding = new RolePermissionBinding();
+        memberBinding.setRoleCode("member");
+        memberBinding.setPermissionCodes(new ArrayList<>(List.of(
+                "meta.model.read", "bpm.process.read", "crm.customer.read")));
+        template.setRolePermissionBindings(new ArrayList<>(List.of(
+                template.getRolePermissionBindings().get(0), memberBinding)));
+
+        MenuTemplate bpmMenu = menuTpl("bpm.tasks", "Tasks", 1, "/bpm/tasks");
+        template.setMenus(new ArrayList<>(List.of(bpmMenu)));
+
+        TenantBootstrapServiceImpl.removeProductOwnedEntries(template);
+
+        assertEquals(List.of("meta.model.read"),
+                template.getPermissions().stream().map(PermissionTemplate::getCode).toList());
+        assertEquals(List.of("*"), template.getRolePermissionBindings().get(0).getPermissionCodes());
+        assertEquals(List.of("meta.model.read"),
+                template.getRolePermissionBindings().get(1).getPermissionCodes());
+        assertEquals(List.of(), template.getMenus());
+    }
 }

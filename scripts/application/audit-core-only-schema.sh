@@ -51,7 +51,12 @@ BEGIN
     SELECT tablename
     FROM pg_tables
     WHERE schemaname = 'public'
-      AND tablename <> 'ab_flyway_schema_history'
+      AND tablename NOT IN (
+        'ab_flyway_schema_history',
+        -- Operational provenance may legitimately contain an artifact path whose
+        -- directory name mentions the extraction project. It is not product data.
+        'ab_plugin_import_history'
+      )
     ORDER BY tablename
   LOOP
     EXECUTE format(
