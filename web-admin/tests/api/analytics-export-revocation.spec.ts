@@ -168,3 +168,81 @@ for (const boundary of ['resource', 'root'] as const) {
     }
   });
 }
+
+test('SQL and field edits invalidate old files and change new export content', async ({
+  request,
+}) => {
+  const code = `export_edit_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
+  const fixture = await request.post('/api/dynamic/e2et_order/create', {
+    data: {
+      e2et_order_title: code,
+      e2et_order_type: 'normal',
+      e2et_order_urgent: false,
+      e2et_order_status: 'draft',
+    },
+  });
+  expect(fixture.status(), await fixture.text()).toBe(200);
+  const fixturePid = (await fixture.json()).data.pid;
+  const fromSql = 'SELECT pid, e2et_order_title FROM mt_e2et_order WHERE pid = #{params.rootPid}';
+  const created = await request.post('/api/meta/named-queries', {
+    data: {
+      code,
+      title: 'Export definition edits',
+      status: 'draft',
+      fromSql,
+      fields: [
+        { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
+      ],
+    },
+  });
+  expect(created.status(), await created.text()).toBe(200);
+  const queryPid = (await created.json()).data.pid;
+  const exportFile = async (expected: string) => {
+    const response = await request.post(`/api/meta/named-queries/${code}/export-data`, {
+      data: { format: 'CSV', parameters: { rootPid: fixturePid, marker: code } },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    expect((await response.json()).data.recordCount).toBe(1);
+    const url = (await response.json()).data.downloadUrl;
+    const download = await request.get(url);
+    expect(download.status(), await download.text()).toBe(200);
+    const lines = (await download.text())
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split(/\r?\n/);
+    expect(lines).toHaveLength(2);
+    expect(lines[1].replace(/^"|"$/g, '')).toBe(expected);
+    return url;
+  };
+  const original = await exportFile(fixturePid);
+  const revisedSql = `${fromSql} AND e2et_order_title = #{params.marker}`;
+  const sqlUpdate = await request.put(`/api/meta/named-queries/${queryPid}`, {
+    data: { fromSql: revisedSql },
+  });
+  expect(sqlUpdate.status(), await sqlUpdate.text()).toBe(200);
+  const saved = await request.get(`/api/meta/named-queries/${queryPid}`);
+  expect(saved.status()).toBe(200);
+  expect((await saved.json()).data.fromSql).toBe(revisedSql);
+  const staleSql = await request.get(original);
+  expect(staleSql.status(), await staleSql.text()).toBe(403);
+  expect(await staleSql.text()).toContain('Export query definition has changed');
+  const afterSql = await exportFile(fixturePid);
+  const fieldUpdate = await request.put(`/api/meta/named-queries/${code}/fields/record_key`, {
+    data: {
+      fieldCode: 'record_key',
+      columnExpr: 'e2et_order_title',
+      dataType: 'string',
+      operators: ['eq'],
+    },
+  });
+  expect(fieldUpdate.status(), await fieldUpdate.text()).toBe(200);
+  const fields = await request.get(`/api/meta/named-queries/${code}/fields`);
+  expect(fields.status()).toBe(200);
+  expect(
+    (await fields.json()).data.find((field: any) => field.fieldCode === 'record_key').columnExpr,
+  ).toBe('e2et_order_title');
+  const staleField = await request.get(afterSql);
+  expect(staleField.status(), await staleField.text()).toBe(403);
+  expect(await staleField.text()).toContain('Export query definition has changed');
+  await exportFile(code);
+});
