@@ -186,6 +186,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
                         pa.message() != null ? pa.message() : "Approval required",
                         input,
                         approvalPid);
+                sink.onDone("", null);
                 yield new TurnOutcome.PendingConfirmation(
                         approvalPid,
                         pa.message() != null ? pa.message() : "Approval required",

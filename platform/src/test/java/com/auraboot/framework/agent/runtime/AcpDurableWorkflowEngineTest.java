@@ -58,4 +58,20 @@ class AcpDurableWorkflowEngineTest {
         verify(emitter).complete();
         verify(emitter, never()).completeWithError(any());
     }
+    @Test
+    void pendingApprovalClosesSseWhilePreservingPendingOutcome() {
+        var runs = mock(AgentRunService.class);
+        var context = mock(TurnContext.class);
+        when(context.tenantId()).thenReturn(7L);
+        when(runs.executeTaskSync(7L, "task", "aurabot", "run"))
+                .thenReturn(new RunOutcome.PendingApproval("run", "approval", "Review action"));
+        var mapper = new ObjectMapper();
+        var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), mapper);
+        var emitter = mock(SseEmitter.class);
+        var outcome = engine.resumeConversationRun(context, "task", "run", new SseResponseSink(emitter, mapper));
+        assertThat(outcome).isInstanceOf(TurnOutcome.PendingConfirmation.class);
+        verify(emitter).complete();
+        verify(emitter, never()).completeWithError(any());
+    }
+
 }
