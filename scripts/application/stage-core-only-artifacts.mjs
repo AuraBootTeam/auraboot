@@ -177,6 +177,26 @@ function packWebShell(repoRoot, destination, version) {
       filter: (candidate) => isWebShellPublishableSource(candidate)
         && !/(?:^|\/)dist(?:\/|$)/.test(candidate),
     });
+    for (const file of [
+      'application-cli.mjs',
+      'application-contract.mjs',
+      'application-graph-adapters.mjs',
+    ]) {
+      copyArtifact(
+        resolve(repoRoot, 'scripts/application', file),
+        resolve(packageRoot, 'scripts/application', file),
+      );
+    }
+    for (const file of [
+      'application-lock.schema.json',
+      'application-manifest.schema.json',
+      'web-contribution.schema.json',
+    ]) {
+      copyArtifact(
+        resolve(repoRoot, 'distribution/application', file),
+        resolve(packageRoot, 'distribution/application', file),
+      );
+    }
     copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(packageRoot, 'pnpm-lock.yaml'));
     copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
     const rootManifest = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
@@ -197,7 +217,9 @@ function packWebShell(repoRoot, destination, version) {
         'LICENSE.txt',
         'pnpm-lock.yaml',
         'pnpm-workspace.yaml',
+        'distribution',
         'packages',
+        'scripts',
         'web-admin',
       ],
     }, null, 2)}\n`);
