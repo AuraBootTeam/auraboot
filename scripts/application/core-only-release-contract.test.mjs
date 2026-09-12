@@ -43,6 +43,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /"evidenceRoot": evidence_root/);
   assert.match(productImageGate, /"database": \{"engine": "PostgreSQL"/);
   assert.match(productImageGate, /"lifecycle": "ephemeral-ci"/);
+  assert.match(productImageGate, /create-release-screenshot-manifest\.mjs/);
+  assert.match(productImageGate, /AURA_RELEASE_SCREENSHOT_IDS/);
   assert.doesNotMatch(productImageGate, /\bcontainer\s+(?:build|run|image)/);
 });
 

@@ -15,6 +15,7 @@ need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 : "${AURA_PRODUCT_MIGRATION_OWNER:?AURA_PRODUCT_MIGRATION_OWNER is required}"
 : "${AURA_PRODUCT_IMAGE_LAYOUT:?AURA_PRODUCT_IMAGE_LAYOUT is required}"
 : "${AURA_PRODUCT_LIFECYCLE:?AURA_PRODUCT_LIFECYCLE is required}"
+: "${AURA_RELEASE_SCREENSHOT_IDS:?AURA_RELEASE_SCREENSHOT_IDS is required}"
 : "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required}"
 : "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required}"
 : "${AURA_RELEASE_REGISTRY_PASSWORD_FILE:?AURA_RELEASE_REGISTRY_PASSWORD_FILE is required}"
@@ -213,6 +214,12 @@ env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_
   PW_ARTIFACT_DIR="$ARTIFACTS/e2e/artifacts" PW_RESULTS_JSON="$ARTIFACTS/e2e/results.json" \
   pnpm --dir "$PRODUCT_ROOT" exec playwright test --config playwright.release.config.ts \
   >"$ARTIFACTS/logs/playwright.log" 2>&1 || fail 'release-image browser journey failed'
+node "$CORE_ROOT/scripts/application/create-release-screenshot-manifest.mjs" \
+  --root "$ARTIFACTS/e2e/artifacts" --output "$ARTIFACTS/e2e/screenshot-manifest.json" \
+  --required "$AURA_RELEASE_SCREENSHOT_IDS" --product "$AURA_PRODUCT_ID" \
+  --core-commit "$CORE_SHA" --product-commit "$PRODUCT_SHA" --image-digest "$IMAGE_ID" \
+  >"$ARTIFACTS/logs/screenshot-manifest.log" 2>&1 \
+  || fail 'required release screenshots are incomplete or invalid'
 
 REGISTRY_HOST="${AURA_RELEASE_REGISTRY%%/*}"
 REGISTRY_REPOSITORY="${AURA_RELEASE_REGISTRY%/}/$AURA_PRODUCT_ID"
@@ -260,6 +267,7 @@ receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
                        "lifecycle": "ephemeral-ci"},
            "evidenceRoot": evidence_root,
            "browserResults": "e2e/results.json",
+           "screenshotManifest": "e2e/screenshot-manifest.json",
            "logsRoot": "logs",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
 if fixture_path:
