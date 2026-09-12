@@ -98,7 +98,8 @@ public class AuraBotController {
                         request.getClientMsgId(),             // Phase B.1: dedup key
                         request.getMessage(),
                         null,                                 // pageContext — carried in legacyRequest
-                        null,                                 // options — carried in legacyRequest
+                        request.getOptions() == null ? null : objectMapper.convertValue(
+                                request.getOptions(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}),
                         InboundMode.NEW_FROM_REQUEST,
                         null,                                 // precomputedBucket — Phase B+
                         null,                                 // inboundMessageId — D.1: only set when EXISTING_MESSAGE_ID
