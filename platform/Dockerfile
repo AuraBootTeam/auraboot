@@ -45,19 +45,16 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 # Copy source code
 COPY platform/src ./src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
-COPY plugins/crm/backend plugins/crm/backend
 
 # Copy vendor dependencies if present (use glob pattern to make optional)
 COPY platform/vendor* ./vendor/
 
-# Build the application and the official CRM command-handler JAR. The CRM
-# configuration is imported from /app/plugins, while PF4J must load its handler
-# extensions from /app/pf4j-plugins before import-time command validation runs.
+# Build the platform application only. Product PF4J JARs are supplied by the
+# independently versioned application image and never compiled into Core.
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
-    ./gradlew :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test && \
-    ./gradlew -p plugins/crm/backend jar --no-daemon -x test
+    ./gradlew :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
@@ -78,7 +75,6 @@ RUN mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts /app/pf4j-p
 # Copy built executable boot JAR from builder (bootJar carries the 'boot' classifier;
 # the plain library jar also lands in build/libs, so glob the boot jar explicitly)
 COPY --from=builder --chown=appuser:appuser /app/build/libs/*-boot.jar app.jar
-COPY --from=builder --chown=appuser:appuser /app/plugins/crm/backend/build/libs/crm-plugin-*.jar /app/pf4j-plugins/
 
 # Bake the public plugins into the image so a pure `docker pull` needs no repo
 # checkout. quickstart.sh imports them from /app/plugins (AURA_BUILTIN_PLUGINS_DIR).

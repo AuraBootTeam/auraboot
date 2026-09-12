@@ -148,25 +148,25 @@ test("CLI accepts an explicit independent root and emits a shell-safe TSV contra
 
 test("keeps OSS root precedence and de-duplicates profile plus explicit selections", (t) => {
   const { repoRoot, extraRoot } = fixture(t);
-  addPlugin(path.join(repoRoot, "plugins"), "crm", {
+  addPlugin(path.join(repoRoot, "plugins"), "commerce", {
     pluginType: "hybrid",
-    backend: { jarPath: "backend/build/libs/oss-crm-plugin.jar" },
+    backend: { jarPath: "backend/build/libs/oss-commerce-plugin.jar" },
   });
-  addPlugin(extraRoot, "crm", {
+  addPlugin(extraRoot, "commerce", {
     pluginType: "hybrid",
-    backend: { jarPath: "backend/build/libs/external-crm-plugin.jar" },
+    backend: { jarPath: "backend/build/libs/external-commerce-plugin.jar" },
   });
 
   const result = resolvePluginBackends({
     repoRoot,
     profile: "none",
     extraPluginRoots: [extraRoot],
-    plugins: ["crm", "crm"],
+    plugins: ["commerce", "commerce"],
   });
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].pluginDir, path.join(repoRoot, "plugins/crm"));
-  assert.match(result[0].jarPath, /oss-crm-plugin\.jar$/);
+  assert.equal(result[0].pluginDir, path.join(repoRoot, "plugins/commerce"));
+  assert.match(result[0].jarPath, /oss-commerce-plugin\.jar$/);
 });
 
 test("fails closed when a backend jar path escapes or lacks a build boundary", (t) => {

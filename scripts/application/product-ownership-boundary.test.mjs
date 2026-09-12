@@ -79,7 +79,9 @@ test('core production graph contains no product tables or product-owned HTTP rou
 
 test('core build declares no SmartEngine, Drools or KIE artifact dependency', () => {
   const build = readFileSync(resolve(ROOT, 'platform/build.gradle'), 'utf8');
+  const dockerfile = readFileSync(resolve(ROOT, 'platform/Dockerfile'), 'utf8');
   assert.doesNotMatch(build, /com\.auraboot\.smart\.framework|org\.drools|org\.kie|kie-/i);
+  assert.doesNotMatch(dockerfile, /plugins\/(?:crm|core-bpm)|(?:crm|bpm)-plugin/i);
 });
 
 test('core exposes no legacy BPM or CRM product test and release fallback', () => {
