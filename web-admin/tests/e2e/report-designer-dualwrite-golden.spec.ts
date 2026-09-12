@@ -397,3 +397,117 @@ test('report export API applies declared model parameters and rejects missing re
   const stored = await page.request.get(`/api/report-definitions/${pid}`);
   expect((await stored.json()).data.dsl).toEqual(dsl);
 });
+
+test('report exports all 201 matching records and rejects an undersized export limit', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const { executeCommandViaApi } = await import('./helpers');
+  const title = `ReportRows${Date.now()}`;
+  const titles = Array.from({ length: 201 }, (_, i) => `${title}-${String(i).padStart(3, '0')}`);
+  for (let offset = 0; offset < titles.length; offset += 4) {
+    await Promise.all(
+      titles.slice(offset, offset + 4).map(async (orderTitle) => {
+        const created = await executeCommandViaApi(
+          page,
+          'e2et:create_order',
+          {
+            e2et_order_title: orderTitle,
+            e2et_order_type: 'normal',
+            e2et_order_customer: title,
+            e2et_order_urgent: false,
+          },
+          undefined,
+          'create',
+        );
+        expect(created.code).toBe('0');
+        expect(created.recordId).toBeTruthy();
+      }),
+    );
+  }
+  const dsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: {
+      orders: {
+        type: 'model',
+        modelCode: 'e2et_order',
+        filters: [{ field: 'e2et_order_customer', operator: 'EQ', value: title }],
+      },
+    },
+    body: [
+      {
+        id: 'orders',
+        blockType: 'table',
+        title: 'Orders',
+        dataSource: 'orders',
+        showHeader: true,
+        columns: [{ field: 'e2et_order_title', label: 'Title' }],
+      },
+    ],
+  };
+  const created = await page.request.post('/api/report-definitions', {
+    data: { code: title.toLowerCase(), title, profile: 'paged-media', dsl },
+  });
+  expect(created.status()).toBe(200);
+  const { pid } = (await created.json()).data;
+  await page.goto('/home');
+  await page.locator('a[href="/p/c/report_management"]').first().click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: title })
+    .getByRole('button', { name: /打开|Open/ })
+    .click();
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByRole('cell', { name: new RegExp(`^${title}-`) })).toHaveCount(201);
+  const downloads: Record<string, string> = {};
+  for (const format of ['JSON', 'Excel', 'PDF']) {
+    const event = page.waitForEvent('download');
+    await page.getByRole('button', { name: `Export ${format}`, exact: true }).click();
+    const artifact = await event;
+    downloads[format] =
+      `${process.env.AURA_EVIDENCE_DIR}/report-201.${format === 'Excel' ? 'xlsx' : format.toLowerCase()}`;
+    await artifact.saveAs(downloads[format]);
+  }
+  const json = JSON.parse(await readFile(downloads.JSON, 'utf8'));
+  expect(
+    json.dataSets.orders.map((row: { e2et_order_title: string }) => row.e2et_order_title).sort(),
+  ).toEqual(titles);
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(await readFile(downloads.Excel), { type: 'buffer' });
+  const rows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Orders, { header: 1 });
+  expect(
+    rows
+      .slice(2)
+      .map((row) => row[0])
+      .sort(),
+  ).toEqual(titles);
+  await writeFile(
+    `${process.env.AURA_EVIDENCE_DIR}/report-201-expected.json`,
+    JSON.stringify(titles),
+  );
+  const limited = await page.request.put(`/api/report-definitions/${pid}`, {
+    data: {
+      title,
+      profile: 'paged-media',
+      dsl: {
+        ...dsl,
+        dataSources: { orders: { ...dsl.dataSources.orders, maxItems: 200 } },
+      },
+    },
+  });
+  expect(limited.status()).toBe(200);
+  for (const format of ['json', 'excel', 'pdf']) {
+    const response = await page.request.post(`/api/reports/export/${format}`, {
+      data: { reportPid: pid },
+    });
+    expect(response.status()).toBe(422);
+    expect(await response.text()).toContain('exceeds the export limit of 200');
+  }
+});

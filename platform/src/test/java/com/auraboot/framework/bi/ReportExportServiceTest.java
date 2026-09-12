@@ -855,6 +855,42 @@ class ReportExportServiceTest {
         return dsl;
     }
 
+    @Test
+    void exportJson_includesRowsBeyondTheFormerDefaultLimit() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "All rows", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders")), "body", List.of())));
+        when(reportStorageService.findByPid("full-rows")).thenReturn(report);
+        List<Map<String, Object>> rows = java.util.stream.IntStream.range(0, 201)
+                .mapToObj(index -> Map.<String, Object>of("title", "row-" + index)).toList();
+        when(dynamicDataService.list(eq("orders"), any())).thenReturn(PaginationResult.of(rows, 201L, 1, 1000));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("full-rows");
+        var payload = new ObjectMapper().readTree(reportExportService.exportJson(request).getBytes());
+        assertThat(payload.path("dataSets").path("rows").size()).isEqualTo(201);
+        assertThat(payload.path("dataSets").path("rows").get(200).path("title").asText()).isEqualTo("row-200");
+        ArgumentCaptor<DynamicQueryRequest> captured = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("orders"), captured.capture());
+        assertThat(captured.getValue().getPageSize()).isEqualTo(1000);
+    }
+
+    @Test
+    void exportsRejectTruncatedResultsInsteadOfProducingPartialFiles() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Limited", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders", "maxItems", 2)), "body", List.of())));
+        when(reportStorageService.findByPid("limited")).thenReturn(report);
+        when(dynamicDataService.list(eq("orders"), any())).thenReturn(PaginationResult.of(
+                List.of(Map.of("title", "first"), Map.of("title", "second")), 3L, 1, 2));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("limited");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+    }
+
     private Map<String, Object> nonStaticDataSourceReportDsl() {
         Map<String, Object> modelDataSource = new LinkedHashMap<>();
         modelDataSource.put("type", "model");

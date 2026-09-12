@@ -90,7 +90,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String DATA_SOURCE_TABLE = "table";
     private static final String DATA_SOURCE_NAMED_QUERY = "namedQuery";
     private static final String DATA_SOURCE_API = "api";
-    private static final int DEFAULT_EXPORT_ROW_LIMIT = 200;
+    private static final int DEFAULT_EXPORT_ROW_LIMIT = 1000;
     private static final int MAX_EXPORT_ROW_LIMIT = 1000;
     private static final Set<String> CANONICAL_API_DATA_SOURCE_ENDPOINTS = Set.of(
             "/api/datasource/list",
@@ -732,7 +732,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                 .extraParams(removeControlParams(params))
                 .build();
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
-        return result == null ? List.of() : normalizeRows(result.getRecords());
+        return completeExportRows(result, resolveRowLimit(dataSource, params));
     }
 
     private List<Map<String, Object>> resolveNamedQueryRows(String queryCode,
@@ -749,7 +749,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         request.setExecuteQuery(true);
         request.setParameters(removeControlParams(params));
         PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryCode, request);
-        return result == null ? List.of() : normalizeRows(result.getRecords());
+        return completeExportRows(result, resolveRowLimit(dataSource, params));
     }
 
     private List<Map<String, Object>> resolveApiRows(Map<String, Object> dataSource) {
@@ -840,6 +840,24 @@ public class ReportExportServiceImpl implements ReportExportService {
         return objectMapper.convertValue(binding, QueryCondition.class);
     }
 
+    private List<Map<String, Object>> completeExportRows(
+            PaginationResult<Map<String, Object>> result, int limit) {
+        if (result == null || result.getTotal() == null || result.getRecords() == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report query did not provide a complete result count");
+        }
+        if (result.getTotal() > limit) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report result exceeds the export limit of " + limit + " rows. Narrow the report filters.");
+        }
+        List<Map<String, Object>> rows = normalizeRows(result.getRecords());
+        if (result.getTotal() != rows.size()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report query returned incomplete rows. Export was cancelled.");
+        }
+        return rows;
+    }
+
     private int resolveRowLimit(Map<String, Object> dataSource, Map<String, Object> params) {
         Object rawLimit = firstPresent(dataSource, "maxItems", "limit", "pageSize", "size");
         if (rawLimit == null && params != null) {
@@ -850,7 +868,11 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
         try {
             int parsed = Integer.parseInt(rawLimit.toString());
-            return Math.max(1, Math.min(parsed, MAX_EXPORT_ROW_LIMIT));
+            if (parsed < 1 || parsed > MAX_EXPORT_ROW_LIMIT) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Report row limit must be between 1 and " + MAX_EXPORT_ROW_LIMIT);
+            }
+            return parsed;
         } catch (NumberFormatException e) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Report dataSource row limit must be a number");

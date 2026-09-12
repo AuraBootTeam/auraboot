@@ -460,8 +460,8 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
       <ReportQueryControls report={report} query={query} />
       <p className="mb-4 text-sm text-gray-500">
         {text({
-          zh: '模型和命名查询数据源最多预览 500 行；下载请使用服务端导出。',
-          en: 'Model and named-query sources preview up to 500 rows. Use server export to download.',
+          zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',
+          en: 'Model and named-query sources preview up to 500 rows and export up to 1000 rows. Narrow filters for larger results.',
         })}
       </p>
       {report.header && (
