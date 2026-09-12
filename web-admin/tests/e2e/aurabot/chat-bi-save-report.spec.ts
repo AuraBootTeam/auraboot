@@ -8,6 +8,7 @@ import { PG_CONN } from '../../helpers/environments';
 test.use({
   storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
   locale: 'zh-CN',
+  viewport: { width: 1440, height: 1000 },
 });
 
 test('AuraBot analysis saves an executable report and reopens its data', async ({ page }) => {
@@ -17,7 +18,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     if (message.type() === 'error') console.log('[analytics-console-error]', message.text());
   });
   const funnelFrom = new Date().toISOString();
-  const title = `Analytics fixture ${Date.now()}`;
+  const title = `订单分析验证 ${Date.now()}`;
   const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
     data: {
       e2et_order_title: title,
@@ -28,7 +29,6 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   });
   expect(fixture.status()).toBe(200);
   expect(String((await fixture.json()).code)).toMatch(/^(0|200)$/);
-  await page.addInitScript(() => localStorage.removeItem('aurabot:last-conversation-id'));
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
@@ -37,6 +37,20 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   const panel = page.getByTestId('aurabot-panel');
   if (!(await panel.isVisible())) await page.getByTestId('ai-panel-toggle').click();
   await expect(panel).toBeVisible();
+  await panel.getByTestId('aurabot-history-trigger').click();
+  await panel.getByTestId('aurabot-new-session').click();
+  await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
+  const matrix = JSON.parse(
+    await readFile(`${process.env.AURA_EVIDENCE_DIR}/acceptance-matrix.json`, 'utf8'),
+  );
+  const shot = async (id: string) => {
+    const scenario = matrix.scenarios.find((row: { id: string }) => row.id === id);
+    expect(scenario).toBeDefined();
+    await page.screenshot({
+      path: `${process.env.AURA_EVIDENCE_DIR}/${scenario.screenshot}`,
+      fullPage: true,
+    });
+  };
   const query = {
     modelCode: 'e2et_order',
     dimensions: ['e2et_order_title'],
@@ -51,7 +65,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     '@@AURABOOT_STUB_TOOL_USE@@ ' +
       JSON.stringify({
         name: 'aurabot_chat-bi',
-        input: { ...query, chartType: 'table', interpretation: 'Filtered orders' },
+        input: { ...query, chartType: 'table', interpretation: '订单数量分析' },
       }),
   );
   await input.press('Enter');
@@ -59,6 +73,11 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   await expect(card).toBeVisible({ timeout: 45000 });
   await expect(card).toHaveAttribute('data-row-count', '1');
   await expect(card).toContainText(title);
+  await expect(card.locator('thead')).toContainText('数量');
+  await expect(card.locator('thead')).toContainText('订单标题');
+  await expect(card.getByText('还没有已记录的建议。', { exact: false })).toBeVisible();
+  await card.scrollIntoViewIfNeeded();
+  await shot('analysis');
   const createdPromise = page.waitForResponse(
     (r) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/report-definitions',
@@ -70,6 +89,13 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   expect(created.request().postDataJSON().sourceAnalysisId).toBe(analysisId);
   const persistedQuery = created.request().postDataJSON().dsl.dataSources.analysis.aggregateQuery;
   expect(persistedQuery).toMatchObject({ type: 'aggregate', ...query });
+  const columns = created.request().postDataJSON().dsl.body[0].columns;
+  expect(columns).toEqual(
+    expect.arrayContaining([
+      { field: 'cnt', label: '数量' },
+      { field: 'e2et_order_title', label: '订单标题' },
+    ]),
+  );
   const saved = (await created.json()).data;
   const db = new Client(PG_CONN);
   await db.connect();
@@ -105,7 +131,8 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     'href',
     `/report-designer/${saved.pid}`,
   );
-  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/saved.png`, fullPage: true });
+  await card.scrollIntoViewIfNeeded();
+  await shot('saved');
   await card.getByTestId('chatbi-saved-report').click();
   await expect(page).toHaveURL(new RegExp(`/report-designer/${saved.pid}$`));
   await page.waitForFunction(() => {
@@ -131,6 +158,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   expect(queried.request().postDataJSON()).toEqual(persistedQuery);
   expect((await queried.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
   await expect(page.locator('main').getByText(title, { exact: true }).first()).toBeVisible();
+  await shot('preview');
   const reloadDefinition = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === `/api/report-definitions/${saved.pid}` &&
@@ -168,6 +196,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /导出 JSON|Export JSON/ }).click();
   const download = await downloadPromise;
+  await download.saveAs(`${process.env.AURA_EVIDENCE_DIR}/report-data.json`);
   const exportRequest = (await exportResponse).request().postDataJSON();
   expect(exportRequest.usageId).toMatch(/^[0-9a-f-]{36}$/);
   const path = await download.path();
@@ -175,7 +204,8 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   const artifact = JSON.parse(await readFile(path!, 'utf8'));
   expect(artifact.dataSets.analysis).toEqual([{ cnt: 1, e2et_order_title: title }]);
   expect(artifact.reportDsl.dataSources.analysis.aggregateQuery).toEqual(persistedQuery);
-  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/reopened.png`, fullPage: true });
+  expect(artifact.reportDsl.body[0].columns).toEqual(columns);
+  await shot('reopened');
   await expect
     .poll(async () => {
       const response = await page.request.get('/api/analytics/behavior/analysis-funnel', {
