@@ -106,6 +106,8 @@ class AgentApprovalGateServiceConcurrencyTest {
                 .thenReturn(List.of(Map.of("agent_id", "agent-1")))
                 .thenReturn(List.of(Map.of("run_status", "pending")));
 
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+
         service.enforceApprovalTimeouts();
 
         @SuppressWarnings("unchecked")
@@ -116,7 +118,9 @@ class AgentApprovalGateServiceConcurrencyTest {
         assertThat(updateCaptor.getAllValues().get(0))
                 .containsEntry("approval_status", "expired")
                 .containsEntry("rejection_reason", "Auto-expired: approval timeout exceeded");
-        assertThat(conditionCaptor.getAllValues().get(0)).containsEntry("pid", "apv-expired");
+        assertThat(conditionCaptor.getAllValues().get(0))
+                .containsEntry("pid", "apv-expired")
+                .containsEntry("approval_status", "pending");
         assertThat(updateCaptor.getAllValues().get(1))
                 .containsEntry("run_status", "failed")
                 .containsEntry("error_message", "Approval expired");
@@ -135,6 +139,23 @@ class AgentApprovalGateServiceConcurrencyTest {
         assertThat(conditions.getValue()).containsEntry("approval_status", "pending");
         verify(eventBus, never()).publishAfterCommit(any());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), any());
+        verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
+    }
+
+    @Test
+    void timeoutCannotOverwriteAConcurrentDecisionOrEmitSideEffects() {
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "apv-expired", "tenant_id", 1L,
+                        "run_id", "run-1", "task_id", "task-1")));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+
+        newService().enforceApprovalTimeouts();
+
+        @SuppressWarnings("unchecked") ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        assertThat(conditions.getValue()).containsEntry("approval_status", "pending");
+        verify(eventBus, never()).publishAfterCommit(any());
+        verify(dynamicDataMapper, times(1)).selectByQueryWithoutTenant(anyString(), any());
         verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
     }
 

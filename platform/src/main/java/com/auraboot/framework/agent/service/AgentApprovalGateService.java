@@ -718,7 +718,11 @@ public class AgentApprovalGateService {
                 update.put("approval_status", "expired");
                 update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
                 update.put("updated_at", now);
-                dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", pid));
+                int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                        Map.of("pid", pid, "approval_status", "pending"));
+                if (updated != 1) {
+                    continue;
+                }
 
                 String runPid = (String) approval.get("run_id");
                 Long tenantId = approval.get("tenant_id") != null
