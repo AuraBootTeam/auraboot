@@ -2083,6 +2083,7 @@ CREATE TABLE public.ab_agent_run (
     context_envelope_hash character varying(64),
     deployment_pid character varying(26),
     context_envelope text,
+    final_response text,
     CONSTRAINT chk_agent_run_subtask_origin CHECK (((subtask_origin IS NULL) OR ((subtask_origin)::text = ANY ((ARRAY['interrupt_subtask'::character varying, 'delegate_task'::character varying, 'scheduled_split'::character varying])::text[]))))
 );
 

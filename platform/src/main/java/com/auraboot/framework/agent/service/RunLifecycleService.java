@@ -118,6 +118,7 @@ public class RunLifecycleService {
         runUpdate.put("input_tokens", result.totalInputTokens);
         runUpdate.put("output_tokens", result.totalOutputTokens);
         runUpdate.put("total_cost", result.totalCost);
+        runUpdate.put("final_response", result.lastResponse);
         if (!result.success) {
             runUpdate.put("error_message", "Plan execution did not reach success terminal state");
         }
@@ -134,6 +135,24 @@ public class RunLifecycleService {
         boolean changed = terminalStore.complete(tenantId, runPid, taskPid, runUpdate, taskUpdate,
                 () -> publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked"));
         return changed && result.success;
+    }
+
+    /** Read the winning terminal result, scoped to the run's persisted task and tenant. */
+    RunOutcome readTerminalOutcome(Long tenantId, String runPid, String taskPid) {
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT run_status, final_response, input_tokens, output_tokens, total_cost, error_message "
+                        + "FROM ab_agent_run WHERE tenant_id = ? AND pid = ? AND task_id = ?",
+                tenantId, runPid, taskPid);
+        String status = (String) row.get("run_status");
+        return switch (status) {
+            case "success" -> new RunOutcome.Success(runPid, (String) row.get("final_response"),
+                    ((Number) row.get("input_tokens")).intValue(),
+                    ((Number) row.get("output_tokens")).intValue(),
+                    ((Number) row.get("total_cost")).doubleValue());
+            case "failed" -> new RunOutcome.Failed(runPid, (String) row.get("error_message"));
+            case "cancelled" -> new RunOutcome.Cancelled(runPid, (String) row.get("error_message"));
+            default -> throw new IllegalStateException("Run has not reached a terminal state: " + status);
+        };
     }
 
     /**

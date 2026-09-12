@@ -135,6 +135,55 @@ class AgentRunServiceSyncTest {
         // job. Bind a system tenant for tests so the deeper code paths that
         // read MetaContext.getCurrentUserId() / .exists() do not throw.
         MetaContext.setSystemTenantContext(TENANT_ID);
+        org.mockito.Mockito.doAnswer(inv -> {
+            String runPid = inv.getArgument(1);
+            when(runLifecycleService.readTerminalOutcome(TENANT_ID, runPid, TASK_PID))
+                    .thenReturn(new RunOutcome.Failed(runPid, inv.getArgument(4)));
+            return null;
+        }).when(runLifecycleService).failRun(any(), anyString(), anyString(), any(), any());
+    }
+
+    private boolean persistLoopResult(org.mockito.invocation.InvocationOnMock inv) {
+        String runPid = inv.getArgument(1);
+        AgentRunService.AgentLoopResult result = inv.getArgument(4);
+        RunOutcome outcome = result.success
+                ? new RunOutcome.Success(runPid, result.lastResponse, result.totalInputTokens,
+                        result.totalOutputTokens, result.totalCost)
+                : new RunOutcome.Failed(runPid, "Plan execution did not reach success terminal state");
+        when(runLifecycleService.readTerminalOutcome(TENANT_ID, runPid, TASK_PID)).thenReturn(outcome);
+        return result.success;
+    }
+
+    @Test
+    void cancelledRunDoesNotReturnLateLoopSuccess() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "Late success must not escape";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(ok);
+        when(runLifecycleService.readTerminalOutcome(eq(TENANT_ID), anyString(), eq(TASK_PID)))
+                .thenAnswer(inv -> new RunOutcome.Cancelled(inv.getArgument(1), "cancelled by user interrupt"));
+        assertThat(service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null))
+                .isInstanceOf(RunOutcome.Cancelled.class);
+        verify(observationService, never()).publish(any(), eq("agent_run.outcome"), any(), any(), any(), any());
+        verify(observationService).publish(eq(TENANT_ID), eq("run_completed"), eq(AGENT_CODE),
+                eq("agent_run"), anyString(), argThat(detail -> "cancelled".equals(detail.get("status"))));
+    }
+
+    @Test
+    void cancelledRunDoesNotReturnLateExceptionAsFailure() throws Exception {
+        primeHappyPath();
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenThrow(new IllegalStateException("teardown after cancellation"));
+        org.mockito.Mockito.doNothing().when(runLifecycleService).failRun(any(), anyString(), anyString(), any(), any());
+        when(runLifecycleService.readTerminalOutcome(eq(TENANT_ID), anyString(), eq(TASK_PID)))
+                .thenAnswer(inv -> new RunOutcome.Cancelled(inv.getArgument(1), "cancelled"));
+        assertThat(service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null))
+                .isInstanceOf(RunOutcome.Cancelled.class);
+        verify(observationService, never()).publish(any(), eq("run_failed"), any(), any(), any(), any());
+        verify(runLifecycleService, never()).markSessionEndedPublished(anyString());
     }
 
     @AfterEach
@@ -453,7 +502,7 @@ class AgentRunServiceSyncTest {
                 .thenReturn(ok);
         // completeRunRecord — caller of completeRun expects this to return true on success
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -477,7 +526,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -552,7 +601,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -582,7 +631,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -677,7 +726,7 @@ class AgentRunServiceSyncTest {
                     return ok;
                 });
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -706,7 +755,7 @@ class AgentRunServiceSyncTest {
                     return failed;
                 });
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(false);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 

@@ -83,6 +83,28 @@ class AgentRunTerminalStoreIT {
     private String runStatus() { return jdbc.queryForObject("SELECT run_status FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid); }
     private String taskStatus() { return jdbc.queryForObject("SELECT task_status FROM ab_agent_task WHERE tenant_id=? AND pid=?", String.class, tenant, taskPid); }
     private int events() { return jdbc.queryForObject("SELECT count(*) FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", Integer.class, tenant, runPid); }
+    @Test void readsWinningAttemptResponseAndRejectsWrongScopeOrNonterminalState() {
+        RunLifecycleService lifecycle = lifecycle(new AtomicInteger());
+        assertThatThrownBy(() -> lifecycle.readTerminalOutcome(tenant, runPid, taskPid))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("terminal state");
+        var result = new AgentRunService.AgentLoopResult();
+        result.success = true;
+        result.lastResponse = "Persisted answer";
+        result.totalInputTokens = 13;
+        result.totalOutputTokens = 5;
+        result.totalCost = 0.0012;
+        assertThat(lifecycle.completeRunRecord(tenant, runPid, taskPid,
+                java.time.LocalDateTime.now(), result, "fixture")).isTrue();
+        data.update("ab_agent_task", Map.of("output_data", "Later task output"),
+                Map.of("tenant_id", tenant, "pid", taskPid));
+        assertThat(lifecycle.readTerminalOutcome(tenant, runPid, taskPid))
+                .isEqualTo(new RunOutcome.Success(runPid, "Persisted answer", 13, 5, 0.0012));
+        assertThatThrownBy(() -> lifecycle.readTerminalOutcome(tenant + 1, runPid, taskPid))
+                .isInstanceOf(org.springframework.dao.EmptyResultDataAccessException.class);
+        assertThatThrownBy(() -> lifecycle.readTerminalOutcome(tenant, runPid, "unrelated"))
+                .isInstanceOf(org.springframework.dao.EmptyResultDataAccessException.class);
+    }
+
     @Test void commitsPairAndOutboxOnceWithPersistedActor() {
         AtomicInteger signals = new AtomicInteger();
         assertThat(store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, signals::incrementAndGet)).isTrue();

@@ -181,6 +181,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
                         pa.message() != null ? pa.message() : "Approval required",
                         approvalPid);
             }
+            case RunOutcome.Cancelled c -> new TurnOutcome.Interrupted(c.reason(), "user_cancelled");
             case RunOutcome.Failed f -> {
                 String msg = f.errorMessage() != null ? f.errorMessage() : "Agent run failed";
                 sink.onError(msg, null);
