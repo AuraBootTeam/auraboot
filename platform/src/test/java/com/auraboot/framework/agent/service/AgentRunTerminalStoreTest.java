@@ -36,6 +36,34 @@ class AgentRunTerminalStoreTest {
         when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task")))
                 .thenReturn(List.of(Map.of("run_status", status, "actor_user_id", 91L, "principal_type", "human_delegated")));
     }
+    @Test void aChangedAnalyticsGoalCannotPublishAnExecutionStart() {
+        var sources = mock(com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.class);
+        var provider = mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getObject()).thenReturn(sources);
+        org.springframework.test.util.ReflectionTestUtils.setField(store, "analyticsSources", provider);
+        when(sources.resolve("adopt")).thenReturn(new com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.Source(
+                "Frozen goal", Map.of("adoptionPid", "adopt")));
+        when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task"))).thenReturn(List.of(Map.of(
+                "run_status", "running", "actor_user_id", 91L, "description", "Changed goal",
+                "analytics_binding", "{\"adoptionPid\":\"adopt\"}", "analytics_goal", "Frozen goal",
+                "input_data", "{\"analyticsExecution\":{\"adoptionPid\":\"adopt\"},\"userMessage\":\"Changed goal\"}")));
+        assertThatThrownBy(() -> store.started(7L, "run", "task")).hasMessageContaining("binding changed");
+        verifyNoInteractions(outcomes);
+    }
+    @Test void aClientSuppliedBindingWithoutServerProvenanceCannotStart() {
+        when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task"))).thenReturn(List.of(Map.of(
+                "run_status", "running", "actor_user_id", 91L,
+                "input_data", "{\"analyticsExecution\":{\"adoptionPid\":\"adopt\"}}")));
+        assertThatThrownBy(() -> store.started(7L, "run", "task")).hasMessageContaining("server-owned");
+        verifyNoInteractions(outcomes);
+    }
+    @Test void removingTaskInputCannotRemoveAuthoritativeAttribution() {
+        when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task"))).thenReturn(List.of(Map.of(
+                "run_status", "running", "actor_user_id", 91L,
+                "analytics_binding", "{\"adoptionPid\":\"adopt\"}", "input_data", "{}")));
+        assertThatThrownBy(() -> store.started(7L, "run", "task")).hasMessageContaining("server-owned");
+        verifyNoInteractions(outcomes);
+    }
     @Test void completionPersistsScopedPairAndDefersSignalUntilCommit() {
         row("running");
         when(data.update(anyString(), anyMap(), anyMap())).thenReturn(1);

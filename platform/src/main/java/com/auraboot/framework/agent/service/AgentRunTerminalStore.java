@@ -22,6 +22,8 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 public class AgentRunTerminalStore {
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService> analyticsSources;
     private final JdbcTemplate jdbc;
     private final DynamicDataMapper data;
     private final BehaviorOutcomePublisher outcomes;
@@ -55,9 +57,11 @@ public class AgentRunTerminalStore {
     @Transactional
     public void started(Long tenantId, String runPid, String taskPid) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT r.actor_user_id, r.principal_type, r.run_status
+                SELECT r.actor_user_id, r.principal_type, r.run_status, t.description, t.input_data,
+                       a.binding AS analytics_binding, a.goal AS analytics_goal
                 FROM ab_agent_run r JOIN ab_agent_task t
                   ON t.pid = r.task_id AND t.tenant_id = r.tenant_id
+                LEFT JOIN ab_analytics_task_execution a ON a.tenant_id = t.tenant_id AND a.task_pid = t.pid
                 WHERE r.tenant_id = ? AND r.pid = ? AND t.pid = ? AND t.deleted_flag = FALSE
                 FOR UPDATE OF r, t
                 """, tenantId, runPid, taskPid);
@@ -67,14 +71,44 @@ public class AgentRunTerminalStore {
             throw new IllegalStateException("Run is not admitted for execution");
         }
         Object actor = row.get("actor_user_id");
+        Map<String, Object> props = new java.util.LinkedHashMap<>();
+        props.put("taskPid", taskPid);
+        props.put("principalType", row.get("principal_type") == null ? "unknown" : row.get("principal_type"));
+        String analysisId = null;
+        String adoptionEventId = null;
+        try {
+            var json = new com.fasterxml.jackson.databind.ObjectMapper();
+            var input = json.readTree(row.get("input_data") == null ? "{}" : row.get("input_data").toString());
+            var binding = input.get("analyticsExecution");
+            Object authoritativeValue = row.get("analytics_binding");
+            if (binding != null || authoritativeValue != null) {
+                if (binding == null || authoritativeValue == null
+                        || !json.readTree(authoritativeValue.toString()).equals(binding)) {
+                    throw new IllegalStateException("Analytics task has no matching server-owned execution binding");
+                }
+                var source = analyticsSources.getObject().resolve(binding.path("adoptionPid").asText());
+                if (!json.valueToTree(source.binding()).equals(binding)
+                        || !java.util.Objects.equals(source.goal(), row.get("analytics_goal"))
+                        || !java.util.Objects.equals(source.goal(), row.get("description"))
+                        || !java.util.Objects.equals(source.goal(), input.path("userMessage").asText())
+                        || !java.util.Objects.equals(String.valueOf(actor), String.valueOf(source.binding().get("actorUserId")))) {
+                    throw new IllegalStateException("Analytics task binding changed before execution");
+                }
+                props.put("analyticsExecution", source.binding());
+                analysisId = String.valueOf(source.binding().get("analysisId"));
+                adoptionEventId = UUID.nameUUIDFromBytes((tenantId + ":" + actor + ":analytics_suggestion_adopted:"
+                        + source.binding().get("adoptionPid")).getBytes(StandardCharsets.UTF_8)).toString();
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalStateException("Task execution input is invalid", invalid);
+        }
         outcomes.publish(BehaviorOutcomeEvent.builder()
                 .tenantId(tenantId).userId(actor == null ? null : Long.valueOf(actor.toString()))
                 .eventId(UUID.nameUUIDFromBytes((tenantId + ":" + runPid + ":started")
                         .getBytes(StandardCharsets.UTF_8)).toString())
-                .eventName("agent_execution_started").runId(runPid)
+                .eventName("agent_execution_started").runId(runPid).interactionId(analysisId).causedByEventId(adoptionEventId)
                 .targetType("agent_run").targetKey(runPid)
-                .props(Map.of("taskPid", taskPid, "principalType",
-                        row.get("principal_type") == null ? "unknown" : row.get("principal_type")))
+                .props(props)
                 .build());
     }
 

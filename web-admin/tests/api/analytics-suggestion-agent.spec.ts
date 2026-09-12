@@ -183,7 +183,7 @@ test('AuraBot tool confirmation persists an AI suggestion without adopting it', 
       decisionMode: 'ai_assisted',
     });
     const adoptedFacts = await db.query(
-      'SELECT payload FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name=$2',
+      'SELECT payload, event_id FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name=$2',
       [analysis.analysisId, 'analytics_suggestion_adopted'],
     );
     expect(adoptedFacts.rows).toHaveLength(1);
@@ -191,6 +191,77 @@ test('AuraBot tool confirmation persists an AI suggestion without adopting it', 
       decisionMode: 'ai_assisted',
       suggestionVersionPid: rows[0].pid,
     });
+    const execution = { adoptionPid: adoption.pid, requestId: randomUUID() };
+    const launch = async () =>
+      request.post('/api/ai/aurabot/chat/stream', {
+        data: {
+          sessionId: marker,
+          clientMsgId: randomUUID(),
+          message: 'Client text must not replace the frozen goal',
+          analyticsExecution: execution,
+        },
+      });
+    const started = await launch();
+    expect(started.status()).toBe(200);
+    const startedEvents = parseEvents(await started.text());
+    expect(
+      startedEvents.some((event) => event.event === 'error'),
+      JSON.stringify(startedEvents),
+    ).toBe(false);
+    const tasks = await db.query(
+      "SELECT pid, description, input_data::jsonb AS input_data FROM ab_agent_task WHERE input_data::jsonb->'analyticsExecution'->>'adoptionPid'=$1",
+      [adoption.pid],
+    );
+    expect(tasks.rows).toHaveLength(1);
+    const task = tasks.rows[0];
+    expect(task.description).toBe(proposal.executionIntent.goal);
+    expect(task.input_data.analyticsExecution).toMatchObject({
+      adoptionPid: adoption.pid,
+      versionPid: rows[0].pid,
+      analysisId: analysis.analysisId,
+      decisionMode: 'ai_assisted',
+    });
+    const bindings = await db.query(
+      'SELECT task_pid, goal, binding FROM ab_analytics_task_execution WHERE adoption_pid=$1',
+      [adoption.pid],
+    );
+    expect(bindings.rows).toHaveLength(1);
+    expect(bindings.rows[0].task_pid).toBe(task.pid);
+    expect(bindings.rows[0].goal).toBe(proposal.executionIntent.goal);
+    expect(bindings.rows[0].binding).toEqual(task.input_data.analyticsExecution);
+    const runs = await db.query('SELECT pid, run_status FROM ab_agent_run WHERE task_id=$1', [
+      task.pid,
+    ]);
+    expect(runs.rows).toHaveLength(1);
+    expect(runs.rows[0].run_status).toBe('success');
+    const startFacts = await db.query(
+      'SELECT payload, caused_by_event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name=$2',
+      [runs.rows[0].pid, 'agent_execution_started'],
+    );
+    expect(startFacts.rows).toHaveLength(1);
+    expect(startFacts.rows[0].payload.analyticsExecution).toMatchObject({
+      adoptionPid: adoption.pid,
+      versionPid: rows[0].pid,
+    });
+    expect(startFacts.rows[0].caused_by_event_id).toBe(adoptedFacts.rows[0].event_id);
+    const repeated = await launch();
+    expect(repeated.status()).toBe(200);
+    expect(await repeated.text()).toContain('already has a task');
+    execution.requestId = randomUUID();
+    const freshIdentity = await launch();
+    expect(freshIdentity.status()).toBe(200);
+    expect(await freshIdentity.text()).toContain('already has a task');
+    expect(
+      (
+        await db.query('SELECT count(*) FROM ab_analytics_task_execution WHERE adoption_pid=$1', [
+          adoption.pid,
+        ])
+      ).rows[0].count,
+    ).toBe('1');
+    expect(
+      (await db.query('SELECT count(*) FROM ab_agent_run WHERE task_id=$1', [task.pid])).rows[0]
+        .count,
+    ).toBe('1');
   } finally {
     await db.end();
   }

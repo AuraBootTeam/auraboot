@@ -19,5 +19,12 @@
     "name:en": "Read personal analysis suggestions",
     "resourceType": "data",
     "module": "analytics"
+  },
+  {
+    "code": "analytics.suggestion.execute",
+    "name:zh-CN": "\u6267\u884c\u5df2\u91c7\u7eb3\u5efa\u8bae",
+    "name:en": "Execute adopted suggestions",
+    "resourceType": "operation",
+    "module": "analytics"
   }
 ]

@@ -3089,6 +3089,24 @@ ALTER SEQUENCE public.ab_ai_trace_span_id_seq OWNED BY public.ab_ai_trace_span.i
 
 
 --
+-- Name: ab_analytics_task_execution; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_analytics_task_execution (
+    tenant_id bigint NOT NULL,
+    task_pid character varying(26) NOT NULL,
+    actor_user_id bigint NOT NULL,
+    adoption_pid character varying(26) NOT NULL,
+    request_key uuid NOT NULL,
+    binding jsonb NOT NULL,
+    goal text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_analytics_task_execution_binding_check CHECK ((jsonb_typeof(binding) = 'object'::text)),
+    CONSTRAINT ab_analytics_task_execution_goal_check CHECK (((length(goal) >= 1) AND (length(goal) <= 4000)))
+);
+
+
+--
 -- Name: ab_announcement; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -19479,6 +19497,30 @@ ALTER TABLE ONLY public.ab_ai_trace
 
 
 --
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_pkey PRIMARY KEY (tenant_id, task_pid);
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_actor_user_id_adoptio_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_actor_user_id_adoptio_key UNIQUE (tenant_id, actor_user_id, adoption_pid);
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_request_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_request_key_key UNIQUE (tenant_id, request_key);
+
+
+--
 -- Name: ab_announcement ab_announcement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -23708,6 +23750,14 @@ ALTER TABLE ONLY public.ab_agent_release
 
 ALTER TABLE ONLY public.ab_agent_release
     ADD CONSTRAINT uq_agent_release_version UNIQUE (tenant_id, agent_code, release_no);
+
+
+--
+-- Name: ab_agent_task uq_agent_task_tenant_pid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_task
+    ADD CONSTRAINT uq_agent_task_tenant_pid UNIQUE (tenant_id, pid);
 
 
 --
@@ -30574,6 +30624,14 @@ CREATE TRIGGER trg_page_schema_ownership_default BEFORE INSERT OR UPDATE OF is_t
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_task_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_task_pid_fkey FOREIGN KEY (tenant_id, task_pid) REFERENCES public.ab_agent_task(tenant_id, pid);
 
 
 --

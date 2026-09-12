@@ -63,6 +63,10 @@ public class AuraBotController {
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
+        if (request.getAnalyticsExecution() != null) {
+            if (request.getOptions() == null) request.setOptions(new ChatRequest.ChatOptions());
+            request.getOptions().setExplicitDurableRequest(true);
+        }
         SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
 
         // Snapshot identity BEFORE the async hop — MetaContext is a ThreadLocal that
