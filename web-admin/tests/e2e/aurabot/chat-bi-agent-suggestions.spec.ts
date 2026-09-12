@@ -288,6 +288,26 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     await executionMessage.scrollIntoViewIfNeeded();
     await expect(executionMessage).toBeInViewport();
     await shot('ai-executed');
+    await suggestions.getByRole('button', { name: '刷新建议', exact: true }).click();
+    await expect(version.getByTestId('analytics-execution-status')).toContainText('执行成功');
+    await expect(version.getByTestId('analytics-execution-status')).toContainText('运行次数: 1');
+    await expect(version.getByRole('button', { name: '发起执行', exact: true })).toHaveCount(0);
+    const persistedStatus = await page.request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysisId! },
+    });
+    expect((await persistedStatus.json()).data.records[0].execution).toEqual({
+      state: 'success',
+      attempts: 1,
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
+    await page.getByTestId('ai-panel-toggle').click();
+    const restored = page
+      .locator(`[data-testid="chatbi-result-card"][data-analysis-id="${analysisId}"]`)
+      .getByTestId('analytics-execution-status');
+    await expect(restored).toContainText('执行成功', { timeout: 15000 });
+    await restored.scrollIntoViewIfNeeded();
+    await shot('ai-status');
   } finally {
     await db.end();
   }

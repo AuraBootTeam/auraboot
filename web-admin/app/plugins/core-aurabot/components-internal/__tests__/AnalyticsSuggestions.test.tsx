@@ -14,6 +14,7 @@ const fixture = vi.hoisted(() => ({
     origin: 'human_authored',
     adoptionPid: 'adoption' as string | null,
     executionGoal: 'Review the order' as string | null,
+    execution: null as { state: string; attempts: number } | null,
   },
 }));
 vi.mock('~/contexts/AuthContext', () => ({
@@ -45,8 +46,23 @@ beforeEach(() => {
   fixture.loading = false;
   fixture.row.adoptionPid = 'adoption';
   fixture.row.executionGoal = 'Review the order';
+  fixture.row.execution = null;
 });
 describe('Analytics suggestion execution eligibility', () => {
+  it.each(['success', 'failed', 'pending', 'queued', 'running', 'cancelled', 'unknown'])(
+    'shows persisted %s without another first-run action',
+    async (state) => {
+      fixture.row.execution = { state, attempts: 1 };
+      await show();
+      expect(screen.getByTestId('analytics-execution-status')).toHaveTextContent('运行次数: 1');
+      expect(screen.queryByRole('button', { name: '发起执行' })).not.toBeInTheDocument();
+    },
+  );
+  it('allows a created task with no run to re-enter admission', async () => {
+    fixture.row.execution = { state: 'not_started', attempts: 0 };
+    await show();
+    expect(screen.getByRole('button', { name: '发起执行' })).toBeEnabled();
+  });
   it('hides execution without the dedicated permission', async () => {
     fixture.execute = false;
     await show();

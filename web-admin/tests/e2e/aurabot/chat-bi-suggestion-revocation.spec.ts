@@ -200,6 +200,12 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     const readBody = await read.json();
     expect(String(readBody.code), JSON.stringify(readBody)).toBe('403');
     expect(readBody.data).toBeNull();
+    const emptyPage = await page.request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysisId!, page: '99', pageSize: '5' },
+    });
+    const emptyPageBody = await emptyPage.json();
+    expect(String(emptyPageBody.code)).toBe('403');
+    expect(emptyPageBody.data).toBeNull();
     await expect(suggestions.getByTestId('analytics-suggestion')).toHaveCount(0);
     await expect(suggestions.getByRole('alert')).toBeVisible();
     await page.screenshot({

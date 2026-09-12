@@ -24,6 +24,7 @@ type Suggestion = {
   title: string;
   content: string;
   executionGoal?: string | null;
+  execution?: { state: string; attempts: number } | null;
   version: number;
   groupKey: string;
   origin: string;
@@ -67,6 +68,7 @@ export function AnalyticsSuggestions({
   const [invalid, setInvalid] = useState(false);
   const requestIdentity = useRef<{ signature: string; id: string } | null>(null);
   const generation = useRef(0);
+  const wasRunning = useRef(conversationState.isLoading);
   const sectionRef = useRef<HTMLElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const rememberOpener = () => {
@@ -123,6 +125,24 @@ export function AnalyticsSuggestions({
       generation.current++;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (wasRunning.current && !conversationState.isLoading) void load();
+    wasRunning.current = conversationState.isLoading;
+  }, [conversationState.isLoading, load]);
+  const executionLabel = (state: string) => {
+    const labels: Record<string, string> = {
+      not_started: l('任务已创建，尚未开始', 'Task created, not started'),
+      running: l('已开始，等待结果', 'Started, awaiting outcome'),
+      pending: l('等待审批', 'Awaiting approval'),
+      queued: l('等待调度', 'Queued'),
+      success: l('执行成功', 'Execution succeeded'),
+      failed: l('执行失败', 'Execution failed'),
+      cancelled: l('执行已取消', 'Execution cancelled'),
+      unavailable: l('任务已移除', 'Task unavailable'),
+    };
+    return labels[state] || l('状态待确认', 'Status unknown');
+  };
 
   const execute = async (command: string, payload: Record<string, unknown>) => {
     const signature = JSON.stringify({ command, payload });
@@ -298,19 +318,31 @@ export function AnalyticsSuggestions({
                   </Button>
                 )
               )}
-              {row.adoptionPid && row.executionGoal && executionPermission && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={conversationState.isLoading}
-                  onClick={() => {
-                    rememberOpener();
-                    setExecutionConfirmation(row);
-                  }}
+              {row.execution && (
+                <span
+                  data-testid="analytics-execution-status"
+                  className="text-xs text-gray-600 dark:text-gray-300"
                 >
-                  {l('发起执行', 'Start execution')}
-                </Button>
+                  {executionLabel(row.execution.state)} · {l('运行次数', 'Attempts')}:{' '}
+                  {row.execution.attempts}
+                </span>
               )}
+              {row.adoptionPid &&
+                row.executionGoal &&
+                executionPermission &&
+                (!row.execution || row.execution.state === 'not_started') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={conversationState.isLoading}
+                    onClick={() => {
+                      rememberOpener();
+                      setExecutionConfirmation(row);
+                    }}
+                  >
+                    {l('发起执行', 'Start execution')}
+                  </Button>
+                )}
               {canPropose && latest.has(row.pid) && (
                 <Button size="sm" variant="ghost" onClick={() => openForm(row)}>
                   {l('修订建议', 'Revise suggestion')}

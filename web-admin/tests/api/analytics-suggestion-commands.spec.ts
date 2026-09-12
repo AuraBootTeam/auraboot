@@ -122,9 +122,12 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       { type: 'agent_task', goal: ' ' },
       { type: 'agent_task', goal: 'Review', runPid: first.pid },
     ]) {
-      const invalidIntent = await request.post('/api/meta/commands/execute/core_dashboard:propose_suggestion', {
-        data: {payload: {...proposal, requestId: randomUUID(), executionIntent}},
-      });
+      const invalidIntent = await request.post(
+        '/api/meta/commands/execute/core_dashboard:propose_suggestion',
+        {
+          data: { payload: { ...proposal, requestId: randomUUID(), executionIntent } },
+        },
+      );
       expect(invalidIntent.status(), await invalidIntent.text()).toBe(400);
     }
     const replay = await execute('propose_suggestion', proposal);
@@ -185,6 +188,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         'adoptionPid',
         'decisionMode',
         'executionGoal',
+        'execution',
       ].sort(),
     );
     for (const params of [
