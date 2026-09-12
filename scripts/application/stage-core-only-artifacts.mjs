@@ -336,6 +336,14 @@ function main() {
   );
   const coreMigrations = requirePath(resolve(migrationOutput, 'core'), 'core-only migrations');
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
+  const orgManagement = copyArtifact(
+    resolve(repoRoot, 'plugins/org-management'),
+    resolve(output, 'config/org-management'),
+  );
+  const coreOwnership = copyArtifact(
+    resolve(repoRoot, 'plugins/core-ownership'),
+    resolve(output, 'config/core-ownership'),
+  );
   const configSplit = writePlatformAdminConfigSplit(
     resolve(repoRoot, 'plugins/platform-admin'),
     resolve(output, 'config-split'),
@@ -353,6 +361,8 @@ function main() {
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
     { type: 'config', id: 'platform-admin', version, path: platformAdmin },
+    { type: 'config', id: 'org-management', version, path: orgManagement },
+    { type: 'config', id: 'core-ownership', version, path: coreOwnership },
   ];
   const catalog = {
     schemaVersion: 1,
@@ -396,6 +406,7 @@ function main() {
       lockIdentity: lock.identity,
       graphDigest: lock.composition.graphDigest,
       artifactCount: lock.artifacts.length,
+      catalogArtifactCount: catalog.artifacts.length,
     }, null, 2)}\n`,
   );
   process.stdout.write(`${JSON.stringify({
@@ -405,6 +416,7 @@ function main() {
     lockIdentity: lock.identity,
     graphDigest: lock.composition.graphDigest,
     artifactCount: lock.artifacts.length,
+    catalogArtifactCount: catalog.artifacts.length,
   }, null, 2)}\n`);
 }
 
