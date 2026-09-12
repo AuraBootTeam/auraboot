@@ -22,7 +22,7 @@ public class AnalyticsSuggestionController {
     private final com.fasterxml.jackson.databind.ObjectMapper json;
     private static final String PREFIX = "core_dashboard_";
     public record Suggestion(String pid, String title, String content, int version, String groupKey,
-                             String origin, String adoptionPid, String decisionMode) {}
+                             String origin, String adoptionPid, String decisionMode, String executionGoal) {}
     public record Page(List<Suggestion> records, long total, int page, int pageSize) {}
 
     @GetMapping
@@ -64,9 +64,19 @@ public class AnalyticsSuggestionController {
             return new Suggestion(pid, String.valueOf(row.get(PREFIX + "title")), String.valueOf(row.get(PREFIX + "content")),
                     ((Number) row.get(PREFIX + "version")).intValue(), String.valueOf(row.get(PREFIX + "group_key")),
                     String.valueOf(row.get(PREFIX + "origin")), decision == null ? null : String.valueOf(decision.get("pid")),
-                    decision == null ? null : String.valueOf(decision.get(PREFIX + "decision_mode")));
+                    decision == null ? null : String.valueOf(decision.get(PREFIX + "decision_mode")), executionGoal(row));
         }).toList();
         return ApiResponse.success(new Page(records, versions.getTotal(), page, pageSize));
+    }
+    private String executionGoal(Map<String, Object> row) {
+        Object stored = row.get(PREFIX + "execution_intent");
+        if (stored == null) return null;
+        try {
+            return com.auraboot.framework.behavior.service.AnalyticsExecutionIntent.parse(
+                    json.readValue(String.valueOf(stored), Map.class)).goal();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new BusinessException(ResponseCode.BadParam, "Stored execution intent is invalid");
+        }
     }
     private static QueryCondition eq(String field, Object value) {
         return QueryCondition.builder().fieldName(field).operator(QueryCondition.Operator.EQ).value(value).build();

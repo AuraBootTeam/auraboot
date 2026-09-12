@@ -91,18 +91,49 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       query: analysis.dataSource,
       title: marker,
       content: 'Review this analysis before deciding on a business action.',
+      executionIntent: {
+        type: 'agent_task',
+        goal: 'Review the selected orders and report findings.',
+      },
       requestId: randomUUID(),
     };
     const first = await execute('propose_suggestion', proposal);
     expect(first.core_dashboard_version, JSON.stringify(first)).toBe(1);
     expect(first.core_dashboard_origin).toBe('human_authored');
     expect(first.core_dashboard_analysis_id).toBe(analysis.analysisId);
+    const storedIntent = (value: unknown) =>
+      typeof value === 'string' ? JSON.parse(value) : value;
+    expect(storedIntent(first.core_dashboard_execution_intent)).toEqual(proposal.executionIntent);
+    const intentConflict = await request.post(
+      '/api/meta/commands/execute/core_dashboard:propose_suggestion',
+      {
+        data: {
+          payload: {
+            ...proposal,
+            executionIntent: { ...proposal.executionIntent, goal: 'Changed task' },
+          },
+        },
+      },
+    );
+    expect(intentConflict.status()).toBe(400);
+    expect(await intentConflict.text()).toContain('Request identity was already used');
+    for (const executionIntent of [
+      { type: 'raw_sql', goal: 'Execute arbitrary SQL' },
+      { type: 'agent_task', goal: ' ' },
+      { type: 'agent_task', goal: 'Review', runPid: first.pid },
+    ]) {
+      const invalidIntent = await request.post('/api/meta/commands/execute/core_dashboard:propose_suggestion', {
+        data: {payload: {...proposal, requestId: randomUUID(), executionIntent}},
+      });
+      expect(invalidIntent.status(), await invalidIntent.text()).toBe(400);
+    }
     const replay = await execute('propose_suggestion', proposal);
     expect(replay.pid).toBe(first.pid);
     const revised = await execute(
       'propose_suggestion',
       {
         ...proposal,
+        executionIntent: undefined,
         content: 'Revised recommendation after review.',
         previousPid: first.pid,
         requestId: randomUUID(),
@@ -110,6 +141,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       first.pid,
     );
     expect(revised.core_dashboard_version).toBe(2);
+    expect(storedIntent(revised.core_dashboard_execution_intent)).toEqual(proposal.executionIntent);
     expect(revised.core_dashboard_group_key).toBe(first.core_dashboard_group_key);
     expect(revised.core_dashboard_previous_pid).toBe(first.pid);
     const original = await request.get(`/api/dynamic/core_dashboard_suggestion/${first.pid}`);
@@ -152,6 +184,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         'origin',
         'adoptionPid',
         'decisionMode',
+        'executionGoal',
       ].sort(),
     );
     for (const params of [

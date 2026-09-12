@@ -22,6 +22,7 @@ type Suggestion = {
   pid: string;
   title: string;
   content: string;
+  executionGoal?: string | null;
   version: number;
   groupKey: string;
   origin: string;
@@ -261,6 +262,11 @@ export function AnalyticsSuggestions({
           <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap text-gray-600 dark:text-gray-300">
             {row.content}
           </p>
+          {row.executionGoal && (
+            <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
+              {l('执行目标', 'Execution goal')}: {row.executionGoal}
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-gray-500">
               {row.origin === 'agent_generated'
@@ -400,6 +406,11 @@ export function AnalyticsSuggestions({
           <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
             {confirmation?.content}
           </p>
+          {confirmation?.executionGoal && (
+            <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
+              {l('执行目标', 'Execution goal')}: {confirmation.executionGoal}
+            </p>
+          )}
           {actionError && (
             <p role="alert" className="text-sm text-red-600">
               {errorText}

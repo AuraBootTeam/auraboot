@@ -158,5 +158,13 @@
     "required": true,
     "visible": false,
     "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_execution_intent",
+    "sequence": 21,
+    "required": false,
+    "visible": false,
+    "editable": false
   }
 ]

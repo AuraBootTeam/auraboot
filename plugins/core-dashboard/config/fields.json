@@ -194,5 +194,17 @@
       "maxLength": 64,
       "unique": true
     }
+  },
+  {
+    "code": "core_dashboard_execution_intent",
+    "displayName:zh-CN": "\u6267\u884c\u76ee\u6807",
+    "displayName:en": "Execution goal",
+    "dataType": "json",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion"
+    ],
+    "constraints": {
+      "required": false
+    }
   }
 ]

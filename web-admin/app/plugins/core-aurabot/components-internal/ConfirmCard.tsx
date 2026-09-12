@@ -88,7 +88,9 @@ export function ConfirmCard({
 
   // Filter input params for display
   const visibleParams = Object.entries(input).filter(([key]) =>
-    isAnalyticsSuggestion ? ['title', 'content'].includes(key) : !EXCLUDED_KEYS.has(key),
+    isAnalyticsSuggestion
+      ? ['title', 'content', 'executionIntent'].includes(key)
+      : !EXCLUDED_KEYS.has(key),
   );
   const safeDescription = isAnalyticsSuggestion
     ? isZh
@@ -122,15 +124,23 @@ export function ConfirmCard({
               {visibleParams.map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-xs">
                   <span className="min-w-[60px] font-medium text-amber-600 dark:text-amber-400">
-                    {isAnalyticsSuggestion && key === 'content'
+                    {isAnalyticsSuggestion && key === 'executionIntent'
                       ? isZh
-                        ? '建议内容'
-                        : 'Suggestion'
-                      : formatParamName(key, isZh)}
+                        ? '执行目标'
+                        : 'Execution goal'
+                      : isAnalyticsSuggestion && key === 'content'
+                        ? isZh
+                          ? '建议内容'
+                          : 'Suggestion'
+                        : formatParamName(key, isZh)}
                     :
                   </span>
                   <span className="break-all text-amber-700 dark:text-amber-300/70">
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    {isAnalyticsSuggestion && key === 'executionIntent'
+                      ? String((value as { goal?: string })?.goal ?? '')
+                      : typeof value === 'object'
+                        ? JSON.stringify(value)
+                        : String(value)}
                   </span>
                 </div>
               ))}

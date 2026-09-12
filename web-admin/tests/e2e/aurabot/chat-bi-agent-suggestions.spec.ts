@@ -142,6 +142,10 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       query: result.dataSource,
       title: marker,
       content: 'Check the order before deciding.',
+      executionIntent: {
+        type: 'agent_task',
+        goal: 'Review the selected order and report findings.',
+      },
       requestId: randomUUID(),
     };
     await input.fill(
@@ -155,6 +159,7 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     await input.press('Enter');
     const confirmation = panel.getByTestId('aurabot-confirm-card');
     await expect(confirmation).toBeVisible({ timeout: 45000 });
+    await expect(confirmation).toContainText(proposal.executionIntent.goal);
     await confirmation.scrollIntoViewIfNeeded();
     await shot('ai-confirm');
     const before = await page.request.get('/api/analytics/suggestions', {
@@ -183,6 +188,7 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     await version.getByRole('button', { name: '采纳此版本', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('执行需另行发起');
+    await expect(dialog).toContainText(proposal.executionIntent.goal);
     const adoptionResponse = page.waitForResponse(
       (r) =>
         r.request().method() === 'POST' &&

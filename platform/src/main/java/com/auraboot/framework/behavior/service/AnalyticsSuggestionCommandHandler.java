@@ -59,7 +59,9 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
     }
 
     private Map<String, Object> propose(Map<String, Object> payload) {
-        allowed(payload, Set.of("analysisId", "query", "title", "content", "previousPid", "requestId"));
+        allowed(payload, Set.of("analysisId", "query", "title", "content", "previousPid", "requestId", "executionIntent"));
+        AnalyticsExecutionIntent executionIntent = payload.containsKey("executionIntent")
+                ? AnalyticsExecutionIntent.parse(payload.get("executionIntent")) : null;
         String analysis = text(payload, "analysisId", 40);
         String title = text(payload, "title", 200);
         String content = text(payload, "content", 4000);
@@ -81,6 +83,14 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
             if (!analysis.equals(previous.get(PREFIX + "analysis_id")) || !hash.equals(previous.get(PREFIX + "query_hash"))) {
                 throw invalid("A revision must retain its original analysis and query");
             }
+            if (executionIntent == null && previous.get(PREFIX + "execution_intent") != null) {
+                try {
+                    executionIntent = AnalyticsExecutionIntent.parse(json.readValue(
+                            String.valueOf(previous.get(PREFIX + "execution_intent")), Map.class));
+                } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+                    throw invalid("Stored execution intent is invalid");
+                }
+            }
             group = String.valueOf(previous.get(PREFIX + "group_key"));
             lock("version:" + group);
             var latest = list(VERSION, "group_key", group).getRecords();
@@ -98,6 +108,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
             return "agent_generated";
         }).orElse(isAgentExecution() ? "agent_generated" : "human_authored");
         Map<String, Object> record = new LinkedHashMap<>();
+        if (executionIntent != null) record.put(PREFIX + "execution_intent", executionIntent.toMap());
         record.put(PREFIX + "title", title); record.put(PREFIX + "content", content);
         record.put(PREFIX + "analysis_id", analysis); record.put(PREFIX + "query_hash", hash);
         record.put(PREFIX + "group_key", group); record.put(PREFIX + "version", version);

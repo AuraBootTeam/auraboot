@@ -48,6 +48,28 @@
           "type": "string",
           "format": "uuid",
           "description": "A stable caller-generated UUID reused only for an exact retry."
+        },
+        "executionIntent": {
+          "type": "object",
+          "description": "Optional immutable task goal. Saving or adopting does not execute it. Omit during revision to retain the previous goal.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "agent_task"
+              ]
+            },
+            "goal": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "type",
+            "goal"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

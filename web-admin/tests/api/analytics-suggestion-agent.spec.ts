@@ -102,6 +102,10 @@ test('AuraBot tool confirmation persists an AI suggestion without adopting it', 
       query: analysis.dataSource,
       title: 'AI analysis recommendation',
       content: 'Review the filtered orders before making a business decision.',
+      executionIntent: {
+        type: 'agent_task',
+        goal: 'Review the selected order and report findings.',
+      },
       requestId: randomUUID(),
     };
     const offered = await request.post('/api/ai/aurabot/chat/stream', {
