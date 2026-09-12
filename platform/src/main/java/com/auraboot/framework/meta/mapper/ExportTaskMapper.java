@@ -19,8 +19,9 @@ public interface ExportTaskMapper extends BaseMapper<ExportTask> {
     @Select("SELECT * FROM ab_export_task WHERE pid = #{pid}")
     ExportTask findByPid(@Param("pid") String pid);
 
-    @Select("SELECT * FROM ab_export_task WHERE query_code = #{queryCode} ORDER BY created_at DESC LIMIT #{limit}")
-    List<ExportTask> findByQueryCode(@Param("queryCode") String queryCode, @Param("limit") int limit);
+    @Select("SELECT * FROM ab_export_task WHERE query_code = #{queryCode} AND tenant_id = #{tenantId} AND created_by = #{userId} ORDER BY created_at DESC LIMIT #{limit}")
+    List<ExportTask> findByQueryCode(@Param("queryCode") String queryCode, @Param("tenantId") Long tenantId,
+                                     @Param("userId") Long userId, @Param("limit") int limit);
 
     @Update("UPDATE ab_export_task SET status = #{status}, progress = #{progress}, processed_rows = #{processedRows} WHERE id = #{id}")
     int updateProgress(@Param("id") Long id, @Param("status") String status,

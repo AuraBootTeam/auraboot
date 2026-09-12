@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.ExportTaskDTO;
 import com.auraboot.framework.meta.dto.NamedQueryDataExportRequest;
 import com.auraboot.framework.meta.entity.ExportTask;
@@ -96,7 +97,7 @@ public class ExportTaskService {
      */
     public ExportTaskDTO getTaskStatus(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
-        if (task == null || !belongsToCurrentTenant(task)) {
+        if (task == null || !belongsToCurrentOwner(task)) {
             throw new MetaServiceException("Export task not found: " + taskPid);
         }
         return toDTO(task);
@@ -107,27 +108,28 @@ public class ExportTaskService {
      */
     public String getFileKey(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
-        if (task == null || !belongsToCurrentTenant(task)) {
+        if (task == null || !belongsToCurrentOwner(task)) {
             return null;
         }
         return task.getFileKey();
     }
 
-    /**
-     * {@code ab_export_task} is excluded from the tenant line interceptor and resolved by a
-     * global {@code pid}, so re-assert tenant ownership here — a tenant must not read another
-     * tenant's export status / file / queryCode via its (ULID) taskPid.
-     */
-    private boolean belongsToCurrentTenant(ExportTask task) {
-        Long current = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
-        return current != null && current.equals(task.getTenantId());
+    /** Global task identifiers must always be scoped to the authenticated owner. */
+    private boolean belongsToCurrentOwner(ExportTask task) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        return tenantId != null && userId != null
+                && tenantId.equals(task.getTenantId()) && userId.equals(task.getCreatedBy());
     }
 
-    /**
-     * Get recent export tasks for a query.
-     */
+    /** Get recent exports belonging to the authenticated user within the tenant. */
     public List<ExportTaskDTO> getRecentTasks(String queryCode, int limit) {
-        return exportTaskMapper.findByQueryCode(queryCode, limit).stream()
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            throw new MetaServiceException("Authenticated export owner is required");
+        }
+        return exportTaskMapper.findByQueryCode(queryCode, tenantId, userId, limit).stream()
                 .map(this::toDTO)
                 .toList();
     }
