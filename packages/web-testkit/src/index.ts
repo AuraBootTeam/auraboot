@@ -4,6 +4,8 @@ export interface RuntimeIdentityExpectation {
   applicationId: string
   applicationVersion: string
   lockIdentity: string
+  sourceCommit?: string
+  imageDigest?: string
 }
 
 /** Read-only release identity assertion shared by independent application journeys. */

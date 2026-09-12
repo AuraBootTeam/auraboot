@@ -23,6 +23,8 @@ platform:
       version: 1.0.0
     - package: "@auraboot/designer-sdk"
       version: 1.0.0
+    - package: "@auraboot/web-testkit"
+      version: 1.0.0
   dslSchema: 4
 backend:
   mode: core-only
@@ -35,3 +37,5 @@ config:
   importOrder:
     - core-meta
     - platform-admin
+    - org-management
+    - core-ownership

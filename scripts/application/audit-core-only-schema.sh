@@ -23,8 +23,7 @@ WHERE schemaname = 'public'
       'ab_node_interceptor',
       'ab_event_log',
       'ab_chain_execution',
-      'ab_saga_execution',
-      'ab_automation_node_execution'
+      'ab_saga_execution'
     )
   )
 ORDER BY tablename;

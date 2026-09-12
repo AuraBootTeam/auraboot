@@ -66,6 +66,39 @@ function copyArtifact(source, target) {
   return target;
 }
 
+function extractTarball(tarball, target) {
+  mkdirSync(target, { recursive: true });
+  run('tar', ['-xzf', tarball, '-C', target, '--strip-components=1']);
+}
+
+function materializeAndBuildCoreWeb({ repoRoot, output, webShell, npmArtifacts }) {
+  const workRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-core-web-build-'));
+  try {
+    extractTarball(webShell, workRoot);
+    run('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts'], {
+      cwd: workRoot,
+      capture: false,
+    });
+    for (const artifact of npmArtifacts.filter(({ id }) => id !== '@auraboot/web-shell')) {
+      const packageRoot = resolve(workRoot, 'web-admin/node_modules', artifact.id);
+      rmSync(packageRoot, { recursive: true, force: true });
+      extractTarball(artifact.path, packageRoot);
+    }
+    run('pnpm', ['--dir', 'web-admin', 'build'], { cwd: workRoot, capture: false });
+    cpSync(resolve(workRoot, 'web-admin/build'), resolve(output, 'web'), { recursive: true });
+
+    cpSync(resolve(repoRoot, 'scripts/application'), resolve(output, 'bin/application'), {
+      recursive: true,
+      filter: (candidate) => !/\.(?:test|spec)\.mjs$/.test(candidate),
+    });
+    cpSync(resolve(repoRoot, 'distribution/application'), resolve(output, 'distribution/application'), {
+      recursive: true,
+    });
+  } finally {
+    rmSync(workRoot, { recursive: true, force: true });
+  }
+}
+
 function sourceRecord(repository, commit) {
   return { repository, commit };
 }
@@ -391,12 +424,37 @@ function main() {
     resolve(repoRoot, 'plugins/platform-admin'),
     resolve(output, 'config/platform-admin'),
   );
+  materializeAndBuildCoreWeb({
+    repoRoot,
+    output,
+    webShell,
+    npmArtifacts: [
+      { id: '@auraboot/web-shell', path: webShell },
+      { id: '@auraboot/dsl-types', path: dslTypes },
+      { id: '@auraboot/nav-model', path: navModel },
+      { id: '@auraboot/plugin-sdk', path: pluginSdk },
+      { id: '@auraboot/ui', path: ui },
+      { id: '@auraboot/dsl-runtime', path: dslRuntime },
+      { id: '@auraboot/designer-sdk', path: designerSdk },
+      { id: '@auraboot/web-testkit', path: webTestkit },
+    ],
+  });
+  const deploymentScript = copyArtifact(
+    resolve(repoRoot, 'scripts/application/auraboot-core-env.sh'),
+    resolve(output, 'bin/auraboot-core-env.sh'),
+  );
   const runtimeImage = resolve(output, 'oci/auraboot-runtime');
   const runtimeRootfs = prepareRootfs([
     { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
+    { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
+    { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
+    { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
+    { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
+    { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
+    { source: resolve(output, 'web'), destination: '/opt/auraboot/web' },
+    { source: deploymentScript, destination: '/opt/auraboot/bin/auraboot-core-env.sh' },
     { source: resolve(output, 'app.yaml'), destination: '/opt/auraboot/app.yaml' },
-    { source: resolve(output, 'application.lock.pending'), destination: '/opt/auraboot/application.lock.pending' },
-  ].filter(({ source }) => existsSync(source)));
+  ]);
   const runtimeImageDigest = createOciImageLayout({
     output: runtimeImage,
     rootfs: runtimeRootfs,
@@ -467,6 +525,11 @@ function main() {
       verification: { resolver: 'application-contract-v1', checksum: 'sha256', result: 'PASS' },
       image: { id: 'auraboot-runtime', digest: runtimeImageDigest, layout: 'oci/auraboot-runtime' },
       sbom: { format: 'CycloneDX-1.5', path: 'sbom.cdx.json', digest: sha256Path(sbom) },
+      web: { path: 'web', digest: sha256Path(resolve(output, 'web')) },
+      deploymentScript: {
+        path: 'bin/auraboot-core-env.sh',
+        digest: sha256Path(deploymentScript),
+      },
       artifacts: lock.artifacts.map(({ type, id, version: artifactVersion, digest, localPath }) => ({
         type,
         id,
