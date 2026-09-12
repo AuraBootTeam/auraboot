@@ -5,7 +5,7 @@
  * Supports automatic refresh, drill-down filters, and linkage filters.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react';
 import { chartDataService } from '~/shared/services/chartDataService';
 import type {
   ChartDataSource,
@@ -16,6 +16,7 @@ import type {
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useDimensionLabels } from './useDimensionLabels';
+import { DashboardQueryContext } from './DashboardQueryContext';
 
 type ApiDataPayload =
   | { records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }
@@ -201,6 +202,10 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const dashboardQuery = useContext(DashboardQueryContext);
+  const dashboardPid = dashboardQuery?.dashboardPid;
+  const widgetId = dashboardQuery?.widgetId;
+  const usageId = dashboardQuery?.usageId;
   const dataSourceRef = useRef(dataSource);
   const drillFiltersRef = useRef(drillFilters);
   const linkageFiltersRef = useRef(linkageFilters);
@@ -306,7 +311,14 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
           : {}),
       };
 
-      const response = await chartDataService.fetchChartData(request);
+      const response =
+        dashboardPid && widgetId && usageId
+          ? await chartDataService.fetchDashboardWidget(dashboardPid, widgetId, {
+              usageId,
+              linkageFilters: currentLinkageFilters,
+              drillFilters: currentDrillFilters,
+            })
+          : await chartDataService.fetchChartData(request);
 
       // Only update state if component is still mounted
       if (mountedRef.current) {
@@ -328,7 +340,16 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         setLoading(false);
       }
     }
-  }, [apiParamsKey, dataSourceKey, drillFiltersKey, enabled, linkageFiltersKey]);
+  }, [
+    apiParamsKey,
+    dataSourceKey,
+    drillFiltersKey,
+    enabled,
+    linkageFiltersKey,
+    dashboardPid,
+    widgetId,
+    usageId,
+  ]);
 
   /**
    * Effect for initial fetch and dependency changes

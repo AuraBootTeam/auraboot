@@ -10,6 +10,10 @@ test.use({
 
 test('AuraBot filtered analysis saves its complete query to a dashboard', async ({ page }) => {
   test.setTimeout(120000);
+  page.on('pageerror', (error) => console.log('[analytics-page-error]', error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') console.log('[analytics-console-error]', message.text());
+  });
   const title = `Analytics fixture ${Date.now()}`;
   const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
     data: {
@@ -71,10 +75,27 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
           name: 'analytics_query_succeeded',
           props: { rowCount: 1, queryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
         },
+        {
+          name: 'analytics_result_viewed',
+          props: {
+            queryHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            signalSource: 'client_visible',
+          },
+        },
       ]);
   } finally {
     await db.end();
   }
+
+  const replayView = await page.request.post(`/api/analytics/results/${analysisId}/view`, {
+    data: {},
+  });
+  expect(replayView.status()).toBe(200);
+  const inventedView = await page.request.post(
+    `/api/analytics/results/00000000-0000-0000-0000-000000000000/view`,
+    { data: {} },
+  );
+  expect(inventedView.status()).toBe(400);
 
   const createdResponse = page.waitForResponse(
     (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/dashboards',
@@ -148,24 +169,60 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
     path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-saved.png`,
     fullPage: true,
   });
-  const requery = page.waitForResponse((response) => {
-    if (
-      new URL(response.url()).pathname !== '/api/meta/chart-data' ||
-      response.request().method() !== 'POST'
-    )
-      return false;
-    return response
-      .request()
-      .postDataJSON()
-      ?.filters?.some((filter: { value?: string }) => filter.value === title);
-  });
+  const queryPath = `/api/dashboards/${saved.pid}/widgets/${saved.widgets[0].id}/data`;
+  const requery = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === queryPath && response.request().method() === 'POST',
+  );
   await card.getByTestId('chatbi-saved-dashboard').click();
   await expect(page).toHaveURL(new RegExp(`/dashboards/view/${saved.code}$`));
   const refreshed = await requery;
   expect(refreshed.status()).toBe(200);
-  expect(refreshed.request().postDataJSON()).toMatchObject({ type: 'aggregate', ...query });
+  const usageRequest = refreshed.request().postDataJSON();
+  expect(usageRequest).toEqual({ usageId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
   expect((await refreshed.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
   await expect(page.locator('main').getByText(title, { exact: true })).toBeVisible();
+  const duplicateUse = await page.request.post(queryPath, { data: usageRequest });
+  expect(duplicateUse.status()).toBe(200);
+  expect((await duplicateUse.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
+  const missingWidget = await page.request.post(
+    `/api/dashboards/${saved.pid}/widgets/missing/data`,
+    { data: usageRequest },
+  );
+  expect(missingWidget.status()).toBe(404);
+  const usedProof = new Client(PG_CONN);
+  await usedProof.connect();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const used = await usedProof.query(
+            "SELECT props FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_used'",
+            [analysisId],
+          );
+          return used.rows;
+        },
+        { timeout: 15000 },
+      )
+      .toEqual([
+        {
+          props: {
+            targetType: 'dashboard',
+            targetKey: saved.pid,
+            widgetId: saved.widgets[0].id,
+            queryHash: saved.extension.analyticsOrigin.queryHash,
+            originalQuery: true,
+          },
+        },
+      ]);
+    const viewed = await usedProof.query(
+      "SELECT count(*)::int AS count FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_result_viewed'",
+      [analysisId],
+    );
+    expect(viewed.rows).toEqual([{ count: 1 }]);
+  } finally {
+    await usedProof.end();
+  }
   await page.screenshot({
     path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-reopened.png`,
     fullPage: true,

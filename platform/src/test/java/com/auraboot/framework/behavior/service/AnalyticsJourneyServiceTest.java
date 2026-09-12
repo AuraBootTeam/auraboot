@@ -40,6 +40,23 @@ class AnalyticsJourneyServiceTest {
     }
 
     @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void dashboardUseIsIdempotentWithinVisitAndScopedToViewer() {
+        MetaContext.setContext(42L, 7L, "viewer", "viewer");
+        var visit = java.util.UUID.randomUUID();
+        service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+        service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+        service.dashboardUsed("analysis", "dashboard", "widget", java.util.UUID.randomUUID(), "hash", true);
+        MetaContext.setCurrentUserId(8L);
+        service.dashboardUsed("analysis", "dashboard", "widget", visit, "hash", true);
+        ArgumentCaptor<List<BehaviorEventInput>> batches = ArgumentCaptor.forClass((Class) List.class);
+        verify(publisher, times(4)).publish(eq(42L), anyLong(), batches.capture());
+        var ids = batches.getAllValues().stream().map(batch -> batch.getFirst().getEventId()).toList();
+        assertThat(ids.get(0)).isEqualTo(ids.get(1));
+        assertThat(List.of(ids.get(0), ids.get(2), ids.get(3))).doesNotHaveDuplicates();
+    }
+
+    @Test
     void missingContextDoesNotPublishUnownedEvents() {
         assertThatThrownBy(service::requested).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(publisher);

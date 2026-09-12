@@ -39,10 +39,7 @@ export default function DashboardViewByCode() {
     const value = dashboard?.description || '';
     return value.startsWith('$i18n:') ? t(value.slice(6)) : value;
   }, [dashboard?.description, t]);
-  const l = useCallback(
-    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
-    [locale],
-  );
+  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const loadDashboard = useCallback(async () => {
     if (!code) return;
@@ -72,7 +69,7 @@ export default function DashboardViewByCode() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-4">
-        <div className="min-w-0 flex items-center">
+        <div className="flex min-w-0 items-center">
           <Link to="/dashboards" className="mr-3 text-gray-400 hover:text-gray-600">
             <ArrowLeftIcon className="h-5 w-5" />
           </Link>
@@ -89,7 +86,7 @@ export default function DashboardViewByCode() {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center rounded-md bg-gray-100 px-3 py-1.5 text-sm whitespace-nowrap text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
           >
             <ArrowPathIcon className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {l('刷新', 'Refresh')}
@@ -104,7 +101,7 @@ export default function DashboardViewByCode() {
           {dashboard?.pid && (
             <Link
               to={`/dashboard-designer/${dashboard.pid}`}
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700"
+              className="inline-flex shrink-0 items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm whitespace-nowrap text-white transition-colors hover:bg-blue-700"
             >
               <PencilSquareIcon className="mr-1.5 h-4 w-4" />
               {l('编辑', 'Edit')}
@@ -134,6 +131,7 @@ export default function DashboardViewByCode() {
         {!loading && !error && dashboard && (
           <div ref={dashboardRef}>
             <DashboardViewer
+              dashboardPid={dashboard.extension?.analyticsOrigin ? dashboard.pid : undefined}
               widgets={runtimeWidgets}
               layoutConfig={dashboard.layoutConfig || { columns: 12, rowHeight: 80, gap: 16 }}
               title={dashboardTitle}

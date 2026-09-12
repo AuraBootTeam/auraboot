@@ -13,6 +13,24 @@ import type { AggregateQueryRequest, AggregateQueryResponse } from '~/framework/
  * Chart data service for aggregate queries
  */
 export const chartDataService = {
+  async fetchDashboardWidget(
+    dashboardPid: string,
+    widgetId: string,
+    request: {
+      usageId: string;
+      linkageFilters?: AggregateQueryRequest['filters'];
+      drillFilters?: AggregateQueryRequest['drillFilters'];
+    },
+  ): Promise<AggregateQueryResponse> {
+    const result = await post<AggregateQueryResponse>(
+      `/api/dashboards/${encodeURIComponent(dashboardPid)}/widgets/${encodeURIComponent(widgetId)}/data`,
+      request,
+    );
+    if (!ResultHelper.isSuccess(result) || result.data === null) {
+      throw new Error(result.desc || 'Failed to fetch saved dashboard data');
+    }
+    return result.data;
+  },
   /**
    * Fetch chart data using aggregate query
    *

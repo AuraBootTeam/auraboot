@@ -32,14 +32,35 @@ public class AnalyticsJourneyService {
         publish(analysisId, "analytics_query_failed", Map.of());
     }
 
+    public void resultViewed(String analysisId, String queryHash) {
+        String identity = MetaContext.getCurrentTenantId() + ":" + MetaContext.getCurrentUserId()
+                + ":result-viewed:" + analysisId;
+        publish(analysisId, "analytics_result_viewed", Map.of("queryHash", queryHash, "signalSource", "client_visible"),
+                UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
+    }
+
+    public void dashboardUsed(String analysisId, String dashboardPid, String widgetId,
+                              UUID usageId, String queryHash, boolean originalQuery) {
+        String identity = MetaContext.getCurrentTenantId() + ":" + MetaContext.getCurrentUserId()
+                + ":dashboard-used:" + dashboardPid + ":" + widgetId + ":" + usageId;
+        publish(analysisId, "analytics_dashboard_used", Map.of("targetType", "dashboard",
+                "targetKey", dashboardPid, "widgetId", widgetId, "queryHash", queryHash,
+                "originalQuery", originalQuery),
+                UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
+    }
+
     private void publish(String analysisId, String name, Map<String, Object> props) {
+        publish(analysisId, name, props, UUID.randomUUID().toString());
+    }
+
+    private void publish(String analysisId, String name, Map<String, Object> props, String eventId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         if (tenantId == null || userId == null) {
             throw new IllegalStateException("Analytics journey requires an authenticated tenant context");
         }
         BehaviorEventInput event = new BehaviorEventInput();
-        event.setEventId(UUID.randomUUID().toString());
+        event.setEventId(eventId);
         event.setSchemaVersion("1");
         event.setEventName(name);
         event.setEventCategory("analytics");

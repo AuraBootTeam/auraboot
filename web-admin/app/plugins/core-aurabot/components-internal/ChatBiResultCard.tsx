@@ -12,6 +12,7 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
+import { useAnalyticsResultView } from './useAnalyticsResultView';
 import { useI18n } from '~/contexts/I18nContext';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
@@ -223,6 +224,7 @@ function inferChartType(records: Record<string, unknown>[], columns: string[]): 
 export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { t } = useI18n();
   const [showSql, setShowSql] = useState(false);
+  const resultViewRef = useAnalyticsResultView(result.analysisId);
 
   const { interpretation, chartConfig, columns = [], records = [], total, sql, truncated } = result;
 
@@ -290,6 +292,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   return (
     <div className="mb-3 flex justify-start">
       <div
+        ref={resultViewRef}
         data-testid="chatbi-result-card"
         data-analysis-id={result.analysisId}
         data-chart-type={chartType}
