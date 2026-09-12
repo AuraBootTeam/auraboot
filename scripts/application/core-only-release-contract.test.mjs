@@ -17,11 +17,23 @@ test('core release stages a compiled Web shell and a self-contained deployment d
 });
 
 test('core deployment forces an empty PF4J directory and verifies exact runtime identity', () => {
+  assert.match(deploy, /AURA_APPLICATION_MODE=core-only/);
   assert.match(deploy, /-Daura\.plugins\.dir="\$STATE_ROOT\/empty-plugins"/);
   assert.match(deploy, /api\/application\/identity/);
   assert.match(deploy, /actual_identity.*expected_identity/);
   assert.match(deploy, /audit-core-only-schema\.sh/);
   assert.match(deploy, /code ~\* '\(\^\|_\)\(bpm\|crm\)/);
+});
+
+test('core-only bootstrap filters product-specific seed content', () => {
+  const categorySeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/MarketplaceCategorySeeder.java'), 'utf8');
+  const solutionSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/SolutionSeeder.java'), 'utf8');
+  const agentSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/AgentTemplateSeeder.java'), 'utf8');
+  const bootstrap = readFileSync(resolve(root, 'platform/src/main/resources/tenant-templates/default-bootstrap.json'), 'utf8');
+  assert.match(categorySeeder, /ApplicationMode\.isCoreOnly\(\).*"crm"/s);
+  assert.match(solutionSeeder, /ApplicationMode\.isCoreOnly\(\).*containsProductSignal/s);
+  assert.match(agentSeeder, /ApplicationMode\.isCoreOnly\(\)/);
+  assert.doesNotMatch(bootstrap, /BPM/);
 });
 
 test('core schema audit keeps provider-neutral automation storage in core', () => {

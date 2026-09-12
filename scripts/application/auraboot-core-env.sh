@@ -87,7 +87,7 @@ start_backend() {
   if [[ -f "$STATE_ROOT/runtime.pid" ]] && kill -0 "$(cat "$STATE_ROOT/runtime.pid")" 2>/dev/null; then
     echo 'backend runtime already active'; return
   fi
-  AURABOOT_BOOTSTRAP_ENABLED=false AURABOOT_DEMO_SEED=false JWT_SECRET="$JWT_SECRET" \
+  AURA_APPLICATION_MODE=core-only AURABOOT_BOOTSTRAP_ENABLED=false AURABOOT_DEMO_SEED=false JWT_SECRET="$JWT_SECRET" \
   nohup java -Daura.plugins.dir="$STATE_ROOT/empty-plugins" -jar "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar" \
     --server.port="$APP_PORT" --spring.profiles.active="$SPRING_PROFILES_ACTIVE" --spring.datasource.url="$JDBC_URL" \
     --spring.datasource.username="$DB_USER" --spring.datasource.password="$DB_PASSWORD" \

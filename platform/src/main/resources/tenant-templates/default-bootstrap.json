@@ -67,7 +67,7 @@
     {
       "code": "acp.runtime.manage",
       "name": "Agent 运行时操作",
-      "description": "派发任务给 Agent、脚手架、调度重载/触发、工具契约派生、dry-run/沙箱、协作与 BPM 桥接、技能同步",
+      "description": "派发任务给 Agent、脚手架、调度重载/触发、工具契约派生、dry-run/沙箱、协作与工作流能力桥接、技能同步",
       "type": "function",
       "module": "acp",
       "resource": "/api/agent",
