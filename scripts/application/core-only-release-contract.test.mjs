@@ -9,6 +9,8 @@ const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
+  assert.match(stage, /platform\/gradlew/);
+  assert.match(stage, /'clean', 'bootJar', '--no-daemon', '-x', 'test'/);
   assert.match(stage, /materializeAndBuildCoreWeb/);
   assert.match(stage, /pnpm', \['--dir', 'web-admin', 'build'\]/);
   assert.match(stage, /bin\/auraboot-core-env\.sh/);

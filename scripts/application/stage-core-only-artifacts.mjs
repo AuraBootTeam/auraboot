@@ -387,6 +387,15 @@ function main() {
     if (actual !== version) throw new Error(`${name} version ${actual} does not match VERSION ${version}`);
   }
 
+  // Never attach the current Git identity to whatever happens to be left in
+  // platform/build/libs. Release staging must create the runtime bytes from the
+  // clean worktree it just identified, so a previous checkout cannot leak into
+  // an otherwise valid lock and receipt.
+  run(resolve(repoRoot, 'platform/gradlew'), [
+    '-p', resolve(repoRoot, 'platform'),
+    'clean', 'bootJar', '--no-daemon', '-x', 'test',
+  ], { cwd: repoRoot, capture: false });
+
   mkdirSync(output, { recursive: false });
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
 
