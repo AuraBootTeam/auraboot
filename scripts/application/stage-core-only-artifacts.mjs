@@ -24,6 +24,7 @@ import {
   verifyArtifacts,
 } from './application-contract.mjs';
 import { writeMigrationSplit } from './migration-ownership.mjs';
+import { writePlatformAdminConfigSplit } from './config-ownership.mjs';
 
 const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
@@ -197,10 +198,11 @@ function main() {
   );
   const coreMigrations = requirePath(resolve(migrationOutput, 'core'), 'core-only migrations');
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
-  const platformAdmin = copyArtifact(
+  const configSplit = writePlatformAdminConfigSplit(
     resolve(repoRoot, 'plugins/platform-admin'),
-    resolve(output, 'config/platform-admin'),
+    resolve(output, 'config-split'),
   );
+  const platformAdmin = copyArtifact(configSplit.coreRoot, resolve(output, 'config/platform-admin'));
 
   const artifactInputs = [
     { type: 'runtime', id: 'com.auraboot:runtime', version, path: runtime },
