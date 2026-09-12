@@ -13,6 +13,7 @@
 import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
 import { useSmartText } from '~/utils/i18n';
+import { resolveFieldLabel } from '~/framework/meta/utils/i18nResolver';
 import { reportDesignerService } from '~/plugins/core-designer/components/report-designer/services/reportDesignerService';
 import { createEmptyReport } from '~/plugins/core-designer/components/report-designer/types';
 import { useAnalyticsResultView } from './useAnalyticsResultView';
@@ -168,9 +169,11 @@ function ChatBiChart({
 function DataTable({
   records,
   columns,
+  labels = {},
 }: {
   records: Record<string, unknown>[];
   columns: string[];
+  labels?: Record<string, string>;
 }) {
   return (
     <div className="max-h-[300px] overflow-auto">
@@ -182,7 +185,7 @@ function DataTable({
                 key={col}
                 className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400"
               >
-                {col}
+                {labels[col] || col}
               </th>
             ))}
           </tr>
@@ -253,6 +256,32 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const [savedPid, setSavedPid] = useState<string | null>(null);
   const [savedCode, setSavedCode] = useState<string | null>(null);
   const text = useSmartText();
+  const columnLabels: Record<string, string> = {};
+  const aggregations: Record<string, string> = {
+    count: text({ 'zh-CN': '数量', 'en-US': 'Count' }),
+    sum: text({ 'zh-CN': '合计', 'en-US': 'Sum' }),
+    avg: text({ 'zh-CN': '平均值', 'en-US': 'Average' }),
+    min: text({ 'zh-CN': '最小值', 'en-US': 'Minimum' }),
+    max: text({ 'zh-CN': '最大值', 'en-US': 'Maximum' }),
+    count_distinct: text({ 'zh-CN': '去重数量', 'en-US': 'Distinct count' }),
+  };
+  for (const column of effectiveColumns) {
+    const metric = (result.metrics || result.dataSource?.metrics || []).find(
+      (candidate) => (candidate.alias || candidate.field) === column,
+    );
+    const field = metric?.field || column;
+    const fieldLabel = resolveFieldLabel(
+      field,
+      result.modelCode || result.dataSource?.modelCode || '',
+      t,
+    );
+    columnLabels[column] =
+      metric && aggregations[metric.aggregation]
+        ? metric.aggregation === 'count' && field === 'pid'
+          ? aggregations.count
+          : `${fieldLabel} · ${aggregations[metric.aggregation]}`
+        : fieldLabel;
+  }
   const [savingReport, setSavingReport] = useState(false);
   const [savedReportPid, setSavedReportPid] = useState<string | null>(null);
   const dataSource = result.dataSource;
@@ -275,7 +304,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           blockType: 'table',
           dataSource: 'analysis',
           showHeader: true,
-          columns: effectiveColumns.map((field) => ({ field, label: field })),
+          columns: effectiveColumns.map((field) => ({ field, label: columnLabels[field] })),
         },
       ];
       const pid = await reportDesignerService.save(report, undefined, result.analysisId);
@@ -393,7 +422,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               title={interpretation}
             />
           ) : (
-            <DataTable records={records} columns={effectiveColumns} />
+            <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />
           )}
         </div>
 

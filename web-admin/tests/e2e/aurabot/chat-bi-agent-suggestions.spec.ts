@@ -116,6 +116,8 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
       path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-${n}.png`,
       fullPage: true,
     });
+  await expect(card.locator('thead')).not.toContainText('e2et_order_title');
+  await expect(card.locator('th').first()).toHaveText('数量');
   await expect(suggestions).toContainText('还没有已记录的建议');
   await suggestions.scrollIntoViewIfNeeded();
   await shot('01');
