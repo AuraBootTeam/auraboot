@@ -1145,6 +1145,20 @@ public class StepLoopService {
         String result = toolLoopService.executeToolCall(
                 tenantId, runPid, taskPid, agentCode, toolName, approvedInput, approvedTools, traceCtx);
         throwIfApprovalRequiredToolResult(result, toolName, approvedInput);
+        if (!ToolResultOutcome.isSuccess(result, objectMapper)) {
+            String failure = "Approved tool execution failed: " + toolName;
+            step.setStatus(AgentPlanStep.StepStatus.FAILED);
+            step.setError(failure);
+            step.setResult(truncate(result, 200));
+            step.setFinishedAt(LocalDateTime.now());
+            step.setDurationMs(System.currentTimeMillis() - started);
+            Map<String, Object> failed = new LinkedHashMap<>(output);
+            failed.put("status", "failed");
+            failed.put("result", truncate(result, 200));
+            step.setOutput(failed);
+            persistPlan(tenantId, runPid, plan, stepIndex, "approval_tool_failed");
+            throw new IllegalStateException(failure);
+        }
 
         step.setStatus(AgentPlanStep.StepStatus.COMPLETED);
         step.setError(null);

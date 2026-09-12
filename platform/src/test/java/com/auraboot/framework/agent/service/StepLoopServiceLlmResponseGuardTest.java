@@ -347,6 +347,36 @@ class StepLoopServiceLlmResponseGuardTest {
         verifyNoInteractions(tools, provider);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{\"success\":false,\"error\":\"denied\"}", "Error: provider rejected"})
+    @org.junit.jupiter.params.provider.NullSource
+    void failedApprovedToolPersistsFailureAndStopsLaterSteps(String result) {
+        var tools = mock(ToolLoopService.class);
+        when(tools.executeToolCall(any(), anyString(), anyString(), anyString(), anyString(), anyMap(), any(), any()))
+                .thenReturn(result);
+        var gate = mock(AgentApprovalGateService.class);
+        when(gate.consumeResumeGrant(any(), anyString(), anyString(), anyString(), anyMap())).thenReturn(true);
+        var mapper = persistentMapper();
+        var service = newService(mapper, gate, tools);
+        var step = new AgentPlanStep(0, "Approved action");
+        step.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        step.setOutput(Map.of("approvalPid", "approved", "approvalToolName", "write", "approvalInput", Map.of("value", "one")));
+        var later = new AgentPlanStep(1, "Follow-up action");
+        var previousStatus = later.getStatus();
+        var provider = mock(LlmProvider.class);
+        assertThatThrownBy(() -> service.executePlanSteps(new java.util.ArrayList<>(List.of(step, later)), 0,
+                1L, "run", "task", "aurabot", "system", "user", List.of(), Map.of(), Map.of(), provider,
+                providerConfig(), null, true)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Approved tool execution failed");
+        assertThat(step.getStatus()).isEqualTo(AgentPlanStep.StepStatus.FAILED);
+        assertThat(step.getOutput()).containsEntry("status", "failed").containsEntry("approvalPid", "approved");
+        assertThat(step.getFinishedAt()).isNotNull();
+        assertThat(later.getStatus()).isEqualTo(previousStatus);
+        verify(mapper).updateWithJsonb(anyString(), anyMap(), anyMap(), anySet());
+        verifyNoInteractions(provider);
+        assertThat(StepContext.getStepIndex()).isNull();
+    }
+
     private StepLoopService newService() {
         DynamicDataMapper dynamicDataMapper = mock(DynamicDataMapper.class);
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());

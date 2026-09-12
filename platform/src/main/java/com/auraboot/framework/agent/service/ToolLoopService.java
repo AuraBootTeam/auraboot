@@ -1195,18 +1195,7 @@ public class ToolLoopService {
     }
 
     private boolean isToolResultSuccess(String result) {
-        if (result == null || result.startsWith("Error")) {
-            return false;
-        }
-        try {
-            Object parsed = objectMapper.readValue(result, Object.class);
-            if (parsed instanceof Map<?, ?> map && map.containsKey("success")) {
-                return Boolean.TRUE.equals(map.get("success"));
-            }
-        } catch (Exception ignored) {
-            // Non-JSON tool output is considered successful unless it starts with Error.
-        }
-        return true;
+        return ToolResultOutcome.isSuccess(result, objectMapper);
     }
 
     private Map<String, Object> parseToolResultMap(String result) {
