@@ -51,7 +51,7 @@ class RunLifecycleServiceTest {
                 observationService,
                 providerFactory,
                 jdbcTemplate,
-                eventPublisher);
+                eventPublisher, org.mockito.Mockito.mock(AgentRunTerminalStore.class));
     }
 
     @Test

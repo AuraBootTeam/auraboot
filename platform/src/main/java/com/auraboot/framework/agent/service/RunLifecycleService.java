@@ -38,6 +38,7 @@ public class RunLifecycleService {
     private final LlmProviderFactory providerFactory;
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final AgentRunTerminalStore terminalStore;
 
     static final int DEFAULT_MAX_CONCURRENT_RUNS = 3;
     static final int HEARTBEAT_INTERVAL_SECONDS = 30;
@@ -121,7 +122,6 @@ public class RunLifecycleService {
             runUpdate.put("error_message", "Plan execution did not reach success terminal state");
         }
         runUpdate.put("updated_at", completedAt);
-        dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
 
         Map<String, Object> taskUpdate = new HashMap<>();
         taskUpdate.put("task_status", result.success ? "done" : "blocked");
@@ -131,11 +131,9 @@ public class RunLifecycleService {
         if (result.lastResponse != null && !result.lastResponse.isBlank()) {
             taskUpdate.put("output_data", result.lastResponse);
         }
-        dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
-
-        publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked");
-
-        return result.success;
+        boolean changed = terminalStore.complete(tenantId, runPid, taskPid, runUpdate, taskUpdate,
+                () -> publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked"));
+        return changed && result.success;
     }
 
     /**
