@@ -74,6 +74,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -734,7 +735,7 @@ class PluginResourceImporterImplApplyTest {
     // ==================== importDict CREATE / UPDATE ====================
 
     @Test
-    @DisplayName("importDict CREATE branch: no existing dict -> dictService.create + markItemsAsPluginSource")
+    @DisplayName("importDict CREATE branch: no existing dict -> dictService.create with plugin ownership")
     void importDict_create_happyPath() {
         when(dictService.findByCode("d1")).thenReturn(null);
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any())).thenReturn(null);
@@ -754,8 +755,7 @@ class PluginResourceImporterImplApplyTest {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         assertThat(result.getResourcePid()).isEqualTo("dict-pid-new");
-        verify(dictService).create(any());
-        verify(dictService).markItemsAsPluginSource("dict-pid-new");
+        verify(dictService).create(argThat(request -> "plg".equals(request.getPluginPid())));
     }
 
     @Test

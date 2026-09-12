@@ -2174,8 +2174,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             }
 
             DictDTO created = dictService.create(request);
-            // Mark all items as PLUGIN-sourced for source-aware reimport
-            dictService.markItemsAsPluginSource(created.getPid());
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DICT,
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),

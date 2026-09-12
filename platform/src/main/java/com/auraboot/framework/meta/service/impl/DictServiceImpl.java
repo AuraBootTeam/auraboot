@@ -131,7 +131,8 @@ public class DictServiceImpl implements DictService {
 
         // 处理字典项（如果有）
         if (request.getItems() != null && !request.getItems().isEmpty()) {
-            saveDictItems(dict.getId(), request.getItems());
+            saveDictItems(dict.getId(), request.getItems(),
+                    StringUtils.hasText(request.getPluginPid()));
         }
 
         log.info("字典创建成功: {} (租户: {}), 字典项数量: {}",
@@ -176,6 +177,11 @@ public class DictServiceImpl implements DictService {
      * 所有字典类型统一使用此方法保存字典项
      */
     private void saveDictItems(Long dictId, List<DictCreateRequest.DictItemCreateRequest> itemRequests) {
+        saveDictItems(dictId, itemRequests, false);
+    }
+
+    private void saveDictItems(Long dictId, List<DictCreateRequest.DictItemCreateRequest> itemRequests,
+                               boolean pluginSource) {
         if (itemRequests == null || itemRequests.isEmpty()) {
             return;
         }
@@ -192,6 +198,7 @@ public class DictServiceImpl implements DictService {
             item.setSortNo(itemRequest.getSortOrder() != null ? itemRequest.getSortOrder() : 0);
             item.setParentValue(itemRequest.getParentValue());
             item.setStatus(Boolean.TRUE.equals(itemRequest.getDisabled()) ? "disabled" : "enabled");
+            item.setSource(pluginSource ? "plugin" : "user");
             item.setExtra(itemRequest.getExtension());
             item.setCreatedAt(Instant.now());
             item.setUpdatedAt(Instant.now());
