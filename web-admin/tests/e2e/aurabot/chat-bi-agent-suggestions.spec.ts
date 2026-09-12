@@ -61,6 +61,9 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
   await expect(toggle).toHaveClass(/text-gray-500/);
   await toggle.click();
   await expect(panel.getByTestId('aurabot-input')).toBeVisible();
+  await panel.getByTestId('aurabot-history-trigger').click();
+  await panel.getByTestId('aurabot-new-session').click();
+  await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
   const query = {
     modelCode: 'e2et_order',
     dimensions: ['e2et_order_title'],
@@ -294,6 +297,7 @@ test('AI suggestion confirmation and manual adoption use the visible AuraBot con
     await expect(executionMessage).toContainText(marker);
     await executionMessage.scrollIntoViewIfNeeded();
     await expect(executionMessage).toBeInViewport();
+    await expect(panel.getByTestId('chat-msg-agent').filter({ hasText: 'tool-output' })).toHaveCount(0);
     await shot('ai-executed');
     await suggestions.getByRole('button', { name: '刷新建议', exact: true }).click();
     await expect(version.getByTestId('analytics-execution-status')).toContainText('执行成功');

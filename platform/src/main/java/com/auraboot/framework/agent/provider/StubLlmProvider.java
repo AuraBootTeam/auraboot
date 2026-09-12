@@ -31,9 +31,9 @@ import java.time.Duration;
  *
  * <p>The stub answers normal calls with a single text block containing
  * {@code "[stub response]"} and stop_reason {@code "end_turn"}. When a test
- * turn has just returned a {@code tool_result}, the final text includes a
- * compact deterministic digest of that result so browser E2E can assert the
- * real tool loop outcome without a real LLM summarizer.
+ * turn explicitly requests {@link #TOOL_RESULT_DIGEST_MARKER}, the final text includes a
+ * diagnostic digest of the latest tool result. Ordinary UI tests assert structured
+ * tool results and persisted facts instead of echoing internal payloads as prose.
  *
  * <p>Streaming: {@link #streamChat} emits a single delta chunk followed by a
  * terminal {@code done} chunk wrapping the same response. This matches the
@@ -88,6 +88,8 @@ public class StubLlmProvider implements LlmProvider {
     static final long MAX_STUB_DELAY_MS = 10_000L;
 
     /** Fixed response text returned for every chat request. */
+    static final String TOOL_RESULT_DIGEST_MARKER = "@@AURABOOT_STUB_TOOL_RESULT_DIGEST@@";
+
     static final String STUB_RESPONSE_TEXT = "[stub response]";
 
     private static final int MAX_TOOL_RESULT_DIGEST_CHARS = 2000;
@@ -138,7 +140,7 @@ public class StubLlmProvider implements LlmProvider {
         // Emit one delta chunk + one terminal done chunk so downstream
         // aggregators that expect at least one delta before the terminal frame
         // (mirroring Anthropic's wire shape) stay byte-compatible.
-        LlmChunk deltaChunk = LlmChunk.delta(0L, STUB_RESPONSE_TEXT);
+        LlmChunk deltaChunk = LlmChunk.delta(0L, aggregate.getContent().get(0).getText());
         LlmChunk doneChunk = LlmChunk.done(1L, aggregate);
         Flux<LlmChunk> stream = Flux.just(deltaChunk, doneChunk);
         // DELAY_MARKER spreads the two chunks across the requested window so any
@@ -198,6 +200,12 @@ public class StubLlmProvider implements LlmProvider {
     }
 
     private String latestToolResultDigest(LlmChatRequest request) {
+        boolean requested = request != null && request.getMessages() != null
+                && request.getMessages().stream().anyMatch(message -> message != null
+                    && "user".equals(message.getRole())
+                    && message.getContent() instanceof String text
+                    && text.contains(TOOL_RESULT_DIGEST_MARKER));
+        if (!requested) return null;
         Object result = latestToolResult(request);
         if (result == null) {
             return null;

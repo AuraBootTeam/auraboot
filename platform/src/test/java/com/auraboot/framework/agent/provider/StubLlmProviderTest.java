@@ -36,7 +36,7 @@ class StubLlmProviderTest {
     }
 
     @Test
-    @DisplayName("scripted marker is not repeated after tool_result and final text carries result digest")
+    @DisplayName("scripted marker is not repeated after tool_result and internal payload is not echoed")
     void scriptedToolUseMarkerIsIgnoredAfterToolResult() {
         String message = StubLlmProvider.TOOL_USE_MARKER + " "
                 + "{\"id\":\"toolu-skill\",\"name\":\"aurabot:model:create\","
@@ -57,19 +57,20 @@ class StubLlmProviderTest {
 
         assertThat(response.getStopReason()).isEqualTo("end_turn");
         assertThat(response.getContent().get(0).getText())
-                .contains("[stub response]")
-                .contains("\"success\":true");
+                .isEqualTo("[stub response]");
     }
 
     @Test
-    @DisplayName("tool_result JSON string is surfaced in deterministic final text")
+    @DisplayName("tool_result diagnostic echo requires explicit opt-in")
     void toolResultJsonStringIsSurfacedInFinalText() {
         String supplierResult = """
                 {"success":true,"records":[{"supplier_name":"Shenzhen Precision Components","supplier_id":"SUP-1"}]}
                 """;
 
         LlmChatResponse response = provider.chat(LlmChatRequest.builder()
-                .messages(List.of(LlmChatRequest.Message.builder()
+                .messages(List.of(
+                        LlmChatRequest.Message.text("user", StubLlmProvider.TOOL_RESULT_DIGEST_MARKER),
+                        LlmChatRequest.Message.builder()
                         .role("user")
                         .content(List.of(LlmChatRequest.ContentBlock.builder()
                                 .type("tool_result")
@@ -84,6 +85,19 @@ class StubLlmProviderTest {
                 .contains("[stub response]")
                 .contains("Shenzhen Precision Components")
                 .contains("SUP-1");
+    }
+
+    @Test
+    void wrappedToolResultsDoNotLeakWithoutDiagnosticOptIn() {
+        var request = LlmChatRequest.builder().messages(List.of(
+                LlmChatRequest.Message.builder().role("user").content(List.of(
+                        LlmChatRequest.ContentBlock.builder().type("tool_result")
+                                .result("<tool-output>internal-id secret-payload</tool-output>").build()
+                )).build())).build();
+        assertThat(provider.chat(request, "", "").getContent().get(0).getText())
+                .isEqualTo("[stub response]");
+        var chunks = provider.streamChat(request, "", "").collectList().block();
+        assertThat(chunks).hasSize(2);
     }
 
     @Test
