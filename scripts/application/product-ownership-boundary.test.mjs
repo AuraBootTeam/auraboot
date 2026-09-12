@@ -154,6 +154,7 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/playwright.seed.config.ts',
     'scripts/docker-ga-showcase-e2e.sh',
     'scripts/host-oee-dashboard-golden.sh',
+    'scripts/mes-wms-golden-run.sh',
     'scripts/deploy/oss-remote/gen-admin-storage.mjs',
     'web-admin/tests/helpers/wd-fixtures.ts',
   ]) {
