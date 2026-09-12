@@ -27,6 +27,7 @@ function manifest() {
       pluginApi: '1.3.0',
       webShell: '1.3.0',
       pluginSdk: '1.3.0',
+      webPackages: [{ package: '@auraboot/ui', version: '1.3.0' }],
       dslSchema: 4,
     },
     backend: {
@@ -55,6 +56,7 @@ function catalog() {
       { ...artifact('maven', 'com.auraboot:platform-plugin-api', '1.3.0', '2'), uri: 'maven:com.auraboot:platform-plugin-api:1.3.0' },
       artifact('npm', '@auraboot/web-shell', '1.3.0', '3'),
       artifact('npm', '@auraboot/plugin-sdk', '1.3.0', '4'),
+      artifact('npm', '@auraboot/ui', '1.3.0', 'b'),
       artifact('plugin', 'com.auraboot.crm', '1.0.0', '5'),
       artifact('migration', 'core', '1.3.0', '6'),
       artifact('migration', 'crm', '1.0.0', '7'),
@@ -95,7 +97,7 @@ describe('AuraBoot application contract', () => {
     const second = resolveFixture();
 
     assert.deepEqual(first, second);
-    assert.equal(first.artifacts.length, 10);
+    assert.equal(first.artifacts.length, 11);
     assert.match(first.identity, /^sha256:[0-9a-f]{64}$/);
     assert.doesNotThrow(() => validateLock(first));
   });

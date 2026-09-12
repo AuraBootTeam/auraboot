@@ -81,6 +81,7 @@ export function validateManifest(manifest) {
   assertUnique(manifest.backend.plugins.map((plugin) => plugin.id), 'backend.plugins');
   assertUnique(manifest.backend.migrationSets, 'backend.migrationSets');
   assertUnique(manifest.frontend.contributions.map((item) => item.package), 'frontend.contributions');
+  assertUnique(manifest.platform.webPackages.map((item) => item.package), 'platform.webPackages');
   assertUnique(manifest.config.importOrder, 'config.importOrder');
   return manifest;
 }
@@ -167,6 +168,7 @@ export function buildApplicationGraph(manifestInput, webContributionInputs = [],
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { kind: 'web', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
+    ...manifest.platform.webPackages.map((item) => ({ kind: 'web', id: item.package, version: item.version })),
     ...manifest.backend.plugins.map((plugin) => ({ kind: 'plugin', id: plugin.id, version: plugin.version })),
     ...manifest.backend.migrationSets.map((id) => ({ kind: 'migration', id })),
     ...manifest.frontend.contributions.map((item) => ({
@@ -265,6 +267,7 @@ function requirements(manifest) {
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
+    ...manifest.platform.webPackages.map((item) => ({ type: 'npm', id: item.package, version: item.version })),
     ...manifest.backend.plugins.map((plugin) => ({ type: 'plugin', id: plugin.id, version: plugin.version })),
     ...manifest.backend.migrationSets.map((id) => ({ type: 'migration', id })),
     ...manifest.frontend.contributions.map((item) => ({

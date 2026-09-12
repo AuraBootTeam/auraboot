@@ -22,6 +22,7 @@ function manifest() {
       pluginApi: '1.0.0',
       webShell: '1.0.0',
       pluginSdk: '1.0.0',
+      webPackages: [{ package: '@auraboot/ui', version: '1.0.0' }],
       dslSchema: 4,
     },
     backend: { mode: 'core-only', plugins: [], migrationSets: ['core'] },
@@ -80,6 +81,7 @@ describe('application graph adapters', () => {
       ['maven', 'com.auraboot:platform-plugin-api', 'maven/plugin-api.jar'],
       ['npm', '@auraboot/web-shell', 'npm/web-shell.tgz'],
       ['npm', '@auraboot/plugin-sdk', 'npm/plugin-sdk.tgz'],
+      ['npm', '@auraboot/ui', 'npm/ui.tgz'],
       ['migration', 'core', 'migrations/core.bin'],
       ['config', 'core-meta', 'config/core-meta.bin'],
     ];

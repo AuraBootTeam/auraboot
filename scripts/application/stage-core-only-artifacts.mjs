@@ -156,6 +156,35 @@ function packWebShell(repoRoot, destination, version) {
   }
 }
 
+function packUi(repoRoot, destination) {
+  mkdirSync(destination, { recursive: true });
+  const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-ui-pack-'));
+  const sourceRoot = resolve(repoRoot, 'packages/ui');
+  try {
+    run('pnpm', ['exec', 'tsc', '-p', 'packages/ui/tsconfig.json', '--tsBuildInfoFile', resolve(packageRoot, 'tsconfig.tsbuildinfo')], {
+      cwd: repoRoot,
+      capture: false,
+    });
+    cpSync(resolve(sourceRoot, 'dist'), resolve(packageRoot, 'dist'), { recursive: true });
+    cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
+    copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
+    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
+    packageManifest.main = './dist/index.js';
+    packageManifest.module = './dist/index.js';
+    packageManifest.types = './dist/index.d.ts';
+    packageManifest.exports = {
+      '.': { types: './dist/index.d.ts', import: './dist/index.js', default: './dist/index.js' },
+      './toast': { types: './dist/toast.d.ts', import: './dist/toast.js', default: './dist/toast.js' },
+    };
+    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
+    const packed = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
+    return requirePath(resolve(packed.split('\n').at(-1)), 'UI tarball');
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true });
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const { repoRoot, output } = options;
@@ -190,6 +219,7 @@ function main() {
   );
   const npmRoot = resolve(output, 'npm');
   const pluginSdk = packPluginSdk(repoRoot, npmRoot);
+  const ui = packUi(repoRoot, npmRoot);
   const webShell = packWebShell(repoRoot, npmRoot, version);
   const migrationOutput = resolve(output, 'migrations');
   writeMigrationSplit(
@@ -209,6 +239,7 @@ function main() {
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version, path: pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version, path: webShell },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk, path: pluginSdk },
+    { type: 'npm', id: '@auraboot/ui', version: '1.0.0', path: ui },
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
     { type: 'config', id: 'platform-admin', version, path: platformAdmin },

@@ -21,12 +21,25 @@
     "platform": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["runtime", "pluginApi", "webShell", "pluginSdk", "dslSchema"],
+      "required": ["runtime", "pluginApi", "webShell", "pluginSdk", "webPackages", "dslSchema"],
       "properties": {
         "runtime": { "$ref": "#/definitions/releaseVersion" },
         "pluginApi": { "$ref": "#/definitions/releaseVersion" },
         "webShell": { "$ref": "#/definitions/releaseVersion" },
         "pluginSdk": { "$ref": "#/definitions/releaseVersion" },
+        "webPackages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version"],
+            "properties": {
+              "package": { "type": "string", "pattern": "^@auraboot/[a-z0-9-]+$" },
+              "version": { "$ref": "#/definitions/releaseVersion" }
+            }
+          }
+        },
         "dslSchema": { "type": "integer", "minimum": 1 }
       }
     },

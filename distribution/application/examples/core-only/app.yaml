@@ -9,6 +9,9 @@ platform:
   pluginApi: 1.0.0
   webShell: 1.0.0
   pluginSdk: 0.0.1
+  webPackages:
+    - package: "@auraboot/ui"
+      version: 1.0.0
   dslSchema: 4
 backend:
   mode: core-only
