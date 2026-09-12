@@ -23,6 +23,17 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
   const importResult = await imported.json();
   expect(importResult.success, JSON.stringify(importResult)).toBe(true);
   const marker = `suggestion-${randomUUID()}`;
+  for (const title of [marker, marker, `${marker}-excluded`]) {
+    const fixture = await request.post('/api/dynamic/e2et_order/create', {
+      data: {
+        e2et_order_title: title,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+        e2et_order_status: 'draft',
+      },
+    });
+    expect(fixture.status(), await fixture.text()).toBe(200);
+  }
   const chat = await request.post('/api/ai/aurabot/chat/stream', {
     data: {
       sessionId: marker,
@@ -58,6 +69,9 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     });
   const analysis = contracts.find((contract) => contract?.data?.data?.analysisId)?.data.data;
   expect(analysis, JSON.stringify(contracts)).toBeDefined();
+  expect(analysis.records).toHaveLength(1);
+  expect(analysis.records[0].e2et_order_title).toBe(marker);
+  expect(Number(analysis.records[0].cnt)).toBe(2);
   const db = new Client(PG_CONN);
   await db.connect();
   try {
