@@ -5,6 +5,7 @@ import com.auraboot.framework.decision.adapter.DecisionTableAdapter;
 import com.auraboot.framework.decision.adapter.SimpleConditionAdapter;
 import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.DefaultDecisionRuntime;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -41,6 +42,7 @@ public class DecisionRuntimeConfig {
     }
 
     @Bean
+    @ConditionalOnBean(com.auraboot.framework.bpm.rule.DroolsEngineService.class)
     public com.auraboot.framework.decision.adapter.DroolsDrlAdapter droolsDrlAdapter(
             com.auraboot.framework.bpm.rule.DroolsEngineService droolsEngineService) {
         return new com.auraboot.framework.decision.adapter.DroolsDrlAdapter(droolsEngineService);

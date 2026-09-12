@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -49,7 +50,7 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
     private final AutomationTriggerService automationTriggerService;
-    private final com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+    private final ObjectProvider<com.auraboot.framework.automation.bpm.AutomationProcessRuntime> automationProcessRuntimeProvider;
     private final AutomationFlowTriggerDeriver flowTriggerDeriver;
     private final DecisionUsageIndexService usageIndexService;
 
@@ -129,7 +130,7 @@ public class AutomationServiceImpl implements AutomationService {
         automationMapper.insertAutomation(automation);
         usageIndexService.refreshSource("AUTOMATION", automation.getPid());
         if (Boolean.TRUE.equals(automation.getEnabled())) {
-            automationProcessRuntime.deploy(automation);
+            requireAutomationProcessRuntime().deploy(automation);
         }
 
         log.info("Automation created: pid={}", automation.getPid());
@@ -311,7 +312,7 @@ public class AutomationServiceImpl implements AutomationService {
 
         // Trigger execution always goes through SmartEngine. The compiler supports both
         // visual flowConfig and flat actions[], so both shapes must be deployed on enable.
-        automationProcessRuntime.deploy(automation);
+        requireAutomationProcessRuntime().deploy(automation);
 
         log.info("Automation enabled: pid={}", pid);
         return toDTO(automation);
@@ -515,6 +516,14 @@ public class AutomationServiceImpl implements AutomationService {
                         "Invalid trigger type: " + request.getTriggerType());
             }
         }
+    }
+
+    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime requireAutomationProcessRuntime() {
+        var runtime = automationProcessRuntimeProvider.getIfAvailable();
+        if (runtime == null) {
+            throw new IllegalStateException("BPM application capability is required to enable automations");
+        }
+        return runtime;
     }
 
     private AutomationDTO toDTO(Automation entity) {

@@ -180,8 +180,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
 
     // Dependencies for deploying BPMN to SmartEngine at import time.
-    private final com.auraboot.framework.bpm.converter.JsonToBpmnConverter jsonToBpmnConverter;
-    private final com.auraboot.smart.framework.engine.SmartEngine smartEngine;
+    private final ObjectProvider<com.auraboot.framework.bpm.converter.JsonToBpmnConverter> jsonToBpmnConverterProvider;
+    private final ObjectProvider<com.auraboot.smart.framework.engine.SmartEngine> smartEngineProvider;
 
     // Optional dependency - may not be configured in all environments
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -1726,6 +1726,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 designerJson.putIfAbsent("name", dto.getEffectiveName());
             }
             try {
+                var jsonToBpmnConverter = jsonToBpmnConverterProvider.getIfAvailable();
+                if (jsonToBpmnConverter == null) {
+                    throw new PluginException(
+                            "BPM process import requires an installed JsonToBpmnConverter provider");
+                }
                 String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
                 return stampVersion(bpmnXml, version);
             } catch (Exception e) {
@@ -1842,6 +1847,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Without tenantId the key is processKey:version; but ProcessEngineService.startProcess
             // passes TENANT_ID in variables, causing SmartEngine to look up by
             // processKey:version:tenantId — which would be absent.
+            var smartEngine = smartEngineProvider.getIfAvailable();
+            if (smartEngine == null) {
+                throw new PluginException("BPM process deploy requires an installed SmartEngine provider");
+            }
             smartEngine.getRepositoryCommandService()
                     .deployWithUTF8Content(bpmnXml, String.valueOf(tenantId));
             log.info("Deployed BPMN process to SmartEngine: tenantId={}, processKey={}, version={}",

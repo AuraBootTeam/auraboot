@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
+import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -94,6 +95,9 @@ public class SolutionSeeder {
 
         int count = 0;
         for (Object[] sol : solutions) {
+            if (ApplicationMode.isCoreOnly() && containsProductSignal(sol)) {
+                continue;
+            }
             count += jdbcTemplate.update(sql,
                 sol[0], sol[1], sol[2], sol[3], sol[4], sol[5],
                 sol[6], sol[7], sol[8], sol[9], sol[10],
@@ -101,5 +105,15 @@ public class SolutionSeeder {
                 sol[16], sol[17], sol[18], sol[19]);
         }
         log.info("SolutionSeeder: seeded {} solutions (skipped {} existing)", count, solutions.length - count);
+    }
+
+    private boolean containsProductSignal(Object[] solution) {
+        for (Object value : solution) {
+            if (value instanceof String text
+                    && text.matches("(?is).*(^|[^a-z0-9])(crm|bpm)([^a-z0-9]|$).*$")) {
+                return true;
+            }
+        }
+        return false;
     }
 }

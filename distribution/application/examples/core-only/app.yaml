@@ -11,6 +11,7 @@ platform:
   pluginSdk: 0.0.1
   dslSchema: 4
 backend:
+  mode: core-only
   plugins: []
   migrationSets:
     - core

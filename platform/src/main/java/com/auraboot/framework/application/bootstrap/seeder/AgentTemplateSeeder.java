@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
+import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
@@ -222,12 +223,18 @@ public class AgentTemplateSeeder {
 
         int count = 0;
         for (Object[] skill : skills) {
+            if (ApplicationMode.isCoreOnly()
+                    && ("approval_workflow".equals(skill[2]) || "crm_operations".equals(skill[2]))) {
+                continue;
+            }
             count += jdbcTemplate.update(sql, skill[0], skill[1], skill[2], skill[3],
                     skill[4], skill[5], skill[6], skill[7], skill[8], skill[9], skill[10]);
         }
         log.info("AgentTemplateSeeder: upserted {} built-in skills (re-applies execution_config)", count);
 
-        seedOrchestrationSkills();
+        if (!ApplicationMode.isCoreOnly()) {
+            seedOrchestrationSkills();
+        }
     }
 
     /**
@@ -420,6 +427,13 @@ public class AgentTemplateSeeder {
 
         int count = 0;
         for (Object[] agent : agents) {
+            if (ApplicationMode.isCoreOnly()
+                    && ("tpl_approval_assistant".equals(agent[2]) || "tpl_customer_service".equals(agent[2]))) {
+                continue;
+            }
+            if (ApplicationMode.isCoreOnly() && "tpl_aurabot_internal".equals(agent[2])) {
+                agent[7] = "data_entry_assistant,report_analysis,ops_inspector";
+            }
             count += jdbcTemplate.update(sql, agent[0], agent[1], agent[2], agent[3],
                     agent[4], agent[5], agent[6], agent[7], agent[8], agent[9]);
         }

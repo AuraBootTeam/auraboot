@@ -86,6 +86,7 @@ import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -155,8 +156,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final CommandActionDeriver commandActionDeriver;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
-    private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
-    private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
+    private final ObjectProvider<com.auraboot.framework.bpm.rule.DroolsRuleService> droolsRuleServiceProvider;
+    private final ObjectProvider<com.auraboot.framework.bpm.service.SlaConfigService> slaConfigServiceProvider;
     private final AutomationService automationService;
     private final DrtDefinitionService drtDefinitionService;
     private final DecisionVersionService decisionVersionService;
@@ -2398,6 +2399,10 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private void importRules(PluginManifestExtended manifest) {
         if (manifest.getRules() == null || manifest.getRules().isEmpty()) return;
+        var droolsRuleService = droolsRuleServiceProvider.getIfAvailable();
+        if (droolsRuleService == null) {
+            throw new PluginException("BPM rule import requires an installed DroolsRuleService provider");
+        }
         int created = 0;
         for (BpmRuleDefinitionDTO dto : manifest.getRules()) {
             if (!dto.isValid()) {
@@ -2719,6 +2724,10 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private void importSlaConfigs(PluginManifestExtended manifest) {
         if (manifest.getSlaConfigs() == null || manifest.getSlaConfigs().isEmpty()) return;
+        var slaConfigService = slaConfigServiceProvider.getIfAvailable();
+        if (slaConfigService == null) {
+            throw new PluginException("SLA import requires an installed SlaConfigService provider");
+        }
         int created = 0;
         for (SlaConfigDefinitionDTO dto : manifest.getSlaConfigs()) {
             if (!dto.isValid()) {

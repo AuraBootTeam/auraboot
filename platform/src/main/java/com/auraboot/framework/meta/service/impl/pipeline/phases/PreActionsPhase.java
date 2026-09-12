@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -79,7 +80,7 @@ public class PreActionsPhase implements CommandPhase {
     private static final String RULE_RESULT_KEY_REASON = "reason";
     private static final String FALLBACK_REASON_KEY = "bpm.rule.execution_failed";
 
-    private final DroolsEngineService droolsEngineService;
+    private final ObjectProvider<DroolsEngineService> droolsEngineServiceProvider;
     private final DynamicDataService dynamicDataService;
     private final RecordSnapshotReader snapshotReader;
 
@@ -195,6 +196,10 @@ public class PreActionsPhase implements CommandPhase {
 
         Map<String, Object> ruleResult;
         try {
+            DroolsEngineService droolsEngineService = droolsEngineServiceProvider.getIfAvailable();
+            if (droolsEngineService == null) {
+                throw new BusinessException(RuleReasonMessages.i18nKey(FALLBACK_REASON_KEY));
+            }
             ruleResult = droolsEngineService.evaluate(ruleCode, facts);
         } catch (BusinessException be) {
             throw be;

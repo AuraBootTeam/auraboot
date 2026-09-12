@@ -9,12 +9,14 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +39,9 @@ class PreActionsPhaseTest {
     private DroolsEngineService droolsEngineService;
 
     @Mock
+    private ObjectProvider<DroolsEngineService> droolsEngineServiceProvider;
+
+    @Mock
     private DynamicDataService dynamicDataService;
 
     @Mock
@@ -44,6 +49,13 @@ class PreActionsPhaseTest {
 
     @InjectMocks
     private PreActionsPhase phase;
+
+    @BeforeEach
+    void provideDroolsEngineWhenAvailable() {
+        org.mockito.Mockito.lenient()
+                .when(droolsEngineServiceProvider.getIfAvailable())
+                .thenReturn(droolsEngineService);
+    }
 
     @Test
     @SuppressWarnings({"unchecked", "rawtypes"})

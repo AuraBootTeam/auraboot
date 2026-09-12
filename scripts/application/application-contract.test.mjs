@@ -30,6 +30,7 @@ function manifest() {
       dslSchema: 4,
     },
     backend: {
+      mode: 'application',
       plugins: [{ id: 'com.auraboot.crm', version: '1.0.0' }],
       migrationSets: ['core', 'crm'],
     },

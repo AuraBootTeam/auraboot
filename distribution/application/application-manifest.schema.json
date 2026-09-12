@@ -33,8 +33,9 @@
     "backend": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["plugins", "migrationSets"],
+      "required": ["mode", "plugins", "migrationSets"],
       "properties": {
+        "mode": { "enum": ["core-only", "application"] },
         "plugins": {
           "type": "array",
           "items": {

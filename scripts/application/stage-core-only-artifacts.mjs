@@ -23,6 +23,7 @@ import {
   validateManifest,
   verifyArtifacts,
 } from './application-contract.mjs';
+import { writeMigrationSplit } from './migration-ownership.mjs';
 
 const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
@@ -189,10 +190,12 @@ function main() {
   const npmRoot = resolve(output, 'npm');
   const pluginSdk = packPluginSdk(repoRoot, npmRoot);
   const webShell = packWebShell(repoRoot, npmRoot, version);
-  const coreMigrations = copyArtifact(
+  const migrationOutput = resolve(output, 'migrations');
+  writeMigrationSplit(
     resolve(repoRoot, 'platform/src/main/resources/db/migration/core'),
-    resolve(output, 'migrations/core'),
+    migrationOutput,
   );
+  const coreMigrations = requirePath(resolve(migrationOutput, 'core'), 'core-only migrations');
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
   const platformAdmin = copyArtifact(
     resolve(repoRoot, 'plugins/platform-admin'),

@@ -25,6 +25,7 @@ import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -54,7 +55,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
-    private final AutomationProcessRuntime automationProcessRuntime;
+    private final ObjectProvider<AutomationProcessRuntime> automationProcessRuntimeProvider;
 
     /**
      * Optional DecisionRuntime integration (M4): when an automation's trigger_config has a
@@ -86,10 +87,10 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
             AutomationLogMapper automationLogMapper,
-            AutomationProcessRuntime automationProcessRuntime) {
+            ObjectProvider<AutomationProcessRuntime> automationProcessRuntimeProvider) {
         this.automationMapper = automationMapper;
         this.automationLogMapper = automationLogMapper;
-        this.automationProcessRuntime = automationProcessRuntime;
+        this.automationProcessRuntimeProvider = automationProcessRuntimeProvider;
     }
 
     @Override
@@ -343,7 +344,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             try {
                 // Pass the log id through so AutomationActionServiceTaskDelegate can persist
                 // per-node execution rows linked to this run (G5 runtime overlay).
-                actionResults = automationProcessRuntime.run(
+                actionResults = requireAutomationProcessRuntime().run(
                         automation, recordPid, executionPayload, logEntry.getId());
                 logEntry.setStatus(StatusConstants.SUCCESS);
             } catch (AutomationProcessRuntime.AutomationProcessRunException e) {
@@ -368,6 +369,14 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 metaContextSnapshot.restore();
             }
         }
+    }
+
+    private AutomationProcessRuntime requireAutomationProcessRuntime() {
+        AutomationProcessRuntime runtime = automationProcessRuntimeProvider.getIfAvailable();
+        if (runtime == null) {
+            throw new IllegalStateException("BPM application capability is required to execute automations");
+        }
+        return runtime;
     }
 
     @Override

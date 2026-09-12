@@ -24,7 +24,7 @@ function manifest() {
       pluginSdk: '1.0.0',
       dslSchema: 4,
     },
-    backend: { plugins: [], migrationSets: ['core'] },
+    backend: { mode: 'core-only', plugins: [], migrationSets: ['core'] },
     frontend: { contributions: [{ package: '@auraboot/aura-crm-web', version: '1.0.0' }] },
     config: { importOrder: ['core-meta'] },
   };

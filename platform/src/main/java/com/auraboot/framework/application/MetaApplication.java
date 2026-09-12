@@ -34,7 +34,16 @@ public class MetaApplication {
 
 	//todo profile 设置,docker 集成,https
 	public static void main(String[] args) {
-		SpringApplication.run(MetaApplication.class, args);
+		Class<?> source = applicationSource(args);
+		SpringApplication.run(source, args);
+	}
+
+	static Class<?> applicationSource(String[] args) {
+		String mode = ApplicationMode.resolve(args);
+		if (!mode.isBlank()) {
+			System.setProperty(ApplicationMode.PROPERTY, mode);
+		}
+		return ApplicationMode.CORE_ONLY.equals(mode) ? CoreOnlyApplication.class : MetaApplication.class;
 	}
 
 }

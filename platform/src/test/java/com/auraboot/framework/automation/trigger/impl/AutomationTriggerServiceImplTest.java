@@ -54,8 +54,12 @@ class AutomationTriggerServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.bpm.AutomationProcessRuntime>
+                runtimeProvider = mock(org.springframework.beans.factory.ObjectProvider.class);
+        lenient().when(runtimeProvider.getIfAvailable()).thenReturn(automationProcessRuntime);
         service = new AutomationTriggerServiceImpl(
-                automationMapper, automationLogMapper, automationProcessRuntime);
+                automationMapper, automationLogMapper, runtimeProvider);
         ReflectionTestUtils.setField(service, "userMapper", userMapper);
         ReflectionTestUtils.setField(service, "tenantMemberService", tenantMemberService);
     }
