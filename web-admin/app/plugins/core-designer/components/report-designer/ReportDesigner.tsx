@@ -472,12 +472,22 @@ const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
       <ReportQueryControls report={report} query={query} />
-      <p className="mb-4 text-sm text-gray-500">
-        {text({
-          zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',
-          en: 'Model and named-query sources preview up to 500 rows and export up to 1000 rows. Narrow filters for larger results.',
-        })}
-      </p>
+      {Object.values(report.dataSources).some(source => source.type === 'aggregate') && (
+        <p className="mb-4 text-sm text-gray-500" data-testid="report-aggregate-limit-hint">
+          {text({
+            zh: '聚合数据按查询定义的范围和条数上限计算，预览与导出使用相同查询。',
+            en: 'Aggregate data uses the scope and row limit defined by the query. Preview and export use the same query.',
+          })}
+        </p>
+      )}
+      {Object.values(report.dataSources).some(source => source.type === 'model' || source.type === 'namedQuery') && (
+        <p className="mb-4 text-sm text-gray-500">
+          {text({
+            zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',
+            en: 'Model and named-query sources preview up to 500 rows and export up to 1000 rows. Narrow filters for larger results.',
+          })}
+        </p>
+      )}
       {report.header && (
         <>
           <div className="mb-4">

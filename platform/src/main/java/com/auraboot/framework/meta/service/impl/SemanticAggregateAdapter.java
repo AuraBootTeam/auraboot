@@ -193,7 +193,28 @@ public class SemanticAggregateAdapter {
     AggregateQueryResponse rebuild(SemanticQueryResponse semResp,
                                    AggregateQueryRequest request) {
         AggregateQueryResponse out = new AggregateQueryResponse();
-        out.setRows(semResp.getRows() == null ? List.of() : semResp.getRows());
+        List<String> requestedColumns = new ArrayList<>();
+        if (request.getDimensions() != null) requestedColumns.addAll(request.getDimensions());
+        if (request.getMetrics() != null) {
+            for (MetricConfig metric : request.getMetrics()) {
+                String code = pickMetricCode(metric);
+                if (code != null) requestedColumns.add(code);
+            }
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> source : semResp.getRows() == null
+                ? List.<Map<String, Object>>of() : semResp.getRows()) {
+            Map<String, Object> row = new LinkedHashMap<>(source);
+            for (String column : requestedColumns) {
+                String qualified = qualify(column, request.getSemanticModelCode());
+                if (!column.equals(qualified) && source.containsKey(qualified)) {
+                    row.remove(qualified);
+                    row.put(column, source.get(qualified));
+                }
+            }
+            rows.add(row);
+        }
+        out.setRows(rows);
 
         AggregateQueryResponse.QueryMeta meta = new AggregateQueryResponse.QueryMeta();
         meta.setDimensions(request.getDimensions());

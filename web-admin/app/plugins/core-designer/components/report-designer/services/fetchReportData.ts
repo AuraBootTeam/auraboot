@@ -94,6 +94,22 @@ async function fetchApiData(ds: ReportDataSource): Promise<Record<string, unknow
   return rows;
 }
 
+async function fetchAggregateData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
+  if (!ds.aggregateQuery || ds.aggregateQuery.type !== 'aggregate')
+    throw new Error('Report aggregateQuery is required');
+  const response = await fetch('/api/reports/query/aggregate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ds.aggregateQuery),
+  });
+  requireReportResponse(response);
+  const result = await response.json();
+  if (![0, 200].includes(Number(result.code)) || !Array.isArray(result.data?.rows)) {
+    throw new Error(result.message || 'Invalid report aggregate response');
+  }
+  return result.data.rows;
+}
+
 async function fetchStaticData(ds: ReportDataSource): Promise<Record<string, unknown>[]> {
   return Array.isArray(ds.data) ? ds.data : [];
 }
@@ -117,6 +133,9 @@ export async function fetchReportData(
 
   const fetches = entries.map(async ([key, ds]) => {
     switch (ds.type) {
+      case 'aggregate':
+        results[key] = await fetchAggregateData(ds);
+        break;
       case 'model':
         results[key] = await fetchModelData(ds);
         break;

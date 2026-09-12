@@ -117,6 +117,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             "reportingCurrency"
     );
 
+    private final com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
@@ -338,6 +339,10 @@ public class ReportExportServiceImpl implements ReportExportService {
         if (!(rawSources instanceof Map<?, ?> sources)) return;
         for (Object rawSource : sources.values()) {
             if (!(rawSource instanceof Map<?, ?> source)) continue;
+            if ("aggregate".equals(source.get("type"))) {
+                aggregateQueries.validateAccess(readAggregateQuery(toStringObjectMap(source)));
+                continue;
+            }
             if (DATA_SOURCE_NAMED_QUERY.equals(source.get("type")) || DATA_SOURCE_API.equals(source.get("type"))) {
                 requireReadPermission("data.datasource.read");
                 continue;
@@ -739,6 +744,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         return switch (type) {
+            case "aggregate" -> aggregateQueries.execute(readAggregateQuery(dataSource)).getRows();
             case DATA_SOURCE_STATIC -> normalizeRows(inlineRows);
             case DATA_SOURCE_MODEL, DATA_SOURCE_TABLE -> resolveModelRows(dataSource);
             case DATA_SOURCE_NAMED_QUERY -> {
@@ -749,6 +755,14 @@ public class ReportExportServiceImpl implements ReportExportService {
             default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Unsupported report dataSource type: " + type);
         };
+    }
+
+    private com.auraboot.framework.meta.dto.AggregateQueryRequest readAggregateQuery(Map<String, Object> source) {
+        if (!(source.get("aggregateQuery") instanceof Map<?, ?>)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report aggregateQuery is required");
+        }
+        return objectMapper.convertValue(source.get("aggregateQuery"),
+                com.auraboot.framework.meta.dto.AggregateQueryRequest.class);
     }
 
     private List<Map<String, Object>> resolveModelRows(Map<String, Object> dataSource) {

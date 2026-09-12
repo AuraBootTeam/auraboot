@@ -69,3 +69,43 @@ it('prioritizes a later access denial over another source failure', async () => 
   deny({ ok: false, status: 403 });
   await denied;
 });
+
+it('preserves the governed aggregate contract and result rows', async () => {
+  const rows = [
+    { region: 'East', revenue: 120 },
+    { region: 'West', revenue: 80 },
+  ];
+  const fetch = vi
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => ({ code: 0, data: { rows } }) });
+  vi.stubGlobal('fetch', fetch);
+  const report = createEmptyReport('Aggregate');
+  const aggregateQuery = { type: 'aggregate' as const, semanticModelCode: 'sales', limit: 42 };
+  report.dataSources = { sales: { type: 'aggregate', aggregateQuery } };
+  expect(await fetchReportData(report)).toEqual({ sales: rows });
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/reports/query/aggregate',
+    expect.objectContaining({ method: 'POST', body: JSON.stringify(aggregateQuery) }),
+  );
+});
+
+it.each([401, 403])('preserves aggregate access denial for HTTP %s', async (status) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+  const report = createEmptyReport('Protected aggregate');
+  report.dataSources = {
+    rows: { type: 'aggregate', aggregateQuery: { type: 'aggregate', semanticModelCode: 'sales' } },
+  };
+  await expect(fetchReportData(report)).rejects.toMatchObject({ kind: 'access' });
+});
+
+it('rejects missing aggregate rows instead of showing a successful empty report', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ ok: true, json: async () => ({ code: 0, data: {} }) }),
+  );
+  const report = createEmptyReport('Invalid aggregate');
+  report.dataSources = {
+    rows: { type: 'aggregate', aggregateQuery: { type: 'aggregate', modelCode: 'orders' } },
+  };
+  await expect(fetchReportData(report)).rejects.toThrow();
+});

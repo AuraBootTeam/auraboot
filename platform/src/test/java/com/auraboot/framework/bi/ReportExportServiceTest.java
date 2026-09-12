@@ -86,12 +86,15 @@ class ReportExportServiceTest {
     @Mock
     private ReportRenderClient reportRenderClient;
 
+    @Mock
+    private com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient().when(userPermissionService.hasPermission(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
-        reportExportService = new ReportExportServiceImpl(new ObjectMapper(),
+        reportExportService = new ReportExportServiceImpl(aggregateQueries, new ObjectMapper(),
                 dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
                 reportRenderClient, BrandingIdentity::community, userPermissionService);
         // A successful export records an audit event sourced from MetaContext (set on every real
@@ -171,7 +174,7 @@ class ReportExportServiceTest {
                         .withProperty("AURABOOT_BRANDING_CONFIG_PATH", brandingConfig.toString())
                         .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", "SO-2026-001"),
                 new ObjectMapper());
-        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(
+        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(aggregateQueries,
                 new ObjectMapper(),
                 dynamicDataService,
                 namedQueryService,
@@ -621,6 +624,30 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportPdf(request))
                 .isInstanceOf(ValidationException.class);
         verify(auditTrailService, never()).recordAudit(any());
+    }
+
+    @Test
+    void aggregateExportPreservesGovernedQueryAndCanonicalRows() throws Exception {
+        var query = Map.of("type", "aggregate", "semanticModelCode", "sales", "limit", 42);
+        var dsl = reportDsl();
+        dsl.put("dataSources", Map.of("orders", Map.of("type", "aggregate", "aggregateQuery", query)));
+        var page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().writeValueAsString(dsl));
+        when(reportStorageService.findByPid("aggregate-report")).thenReturn(page);
+        var response = new com.auraboot.framework.meta.dto.AggregateQueryResponse();
+        response.setRows(List.of(Map.of("region", "East", "cases", 120), Map.of("region", "West", "cases", 80)));
+        when(aggregateQueries.execute(any())).thenReturn(response);
+        var request = new ReportExportRequest(); request.setReportPid("aggregate-report");
+        var payload = new ObjectMapper().readTree(reportExportService.exportJson(request).getBytes());
+        assertThat(payload.path("dataSets").path("orders").get(0).path("cases").asInt()).isEqualTo(120);
+        assertThat(payload.path("dataSets").path("orders").get(1).path("cases").asInt()).isEqualTo(80);
+        var captured = ArgumentCaptor.forClass(com.auraboot.framework.meta.dto.AggregateQueryRequest.class);
+        verify(aggregateQueries).execute(captured.capture());
+        assertThat(captured.getValue().getSemanticModelCode()).isEqualTo("sales");
+        assertThat(captured.getValue().getLimit()).isEqualTo(42);
+        verify(aggregateQueries).validateAccess(captured.getValue());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService);
     }
 
     private void stubReportDsl(String reportPid) {

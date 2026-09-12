@@ -12,6 +12,9 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
+import { useSmartText } from '~/utils/i18n';
+import { reportDesignerService } from '~/plugins/core-designer/components/report-designer/services/reportDesignerService';
+import { createEmptyReport } from '~/plugins/core-designer/components/report-designer/types';
 import { useAnalyticsResultView } from './useAnalyticsResultView';
 import { useI18n } from '~/contexts/I18nContext';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
@@ -247,7 +250,44 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
   const [savedCode, setSavedCode] = useState<string | null>(null);
+  const text = useSmartText();
+  const [savingReport, setSavingReport] = useState(false);
+  const [savedReportPid, setSavedReportPid] = useState<string | null>(null);
   const dataSource = result.dataSource;
+  const canSaveReport = dataSource?.type === 'aggregate' && records.length > 0 && !savedReportPid;
+  const handleSaveReport = async () => {
+    if (!canSaveReport || savingReport || !dataSource) return;
+    setSavingReport(true);
+    try {
+      const report = createEmptyReport(
+        String(
+          interpretation || modelCode || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' }),
+        ).slice(0, 200),
+      );
+      report.dataSources = {
+        analysis: { type: 'aggregate', aggregateQuery: { ...dataSource, type: 'aggregate' } },
+      };
+      report.body = [
+        {
+          id: 'analysis',
+          blockType: 'table',
+          dataSource: 'analysis',
+          showHeader: true,
+          columns: effectiveColumns.map((field) => ({ field, label: field })),
+        },
+      ];
+      const pid = await reportDesignerService.save(report);
+      if (!pid) throw new Error('Saved report identity is missing');
+      setSavedReportPid(pid);
+      toast.success(text({ 'zh-CN': '已存为报表', 'en-US': 'Saved as report' }));
+    } catch {
+      toast.error(
+        text({ 'zh-CN': '存为报表失败，请重试', 'en-US': 'Could not save report. Please retry.' }),
+      );
+    } finally {
+      setSavingReport(false);
+    }
+  };
   const canSave = !!dataSource && records.length > 0 && !savedPid;
 
   const handleSaveDashboard = async () => {
@@ -347,8 +387,28 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         </div>
 
         {/* Actions: ad-hoc → persisted bridge (save this chart as a dashboard widget) */}
-        {(canSave || savedPid) && (
+        {(canSave || savedPid || canSaveReport || savedReportPid) && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
+            {savedReportPid ? (
+              <a
+                data-testid="chatbi-saved-report"
+                href={`/report-designer/${encodeURIComponent(savedReportPid)}`}
+                className="text-xs font-medium text-green-600 underline dark:text-green-400"
+              >
+                {text({ 'zh-CN': '打开报表', 'en-US': 'Open report' })}
+              </a>
+            ) : canSaveReport ? (
+              <button
+                data-testid="chatbi-save-report"
+                onClick={handleSaveReport}
+                disabled={savingReport}
+                className="rounded-md px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+              >
+                {savingReport
+                  ? text({ 'zh-CN': '保存中…', 'en-US': 'Saving…' })
+                  : text({ 'zh-CN': '存为报表', 'en-US': 'Save as report' })}
+              </button>
+            ) : null}
             {savedPid ? (
               <a
                 data-testid="chatbi-saved-dashboard"
