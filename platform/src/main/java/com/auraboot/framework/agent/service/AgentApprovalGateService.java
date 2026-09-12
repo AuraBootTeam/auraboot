@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.event.AgentApprovalEvent;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.event.AuraEventBus;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -715,7 +716,12 @@ public class AgentApprovalGateService {
 
         for (Map<String, Object> approval : expired) {
             String pid = (String) approval.get("pid");
+            MetaContext.Snapshot previousContext = MetaContext.snapshot();
             try {
+                Long tenantId = ((Number) Objects.requireNonNull(approval.get("tenant_id"),
+                        "Expired approval must have a tenant")).longValue();
+                MetaContext.clear();
+                MetaContext.setSystemTenantContext(tenantId);
                 Map<String, Object> update = new HashMap<>();
                 update.put("approval_status", "expired");
                 update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
@@ -727,8 +733,6 @@ public class AgentApprovalGateService {
                 }
 
                 String runPid = (String) approval.get("run_id");
-                Long tenantId = approval.get("tenant_id") != null
-                        ? ((Number) approval.get("tenant_id")).longValue() : null;
                 String agentCode = resolveAgentCode(tenantId, runPid);
 
                 // Publish domain event
@@ -744,6 +748,9 @@ public class AgentApprovalGateService {
                         runPid, approval.get("task_id"));
             } catch (Exception e) {
                 log.error("Failed to expire approval {}: {}", pid, e.getMessage());
+            } finally {
+                MetaContext.clear();
+                MetaContext.restore(previousContext);
             }
         }
     }

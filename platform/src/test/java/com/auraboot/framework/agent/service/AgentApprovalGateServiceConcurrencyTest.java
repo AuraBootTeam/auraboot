@@ -111,7 +111,14 @@ class AgentApprovalGateServiceConcurrencyTest {
 
         when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
 
+        when(terminalStore.failPendingApproval(1L, "run-1", "task-1", "Approval expired"))
+                .thenAnswer(invocation -> {
+                    assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(1L);
+                    return true;
+                });
+        com.auraboot.framework.application.tenant.MetaContext.clear();
         service.enforceApprovalTimeouts();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);

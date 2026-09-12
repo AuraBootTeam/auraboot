@@ -8,7 +8,7 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
   test(`ACP authorized decision after foreign-user denial: ${mode}`, async ({ request }) => {
     const from = new Date().toISOString();
     let approved = mode !== 'reject';
-    test.setTimeout(90000);
+    test.setTimeout(mode === 'expired' ? 360000 : 90000);
     const tag = randomUUID().replaceAll('-', '').slice(0, 16);
     const code = `approved_${tag}`,
       tool = `custom:${code}`,
@@ -180,6 +180,50 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
         expect(response.status()).toBe(200);
         return response.text();
       };
+      const verifyFailedOutcome = async () => {
+        const terminalFacts = (
+          await db.query(
+            `SELECT event_id, event_name, caused_by_event_id, payload
+             FROM ab_behavior_outcome_outbox WHERE tenant_id=$1 AND run_id=$2 ORDER BY id`,
+            [owners[0].tenant_id, approval.run_id],
+          )
+        ).rows;
+        expect(terminalFacts.map((fact) => fact.event_name)).toEqual([
+          'agent_execution_started',
+          'agent_execution_completed',
+        ]);
+        expect(terminalFacts[1].caused_by_event_id).toBe(terminalFacts[0].event_id);
+        expect(terminalFacts[1].payload.status).toBe('failed');
+        const taskState = (
+          await db.query('SELECT task_status FROM ab_agent_task WHERE pid=$1 AND tenant_id=$2', [
+            approval.task_id,
+            owners[0].tenant_id,
+          ])
+        ).rows;
+        expect(taskState).toEqual([{ task_status: 'blocked' }]);
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.query(
+                  'SELECT event_id FROM ab_behavior_event WHERE tenant_id=$1 AND run_id=$2 ORDER BY event_id',
+                  [owners[0].tenant_id, approval.run_id],
+                )
+              ).rows.map((fact) => fact.event_id),
+            { timeout: 15000 },
+          )
+          .toEqual(terminalFacts.map((fact) => fact.event_id).sort());
+        const stats = await request.get('/api/analytics/behavior/executions', {
+          params: { from, to: new Date().toISOString() },
+        });
+        expect(stats.status()).toBe(200);
+        expect((await stats.json()).data.counts).toMatchObject({
+          started: 1,
+          succeeded: 0,
+          failed: 1,
+          unresolved: 0,
+        });
+      };
       if (mode === 'expired') {
         const expiry = (
           await db.query(
@@ -206,6 +250,26 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
           ).rows;
           expect(taskRuns).toEqual([{ pid: approval.run_id }]);
         }
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.query(
+                  `SELECT a.approval_status, r.run_status FROM ab_agent_approval a
+             JOIN ab_agent_run r ON r.pid=a.run_id AND r.tenant_id=a.tenant_id
+             WHERE a.pid=$1 AND a.tenant_id=$2`,
+                  [approval.pid, owners[0].tenant_id],
+                )
+              ).rows,
+            { timeout: 330000, intervals: [1000, 5000] },
+          )
+          .toEqual([{ approval_status: 'expired', run_status: 'failed' }]);
+        expect(await actions()).toEqual([]);
+        await verifyFailedOutcome();
+        const afterExpiry = await decide(true);
+        expect(afterExpiry).toContain('event:error');
+        expect(afterExpiry).not.toContain('event:done');
+        expect(await actions()).toEqual([]);
         return;
       }
       let text: string;
@@ -249,48 +313,7 @@ for (const mode of ['approve', 'reject', 'race', 'expired']) {
         expect(runs).toHaveLength(1);
         expect(runs[0].run_status).toBe('failed');
         expect(executed).toEqual([]);
-        const terminalFacts = (
-          await db.query(
-            `SELECT event_id, event_name, caused_by_event_id, payload
-             FROM ab_behavior_outcome_outbox WHERE tenant_id=$1 AND run_id=$2 ORDER BY id`,
-            [owners[0].tenant_id, approval.run_id],
-          )
-        ).rows;
-        expect(terminalFacts.map((fact) => fact.event_name)).toEqual([
-          'agent_execution_started',
-          'agent_execution_completed',
-        ]);
-        expect(terminalFacts[1].caused_by_event_id).toBe(terminalFacts[0].event_id);
-        expect(terminalFacts[1].payload.status).toBe('failed');
-        const taskState = (
-          await db.query('SELECT task_status FROM ab_agent_task WHERE pid=$1 AND tenant_id=$2', [
-            approval.task_id,
-            owners[0].tenant_id,
-          ])
-        ).rows;
-        expect(taskState).toEqual([{ task_status: 'blocked' }]);
-        await expect
-          .poll(
-            async () =>
-              (
-                await db.query(
-                  'SELECT event_id FROM ab_behavior_event WHERE tenant_id=$1 AND run_id=$2 ORDER BY event_id',
-                  [owners[0].tenant_id, approval.run_id],
-                )
-              ).rows.map((fact) => fact.event_id),
-            { timeout: 15000 },
-          )
-          .toEqual(terminalFacts.map((fact) => fact.event_id).sort());
-        const stats = await request.get('/api/analytics/behavior/executions', {
-          params: { from, to: new Date().toISOString() },
-        });
-        expect(stats.status()).toBe(200);
-        expect((await stats.json()).data.counts).toMatchObject({
-          started: 1,
-          succeeded: 0,
-          failed: 1,
-          unresolved: 0,
-        });
+        await verifyFailedOutcome();
       }
       const replay = await request.post('/api/ai/aurabot/execute', {
         headers: { Accept: 'text/event-stream' },
