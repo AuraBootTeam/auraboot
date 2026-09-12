@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Commits run termination and its execution fact as one transaction. */
+/** Commits run/task persistence boundaries and authoritative terminal execution facts. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -25,6 +25,31 @@ public class AgentRunTerminalStore {
     private final JdbcTemplate jdbc;
     private final DynamicDataMapper data;
     private final BehaviorOutcomePublisher outcomes;
+
+    /** Creates a run and updates its owning task atomically; admission is not an execution-start fact. */
+    @Transactional
+    public void create(Long tenantId, String runPid, String taskPid,
+                       Map<String, Object> run, Map<String, Object> taskUpdate) {
+        if (!java.util.Objects.equals(tenantId, run.get("tenant_id"))
+                || !java.util.Objects.equals(runPid, run.get("pid"))
+                || !java.util.Objects.equals(taskPid, run.get("task_id"))) {
+            throw new IllegalArgumentException("Run identity does not match its persistence scope");
+        }
+        List<Map<String, Object>> tasks = jdbc.queryForList("""
+                SELECT pid FROM ab_agent_task
+                WHERE tenant_id = ? AND pid = ? AND deleted_flag = FALSE
+                FOR UPDATE
+                """, tenantId, taskPid);
+        if (tasks.size() != 1) throw new IllegalStateException("Run task is unavailable");
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Run creation requires a transaction");
+        }
+        if (data.insert("ab_agent_run", run) != 1
+                || data.update("ab_agent_task", taskUpdate,
+                Map.of("tenant_id", tenantId, "pid", taskPid)) != 1) {
+            throw new IllegalStateException("Run creation did not persist exactly one run/task pair");
+        }
+    }
 
     @Transactional
     public boolean complete(Long tenantId, String runPid, String taskPid,

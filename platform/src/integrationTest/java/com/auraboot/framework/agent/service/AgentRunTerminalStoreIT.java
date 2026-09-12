@@ -83,6 +83,64 @@ class AgentRunTerminalStoreIT {
     private String runStatus() { return jdbc.queryForObject("SELECT run_status FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid); }
     private String taskStatus() { return jdbc.queryForObject("SELECT task_status FROM ab_agent_task WHERE tenant_id=? AND pid=?", String.class, tenant, taskPid); }
     private int events() { return jdbc.queryForObject("SELECT count(*) FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", Integer.class, tenant, runPid); }
+    @Test void lifecycleCreationCommitsRunAndScopedTaskWithoutInventingStartFact() {
+        String attempt = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
+        data.update("ab_agent_task", Map.of("task_status", "todo"), Map.of("tenant_id", tenant, "pid", taskPid));
+        lifecycle(new AtomicInteger()).createRunRecord(tenant, attempt, taskPid,
+                "terminal-fixture", "fixture-model", java.time.LocalDateTime.now());
+        assertThat(jdbc.queryForMap("SELECT task_id, run_status, run_model FROM ab_agent_run WHERE tenant_id=? AND pid=?",
+                tenant, attempt)).containsEntry("task_id", taskPid).containsEntry("run_status", "running")
+                .containsEntry("run_model", "fixture-model");
+        assertThat(taskStatus()).isEqualTo("in_progress");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?",
+                Integer.class, tenant, attempt)).isZero();
+    }
+
+    @Test void lifecycleCreationRollbackRemovesRunAndRestoresTask() {
+        String attempt = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
+        data.update("ab_agent_task", Map.of("task_status", "todo"), Map.of("tenant_id", tenant, "pid", taskPid));
+        var tx = new TransactionTemplate(context.getBean(DataSourceTransactionManager.class));
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            lifecycle(new AtomicInteger()).createRunRecord(tenant, attempt, taskPid,
+                    "terminal-fixture", "fixture-model", java.time.LocalDateTime.now());
+            throw new IllegalStateException("injected after run/task creation");
+        })).hasMessage("injected after run/task creation");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_agent_run WHERE tenant_id=? AND pid=?",
+                Integer.class, tenant, attempt)).isZero();
+        assertThat(taskStatus()).isEqualTo("todo");
+    }
+
+    @Test void taskWriteFailureRollsBackInsertedRunThroughStoreProxy() {
+        String attempt = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
+        assertThatThrownBy(() -> store.create(tenant, attempt, taskPid,
+                Map.of("tenant_id", tenant, "pid", attempt, "task_id", taskPid,
+                        "agent_id", "terminal-fixture", "run_status", "running"),
+                Map.of("task_status", "x".repeat(1000))))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_agent_run WHERE tenant_id=? AND pid=?",
+                Integer.class, tenant, attempt)).isZero();
+        assertThat(taskStatus()).isEqualTo("in_progress");
+    }
+
+    @Test void lifecycleCreationRejectsForeignTaskWithoutOrphanRun() {
+        String attempt = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
+        assertThatThrownBy(() -> lifecycle(new AtomicInteger()).createRunRecord(tenant + 1, attempt, taskPid,
+                "terminal-fixture", "fixture-model", java.time.LocalDateTime.now()))
+                .hasMessage("Run task is unavailable");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_agent_run WHERE pid=?", Integer.class, attempt)).isZero();
+        assertThat(taskStatus()).isEqualTo("in_progress");
+    }
+
+    @Test void lifecycleCreationRejectsDuplicateRunBeforeChangingTask() {
+        data.update("ab_agent_task", Map.of("task_status", "todo"), Map.of("tenant_id", tenant, "pid", taskPid));
+        assertThatThrownBy(() -> lifecycle(new AtomicInteger()).createRunRecord(tenant, runPid, taskPid,
+                "terminal-fixture", "fixture-model", java.time.LocalDateTime.now()))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(taskStatus()).isEqualTo("todo");
+        assertThat(runStatus()).isEqualTo("running");
+        assertThat(events()).isZero();
+    }
+
     @Test void readsWinningAttemptResponseAndRejectsWrongScopeOrNonterminalState() {
         RunLifecycleService lifecycle = lifecycle(new AtomicInteger());
         assertThatThrownBy(() -> lifecycle.readTerminalOutcome(tenant, runPid, taskPid))

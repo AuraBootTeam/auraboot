@@ -85,10 +85,9 @@ public class RunLifecycleService {
         });
         run.put("created_at", startedAt);
         run.put("updated_at", startedAt);
-        dynamicDataMapper.insert("ab_agent_run", run);
 
         Map<String, Object> taskUpdate = Map.of("task_status", "in_progress", "started_at", startedAt, "updated_at", LocalDateTime.now());
-        dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
+        terminalStore.create(tenantId, runPid, taskPid, run, taskUpdate);
     }
 
     private String serializeContextEnvelope(ContextEnvelope envelope) {

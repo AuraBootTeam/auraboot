@@ -40,6 +40,7 @@ class RunLifecycleExecutionContextTest {
     @Mock private LlmProviderFactory providerFactory;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private AgentRunTerminalStore terminalStore;
 
     @AfterEach
     void cleanUp() {
@@ -89,7 +90,7 @@ class RunLifecycleExecutionContextTest {
                 observationService,
                 providerFactory,
                 jdbcTemplate,
-                eventPublisher, org.mockito.Mockito.mock(AgentRunTerminalStore.class));
+                eventPublisher, terminalStore);
 
         ExecutionPrincipalContext.callAs(
                 principal,
@@ -109,7 +110,8 @@ class RunLifecycleExecutionContextTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> row =
                 ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper).insert(eq("ab_agent_run"), row.capture());
+        verify(terminalStore).create(eq(7L), eq("RUN_1"), eq("TASK_1"), row.capture(),
+                org.mockito.ArgumentMatchers.anyMap());
         assertThat(row.getValue())
                 .containsEntry("actor_user_id", 301L)
                 .containsEntry("actor_member_id", 401L)
