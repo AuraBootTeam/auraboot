@@ -16,6 +16,7 @@ import com.auraboot.framework.agent.service.AgentContractDeriver;
 import com.auraboot.framework.agent.service.AgentDispatchHandler;
 import com.auraboot.framework.agent.service.AgentHintEnhancer;
 import com.auraboot.framework.agent.service.AgentRunService;
+import com.auraboot.framework.agent.service.AgentRuntimeDataService;
 import com.auraboot.framework.agent.service.AgentScheduleService;
 import com.auraboot.framework.agent.service.AgentSkillService;
 import com.auraboot.framework.agent.service.SkillAutoGenerator;
@@ -31,7 +32,6 @@ import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -70,7 +69,7 @@ public class AgentRuntimeController {
     private final AgentCostReportService costReportService;
     private final SkillAutoGenerator skillAutoGenerator;
     private final AgentChatPort agentChatPort;
-    private final DynamicDataMapper dynamicDataMapper;
+    private final AgentRuntimeDataService runtimeDataService;
     private final ObjectMapper objectMapper;
 
     @PostMapping("/dispatch")
@@ -237,9 +236,7 @@ public class AgentRuntimeController {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         // Load the original run
-        String runSql = "SELECT * FROM ab_agent_run WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-        List<Map<String, Object>> runRows = dynamicDataMapper.selectByQuery(runSql,
-                Map.of("tenantId", tenantId, "pid", runPid));
+        List<Map<String, Object>> runRows = runtimeDataService.findRun(tenantId, runPid);
         if (runRows.isEmpty()) {
             return ApiResponse.error("Run not found: " + runPid);
         }
@@ -254,10 +251,7 @@ public class AgentRuntimeController {
         String agentCode = (String) run.get("agent_id");
 
         // Load the associated task
-        String taskSql = "SELECT * FROM ab_agent_task WHERE tenant_id = #{params.tenantId} " +
-                "AND pid = #{params.taskPid} AND deleted_flag = FALSE";
-        List<Map<String, Object>> taskRows = dynamicDataMapper.selectByQuery(taskSql,
-                Map.of("tenantId", tenantId, "taskPid", taskPid));
+        List<Map<String, Object>> taskRows = runtimeDataService.findTask(tenantId, taskPid);
         if (taskRows.isEmpty()) {
             return ApiResponse.error("Associated task not found: " + taskPid);
         }
@@ -267,7 +261,6 @@ public class AgentRuntimeController {
 
         // Reset task to TODO if it's not in a terminal success/cancel state
         if (!"done".equals(taskStatus) && !"cancelled".equals(taskStatus)) {
-            LocalDateTime now = LocalDateTime.now();
             int retryCount = task.get("retry_count") != null ? ((Number) task.get("retry_count")).intValue() : 0;
             int maxRetries = task.get("max_retries") != null ? ((Number) task.get("max_retries")).intValue() : 3;
 
@@ -275,11 +268,7 @@ public class AgentRuntimeController {
                 return ApiResponse.error("Max retries exceeded (" + maxRetries + ") for task: " + taskPid);
             }
 
-            Map<String, Object> taskUpdate = new HashMap<>();
-            taskUpdate.put("task_status", "todo");
-            taskUpdate.put("retry_count", retryCount + 1);
-            taskUpdate.put("updated_at", now);
-            dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
+            runtimeDataService.resetTaskForRetry(taskPid, retryCount + 1);
         }
 
         // Re-dispatch the task
@@ -300,9 +289,7 @@ public class AgentRuntimeController {
         }
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        String runSql = "SELECT * FROM ab_agent_run WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-        List<Map<String, Object>> runRows = dynamicDataMapper.selectByQuery(runSql,
-                Map.of("tenantId", tenantId, "pid", runPid));
+        List<Map<String, Object>> runRows = runtimeDataService.findRun(tenantId, runPid);
         if (runRows.isEmpty()) {
             return ApiResponse.error("Run not found: " + runPid);
         }
@@ -381,10 +368,7 @@ public class AgentRuntimeController {
     @GetMapping("/approvals/pending")
     public ApiResponse<List<Map<String, Object>>> listPendingApprovals() {
         Long tenantId = MetaContext.getCurrentTenantId();
-        String sql = "SELECT * FROM ab_agent_approval WHERE tenant_id = #{params.tenantId} " +
-                "AND approval_status = 'pending' ORDER BY created_at DESC";
-        List<Map<String, Object>> approvals = dynamicDataMapper.selectByQuery(sql, Map.of("tenantId", tenantId));
-        return ApiResponse.success(approvals);
+        return ApiResponse.success(runtimeDataService.listPendingApprovals(tenantId));
     }
 
     /** Batch-enhance agent_hint for commands with missing or generic hints using LLM */
@@ -785,22 +769,7 @@ public class AgentRuntimeController {
             @RequestParam(required = false) String targetModel,
             @RequestParam(required = false, defaultValue = "7") int days) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        String sql;
-        Map<String, Object> params = new HashMap<>();
-        params.put("tenantId", tenantId);
-
-        if (runId != null && !runId.isBlank()) {
-            sql = "SELECT * FROM ab_agent_action WHERE tenant_id = #{params.tenantId} AND run_id = #{params.runId} ORDER BY executed_at ASC";
-            params.put("runId", runId);
-        } else if (targetModel != null && !targetModel.isBlank()) {
-            sql = "SELECT * FROM ab_agent_action WHERE tenant_id = #{params.tenantId} AND target_model = #{params.targetModel} AND executed_at >= NOW() - INTERVAL '" + days + " days' ORDER BY executed_at DESC LIMIT 100";
-            params.put("targetModel", targetModel);
-        } else {
-            sql = "SELECT * FROM ab_agent_action WHERE tenant_id = #{params.tenantId} AND executed_at >= NOW() - INTERVAL '" + days + " days' ORDER BY executed_at DESC LIMIT 100";
-        }
-
-        List<Map<String, Object>> actions = dynamicDataMapper.selectByQuery(sql, params);
-        return ApiResponse.success(actions);
+        return ApiResponse.success(runtimeDataService.listActions(tenantId, runId, targetModel, days));
     }
 
     /**
@@ -810,9 +779,7 @@ public class AgentRuntimeController {
     @GetMapping("/actions/{pid}")
     public ApiResponse<Map<String, Object>> getAction(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        String sql = "SELECT * FROM ab_agent_action WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId, "pid", pid));
+        List<Map<String, Object>> rows = runtimeDataService.findAction(tenantId, pid);
         if (rows.isEmpty()) {
             return ApiResponse.error("Action not found: " + pid);
         }
