@@ -62,4 +62,20 @@ class AnalyticsRecordAccessBoundaryTest {
         guarded.getTableName(AnalyticsSuggestionCommandHandler.VERSION);
         verify(metadata).getTableName(AnalyticsSuggestionCommandHandler.VERSION);
     }
+    @Test void namedSqlCountsCannotExposePrivateTablesAndScopeCloses() throws Throwable {
+        var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+        when(metadata.getModelDefinition(anyString())).thenReturn(java.util.Optional.empty());
+        org.springframework.test.util.ReflectionTestUtils.setField(boundary, "metadata", metadata);
+        var mapper = mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class);
+        var factory = new AspectJProxyFactory(mapper);
+        factory.addAspect(boundary);
+        com.auraboot.framework.meta.mapper.DynamicDataMapper guarded = factory.getProxy();
+        String sql = "SELECT count(*) FROM (SELECT pid FROM public.mt_core_dashboard_adoption) x";
+        var operation = mock(org.aspectj.lang.ProceedingJoinPoint.class);
+        when(operation.proceed()).thenAnswer(call -> guarded.countByQueryWithoutTenant(sql, Map.of()));
+        assertThatThrownBy(() -> boundary.namedOperation(operation)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(mapper);
+        guarded.countByQueryWithoutTenant(sql, Map.of());
+        verify(mapper).countByQueryWithoutTenant(sql, Map.of());
+    }
 }

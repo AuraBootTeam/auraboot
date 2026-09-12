@@ -17,6 +17,13 @@ public class AnalyticsRecordAccessBoundary {
     private final ThreadLocal<Principal> domainRead = new ThreadLocal<>();
     private record Principal(Long tenant, Long user) {}
     private final ThreadLocal<Boolean> semanticRead = new ThreadLocal<>();
+    private final ThreadLocal<Boolean> namedRead = new ThreadLocal<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.meta.service.MetaModelService metadata;
+    private final com.auraboot.framework.meta.service.SecureSqlRewriter sqlSources =
+            new com.auraboot.framework.meta.service.SecureSqlRewriter();
+
 
     @Around("execution(* com.auraboot.framework.behavior.service.AnalyticsSuggestionCommandHandler.execute(..))"
             + " || execution(* com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.resolve(..))"
@@ -51,7 +58,45 @@ public class AnalyticsRecordAccessBoundary {
             // Raw facts are not business-query sources, even inside a suggestion operation.
             throw denied();
         }
+        if (call.getArgs()[0] instanceof AggregateQueryRequest query && "namedQuery".equals(query.getType())) {
+            return namedOperation(call);
+        }
         return call.proceed();
+    }
+
+    @Around("execution(* com.auraboot.framework.meta.service.NamedQueryService+.executeQuery(..))"
+            + " || execution(* com.auraboot.framework.meta.service.NamedQueryService+.testQuery(..))"
+            + " || execution(* com.auraboot.framework.meta.service.NamedQueryService+.exportData(..))")
+    public Object namedOperation(ProceedingJoinPoint call) throws Throwable {
+        Boolean previous = namedRead.get();
+        namedRead.set(true);
+        try {
+            return call.proceed();
+        } finally {
+            if (previous == null) namedRead.remove();
+            else namedRead.set(previous);
+        }
+    }
+
+    @Around("execution(* com.auraboot.framework.meta.mapper.DynamicDataMapper.selectByQuery*(..))"
+            + " || execution(* com.auraboot.framework.meta.mapper.DynamicDataMapper.countByQuery*(..))")
+    public Object namedSql(ProceedingJoinPoint call) throws Throwable {
+        if (Boolean.TRUE.equals(namedRead.get())) {
+            java.util.Set<String> protectedTables = new java.util.HashSet<>();
+            for (String model : java.util.List.of(AnalyticsSuggestionCommandHandler.VERSION, AnalyticsSuggestionCommandHandler.ADOPTION)) {
+                protectedTables.add(normalizeTable(com.auraboot.framework.meta.constant.SystemFieldConstants.generateTableName(model)));
+                metadata.getModelDefinition(model).ifPresent(definition -> protectedTables.add(normalizeTable(definition.getTableName())));
+            }
+            for (String table : sqlSources.referencedTables((String) call.getArgs()[0])) {
+                if (protectedTables.contains(normalizeTable(table))) throw denied();
+            }
+        }
+        return call.proceed();
+    }
+
+    private static String normalizeTable(String table) {
+        String name = java.util.Objects.requireNonNull(table, "Physical source table is required").replace("\"", "");
+        return name.substring(name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
     }
 
     @Around("execution(* com.auraboot.framework.semantic.service.SemanticQueryService.executeQuery(..))"

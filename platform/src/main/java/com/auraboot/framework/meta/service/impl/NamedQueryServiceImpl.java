@@ -842,6 +842,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         Long tenantId = getCurrentTenantId();
+        authorizeDeclaredResource(query);
 
         try {
             // 2. Get field whitelist
@@ -886,6 +887,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
 
             Map<String, Object> params = new HashMap<>();
+            if (request.getParameters() != null) params.putAll(request.getParameters());
             List<String> whereClauses = new ArrayList<>();
 
             if (query.hasBaseWhere()) {
@@ -899,6 +901,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             params.put("tenantId", tenantId);
             Long userId = getCurrentUserId();
             params.put("currentUserId", userId != null ? userId.toString() : null);
+            authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
 
             appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
 
@@ -959,6 +962,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     .exportTime(startTime)
                     .build();
 
+        } catch (AccessDeniedException denied) {
+            throw denied;
         } catch (MetaServiceException e) {
             throw e;
         } catch (Exception e) {

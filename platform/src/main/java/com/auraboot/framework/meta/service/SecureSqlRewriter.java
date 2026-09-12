@@ -209,6 +209,18 @@ public class SecureSqlRewriter {
      * @param sql SQL语句
      * @return true如果是SELECT语句
      */
+    /** Resolve physical source names before a named query reaches its SQL executor. */
+    public java.util.Set<String> referencedTables(String sql) {
+        if (sql == null || sql.isBlank()) throw new MetaServiceException("SQL source is required");
+        try {
+            Statement statement = CCJSqlParserUtil.parse(normalizeMybatisParams(sql).sql);
+            if (!(statement instanceof Select)) throw new MetaServiceException("A SELECT source is required");
+            return new java.util.HashSet<>(new net.sf.jsqlparser.util.TablesNamesFinder().getTableList(statement));
+        } catch (JSQLParserException invalid) {
+            throw new MetaServiceException("Cannot establish named query source tables", invalid);
+        }
+    }
+
     public boolean isSelectStatement(String sql) {
         if (sql == null || sql.trim().isEmpty()) {
             return false;
