@@ -18,7 +18,6 @@
     "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs",
     "validate:permissions": "node scripts/validate-permission-codes.mjs",
     "validate:status-colors": "node scripts/check-dsl-status-colors.mjs",
-    "test:oee-host-golden": "bash scripts/host-oee-dashboard-golden.sh all",
     "validate:cache-eviction": "node scripts/check-cache-eviction.mjs",
     "validate:e2e-assertions": "node scripts/check-e2e-assertions.mjs",
     "validate:scripts-index": "node scripts/check-scripts-index.mjs"

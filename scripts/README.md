@@ -186,7 +186,6 @@
 | `faq-loop-golden-run.sh` | 3 | 2026-07-23 | faq-loop-golden-run.sh — one-click, self-contained golden for the conversation → FAQ loop. |
 | `ga-e2e-prepare-deps.sh` | 3 | 2026-05-17 | Prepare pnpm dependencies for the GA Docker E2E frontend/runner containers. |
 | `ga-showcase-e2e.sh` | 3 | 2026-05-10 | Run the GA community showcase E2E gate with isolated Playwright storage. |
-| `host-oee-dashboard-golden.sh` | 1 | 2026-06-22 | Host-first OEE dashboard golden. |
 | `import-plugins.sh` | 16 | 2026-06-13 | Import AuraBoot plugins into a running backend. |
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |

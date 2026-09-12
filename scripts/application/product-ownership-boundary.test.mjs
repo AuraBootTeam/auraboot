@@ -111,6 +111,7 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts',
     'web-admin/tests/e2e/aurabot/pcba-quality-agent-entry.spec.ts',
     'web-admin/tests/e2e/aurabot/pcba-quality-agent-write.spec.ts',
+    'web-admin/tests/e2e/pcba/oee-dashboard-host-golden.spec.ts',
     'web-admin/tests/e2e/automation/rule-binding-designer-host.spec.ts',
     'web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts',
     'web-admin/tests/e2e/decisionops/strategy-studio-dmn-value-labels.spec.ts',
@@ -152,6 +153,7 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/scripts/run-showcase-seed-sequence.test.mjs',
     'web-admin/playwright.seed.config.ts',
     'scripts/docker-ga-showcase-e2e.sh',
+    'scripts/host-oee-dashboard-golden.sh',
     'scripts/deploy/oss-remote/gen-admin-storage.mjs',
     'web-admin/tests/helpers/wd-fixtures.ts',
   ]) {

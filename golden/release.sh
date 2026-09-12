@@ -35,13 +35,12 @@ runner_for() {
     OSS-REL-QUICK-FILTER)           echo "./scripts/quick-filter-chip-golden-run.sh" ;;
     OSS-REL-SUSPENDED-TENANT-API)   echo "./scripts/suspended-tenant-login-golden.sh" ;;
     OSS-REL-SUSPENDED-TENANT-UI)    echo "./scripts/suspended-tenant-login-ui-golden.sh" ;;
-    OSS-REL-OEE-DASHBOARD)          echo "./scripts/host-oee-dashboard-golden.sh" ;;
     OSS-REL-COLLAB-TRIO)            echo "./scripts/collab-trio-golden-run.sh" ;;
     *) return 1 ;;
   esac
 }
 
-ALL="OSS-REL-RBAC OSS-REL-AURABOT OSS-REL-DIGITAL-EMPLOYEE OSS-REL-FAQ-LOOP OSS-REL-KB-INGESTION OSS-REL-QUICK-FILTER OSS-REL-SUSPENDED-TENANT-API OSS-REL-SUSPENDED-TENANT-UI OSS-REL-OEE-DASHBOARD OSS-REL-COLLAB-TRIO"
+ALL="OSS-REL-RBAC OSS-REL-AURABOT OSS-REL-DIGITAL-EMPLOYEE OSS-REL-FAQ-LOOP OSS-REL-KB-INGESTION OSS-REL-QUICK-FILTER OSS-REL-SUSPENDED-TENANT-API OSS-REL-SUSPENDED-TENANT-UI OSS-REL-COLLAB-TRIO"
 
 # Drift check: every release suite in the catalog must have a runner here, and vice
 # versa. Without it, adding a suite to the catalog and forgetting this file produces a
