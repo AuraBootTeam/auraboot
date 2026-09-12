@@ -444,6 +444,68 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
         const scopedFile = await owner.get((await scopedExport.json()).data.downloadUrl);
         expect(scopedFile.status(), await scopedFile.text()).toBe(200);
         expect.soft(JSON.parse(await scopedFile.text())).toEqual([]);
+        const asyncScoped = await owner.post(`/api/meta/named-queries/${joinCode}/export-async`, {
+          data: { format: 'JSON', parameters },
+        });
+        expect(asyncScoped.status(), await asyncScoped.text()).toBe(200);
+        const scopeTaskPath = `/api/meta/named-queries/export-tasks/${(await asyncScoped.json()).data.pid}`;
+        let scopedDownload: string | undefined;
+        await expect
+          .poll(
+            async () => {
+              const status = await owner.get(scopeTaskPath);
+              expect(status.status()).toBe(200);
+              const task = (await status.json()).data;
+              expect(task.status, task.errorMessage).not.toBe('failed');
+              if (task.status === 'completed') {
+                expect(task.processedRows).toBe(0);
+                scopedDownload = task.downloadUrl;
+              }
+              return task.status;
+            },
+            { timeout: 15000 },
+          )
+          .toBe('completed');
+        expect(scopedDownload).toBeTruthy();
+        const emptyAsyncFile = await owner.get(scopedDownload!);
+        expect(emptyAsyncFile.status()).toBe(200);
+        expect(JSON.parse(await emptyAsyncFile.text())).toEqual([]);
+        const leftCode = `${joinCode}_left`;
+        const leftQuery = await request.post('/api/meta/named-queries', {
+          data: {
+            code: leftCode,
+            title: 'Scoped left join',
+            status: 'published',
+            ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
+            fromSql:
+              'SELECT o.pid AS order_pid, o.created_by, c.pid AS customer_pid FROM mt_e2et_order o LEFT JOIN mt_e2et_customer c ON c.pid = #{params.customerPid} WHERE o.pid = #{params.orderPid}',
+            fields: [
+              {
+                fieldCode: 'record_key',
+                columnExpr: 'order_pid',
+                dataType: 'string',
+                operators: ['eq'],
+              },
+              {
+                fieldCode: 'customer_key',
+                columnExpr: 'customer_pid',
+                dataType: 'string',
+                operators: ['eq'],
+              },
+            ],
+          },
+        });
+        expect(leftQuery.status(), await leftQuery.text()).toBe(200);
+        const leftExport = await owner.post(`/api/meta/named-queries/${leftCode}/export-data`, {
+          data: { format: 'JSON', parameters },
+        });
+        expect(leftExport.status(), await leftExport.text()).toBe(200);
+        expect((await leftExport.json()).data.recordCount).toBe(1);
+        const leftFile = await owner.get((await leftExport.json()).data.downloadUrl);
+        expect(leftFile.status()).toBe(200);
+        expect(JSON.parse(await leftFile.text())).toEqual([
+          { record_key: fixturePid, customer_key: null },
+        ]);
         const staleScope = await owner.get(priorFiles[0]);
         expect.soft(staleScope.status(), await staleScope.text()).toBe(403);
       } finally {

@@ -18,7 +18,7 @@ class NamedQueryFieldProtectionAuthorizationTest {
     private final MetaModelService models = mock(MetaModelService.class);
     private final NamedQuerySourceModels sources = mock(NamedQuerySourceModels.class);
     private final PermissionEvaluator permissions = mock(PermissionEvaluator.class);
-    private final NamedQueryFieldProtection protection = new NamedQueryFieldProtection(policies, masks, models, sources, permissions);
+    private final NamedQueryFieldProtection protection = new NamedQueryFieldProtection(policies, masks, models, sources, mock(DataDomainService.class), permissions);
     private final NamedQuery query = new NamedQuery();
 
     @BeforeEach void setup() {

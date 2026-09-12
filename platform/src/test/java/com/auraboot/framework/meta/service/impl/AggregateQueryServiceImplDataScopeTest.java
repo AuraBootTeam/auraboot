@@ -56,10 +56,11 @@ class AggregateQueryServiceImplDataScopeTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(fieldProtection.rewrite(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
         org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("list")))
-                .thenReturn(new NamedQueryFieldProtection.Plan(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), List.of()));
+                .thenReturn(new NamedQueryFieldProtection.Plan(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), List.of(), Map.of()));
         org.mockito.Mockito.lenient().when(fieldProtection.apply(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");

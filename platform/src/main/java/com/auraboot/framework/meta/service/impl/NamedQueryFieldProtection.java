@@ -19,12 +19,13 @@ public class NamedQueryFieldProtection {
     private final FieldMaskService masks;
     private final MetaModelService models;
     private final NamedQuerySourceModels sources;
+    private final DataDomainService domains;
     private final com.auraboot.framework.permission.engine.PermissionEvaluator permissionEvaluator;
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 
     public record Protection(Map<String, String> aliases,
                              List<FieldMaskRule> policies, List<FieldMaskConfig> configs) { }
-    public record Plan(JsonNode evidence, List<Protection> protections) { }
+    public record Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes) { }
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields) {
         return prepare(query, fields, "export");
@@ -43,6 +44,20 @@ public class NamedQueryFieldProtection {
         if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
         var evidence = JSON.createObjectNode();
         evidence.set("sourceModels", JSON.valueToTree(sourceModels));
+        Map<String, String> sourceScopes = new TreeMap<>();
+        Map<String, String> modelScopes = new HashMap<>();
+        for (var source : sourceModels.entrySet()) {
+            String scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
+                String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
+                String row = permit != null ? permit : policies.buildRowFilter(MetaContext.getCurrentTenantId(), model, "read", MetaContext.getCurrentUserId());
+                String domain = domains.buildDomainFilter(model, MetaContext.getCurrentUserId());
+                return java.util.stream.Stream.of(row, domain).filter(value -> value != null && !value.isBlank())
+                        .map(value -> "(" + value.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "") + ")")
+                        .collect(java.util.stream.Collectors.joining(" AND "));
+            });
+            sourceScopes.put(source.getKey(), scope);
+        }
+        evidence.set("sourceScopes", JSON.valueToTree(sourceScopes));
         var groups = evidence.putObject("protections");
         List<Protection> protections = new ArrayList<>();
         for (String resource : resources) {
@@ -50,7 +65,7 @@ public class NamedQueryFieldProtection {
             groups.set(resource, group.evidence());
             protections.addAll(group.protections());
         }
-        return new Plan(evidence, List.copyOf(protections));
+        return new Plan(evidence, List.copyOf(protections), Map.copyOf(sourceScopes));
     }
 
     private Plan prepareResource(NamedQuery query, List<NamedQueryField> fields, String resource, String context) {
@@ -87,7 +102,11 @@ public class NamedQueryFieldProtection {
             configEvidence.add(value);
         }
         evidence.set("aliases", JSON.valueToTree(aliases));
-        return new Plan(evidence, List.of(new Protection(Map.copyOf(aliases), List.copyOf(rules), List.copyOf(configs))));
+        return new Plan(evidence, List.of(new Protection(Map.copyOf(aliases), List.copyOf(rules), List.copyOf(configs))), Map.of());
+    }
+
+    public String rewrite(Plan plan, String sql) {
+        return new NamedQuerySourceScopeRewriter().rewrite(sql, plan.sourceScopes());
     }
 
     public List<Map<String, Object>> apply(Plan plan, List<Map<String, Object>> records) {
@@ -112,5 +131,5 @@ public class NamedQueryFieldProtection {
         return result;
     }
 
-    private static Plan empty() { return new Plan(JSON.createObjectNode(), List.of()); }
+    private static Plan empty() { return new Plan(JSON.createObjectNode(), List.of(), Map.of()); }
 }

@@ -69,6 +69,7 @@ class NamedQueryServiceImplTest {
     void configureFieldProtection() {
         NamedQueryFieldProtection protection = mock(NamedQueryFieldProtection.class);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", protection);
+        when(protection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(protection.apply(any(), org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> invocation.getArgument(1));
     }
 

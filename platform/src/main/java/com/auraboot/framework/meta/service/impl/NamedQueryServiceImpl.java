@@ -745,6 +745,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+        sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
 
         // Count total
         // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
@@ -966,7 +967,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     exportFieldCodes.stream().map(fieldMap::get).toList());
 
             // 8. Execute query
-            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(sql.toString(), params);
+            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(fieldProtection.rewrite(protection, sql.toString()), params);
             data = fieldProtection.apply(protection, data);
 
             // 9. Generate export file
