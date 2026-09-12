@@ -11,10 +11,9 @@ function events(text: string): Array<{ event: string; data: any }> {
     return line.startsWith('data:') ? [{ event, data: JSON.parse(line.slice(5).trim()) }] : [];
   });
 }
-for (const approved of [true, false]) {
-  test(`public confirmation preserves owner and frozen input: ${approved ? 'approve' : 'deny'}`, async ({
-    request,
-  }) => {
+for (const mode of ['approve', 'deny', 'concurrent']) {
+  const approved = mode !== 'deny';
+  test(`public confirmation preserves owner and frozen input: ${mode}`, async ({ request }) => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 16);
     const agentCode = `confirm_${suffix}`,
       modelCode = `confirm_model_${suffix}`,
@@ -137,12 +136,28 @@ for (const approved of [true, false]) {
         toolName: 'untrusted_tool',
         input: { code: forgedCode },
       };
-      const resumed = await request.post('/api/ai/aurabot/execute', {
-        headers: { Accept: 'text/event-stream' },
-        data: payload,
-      });
-      expect(resumed.status()).toBe(200);
-      const results = events(await resumed.text());
+      const execute = async () => {
+        const response = await request.post('/api/ai/aurabot/execute', {
+          headers: { Accept: 'text/event-stream' },
+          data: payload,
+        });
+        expect(response.status()).toBe(200);
+        return events(await response.text());
+      };
+      let results: ReturnType<typeof events>;
+      if (mode === 'concurrent') {
+        const attempts = await Promise.all([execute(), execute()]);
+        const successes = attempts.filter((attempt) =>
+          attempt.some((e) => e.event === 'tool_result' && e.data.success === true),
+        );
+        const rejected = attempts.filter((attempt) => attempt.some((e) => e.event === 'error'));
+        expect(successes).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        expect(rejected[0].some((e) => e.event === 'tool_result')).toBe(false);
+        results = successes[0];
+      } else {
+        results = await execute();
+      }
       expect(results.some((e) => e.event === 'done')).toBe(true);
       expect(results.some((e) => e.event === 'error')).toBe(false);
       const saved = await read();
