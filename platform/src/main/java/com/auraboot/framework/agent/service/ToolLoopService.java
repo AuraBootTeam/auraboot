@@ -261,10 +261,8 @@ public class ToolLoopService {
                         "message", "This tool requires human approval. Approval request " +
                                 approvalPid + " has been created."));
             }
-            return toJsonResult(Map.of(
-                    "success", false,
-                    "approvalRequired", true,
-                        "error", "This tool requires human approval, but no matching approval policy could create a request. No data was changed."));
+            // A null result now means an exact approved grant was consumed.
+            // Missing policy is an explicit denial from the gate.
         }
 
         if (toolDef.isRequiresConfirmation() && !auraBotSkill) {
