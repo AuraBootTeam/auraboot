@@ -7,9 +7,28 @@ import { describe, it } from 'node:test';
 import {
   classifyMigrationStatement,
   splitMigrationDirectory,
+  splitSharedSeedStatement,
   splitSqlStatements,
   writeMigrationSplit,
 } from './migration-ownership.mjs';
+
+it('keeps unrelated core rows out of CRM shared-seed artifacts', () => {
+  const parts = splitSharedSeedStatement(`
+    INSERT INTO ab_agent_capability (pid, capability_code, object_patterns) VALUES
+    ('CAP_CRM', 'crm.query', '["crm_*"]'),
+    ('CAP_PM', 'pm.query', '["pm_*"]'),
+    ('CAP_GENERIC', 'generic.query', '["*"]')
+    ON CONFLICT DO NOTHING;
+  `);
+  assert.equal(parts.length, 2);
+  const crm = parts.find((part) => part.includes('CAP_CRM'));
+  const core = parts.find((part) => part.includes('CAP_PM'));
+  assert.ok(crm);
+  assert.ok(core);
+  assert.doesNotMatch(crm, /CAP_PM|CAP_GENERIC/);
+  assert.match(core, /CAP_PM/);
+  assert.match(core, /CAP_GENERIC/);
+});
 
 describe('application migration ownership', () => {
   it('keeps semicolons inside PostgreSQL strings and dollar-quoted blocks intact', () => {

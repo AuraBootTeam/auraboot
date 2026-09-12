@@ -233,6 +233,72 @@ function literalOwners(sql) {
   return owners;
 }
 
+const SHARED_SEED_TABLES = new Set([
+  'ab_object_alias',
+  'ab_semantic_term',
+  'ab_agent_capability',
+]);
+
+function splitValueTuples(values) {
+  const tuples = [];
+  let start = 0;
+  let depth = 0;
+  let quote = false;
+  for (let index = 0; index < values.length; index += 1) {
+    const current = values[index];
+    const next = values[index + 1];
+    if (quote) {
+      if (current === "'" && next === "'") index += 1;
+      else if (current === "'") quote = false;
+      continue;
+    }
+    if (current === "'") quote = true;
+    else if (current === '(') depth += 1;
+    else if (current === ')') depth -= 1;
+    else if (current === ',' && depth === 0) {
+      tuples.push(values.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const tail = values.slice(start).trim();
+  if (tail) tuples.push(tail);
+  if (quote || depth !== 0 || tuples.some((tuple) => !tuple.startsWith('(') || !tuple.endsWith(')'))) {
+    throw new Error('unable to split shared seed VALUES tuples safely');
+  }
+  return tuples;
+}
+
+/**
+ * A shared platform catalog table may contain core and product rows in one INSERT.
+ * Split by tuple so a CRM literal cannot drag PM/generic rows into the CRM artifact.
+ */
+export function splitSharedSeedStatement(statement) {
+  const code = stripSqlComments(statement).trim();
+  const tableMatch = code.match(/^insert\s+into\s+([a-z_][a-z0-9_$]*)\b/i);
+  if (!tableMatch || !SHARED_SEED_TABLES.has(tableMatch[1].toLowerCase())) return [statement];
+
+  const valuesIndex = statement.search(/\bVALUES\b/i);
+  const conflictIndex = statement.search(/\bON\s+CONFLICT\b/i);
+  if (valuesIndex < 0 || conflictIndex < 0 || conflictIndex <= valuesIndex) {
+    throw new Error(`shared seed INSERT for ${tableMatch[1]} must use VALUES ... ON CONFLICT`);
+  }
+  const valuesKeyword = statement.slice(valuesIndex).match(/^VALUES\b/i)?.[0] ?? 'VALUES';
+  const prefix = statement.slice(0, valuesIndex + valuesKeyword.length);
+  const suffix = statement.slice(conflictIndex).trim();
+  const tuples = splitValueTuples(statement.slice(valuesIndex + valuesKeyword.length, conflictIndex));
+  const grouped = new Map();
+  for (const tuple of tuples) {
+    const owners = literalOwners(tuple);
+    if (owners.size > 1) {
+      throw new Error(`shared seed tuple mixes product ownership: ${tuple}`);
+    }
+    const owner = owners.size === 1 ? [...owners][0] : 'core';
+    if (!grouped.has(owner)) grouped.set(owner, []);
+    grouped.get(owner).push(tuple);
+  }
+  return [...grouped.values()].map((rows) => `${prefix}\n${rows.join(',\n')}\n${suffix}`);
+}
+
 export function classifyMigrationStatement(statement) {
   const code = stripSqlComments(statement);
   const normalized = code.toLowerCase();
@@ -281,7 +347,9 @@ export function splitMigrationDirectory(sourceRoot) {
   for (const file of files) {
     const source = readFileSync(resolve(sourceRoot, file), 'utf8');
     const statements = splitSqlStatements(source);
-    const executableStatements = statements.filter((statement) => stripSqlComments(statement).trim().length > 0);
+    const executableStatements = statements
+      .filter((statement) => stripSqlComments(statement).trim().length > 0)
+      .flatMap(splitSharedSeedStatement);
     const core = [];
     const counts = { core: 0, bpm: 0, crm: 0, mixed: 0 };
     executableStatements.forEach((statement, statementIndex) => {

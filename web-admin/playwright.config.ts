@@ -154,8 +154,6 @@ const contractScopeDirs = [
 const scopeRegex = (dirs: string[]) => new RegExp(`.*\\/(${dirs.join('|')})\\/.*\\.spec\\.ts$`);
 const enterpriseScopeFilePatterns = [
   /.*\/aurabot\/pcba-.*\.spec\.ts$/,
-  /.*\/crm\/crm-(agent-ui-smoke|calendar-sync|campaign-sla|dashboard|dashboard-enhanced|email-features|inbound-channel|inbound-lifecycle|inbound-smoke|merge-queue|opportunity-currency|quote-complaint|web-form)\.spec\.ts$/,
-  /.*\/cs-agent\/cs-agent-email-lifecycle\.spec\.ts$/,
   /.*\/plugin\/asset-.*\.spec\.ts$/,
   /.*\/plugin\/pcba-.*\.spec\.ts$/,
   /.*\/plugin\/pm-.*\.spec\.ts$/,

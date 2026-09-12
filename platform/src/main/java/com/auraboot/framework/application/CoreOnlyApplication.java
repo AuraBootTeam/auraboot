@@ -35,7 +35,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
             type = FilterType.REGEX,
             pattern = {
                 "com\\.auraboot\\.framework\\.action\\.executor\\.BpmActionExecutor",
-                "com\\.auraboot\\.framework\\.agent\\.listener\\.CustomerServiceAgentListener",
                 "com\\.auraboot\\.framework\\.automation\\.bpm(\\..*)?",
                 "com\\.auraboot\\.framework\\.automation\\.executor\\.impl\\.(CcTaskActionExecutor|StartProcessActionExecutor)",
                 "com\\.auraboot\\.framework\\.eventpolicy\\.executor\\.handler\\.(CcTaskActionHandler|StartProcessActionHandler)",

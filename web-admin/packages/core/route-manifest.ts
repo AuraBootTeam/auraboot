@@ -75,11 +75,6 @@ export function adminRuntimeEngineRoutes() {
     // no low-code pageKey or navigate by deep link, so falling through to /*
     // incorrectly renders "Page Unavailable".
     route('/executive-dashboard', './routes/executive-dashboard/index.tsx'),
-    route('/crm/merge-queue', './routes/crm/merge-queue.tsx'),
-    route('/crm/settings/inbound-channels', './routes/crm/settings/inbound-channels.tsx'),
-    route('/crm/settings/web-forms', './routes/crm/settings/web-forms.tsx'),
-    route('/crm/settings/web-form-editor/:pid', './routes/crm/settings/web-form-editor.$pid.tsx'),
-    route('/crm/settings/calendar-sync', './routes/crm/settings/calendar-sync.tsx'),
     route(
       '/project-management/projects/:projectId',
       './routes/project-management/projects.$projectId.tsx',
