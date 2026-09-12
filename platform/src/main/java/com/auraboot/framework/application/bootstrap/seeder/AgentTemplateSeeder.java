@@ -1,6 +1,5 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
-import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
@@ -16,16 +15,12 @@ import org.springframework.stereotype.Component;
  * AgentSkillService.listSkills() includes system-tenant skills as platform defaults.
  * <p>
  * Skills:
- * - approval_workflow  : approve/reject BPM tasks, query pending approvals
  * - data_entry_assistant: form fill, batch import, field validation
  * - report_analysis    : generate reports, describe charts, trend analysis
- * - crm_operations     : query contacts/leads/opportunities, log activities
  * - ops_inspector      : system monitoring, scheduled tasks, anomaly detection
  * <p>
- * Agent Profile Templates (3):
- * - aurabot_internal   : full-featured internal assistant (all skills)
- * - approval_assistant : focused on approval workflows, strict policy compliance
- * - customer_service   : external-facing, minimal permissions, RAG knowledge base
+ * Agent Profile Templates:
+ * - aurabot_internal   : platform assistant using only provider-neutral skills
  * <p>
  * soul_profile is stored as structured JSONB with fields:
  * persona, values, tone, tone_description, boundaries, greeting, language_preference.
@@ -85,33 +80,6 @@ public class AgentTemplateSeeder {
                 "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}";
 
         Object[][] skills = {
-            // approval_workflow
-            {
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
-                "approval_workflow", "审批工作流助手", "处理审批任务：查询待审批列表、审批通过/拒绝、催办提醒",
-                "workflow", "approval", "IconClipboardCheck",
-                "[\"query_pending_approvals\",\"approve_task\",\"reject_task\",\"notify_approver\"]",
-                """
-                你是审批助手。职责：
-                1. 帮用户查询待审批事项
-                2. 根据用户指令执行审批通过或拒绝操作
-                3. 审批金额超过10万时，提醒需总经理二次确认
-                4. 拒绝时必须要求填写拒绝原因
-                始终用中文回复，审批操作前先确认关键信息。
-
-                Sub-agent delegation: when the user asks for an independent
-                side-task that can run in parallel with the current approval
-                conversation (for example, "also generate a monthly approval
-                summary report while I keep reviewing this batch"), call the
-                tool `platform.delegate_task` with `{ "subtaskMessage":
-                "<clear description of the side-task>" }` and optionally
-                `agentCode` to override the child agent. The call requires
-                user approval before the child run starts; the parent
-                conversation does not block on the child. Do NOT delegate the
-                user's primary approval intent itself.
-                """,
-                defaultExecutionConfig
-            },
             // data_entry_assistant
             {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
@@ -166,32 +134,6 @@ public class AgentTemplateSeeder {
                 """,
                 reportAnalysisExecutionConfig
             },
-            // crm_operations
-            {
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
-                "crm_operations", "CRM销售助手", "查询客户/线索/商机信息，记录跟进活动，推进销售流程",
-                "workflow", "crm", "IconUsers",
-                "[\"query_customers\",\"query_leads\",\"query_opportunities\",\"log_activity\",\"update_stage\"]",
-                """
-                你是销售助手。职责：
-                1. 快速查询客户、线索和商机信息
-                2. 帮助记录拜访、通话、邮件等跟进活动
-                3. 根据商机阶段给出推进建议
-                4. 汇总销售漏斗数据和关键指标
-                理解销售场景，用简洁的语言总结关键信息，避免信息过载。
-
-                Sub-agent delegation: when the user asks for an independent
-                bulk side-task (for example, "delegate a bulk export of all
-                opportunities in stage=Negotiation while I keep logging
-                today's calls"), invoke `platform.delegate_task` with
-                `{ "subtaskMessage": "<describe the export / batch update
-                job>" }` and optionally `agentCode`. The call requires user
-                approval before the child run starts; the parent
-                conversation does not block on the child. Do not delegate
-                single-record lookups or activity logs.
-                """,
-                defaultExecutionConfig
-            },
             // ops_inspector
             {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
@@ -223,87 +165,10 @@ public class AgentTemplateSeeder {
 
         int count = 0;
         for (Object[] skill : skills) {
-            if (ApplicationMode.isCoreOnly()
-                    && ("approval_workflow".equals(skill[2]) || "crm_operations".equals(skill[2]))) {
-                continue;
-            }
             count += jdbcTemplate.update(sql, skill[0], skill[1], skill[2], skill[3],
                     skill[4], skill[5], skill[6], skill[7], skill[8], skill[9], skill[10]);
         }
         log.info("AgentTemplateSeeder: upserted {} built-in skills (re-applies execution_config)", count);
-
-        if (!ApplicationMode.isCoreOnly()) {
-            seedOrchestrationSkills();
-        }
-    }
-
-    /**
-     * Orchestration-mode skills are the "asset layer" of a digital employee:
-     * a governed playbook (prompt_template) that the LLM follows within a
-     * bounded, real tool set (skill_tools) and a step ceiling (max_steps). See
-     * DDR-2026-07-23 "digital employee boundary and the skill asset layer".
-     *
-     * <p>Unlike the five template skills above (which wrap a single tool and
-     * carry placeholder tool codes), these reference <em>real registered tool
-     * codes</em> resolved by {@code DslToolProvider} ({@code nq:}/{@code cmd:}
-     * prefixes) so they actually run against the system of record. This first
-     * one — the quarterly customer-structure review — is deliberately
-     * read-only ({@code actionability=read_only}, no create/update tool in
-     * {@code skill_tools}): it analyses real accounts and <em>proposes</em>
-     * follow-up actions in prose, honouring the "propose, don't execute"
-     * boundary. The heavy reasoning is delegated to the LLM; the platform owns
-     * the governed read, the step ceiling, and the audit trail.
-     */
-    private void seedOrchestrationSkills() {
-        String sql = """
-                INSERT INTO ab_agent_skill
-                (pid, tenant_id, skill_code, skill_name, skill_description, skill_level,
-                 skill_category, skill_icon, skill_tools, prompt_template, execution_mode,
-                 max_steps, actionability, output_type, declared_effects, is_builtin, skill_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, 'orchestration',
-                        ?, 'read_only', 'text', ?::jsonb, TRUE, 'active')
-                ON CONFLICT (tenant_id, skill_code) DO UPDATE SET
-                    skill_name = EXCLUDED.skill_name,
-                    skill_description = EXCLUDED.skill_description,
-                    skill_tools = EXCLUDED.skill_tools,
-                    prompt_template = EXCLUDED.prompt_template,
-                    execution_mode = EXCLUDED.execution_mode,
-                    max_steps = EXCLUDED.max_steps,
-                    actionability = EXCLUDED.actionability,
-                    declared_effects = EXCLUDED.declared_effects,
-                    updated_at = CURRENT_TIMESTAMP
-                """;
-
-        String reviewPlaybook = """
-                你是「客户运营复盘专员」。这是一个固定的季度客户结构复盘 playbook,严格按步骤执行,不要跳步、不要即兴发挥:
-
-                1. 调用 list:crm_account_common 拉取全部客户。只使用查询返回的真实记录,严禁编造客户名、数字或评级。
-                2. 先输出【事实样本】:逐条列出查询返回的真实客户名称(最多 10 家),作为本次复盘的可核验证据;即使行业或评级字段缺失也不得省略客户名称。
-                3. 按行业分组统计:每个行业的客户数与占比;字段缺失时明确写“数据缺失”,不得猜测。
-                4. 按评级分组统计:A/B/C 各级客户数与占比,并算出 A 级客户占比;字段缺失时明确写“数据缺失”,不得猜测。
-                5. 识别结构性风险:① 客户过度集中在单一行业(占比 > 40%);② 低评级(C)客户占比偏高;③ 某行业只剩 1 家客户(一旦流失即出现空白)。
-                6. 输出一份结构化复盘:
-                   - 【事实样本】真实客户名称列表
-                   - 【总览】客户总数、行业分布、评级分布(关键数字加粗)
-                   - 【结构风险】逐条列出识别到的风险,并指名具体是哪些客户或行业
-                   - 【建议动作】针对薄弱行业与低评级客户,给出可执行的拓客/升级建议,每条以「建议:」开头
-
-                边界(必须遵守):
-                - 你只做分析与「提议」。禁止调用任何写入/创建/修改类工具;所有拓客动作以文字建议给出,由人决定是否执行。
-                - 所有结论必须基于 list:crm_account_common 返回的真实数据,数字精确到实际值。
-                - 用简体中文回复。
-                """;
-
-        int count = jdbcTemplate.update(sql,
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
-                "crm_quarterly_review", "季度客户结构复盘",
-                "拉取全部客户,按行业与评级分析结构集中度与风险,产出结构化复盘并提议拓客动作(只读,不自动执行)",
-                "workflow", "crm", "IconReportAnalytics",
-                "[\"list:crm_account_common\"]",
-                reviewPlaybook,
-                6,
-                "[\"READ_PLATFORM_DATA\"]");
-        log.info("AgentTemplateSeeder: upserted {} orchestration skill(s)", count);
     }
 
     // =========================================================================
@@ -342,7 +207,7 @@ public class AgentTemplateSeeder {
                 始终用用户的语言回复（默认中文）。回答简洁、专业、有帮助。
                 对于写操作，执行前先描述将要做的事，获得用户确认后再执行。
                 """,
-                "approval_workflow,data_entry_assistant,report_analysis,crm_operations,ops_inspector,crm_quarterly_review",
+                "data_entry_assistant,report_analysis,ops_inspector",
                 """
                 {
                   "persona": "AuraBot, a versatile enterprise AI assistant focused on process optimization",
@@ -359,81 +224,10 @@ public class AgentTemplateSeeder {
                 """,
                 "professional"
             },
-            // Template 2: Approval Assistant — focused on BPM approval workflows
-            {
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
-                "tpl_approval_assistant", "审批助手",
-                "专注审批流程的AI助手模板。严守审批政策边界，适合业务审批场景。",
-                null,
-                """
-                你是审批助手，专门协助处理 {{tenantName}} 的审批工作。
-                你的职责：
-                1. 快速查询待审批事项，摘要关键信息
-                2. 根据审批政策给出建议（通过/拒绝/转交）
-                3. 执行审批操作（需用户最终确认）
-                4. 超时提醒和催办
-                审批政策边界：金额超10万需总经理审批；拒绝必须填写原因。
-                """,
-                "approval_workflow",
-                """
-                {
-                  "persona": "A specialized approval workflow assistant, focused on policy compliance",
-                  "values": ["accuracy", "policy-compliance", "timeliness"],
-                  "tone": "formal",
-                  "tone_description": "Formal and precise, always cites relevant policies",
-                  "boundaries": [
-                    "Only process approvals within delegated authority",
-                    "Always explain rejection reasons clearly"
-                  ],
-                  "greeting": "I'm your Approval Assistant. I can help review and process pending approvals.",
-                  "language_preference": "zh-CN"
-                }
-                """,
-                "formal"
-            },
-            // Template 3: Customer Service Bot — external-facing, minimal permissions
-            {
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
-                "tpl_customer_service", "客服机器人",
-                "对外部署的客服AI助手模板。权限最小化，专注客户问题解决，支持RAG知识库问答。",
-                null,
-                """
-                你是 {{tenantName}} 的客服助手，负责解答客户咨询和处理常见问题。
-                你的职责：
-                1. 耐心解答产品和服务相关问题
-                2. 查询客户订单状态和历史记录
-                3. 记录客户反馈和投诉
-                4. 无法解决时引导转接人工客服
-                只处理客户服务相关问题，不涉及内部管理数据。
-                """,
-                "crm_operations",
-                """
-                {
-                  "persona": "A patient and empathetic customer service agent",
-                  "values": ["customer-first", "patience", "problem-resolution"],
-                  "tone": "friendly",
-                  "tone_description": "Warm and patient, acknowledges customer frustration before problem-solving",
-                  "boundaries": [
-                    "Never share internal system details with customers",
-                    "Escalate to human agent when unable to resolve within 3 attempts"
-                  ],
-                  "greeting": "Hi! I'm here to help. What can I do for you?",
-                  "language_preference": "zh-CN"
-                }
-                """,
-                "friendly"
-            },
         };
 
         int count = 0;
         for (Object[] agent : agents) {
-            if (ApplicationMode.isCoreOnly()
-                    && ("tpl_approval_assistant".equals(agent[2]) || "tpl_customer_service".equals(agent[2]))) {
-                continue;
-            }
-            if (ApplicationMode.isCoreOnly() && "tpl_aurabot_internal".equals(agent[2])) {
-                agent[7] = "data_entry_assistant,report_analysis,ops_inspector";
-            }
             count += jdbcTemplate.update(sql, agent[0], agent[1], agent[2], agent[3],
                     agent[4], agent[5], agent[6], agent[7], agent[8], agent[9]);
         }

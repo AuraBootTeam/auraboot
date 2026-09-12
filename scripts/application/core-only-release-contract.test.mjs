@@ -25,14 +25,14 @@ test('core deployment forces an empty PF4J directory and verifies exact runtime 
   assert.match(deploy, /code ~\* '\(\^\|_\)\(bpm\|crm\)/);
 });
 
-test('core-only bootstrap filters product-specific seed content', () => {
+test('core bootstrap source contains no BPM or CRM product seed content', () => {
   const categorySeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/MarketplaceCategorySeeder.java'), 'utf8');
   const solutionSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/SolutionSeeder.java'), 'utf8');
   const agentSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/AgentTemplateSeeder.java'), 'utf8');
   const bootstrap = readFileSync(resolve(root, 'platform/src/main/resources/tenant-templates/default-bootstrap.json'), 'utf8');
-  assert.match(categorySeeder, /ApplicationMode\.isCoreOnly\(\).*"crm"/s);
-  assert.match(solutionSeeder, /ApplicationMode\.isCoreOnly\(\).*containsProductSignal/s);
-  assert.match(agentSeeder, /ApplicationMode\.isCoreOnly\(\)/);
+  for (const source of [categorySeeder, solutionSeeder, agentSeeder]) {
+    assert.doesNotMatch(source, /(^|[^a-z0-9])(crm|bpm)([^a-z0-9]|$)/i);
+  }
   assert.doesNotMatch(bootstrap, /BPM/);
 });
 

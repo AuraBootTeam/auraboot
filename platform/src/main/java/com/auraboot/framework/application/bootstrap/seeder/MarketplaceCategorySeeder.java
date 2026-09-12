@@ -1,6 +1,5 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
-import com.auraboot.framework.application.ApplicationMode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,6 @@ public class MarketplaceCategorySeeder {
                 """;
 
         Object[][] categories = {
-            {UniqueIdGenerator.generate(), "crm", "客户关系管理", "crm", "IconUsers", 10},
             {UniqueIdGenerator.generate(), "erp", "企业资源计划", "erp", "IconBuilding", 20},
             {UniqueIdGenerator.generate(), "finance", "财务管理", "Finance", "IconCurrencyDollar", 30},
             {UniqueIdGenerator.generate(), "hr", "人力资源", "HR", "IconUserGroup", 40},
@@ -34,9 +32,6 @@ public class MarketplaceCategorySeeder {
 
         int count = 0;
         for (Object[] category : categories) {
-            if (ApplicationMode.isCoreOnly() && "crm".equals(category[1])) {
-                continue;
-            }
             count += jdbcTemplate.update(sql, category[0], category[1], category[2], category[3], category[4], category[5]);
         }
         log.info("MarketplaceCategorySeeder: seeded {} categories (skipped {} existing)", count, categories.length - count);
