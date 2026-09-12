@@ -61,6 +61,41 @@ test('private physical sources cannot be listed or aggregated through named quer
     const exported = await request.post(`/api/meta/named-queries/${code}/export-data`, {
       data: { format: 'CSV', parameters: { marker, tenantId: -1, currentUserId: '0' } },
     });
+    const asyncExport = await request.post(`/api/meta/named-queries/${code}/export-async`, {
+      data: { format: 'CSV', parameters: { marker, tenantId: -1, currentUserId: '0' } },
+    });
+    expect(asyncExport.status(), await asyncExport.text()).toBe(200);
+    const taskPid = (await asyncExport.json()).data.pid;
+    let asyncTask: any;
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get(`/api/meta/named-queries/export-tasks/${taskPid}`);
+          expect(response.status(), await response.text()).toBe(200);
+          asyncTask = (await response.json()).data;
+          return asyncTask.status;
+        },
+        { timeout: 15000 },
+      )
+      .toBe(table === 'mt_e2et_order' ? 'completed' : 'failed');
+    if (table === 'mt_e2et_order') {
+      expect(asyncTask.processedRows).toBe(1);
+      const file = await request.get(asyncTask.downloadUrl);
+      expect(file.status()).toBe(200);
+      const rows = (await file.text())
+        .replace(/^\uFEFF/, '')
+        .trim()
+        .split(/\r?\n/);
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toContain(fixturePid);
+    } else {
+      expect(asyncTask.errorMessage).toContain(
+        'Raw analytics records require the authorized analytics service',
+      );
+      expect(asyncTask.downloadUrl).toBeFalsy();
+      const file = await request.get(`/api/meta/named-queries/export-tasks/${taskPid}/download`);
+      expect(file.status()).toBe(404);
+    }
     const privateSource = table !== 'mt_e2et_order';
     for (const response of [listed, chart, exported]) {
       expect(response.status(), await response.text()).toBe(privateSource ? 403 : 200);

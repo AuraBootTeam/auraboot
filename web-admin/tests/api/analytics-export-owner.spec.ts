@@ -26,9 +26,18 @@ test('async export task and file belong to their creator', async ({ request }) =
   const pid = (await submitted.json()).data.pid;
   expect(pid).toBeTruthy();
   const path = `/api/meta/named-queries/export-tasks/${pid}`;
-  const status = await request.get(path);
-  expect(status.status(), await status.text()).toBe(200);
-  expect((await status.json()).data.status).toBe('completed');
+  await expect
+    .poll(
+      async () => {
+        const status = await request.get(path);
+        expect(status.status(), await status.text()).toBe(200);
+        const state = (await status.json()).data.status;
+        expect(state).not.toBe('failed');
+        return state;
+      },
+      { timeout: 15000 },
+    )
+    .toBe('completed');
   const download = await request.get(`${path}/download`);
   expect(download.status(), await download.text()).toBe(200);
   expect((await download.body()).subarray(0, 2).toString()).toBe('PK');
