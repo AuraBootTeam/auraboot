@@ -124,6 +124,20 @@ class AgentApprovalGateServiceConcurrencyTest {
         verify(eventBus).publishAfterCommit(any());
     }
 
+    @Test
+    void rejectionCannotOverwriteAConcurrentDecisionOrEmitSideEffects() {
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenReturn(List.of(pendingApproval()));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+        assertThatThrownBy(() -> newService().reject(1L, "apv-1", 99L, "deny"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("already processed");
+        @SuppressWarnings("unchecked") ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        assertThat(conditions.getValue()).containsEntry("approval_status", "pending");
+        verify(eventBus, never()).publishAfterCommit(any());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), any());
+        verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
+    }
+
     private AgentApprovalGateService newService() {
         return new AgentApprovalGateService(
                 dynamicDataMapper,

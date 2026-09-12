@@ -673,7 +673,11 @@ public class AgentApprovalGateService {
         update.put("approved_at", now);
         update.put("rejection_reason", reason != null ? reason : "Rejected by user");
         update.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", approvalPid));
+        int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                Map.of("pid", approvalPid, "approval_status", "pending"));
+        if (updated != 1) {
+            throw new IllegalStateException("Approval already processed: " + approvalPid);
+        }
         log.info("Approval rejected: pid={}, approver={}, reason={}", approvalPid, approverId, reason);
 
         String runPid = (String) approval.get("run_id");

@@ -4,10 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
-for (const approved of [true, false]) {
-  test(`ACP authorized decision after foreign-user denial: ${approved ? 'approve' : 'reject'}`, async ({
-    request,
-  }) => {
+for (const mode of ['approve', 'reject', 'race']) {
+  test(`ACP authorized decision after foreign-user denial: ${mode}`, async ({ request }) => {
+    let approved = mode !== 'reject';
     test.setTimeout(90000);
     const tag = randomUUID().replaceAll('-', '').slice(0, 16);
     const code = `approved_${tag}`,
@@ -172,12 +171,24 @@ for (const approved of [true, false]) {
         await foreign.dispose();
       }
 
-      const resumed = await request.post('/api/ai/aurabot/execute', {
-        headers: { Accept: 'text/event-stream' },
-        data: { pendingTurnId: approval.pid, confirmed: approved },
-      });
-      expect(resumed.status()).toBe(200);
-      const text = await resumed.text();
+      const decide = async (decision: boolean) => {
+        const response = await request.post('/api/ai/aurabot/execute', {
+          headers: { Accept: 'text/event-stream' },
+          data: { pendingTurnId: approval.pid, confirmed: decision },
+        });
+        expect(response.status()).toBe(200);
+        return response.text();
+      };
+      let text: string;
+      if (mode === 'race') {
+        const results = await Promise.all([decide(true), decide(false)]);
+        expect(results.filter((result) => result.includes('event:error'))).toHaveLength(1);
+        expect(results.filter((result) => result.includes('event:done'))).toHaveLength(1);
+        approved = results[0].includes('event:done');
+        text = results[approved ? 0 : 1];
+      } else {
+        text = await decide(approved);
+      }
       expect(text).not.toContain('event:error');
       expect(text).toContain('event:done');
       const after = (

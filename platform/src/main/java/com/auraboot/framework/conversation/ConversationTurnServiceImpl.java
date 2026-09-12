@@ -712,12 +712,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     yield syncResumeAcpRun(ctx, taskPid, runPid, capturingSink);
                 }
                 case DENIED -> {
-                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation");
+                    if (agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation") == null) {
+                        throw new IllegalStateException("Approval already processed: " + approvalPid);
+                    }
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User denied the operation", "user_denied");
                 }
                 case CANCELLED -> {
-                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation");
+                    if (agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation") == null) {
+                        throw new IllegalStateException("Approval already processed: " + approvalPid);
+                    }
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User cancelled the operation", "user_cancelled");
                 }
