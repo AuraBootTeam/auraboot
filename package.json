@@ -11,6 +11,7 @@
     "agent:git-guard": "node scripts/agent-git-guard.mjs",
     "audit:product-extraction": "node scripts/application/generate-product-extraction-inventory.mjs",
     "application": "node scripts/application/application-cli.mjs",
+    "application:stage-core-only": "node scripts/application/stage-core-only-artifacts.mjs",
     "test:application": "node --test scripts/application/*.test.mjs",
     "test:product-extraction-inventory": "node --test scripts/application/generate-product-extraction-inventory.test.mjs",
     "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs && node scripts/validate-permission-codes.mjs && node scripts/check-dsl-status-colors.mjs && node scripts/check-cache-eviction.mjs && node scripts/check-e2e-assertions.mjs",

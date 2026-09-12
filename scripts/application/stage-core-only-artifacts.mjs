@@ -1,0 +1,226 @@
+#!/usr/bin/env node
+
+import { execFileSync } from 'node:child_process';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import YAML from 'yaml';
+
+import {
+  readStructuredFile,
+  resolveApplication,
+  sha256Path,
+  validateManifest,
+  verifyArtifacts,
+} from './application-contract.mjs';
+
+const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
+const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
+
+function parseArgs(argv) {
+  const options = { repoRoot: DEFAULT_REPO_ROOT };
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === '--repo-root') options.repoRoot = resolve(argv[++index]);
+    else if (argument === '--output') options.output = resolve(argv[++index]);
+    else throw new Error(`unknown argument: ${argument}`);
+  }
+  if (!options.output) throw new Error('--output is required');
+  return options;
+}
+
+function run(command, args, options = {}) {
+  return execFileSync(command, args, {
+    cwd: options.cwd,
+    encoding: 'utf8',
+    stdio: options.capture === false ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function requirePath(path, label) {
+  if (!existsSync(path)) throw new Error(`${label} does not exist: ${path}`);
+  return path;
+}
+
+function copyArtifact(source, target) {
+  requirePath(source, 'artifact input');
+  mkdirSync(dirname(target), { recursive: true });
+  cpSync(source, target, { recursive: true, errorOnExist: true, force: false });
+  return target;
+}
+
+function sourceRecord(repository, commit) {
+  return { repository, commit };
+}
+
+function catalogArtifact({ type, id, version, path, output, repository, commit }) {
+  return {
+    type,
+    id,
+    version,
+    uri: `artifact:${basename(path)}`,
+    digest: sha256Path(path),
+    localPath: path.slice(output.length + 1),
+    source: sourceRecord(repository, commit),
+  };
+}
+
+function packPluginSdk(repoRoot, destination) {
+  mkdirSync(destination, { recursive: true });
+  const buildRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-plugin-sdk-build-'));
+  try {
+    run(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '-p',
+        'packages/plugin-sdk/tsconfig.json',
+        '--tsBuildInfoFile',
+        resolve(buildRoot, 'tsconfig.tsbuildinfo'),
+      ],
+      { cwd: repoRoot, capture: false },
+    );
+    const output = run(
+      'pnpm',
+      ['--dir', resolve(repoRoot, 'packages/plugin-sdk'), 'pack', '--pack-destination', destination],
+      { cwd: repoRoot },
+    );
+    const tarball = output.split('\n').at(-1);
+    return requirePath(resolve(tarball), 'plugin SDK tarball');
+  } finally {
+    rmSync(buildRoot, { recursive: true, force: true });
+  }
+}
+
+function packWebShell(repoRoot, destination, version) {
+  const buildRoot = requirePath(resolve(repoRoot, 'web-admin/build'), 'Web Shell build');
+  const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-web-shell-pack-'));
+  try {
+    cpSync(buildRoot, resolve(packageRoot, 'build'), { recursive: true, errorOnExist: true, force: false });
+    writeFileSync(
+      resolve(packageRoot, 'package.json'),
+      `${JSON.stringify({
+        name: '@auraboot/web-shell',
+        version,
+        private: false,
+        type: 'module',
+        main: './build/server/index.js',
+        exports: { '.': './build/server/index.js' },
+        files: ['build'],
+        engines: { node: '>=20' },
+      }, null, 2)}\n`,
+    );
+    const output = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
+    const tarball = output.split('\n').at(-1);
+    return requirePath(resolve(tarball), 'Web Shell tarball');
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true });
+  }
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const { repoRoot, output } = options;
+  if (existsSync(output)) throw new Error(`output already exists: ${output}`);
+
+  const dirty = run('git', ['status', '--porcelain'], { cwd: repoRoot });
+  if (dirty) throw new Error('refusing to stage artifacts from a dirty Git worktree');
+
+  const commit = run('git', ['rev-parse', 'HEAD'], { cwd: repoRoot });
+  const repository = run('git', ['remote', 'get-url', 'origin'], { cwd: repoRoot });
+  const version = readFileSync(resolve(repoRoot, 'VERSION'), 'utf8').trim();
+  const manifestPath = resolve(repoRoot, 'distribution/application/examples/core-only/app.yaml');
+  const manifest = validateManifest(readStructuredFile(manifestPath));
+  for (const [name, actual] of Object.entries({
+    runtime: manifest.platform.runtime,
+    pluginApi: manifest.platform.pluginApi,
+    webShell: manifest.platform.webShell,
+  })) {
+    if (actual !== version) throw new Error(`${name} version ${actual} does not match VERSION ${version}`);
+  }
+
+  mkdirSync(output, { recursive: false });
+  copyFileSync(manifestPath, resolve(output, 'app.yaml'));
+
+  const runtime = copyArtifact(
+    resolve(repoRoot, `platform/build/libs/AuraBoot-${version}-boot.jar`),
+    resolve(output, `runtime/AuraBoot-${version}-boot.jar`),
+  );
+  const pluginApi = copyArtifact(
+    resolve(repoRoot, `platform/platform-plugin-api/build/libs/platform-plugin-api-${version}.jar`),
+    resolve(output, `maven/platform-plugin-api-${version}.jar`),
+  );
+  const npmRoot = resolve(output, 'npm');
+  const pluginSdk = packPluginSdk(repoRoot, npmRoot);
+  const webShell = packWebShell(repoRoot, npmRoot, version);
+  const coreMigrations = copyArtifact(
+    resolve(repoRoot, 'platform/src/main/resources/db/migration/core'),
+    resolve(output, 'migrations/core'),
+  );
+  const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
+  const platformAdmin = copyArtifact(
+    resolve(repoRoot, 'plugins/platform-admin'),
+    resolve(output, 'config/platform-admin'),
+  );
+
+  const artifactInputs = [
+    { type: 'runtime', id: 'com.auraboot:runtime', version, path: runtime },
+    { type: 'maven', id: 'com.auraboot:platform-plugin-api', version, path: pluginApi },
+    { type: 'npm', id: '@auraboot/web-shell', version, path: webShell },
+    { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk, path: pluginSdk },
+    { type: 'migration', id: 'core', version, path: coreMigrations },
+    { type: 'config', id: 'core-meta', version, path: coreMeta },
+    { type: 'config', id: 'platform-admin', version, path: platformAdmin },
+  ];
+  const catalog = {
+    schemaVersion: 1,
+    artifacts: artifactInputs.map((artifact) => catalogArtifact({
+      ...artifact,
+      output,
+      repository,
+      commit,
+    })),
+  };
+  const lock = resolveApplication(manifest, catalog);
+  verifyArtifacts(lock, { artifactRoot: output });
+  writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
+  writeFileSync(resolve(output, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
+  writeFileSync(resolve(output, 'app.resolved.yaml'), YAML.stringify(manifest));
+  writeFileSync(
+    resolve(output, 'staging-summary.json'),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      source: sourceRecord(repository, commit),
+      application: lock.application,
+      lockIdentity: lock.identity,
+      graphDigest: lock.composition.graphDigest,
+      artifactCount: lock.artifacts.length,
+    }, null, 2)}\n`,
+  );
+  process.stdout.write(`${JSON.stringify({
+    status: 'PASS',
+    output,
+    commit,
+    lockIdentity: lock.identity,
+    graphDigest: lock.composition.graphDigest,
+    artifactCount: lock.artifacts.length,
+  }, null, 2)}\n`);
+}
+
+try {
+  main();
+} catch (error) {
+  process.stderr.write(`core-only artifact staging failed: ${error.message}\n`);
+  process.exitCode = 1;
+}

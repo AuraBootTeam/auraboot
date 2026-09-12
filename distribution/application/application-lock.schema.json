@@ -48,7 +48,7 @@
         "additionalProperties": false,
         "required": ["type", "id", "version", "uri", "digest", "source"],
         "properties": {
-          "type": { "enum": ["maven", "npm", "plugin", "config", "migration", "oci"] },
+          "type": { "enum": ["runtime", "maven", "npm", "plugin", "config", "migration", "oci"] },
           "id": { "type": "string", "minLength": 1 },
           "version": { "type": "string", "minLength": 1 },
           "uri": { "type": "string", "pattern": "^(maven|npm|oci|artifact):" },

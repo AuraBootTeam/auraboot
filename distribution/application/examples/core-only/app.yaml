@@ -8,7 +8,7 @@ platform:
   runtime: 1.0.0
   pluginApi: 1.0.0
   webShell: 1.0.0
-  pluginSdk: 1.0.0
+  pluginSdk: 0.0.1
   dslSchema: 4
 backend:
   plugins: []

@@ -8,6 +8,7 @@ import {
   buildApplicationGraph,
   resolveApplication,
   sha256,
+  sha256Path,
   validateLock,
   validateManifest,
   verifyArtifacts,
@@ -48,7 +49,7 @@ function catalog() {
   });
   return {
     artifacts: [
-      artifact('oci', 'com.auraboot:runtime', '1.3.0', '1'),
+      artifact('runtime', 'com.auraboot:runtime', '1.3.0', '1'),
       { ...artifact('maven', 'com.auraboot:platform-plugin-api', '1.3.0', '2'), uri: 'maven:com.auraboot:platform-plugin-api:1.3.0' },
       artifact('npm', '@auraboot/web-shell', '1.3.0', '3'),
       artifact('npm', '@auraboot/plugin-sdk', '1.3.0', '4'),
@@ -126,5 +127,20 @@ describe('AuraBoot application contract', () => {
 
     writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
     assert.throws(() => verifyArtifacts(lock, { artifactRoot }), /checksum mismatch/);
+  });
+
+  it('computes deterministic directory digests and detects nested mutations', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'aura-application-directory-'));
+    const nested = join(artifactRoot, 'nested');
+    mkdirSync(nested);
+    writeFileSync(join(artifactRoot, 'a.txt'), 'alpha');
+    writeFileSync(join(nested, 'b.txt'), 'beta');
+
+    const first = sha256Path(artifactRoot);
+    const second = sha256Path(artifactRoot);
+    assert.equal(first, second);
+
+    writeFileSync(join(nested, 'b.txt'), 'mutated');
+    assert.notEqual(sha256Path(artifactRoot), first);
   });
 });

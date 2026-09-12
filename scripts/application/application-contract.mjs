@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
 import Ajv from 'ajv';
@@ -27,6 +27,27 @@ export function canonicalJson(value) {
 
 export function sha256(value) {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+export function sha256Path(path) {
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${path}`);
+  if (stat.isFile()) return sha256(readFileSync(path));
+  if (!stat.isDirectory()) throw new Error(`unsupported staged artifact type: ${path}`);
+  const entries = [];
+  const walk = (directory, prefix = '') => {
+    for (const name of readdirSync(directory).sort()) {
+      const child = resolve(directory, name);
+      const childRelative = prefix ? `${prefix}/${name}` : name;
+      const childStat = lstatSync(child);
+      if (childStat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${child}`);
+      if (childStat.isDirectory()) walk(child, childRelative);
+      else if (childStat.isFile()) entries.push(`${childRelative}\0${sha256(readFileSync(child))}`);
+      else throw new Error(`unsupported staged artifact type: ${child}`);
+    }
+  };
+  walk(path);
+  return sha256(`${entries.join('\n')}\n`);
 }
 
 function withoutIdentity(lock) {
@@ -111,13 +132,12 @@ export function verifyArtifacts(lockInput, { artifactRoot }) {
     if (relative(root, path).startsWith('..')) {
       throw new Error(`artifact ${artifact.type}:${artifact.id} escapes the artifact root`);
     }
-    let bytes;
+    let actualDigest;
     try {
-      bytes = readFileSync(path);
+      actualDigest = sha256Path(path);
     } catch (error) {
       throw new Error(`artifact ${artifact.type}:${artifact.id} cannot be read at ${artifact.localPath}: ${error.message}`);
     }
-    const actualDigest = sha256(bytes);
     if (actualDigest !== artifact.digest) {
       throw new Error(
         `artifact ${artifact.type}:${artifact.id} checksum mismatch: expected ${artifact.digest}, received ${actualDigest}`,
@@ -129,7 +149,7 @@ export function verifyArtifacts(lockInput, { artifactRoot }) {
 
 function requirements(manifest) {
   return [
-    { type: 'oci', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
+    { type: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
