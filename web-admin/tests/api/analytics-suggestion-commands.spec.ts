@@ -258,6 +258,102 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         { timeout: 15000 },
       )
       .toEqual(facts.rows.map((row) => row.event_id).sort());
+    const executionFrom = new Date().toISOString();
+    const dispatch = async () => {
+      const response = await request.post('/api/ai/aurabot/chat/stream', {
+        headers: { Accept: 'text/event-stream' },
+        data: {
+          sessionId: marker,
+          clientMsgId: randomUUID(),
+          message: proposal.executionIntent.goal,
+          analyticsExecution: { adoptionPid: adopted.pid, requestId: randomUUID() },
+          options: { provider: 'stub', model: 'stub-model' },
+        },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      return response.text();
+    };
+    const completed = await dispatch();
+    expect(completed).toContain('event:done');
+    expect(completed).not.toContain('event:error');
+    const executionRows = async () =>
+      (
+        await db.query(
+          `SELECT a.task_pid, a.binding, a.goal, r.pid AS run_pid, r.run_status
+       FROM ab_analytics_task_execution a JOIN ab_agent_run r
+         ON r.tenant_id=a.tenant_id AND r.task_id=a.task_pid
+       WHERE a.adoption_pid=$1`,
+          [adopted.pid],
+        )
+      ).rows;
+    const linked = await executionRows();
+    expect(linked).toHaveLength(1);
+    expect(linked[0].run_status).toBe('success');
+    expect(linked[0].goal).toBe(proposal.executionIntent.goal);
+    expect(linked[0].binding).toMatchObject({
+      adoptionPid: adopted.pid,
+      analysisId: analysis.analysisId,
+    });
+    const executionFacts = (
+      await db.query(
+        `SELECT event_id, event_name, caused_by_event_id, payload FROM ab_behavior_outcome_outbox
+       WHERE run_id=$1 ORDER BY id`,
+        [linked[0].run_pid],
+      )
+    ).rows;
+    expect(executionFacts.map((row) => row.event_name)).toEqual([
+      'agent_execution_started',
+      'agent_execution_completed',
+    ]);
+    expect(executionFacts[0].caused_by_event_id).toBe(facts.rows[2].event_id);
+    expect(executionFacts[0].payload.analyticsExecution).toMatchObject({
+      adoptionPid: adopted.pid,
+      analysisId: analysis.analysisId,
+    });
+    expect(executionFacts[1].caused_by_event_id).toBe(executionFacts[0].event_id);
+    expect(executionFacts[1].payload.status).toBe('success');
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.query(
+              'SELECT event_id FROM ab_behavior_event WHERE run_id=$1 ORDER BY event_id',
+              [linked[0].run_pid],
+            )
+          ).rows.map((row) => row.event_id),
+        { timeout: 15000 },
+      )
+      .toEqual(executionFacts.map((row) => row.event_id).sort());
+    const projected = await request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysis.analysisId, page: 2, pageSize: 1 },
+    });
+    expect(projected.status()).toBe(200);
+    expect((await projected.json()).data.records[0]).toMatchObject({
+      pid: first.pid,
+      adoptionPid: adopted.pid,
+      execution: { state: 'success', attempts: 1 },
+    });
+    const statistics = await request.get('/api/analytics/behavior/executions', {
+      params: { from: executionFrom, to: new Date().toISOString() },
+    });
+    expect(statistics.status()).toBe(200);
+    expect((await statistics.json()).data.counts).toMatchObject({
+      started: 1,
+      succeeded: 1,
+      failed: 0,
+      unresolved: 0,
+    });
+    await dispatch();
+    expect(await executionRows()).toEqual(linked);
+    expect(
+      (
+        await db.query(
+          'SELECT event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 ORDER BY id',
+          [linked[0].run_pid],
+        )
+      ).rows.map((row) => row.event_id),
+    ).toEqual(executionFacts.map((row) => row.event_id));
+
     for (const role of ['tenant_member', 'tenant_admin']) {
       const email = `suggestion-${randomUUID()}@e2e.local`;
       const password = `Aa7!${randomUUID()}`;
@@ -309,15 +405,13 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       }
     }
     expect(
-      Number(
-        (
-          await db.query(
-            'SELECT count(*) FROM ab_behavior_outcome_outbox WHERE interaction_id=$1',
-            [analysis.analysisId],
-          )
-        ).rows[0].count,
-      ),
-    ).toBe(3);
+      (
+        await db.query(
+          'SELECT event_id FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 ORDER BY event_id',
+          [analysis.analysisId],
+        )
+      ).rows.map((row) => row.event_id),
+    ).toEqual([...facts.rows.map((row) => row.event_id), executionFacts[0].event_id].sort());
   } finally {
     await db.end();
   }
