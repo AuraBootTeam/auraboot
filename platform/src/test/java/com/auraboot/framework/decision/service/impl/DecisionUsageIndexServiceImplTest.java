@@ -23,6 +23,7 @@ import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
+import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
@@ -43,6 +44,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class DecisionUsageIndexServiceImplTest {
@@ -57,7 +59,13 @@ class DecisionUsageIndexServiceImplTest {
     private final BpmProcessDefinitionMapper bpmProcessDefinitionMapper = mock(BpmProcessDefinitionMapper.class);
     private final RolePermissionMapper rolePermissionMapper = mock(RolePermissionMapper.class);
     private final PermissionMapper permissionMapper = mock(PermissionMapper.class);
+    private final TableMetadataService tableMetadataService = mock(TableMetadataService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    {
+        when(tableMetadataService.tableExists("ab_sla_config")).thenReturn(true);
+        when(tableMetadataService.tableExists("ab_bpm_process_definition")).thenReturn(true);
+    }
 
     private final DecisionUsageIndexServiceImpl service = new DecisionUsageIndexServiceImpl(
             usageRefMapper,
@@ -70,7 +78,26 @@ class DecisionUsageIndexServiceImplTest {
             bpmProcessDefinitionMapper,
             rolePermissionMapper,
             permissionMapper,
-            objectMapper);
+            objectMapper,
+            tableMetadataService);
+
+    @Test
+    void rebuildSkipsOptionalProductScannersWhenTheirTablesAreAbsent() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(tableMetadataService.tableExists("ab_sla_config")).thenReturn(false);
+        when(tableMetadataService.tableExists("ab_bpm_process_definition")).thenReturn(false);
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+        when(rolePermissionMapper.selectList(any())).thenReturn(List.of());
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        assertThat(summary.getTotalRefs()).isZero();
+        verify(slaConfigMapper, never()).selectList(any());
+        verify(bpmProcessDefinitionMapper, never()).selectList(any());
+    }
 
     @AfterEach
     void clearContext() {

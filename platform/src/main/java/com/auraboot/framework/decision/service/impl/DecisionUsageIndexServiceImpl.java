@@ -24,6 +24,7 @@ import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -57,6 +58,9 @@ import java.util.Set;
 @Slf4j
 public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService {
 
+    private static final String SLA_CONFIG_TABLE = "ab_sla_config";
+    private static final String BPM_PROCESS_DEFINITION_TABLE = "ab_bpm_process_definition";
+
     private static final Set<String> INDEXABLE_VERSION_STATUSES = Set.of(
             "VALIDATED", "PENDING_APPROVAL", "PUBLISHED", "DEPRECATED");
     private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of(
@@ -74,6 +78,7 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
+    private final TableMetadataService tableMetadataService;
 
     @Override
     @Transactional
@@ -372,6 +377,10 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     }
 
     private List<DecisionUsageRefEntity> scanSlaRules(Long tenantId) {
+        if (!tableMetadataService.tableExists(SLA_CONFIG_TABLE)) {
+            log.debug("Skipping SLA decision-usage scan because optional table {} is absent", SLA_CONFIG_TABLE);
+            return List.of();
+        }
         return slaConfigMapper.selectList(new LambdaQueryWrapper<SlaConfigEntity>()
                         .eq(SlaConfigEntity::getTenantId, tenantId)
                         .eq(SlaConfigEntity::getDeletedFlag, false))
@@ -485,6 +494,11 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     }
 
     private List<DecisionUsageRefEntity> scanBpmProcesses(Long tenantId) {
+        if (!tableMetadataService.tableExists(BPM_PROCESS_DEFINITION_TABLE)) {
+            log.debug("Skipping BPM decision-usage scan because optional table {} is absent",
+                    BPM_PROCESS_DEFINITION_TABLE);
+            return List.of();
+        }
         List<BpmProcessDefinition> processes = bpmProcessDefinitionMapper.selectList(
                 new LambdaQueryWrapper<BpmProcessDefinition>()
                         .eq(BpmProcessDefinition::getTenantId, tenantId)
