@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 
@@ -57,6 +57,16 @@ test('core production graph contains no product tables or product-owned HTTP rou
 test('core build declares no SmartEngine, Drools or KIE artifact dependency', () => {
   const build = readFileSync(resolve(ROOT, 'platform/build.gradle'), 'utf8');
   assert.doesNotMatch(build, /com\.auraboot\.smart\.framework|org\.drools|org\.kie|kie-/i);
+});
+
+test('core exposes no legacy BPM product or release runner fallback', () => {
+  for (const relative of [
+    'scripts/bpm-release-gate.sh',
+    'scripts/bpm-release-gate.pins.json',
+    'scripts/run-bpm-release-image-gate.sh',
+  ]) {
+    assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
+  }
 });
 
 test('public source-facade npm exports resolve to typed source files', () => {
