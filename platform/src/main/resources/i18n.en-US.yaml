@@ -257,24 +257,6 @@ notification:
     load_failed: Failed to load notification preferences
     update_failed: Failed to update notification preferences
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: New task assigned to you
-    task_completed:
-      title: Task completed
-    process_started:
-      title: Process started
-    process_ended:
-      title: Process completed
-    sla_warning:
-      title: SLA warning
-    sla_escalated:
-      title: SLA escalated
-    default:
-      title: BPM notification
-
 # Flow Designer SDK
 flow:
   palette:

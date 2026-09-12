@@ -91,24 +91,6 @@ notification:
     load_failed: 알림 설정을 불러오지 못했습니다
     update_failed: 알림 설정을 업데이트하지 못했습니다
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 새로운 할 일이 있습니다
-    task_completed:
-      title: 작업이 완료되었습니다
-    process_started:
-      title: 프로세스가 시작되었습니다
-    process_ended:
-      title: 프로세스가 완료되었습니다
-    sla_warning:
-      title: SLA 경고
-    sla_escalated:
-      title: SLA 에스컬레이션
-    default:
-      title: BPM 알림
-
 # Flow Designer SDK
 flow:
   palette:

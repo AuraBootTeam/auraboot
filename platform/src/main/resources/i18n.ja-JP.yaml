@@ -91,24 +91,6 @@ notification:
     load_failed: 通知設定の読み込みに失敗しました
     update_failed: 通知設定の更新に失敗しました
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 新しいタスクがあります
-    task_completed:
-      title: タスクが完了しました
-    process_started:
-      title: プロセスが開始されました
-    process_ended:
-      title: プロセスが完了しました
-    sla_warning:
-      title: SLA 警告
-    sla_escalated:
-      title: SLA エスカレーション
-    default:
-      title: BPM 通知
-
 # Flow Designer SDK
 flow:
   palette:

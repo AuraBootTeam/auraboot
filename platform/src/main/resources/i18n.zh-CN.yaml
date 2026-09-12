@@ -549,24 +549,6 @@ notification:
     load_failed: 加载通知偏好失败
     update_failed: 更新通知偏好失败
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 您有新的待办任务
-    task_completed:
-      title: 任务已完成
-    process_started:
-      title: 流程已发起
-    process_ended:
-      title: 流程已结束
-    sla_warning:
-      title: SLA 预警提醒
-    sla_escalated:
-      title: SLA 已升级
-    default:
-      title: 流程通知
-
 # Flow Designer SDK
 flow:
   palette:
