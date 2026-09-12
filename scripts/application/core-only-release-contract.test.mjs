@@ -52,5 +52,6 @@ test('release OCI is built on a pinned Linux JRE and requires a real image build
   assert.match(oci, /execFileSync\('container', \['image', 'save'/);
   assert.match(oci, /'buildx', 'build'/);
   assert.match(oci, /requires Apple container or Docker buildx/);
+  assert.match(oci, /mkdtempSync\(resolve\(dirname\(output\), '\.auraboot-image-'\)\)/);
   assert.doesNotMatch(oci, /application payload layer/);
 });

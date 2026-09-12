@@ -12,7 +12,10 @@ function commandExists(command) {
 }
 
 function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
-  const context = mkdtempSync(resolve(tmpdir(), 'auraboot-image-'));
+  // Apple Container only shares workspace-backed paths with its builder VM.
+  // Keep the context beside the requested OCI layout instead of macOS $TMPDIR.
+  mkdirSync(dirname(output), { recursive: true });
+  const context = mkdtempSync(resolve(dirname(output), '.auraboot-image-'));
   const archive = resolve(context, 'image.tar');
   const contextRootfs = resolve(context, 'rootfs');
   const tag = `aura-release-${process.pid}-${digest(Buffer.from(JSON.stringify(labels))).slice(0, 12)}:local`;
