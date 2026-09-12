@@ -1,6 +1,7 @@
 package com.auraboot.framework.aurabot.skill.builtin;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.behavior.service.AnalyticsJourneyService;
 import com.auraboot.framework.aurabot.skill.*;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
@@ -201,12 +202,15 @@ public class ChatBiSkill implements AuraBotSkill {
     private final SemanticCatalogService catalog;
     private final UserPermissionService permissions;
 
+    private final AnalyticsJourneyService journey;
+
     public ChatBiSkill(AggregateQueryService queries, ObjectMapper mapper,
-                       SemanticCatalogService catalog, UserPermissionService permissions) {
+                       SemanticCatalogService catalog, UserPermissionService permissions, AnalyticsJourneyService journey) {
         this.queries = queries;
         this.mapper = mapper;
         this.catalog = catalog;
         this.permissions = permissions;
+        this.journey = journey;
     }
 
     /** One contract for native tool exposure and skill validation. */
@@ -237,6 +241,20 @@ public class ChatBiSkill implements AuraBotSkill {
         if ("catalog".equals(action)) return success(mapper.valueToTree(accessibleCatalog()));
         if (!"query".equals(action)) throw invalid("Unknown analytics action");
 
+        String analysisId = journey.requested();
+        SkillResult result;
+        try {
+            result = executeQuery(params);
+        } catch (RuntimeException error) {
+            journey.failed(analysisId);
+            throw error;
+        }
+        ((ObjectNode) result.getPayload()).put("analysisId", analysisId);
+        journey.succeeded(analysisId, ((ObjectNode) result.getPayload()).path("rowCount").asInt());
+        return result;
+    }
+
+    private SkillResult executeQuery(JsonNode params) {
         ObjectNode queryJson = ((ObjectNode) params).deepCopy();
         queryJson.remove(List.of("action", "chartType", "interpretation"));
         AggregateQueryRequest query;

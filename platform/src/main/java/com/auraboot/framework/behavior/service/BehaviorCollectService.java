@@ -53,6 +53,7 @@ public class BehaviorCollectService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "tenant_required");
         }
+        rejectReservedEvents(events);
         int enqueued = publisher.publish(tenantId, MetaContext.getCurrentUserId(), events);
         metrics.recordAccepted("authenticated", enqueued);
         return enqueued;
@@ -67,8 +68,16 @@ public class BehaviorCollectService {
         if (events == null || events.isEmpty()) {
             return 0;
         }
+        rejectReservedEvents(events);
         int enqueued = publisher.publish(tenantId, null, events);
         metrics.recordAccepted("keyed", enqueued);
         return enqueued;
     }
+    private void rejectReservedEvents(List<BehaviorEventInput> events) {
+        if (events.stream().anyMatch(event -> event != null && event.getEventName() != null
+                && event.getEventName().startsWith("analytics_"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reserved_server_event");
+        }
+    }
+
 }

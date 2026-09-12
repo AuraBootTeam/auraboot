@@ -1,5 +1,7 @@
 /** Deterministic tool execution over a real model. This is not a real-LLM reasoning test. */
 import { test, expect } from '../../fixtures';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 
 test.use({
   storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
@@ -50,6 +52,27 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
   await expect(card).toBeVisible({ timeout: 45000 });
   await expect(card).toHaveAttribute('data-row-count', '1');
   await expect(card).toContainText(title);
+  const analysisId = await card.getAttribute('data-analysis-id');
+  expect(analysisId).toMatch(/^[0-9a-f-]{36}$/);
+  const db = new Client(PG_CONN);
+  await db.connect();
+  try {
+    await expect
+      .poll(async () => {
+        const rows = await db.query(
+          'SELECT event_name, props, user_id::text, tenant_id::text FROM ab_behavior_event WHERE interaction_id = $1 ORDER BY occurred_at, id',
+          [analysisId],
+        );
+        return rows.rows.map((row) => ({ name: row.event_name, props: row.props }));
+      })
+      .toEqual([
+        { name: 'analytics_requested', props: null },
+        { name: 'analytics_query_succeeded', props: { rowCount: 1 } },
+      ]);
+  } finally {
+    await db.end();
+  }
+
   const createdResponse = page.waitForResponse(
     (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/dashboards',
   );

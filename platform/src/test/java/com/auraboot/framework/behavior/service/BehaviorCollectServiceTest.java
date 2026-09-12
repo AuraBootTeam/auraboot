@@ -91,4 +91,17 @@ class BehaviorCollectServiceTest {
         assertThat(service.record(List.of())).isZero();
         verify(publisher, never()).publish(anyLong(), any(), anyList());
     }
+    @Test
+    void clientsCannotForgeServerAnalyticsStages() {
+        MetaContext.setCurrentTenantId(900L);
+        MetaContext.setCurrentUserId(55L);
+        BehaviorEventInput forged = event("forged");
+        forged.setEventName("analytics_query_succeeded");
+        assertThatThrownBy(() -> service.record(List.of(forged)))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.recordAnonymous(List.of(forged), 900L))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(publisher, never()).publish(anyLong(), any(), anyList());
+    }
+
 }

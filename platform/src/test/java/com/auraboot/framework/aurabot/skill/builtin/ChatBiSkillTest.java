@@ -36,6 +36,7 @@ class ChatBiSkillTest {
     private final ObjectMapper om = new ObjectMapper();
     private AggregateQueryService aggregateQueryService;
     private ChatBiSkill skill;
+    private com.auraboot.framework.behavior.service.AnalyticsJourneyService journey;
     private com.auraboot.framework.semantic.service.SemanticCatalogService catalog;
     private com.auraboot.framework.permission.service.UserPermissionService permissions;
 
@@ -45,7 +46,9 @@ class ChatBiSkillTest {
         aggregateQueryService = mock(AggregateQueryService.class);
         catalog = mock(com.auraboot.framework.semantic.service.SemanticCatalogService.class);
         permissions = mock(com.auraboot.framework.permission.service.UserPermissionService.class);
-        skill = new ChatBiSkill(aggregateQueryService, om, catalog, permissions);
+        journey = mock(com.auraboot.framework.behavior.service.AnalyticsJourneyService.class);
+        org.mockito.Mockito.lenient().when(journey.requested()).thenReturn("analysis-1");
+        skill = new ChatBiSkill(aggregateQueryService, om, catalog, permissions, journey);
     }
 
     private ObjectNode baseParams() {
@@ -215,6 +218,15 @@ class ChatBiSkillTest {
         assertThatThrownBy(() -> run(om.createObjectNode().put("action", "catalog")))
                 .isInstanceOf(SkillSpiException.class);
         org.mockito.Mockito.verifyNoInteractions(aggregateQueryService);
+    }
+
+    @Test
+    void queryFailureRecordsFailureWithoutSuccess() {
+        when(aggregateQueryService.execute(any())).thenThrow(new IllegalStateException("query failed"));
+        assertThatThrownBy(() -> skill.execute(SkillRequest.builder().params(baseParams()).build()))
+                .isInstanceOf(IllegalStateException.class);
+        verify(journey).failed("analysis-1");
+        org.mockito.Mockito.verify(journey, org.mockito.Mockito.never()).succeeded(any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
 }

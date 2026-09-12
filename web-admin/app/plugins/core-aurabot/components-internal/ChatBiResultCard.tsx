@@ -24,6 +24,7 @@ interface ChatBiMetric {
 }
 
 export interface ChatBiResult {
+  analysisId?: string;
   dataSource?: ChartDataSource;
   interpretation?: string;
   modelCode?: string;
@@ -282,6 +283,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     <div className="mb-3 flex justify-start">
       <div
         data-testid="chatbi-result-card"
+        data-analysis-id={result.analysisId}
         data-chart-type={chartType}
         data-row-count={records.length}
         className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800"

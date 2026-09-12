@@ -50,12 +50,29 @@ test('behavior rollups share half-open boundaries and deduplicate delivery', asy
 });
 
 test('behavior queries reject partial and reversed windows', async ({ request }) => {
-  for (const params of [
+  const invalidWindows: Record<string, string>[] = [
     { from: '2026-09-01T00:00:00Z' },
     { from: '2026-09-02T00:00:00Z', to: '2026-09-01T00:00:00Z' },
     { from: '2024-01-01T00:00:00Z', to: '2026-01-01T00:00:00Z' },
-  ]) {
+  ];
+  for (const params of invalidWindows) {
     const response = await request.get('/api/analytics/behavior/overview', { params });
     expect(response.status()).toBe(400);
   }
+});
+
+test('client collect cannot forge analytics query success', async ({ request }) => {
+  const response = await request.post('/api/collect', {
+    data: {
+      events: [
+        {
+          eventId: randomUUID(),
+          eventName: 'analytics_query_succeeded',
+          source: 'server',
+          occurredAt: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  expect(response.status()).toBe(400);
 });
