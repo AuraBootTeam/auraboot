@@ -40,7 +40,7 @@ public class AgentRunTerminalStore {
                 FROM ab_agent_run r JOIN ab_agent_task t
                   ON t.pid = r.task_id AND t.tenant_id = r.tenant_id
                 WHERE r.tenant_id = ? AND r.pid = ? AND t.pid = ?
-                  AND r.deleted_flag = FALSE AND t.deleted_flag = FALSE
+                  AND t.deleted_flag = FALSE
                 FOR UPDATE OF r, t
                 """, tenantId, runPid, taskPid);
         if (rows.size() != 1) throw new IllegalStateException("Run/task relationship is unavailable");
