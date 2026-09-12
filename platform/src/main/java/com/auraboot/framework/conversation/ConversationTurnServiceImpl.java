@@ -658,6 +658,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
+        if (!agentApprovalGateService.isAuthorizedApprover(tenantId, approvalPid, approverId)) {
+            String msg = "Insufficient permission to decide this approval";
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
+        }
         if (!"pending".equals(existingStatus)) {
             String msg = "Approval " + approvalPid + " is no longer pending (status=" + existingStatus + ")";
             log.warn(msg);

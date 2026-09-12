@@ -56,4 +56,17 @@ class AgentResumeGrantTest {
         verify(data, never()).insert(anyString(), anyMap());
     }
 
+    @Test void stringApproverIdsMatchExactlyWithoutFloatingPointCoercion() {
+        long userId = 357021799806013440L;
+        for (String encoded : new String[]{"\"357021799806013440\"", "357021799806013440", "357021799806013440.5", "\"9223372036854775808\"", "\"invalid\""}) {
+            reset(data);
+            when(data.selectByQuery(anyString(), anyMap())).thenReturn(
+                    java.util.List.of(Map.of("pid", "approval", "policy_id", "policy")),
+                    java.util.List.of(Map.of("pid", "policy", "approver_rules", "[{\"type\":\"USER\",\"userId\":" + encoded + "}]")));
+            assertThat(gate.isAuthorizedApprover(7L, "approval", userId))
+                    .as("rule value %s", encoded)
+                    .isEqualTo(encoded.equals("\"357021799806013440\"") || encoded.equals("357021799806013440"));
+        }
+    }
+
 }

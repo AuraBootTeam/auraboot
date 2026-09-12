@@ -529,7 +529,14 @@ public class AgentApprovalGateService {
      */
     private Long toLong(Object value) {
         if (value instanceof Long) return (Long) value;
-        if (value instanceof Number) return ((Number) value).longValue();
+        if (value instanceof Integer || value instanceof Short || value instanceof Byte) return ((Number) value).longValue();
+        if (value instanceof String text && text.matches("[0-9]+")) {
+            try {
+                return Long.valueOf(text);
+            } catch (NumberFormatException outOfRange) {
+                return null;
+            }
+        }
         return null;
     }
 
