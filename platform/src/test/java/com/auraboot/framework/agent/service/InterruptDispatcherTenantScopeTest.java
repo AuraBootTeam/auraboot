@@ -9,19 +9,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
-/**
- * Unit test for {@link InterruptDispatcher} tenant-scoping of the agent-run cancel path
- * (deep-review DR-20260701 W1-F1).
- *
- * <p>A REPLACE_INTENT interrupt cancels the active run via a raw JdbcTemplate UPDATE that
- * bypasses the MyBatis tenant interceptor ({@code ab_agent_run} is not in the ignoreTable),
- * so the caller's tenant_id MUST be in the WHERE clause — otherwise any authenticated user
- * could cancel another tenant's running agent run by submitting its run pid.
- */
+/** Verifies tenant propagation and truthful cancellation results. */
 @ExtendWith(MockitoExtension.class)
 class InterruptDispatcherTenantScopeTest {
 
@@ -33,7 +23,7 @@ class InterruptDispatcherTenantScopeTest {
     @InjectMocks private InterruptDispatcher dispatcher;
 
     @Test
-    @DisplayName("REPLACE_INTENT cancel UPDATE is tenant-scoped (WHERE tenant_id = ? bound to caller tenant)")
+    @DisplayName("REPLACE_INTENT delegates the caller tenant and reports a rejected cancel as noop")
     void cancelRunUpdateIsTenantScoped() {
         InterruptClassifier.Classification replace = InterruptClassifier.Classification.builder()
                 .subPolicy(InterruptClassifier.REPLACE_INTENT)
@@ -42,15 +32,9 @@ class InterruptDispatcherTenantScopeTest {
                 .reason("test")
                 .build();
 
-        // jdbcTemplate.update(...) returns 0 by default → cancelRun treats it as a race with completion
-        // and returns before the follow-up SELECT, so no further stubbing is needed.
-        dispatcher.dispatch(7L, "session-1", "run-from-tenant-B", "stop", replace);
-
-        // The cancel UPDATE must be tenant-scoped and bind (runPid, tenantId) — not runPid alone.
-        verify(jdbcTemplate).update(
-                argThat((String sql) -> sql != null
-                        && sql.contains("UPDATE ab_agent_run")
-                        && sql.contains("tenant_id = ?")),
-                eq("run-from-tenant-B"), eq(7L));
+        var result = dispatcher.dispatch(7L, "session-1", "run-from-tenant-B", "stop", replace);
+        verify(runLifecycleService).cancelRun(7L, "run-from-tenant-B");
+        org.assertj.core.api.Assertions.assertThat(result.getActionTaken()).isEqualTo("noop");
+        org.mockito.Mockito.verifyNoInteractions(eventPublisher);
     }
 }

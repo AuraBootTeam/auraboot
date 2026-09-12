@@ -79,7 +79,7 @@ class AgentRunTerminalStoreIT {
                 "task_id", taskPid, "agent_id", "terminal-fixture", "run_status", "running",
                 "actor_user_id", 91L, "principal_type", "human_delegated"))).isEqualTo(1);
     }
-    @AfterEach void close() { if (context != null) context.close(); }
+    @AfterEach void close() { if (context != null) context.close(); com.auraboot.framework.application.tenant.MetaContext.clear(); }
     private String runStatus() { return jdbc.queryForObject("SELECT run_status FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid); }
     private String taskStatus() { return jdbc.queryForObject("SELECT task_status FROM ab_agent_task WHERE tenant_id=? AND pid=?", String.class, tenant, taskPid); }
     private int events() { return jdbc.queryForObject("SELECT count(*) FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", Integer.class, tenant, runPid); }
@@ -167,6 +167,60 @@ class AgentRunTerminalStoreIT {
         assertThat(runStatus()).isEqualTo("success"); assertThat(taskStatus()).isEqualTo("done");
         assertThat(events()).isEqualTo(1); assertThat(signals.get()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT error_message FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid)).isNull();
+    }
+
+    private InterruptDispatcher dispatcher(AtomicInteger signals) {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(tenant, 92L, "terminal-requester", "terminal-requester");
+        return new InterruptDispatcher(jdbc, event -> signals.incrementAndGet(), lifecycle(signals), null);
+    }
+    private InterruptClassifier.Classification replaceIntent() {
+        return InterruptClassifier.Classification.builder().subPolicy(InterruptClassifier.REPLACE_INTENT)
+                .tier("keyword").confidence(1.0).reason("transaction fixture").build();
+    }
+    @Test void interruptCancellationCommitsTaskRunAndOutcomeAndLogsActualAction() {
+        AtomicInteger signals = new AtomicInteger();
+        var result = dispatcher(signals).dispatch(tenant, taskPid, runPid, "stop", replaceIntent());
+        assertThat(result.getActionTaken()).isEqualTo("cancelled_run");
+        assertThat(runStatus()).isEqualTo("cancelled"); assertThat(taskStatus()).isEqualTo("cancelled");
+        assertThat(events()).isEqualTo(1); assertThat(signals.get()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT action_taken FROM ab_agent_interrupt_log WHERE tenant_id=? AND pid=?", String.class, tenant, result.getInterruptLogPid()))
+                .isEqualTo("cancelled_run");
+        assertThat(store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, signals::incrementAndGet)).isFalse();
+        assertThat(runStatus()).isEqualTo("cancelled"); assertThat(events()).isEqualTo(1);
+    }
+    @Test void cancellationAfterSuccessAndWrongTenantReportNoop() {
+        AtomicInteger signals = new AtomicInteger();
+        assertThat(dispatcher(signals).dispatch(tenant + 1, taskPid, runPid, "foreign stop", replaceIntent()).getActionTaken()).isEqualTo("noop");
+        assertThat(runStatus()).isEqualTo("running"); assertThat(events()).isZero();
+        assertThat(store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, signals::incrementAndGet)).isTrue();
+        var result = dispatcher(signals).dispatch(tenant, taskPid, runPid, "late stop", replaceIntent());
+        assertThat(result.getActionTaken()).isEqualTo("noop");
+        assertThat(jdbc.queryForObject("SELECT action_taken FROM ab_agent_interrupt_log WHERE tenant_id=? AND pid=?", String.class, tenant, result.getInterruptLogPid()))
+                .isEqualTo("noop");
+        assertThat(dispatcher(signals).dispatch(tenant + 1, taskPid, runPid, "foreign stop", replaceIntent()).getActionTaken()).isEqualTo("noop");
+        assertThat(runStatus()).isEqualTo("success"); assertThat(taskStatus()).isEqualTo("done");
+        assertThat(events()).isEqualTo(1); assertThat(signals.get()).isEqualTo(1);
+    }
+    @Test void cancellationCompetingWithSuccessPreservesWinningPairAndAudit() throws Exception {
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        AtomicInteger signals = new AtomicInteger();
+        try {
+            var success = pool.submit(() -> { ready.countDown(); start.await();
+                return store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, signals::incrementAndGet); });
+            var cancellation = pool.submit(() -> { ready.countDown(); start.await();
+                return dispatcher(signals).dispatch(tenant, taskPid, runPid, "stop", replaceIntent()); });
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); start.countDown();
+            boolean won = success.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            var result = cancellation.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            String status = won ? "success" : "cancelled";
+            assertThat(runStatus()).isEqualTo(status);
+            assertThat(taskStatus()).isEqualTo(won ? "done" : "cancelled");
+            assertThat(result.getActionTaken()).isEqualTo(won ? "noop" : "cancelled_run");
+            assertThat(events()).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT payload->>'status' FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", String.class, tenant, runPid)).isEqualTo(status);
+        } finally { start.countDown(); pool.shutdownNow(); }
     }
 
 }

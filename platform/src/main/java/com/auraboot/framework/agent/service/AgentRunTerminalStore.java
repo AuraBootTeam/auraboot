@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Commits normal run completion and its execution fact as one transaction. */
+/** Commits run termination and its execution fact as one transaction. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -31,8 +31,13 @@ public class AgentRunTerminalStore {
                             Map<String, Object> runUpdate, Map<String, Object> taskUpdate,
                             Runnable committedSignal) {
         String status = String.valueOf(runUpdate.get("run_status"));
-        if (!Set.of("success", "failed").contains(status)
-                || !("success".equals(status) ? "done" : "blocked").equals(taskUpdate.get("task_status"))) {
+        String taskStatus = switch (status) {
+            case "success" -> "done";
+            case "failed" -> "blocked";
+            case "cancelled" -> "cancelled";
+            default -> "";
+        };
+        if (taskStatus.isEmpty() || !taskStatus.equals(taskUpdate.get("task_status"))) {
             throw new IllegalArgumentException("Invalid run/task completion status pair");
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
@@ -47,6 +52,7 @@ public class AgentRunTerminalStore {
         Map<String, Object> row = rows.get(0);
         String previous = String.valueOf(row.get("run_status"));
         if (Set.of("success", "failed", "cancelled").contains(previous)) return false;
+        if ("cancelled".equals(status) && !"running".equals(previous)) return false;
         if (!"running".equals(previous)) throw new IllegalStateException("Run is not executing");
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Run completion requires a transaction");

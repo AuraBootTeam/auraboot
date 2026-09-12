@@ -196,6 +196,21 @@ public class RunLifecycleService {
         if (changed) cancelChildTasks(tenantId, taskPid);
     }
 
+    boolean cancelRun(Long tenantId, String runPid) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT task_id, error_message FROM ab_agent_run WHERE tenant_id = ? AND pid = ? AND run_status = 'running'",
+                tenantId, runPid);
+        if (rows.isEmpty()) return false;
+        String taskPid = (String) rows.get(0).get("task_id");
+        Object previousError = rows.get(0).get("error_message");
+        String diagnostic = (previousError == null ? "" : previousError + "\n") + "cancelled by user interrupt";
+        LocalDateTime now = LocalDateTime.now();
+        return terminalStore.complete(tenantId, runPid, taskPid,
+                Map.of("run_status", "cancelled", "completed_at", now, "updated_at", now, "error_message", diagnostic),
+                Map.of("task_status", "cancelled", "completed_at", now, "updated_at", now),
+                () -> publishTaskCompleted(tenantId, taskPid, "cancelled"));
+    }
+
     void failTask(Long tenantId, String taskPid, String error) {
         Map<String, Object> taskUpdate = new HashMap<>();
         taskUpdate.put("task_status", "blocked");
