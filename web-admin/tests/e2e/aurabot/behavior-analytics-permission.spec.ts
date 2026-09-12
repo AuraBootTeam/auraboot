@@ -49,6 +49,7 @@ test('behavior reads require dashboard permission for both APIs and menu', async
     'top-events',
     'daily',
     'analysis-funnel',
+    'executions',
     'retention?unit=user',
     'retention?unit=artifact',
   ];
@@ -56,12 +57,19 @@ test('behavior reads require dashboard permission for both APIs and menu', async
     from: new Date(Date.now() - 30 * 86400000).toISOString(),
     to: new Date().toISOString(),
   };
-  const rows = (body: any) => body.data?.records ?? body;
+  const rows = (body: any, path: string) => {
+    if (path === 'executions') {
+      const { dataCutoff, ...data } = body.data;
+      expect(dataCutoff).toBeTruthy();
+      return data;
+    }
+    return body.data?.records ?? body;
+  };
   const expected = new Map<string, unknown>();
   for (const path of paths) {
     const response = await page.request.get(`/api/analytics/behavior/${path}`, { params: window });
     expect(response.status()).toBe(200);
-    expected.set(path, rows(await response.json()));
+    expected.set(path, rows(await response.json(), path));
   }
   const evidence: unknown[] = [];
   for (const [index, user] of users.entries()) {
@@ -77,7 +85,8 @@ test('behavior reads require dashboard permission for both APIs and menu', async
           params: window,
         });
         expect(response.status(), `${user.key}: ${path}`).toBe(index === 1 ? 200 : 403);
-        if (index === 1) expect(rows(await response.json()), path).toEqual(expected.get(path));
+        if (index === 1)
+          expect(rows(await response.json(), path), path).toEqual(expected.get(path));
         results.push({ path, status: response.status() });
       }
       if (index === 0)
@@ -101,6 +110,28 @@ test('behavior reads require dashboard permission for both APIs and menu', async
         await expect(
           session.page.getByRole('heading', { name: '分析任务转化', exact: true }),
         ).toBeVisible();
+      }
+      if (index === 1) {
+        const revoked = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+          data: [{ permissionId: permission.id, granted: false }],
+        });
+        expect(revoked.status()).toBe(200);
+        await expect
+          .poll(async () =>
+            (await fetchRoleSnapshot(session.page)).permissionCodes.includes('dashboard.read'),
+          )
+          .toBe(false);
+        for (const path of paths) {
+          const denied = await session.page.request.get(`/api/analytics/behavior/${path}`, {
+            params: window,
+          });
+          expect(denied.status(), `revoked: ${path}`).toBe(403);
+          results.push({ path: `revoked:${path}`, status: denied.status() });
+        }
+        await session.page.reload();
+        await expect(
+          session.page.getByTestId('sidebar').getByText('行为分析', { exact: true }),
+        ).toHaveCount(0);
       }
       evidence.push({ role: user.roleCodes, snapshot, results });
     } finally {
