@@ -129,6 +129,63 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
       const detail = await owner.get(`/api/dynamic/e2et_order/${fixturePid}`);
       expect(detail.status(), await detail.text()).toBe(200);
       expect((await detail.json()).data.e2et_order_title).toBeNull();
+      const listed = await owner.post(`/api/meta/named-queries/${code}/execute`, {
+        data: { page: 1, size: 5, parameters: { marker: code } },
+      });
+      expect(listed.status(), await listed.text()).toBe(200);
+      expect
+        .soft((await listed.json()).data.records)
+        .toEqual([{ record_key: fixturePid, display_title: null }]);
+      const chart = await owner.post('/api/meta/chart-data', {
+        data: {
+          type: 'namedQuery',
+          queryCode: code,
+          dimensions: ['record_key', 'display_title'],
+          metrics: [],
+          parameters: { marker: code },
+        },
+      });
+      expect(chart.status(), await chart.text()).toBe(200);
+      expect
+        .soft((await chart.json()).data.rows)
+        .toEqual([{ record_key: fixturePid, display_title: null }]);
+      const passthrough = await owner.post('/api/meta/chart-data', {
+        data: {
+          type: 'namedQuery',
+          queryCode: code,
+          dimensions: [],
+          metrics: [],
+          parameters: { marker: code },
+        },
+      });
+      expect(passthrough.status(), await passthrough.text()).toBe(200);
+      expect((await passthrough.json()).data.rows).toEqual([
+        { record_key: fixturePid, display_title: null },
+      ]);
+      const counted = await owner.post('/api/meta/chart-data', {
+        data: {
+          type: 'namedQuery',
+          queryCode: code,
+          dimensions: [],
+          metrics: [{ field: 'record_key', aggregation: 'count', alias: 'total' }],
+          parameters: { marker: code },
+        },
+      });
+      expect(counted.status(), await counted.text()).toBe(200);
+      expect((await counted.json()).data.rows).toEqual([{ total: 1 }]);
+      const protectedCount = await owner.post('/api/meta/chart-data', {
+        data: {
+          type: 'namedQuery',
+          queryCode: code,
+          dimensions: [],
+          metrics: [{ field: 'display_title', aggregation: 'count', alias: 'total' }],
+          parameters: { marker: code },
+        },
+      });
+      expect(protectedCount.status(), await protectedCount.text()).toBe(403);
+      expect(await protectedCount.text()).toContain(
+        'Protected field aggregation requires explicit output protection',
+      );
       const oldFile = await owner.get(url);
       const maskedExport = await owner.post(`/api/meta/named-queries/${code}/export-data`, {
         data: { format: 'CSV', parameters: { marker: code, rootPid: fixturePid } },

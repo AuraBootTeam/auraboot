@@ -53,6 +53,9 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private NamedQueryFieldProtection fieldProtection;
+
     /**
      * Optional — when present and the request carries a {@code semanticModelCode},
      * delegate to the semantic layer (PRD 16 §6 W4 D4). Wired via field injection
@@ -248,6 +251,31 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
+        List<NamedQueryField> outputFields = new ArrayList<>();
+        if (request.getDimensions() != null) {
+            for (String dimension : request.getDimensions()) outputFields.add(fieldMap.get(dimension));
+        }
+        Set<String> metricAliases = new HashSet<>();
+        if (request.getMetrics() != null) {
+            for (MetricConfig metric : request.getMetrics()) {
+                String alias = metric.getAlias() != null ? metric.getAlias()
+                        : metric.getField() + "_" + metric.getAggregation().toLowerCase();
+                NamedQueryField projection = new NamedQueryField();
+                projection.setFieldCode(alias);
+                projection.setColumnExpr(fieldMap.get(metric.getField()).getColumnExpr());
+                outputFields.add(projection);
+                metricAliases.add(alias);
+            }
+        }
+        if (outputFields.isEmpty()) outputFields.addAll(fields);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, outputFields, "list");
+        for (var group : protection.protections()) {
+            if (group.aliases().keySet().stream().anyMatch(metricAliases::contains)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Protected field aggregation requires explicit output protection");
+            }
+        }
+
         // Use tenant-bypass method since tenant isolation is handled inside the NamedQuery's fromSql.
         // This avoids JSqlParser failures on complex PostgreSQL-specific syntax.
         List<Map<String, Object>> rawRows = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
@@ -257,6 +285,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 : List.of();
 
         AggregateQueryResponse response = new AggregateQueryResponse();
+        rows = fieldProtection.apply(protection, rows);
         response.setRows(rows);
         response.setMeta(buildMetaForNamedQuery(request, query, fieldMap));
         response.setSummary(calculateSummary(rows, request.getMetrics()));
@@ -351,8 +380,9 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         if (selectClauses.isEmpty()) {
-            // Identity passthrough — return the named query's full output as-is
-            sql.append("*");
+            // Preserve the configured output whitelist and aliases in passthrough mode.
+            sql.append(fieldMap.values().stream().map(field -> field.getColumnExpr() + " AS " + field.getFieldCode())
+                    .collect(Collectors.joining(", ")));
         } else {
             sql.append(String.join(", ", selectClauses));
         }

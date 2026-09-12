@@ -26,6 +26,10 @@ public class NamedQueryFieldProtection {
     public record Plan(JsonNode evidence, List<Protection> protections) { }
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields) {
+        return prepare(query, fields, "export");
+    }
+
+    public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context) {
         var sourceModels = sources.resolve(MetaContext.getCurrentTenantId(), query.getFromSql(), fields);
         Set<String> resources = new TreeSet<>(sourceModels.values());
         if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
@@ -34,17 +38,17 @@ public class NamedQueryFieldProtection {
         var groups = evidence.putObject("protections");
         List<Protection> protections = new ArrayList<>();
         for (String resource : resources) {
-            Plan group = prepareResource(query, fields, resource);
+            Plan group = prepareResource(query, fields, resource, context);
             groups.set(resource, group.evidence());
             protections.addAll(group.protections());
         }
         return new Plan(evidence, List.copyOf(protections));
     }
 
-    private Plan prepareResource(NamedQuery query, List<NamedQueryField> fields, String resource) {
+    private Plan prepareResource(NamedQuery query, List<NamedQueryField> fields, String resource, String context) {
         Long user = MetaContext.getCurrentUserId();
         List<FieldMaskRule> rules = policies.getFieldMaskRules(MetaContext.getCurrentTenantId(), resource, user);
-        List<FieldMaskConfig> configs = masks.getEffectiveConfigs(resource, user, "export");
+        List<FieldMaskConfig> configs = masks.getEffectiveConfigs(resource, user, context);
         if (rules.isEmpty() && configs.isEmpty()) return empty();
         Map<String, String> protectedColumns = new HashMap<>();
         Set<String> protectedFields = new HashSet<>();

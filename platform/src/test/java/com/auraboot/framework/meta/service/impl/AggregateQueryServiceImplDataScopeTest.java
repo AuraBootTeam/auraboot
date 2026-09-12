@@ -49,12 +49,19 @@ class AggregateQueryServiceImplDataScopeTest {
     @Mock private MetaModelService metaModelService;
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
+    @Mock private NamedQueryFieldProtection fieldProtection;
 
     @InjectMocks
     private AggregateQueryServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
+        org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("list")))
+                .thenReturn(new NamedQueryFieldProtection.Plan(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), List.of()));
+        org.mockito.Mockito.lenient().when(fieldProtection.apply(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         MetaContext.setMemberId(MEMBER_ID);
     }

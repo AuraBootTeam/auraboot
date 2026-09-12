@@ -65,6 +65,7 @@ class AggregateQueryFilterTreeTest {
     @Mock private MetaModelService metaModelService;
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
+    @Mock private NamedQueryFieldProtection fieldProtection;
 
     @InjectMocks
     private AggregateQueryServiceImpl service;
@@ -74,6 +75,12 @@ class AggregateQueryFilterTreeTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
+        org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("list")))
+                .thenReturn(new NamedQueryFieldProtection.Plan(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), List.of()));
+        org.mockito.Mockito.lenient().when(fieldProtection.apply(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         // Pin "now" to 2026-07-15 (a Wednesday) so relative-time windows are deterministic.
         ReflectionTestUtils.setField(service, "clock",

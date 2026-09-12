@@ -65,6 +65,13 @@ class NamedQueryServiceImplTest {
             permissionEvaluator,
             dynamicDataServiceProvider);
 
+    @org.junit.jupiter.api.BeforeEach
+    void configureFieldProtection() {
+        NamedQueryFieldProtection protection = mock(NamedQueryFieldProtection.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", protection);
+        when(protection.apply(any(), org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> invocation.getArgument(1));
+    }
+
     @AfterEach
     void clearContext() {
         MetaContext.clear();

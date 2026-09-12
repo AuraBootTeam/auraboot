@@ -744,6 +744,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+
         // Count total
         // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
@@ -756,6 +758,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
         List<Map<String, Object>> records = dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
 
+        records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
     }
 
