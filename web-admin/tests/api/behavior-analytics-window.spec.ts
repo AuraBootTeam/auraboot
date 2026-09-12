@@ -118,3 +118,82 @@ test('client collect rejects forged server provenance without accepting part of 
     })
     .toBe(1);
 });
+
+test('anonymous site-key collect rejects server provenance and records a genuine anonymous visitor', async ({
+  request,
+  playwright,
+}) => {
+  const name = `Provenance ${randomUUID()}`;
+  const created = await request.post('/api/meta/commands/execute/behavior_site_key:create', {
+    data: { payload: { name } },
+  });
+  expect(created.status()).toBe(200);
+  expect((await created.json()).code).toBe('0');
+  const listed = await request.get('/api/dynamic/behavior_site_key/list', {
+    params: {
+      pageNum: '1',
+      pageSize: '10',
+      filters: JSON.stringify([{ fieldName: 'name', operator: 'EQ', value: name }]),
+    },
+  });
+  expect(listed.status()).toBe(200);
+  const rows = (await listed.json()).data.records;
+  expect(rows).toHaveLength(1);
+  const siteKey = rows[0].site_key;
+  expect(siteKey).toMatch(/^abk_/);
+  const anonymous = await playwright.request.newContext({
+    baseURL: process.env.BACKEND_URL,
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    const start = Date.now() + 363 * 86400000;
+    const params = { from: new Date(start).toISOString(), to: new Date(start + 1).toISOString() };
+    const client = {
+      eventName: 'page_view',
+      eventCategory: 'navigation',
+      source: 'web',
+      schemaVersion: '1',
+      anonId: randomUUID(),
+      clientSessionId: randomUUID(),
+      occurredAt: params.from,
+    };
+    const headers = { 'X-Site-Key': siteKey, Origin: 'https://customer-app.example.com' };
+    for (const forged of [
+      { source: 'server' },
+      { eventCategory: 'business_outcome' },
+      { producerName: 'server-outcome-outbox' },
+      { producerName: 'aurabot-analytics' },
+    ]) {
+      const response = await anonymous.post('/api/collect/keyed', {
+        headers,
+        data: {
+          events: [
+            { ...client, eventId: randomUUID() },
+            { ...client, ...forged, eventId: randomUUID() },
+          ],
+        },
+      });
+      expect(response.status(), JSON.stringify(forged)).toBe(400);
+    }
+    const accepted = await anonymous.post('/api/collect/keyed', {
+      headers,
+      data: { events: [{ ...client, eventId: randomUUID() }] },
+    });
+    expect(accepted.status()).toBe(200);
+    expect((await accepted.json()).accepted).toBe(1);
+    await expect
+      .poll(async () => {
+        const response = await request.get('/api/analytics/behavior/overview', { params });
+        expect(response.status()).toBe(200);
+        return (await response.json()).data.records[0];
+      })
+      .toEqual({ totalEvents: 1, pageViews: 1, uniqueVisitors: 1, sessions: 1 });
+    const unknown = await anonymous.post('/api/collect/keyed', {
+      headers: { ...headers, 'X-Site-Key': `abk_${randomUUID().replaceAll('-', '')}` },
+      data: { events: [{ ...client, eventId: randomUUID() }] },
+    });
+    expect(unknown.status()).toBe(403);
+  } finally {
+    await anonymous.dispose();
+  }
+});
