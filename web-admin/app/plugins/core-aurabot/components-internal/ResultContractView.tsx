@@ -16,6 +16,7 @@
  */
 
 import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
+import { useSmartText } from '~/utils/i18n';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 import type { ResultContract, ResultContractStatus } from '../types/ResultContract';
 
@@ -179,6 +180,21 @@ export interface ResultContractViewProps {
 }
 
 export function ResultContractView({ contract }: ResultContractViewProps) {
+  const text = useSmartText();
+  if (contract.status === 'failed' && contract.errorCode === 'analytics_history_unavailable') {
+    return (
+      <div
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+      >
+        {text({
+          'zh-CN': '历史分析暂不可用，请检查当前数据权限和查询配置。',
+          'en-US':
+            'Historical analysis is unavailable. Check current data access and query configuration.',
+        })}
+      </div>
+    );
+  }
   // AuraBot skills return an execution envelope; render the analytics data, not protocol fields.
   if (contract.skillCode === 'aurabot:chat-bi' && contract.status === 'success') {
     const envelope = contract.data;

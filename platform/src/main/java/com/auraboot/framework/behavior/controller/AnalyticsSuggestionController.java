@@ -18,6 +18,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnalyticsSuggestionController {
     private final DynamicDataService data;
+    private final com.auraboot.framework.bi.service.ReportAggregateQueryService queries;
+    private final com.fasterxml.jackson.databind.ObjectMapper json;
     private static final String PREFIX = "core_dashboard_";
     public record Suggestion(String pid, String title, String content, int version, String groupKey,
                              String origin, String adoptionPid, String decisionMode) {}
@@ -38,6 +40,18 @@ public class AnalyticsSuggestionController {
                         SortField.builder().fieldName("pid").direction(SortField.SortDirection.DESC).build())).build());
         Map<String, Map<String, Object>> decisions = new HashMap<>();
         if (!versions.getRecords().isEmpty()) {
+            // Every version of this source analysis is bound to the same query fingerprint.
+            // Reauthorize before projecting any derived suggestion content.
+            Object snapshot = versions.getRecords().get(0).get(PREFIX + "query");
+            if (!(snapshot instanceof String value)) {
+                throw new BusinessException(ResponseCode.BadParam, "Stored suggestion query is unavailable");
+            }
+            try {
+                queries.execute(json.readValue(value, AggregateQueryRequest.class));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+                throw new BusinessException(ResponseCode.BadParam, "Stored suggestion query is invalid");
+            }
+
             List<Object> pids = versions.getRecords().stream().map(row -> row.get("pid")).toList();
             var adoptions = data.list(AnalyticsSuggestionCommandHandler.ADOPTION, DynamicQueryRequest.builder()
                     .pageNum(1).pageSize(pageSize).conditions(List.of(eq("created_by", MetaContext.getCurrentUserId()),

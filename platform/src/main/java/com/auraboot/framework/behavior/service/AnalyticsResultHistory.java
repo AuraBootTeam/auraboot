@@ -3,7 +3,7 @@ package com.auraboot.framework.behavior.service;
 import com.auraboot.framework.agent.dto.ResultContract;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
-import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.bi.service.ReportAggregateQueryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class AnalyticsResultHistory {
-    private final AggregateQueryService queries;
+    private final ReportAggregateQueryService queries;
     private final ObjectMapper json;
 
     public static List<Map<String, Object>> references(List<ResultContract> contracts) {
@@ -61,10 +61,11 @@ public class AnalyticsResultHistory {
                 data.put("historyRefreshed", true);
                 contracts.add(ResultContract.builder().skillCode("aurabot:chat-bi").status("success")
                         .outputType("structured_result").renderHint("card").actionability("read_only").data(data).build());
-            } catch (BusinessException denied) {
+            } catch (BusinessException | org.springframework.security.access.AccessDeniedException denied) {
                 // Do not expose query filters, old rows or exception details after access changes.
                 contracts.add(ResultContract.builder().skillCode("aurabot:chat-bi").status("failed")
                         .outputType("text").renderHint("summary").actionability("read_only")
+                        .errorCode("analytics_history_unavailable")
                         .textSummary("Historical analysis is unavailable. Check current data access and query configuration.").build());
             }
         }

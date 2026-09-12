@@ -5,7 +5,7 @@ import com.auraboot.framework.behavior.service.AnalyticsResultHistory;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
-import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.bi.service.ReportAggregateQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 class AnalyticsResultHistoryTest {
     @Test void persistsOnlyReferencesAndRequeriesInsteadOfReplayingSensitiveRows() {
         ObjectMapper json = new ObjectMapper();
-        AggregateQueryService queries = mock(AggregateQueryService.class);
+        ReportAggregateQueryService queries = mock(ReportAggregateQueryService.class);
         var contract = ResultContract.builder().skillCode("aurabot:chat-bi").status("success")
                 .data(Map.of("data", Map.of("analysisId", "analysis-1", "dataSource", Map.of("type", "aggregate", "modelCode", "orders"),
                         "chartType", "table", "records", List.of(Map.of("secret", "old-value")), "interpretation", "private conclusion"))).build();
@@ -36,8 +36,8 @@ class AnalyticsResultHistoryTest {
     }
 
     @Test void deniedHistoryDoesNotExposeQueryOrStoredData() {
-        var queries = mock(AggregateQueryService.class);
-        when(queries.execute(any())).thenThrow(new BusinessException(ResponseCode.BadParam, "private denied field"));
+        var queries = mock(ReportAggregateQueryService.class);
+        when(queries.execute(any())).thenThrow(new org.springframework.security.access.AccessDeniedException("private denied field"));
         var json = new ObjectMapper();
         var restored = new AnalyticsResultHistory(queries, json).restore(json.valueToTree(List.of(Map.of(
                 "analysisId", "analysis-1", "dataSource", Map.of("type", "aggregate", "modelCode", "private_model")))));

@@ -7,7 +7,7 @@ import com.auraboot.framework.conversation.TurnScopeContext;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.auraboot.framework.behavior.outcome.BehaviorOutcomePublisher;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.bi.service.ReportAggregateQueryService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension.CommandContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +22,7 @@ class AnalyticsSuggestionCommandHandlerTest {
     private final DynamicDataService data = mock(DynamicDataService.class);
     private final DynamicDataMapper locks = mock(DynamicDataMapper.class);
     private final BehaviorEventMapper events = mock(BehaviorEventMapper.class);
-    private final AggregateQueryService queries = mock(AggregateQueryService.class);
+    private final ReportAggregateQueryService queries = mock(ReportAggregateQueryService.class);
     private final BehaviorOutcomePublisher outcomes = mock(BehaviorOutcomePublisher.class);
     private final AnalyticsSuggestionCommandHandler handler = new AnalyticsSuggestionCommandHandler(
             data, locks, events, queries, outcomes, new ObjectMapper());

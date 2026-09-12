@@ -49,5 +49,6 @@ export interface ResultContract {
 
   skillCode?: string;
   durationMs?: number;
+  errorCode?: string;
   status: ResultContractStatus;
 }

@@ -39,8 +39,11 @@ export function AnalyticsSuggestions({
   query: ChartDataSource;
 }) {
   const canRead = usePermission('analytics.suggestion.read');
-  const canPropose = usePermission('analytics.suggestion.propose');
-  const canAdopt = usePermission('analytics.suggestion.adopt');
+  const canExecute = usePermission('meta.command.execute');
+  const proposalPermission = usePermission('analytics.suggestion.propose');
+  const adoptionPermission = usePermission('analytics.suggestion.adopt');
+  const canPropose = canExecute && proposalPermission;
+  const canAdopt = canExecute && adoptionPermission;
   const { locale } = useI18n();
   const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const inputId = useId();

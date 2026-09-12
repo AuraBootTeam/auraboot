@@ -11,7 +11,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.auraboot.framework.meta.service.AggregateQueryService;
+import com.auraboot.framework.bi.service.ReportAggregateQueryService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,7 +35,7 @@ public class AnalyticsSuggestionCommandHandler implements CommandHandlerExtensio
     private final DynamicDataService data;
     private final DynamicDataMapper locks;
     private final BehaviorEventMapper events;
-    private final AggregateQueryService queries;
+    private final ReportAggregateQueryService queries;
     private final BehaviorOutcomePublisher outcomes;
     private final ObjectMapper json;
 

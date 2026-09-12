@@ -121,6 +121,53 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     expect(adopted.core_dashboard_version).toBe(1);
     expect(adopted.core_dashboard_decision_mode).toBe('human');
     expect((await execute('adopt_suggestion', decision)).pid).toBe(adopted.pid);
+    const firstPage = await request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysis.analysisId, page: 1, pageSize: 1 },
+    });
+    expect(firstPage.status()).toBe(200);
+    expect((await firstPage.json()).data).toMatchObject({
+      total: 2,
+      page: 1,
+      pageSize: 1,
+      records: [{ pid: revised.pid, version: 2, adoptionPid: null }],
+    });
+    const secondPage = await request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysis.analysisId, page: 2, pageSize: 1 },
+    });
+    expect(secondPage.status()).toBe(200);
+    const pageData = (await secondPage.json()).data;
+    expect(pageData).toMatchObject({
+      total: 2,
+      page: 2,
+      pageSize: 1,
+      records: [{ pid: first.pid, version: 1, adoptionPid: adopted.pid, decisionMode: 'human' }],
+    });
+    expect(Object.keys(pageData.records[0]).sort()).toEqual(
+      [
+        'pid',
+        'title',
+        'content',
+        'version',
+        'groupKey',
+        'origin',
+        'adoptionPid',
+        'decisionMode',
+      ].sort(),
+    );
+    for (const params of [
+      { page: 0, pageSize: 1 },
+      { page: 1, pageSize: 51 },
+    ]) {
+      const invalid = await request.get('/api/analytics/suggestions', {
+        params: { analysisId: analysis.analysisId, ...params },
+      });
+      expect(invalid.status()).toBe(400);
+    }
+    const beyond = await request.get('/api/analytics/suggestions', {
+      params: { analysisId: analysis.analysisId, page: 3, pageSize: 1 },
+    });
+    expect(beyond.status()).toBe(200);
+    expect((await beyond.json()).data).toMatchObject({ total: 2, records: [] });
     const conflict = await request.post(
       '/api/meta/commands/execute/core_dashboard:adopt_suggestion',
       { data: { payload: { ...decision, versionPid: revised.pid } } },
@@ -189,6 +236,12 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         extraHTTPHeaders: { Authorization: `Bearer ${jwt}` },
       });
       try {
+        const foreignRead = await other.get('/api/analytics/suggestions', {
+          params: { analysisId: analysis.analysisId },
+        });
+        expect(foreignRead.status()).toBe(role === 'tenant_member' ? 403 : 200);
+        if (role === 'tenant_admin')
+          expect((await foreignRead.json()).data).toMatchObject({ records: [], total: 0 });
         const denied = await other.post(
           '/api/meta/commands/execute/core_dashboard:adopt_suggestion',
           {
