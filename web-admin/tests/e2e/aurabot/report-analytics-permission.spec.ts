@@ -57,6 +57,18 @@ test('report export requires model read permission in addition to artifact permi
   });
   expect(created.status()).toBe(200);
   const { pid } = (await created.json()).data;
+  expect(
+    (
+      await page.request.put(`/api/report-definitions/${pid}`, {
+        data: {
+          title: key,
+          profile: 'paged-media',
+          dsl: { ...dsl, description: 'Second revision' },
+        },
+      })
+    ).status(),
+  ).toBe(200);
+
   const tree = await page.request.get('/api/permissions/tree');
   expect(tree.status()).toBe(200);
   const permissions = new Map<string, unknown>();
@@ -143,7 +155,24 @@ test('report export requires model read permission in addition to artifact permi
         .filter({ hasText: key })
         .getByRole('button', { name: /打开|Open/ })
         .click();
-      await session.page.getByRole('button', { name: 'Preview', exact: true }).click();
+
+      await expect(session.page.getByTestId('report-reader-toolbar')).toContainText('只读报表');
+      await expect(session.page.getByPlaceholder('Report Title')).toHaveCount(0);
+      for (const name of ['Preview', 'Edit', 'Settings', '保存'])
+        await expect(session.page.getByRole('button', { name, exact: true })).toHaveCount(0);
+      const writes: string[] = [];
+      session.page.on('request', (request) => {
+        if (
+          request.url().includes('/api/report-definitions') &&
+          ['POST', 'PUT', 'DELETE'].includes(request.method())
+        )
+          writes.push(request.url());
+      });
+      await session.page.keyboard.press('ControlOrMeta+s');
+      const stillSaved = await session.page.request.get(`/api/report-definitions/${pid}`);
+      expect((await stillSaved.json()).data.dsl.description).toBe('Second revision');
+      expect(writes).toEqual([]);
+
       if (hasModelRead) {
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         const event = session.page.waitForEvent('download');
@@ -162,6 +191,17 @@ test('report export requires model read permission in addition to artifact permi
             session.page.getByRole('button', { name: `Export ${format}`, exact: true }),
           ).toBeDisabled();
       }
+
+      await session.page.getByRole('button', { name: 'Version History', exact: true }).click();
+      await session.page.getByRole('button', { name: /^v1\b/ }).click();
+      await expect(session.page.getByTestId('report-version-preview')).toBeVisible();
+      await expect(session.page.getByRole('button', { name: /^(回滚|Rollback)$/ })).toHaveCount(0);
+      await session.page.getByRole('button', { name: '返回当前报表', exact: true }).click();
+      await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();
+      expect(writes).toEqual([]);
+      await session.page.getByRole('button', { name: /关闭版本面板|Close version/ }).click();
+      await expect(session.page.getByTestId('version-history-panel')).not.toBeInViewport();
+      await expect(session.page.getByText('正在查询报表数据…', { exact: true })).toHaveCount(0);
       await session.page.screenshot({
         path: `${process.env.AURA_EVIDENCE_DIR}/report-role-${hasModelRead ? 'allowed' : 'denied'}.png`,
         fullPage: true,

@@ -1,4 +1,5 @@
 import { useSmartText } from '~/utils/i18n';
+import { usePermission } from '~/contexts/AuthContext';
 /**
  * Report Designer Main Component
  *
@@ -43,6 +44,8 @@ interface ReportDesignerProps {
 
 const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
   const text = useSmartText();
+  const canManage = usePermission('report.definition.manage');
+  const canExport = usePermission('report.export.execute');
   const [loadFailed, setLoadFailed] = React.useState(false);
   const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
@@ -56,6 +59,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     setLoading,
     reset,
   } = useReportStore();
+
+  const viewing = previewMode || !canManage;
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
@@ -89,6 +94,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   );
 
   const saveReport = useCallback(async () => {
+    if (!canManage) throw new Error('Report is read only');
     if (!report) throw new Error('No report to save');
     setSaving(true);
     try {
@@ -101,7 +107,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       setSaving(false);
       throw error;
     }
-  }, [report, pageId, setSaving, setPageId, markSaved]);
+  }, [report, pageId, setSaving, setPageId, markSaved, canManage]);
 
   // Version history management
   const versioning = useVersioning({
@@ -113,7 +119,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     },
   });
 
-  const previewQuery = useReportQuery(report, previewMode && !versioning.viewingVersionPid);
+  const previewQuery = useReportQuery(report, viewing && !versioning.viewingVersionPid);
 
   // Load or create on mount
   useEffect(() => {
@@ -131,7 +137,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Auto-save
   useEffect(() => {
-    if (!isDirty || isSaving || versioning.viewingVersionPid) {
+    if (!canManage || !isDirty || isSaving || versioning.viewingVersionPid) {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
@@ -156,11 +162,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid]);
+  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid, canManage]);
 
   // Ctrl+S + Undo/Redo
   const handleSave = useCallback(async () => {
-    if (versioning.viewingVersionPid) return;
+    if (!canManage || versioning.viewingVersionPid) return;
     try {
       await saveReport();
       lastSaveTimeRef.current = Date.now();
@@ -168,12 +174,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Save failed:', error);
       alert(error instanceof Error ? error.message : 'Save failed');
     }
-  }, [saveReport, versioning.viewingVersionPid]);
+  }, [saveReport, versioning.viewingVersionPid, canManage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
-        versioning.viewingVersionPid &&
+        (!canManage || versioning.viewingVersionPid) &&
         (e.ctrlKey || e.metaKey) &&
         ['s', 'z', 'y'].includes(e.key.toLowerCase())
       ) {
@@ -196,7 +202,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, undo, redo, versioning.viewingVersionPid]);
+  }, [handleSave, undo, redo, versioning.viewingVersionPid, canManage]);
 
   // beforeunload
   useEffect(() => {
@@ -218,7 +224,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Excel Export
   const handleExportExcel = useCallback(async () => {
-    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to Excel.');
       return;
@@ -226,7 +232,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     try {
       const blob = await reportDesignerService.exportExcel(
         pageId,
-        previewMode ? previewQuery.appliedParameters : undefined,
+        viewing ? previewQuery.appliedParameters : undefined,
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -245,14 +251,15 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     pageId,
     isDirty,
     isSaving,
-    previewMode,
+    viewing,
+    canExport,
     previewQuery.canExport,
     previewQuery.appliedParameters,
   ]);
 
   // JSON Export
   const handleExportJson = useCallback(async () => {
-    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to JSON.');
       return;
@@ -260,7 +267,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     try {
       const blob = await reportDesignerService.exportJson(
         pageId,
-        previewMode ? previewQuery.appliedParameters : undefined,
+        viewing ? previewQuery.appliedParameters : undefined,
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -279,14 +286,15 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     pageId,
     isDirty,
     isSaving,
-    previewMode,
+    viewing,
+    canExport,
     previewQuery.canExport,
     previewQuery.appliedParameters,
   ]);
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
-    if (isDirty || isSaving || (previewMode && !previewQuery.canExport)) return;
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to PDF.');
       return;
@@ -294,7 +302,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     try {
       const blob = await reportDesignerService.exportPdf(
         pageId,
-        previewMode ? previewQuery.appliedParameters : undefined,
+        viewing ? previewQuery.appliedParameters : undefined,
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -313,7 +321,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     pageId,
     isDirty,
     isSaving,
-    previewMode,
+    viewing,
+    canExport,
     previewQuery.canExport,
     previewQuery.appliedParameters,
   ]);
@@ -327,6 +336,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       viewingVersionPid={versioning.viewingVersionPid}
       onPreview={versioning.previewVersion}
       onExitPreview={versioning.exitPreview}
+      canRollback={canManage}
       onRollback={versioning.rollbackToVersion}
       isRollingBack={versioning.isRollingBack}
     />
@@ -391,10 +401,12 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   }
 
   // Preview mode: render as runtime
-  if (previewMode && report) {
+  if (viewing && report) {
     return (
       <div className="flex h-screen flex-col bg-gray-50">
         <ReportToolbar
+          readOnly={!canManage}
+          exportAllowed={canExport}
           exportReady={previewQuery.canExport}
           onSave={handleSave}
           onPreview={handlePreview}
@@ -415,6 +427,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <ReportToolbar
+        readOnly={!canManage}
+        exportAllowed={canExport}
         onSave={handleSave}
         onPreview={handlePreview}
         onExportPdf={handleExportPdf}

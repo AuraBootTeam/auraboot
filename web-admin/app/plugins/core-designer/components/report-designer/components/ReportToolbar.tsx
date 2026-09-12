@@ -20,6 +20,8 @@ interface ReportToolbarProps {
   onToggleVersionHistory?: () => void;
   versionCount?: number;
   exportReady?: boolean;
+  readOnly?: boolean;
+  exportAllowed?: boolean;
 }
 
 export const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -31,6 +33,8 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onToggleVersionHistory,
   versionCount,
   exportReady = true,
+  readOnly = false,
+  exportAllowed = true,
 }) => {
   const { isSaving, previewMode, pageId } = useReportStore();
   const text = useSmartText();
@@ -40,7 +44,52 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
 
   if (!report) return null;
 
-  const exportDisabled = isDirty || isSaving || !pageId || !exportReady;
+  const exportDisabled = isDirty || isSaving || !pageId || !exportReady || !exportAllowed;
+
+  if (readOnly)
+    return (
+      <div className="border-b bg-white px-4 py-3" data-testid="report-reader-toolbar">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="min-w-0 text-lg font-semibold text-gray-900">{report.title}</h1>
+          <div className="flex flex-wrap gap-2">
+            {exportAllowed &&
+              (
+                [
+                  ['PDF', onExportPdf],
+                  ['Excel', onExportExcel],
+                  ['JSON', onExportJson],
+                ] as const
+              ).map(
+                ([format, action]) =>
+                  action && (
+                    <button
+                      key={format}
+                      onClick={action}
+                      disabled={exportDisabled}
+                      className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+                    >
+                      Export {format}
+                    </button>
+                  ),
+              )}
+            {onToggleVersionHistory && (
+              <button
+                onClick={onToggleVersionHistory}
+                className="rounded-md border px-3 py-1.5 text-sm"
+              >
+                Version History
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="mt-2 text-sm text-gray-600">
+          {text({
+            zh: '只读报表：可查看数据与历史版本，修改需管理权限。',
+            en: 'Read-only report: view data and version history. Editing requires manage permission.',
+          })}
+        </p>
+      </div>
+    );
 
   const titleInput = (
     <input
