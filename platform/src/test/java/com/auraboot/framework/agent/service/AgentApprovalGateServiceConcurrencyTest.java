@@ -132,6 +132,8 @@ class AgentApprovalGateServiceConcurrencyTest {
                 .containsEntry("pid", "apv-expired")
                 .containsEntry("approval_status", "pending");
         verify(terminalStore).failPendingApproval(1L, "run-1", "task-1", "Approval expired");
+        verify(transactionManager).commit(any());
+        verify(transactionManager, never()).rollback(any());
         verify(eventBus).publishAfterCommit(any());
     }
 
@@ -166,7 +168,26 @@ class AgentApprovalGateServiceConcurrencyTest {
         verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
     }
 
+    @Test
+    void timeoutCompletionFailureRollsBackItsTransactionAndClearsContext() {
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "expired", "tenant_id", 1L,
+                        "run_id", "run", "task_id", "task")))
+                .thenReturn(List.of(Map.of("agent_id", "agent")));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+        when(terminalStore.failPendingApproval(1L, "run", "task", "Approval expired"))
+                .thenThrow(new IllegalStateException("terminal write failed"));
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        newService().enforceApprovalTimeouts();
+        verify(transactionManager).rollback(any());
+        verify(transactionManager, never()).commit(any());
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
     private final AgentRunTerminalStore terminalStore = org.mockito.Mockito.mock(AgentRunTerminalStore.class);
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager =
+            org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
+
 
     private AgentApprovalGateService newService() {
         AgentApprovalGateService service = new AgentApprovalGateService(
@@ -175,6 +196,7 @@ class AgentApprovalGateServiceConcurrencyTest {
                 eventBus,
                 dispatchHandler);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "terminalStore", terminalStore);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "transactionManager", transactionManager);
         return service;
     }
 

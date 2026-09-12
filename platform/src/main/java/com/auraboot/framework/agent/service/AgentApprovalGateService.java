@@ -32,6 +32,8 @@ public class AgentApprovalGateService {
     private final ApprovalNotificationOutbox approvalNotificationOutbox;
     @Autowired
     private AgentRunTerminalStore terminalStore;
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Autowired
     public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
@@ -663,6 +665,7 @@ public class AgentApprovalGateService {
      *
      * @return the approval record, or null if not found / not in PENDING state
      */
+    @org.springframework.transaction.annotation.Transactional
     public Map<String, Object> reject(Long tenantId, String approvalPid, Long approverId, String reason) {
         Map<String, Object> approval = loadPendingApproval(tenantId, approvalPid);
         if (approval == null) {
@@ -722,30 +725,34 @@ public class AgentApprovalGateService {
                         "Expired approval must have a tenant")).longValue();
                 MetaContext.clear();
                 MetaContext.setSystemTenantContext(tenantId);
-                Map<String, Object> update = new HashMap<>();
-                update.put("approval_status", "expired");
-                update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
-                update.put("updated_at", now);
-                int updated = dynamicDataMapper.update("ab_agent_approval", update,
-                        Map.of("pid", pid, "approval_status", "pending"));
-                if (updated != 1) {
-                    continue;
-                }
+                var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+                transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                transaction.executeWithoutResult(status -> {
+                    Map<String, Object> update = new HashMap<>();
+                    update.put("approval_status", "expired");
+                    update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
+                    update.put("updated_at", now);
+                    int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                            Map.of("pid", pid, "approval_status", "pending"));
+                    if (updated != 1) {
+                        return;
+                    }
 
-                String runPid = (String) approval.get("run_id");
-                String agentCode = resolveAgentCode(tenantId, runPid);
+                    String runPid = (String) approval.get("run_id");
+                    String agentCode = resolveAgentCode(tenantId, runPid);
 
-                // Publish domain event
-                if (tenantId != null) {
-                    eventBus.publishAfterCommit(new AgentApprovalEvent(
-                            tenantId, pid, runPid, agentCode, "expired", null));
-                }
+                    // Publish domain event
+                    if (tenantId != null) {
+                        eventBus.publishAfterCommit(new AgentApprovalEvent(
+                                tenantId, pid, runPid, agentCode, "expired", null));
+                    }
 
-                // Fail the associated agent run
-                failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval expired");
+                    // Fail the associated agent run
+                    failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval expired");
 
-                log.info("Approval expired: pid={}, run_id={}, task_id={}", pid,
-                        runPid, approval.get("task_id"));
+                    log.info("Approval expired: pid={}, run_id={}, task_id={}", pid,
+                            runPid, approval.get("task_id"));
+                });
             } catch (Exception e) {
                 log.error("Failed to expire approval {}: {}", pid, e.getMessage());
             } finally {
