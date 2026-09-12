@@ -59,11 +59,30 @@ test('core build declares no SmartEngine, Drools or KIE artifact dependency', ()
   assert.doesNotMatch(build, /com\.auraboot\.smart\.framework|org\.drools|org\.kie|kie-/i);
 });
 
-test('core exposes no legacy BPM product or release runner fallback', () => {
+test('core exposes no legacy BPM or CRM product test and release fallback', () => {
   for (const relative of [
     'scripts/bpm-release-gate.sh',
     'scripts/bpm-release-gate.pins.json',
     'scripts/run-bpm-release-image-gate.sh',
+    'scripts/run-wf-e2e.sh',
+    'scripts/crm-acceptance',
+    'web-admin/playwright.bpm-regression.config.ts',
+    'web-admin/playwright.workflow-demo.config.ts',
+    'web-admin/tests/e2e/bpm-designer',
+    'web-admin/tests/e2e/bpm-smoke/wf-end-to-end-smoke.spec.ts',
+    'web-admin/tests/e2e/crm',
+    'web-admin/tests/api/bpm-conversion.spec.ts',
+    'web-admin/tests/api/bpm-process-definition.spec.ts',
+    'web-admin/tests/api/bpm-sla-suspend.spec.ts',
+    'web-admin/tests/api/bpm-workflow.spec.ts',
+    'web-admin/tests/api/agent/crm-agent-quality-report.mjs',
+    'web-admin/tests/api/agent/crm-agent-quality-report.spec.ts',
+    'web-admin/tests/api/agent/crm-agent-validation.spec.ts',
+    'web-admin/tests/api/agent/crm-ai-scenarios.spec.ts',
+    'web-admin/tests/api/agent/run-crm-agent-validation.mjs',
+    'web-admin/tests/e2e/email/email-crm-timeline.spec.ts',
+    'web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts',
+    'web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts',
   ]) {
     assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
   }
