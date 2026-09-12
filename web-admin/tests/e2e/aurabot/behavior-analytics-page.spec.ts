@@ -111,7 +111,14 @@ test('behavior menu renders ordered funnel and both retention units', async ({
     }),
   );
   expect([...sources].sort()).toEqual(
-    ['analysis-funnel', 'overview', 'retention?unit=artifact', 'retention?unit=user', 'top-events']
+    [
+      'analysis-funnel',
+      'executions',
+      'overview',
+      'retention?unit=artifact',
+      'retention?unit=user',
+      'top-events',
+    ]
       .map((path) => '/api/analytics/behavior/' + path)
       .sort(),
   );

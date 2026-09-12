@@ -197,6 +197,15 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
           setApiRows(result.data?.records ?? result.data?.rows ?? []);
         } else {
           setApiRows([]);
+          setApiError(
+            new Error(
+              result.message ||
+                l(
+                  '请重新应用时间范围或刷新页面。',
+                  'Apply the time range again or refresh the page.',
+                ),
+            ),
+          );
         }
         setApiLoading(false);
       })
@@ -210,7 +219,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- apiParamsKey is the stable value-key for dataSource.params
-  }, [useApiBranch, dataSource?.url, apiParamsKey]);
+  }, [useApiBranch, dataSource?.url, apiParamsKey, l]);
 
   useEffect(() => {
     if (!useModelBranch || !modelCode) return;
