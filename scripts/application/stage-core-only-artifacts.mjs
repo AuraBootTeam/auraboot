@@ -40,11 +40,12 @@ function parseArgs(argv) {
 }
 
 function run(command, args, options = {}) {
-  return execFileSync(command, args, {
+  const output = execFileSync(command, args, {
     cwd: options.cwd,
     encoding: 'utf8',
     stdio: options.capture === false ? 'inherit' : ['ignore', 'pipe', 'pipe'],
-  }).trim();
+  });
+  return typeof output === 'string' ? output.trim() : '';
 }
 
 function requirePath(path, label) {
