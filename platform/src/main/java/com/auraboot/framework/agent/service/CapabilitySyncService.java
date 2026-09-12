@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.entity.AbCapability;
 import com.auraboot.framework.agent.mapper.AbCapabilityMapper;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class CapabilitySyncService {
     private final AbCapabilityMapper capabilityMapper;
     private final CapabilityGraphService capabilityGraphService;
     private final CapabilityMappingSupport mappingSupport;
+    private final TableMetadataService tableMetadataService;
 
     // ==================== Write-Path: Sync to ab_capability ====================
 
@@ -261,6 +263,9 @@ public class CapabilitySyncService {
     }
 
     private List<AbCapability> collectWorkflowCapabilities(Long tenantId) {
+        if (!tableMetadataService.tableExists("ab_bpm_process_definition")) {
+            return List.of();
+        }
         String sql = "SELECT id, pid, process_key, process_name, description, category " +
                 "FROM ab_bpm_process_definition WHERE tenant_id = #{params.tenantId} " +
                 "AND status = 'deployed' AND is_current = true " +
