@@ -41,6 +41,19 @@ test('core tenant and platform-admin configuration owns no BPM or CRM resources'
 
   const baseI18n = readFileSync(resolve(ROOT, 'platform/src/main/resources/seed/i18n-base.json'), 'utf8');
   assert.doesNotMatch(baseI18n, /(?:^|[^a-z0-9])(?:bpm|crm|smartengine)(?:[^a-z0-9]|$)/i);
+
+  const runtimeI18n = ['i18n.zh-CN.yaml', 'i18n.en-US.yaml']
+    .map((name) => readFileSync(resolve(ROOT, 'platform/src/main/resources', name), 'utf8'))
+    .join('\n');
+  assert.doesNotMatch(
+    runtimeI18n,
+    /^\s+(?:crm_opportunity_amount|crm_account_active|bpm_running|bpm_completed_week|newLead|newAccount|newOpportunity|newContract|startProcess):/m,
+  );
+  assert.doesNotMatch(runtimeI18n, /^\s+(?:crm|bpm):\s+(?:CRM|BPM|流程管理)/m);
+  assert.doesNotMatch(
+    runtimeI18n,
+    /^\s+(?:pipeline|leads|activities|my_process|process_stats)(?:_desc)?:/m,
+  );
 });
 
 test('core production graph contains no product tables or product-owned HTTP routes', () => {
