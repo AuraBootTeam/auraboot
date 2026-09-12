@@ -76,3 +76,45 @@ test('client collect cannot forge analytics query success', async ({ request }) 
   });
   expect(response.status()).toBe(400);
 });
+
+test('client collect rejects forged server provenance without accepting part of a batch', async ({
+  request,
+}) => {
+  const start = Date.now() + 364 * 86400000;
+  const params = { from: new Date(start).toISOString(), to: new Date(start + 1).toISOString() };
+  const client = {
+    eventName: 'page_view',
+    eventCategory: 'navigation',
+    source: 'web',
+    schemaVersion: '1',
+    occurredAt: params.from,
+  };
+  for (const forged of [
+    { source: 'server' },
+    { eventCategory: 'business_outcome' },
+    { producerName: 'server-outcome-outbox' },
+    { producerName: 'aurabot-analytics' },
+  ]) {
+    const response = await request.post('/api/collect', {
+      data: {
+        events: [
+          { ...client, eventId: randomUUID() },
+          { ...client, ...forged, eventId: randomUUID() },
+        ],
+      },
+    });
+    expect(response.status(), JSON.stringify(forged)).toBe(400);
+  }
+  const accepted = await request.post('/api/collect', {
+    data: { events: [{ ...client, eventId: randomUUID() }] },
+  });
+  expect(accepted.status()).toBe(200);
+  expect((await accepted.json()).accepted).toBe(1);
+  await expect
+    .poll(async () => {
+      const response = await request.get('/api/analytics/behavior/overview', { params });
+      expect(response.status()).toBe(200);
+      return (await response.json()).data.records[0].totalEvents;
+    })
+    .toBe(1);
+});

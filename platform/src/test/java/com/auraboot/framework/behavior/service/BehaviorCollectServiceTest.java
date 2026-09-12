@@ -104,4 +104,24 @@ class BehaviorCollectServiceTest {
         verify(publisher, never()).publish(anyLong(), any(), anyList());
     }
 
+    @Test
+    void clientsCannotForgeServerProvenanceOrPartiallyEnqueueMixedBatches() {
+        MetaContext.setCurrentTenantId(900L);
+        MetaContext.setCurrentUserId(55L);
+        for (int field = 0; field < 5; field++) {
+            BehaviorEventInput forged = event("forged");
+            switch (field) {
+                case 0 -> forged.setSource(" server ");
+                case 1 -> forged.setEventCategory("BUSINESS_OUTCOME");
+                case 2 -> forged.setProducerName("server-outcome-outbox");
+                case 3 -> forged.setProducerName("aurabot-analytics");
+                case 4 -> forged.setEventName(" ANALYTICS_requested ");
+            }
+            var batch = List.of(event("valid"), forged);
+            assertThatThrownBy(() -> service.record(batch)).isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> service.recordAnonymous(batch, 900L)).isInstanceOf(ResponseStatusException.class);
+        }
+        verify(publisher, never()).publish(anyLong(), any(), anyList());
+    }
+
 }

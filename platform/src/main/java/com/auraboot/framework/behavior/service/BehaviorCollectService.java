@@ -74,10 +74,18 @@ public class BehaviorCollectService {
         return enqueued;
     }
     private void rejectReservedEvents(List<BehaviorEventInput> events) {
-        if (events.stream().anyMatch(event -> event != null && event.getEventName() != null
-                && event.getEventName().startsWith("analytics_"))) {
+        if (events.stream().anyMatch(event -> event != null && (
+                normalized(event.getEventName()).startsWith("analytics_")
+                || "server".equals(normalized(event.getSource()))
+                || "business_outcome".equals(normalized(event.getEventCategory()))
+                || normalized(event.getProducerName()).startsWith("server-")
+                || "aurabot-analytics".equals(normalized(event.getProducerName()))))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reserved_server_event");
         }
+    }
+
+    private static String normalized(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
 }
