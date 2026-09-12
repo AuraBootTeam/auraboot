@@ -131,6 +131,20 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
     'web-admin/tests/api/setup/seed-showcase-dashboard-default.spec.ts',
     'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
     'web-admin/tests/api/setup/seed-showcase-ownership.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-workflow.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-v2-invariants.spec.ts',
+    'web-admin/tests/e2e/showcase/showcase-smoke.spec.ts',
+    'web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts',
+    'web-admin/tests/e2e/showcase/seed-data-validation.spec.ts',
+    'web-admin/tests/e2e/dashboard/designer-datasource-config-golden.spec.ts',
+    'web-admin/tests/e2e/dashboard/aggregate-grain-orderby-golden.spec.ts',
+    'web-admin/tests/e2e/dashboard/arsenal-live-datasource-golden.spec.ts',
+    'web-admin/scripts/run-showcase-seed-sequence.mjs',
+    'web-admin/scripts/run-showcase-seed-sequence.test.mjs',
+    'web-admin/playwright.seed.config.ts',
+    'scripts/docker-ga-showcase-e2e.sh',
+    'scripts/deploy/oss-remote/gen-admin-storage.mjs',
     'web-admin/tests/helpers/wd-fixtures.ts',
   ]) {
     assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} must remain product-owned outside core`);
@@ -140,6 +154,18 @@ test('core exposes no legacy BPM or CRM product test and release fallback', () =
 test('core repository publishing never reconstructs product source trees', () => {
   const script = readFileSync(resolve(ROOT, 'scripts/publish-repos.sh'), 'utf8');
   assert.doesNotMatch(script, /plugins\/(?:crm|core-bpm|workflow-demo)/);
+});
+
+test('core runtime gates never seed or execute BPM/CRM product journeys', () => {
+  const scripts = [
+    'scripts/docker-ga-e2e-bootstrap.sh',
+    'scripts/oss-e2e-gate-run.sh',
+    'scripts/ga-showcase-e2e.sh',
+    'scripts/deploy/oss-remote/deploy.sh',
+  ].map((relative) => readFileSync(resolve(ROOT, relative), 'utf8')).join('\n');
+
+  assert.doesNotMatch(scripts, /seed-showcase|run-showcase-seed-sequence|test:agent:crm/i);
+  assert.doesNotMatch(scripts, /(?:plugins\/|import[_ -]?plugins[^\n]*)(?:crm|core-bpm|workflow-demo)/i);
 });
 
 test('public source-facade npm exports resolve to typed source files', () => {

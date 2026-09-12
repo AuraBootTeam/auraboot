@@ -6,7 +6,7 @@ function read(path) {
   return readFileSync(path, 'utf8');
 }
 
-test('OSS reset init contract gate covers reset, DB, marketplace, and seed runner checks', () => {
+test('OSS reset init contract gate covers reset, DB, marketplace, and platform bootstrap checks', () => {
   assert.ok(existsSync('scripts/check-reset-init-contracts.sh'));
 
   const gate = read('scripts/check-reset-init-contracts.sh');
@@ -38,7 +38,6 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
-  assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
   assert.match(gate, /bash scripts\/lib\/test-runtime-process-owner\.sh/);
 });
 
@@ -117,7 +116,7 @@ test('OSS reset init contract gate is executable for direct local use', () => {
   );
 });
 
-test('OSS CI runs reset init contract gate when reset or seed files change', () => {
+test('OSS CI runs reset init contract gate when reset or platform bootstrap files change', () => {
   assert.ok(existsSync('.github/workflows/reset-init-contracts.yml'));
 
   const workflow = read('.github/workflows/reset-init-contracts.yml');
@@ -127,8 +126,6 @@ test('OSS CI runs reset init contract gate when reset or seed files change', () 
   assert.match(workflow, /scripts\/reset-db\.sh/);
   assert.match(workflow, /scripts\/seed-marketplace\.sh/);
   assert.match(workflow, /web-admin\/package\.json/);
-  assert.match(workflow, /web-admin\/scripts\/run-showcase-seed-sequence\.mjs/);
-  assert.match(workflow, /web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
   assert.match(workflow, /bash scripts\/check-reset-init-contracts\.sh/);
 });
 
@@ -601,7 +598,6 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
 
 test('deployment-neutral knowledge-base seeds use the configured embedding profile', () => {
   for (const path of [
-    'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
     'web-admin/tests/e2e/ai/knowledge-base-smoke.spec.ts',
   ]) {
     const source = read(path);
@@ -631,6 +627,8 @@ test('docker GA bootstrap initializes a blank stack before admin login', () => {
   assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /--profile="\$PLUGIN_IMPORT_PROFILE"/);
   assert.doesNotMatch(script, /seedDemoData/);
+  assert.doesNotMatch(script, /seed-showcase|run-showcase-seed-sequence|crm:create_quote/i);
+  assert.match(script, /Product seed not run by Core/);
   assert.match(script, /aura_bootstrap_setup_if_needed[\s\S]*scripts\/import-plugins\.sh[\s\S]*# 1\. Login as admin -> JWT/);
 });
 

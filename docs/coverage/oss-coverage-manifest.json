@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "c2499c4b9",
+    "commit": "31cc232e8",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -788,8 +788,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
-            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -2890,8 +2889,7 @@
           "evidence": [
             "web-admin/tests/e2e/organization/member-detail.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -2926,8 +2924,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -3078,7 +3075,6 @@
             "web-admin/tests/e2e/showcase/list-configpanel-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/page-creation-dispatch-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-choice-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-misc-e2e.spec.ts",
@@ -4050,8 +4046,7 @@
           "evidence": [
             "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
             "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
-            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -4089,7 +4084,6 @@
             "web-admin/tests/e2e/showcase/list-ux-features.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts"
@@ -5410,8 +5404,7 @@
             "web-admin/tests/e2e/automation/automation-golden.spec.ts",
             "web-admin/tests/e2e/automation/automation-management.spec.ts",
             "web-admin/tests/e2e/automation/llm-call-node.spec.ts",
-            "web-admin/tests/e2e/formula/formula-editor.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/formula/formula-editor.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
           "verdict": "pass",
@@ -5427,7 +5420,6 @@
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
-            "web-admin/tests/e2e/dashboard/designer-datasource-config-golden.spec.ts",
             "web-admin/tests/e2e/designer/dashboard-designer-deep.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts"
           ],
@@ -5479,8 +5471,6 @@
             "web-admin/tests/e2e/contract-cost/executive-dashboard-smoke.spec.ts",
             "web-admin/tests/e2e/contract-cost/pm-workspace-tabs.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "web-admin/tests/e2e/dashboard/aggregate-grain-orderby-golden.spec.ts",
-            "web-admin/tests/e2e/dashboard/arsenal-live-datasource-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-favorites.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
@@ -5597,7 +5587,6 @@
             "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-choice-e2e.spec.ts",
@@ -6038,7 +6027,6 @@
             "web-admin/tests/e2e/showcase/model-field-change-page-sync-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-fields-page-impact-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-page-workbench-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -6387,8 +6375,6 @@
             "web-admin/tests/e2e/plugin/plugin-deep.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",

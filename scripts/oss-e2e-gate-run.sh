@@ -8,11 +8,9 @@
 #   1. brings up a FRESH, slot-isolated host-first stack (zero docker, safe
 #      alongside concurrent sessions, never oss-reset-and-init's global pkill);
 #   2. imports the OSS demo plugins + the internal test-fixtures plugin;
-#   3. runs the full platform showcase seed sequence, so the
-#      ~28 seed-data-dependent specs are green rather than red-for-want-of-data;
-#   4. runs a meaningful, currently-green OSS regression slice under the exact
+#   3. runs a meaningful, currently-green Core regression slice under the exact
 #      env contract a real OSS run needs (PW_PROFILE=oss --project=oss);
-#   5. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
+#   4. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
 #      nonzero = a real failure. The exit code is the whole point: it is what a
 #      crontab line or a release step checks;
 #   6. tears the stack down on the way out, on success OR failure OR interrupt,
@@ -121,29 +119,6 @@ die()  { printf '%s[oss-e2e-gate] ERROR:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; exi
 die_env() { printf '%s[oss-e2e-gate] ENVIRONMENT-INVALID:%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; ENV_INVALID=1; exit 2; }
 ENV_INVALID=0
 
-# True if a dashboard `code` is imported into ab_dashboard (any tenant). Uses the
-# PG* coordinates the caller must already have eval'd from `oss-golden-stack env`.
-dashboard_exists() {
-  local code="$1" got
-  got="$(psql -tAc "select exists(select 1 from ab_dashboard where code = '${code}')" 2>/dev/null | tr -d '[:space:]')"
-  [[ "$got" == "t" ]]
-}
-
-# Resolve SHOWCASE_DEFAULT_DASHBOARD_CODE the way scripts/oss-reset-and-init.sh's
-# select_default_showcase_dashboard does: honour an explicit override (verified to
-# exist), otherwise require the official CRM dashboard. This fails loudly when
-# the product profile drifts away from the canonical public CRM package.
-resolve_default_dashboard() {
-  if [[ -n "${SHOWCASE_DEFAULT_DASHBOARD_CODE:-}" ]]; then
-    dashboard_exists "$SHOWCASE_DEFAULT_DASHBOARD_CODE" \
-      || die_env "SHOWCASE_DEFAULT_DASHBOARD_CODE=$SHOWCASE_DEFAULT_DASHBOARD_CODE is not imported into ab_dashboard"
-    return
-  fi
-  dashboard_exists crm_dashboard \
-    || die_env "official CRM dashboard is not imported (expected crm_dashboard)"
-  export SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard
-}
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slot)   [[ $# -ge 2 ]] || die "--slot requires a value";  SLOT="$2"; shift 2;;
@@ -237,7 +212,7 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
-log "1/5 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
+log "1/4 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
 "$GS" destroy "$NAME" >/dev/null 2>&1 || true
 # --fresh-db => destroy-then-recreate the slot DB, guaranteeing a fresh bootstrap.
 # Default `up` runs the warm step (setup -> auth storageState -> pre-warm), which
@@ -251,47 +226,22 @@ log "1/5 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile
 # explicitly so those specs test the product, not a missing fixture. (Under
 # --no-deps the Playwright setup project does not run, so we cannot lean on its
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
-log "1b/5 import internal test-fixtures plugin (e2et_* models)"
+log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
   || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/golden/$NAME/import.log"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
-log "2/5 resolve stack env"
+log "2/4 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
-mkdir -p "$AURA_EVIDENCE_ROOT/logs" "$AURA_EVIDENCE_ROOT/seed"
+mkdir -p "$AURA_EVIDENCE_ROOT/logs"
 LOG="$AURA_EVIDENCE_ROOT/logs/oss-e2e-gate-$(date +%Y%m%d-%H%M%S).log"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
 
-# Resolve the demo default dashboard BEFORE seeding (the finalization phase reads
-# SHOWCASE_DEFAULT_DASHBOARD_CODE). The OSS demo profile imports the official
-# public CRM and therefore resolves to crm_dashboard.
-resolve_default_dashboard
-export SHOWCASE_DEFAULT_DASHBOARD_CODE
-log "    default dashboard target: $SHOWCASE_DEFAULT_DASHBOARD_CODE"
+# Product seed and product journeys are intentionally absent. The independent
+# aura-bpm and aura-crm release suites own those fixtures and denominators.
 
-# --- 3. full platform showcase seed ------------------------------------------
-# The gate's default scope includes seed-data-dependent specs; a minimal
-# bootstrap alone leaves ~28 of them red. Seed loudly-or-die.
-log "3/5 seed: full platform showcase sequence (loud on failure)"
-SEED_LOG_DIR="$AURA_EVIDENCE_ROOT/seed/oss-e2e-gate"
-mkdir -p "$SEED_LOG_DIR"
-(
-  cd "$REPO_ROOT/web-admin" || exit 90
-  set -o pipefail
-  node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
-       --output-prefix="$SEED_LOG_DIR/showcase" \
-       data extended workflow ai arsenal supplement 2>&1 | tee "$SEED_LOG_DIR/showcase-seed.log" || exit 91
-  # finalization: default dashboard + invariant assertions over what was seeded.
-  node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
-       --output-prefix="$SEED_LOG_DIR/showcase" \
-       dashboard-default invariants 2>&1 | tee "$SEED_LOG_DIR/showcase-finalize.log" || exit 92
-)
-SEED_RC=$?
-[[ "$SEED_RC" == 0 ]] || die_env "platform showcase seed failed (rc=$SEED_RC) — see $SEED_LOG_DIR/*.log"
-log "    seed OK"
-
-# --- 4. run the gate slice under the OSS env contract ------------------------
-log "4/5 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
+# --- 3. run the gate slice under the OSS env contract ------------------------
+log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
 PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --reporter=line)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
@@ -302,8 +252,8 @@ PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
 GATE_RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
 
-# --- 5. report + exit = gate result ------------------------------------------
-log "5/5 result"
+# --- 4. report + exit = gate result ------------------------------------------
+log "4/4 result"
 # Informational counts parsed from the reporter line. The AUTHORITATIVE signal is
 # GATE_RC (the process exit code), never the parsed text — a tee pipeline's own
 # exit code would lie, which is why GATE_RC comes from PIPESTATUS above.

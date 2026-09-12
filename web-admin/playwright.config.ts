@@ -462,7 +462,8 @@ export default defineConfig({
     ...(runProfile === 'full'
       ? [
           {
-            // API tests (excludes setup/seed — those run via reset-and-init.sh or playwright.seed.config.ts)
+            // API tests exclude setup; platform initialization runs through reset-and-init.sh,
+            // while product seed suites are owned by their independent applications.
             name: 'api',
             testDir: './tests/api',
             testIgnore: /setup\//,
