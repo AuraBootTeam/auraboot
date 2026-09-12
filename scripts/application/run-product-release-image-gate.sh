@@ -22,7 +22,7 @@ need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
   && -r "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" ]] \
   || fatal 'release registry password file must be a readable regular non-symlink file'
 
-for command_name in curl docker git node openssl pnpm python3 tar; do need "$command_name"; done
+for command_name in curl docker git node openssl pnpm python3 sha256sum tar; do need "$command_name"; done
 [[ "$(uname -s)" == Linux ]] || fatal 'release images must be built on the admitted Linux CI host'
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
