@@ -131,26 +131,107 @@ function packPluginSdk(repoRoot, destination) {
 }
 
 function packWebShell(repoRoot, destination, version) {
-  const buildRoot = requirePath(resolve(repoRoot, 'web-admin/build'), 'Web Shell build');
+  const sourceRoot = requirePath(resolve(repoRoot, 'web-admin'), 'Web Shell source');
   const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-web-shell-pack-'));
   try {
-    cpSync(buildRoot, resolve(packageRoot, 'build'), { recursive: true, errorOnExist: true, force: false });
-    writeFileSync(
-      resolve(packageRoot, 'package.json'),
-      `${JSON.stringify({
-        name: '@auraboot/web-shell',
-        version,
-        private: false,
-        type: 'module',
-        main: './build/server/index.js',
-        exports: { '.': './build/server/index.js' },
-        files: ['build'],
-        engines: { node: '>=20' },
-      }, null, 2)}\n`,
-    );
+    for (const entry of [
+      'app',
+      'packages',
+      'public',
+      'scripts',
+      'react-router.config.ts',
+      'tailwind.config.js',
+      'tsconfig.json',
+      'vite.config.ts',
+      'vitest.config.ts',
+      'vitest.setup.ts',
+    ]) {
+      cpSync(resolve(sourceRoot, entry), resolve(packageRoot, entry), {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+        filter: (candidate) => !/(?:^|\/)(?:build|node_modules|test-results|\.vite)(?:\/|$)/.test(candidate)
+          && !/\.tsbuildinfo$/.test(candidate),
+      });
+    }
+    const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
+    packageManifest.name = '@auraboot/web-shell';
+    packageManifest.version = version;
+    packageManifest.private = false;
+    packageManifest.scripts = {
+      build: 'pnpm typecheck && react-router build && pnpm verify:production-react-runtime',
+      typecheck: packageManifest.scripts.typecheck,
+      'verify:production-react-runtime': packageManifest.scripts['verify:production-react-runtime'],
+    };
+    packageManifest.files = [
+      'app',
+      'packages',
+      'public',
+      'scripts',
+      'react-router.config.ts',
+      'tailwind.config.js',
+      'tsconfig.json',
+      'vite.config.ts',
+      'vitest.config.ts',
+      'vitest.setup.ts',
+    ];
+    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
     const output = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
     const tarball = output.split('\n').at(-1);
     return requirePath(resolve(tarball), 'Web Shell tarball');
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true });
+  }
+}
+
+function packCompiledPackage(repoRoot, destination, directory, label) {
+  mkdirSync(destination, { recursive: true });
+  const sourceRoot = resolve(repoRoot, 'packages', directory);
+  const packageRoot = mkdtempSync(resolve(tmpdir(), `auraboot-${directory}-pack-`));
+  try {
+    run(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '-p',
+        `packages/${directory}/tsconfig.json`,
+        '--tsBuildInfoFile',
+        resolve(packageRoot, 'tsconfig.tsbuildinfo'),
+      ],
+      { cwd: repoRoot, capture: false },
+    );
+    cpSync(resolve(sourceRoot, 'dist'), resolve(packageRoot, 'dist'), { recursive: true });
+    cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
+    if (existsSync(resolve(sourceRoot, 'README.md'))) {
+      copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
+    }
+    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
+    packageManifest.main = './dist/index.js';
+    packageManifest.module = './dist/index.js';
+    packageManifest.types = './dist/index.d.ts';
+    packageManifest.exports = {
+      '.': {
+        types: './dist/index.d.ts',
+        import: './dist/index.js',
+        default: './dist/index.js',
+      },
+    };
+    packageManifest.dependencies = Object.fromEntries(
+      Object.entries(packageManifest.dependencies ?? {}).map(([name, range]) => {
+        if (!range.startsWith('workspace:')) return [name, range];
+        const dependencyDirectory = name === '@auraboot/dsl-types' ? 'dsl-types' : null;
+        if (!dependencyDirectory) throw new Error(`unknown ${label} workspace dependency: ${name}`);
+        const dependencyManifest = JSON.parse(
+          readFileSync(resolve(repoRoot, `packages/${dependencyDirectory}/package.json`), 'utf8'),
+        );
+        return [name, dependencyManifest.version];
+      }),
+    );
+    writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`);
+    const packed = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
+    return requirePath(resolve(packed.split('\n').at(-1)), `${label} tarball`);
   } finally {
     rmSync(packageRoot, { recursive: true, force: true });
   }
@@ -218,6 +299,8 @@ function main() {
     resolve(output, `maven/platform-plugin-api-${version}.jar`),
   );
   const npmRoot = resolve(output, 'npm');
+  const dslTypes = packCompiledPackage(repoRoot, npmRoot, 'dsl-types', 'DSL types');
+  const navModel = packCompiledPackage(repoRoot, npmRoot, 'nav-model', 'navigation model');
   const pluginSdk = packPluginSdk(repoRoot, npmRoot);
   const ui = packUi(repoRoot, npmRoot);
   const webShell = packWebShell(repoRoot, npmRoot, version);
@@ -238,6 +321,8 @@ function main() {
     { type: 'runtime', id: 'com.auraboot:runtime', version, path: runtime },
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version, path: pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version, path: webShell },
+    { type: 'npm', id: '@auraboot/dsl-types', version: '0.0.1', path: dslTypes },
+    { type: 'npm', id: '@auraboot/nav-model', version: '0.0.1', path: navModel },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk, path: pluginSdk },
     { type: 'npm', id: '@auraboot/ui', version: '1.0.0', path: ui },
     { type: 'migration', id: 'core', version, path: coreMigrations },
