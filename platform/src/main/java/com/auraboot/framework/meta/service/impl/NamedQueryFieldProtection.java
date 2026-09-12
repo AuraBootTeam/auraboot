@@ -19,6 +19,7 @@ public class NamedQueryFieldProtection {
     private final FieldMaskService masks;
     private final MetaModelService models;
     private final NamedQuerySourceModels sources;
+    private final com.auraboot.framework.permission.engine.PermissionEvaluator permissionEvaluator;
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 
     public record Protection(Map<String, String> aliases,
@@ -31,6 +32,13 @@ public class NamedQueryFieldProtection {
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context) {
         var sourceModels = sources.resolve(MetaContext.getCurrentTenantId(), query.getFromSql(), fields);
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) memberId = MetaContext.getCurrentUserId();
+        for (String model : new TreeSet<>(sourceModels.values())) {
+            if (memberId == null || !permissionEvaluator.canAction(memberId, model, "read")) {
+                throw new AccessDeniedException("Access denied for named query source: " + model);
+            }
+        }
         Set<String> resources = new TreeSet<>(sourceModels.values());
         if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
         var evidence = JSON.createObjectNode();

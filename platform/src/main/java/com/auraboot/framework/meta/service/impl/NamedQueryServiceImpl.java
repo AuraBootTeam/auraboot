@@ -838,6 +838,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new AccessDeniedException("Export query is no longer available");
         }
         authorizeDeclaredResource(query);
+        Map<String, Object> params = new HashMap<>();
+        if (request.getParameters() != null) params.putAll(request.getParameters());
+        params.put("tenantId", getCurrentTenantId());
+        Long userId = getCurrentUserId();
+        params.put("currentUserId", userId != null ? userId.toString() : null);
+        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
         List<String> currentScope = new ArrayList<>();
         appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope);
         List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code);
@@ -848,12 +854,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
             throw new AccessDeniedException("Export query definition has changed; create a new export");
         }
-        Map<String, Object> params = new HashMap<>();
-        if (request.getParameters() != null) params.putAll(request.getParameters());
-        params.put("tenantId", getCurrentTenantId());
-        Long userId = getCurrentUserId();
-        params.put("currentUserId", userId != null ? userId.toString() : null);
-        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+
     }
 
     // ==================== Export ====================

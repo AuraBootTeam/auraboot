@@ -336,6 +336,73 @@ for (const boundary of ['resource', 'inferred'] as string[]) {
       const priorFiles: string[] = [];
       for (const mode of modes)
         priorFiles.push(await exportJoin(mode.format, mode.asynchronous, false));
+      const sourceGrant = permissions.get('model.e2et_customer.read');
+      const revokeSource = await request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+        data: [{ permissionId: sourceGrant, granted: false }],
+      });
+      expect(revokeSource.status(), await revokeSource.text()).toBe(200);
+      try {
+        const parameters = { orderPid: fixturePid, customerPid };
+        const deniedList = await owner.post(`/api/meta/named-queries/${joinCode}/execute`, {
+          data: { page: 1, size: 5, parameters },
+        });
+        const deniedChart = await owner.post('/api/meta/chart-data', {
+          data: {
+            type: 'namedQuery',
+            queryCode: joinCode,
+            dimensions: ['record_key', 'customer_key'],
+            metrics: [],
+            parameters,
+          },
+        });
+        const deniedExport = await owner.post(`/api/meta/named-queries/${joinCode}/export-data`, {
+          data: { format: 'JSON', parameters },
+        });
+        for (const denied of [
+          deniedList,
+          deniedChart,
+          deniedExport,
+          await owner.get(priorFiles[0]),
+        ]) {
+          expect.soft(denied.status(), await denied.text()).toBe(403);
+          expect
+            .soft(await denied.text())
+            .toContain('Access denied for named query source: e2et_customer');
+        }
+        const submitted = await owner.post(`/api/meta/named-queries/${joinCode}/export-async`, {
+          data: { format: 'JSON', parameters },
+        });
+        expect(submitted.status(), await submitted.text()).toBe(200);
+        const taskPath = `/api/meta/named-queries/export-tasks/${(await submitted.json()).data.pid}`;
+        await expect
+          .poll(
+            async () => {
+              const status = await owner.get(taskPath);
+              expect(status.status(), await status.text()).toBe(200);
+              const task = (await status.json()).data;
+              expect(task.status).not.toBe('completed');
+              if (task.status === 'failed') {
+                expect(task.errorMessage).toContain(
+                  'Access denied for named query source: e2et_customer',
+                );
+                expect(task.downloadUrl).toBeFalsy();
+              }
+              return task.status;
+            },
+            { timeout: 15000 },
+          )
+          .toBe('failed');
+        const rejectedArtifact = await owner.get(`${taskPath}/download`);
+        expect(rejectedArtifact.status()).toBe(404);
+      } finally {
+        const restored = await request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+          data: [{ permissionId: sourceGrant, granted: true }],
+        });
+        expect(restored.status(), await restored.text()).toBe(200);
+      }
+      const restoredFile = await owner.get(priorFiles[0]);
+      expect(restoredFile.status(), await restoredFile.text()).toBe(200);
+      expect(await restoredFile.text()).toContain(customerTitle);
       const customerPolicy = await request.post('/api/meta/data-permissions', {
         data: {
           name: `Hide customer ${code}`,
