@@ -186,7 +186,11 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-version = '1.0.0-SNAPSHOT'
+version = file('../VERSION').text.trim()
+
+allprojects {
+    version = rootProject.version
+}
 
 // Java工具链配置
 java {
