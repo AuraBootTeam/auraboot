@@ -9,6 +9,7 @@ test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/ad
 test('explicit durable conversation commits started and linked successful execution facts', async ({
   request,
 }) => {
+  const from = new Date().toISOString();
   const marker = `execution-facts-${randomUUID()}`;
   const response = await request.post('/api/ai/aurabot/chat/stream', {
     headers: { Accept: 'text/event-stream' },
@@ -60,6 +61,34 @@ test('explicit durable conversation commits started and linked successful execut
         { timeout: 15000 },
       )
       .toEqual(['agent_execution_completed', 'agent_execution_started']);
+    const stats = await request.get('/api/analytics/behavior/executions', {
+      params: { from, to: new Date().toISOString() },
+    });
+    expect(stats.status()).toBe(200);
+    const execution = (await stats.json()).data;
+    expect(execution.definitionVersion).toBe('agent-execution-cohort-v1');
+    expect(execution.counts).toMatchObject({
+      started: 1,
+      succeeded: 1,
+      failed: 0,
+      cancelled: 0,
+      unresolved: 0,
+      excludedSandbox: 0,
+    });
+    expect(execution.successRate).toBe(1);
+    expect(execution.completedSuccessRate).toBe(1);
+    const empty = await request.get('/api/analytics/behavior/executions', {
+      params: {
+        from: new Date(Date.now() + 60000).toISOString(),
+        to: new Date(Date.now() + 120000).toISOString(),
+      },
+    });
+    expect(empty.status()).toBe(200);
+    expect((await empty.json()).data).toMatchObject({
+      sampleStatus: 'no_sample',
+      successRate: null,
+      completedSuccessRate: null,
+    });
   } finally {
     await db.end();
   }
