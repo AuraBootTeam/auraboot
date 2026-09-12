@@ -672,15 +672,10 @@ public class ActionRecorder {
 
     private String deriveBusinessDomain(String modelCode) {
         if (modelCode == null) return null;
-        if (modelCode.startsWith("crm_")) return "crm";
-        if (modelCode.startsWith("pm_")) return "project";
-        if (modelCode.startsWith("hr_") || modelCode.startsWith("thr_")) return "hr";
-        if (modelCode.startsWith("fin_") || modelCode.startsWith("cc_")) return "finance";
-        if (modelCode.startsWith("inv_") || modelCode.startsWith("wh_")) return "inventory";
-        if (modelCode.startsWith("qc_") || modelCode.startsWith("dp_")) return "quality";
-        if (modelCode.startsWith("proc_") || modelCode.startsWith("po_")) return "procurement";
-        if (modelCode.startsWith("doc_") || modelCode.startsWith("kb_")) return "knowledge";
-        return "general";
+        int separator = modelCode.indexOf('_');
+        if (separator <= 0) return "general";
+        String namespace = modelCode.substring(0, separator).toLowerCase(Locale.ROOT);
+        return namespace.matches("[a-z][a-z0-9]*") ? namespace : "general";
     }
 
     private String buildIntentSummary(CommandMeta meta, Map<String, Object> input,

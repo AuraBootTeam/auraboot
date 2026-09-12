@@ -54,6 +54,12 @@ test('core tenant and platform-admin configuration owns no BPM or CRM resources'
     runtimeI18n,
     /^\s+(?:pipeline|leads|activities|my_process|process_stats)(?:_desc)?:/m,
   );
+
+  const showcaseNamedQueries = readFileSync(
+    resolve(ROOT, 'plugins/showcase/config/named-queries.json'),
+    'utf8',
+  );
+  assert.doesNotMatch(showcaseNamedQueries, /\bmt_crm_[a-z0-9_]+\b/i);
 });
 
 test('core production graph contains no product tables or product-owned HTTP routes', () => {
@@ -62,6 +68,7 @@ test('core production graph contains no product tables or product-owned HTTP rou
     && !path.includes('/__tests__/'));
   assert.doesNotMatch(java, /\b(?:ab_bpm_[a-z0-9_]*|mt_crm_[a-z0-9_]*)\b/i);
   assert.doesNotMatch(java, /["']\/api\/bpm(?:\/|["'])/i);
+  assert.doesNotMatch(java, /modelCode\.startsWith\(["']crm_["']\)/);
   assert.doesNotMatch(web, /["']\/api\/bpm(?:\/|["'])/i);
   assert.doesNotMatch(web, /["']\/bpm\//i);
   assert.doesNotMatch(`${java}\n${web}`, /on_bpm_event|trigger-bpm-event|bpm-inline-approval|process-select/i);
