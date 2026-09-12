@@ -281,6 +281,7 @@ class TenantBootstrapServiceImplTest {
         TenantBootstrapTemplate template = baseTemplate();
         PermissionTemplate corePermission = new PermissionTemplate();
         corePermission.setCode("meta.model.read");
+        corePermission.setDescription("Core collaboration and BPM bridge");
         PermissionTemplate bpmPermission = new PermissionTemplate();
         bpmPermission.setCode("bpm.process.read");
         PermissionTemplate crmPermission = new PermissionTemplate();
@@ -301,6 +302,8 @@ class TenantBootstrapServiceImplTest {
 
         assertEquals(List.of("meta.model.read"),
                 template.getPermissions().stream().map(PermissionTemplate::getCode).toList());
+        assertEquals("Core collaboration and 产品应用 bridge",
+                template.getPermissions().get(0).getDescription());
         assertEquals(List.of("*"), template.getRolePermissionBindings().get(0).getPermissionCodes());
         assertEquals(List.of("meta.model.read"),
                 template.getRolePermissionBindings().get(1).getPermissionCodes());

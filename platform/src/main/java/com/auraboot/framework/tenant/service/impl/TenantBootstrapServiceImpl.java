@@ -164,7 +164,13 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     static void removeProductOwnedEntries(TenantBootstrapTemplate template) {
         if (template.getPermissions() != null) {
             template.setPermissions(template.getPermissions().stream()
-                .filter(permission -> !hasProductPrefix(permission.getCode()))
+                .filter(permission -> !hasProductSignal(
+                    permission.getCode(), permission.getModule(), permission.getResource(),
+                    permission.getAction(), permission.getResourceType()))
+                .peek(permission -> {
+                    permission.setName(sanitizeProductNames(permission.getName()));
+                    permission.setDescription(sanitizeProductNames(permission.getDescription()));
+                })
                 .toList());
         }
         if (template.getMenus() != null) {
@@ -209,6 +215,16 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             }
         }
         return false;
+    }
+
+    private static String sanitizeProductNames(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value
+            .replaceAll("(?i)smartengine", "产品应用")
+            .replaceAll("(?i)bpm", "产品应用")
+            .replaceAll("(?i)crm", "产品应用");
     }
     
     @Override
