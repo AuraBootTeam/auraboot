@@ -19,6 +19,9 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   const title = `Analytics report ${Date.now()}`;
   await page.getByPlaceholder('Report Title').fill(title);
   await expect(page.getByPlaceholder('Report Title')).toHaveValue(title);
+  await page.getByRole('button', { name: /Rich Text/ }).click();
+  await page.getByPlaceholder('Enter text content...').fill('Original analysis conclusion');
+  await expect(page.getByTestId('report-canvas')).toContainText('Original analysis conclusion');
   const pageWrites: string[] = [];
   page.on('request', (request) => {
     if (
@@ -59,6 +62,11 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
     fullPage: true,
   });
   await page.getByPlaceholder('Report Title').fill(`${title} revised`);
+  await page
+    .getByTestId('report-canvas')
+    .getByText('Original analysis conclusion', { exact: true })
+    .click();
+  await page.getByPlaceholder('Enter text content...').fill('Revised analysis conclusion');
   const updatedResponse = page.waitForResponse(
     (r) =>
       r.request().method() === 'PUT' &&
@@ -66,7 +74,22 @@ test('report menu supports save, reopen, version rollback and canonical JSON dow
   );
   await page.getByRole('button', { name: /^(保存|Save)$/ }).click();
   expect((await updatedResponse).status()).toBe(200);
+  await page.getByPlaceholder('Report Title').fill(`${title} unsaved`);
   await page.getByRole('button', { name: 'Version History' }).click();
+  await page.getByRole('button', { name: /^v1\b/ }).click();
+  const historical = page.getByTestId('report-version-preview');
+  await expect(historical).toContainText('Original analysis conclusion');
+  await expect(historical).not.toContainText('Revised analysis conclusion');
+  await expect(page.getByPlaceholder('Report Title')).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+s');
+  const unchanged = await page.request.get(`/api/report-definitions/${created.pid}`);
+  expect((await unchanged.json()).data.dsl.title).toBe(`${title} revised`);
+  await historical.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/report-history-preview.png`,
+  });
+  await page.getByRole('button', { name: '返回当前报表', exact: true }).click();
+  await expect(page.getByPlaceholder('Report Title')).toHaveValue(`${title} unsaved`);
+  await expect(page.getByTestId('report-canvas')).toContainText('Revised analysis conclusion');
   await page.getByRole('button', { name: /^v1\b/ }).click();
   await page.getByRole('button', { name: /^(回滚|Rollback)$/ }).click();
   const rollbackResponse = page.waitForResponse(

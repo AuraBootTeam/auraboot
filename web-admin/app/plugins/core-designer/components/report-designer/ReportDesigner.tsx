@@ -17,11 +17,19 @@ import { useReportStore } from './store/useReportStore';
 import { ReportDocumentProvider, useReportDocument } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
 import { BlockPalette } from './components/BlockPalette';
+import { ReportTableBlock } from './blocks/ReportTableBlock';
+import { ReportGroupedTableBlock } from './blocks/ReportGroupedTableBlock';
+import { ReportStatCardBlock } from './blocks/ReportStatCardBlock';
+import { ReportRichTextBlock } from './blocks/ReportRichTextBlock';
+import { ReportCrossTabBlock } from './blocks/ReportCrossTabBlock';
+import { ReportChartBlock } from './blocks/ReportChartBlock';
+import { ReportBarcodeBlock } from './blocks/ReportBarcodeBlock';
+import { ReportWatermarkBlock } from './blocks/ReportWatermarkBlock';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
 import { fetchReportData } from './services/fetchReportData';
 import { reportDesignerService } from './services/reportDesignerService';
-import { createEmptyReport } from './types';
+import { createEmptyReport, type ReportDsl } from './types';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
 import { reportVersionService } from '~/shared/versioning/versionService';
 
@@ -120,7 +128,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Auto-save
   useEffect(() => {
-    if (!isDirty || isSaving) {
+    if (!isDirty || isSaving || versioning.viewingVersionPid) {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
@@ -145,10 +153,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveReport]);
+  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid]);
 
   // Ctrl+S + Undo/Redo
   const handleSave = useCallback(async () => {
+    if (versioning.viewingVersionPid) return;
     try {
       await saveReport();
       lastSaveTimeRef.current = Date.now();
@@ -156,10 +165,18 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Save failed:', error);
       alert(error instanceof Error ? error.message : 'Save failed');
     }
-  }, [saveReport]);
+  }, [saveReport, versioning.viewingVersionPid]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        versioning.viewingVersionPid &&
+        (e.ctrlKey || e.metaKey) &&
+        ['s', 'z', 'y'].includes(e.key.toLowerCase())
+      ) {
+        e.preventDefault();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
@@ -176,7 +193,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, undo, redo]);
+  }, [handleSave, undo, redo, versioning.viewingVersionPid]);
 
   // beforeunload
   useEffect(() => {
@@ -262,6 +279,20 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     }
   }, [report, pageId]);
 
+  const historyPanel = (
+    <VersionHistoryPanel
+      isOpen={versioning.isOpen}
+      onClose={versioning.closePanel}
+      versions={versioning.versions}
+      isLoading={versioning.isLoading}
+      viewingVersionPid={versioning.viewingVersionPid}
+      onPreview={versioning.previewVersion}
+      onExitPreview={versioning.exitPreview}
+      onRollback={versioning.rollbackToVersion}
+      isRollingBack={versioning.isRollingBack}
+    />
+  );
+
   if (loadFailed)
     return (
       <div role="alert" className="p-8 text-red-600">
@@ -283,6 +314,43 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     );
   }
 
+  if (versioning.viewingVersionPid) {
+    const historical = versioning.viewingSnapshot?.dsl as ReportDsl | undefined;
+    return (
+      <div className="flex h-screen flex-col bg-gray-50" data-testid="report-version-preview">
+        <div className="border-b border-amber-200 bg-amber-50 p-4 pr-80">
+          <h2 className="font-semibold">{historical?.title}</h2>
+          <p className="mt-1 text-sm">
+            {text({
+              zh: '历史版本只读预览；数据按当前访问权限重新查询。',
+              en: 'Read-only historical definition; data is queried using current access permissions.',
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={versioning.exitPreview}
+            className="mt-2 text-sm text-blue-700 underline"
+          >
+            {text({ zh: '返回当前报表', en: 'Return to current report' })}
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto pr-80">
+          {historical ? (
+            <PreviewContent key={versioning.viewingVersionPid} report={historical} />
+          ) : (
+            <p role="alert" className="p-6">
+              {text({
+                zh: '历史版本缺少报表定义，请返回当前报表。',
+                en: 'This version has no report definition. Return to the current report.',
+              })}
+            </p>
+          )}
+        </div>
+        {historyPanel}
+      </div>
+    );
+  }
+
   // Preview mode: render as runtime
   if (previewMode && report) {
     return (
@@ -299,6 +367,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         <div className="flex-1 overflow-auto">
           <PreviewContent report={report} />
         </div>
+        {historyPanel}
       </div>
     );
   }
@@ -321,17 +390,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       </div>
 
       {/* Version History Panel */}
-      <VersionHistoryPanel
-        isOpen={versioning.isOpen}
-        onClose={versioning.closePanel}
-        versions={versioning.versions}
-        isLoading={versioning.isLoading}
-        viewingVersionPid={versioning.viewingVersionPid}
-        onPreview={versioning.previewVersion}
-        onExitPreview={versioning.exitPreview}
-        onRollback={versioning.rollbackToVersion}
-        isRollingBack={versioning.isRollingBack}
-      />
+      {historyPanel}
     </div>
   );
 };
@@ -427,55 +486,49 @@ const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ rep
       {report.body.map((block) => (
         <div key={block.id} className="mb-6">
           {block.blockType === 'table' && (
-            <div>
-              {block.title && <h3 className="mb-2 text-base font-semibold">{block.title}</h3>}
-              <table className="w-full border-collapse border border-gray-300 text-sm">
-                {block.showHeader !== false && (
-                  <thead>
-                    <tr>
-                      {block.columns.map((col, i) => (
-                        <th
-                          key={i}
-                          className="border border-gray-300 bg-gray-100 px-3 py-2 font-semibold"
-                          style={{ textAlign: col.align || 'left' }}
-                        >
-                          {col.label || col.field}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                )}
-                <tbody>
-                  {(dataSets[block.dataSource] || []).map((row, rowIdx) => (
-                    <tr
-                      key={rowIdx}
-                      className={block.stripe !== false && rowIdx % 2 === 1 ? 'bg-gray-50' : ''}
-                    >
-                      {block.columns.map((col, colIdx) => (
-                        <td
-                          key={colIdx}
-                          className="border border-gray-300 px-3 py-1.5"
-                          style={{ textAlign: col.align || 'left' }}
-                        >
-                          {String(row[col.field] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {(dataSets[block.dataSource] || []).length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={block.columns.length}
-                        className="border border-gray-300 px-3 py-4 text-center text-gray-400"
-                      >
-                        No data
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <ReportTableBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
           )}
+          {block.blockType === 'grouped-table' && (
+            <ReportGroupedTableBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'stat-card' && (
+            <ReportStatCardBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'rich-text' && <ReportRichTextBlock block={block} mode="runtime" />}
+          {block.blockType === 'cross-tab' && (
+            <ReportCrossTabBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'chart' && (
+            <ReportChartBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'barcode' && (
+            <ReportBarcodeBlock
+              block={block}
+              mode="runtime"
+              data={block.dataSource ? dataSets[block.dataSource] || [] : []}
+            />
+          )}
+          {block.blockType === 'watermark' && <ReportWatermarkBlock block={block} mode="runtime" />}
         </div>
       ))}
 
