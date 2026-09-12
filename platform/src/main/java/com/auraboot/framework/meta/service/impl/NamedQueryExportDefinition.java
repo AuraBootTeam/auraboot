@@ -18,10 +18,15 @@ final class NamedQueryExportDefinition {
     }
 
     static JsonNode capture(NamedQuery query, List<NamedQueryField> fields, List<String> rowScope) {
+        return capture(query, fields, rowScope, JSON.createObjectNode());
+    }
+
+    static JsonNode capture(NamedQuery query, List<NamedQueryField> fields, List<String> rowScope, JsonNode protection) {
         ObjectNode definition = JSON.valueToTree(query);
         definition.retain(List.of("pid", "tenantId", "code", "resourceCode", "actionCode", "fromSql",
                 "connectorPid", "connectorEndpointCode", "baseWhere", "defaultOrder", "policy"));
         definition.set("rowScope", JSON.valueToTree(rowScope));
+        definition.set("fieldProtection", protection);
         var output = definition.putArray("fields");
         fields.stream().sorted(Comparator.comparing(NamedQueryField::getFieldCode)).forEach(field -> {
             ObjectNode value = JSON.valueToTree(field);

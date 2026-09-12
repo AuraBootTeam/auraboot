@@ -56,6 +56,9 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class NamedQueryServiceImpl extends BaseMetaService implements NamedQueryService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private NamedQueryFieldProtection fieldProtection;
+
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
     private final NamedQueryVersionMapper namedQueryVersionMapper;
@@ -834,8 +837,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         authorizeDeclaredResource(query);
         List<String> currentScope = new ArrayList<>();
         appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope);
-        JsonNode currentDefinition = NamedQueryExportDefinition.capture(query,
-                namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code), currentScope);
+        List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code);
+        List<NamedQueryField> selected = fields.stream().filter(field -> request.getFields() == null
+                || request.getFields().isEmpty() || request.getFields().contains(field.getFieldCode())).toList();
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, selected);
+        JsonNode currentDefinition = NamedQueryExportDefinition.capture(query, fields, currentScope, protection.evidence());
         if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
             throw new AccessDeniedException("Export query definition has changed; create a new export");
         }
@@ -952,8 +958,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             int limit = request.getLimit() != null ? Math.min(request.getLimit(), policyExportMax) : Math.min(10000, policyExportMax);
             sql.append(" LIMIT ").append(limit);
 
+            NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
+                    exportFieldCodes.stream().map(fieldMap::get).toList());
+
             // 8. Execute query
             List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(sql.toString(), params);
+            data = fieldProtection.apply(protection, data);
 
             // 9. Generate export file
             DataExportRequest.ExportFormat format = request.getFormat() != null
@@ -979,7 +989,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             long fileSize = java.nio.file.Files.size(tempFile);
             return ExportResult.builder()
                     .success(true)
-                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields, exportScope))
+                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields, exportScope, protection.evidence()))
                     .filePath(tempFile.toString())
                     .recordCount((long) data.size())
                     .fileSize(fileSize)

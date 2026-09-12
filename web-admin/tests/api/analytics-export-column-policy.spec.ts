@@ -131,6 +131,49 @@ test('column policy hides aliased export fields and invalidates old files', asyn
     expect(maskedExport.status(), await maskedExport.text()).toBe(200);
     const newFile = await owner.get((await maskedExport.json()).data.downloadUrl);
     expect(newFile.status(), await newFile.text()).toBe(200);
+    expect((await maskedExport.json()).data.recordCount).toBe(1);
+    expect((await newFile.text()).trim().split(/\r?\n/)).toHaveLength(2);
+    expect(await newFile.text()).toContain(fixturePid);
+    for (const expression of ['e2et_order_title', 'upper(e2et_order_title)']) {
+      const nestedCode = `${code}_${expression.startsWith('upper') ? 'computed' : 'nested'}`;
+      const nested = await request.post('/api/meta/named-queries', {
+        data: {
+          code: nestedCode,
+          title: 'Nested field protection',
+          status: 'published',
+          resourceCode: 'e2et_order',
+          actionCode: 'read',
+          fromSql: `SELECT renamed, pid FROM (SELECT ${expression} AS renamed, pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}) source`,
+          fields: [
+            {
+              fieldCode: 'display_title',
+              columnExpr: 'renamed',
+              dataType: 'string',
+              operators: ['eq'],
+            },
+            { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
+          ],
+        },
+      });
+      expect(nested.status(), await nested.text()).toBe(200);
+      const result = await owner.post(`/api/meta/named-queries/${nestedCode}/export-data`, {
+        data: { format: 'CSV', parameters: { marker: code } },
+      });
+      if (expression.startsWith('upper')) {
+        expect(result.status(), await result.text()).toBe(403);
+        expect(await result.text()).toContain(
+          'Protected export requires resolved function semantics',
+        );
+      } else {
+        expect(result.status(), await result.text()).toBe(200);
+        expect((await result.json()).data.recordCount).toBe(1);
+        const artifact = await owner.get((await result.json()).data.downloadUrl);
+        expect(artifact.status()).toBe(200);
+        expect(await artifact.text()).not.toContain(code);
+        expect(await artifact.text()).toContain(fixturePid);
+        expect((await artifact.text()).trim().split(/\r?\n/)).toHaveLength(2);
+      }
+    }
     await testInfo.attach('column-policy-observation', {
       contentType: 'application/json',
       body: JSON.stringify({
