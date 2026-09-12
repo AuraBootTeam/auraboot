@@ -156,7 +156,7 @@ public class AuraBotConversationService {
 
     private void ensureMember(Long conversationId, Long tenantId, Long memberId) {
         if (!imConversationService.isMember(conversationId, ImConstants.MEMBER_TYPE_HUMAN, memberId, tenantId)) {
-            throw new IllegalArgumentException("Not a member of this conversation");
+            throw new org.springframework.security.access.AccessDeniedException("Not a member of this conversation");
         }
     }
 
