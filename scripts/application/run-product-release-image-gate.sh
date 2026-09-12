@@ -37,6 +37,25 @@ CORE_SHA="$(git -C "$CORE_ROOT" rev-parse HEAD)"
 PRODUCT_SHA="$(git -C "$PRODUCT_ROOT" rev-parse HEAD)"
 [[ "$CORE_SHA" =~ ^[0-9a-f]{40}$ && "$PRODUCT_SHA" =~ ^[0-9a-f]{40}$ ]] || fatal 'checkout HEAD is not immutable'
 
+FIXTURE_REL="${AURA_PRODUCT_RELEASE_FIXTURE:-}"
+FIXTURE_CONTAINER_ROOT=''
+FIXTURE_DIGEST=''
+if [[ -n "$FIXTURE_REL" ]]; then
+  [[ "$FIXTURE_REL" != /* ]] || fatal 'release acceptance fixture must be product-repository relative'
+  [[ "$FIXTURE_REL" != */ ]] || fatal 'release acceptance fixture must not have a trailing slash'
+  [[ "$FIXTURE_REL" =~ ^[A-Za-z0-9._/-]+$ ]] \
+    || fatal 'release acceptance fixture contains unsupported path characters'
+  IFS='/' read -r -a fixture_parts <<<"$FIXTURE_REL"
+  for fixture_part in "${fixture_parts[@]}"; do
+    [[ -n "$fixture_part" && "$fixture_part" != . && "$fixture_part" != .. ]] \
+      || fatal 'release acceptance fixture contains an unsafe path component'
+  done
+  [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$FIXTURE_REL" 2>/dev/null || true)" == tree ]] \
+    || fatal 'release acceptance fixture must be a tracked directory at the exact product commit'
+  FIXTURE_DIGEST="sha256:$(git -C "$PRODUCT_ROOT" archive "$PRODUCT_SHA" "$FIXTURE_REL" | sha256sum | awk '{print $1}')"
+  FIXTURE_CONTAINER_ROOT="/tmp/aura-release-fixtures/$FIXTURE_REL"
+fi
+
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
@@ -147,6 +166,17 @@ WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));
 COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER=auraboot PGPASSWORD=auraboot_ci ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
+if [[ -n "$FIXTURE_REL" ]]; then
+  info "injecting exact-commit acceptance fixture $FIXTURE_REL ($FIXTURE_DIGEST)"
+  docker exec "$APP_CONTAINER" mkdir -p /tmp/aura-release-fixtures
+  git -C "$PRODUCT_ROOT" archive "$PRODUCT_SHA" "$FIXTURE_REL" \
+    | docker cp - "$APP_CONTAINER:/tmp/aura-release-fixtures" \
+    || fail 'release acceptance fixture injection failed'
+  env "${COMMON_ENV[@]}" AURA_RELEASE_FIXTURE_ROOT="$FIXTURE_CONTAINER_ROOT" \
+    "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish-fixture \
+    >"$ARTIFACTS/logs/publish-fixture.log" 2>&1 \
+    || fail 'explicit release acceptance fixture publish failed'
+fi
 mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 2>&1
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$ARTIFACTS/logs/web.log" 2>&1 || fail 'release Web BFF failed to start'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
@@ -187,16 +217,21 @@ find "$DOCKER_CONFIG_ROOT" -depth -delete
 
 cp "$CORE_RELEASE/release-receipt.json" "$ARTIFACTS/core-build-receipt.json"
 cp "$PRODUCT_RELEASE/release-receipt.json" "$ARTIFACTS/product-build-receipt.json"
-python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" <<'PY'
+python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" <<'PY'
 import datetime, json, sys
-path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job = sys.argv[1:]
-json.dump({"schemaVersion": 1, "status": "PASS", "product": product,
+path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest = sys.argv[1:]
+receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "coreCommit": core, "productCommit": source, "lockIdentity": lock,
            "ociLayoutDigest": layout, "loadedImageId": image_id, "builder": builder,
            "registryImage": registry_image, "registryPulledImageId": pulled_id,
            "job": job, "freshDatabase": "PASS", "payload": "PASS",
            "readiness": "PASS", "browserJourney": "PASS",
-           "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()},
-          open(path, "w"), indent=2, sort_keys=True)
+           "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+if fixture_path:
+    receipt["acceptanceFixture"] = {"sourcePath": fixture_path,
+                                    "sourceCommit": source,
+                                    "archiveDigest": fixture_digest,
+                                    "includedInReleaseImage": False}
+json.dump(receipt, open(path, "w"), indent=2, sort_keys=True)
 PY
 info "$AURA_PRODUCT_ID release image VERIFIED on Linux CI Docker (image=$IMAGE_ID)"

@@ -34,6 +34,9 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /fresh database migration failed/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
   assert.match(productImageGate, /release-image-receipt\.json/);
+  assert.match(productImageGate, /git -C "\$PRODUCT_ROOT" archive "\$PRODUCT_SHA" "\$FIXTURE_REL"/);
+  assert.match(productImageGate, /release acceptance fixture must be a tracked directory at the exact product commit/);
+  assert.match(productImageGate, /includedInReleaseImage/);
   assert.doesNotMatch(productImageGate, /\bcontainer\s+(?:build|run|image)/);
 });
 
