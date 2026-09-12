@@ -17,6 +17,10 @@ final class NamedQuerySourceScopeRewriter {
     private static final Pattern PARAMETER = Pattern.compile("#\\{params\\.[A-Za-z0-9_]+\\}");
 
     String rewrite(String sql, Map<String, String> scopes) {
+        return rewrite(sql, scopes, Map.of());
+    }
+
+    String rewrite(String sql, Map<String, String> scopes, Map<String, String> views) {
         if (scopes.values().stream().allMatch(String::isBlank)) return sql;
         Map<String, String> bindings = new LinkedHashMap<>();
         var matcher = PARAMETER.matcher(sql);
@@ -59,7 +63,10 @@ final class NamedQuerySourceScopeRewriter {
                     if (condition.isBlank()) return super.visit(table, context);
                     if (table.getPivot() != null || table.getUnPivot() != null || table.getSampleClause() != null || table.getIndexHint() != null)
                         throw new AccessDeniedException("Scoped source modifiers require explicit support");
-                    output.append("(SELECT * FROM ").append(table.getFullyQualifiedName())
+                    String definition = views.get(identity);
+                    String input = definition == null ? identity
+                            : "(" + rewrite(definition, scopes, views) + ") AS _view_source";
+                    output.append("(SELECT * FROM ").append(input)
                             .append(" WHERE (").append(condition).append("))");
                     output.append(table.getAlias() != null ? table.getAlias().toString() : " AS " + table.getName());
                     return output;

@@ -25,7 +25,7 @@ class NamedQueryFieldProtectionAuthorizationTest {
         MetaContext.setContext(10L, 20L, "user", "User");
         MetaContext.setMemberId(30L);
         query.setFromSql("orders JOIN customers ON orders.customer = customers.pid");
-        when(sources.resolve(10L, query.getFromSql(), List.of())).thenReturn(Map.of("orders", "orders", "customers", "customers"));
+        when(sources.resolvePlan(10L, query.getFromSql(), List.of())).thenReturn(new NamedQuerySourceModels.Sources(Map.of("orders", "orders", "customers", "customers"), Map.of()));
     }
     @AfterEach void cleanup() { MetaContext.clear(); }
 
@@ -52,5 +52,13 @@ class NamedQueryFieldProtectionAuthorizationTest {
         assertNotNull(protection.prepare(query, List.of()));
         verify(permissions).canAction(20L, "orders", "read");
         verify(permissions).canAction(20L, "customers", "read");
+    }
+
+    @Test void missingProtectedColumnMappingCannotSilentlySkipMasking() {
+        when(permissions.canAction(eq(30L), anyString(), eq("read"))).thenReturn(true);
+        when(policies.getFieldMaskRules(10L, "orders", 20L)).thenReturn(List.of(
+                com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("title").maskType("hide").build()));
+        AccessDeniedException denied = assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of()));
+        assertEquals("Protected field has no physical column mapping", denied.getMessage());
     }
 }

@@ -12,7 +12,7 @@ class NamedQuerySourceScopeRewriterTest {
 
     @Test void leftJoinFiltersItsInputRatherThanOuterWhere() {
         String sql = rewriter.rewrite("SELECT o.pid, c.pid FROM orders o LEFT JOIN customers c ON c.pid = o.customer WHERE o.pid = #{params.pid}", scopes);
-        assertTrue(sql.contains("LEFT JOIN (SELECT * FROM customers WHERE (created_by = 20)) c ON"), sql);
+        assertTrue(sql.contains("LEFT JOIN (SELECT * FROM \"public\".\"customers\" WHERE (created_by = 20)) c ON"), sql);
         assertTrue(sql.endsWith("WHERE o.pid = #{params.pid}"), sql);
     }
     @Test void nestedAndScalarSourcesBothReceiveScope() {
@@ -28,7 +28,7 @@ class NamedQuerySourceScopeRewriterTest {
     @Test void schemaQualifiedColumnUsesPreservedDerivedTableName() {
         String sql = rewriter.rewrite("SELECT public.customers.pid FROM public.customers", scopes);
         assertTrue(sql.startsWith("SELECT customers.pid"), sql);
-        assertTrue(sql.contains("FROM public.customers WHERE (created_by = 20)) AS customers"), sql);
+        assertTrue(sql.contains("FROM \"public\".\"customers\" WHERE (created_by = 20)) AS customers"), sql);
     }
     @Test void parametersWithCommonPrefixesRemainDistinct() {
         String sql = rewriter.rewrite("SELECT pid FROM customers WHERE pid = #{params.p} OR pid = #{params.pid}", scopes);
@@ -61,5 +61,22 @@ class NamedQuerySourceScopeRewriterTest {
                 "WITH c AS (SELECT * FROM customers), customers AS (SELECT * FROM orders) SELECT c.pid FROM c JOIN public.customers p ON c.pid=p.pid"));
         assertEquals(java.util.Set.of("customers"), collector.referencedTables(
                 "WITH customers AS (SELECT * FROM customers) SELECT * FROM customers"));
+    }
+
+    @Test void viewExpansionFiltersBothUnderlyingRowsAndViewOutput() {
+        var allScopes = Map.of(NamedQuerySourceModels.identity("customers"), "created_by = 20",
+                NamedQuerySourceModels.identity("customer_view"), "tenant_id = 10");
+        String sql = rewriter.rewrite("SELECT label FROM customer_view", allScopes,
+                Map.of(NamedQuerySourceModels.identity("customer_view"), "SELECT name AS label, tenant_id FROM customers"));
+        assertTrue(sql.contains("FROM \"public\".\"customers\" WHERE (created_by = 20)"), sql);
+        assertTrue(sql.contains("AS _view_source WHERE (tenant_id = 10)"), sql);
+        assertFalse(sql.contains("FROM customer_view"), sql);
+    }
+
+    @Test void callerCteCannotCaptureAViewPhysicalTable() {
+        String sql = rewriter.rewrite("WITH customers AS (SELECT * FROM customers WHERE 1=0) SELECT * FROM customer_view",
+                Map.of(NamedQuerySourceModels.identity("customers"), "tenant_id = 10", NamedQuerySourceModels.identity("customer_view"), "tenant_id = 10"),
+                Map.of(NamedQuerySourceModels.identity("customer_view"), "SELECT * FROM customers"));
+        assertEquals(2, sql.split("FROM \"public\".\"customers\" WHERE", -1).length - 1, sql);
     }
 }

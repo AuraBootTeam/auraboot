@@ -16,7 +16,7 @@ class NamedQuerySourceModelsTest {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
     private final NamedQuerySourceModels resolver = new NamedQuerySourceModels(mapper, sql, jdbc);
     @org.junit.jupiter.api.BeforeEach void tenantMetadata() {
-        when(jdbc.queryForObject(anyString(), eq(Boolean.class), anyString())).thenReturn(true);
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", true, "definition", ""));
     }
     private Model model(String code, String table) {
         Model model = new Model(); model.setCode(code); model.setTableName(table); return model;
@@ -43,7 +43,7 @@ class NamedQuerySourceModelsTest {
     }
     @Test void sourcesWithoutTenantColumnsAreDenied() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null)));
-        when(jdbc.queryForObject(anyString(), eq(Boolean.class), anyString())).thenReturn(false);
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", "r", "tenant_column", false, "definition", ""));
         assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
     }
     @Test void quotedIdentifiersRetainCaseAndEmbeddedDots() {
@@ -52,4 +52,26 @@ class NamedQuerySourceModelsTest {
         assertNotEquals(NamedQuerySourceModels.identity("\"private.mt_orders\""), NamedQuerySourceModels.identity("private.mt_orders"));
         assertThrows(AccessDeniedException.class, () -> NamedQuerySourceModels.identity("db.public.mt_orders"));
     }
+
+    @Test void viewSourceRefIncludesItsUnderlyingModelAndDefinition() {
+        Model view = model("order_view", null); view.setSourceType("sqlView"); view.setSourceRef("v_orders");
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null), view));
+        when(jdbc.queryForMap(anyString(), eq(identity("v_orders"))))
+                .thenReturn(Map.of("kind", "v", "tenant_column", true, "definition", "SELECT title, tenant_id FROM mt_orders;"));
+        when(sql.referencedTables(anyString())).thenAnswer(call -> ((String) call.getArgument(0)).contains("FROM v_orders") ? Set.of("v_orders") : Set.of("mt_orders"));
+        NamedQueryField field = new NamedQueryField(); field.setFieldCode("title"); field.setColumnExpr("title");
+        var plan = resolver.resolvePlan(42L, "v_orders", List.of(field));
+        assertEquals(Map.of(identity("v_orders"), "order_view", identity("mt_orders"), "orders"), plan.models());
+        assertEquals(Map.of(identity("v_orders"), "SELECT title, tenant_id FROM mt_orders"), plan.views());
+        when(sql.referencedTables("SELECT title, tenant_id FROM mt_orders")).thenReturn(Set.of("secret"));
+        assertThrows(AccessDeniedException.class, () -> resolver.resolvePlan(42L, "v_orders", List.of(field)));
+    }
+    @Test void materializedAndForeignRelationsNeedSeparateSemantics() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("orders", null)));
+        for (String kind : List.of("m", "f")) {
+            when(jdbc.queryForMap(anyString(), anyString())).thenReturn(Map.of("kind", kind, "tenant_column", true, "definition", ""));
+            assertThrows(AccessDeniedException.class, () -> resolve("mt_orders"));
+        }
+    }
+    private static String identity(String table) { return NamedQuerySourceModels.identity(table); }
 }

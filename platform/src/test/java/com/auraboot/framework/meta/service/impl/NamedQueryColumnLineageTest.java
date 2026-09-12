@@ -67,4 +67,12 @@ class NamedQueryColumnLineageTest {
         assertThrows(MetaServiceException.class, () -> resolver.resolve("WITH RECURSIVE c AS (SELECT title FROM mt_orders) SELECT title FROM c", List.of(field("title"))));
         assertThrows(MetaServiceException.class, () -> resolver.resolve("WITH c(label) AS (SELECT * FROM mt_orders) SELECT label FROM c", List.of(field("label"))));
     }
+
+    @Test void viewAliasRetainsBothViewAndUnderlyingFieldProtection() {
+        var views = java.util.Map.of(NamedQuerySourceModels.identity("order_view"), "SELECT title AS label, tenant_id FROM mt_orders");
+        var origin = new NamedQueryColumnLineage(views).resolve("order_view", List.of(field("label"))).get("display_title");
+        assertEquals(Set.of(new NamedQueryColumnLineage.PhysicalColumn("order_view", "label"),
+                new NamedQueryColumnLineage.PhysicalColumn("mt_orders", "title")), origin.columns());
+        assertTrue(origin.direct());
+    }
 }

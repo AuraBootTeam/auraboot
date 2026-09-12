@@ -13,6 +13,10 @@ import java.util.*;
 
 /** Resolves SQL output dependencies without pretending unresolved sources are unprotected. */
 final class NamedQueryColumnLineage {
+    private final Map<String, String> views;
+    NamedQueryColumnLineage() { this(Map.of()); }
+    NamedQueryColumnLineage(Map<String, String> views) { this.views = Map.copyOf(views); }
+
     record PhysicalColumn(String table, String column) { }
     record Origin(Set<PhysicalColumn> columns, boolean direct, boolean opaqueFunction) {
         Origin { columns = Set.copyOf(columns); }
@@ -118,6 +122,20 @@ final class NamedQueryColumnLineage {
             String tableName = table.getFullyQualifiedName();
             Projection cte = table.getSchemaName() == null ? ctes.get(identifier(table.getName())) : null;
             if (cte != null) return new Source(alias != null ? alias : identifier(table.getName()), cte);
+            String definition = views.get(NamedQuerySourceModels.identity(tableName));
+            if (definition != null) {
+                final Projection underlying;
+                try { underlying = projection((Select) CCJSqlParserUtil.parse(definition), Map.of()); }
+                catch (net.sf.jsqlparser.JSQLParserException invalid) {
+                    throw new MetaServiceException("Cannot resolve view column sources", invalid);
+                }
+                return new Source(alias != null ? alias : identifier(table.getName()), column -> {
+                    Origin original = underlying.resolve(column);
+                    Set<PhysicalColumn> columns = new LinkedHashSet<>(original.columns());
+                    columns.add(new PhysicalColumn(tableName, column));
+                    return new Origin(columns, original.direct(), original.opaqueFunction());
+                });
+            }
             return new Source(alias != null ? alias : identifier(table.getName()),
                     column -> new Origin(Set.of(new PhysicalColumn(tableName, column)), true, false));
         }

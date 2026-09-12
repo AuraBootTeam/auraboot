@@ -171,6 +171,11 @@ public class TestSeedController {
         ensureModelPermissionsExist(tenant, user);
         installE2eTestPlugin(tenant, user);
         repairDynamicTableIdentitySequences(tenant);
+        // Fixed analytics view fixture belongs to the test-profile initializer only.
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE VIEW public.v_e2et_analytics_order AS
+                SELECT pid, tenant_id, created_by, e2et_order_title AS label FROM public.mt_e2et_order
+                """);
 
         // 5.6 Ensure a second "colleague" user exists in the test tenant so that
         // mobile user-search (which excludes self) returns at least one result.

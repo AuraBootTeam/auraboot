@@ -2424,12 +2424,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             recordModelPublishAcknowledgement(model, governance, acknowledgementNote);
         }
 
-        // Skip table creation for VIEW models and models with skipTableCreation flag
-        // (e.g., BPM system tables managed outside DSL schema management)
-        if (model.isViewType() || model.isSkipTableCreation()) {
+        // External sources publish metadata without creating a backing entity table.
+        boolean externalSource = model.getSourceType() != null && !"physical".equals(model.getSourceType());
+        if (externalSource || model.isViewType() || model.isSkipTableCreation()) {
             log.info("Publishing model (no table creation): pid={}, code={}, reason={}",
                     logSafe(pid), logSafe(model.getCode()),
-                    model.isViewType() ? "VIEW model" : "skipTableCreation=true");
+                    externalSource ? "external source" : model.isViewType() ? "VIEW model" : "skipTableCreation=true");
         } else {
             // Validate: must have at least one field binding
             List<ModelFieldBinding> bindings = fieldBindingMapper.findByModelId(model.getId());
