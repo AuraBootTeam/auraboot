@@ -262,13 +262,16 @@ class StepLoopServiceLlmResponseGuardTest {
     }
 
     @Test
-    @DisplayName("executePlanSteps resumes an approved tool result without requesting approval again")
+    @DisplayName("executePlanSteps resumes only the approved input and preserves later same-tool approval")
     void executePlanSteps_resumedApprovalTool_executesApprovedInput() throws Exception {
         ToolLoopService toolLoopService = mock(ToolLoopService.class);
         when(toolLoopService.executeToolCall(any(), anyString(), anyString(), anyString(),
                 anyString(), anyMap(), anyList(), any()))
                 .thenReturn("{\"success\":true,\"sendLogId\":123}");
-        StepLoopService service = newService(persistentMapper(), mock(AgentApprovalGateService.class), toolLoopService);
+        AgentApprovalGateService gate = mock(AgentApprovalGateService.class);
+        when(gate.consumeResumeGrant(eq(1L), eq("task-pid"), eq("approval-1"), eq("custom:send_customer_reply"), anyMap())).thenReturn(true);
+        when(gate.checkAndRequestApproval(eq(1L), eq("resume-run"), eq("task-pid"), eq("custom:send_customer_reply"), anyString(), eq(Map.of("stepIndex", 1)), eq(true))).thenReturn("approval-2");
+        StepLoopService service = newService(persistentMapper(), gate, toolLoopService);
 
         Map<String, Object> approvedInput = Map.of(
                 "recipient_email", "customer@example.com",
@@ -283,6 +286,8 @@ class StepLoopServiceLlmResponseGuardTest {
                 "approvalInput", approvedInput));
         AgentPlanStep duplicateSendStep = new AgentPlanStep(1, "Send the reply");
         duplicateSendStep.setToolCode("custom:send_customer_reply");
+        duplicateSendStep.setToolInput(Map.of("recipient_email", "another@example.com"));
+        duplicateSendStep.setRequiresApproval(true);
 
         AgentToolDefinition approvalTool = AgentToolDefinition.builder()
                 .name("custom:send_customer_reply")
@@ -294,7 +299,7 @@ class StepLoopServiceLlmResponseGuardTest {
         LlmProvider provider = mock(LlmProvider.class);
         List<AgentPlanStep> plan = new java.util.ArrayList<>(List.of(awaiting, duplicateSendStep));
 
-        AgentRunService.AgentLoopResult result = service.executePlanSteps(
+        assertThatThrownBy(() -> service.executePlanSteps(
                 plan,
                 0,
                 1L,
@@ -309,13 +314,12 @@ class StepLoopServiceLlmResponseGuardTest {
                 provider,
                 providerConfig(),
                 null,
-                true);
+                true)).isInstanceOf(AgentApprovalPendingException.class);
 
-        assertThat(result.success).isTrue();
         assertThat(awaiting.getStatus()).isEqualTo(AgentPlanStep.StepStatus.COMPLETED);
         assertThat(awaiting.getOutput()).containsEntry("status", "success");
-        assertThat(duplicateSendStep.getStatus()).isEqualTo(AgentPlanStep.StepStatus.COMPLETED);
-        assertThat(duplicateSendStep.getOutput()).containsEntry("status", "success");
+        assertThat(duplicateSendStep.getStatus()).isEqualTo(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        assertThat(duplicateSendStep.getResult()).isNull();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AgentToolDefinition>> toolsCaptor = ArgumentCaptor.forClass(List.class);
         verify(toolLoopService).executeToolCall(eq(1L), eq("resume-run"), eq("task-pid"), eq("aurabot"),
@@ -325,6 +329,22 @@ class StepLoopServiceLlmResponseGuardTest {
                 .singleElement()
                 .satisfies(t -> assertThat(t.isRequiresApproval()).isFalse());
         verifyNoInteractions(provider);
+    }
+
+    @Test
+    void resumedToolWithoutAnExactGrantCannotExecute() {
+        var tools = mock(ToolLoopService.class);
+        var gate = mock(AgentApprovalGateService.class);
+        var service = newService(persistentMapper(), gate, tools);
+        var step = new AgentPlanStep(0, "Execute task directly");
+        step.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        step.setOutput(Map.of("approvalPid", "pending", "approvalToolName", "write", "approvalInput", Map.of("value", "changed")));
+        var provider = mock(LlmProvider.class);
+        assertThatThrownBy(() -> service.executePlanSteps(new java.util.ArrayList<>(List.of(step)), 0,
+                1L, "run", "task", "aurabot", "system", "user", List.of(), Map.of(), Map.of(), provider,
+                providerConfig(), null, true)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(step.getStatus()).isEqualTo(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        verifyNoInteractions(tools, provider);
     }
 
     private StepLoopService newService() {

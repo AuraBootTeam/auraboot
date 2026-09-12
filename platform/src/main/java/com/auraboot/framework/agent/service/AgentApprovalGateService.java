@@ -175,6 +175,39 @@ public class AgentApprovalGateService {
      * concurrent runs racing on the same grant cannot both execute — the loser
      * sees 0 rows updated and falls through to the normal gate.
      */
+    /** Claims one exact approved payload before a saved step may bypass its approval gate. */
+    public boolean consumeResumeGrant(Long tenantId, String taskId, String approvalPid,
+                                      String toolCode, Map<String, Object> input) {
+        if (tenantId == null || taskId == null || toolCode == null || input == null) return false;
+        final String payload;
+        try { payload = objectMapper.writeValueAsString(input); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalArgumentException("Cannot serialize resumed approval input", invalid);
+        }
+        String hash = sha256Hex(canonicalizeJson(payload));
+        String claim = """
+                UPDATE ab_agent_approval SET consumed_at=NOW(), updated_at=NOW()
+                WHERE tenant_id=#{params.tenantId} AND consumed_at IS NULL AND pid=(
+                    SELECT pid FROM ab_agent_approval
+                    WHERE tenant_id=#{params.tenantId} AND task_id=#{params.taskId}
+                      AND approval_status='approved' AND consumed_at IS NULL
+                      AND (expires_at IS NULL OR expires_at > NOW())
+                      AND approval_description=#{params.toolDesc}
+                      AND plan_hash=#{params.planHash}
+                      AND request_data::jsonb=CAST(#{params.payload} AS jsonb)
+                      AND plan_snapshot::jsonb=CAST(#{params.payload} AS jsonb)
+                """;
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId); params.put("taskId", taskId);
+        params.put("toolDesc", "Tool: " + toolCode); params.put("planHash", hash); params.put("payload", payload);
+        if (approvalPid != null) {
+            claim += " AND pid=#{params.approvalPid}";
+            params.put("approvalPid", approvalPid);
+        }
+        claim += " ORDER BY updated_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED)";
+        return dynamicDataMapper.updateByQuery(claim, params) == 1;
+    }
+
     private String findConsumableGrant(Long tenantId, String taskId, String toolCode) {
         if (taskId == null || taskId.isBlank()) {
             return null;
