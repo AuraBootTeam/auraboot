@@ -30,6 +30,24 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/designer-sdk:
+    dependencies:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.6(react@19.2.6)
+
+  packages/dsl-runtime:
+    dependencies:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.6(react@19.2.6)
+
   packages/dsl-types:
     devDependencies:
       typescript:
@@ -76,6 +94,12 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+
+  packages/web-testkit:
+    dependencies:
+      '@playwright/test':
+        specifier: '>=1.50.0 <2'
+        version: 1.60.0
 
   plugins/cli:
     dependencies:
