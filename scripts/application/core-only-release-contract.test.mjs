@@ -8,6 +8,7 @@ const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-ar
 const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env.sh'), 'utf8');
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
+const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
   assert.match(stage, /platform\/gradlew/);
@@ -17,6 +18,18 @@ test('core release stages a compiled Web shell and a self-contained deployment d
   assert.match(stage, /bin\/auraboot-core-env\.sh/);
   assert.match(stage, /bin\/application/);
   assert.match(stage, /web: \{ path: 'web', digest:/);
+});
+
+test('product release-image gate is CI-only, Docker-only and evidence-backed', () => {
+  assert.match(productImageGate, /AURA_CI_JOB_ID/);
+  assert.match(productImageGate, /uname -s.*Linux/);
+  assert.match(productImageGate, /uname -m.*x86_64/);
+  assert.match(productImageGate, /AURA_OCI_BUILDER must be docker/);
+  assert.match(productImageGate, /docker load --input/);
+  assert.match(productImageGate, /fresh database migration failed/);
+  assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
+  assert.match(productImageGate, /release-image-receipt\.json/);
+  assert.doesNotMatch(productImageGate, /\bcontainer\s+(?:build|run|image)/);
 });
 
 test('core deployment forces an empty PF4J directory and verifies exact runtime identity', () => {
@@ -48,10 +61,11 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
   assert.match(oci, /eclipse-temurin:21-jre@sha256:[0-9a-f]{64}/);
-  assert.match(oci, /execFileSync\('container', \['build'/);
-  assert.match(oci, /execFileSync\('container', \['image', 'save'/);
+  assert.doesNotMatch(oci, /execFileSync\('container'/);
+  assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
+  assert.match(oci, /AURA_OCI_BUILDER must be docker/);
   assert.match(oci, /'buildx', 'build'/);
-  assert.match(oci, /requires Apple container or Docker buildx/);
+  assert.match(oci, /'--platform', 'linux\/amd64'/);
   assert.match(oci, /mkdtempSync\(resolve\(dirname\(output\), '\.auraboot-image-'\)\)/);
   assert.doesNotMatch(oci, /application payload layer/);
 });

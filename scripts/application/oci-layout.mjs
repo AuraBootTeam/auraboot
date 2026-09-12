@@ -1,10 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const LINUX_JRE_BASE = 'eclipse-temurin:21-jre@sha256:a80c51f2d09a3e7e00d521f1c817bbceb6b3be94109b4a784d46078099882dda';
 
 function commandExists(command) {
@@ -12,13 +10,19 @@ function commandExists(command) {
 }
 
 function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
-  // Apple Container only shares workspace-backed paths with its builder VM.
-  // Keep the context beside the requested OCI layout instead of macOS $TMPDIR.
+  if (process.platform !== 'linux' || process.arch !== 'x64') {
+    throw new Error('release OCI images must be built on the self-hosted Linux CI Docker builder (linux/amd64)');
+  }
+  if (process.env.AURA_OCI_BUILDER && process.env.AURA_OCI_BUILDER !== 'docker') {
+    throw new Error('AURA_OCI_BUILDER must be docker; Apple Container and local fallbacks are prohibited');
+  }
+  if (!commandExists('docker')) throw new Error('Docker buildx is required on the self-hosted Linux CI builder');
+
   mkdirSync(dirname(output), { recursive: true });
   const context = mkdtempSync(resolve(dirname(output), '.auraboot-image-'));
   const archive = resolve(context, 'image.tar');
   const contextRootfs = resolve(context, 'rootfs');
-  const tag = `aura-release-${process.pid}-${digest(Buffer.from(JSON.stringify(labels))).slice(0, 12)}:local`;
+  const tag = `auraboot-ci-${process.pid}:build`;
   try {
     cpSync(rootfs, contextRootfs, { recursive: true });
     writeFileSync(resolve(context, 'Dockerfile'), [
@@ -29,22 +33,14 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     ].join('\n'));
 
     const labelArgs = Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]);
-    const builder = process.env.AURA_OCI_BUILDER
-      ?? (commandExists('container') ? 'container' : commandExists('docker') ? 'docker' : '');
-    if (builder === 'container') {
-      execFileSync('container', ['build', '--progress', 'plain', '--tag', tag, ...labelArgs, context], { stdio: 'inherit' });
-      execFileSync('container', ['image', 'save', '--output', archive, tag], { stdio: 'inherit' });
-    } else if (builder === 'docker') {
-      execFileSync('docker', [
-        'buildx', 'build', '--progress', 'plain',
-        '--platform', `linux/${process.arch === 'arm64' ? 'arm64' : 'amd64'}`,
-        '--output', `type=oci,dest=${archive}`,
-        ...labelArgs,
-        context,
-      ], { stdio: 'inherit' });
-    } else {
-      throw new Error('a release OCI image requires Apple container or Docker buildx');
-    }
+    execFileSync('docker', [
+      'buildx', 'build', '--progress', 'plain',
+      '--platform', 'linux/amd64',
+      '--tag', tag,
+      '--output', `type=oci,dest=${archive}`,
+      ...labelArgs,
+      context,
+    ], { stdio: 'inherit' });
 
     rmSync(output, { recursive: true, force: true });
     mkdirSync(output, { recursive: true });
@@ -56,9 +52,6 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     }
     return imageDigest;
   } finally {
-    if (commandExists('container')) {
-      spawnSync('container', ['image', 'rm', tag], { stdio: 'ignore' });
-    }
     rmSync(context, { recursive: true, force: true });
   }
 }
