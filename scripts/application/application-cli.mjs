@@ -11,6 +11,11 @@ import {
   validateLock,
   validateManifest,
 } from './application-contract.mjs';
+import {
+  buildArtifactApplicationGraph,
+  buildSourceApplicationGraph,
+  loadCatalogWebContributions,
+} from './application-graph-adapters.mjs';
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -22,6 +27,10 @@ function parseArgs(argv) {
     else if (argument === '--lock') options.lock = resolve(rest[++index]);
     else if (argument === '--output') options.output = resolve(rest[++index]);
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
+    else if (argument === '--source-map') options.sourceMap = resolve(rest[++index]);
+    else if (argument === '--source-graph') options.sourceGraph = resolve(rest[++index]);
+    else if (argument === '--artifact-graph') options.artifactGraph = resolve(rest[++index]);
+    else if (argument === '--target') options.target = rest[++index];
     else if (argument === '--mode') options.mode = rest[++index];
     else throw new Error(`Unknown argument: ${argument}`);
   }
@@ -44,7 +53,8 @@ function main() {
     const manifest = readStructuredFile(required(options, 'manifest'));
     const catalog = readStructuredFile(required(options, 'catalog'));
     const output = required(options, 'output');
-    const lock = resolveApplication(manifest, catalog);
+    const webContributions = loadCatalogWebContributions(manifest, catalog, options.artifactRoot);
+    const lock = resolveApplication(manifest, catalog, { webContributions });
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, `${JSON.stringify(lock, null, 2)}\n`);
     process.stdout.write(`resolved application lock: ${lock.identity}\n`);
@@ -64,10 +74,18 @@ function main() {
   if (options.command === 'graph') {
     const mode = options.mode ?? 'artifact';
     if (!['source', 'artifact'].includes(mode)) throw new Error('--mode must be source or artifact');
+    const target = options.target ?? 'client';
+    if (!['client', 'ssr'].includes(target)) throw new Error('--target must be client or ssr');
     const manifest = readStructuredFile(required(options, 'manifest'));
-    const graph = buildApplicationGraph(manifest);
+    const graph = mode === 'source'
+      ? buildSourceApplicationGraph(manifest, options.sourceMap)
+      : buildArtifactApplicationGraph(
+        manifest,
+        readStructuredFile(required(options, 'lock')),
+        required(options, 'artifactRoot'),
+      );
     const output = options.output;
-    const envelope = { schemaVersion: 1, mode, ...graph };
+    const envelope = { schemaVersion: 1, mode, target, ...graph };
     if (output) {
       mkdirSync(dirname(output), { recursive: true });
       writeFileSync(output, `${JSON.stringify(envelope, null, 2)}\n`);
@@ -75,7 +93,16 @@ function main() {
     process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph [options]');
+  if (options.command === 'compare-graphs') {
+    const source = readStructuredFile(required(options, 'sourceGraph'));
+    const artifact = readStructuredFile(required(options, 'artifactGraph'));
+    if (source.graphDigest !== artifact.graphDigest || JSON.stringify(source.nodes) !== JSON.stringify(artifact.nodes)) {
+      throw new Error(`source/artifact graph mismatch: ${source.graphDigest} != ${artifact.graphDigest}`);
+    }
+    process.stdout.write(`equivalent application graphs: ${source.graphDigest}\n`);
+    return;
+  }
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs [options]');
 }
 
 try {

@@ -9,10 +9,12 @@ const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
 const MANIFEST_SCHEMA_PATH = resolve(REPO_ROOT, 'distribution/application/application-manifest.schema.json');
 const LOCK_SCHEMA_PATH = resolve(REPO_ROOT, 'distribution/application/application-lock.schema.json');
+const WEB_CONTRIBUTION_SCHEMA_PATH = resolve(REPO_ROOT, 'distribution/application/web-contribution.schema.json');
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 const validateManifestSchema = ajv.compile(JSON.parse(readFileSync(MANIFEST_SCHEMA_PATH, 'utf8')));
 const validateLockSchema = ajv.compile(JSON.parse(readFileSync(LOCK_SCHEMA_PATH, 'utf8')));
+const validateWebContributionSchema = ajv.compile(JSON.parse(readFileSync(WEB_CONTRIBUTION_SCHEMA_PATH, 'utf8')));
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -93,8 +95,73 @@ export function validateLock(lock) {
   return lock;
 }
 
-export function buildApplicationGraph(manifestInput) {
+export function validateWebContribution(manifest) {
+  assertSchema(validateWebContributionSchema, manifest, 'web contribution manifest');
+  const routeIds = manifest.routes.map((route) => route.id);
+  const routePaths = manifest.routes.map((route) => route.path);
+  const registrations = manifest.contributions.map((item) => `${item.kind}:${item.id}`);
+  assertUnique(routeIds, 'web contribution routes');
+  assertUnique(routePaths, 'web contribution route paths');
+  assertUnique(registrations, 'web registry contributions');
+  return manifest;
+}
+
+function orderedWebContributions(manifest, webContributionInputs, required) {
+  const declared = manifest.frontend.contributions;
+  if (!required && webContributionInputs.length === 0) return [];
+  const contributions = webContributionInputs.map(validateWebContribution);
+  const packages = contributions.map((item) => item.package.name);
+  assertUnique(packages, 'web contribution packages');
+  if (contributions.length !== declared.length) {
+    throw new Error(`expected ${declared.length} web contribution manifests, received ${contributions.length}`);
+  }
+  return declared.map((requirement) => {
+    const matches = contributions.filter((item) => item.package.name === requirement.package);
+    if (matches.length !== 1) {
+      throw new Error(`web contribution ${requirement.package}@${requirement.version} resolved to ${matches.length} manifests`);
+    }
+    const contribution = matches[0];
+    if (contribution.package.version !== requirement.version) {
+      throw new Error(
+        `web contribution ${requirement.package} version mismatch: expected ${requirement.version}, received ${contribution.package.version}`,
+      );
+    }
+    return contribution;
+  });
+}
+
+function assertWebGraphIntegrity(contributions) {
+  assertUnique(contributions.map((item) => item.plugin.code), 'web plugin codes');
+  assertUnique(contributions.flatMap((item) => item.routes.map((route) => route.id)), 'application route IDs');
+  assertUnique(contributions.flatMap((item) => item.routes.map((route) => route.path)), 'application route paths');
+  assertUnique(
+    contributions.flatMap((item) => item.contributions.map((entry) => `${entry.kind}:${entry.id}`)),
+    'application registry owners',
+  );
+  for (const peer of ['react', 'reactDom', 'router', 'pluginSdk']) {
+    const ranges = [...new Set(contributions.map((item) => item.peerDependencies[peer]))];
+    if (ranges.length > 1) throw new Error(`web contribution peer ${peer} has incompatible ranges: ${ranges.join(', ')}`);
+  }
+  const byCode = new Map(contributions.map((item) => [item.plugin.code, item]));
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (code) => {
+    if (visited.has(code)) return;
+    if (visiting.has(code)) throw new Error(`web contribution activation graph contains a cycle at ${code}`);
+    visiting.add(code);
+    for (const dependency of byCode.get(code)?.plugin.dependsOn ?? []) {
+      if (byCode.has(dependency)) visit(dependency);
+    }
+    visiting.delete(code);
+    visited.add(code);
+  };
+  for (const code of byCode.keys()) visit(code);
+}
+
+export function buildApplicationGraph(manifestInput, webContributionInputs = [], { requireContributions = false } = {}) {
   const manifest = validateManifest(manifestInput);
+  const webContributions = orderedWebContributions(manifest, webContributionInputs, requireContributions);
+  assertWebGraphIntegrity(webContributions);
   const nodes = [
     { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
@@ -108,6 +175,26 @@ export function buildApplicationGraph(manifestInput) {
       version: item.version,
     })),
     ...manifest.config.importOrder.map((id) => ({ kind: 'config', id })),
+    ...webContributions.flatMap((contribution) => [
+      ...contribution.routes.map((route) => ({
+        kind: 'route',
+        id: route.id,
+        owner: contribution.package.name,
+        path: route.path,
+        export: route.export,
+        rendering: route.rendering,
+        ...(route.permission ? { permission: route.permission } : {}),
+        ...(route.featureKey ? { featureKey: route.featureKey } : {}),
+      })),
+      ...contribution.contributions.map((entry) => ({
+        kind: entry.kind,
+        id: entry.id,
+        owner: contribution.package.name,
+        export: entry.export,
+        ...(entry.permission ? { permission: entry.permission } : {}),
+        ...(entry.featureKey ? { featureKey: entry.featureKey } : {}),
+      })),
+    ]),
   ].map((node, order) => ({ ...node, order }));
   const duplicateNodes = nodes
     .map((node) => `${node.kind}:${node.id}`)
@@ -178,7 +265,7 @@ function resolveRequirement(requirement, catalog) {
   return matches[0];
 }
 
-export function resolveApplication(manifestInput, catalog) {
+export function resolveApplication(manifestInput, catalog, { webContributions = [] } = {}) {
   const manifest = validateManifest(manifestInput);
   if (!catalog || !Array.isArray(catalog.artifacts)) throw new Error('artifact catalog must contain artifacts[]');
   const artifacts = requirements(manifest)
@@ -201,7 +288,7 @@ export function resolveApplication(manifestInput, catalog) {
     schemaVersion: 1,
     application: { id: manifest.app.id, version: manifest.app.version },
     manifestDigest: sha256(canonicalJson(manifest)),
-    composition: buildApplicationGraph(manifest),
+    composition: buildApplicationGraph(manifest, webContributions, { requireContributions: true }),
     artifacts,
   };
   const lock = {

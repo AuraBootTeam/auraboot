@@ -114,6 +114,7 @@
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
 | `application/application-cli.mjs` | 1 | 2026-09-12 | Validate application manifests, resolve immutable locks, and verify staged artifact checksums. |
+| `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 
 ## pipeline/lib (12)

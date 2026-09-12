@@ -31,9 +31,15 @@
             "additionalProperties": false,
             "required": ["kind", "id", "order"],
             "properties": {
-              "kind": { "enum": ["runtime", "api", "web", "plugin", "migration", "config"] },
+              "kind": { "enum": ["runtime", "api", "web", "plugin", "migration", "config", "route", "block", "action", "widget", "provider", "i18n"] },
               "id": { "type": "string", "minLength": 1 },
               "version": { "type": "string", "minLength": 1 },
+              "owner": { "type": "string", "minLength": 1 },
+              "path": { "type": "string", "minLength": 1 },
+              "export": { "type": "string", "minLength": 1 },
+              "rendering": { "const": "universal" },
+              "permission": { "type": "string", "minLength": 1 },
+              "featureKey": { "type": "string", "minLength": 1 },
               "order": { "type": "integer", "minimum": 0 }
             }
           }

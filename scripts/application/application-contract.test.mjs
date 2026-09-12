@@ -63,10 +63,34 @@ function catalog() {
   };
 }
 
+function webContribution() {
+  return {
+    schemaVersion: 1,
+    package: { name: '@auraboot/aura-crm-web', version: '1.0.0' },
+    plugin: { code: 'aura.crm', activationPhase: 'application', dependsOn: [] },
+    peerDependencies: {
+      react: '^19.2.0',
+      reactDom: '^19.2.0',
+      router: '^7.0.0',
+      pluginSdk: '^1.0.0',
+    },
+    routes: [
+      { id: 'crm.home', path: '/crm', export: './routes/home', rendering: 'universal' },
+    ],
+    contributions: [
+      { kind: 'widget', id: 'crm-health', export: './widgets/crm-health' },
+    ],
+  };
+}
+
+function resolveFixture(inputManifest = manifest(), inputCatalog = catalog()) {
+  return resolveApplication(inputManifest, inputCatalog, { webContributions: [webContribution()] });
+}
+
 describe('AuraBoot application contract', () => {
   it('resolves a deterministic lock with immutable artifact identities', () => {
-    const first = resolveApplication(manifest(), catalog());
-    const second = resolveApplication(manifest(), catalog());
+    const first = resolveFixture();
+    const second = resolveFixture();
 
     assert.deepEqual(first, second);
     assert.equal(first.artifacts.length, 10);
@@ -85,7 +109,7 @@ describe('AuraBoot application contract', () => {
     const input = catalog();
     input.artifacts = input.artifacts.filter((artifact) => artifact.id !== 'com.auraboot.crm');
 
-    assert.throws(() => resolveApplication(manifest(), input), /resolved to 0 entries/);
+    assert.throws(() => resolveFixture(manifest(), input), /resolved to 0 entries/);
   });
 
   it('rejects duplicate contribution owners', () => {
@@ -96,19 +120,19 @@ describe('AuraBoot application contract', () => {
   });
 
   it('detects lock tampering', () => {
-    const lock = resolveApplication(manifest(), catalog());
+    const lock = resolveFixture();
     lock.artifacts[0].digest = digest('f');
 
     assert.throws(() => validateLock(lock), /identity mismatch/);
   });
 
-  it('produces the same logical composition graph for source and artifact adapters', () => {
-    const sourceGraph = buildApplicationGraph(manifest());
-    const artifactGraph = buildApplicationGraph(manifest());
+  it('produces a deterministic typed composition graph', () => {
+    const sourceGraph = buildApplicationGraph(manifest(), [webContribution()], { requireContributions: true });
+    const artifactGraph = buildApplicationGraph(manifest(), [webContribution()], { requireContributions: true });
 
     assert.deepEqual(sourceGraph, artifactGraph);
     assert.equal(sourceGraph.nodes[0].kind, 'runtime');
-    assert.equal(sourceGraph.nodes.at(-1).id, 'crm');
+    assert.equal(sourceGraph.nodes.at(-1).id, 'crm-health');
   });
 
   it('verifies staged artifact bytes and fails after checksum mutation', () => {
@@ -122,7 +146,7 @@ describe('AuraBoot application contract', () => {
       writeFileSync(path, bytes);
       artifact.digest = sha256(bytes);
     }
-    const lock = resolveApplication(manifest(), input);
+    const lock = resolveFixture(manifest(), input);
     assert.doesNotThrow(() => verifyArtifacts(lock, { artifactRoot }));
 
     writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
@@ -142,5 +166,20 @@ describe('AuraBoot application contract', () => {
 
     writeFileSync(join(nested, 'b.txt'), 'mutated');
     assert.notEqual(sha256Path(artifactRoot), first);
+  });
+
+  it('fails closed on duplicate route paths in the composed web graph', () => {
+    const duplicate = webContribution();
+    duplicate.routes.push({
+      id: 'crm.other',
+      path: '/crm',
+      export: './routes/other',
+      rendering: 'universal',
+    });
+
+    assert.throws(
+      () => buildApplicationGraph(manifest(), [duplicate], { requireContributions: true }),
+      /duplicate owner IDs/,
+    );
   });
 });
