@@ -121,11 +121,12 @@ if [[ "$MUTATION" == locked-plugin-byte ]]; then
   fi
   grep -q 'checksum mismatch' "$ARTIFACTS/logs/mutation-verifier.log" \
     || fatal 'controlled mutation failed for a reason other than checksum mismatch'
-  node - "$ARTIFACTS/mutation-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$MUTATION_TARGET" <<'NODE'
-const [path, product, coreCommit, productCommit, target] = process.argv.slice(2);
+  node - "$ARTIFACTS/mutation-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$MUTATION_TARGET" "$ARTIFACTS" <<'NODE'
+const [path, product, coreCommit, productCommit, target, evidenceRoot] = process.argv.slice(2);
 const receipt = { schemaVersion: 1, status: 'EXPECTED_RED', mutation: 'locked-plugin-byte',
   detectedBy: 'application-artifact-verifier', reason: 'checksum mismatch', product,
-  coreCommit, productCommit, target, releaseImagePushed: false, finishedAt: new Date().toISOString() };
+  coreCommit, productCommit, target, evidenceRoot, verifierLog: 'logs/mutation-verifier.log',
+  releaseImagePushed: false, finishedAt: new Date().toISOString() };
 require('node:fs').writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
 NODE
   fail 'controlled locked-plugin mutation was correctly rejected (expected red)'
@@ -243,15 +244,23 @@ find "$DOCKER_CONFIG_ROOT" -depth -delete
 
 cp "$CORE_RELEASE/release-receipt.json" "$ARTIFACTS/core-build-receipt.json"
 cp "$PRODUCT_RELEASE/release-receipt.json" "$ARTIFACTS/product-build-receipt.json"
-python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" <<'PY'
+python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" <<'PY'
 import datetime, json, sys
-path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest = sys.argv[1:]
+path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port = sys.argv[1:]
 receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "coreCommit": core, "productCommit": source, "lockIdentity": lock,
            "ociLayoutDigest": layout, "loadedImageId": image_id, "builder": builder,
            "registryImage": registry_image, "registryPulledImageId": pulled_id,
            "job": job, "freshDatabase": "PASS", "payload": "PASS",
            "readiness": "PASS", "browserJourney": "PASS",
+           "database": {"engine": "PostgreSQL", "name": "aura_product_ci",
+                        "container": pg_container, "fresh": True},
+           "runtime": {"applicationContainer": app_container,
+                       "webBaseUrl": f"http://127.0.0.1:{web_port}",
+                       "lifecycle": "ephemeral-ci"},
+           "evidenceRoot": evidence_root,
+           "browserResults": "e2e/results.json",
+           "logsRoot": "logs",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
 if fixture_path:
     receipt["acceptanceFixture"] = {"sourcePath": fixture_path,

@@ -40,6 +40,9 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /AURA_RELEASE_MUTATION/);
   assert.match(productImageGate, /controlled locked-plugin mutation was correctly rejected \(expected red\)/);
   assert.match(productImageGate, /releaseImagePushed: false/);
+  assert.match(productImageGate, /"evidenceRoot": evidence_root/);
+  assert.match(productImageGate, /"database": \{"engine": "PostgreSQL"/);
+  assert.match(productImageGate, /"lifecycle": "ephemeral-ci"/);
   assert.doesNotMatch(productImageGate, /\bcontainer\s+(?:build|run|image)/);
 });
 
