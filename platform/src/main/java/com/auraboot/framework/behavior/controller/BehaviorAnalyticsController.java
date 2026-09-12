@@ -11,6 +11,8 @@ import java.time.Instant;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/analytics/behavior")
 @RequiredArgsConstructor
+@RequirePermission(MetaPermission.DASHBOARD_READ)
 public class BehaviorAnalyticsController {
 
     private final BehaviorAnalyticsService analyticsService;
