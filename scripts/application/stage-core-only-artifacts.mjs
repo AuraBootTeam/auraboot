@@ -83,6 +83,12 @@ function catalogArtifact({ type, id, version, path, output, repository, commit }
   };
 }
 
+function isWebShellPublishableSource(candidate) {
+  return !/(?:^|\/)(?:__tests__|tests|test-results|golden-harness|build|node_modules|\.vite)(?:\/|$)/.test(candidate)
+    && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(candidate)
+    && !/\.tsbuildinfo$/.test(candidate);
+}
+
 function packPluginSdk(repoRoot, destination) {
   mkdirSync(destination, { recursive: true });
   const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-plugin-sdk-pack-'));
@@ -155,8 +161,7 @@ function packWebShell(repoRoot, destination, version) {
         recursive: true,
         errorOnExist: true,
         force: false,
-        filter: (candidate) => !/(?:^|\/)(?:build|node_modules|test-results|\.vite)(?:\/|$)/.test(candidate)
-          && !/\.tsbuildinfo$/.test(candidate),
+        filter: isWebShellPublishableSource,
       });
     }
     const webManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
@@ -169,8 +174,8 @@ function packWebShell(repoRoot, destination, version) {
 
     cpSync(resolve(repoRoot, 'packages'), resolve(packageRoot, 'packages'), {
       recursive: true,
-      filter: (candidate) => !/(?:^|\/)(?:dist|node_modules)(?:\/|$)/.test(candidate)
-        && !/\.tsbuildinfo$/.test(candidate),
+      filter: (candidate) => isWebShellPublishableSource(candidate)
+        && !/(?:^|\/)dist(?:\/|$)/.test(candidate),
     });
     copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(packageRoot, 'pnpm-lock.yaml'));
     copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
