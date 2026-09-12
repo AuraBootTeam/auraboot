@@ -173,9 +173,11 @@ function packWebShell(repoRoot, destination, version) {
         && !/\.tsbuildinfo$/.test(candidate),
     });
     copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(packageRoot, 'pnpm-lock.yaml'));
-    copyFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), resolve(packageRoot, 'pnpm-workspace.yaml'));
     copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
     const rootManifest = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
+    const workspaceManifest = YAML.parse(readFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), 'utf8'));
+    workspaceManifest.overrides = rootManifest.pnpm?.overrides ?? {};
+    writeFileSync(resolve(packageRoot, 'pnpm-workspace.yaml'), YAML.stringify(workspaceManifest));
     writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify({
       name: '@auraboot/web-shell',
       version,
