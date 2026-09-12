@@ -157,12 +157,16 @@ public class AgentRunTerminalStore {
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT r.run_status, r.actor_user_id, r.principal_type,
-                       (SELECT o.event_id FROM ab_behavior_outcome_outbox o
-                        WHERE o.tenant_id = r.tenant_id AND o.run_id = r.pid
-                          AND o.event_name = 'agent_execution_started'
-                        ORDER BY o.id LIMIT 1) AS started_event_id
+                       started.event_id AS started_event_id,
+                       started.interaction_id AS started_interaction_id
                 FROM ab_agent_run r JOIN ab_agent_task t
                   ON t.pid = r.task_id AND t.tenant_id = r.tenant_id
+                LEFT JOIN LATERAL (
+                    SELECT o.event_id, o.interaction_id FROM ab_behavior_outcome_outbox o
+                    WHERE o.tenant_id = r.tenant_id AND o.run_id = r.pid
+                      AND o.event_name = 'agent_execution_started'
+                    ORDER BY o.id LIMIT 1
+                ) started ON TRUE
                 WHERE r.tenant_id = ? AND r.pid = ? AND t.pid = ?
                   AND t.deleted_flag = FALSE
                 FOR UPDATE OF r, t
@@ -188,6 +192,7 @@ public class AgentRunTerminalStore {
                 .tenantId(tenantId).userId(actorId).eventId(eventId)
                 .eventName("agent_execution_completed").runId(runPid)
                 .causedByEventId((String) row.get("started_event_id"))
+                .interactionId((String) row.get("started_interaction_id"))
                 .targetType("agent_run").targetKey(runPid)
                 .props(Map.of("status", status, "taskPid", taskPid,
                         "principalType", row.get("principal_type") == null ? "unknown" : row.get("principal_type")))

@@ -99,12 +99,26 @@ class AgentRunTerminalStoreTest {
         verify(outcomes).publish(event.capture());
         assertThat(event.getValue().getUserId()).isEqualTo(91L);
         assertThat(event.getValue().getRunId()).isEqualTo("run");
+        assertThat(event.getValue().getInteractionId()).isNull();
         assertThat(event.getValue().getProps()).containsEntry("status", "success");
         assertThat(event.getValue().getEventId()).hasSize(36);
         verifyNoInteractions(signal);
         TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
         verify(signal).run();
     }
+    @Test void completionKeepsTheCommittedStartAnalysisIdentity() {
+        when(jdbc.queryForList(anyString(), eq(7L), eq("run"), eq("task")))
+                .thenReturn(List.of(Map.of("run_status", "running", "actor_user_id", 91L,
+                        "started_event_id", "start-event", "started_interaction_id", "analysis")));
+        when(data.update(anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(outcomes.publish(any())).thenReturn(true);
+        assertThat(store.complete(7L, "run", "task", run, task, signal)).isTrue();
+        ArgumentCaptor<BehaviorOutcomeEvent> event = ArgumentCaptor.forClass(BehaviorOutcomeEvent.class);
+        verify(outcomes).publish(event.capture());
+        assertThat(event.getValue().getInteractionId()).isEqualTo("analysis");
+        assertThat(event.getValue().getCausedByEventId()).isEqualTo("start-event");
+    }
+
     @Test void cancelledRunCannotBeOverwrittenByLateSuccess() {
         row("cancelled");
         assertThat(store.complete(7L, "run", "task", run, task, signal)).isFalse();

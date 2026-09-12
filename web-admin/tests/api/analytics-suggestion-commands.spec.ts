@@ -296,7 +296,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     });
     const executionFacts = (
       await db.query(
-        `SELECT event_id, event_name, caused_by_event_id, payload FROM ab_behavior_outcome_outbox
+        `SELECT event_id, event_name, caused_by_event_id, interaction_id, payload FROM ab_behavior_outcome_outbox
        WHERE run_id=$1 ORDER BY id`,
         [linked[0].run_pid],
       )
@@ -312,13 +312,14 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     });
     expect(executionFacts[1].caused_by_event_id).toBe(executionFacts[0].event_id);
     expect(executionFacts[1].payload.status).toBe('success');
+    for (const fact of executionFacts) expect(fact.interaction_id).toBe(analysis.analysisId);
     await expect
       .poll(
         async () =>
           (
             await db.query(
-              'SELECT event_id FROM ab_behavior_event WHERE run_id=$1 ORDER BY event_id',
-              [linked[0].run_pid],
+              'SELECT event_id FROM ab_behavior_event WHERE run_id=$1 AND interaction_id=$2 ORDER BY event_id',
+              [linked[0].run_pid, analysis.analysisId],
             )
           ).rows.map((row) => row.event_id),
         { timeout: 15000 },
@@ -411,7 +412,12 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
           [analysis.analysisId],
         )
       ).rows.map((row) => row.event_id),
-    ).toEqual([...facts.rows.map((row) => row.event_id), executionFacts[0].event_id].sort());
+    ).toEqual(
+      [
+        ...facts.rows.map((row) => row.event_id),
+        ...executionFacts.map((row) => row.event_id),
+      ].sort(),
+    );
   } finally {
     await db.end();
   }
