@@ -51,12 +51,16 @@ public class ReportDefinitionController {
     private final ReportStorageService reportStorageService;
     private final ObjectMapper objectMapper;
     private final VersionHistoryService versionHistoryService;
+    private final com.auraboot.framework.behavior.service.AnalyticsArtifactService analyticsArtifacts;
 
     @PostMapping
     @Transactional
     @Operation(summary = "Create a report definition", description = "Persists a new ab_report row and returns the minted pid")
     @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<ReportDefinitionResponse> create(@Valid @RequestBody ReportDefinitionCreateRequest request) {
+        String analysisId = request.getSourceAnalysisId();
+        String queryHash = analysisId != null && !analysisId.isBlank()
+                ? analyticsArtifacts.verifyReportQuery(analysisId, request.getDsl()) : null;
         ReportEntity entity = new ReportEntity();
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCode(request.getCode());
@@ -67,6 +71,7 @@ public class ReportDefinitionController {
         entity.setUpdatedBy(MetaContext.getCurrentUserId());
         ReportEntity created = reportStorageService.create(entity);
         versionHistoryService.recordVersion("report", created.getPid(), "create", null);
+        if (queryHash != null) analyticsArtifacts.reportSaved(analysisId, created.getPid(), queryHash);
         return ApiResponse.success(toResponse(created));
     }
 

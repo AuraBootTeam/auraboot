@@ -117,6 +117,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             "reportingCurrency"
     );
 
+    private final com.auraboot.framework.behavior.service.AnalyticsReportUsageService analyticsReportUsage;
     private final com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
@@ -154,6 +155,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             ReportExportFile file = new ReportExportFile(
                     output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "excel");
             return file;
         } catch (ValidationException | AccessDeniedException e) {
             throw e;
@@ -177,6 +179,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         byte[] pdfBytes = applyPdfBranding(renderPdf(reportDsl, dataSets, title), title);
         ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
         recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "pdf");
         return file;
     }
 
@@ -276,6 +279,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             ReportExportFile file = new ReportExportFile(
                     bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "json");
             return file;
         } catch (ValidationException | AccessDeniedException e) {
             throw e;

@@ -11,13 +11,13 @@ public interface AnalyticsRetentionMapper {
     @Select("""
             WITH valid_events AS (
                 SELECT tenant_id, occurred_at,
-                       CASE WHEN #{unit} = 'user' THEN CAST(user_id AS text) ELSE props->>'targetKey' END AS identity_key
+                       CASE WHEN #{unit} = 'user' THEN CAST(user_id AS text) ELSE (props->>'targetType') || ':' || (props->>'targetKey') END AS identity_key
                 FROM ab_behavior_event
                 WHERE tenant_id = #{tenantId} AND created_at <= #{cutoff} AND occurred_at < #{cutoff}
-                  AND event_name = 'analytics_dashboard_used' AND source = 'server'
+                  AND ((event_name = 'analytics_dashboard_used' AND props->>'targetType' = 'dashboard') OR (event_name = 'analytics_report_used' AND props->>'targetType' = 'report' AND props->>'usageKind' = 'export_generated')) AND source = 'server'
                   AND producer_name = 'aurabot-analytics' AND sampling_probability = 1
                   AND user_id IS NOT NULL AND NULLIF(interaction_id, '') IS NOT NULL
-                  AND props->>'targetType' = 'dashboard' AND NULLIF(props->>'targetKey', '') IS NOT NULL
+                  AND NULLIF(props->>'targetKey', '') IS NOT NULL
             ), first_use AS (
                 SELECT tenant_id, identity_key, min(occurred_at) AS first_at
                 FROM valid_events GROUP BY tenant_id, identity_key

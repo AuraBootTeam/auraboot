@@ -89,12 +89,15 @@ class ReportExportServiceTest {
     @Mock
     private com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
 
+    @Mock
+    private com.auraboot.framework.behavior.service.AnalyticsReportUsageService analyticsReportUsage;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient().when(userPermissionService.hasPermission(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
-        reportExportService = new ReportExportServiceImpl(aggregateQueries, new ObjectMapper(),
+        reportExportService = new ReportExportServiceImpl(analyticsReportUsage, aggregateQueries, new ObjectMapper(),
                 dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
                 reportRenderClient, BrandingIdentity::community, userPermissionService);
         // A successful export records an audit event sourced from MetaContext (set on every real
@@ -174,7 +177,7 @@ class ReportExportServiceTest {
                         .withProperty("AURABOOT_BRANDING_CONFIG_PATH", brandingConfig.toString())
                         .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", "SO-2026-001"),
                 new ObjectMapper());
-        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(aggregateQueries,
+        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(analyticsReportUsage, aggregateQueries,
                 new ObjectMapper(),
                 dynamicDataService,
                 namedQueryService,
@@ -942,7 +945,7 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
         assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
         assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
-        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService, analyticsReportUsage);
     }
 
     @Test
@@ -960,7 +963,7 @@ class ReportExportServiceTest {
             assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
             assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
         }
-        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService, analyticsReportUsage);
     }
 
     @Test
@@ -977,7 +980,7 @@ class ReportExportServiceTest {
         assertThatThrownBy(() -> reportExportService.exportJson(request)).isSameAs(denial);
         assertThatThrownBy(() -> reportExportService.exportExcel(request)).isSameAs(denial);
         assertThatThrownBy(() -> reportExportService.exportPdf(request)).isSameAs(denial);
-        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, auditTrailService);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, auditTrailService, analyticsReportUsage);
     }
 
     private Map<String, Object> nonStaticDataSourceReportDsl() {

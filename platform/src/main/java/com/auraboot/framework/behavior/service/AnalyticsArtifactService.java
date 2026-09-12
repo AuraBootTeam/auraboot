@@ -23,16 +23,39 @@ public class AnalyticsArtifactService {
         if (widgets == null || !widgets.isArray() || widgets.size() != 1) {
             throw new BusinessException(ResponseCode.BadParam, "An analytics dashboard requires one query widget");
         }
+        return verifySource(analysisId, widgets.get(0).path("config").path("dataSource"));
+    }
+
+    public String verifyReportQuery(String analysisId, JsonNode dsl) {
+        JsonNode sources = dsl == null ? null : dsl.get("dataSources");
+        if (sources == null || !sources.isObject() || sources.size() != 1) {
+            throw new BusinessException(ResponseCode.BadParam, "An analytics report requires one aggregate data source");
+        }
+        JsonNode source = sources.elements().next();
+        if (!"aggregate".equals(source.path("type").asText())) {
+            throw new BusinessException(ResponseCode.BadParam, "An analytics report requires an aggregate data source");
+        }
+        return verifySource(analysisId, source.path("aggregateQuery"));
+    }
+
+    private String verifySource(String analysisId, JsonNode source) {
         String expected = events.findSuccessfulQueryHash(MetaContext.getCurrentTenantId(),
                 MetaContext.getCurrentUserId(), analysisId);
         if (expected == null) {
             throw new BusinessException(ResponseCode.BadParam, "Analysis is unavailable or its result has not been recorded");
         }
-        JsonNode source = widgets.get(0).path("config").path("dataSource");
         if (!source.isObject() || !expected.equals(AnalyticsQueryFingerprint.of(source))) {
             throw new BusinessException(ResponseCode.BadParam, "Saved query differs from the analysis result");
         }
         return expected;
+    }
+
+    public void reportSaved(String analysisId, String reportPid, String queryHash) {
+        outcomes.publish(BehaviorOutcomeEvent.builder()
+                .tenantId(MetaContext.getCurrentTenantId()).userId(MetaContext.getCurrentUserId())
+                .eventId(UUID.randomUUID().toString()).eventName("analytics_report_saved")
+                .interactionId(analysisId).targetType("report").targetKey(reportPid)
+                .props(Map.of("queryHash", queryHash)).build());
     }
 
     public void dashboardSaved(String analysisId, String dashboardPid, String queryHash) {

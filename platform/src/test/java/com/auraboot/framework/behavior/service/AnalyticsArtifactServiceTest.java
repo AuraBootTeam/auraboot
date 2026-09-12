@@ -57,4 +57,37 @@ class AnalyticsArtifactServiceTest {
                 .isEqualTo(AnalyticsQueryFingerprint.of(json.readTree("{\"limit\":5,\"filters\":{\"b\":2,\"a\":1}}")))
                 .isNotEqualTo(AnalyticsQueryFingerprint.of(json.readTree("{\"limit\":6,\"filters\":{\"b\":2,\"a\":1}}")));
     }
+
+    @Test
+    void reportSourceMustMatchSuccessfulQueryAndRejectsAdditionalSources() {
+        MetaContext.setContext(42L, 7L, "actor", "tester");
+        ObjectNode query = json.createObjectNode().put("type", "aggregate").put("modelCode", "orders").put("limit", 5);
+        String hash = AnalyticsQueryFingerprint.of(query);
+        when(events.findSuccessfulQueryHash(42L, 7L, "analysis")).thenReturn(hash);
+        ObjectNode dsl = json.createObjectNode();
+        ObjectNode sources = dsl.putObject("dataSources");
+        sources.putObject("analysis").put("type", "aggregate").set("aggregateQuery", query);
+        assertThat(service.verifyReportQuery("analysis", dsl)).isEqualTo(hash);
+        query.put("limit", 6);
+        assertThatThrownBy(() -> service.verifyReportQuery("analysis", dsl)).isInstanceOf(BusinessException.class);
+        query.put("limit", 5);
+        sources.putObject("extra").put("type", "static");
+        assertThatThrownBy(() -> service.verifyReportQuery("analysis", dsl)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(outcomes);
+    }
+
+    @Test
+    void reportOutcomeCarriesServerActorAndArtifactIdentity() {
+        MetaContext.setContext(42L, 7L, "actor", "tester");
+        service.reportSaved("analysis", "report", "hash");
+        var event = org.mockito.ArgumentCaptor.forClass(com.auraboot.framework.behavior.outcome.BehaviorOutcomeEvent.class);
+        verify(outcomes).publish(event.capture());
+        assertThat(event.getValue().getTenantId()).isEqualTo(42L);
+        assertThat(event.getValue().getUserId()).isEqualTo(7L);
+        assertThat(event.getValue().getEventName()).isEqualTo("analytics_report_saved");
+        assertThat(event.getValue().getTargetType()).isEqualTo("report");
+        assertThat(event.getValue().getTargetKey()).isEqualTo("report");
+        assertThat(event.getValue().getInteractionId()).isEqualTo("analysis");
+        assertThat(event.getValue().getProps()).containsEntry("queryHash", "hash");
+    }
 }

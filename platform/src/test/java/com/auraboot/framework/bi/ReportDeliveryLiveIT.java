@@ -103,7 +103,7 @@ class ReportDeliveryLiveIT {
         props.setTimeoutSeconds(90);
         ReportRenderClient renderClient = new ReportRenderClient(new ObjectMapper(), props);
 
-        ReportExportServiceImpl exportService = new ReportExportServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.bi.service.ReportAggregateQueryService.class),
+        ReportExportServiceImpl exportService = new ReportExportServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.behavior.service.AnalyticsReportUsageService.class), org.mockito.Mockito.mock(com.auraboot.framework.bi.service.ReportAggregateQueryService.class),
                 new ObjectMapper(), dynamicDataService, namedQueryService,
                 reportStorageService, auditTrailService, renderClient, BrandingIdentity::community, userPermissionService);
 

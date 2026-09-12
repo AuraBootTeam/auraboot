@@ -69,9 +69,10 @@ export const reportDesignerService = {
     );
   },
 
-  async save(report: ReportDsl, existingPid?: string): Promise<string> {
+  async save(report: ReportDsl, existingPid?: string, sourceAnalysisId?: string): Promise<string> {
     const payload = {
       ...(!existingPid ? { code: `report_${crypto.randomUUID()}` } : {}),
+      ...(!existingPid && sourceAnalysisId ? { sourceAnalysisId } : {}),
       title: report.title,
       profile: 'paged-media',
       dsl: report,
@@ -92,7 +93,7 @@ export const reportDesignerService = {
     const response = await fetch('/api/reports/export/pdf', {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reportPid, parameters }),
+      body: JSON.stringify({ reportPid, parameters, usageId: crypto.randomUUID() }),
     });
 
     if (!response.ok) {
@@ -110,7 +111,7 @@ export const reportDesignerService = {
     const response = await fetch('/api/reports/export/excel', {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reportPid, parameters }),
+      body: JSON.stringify({ reportPid, parameters, usageId: crypto.randomUUID() }),
     });
 
     if (!response.ok) {
@@ -128,7 +129,7 @@ export const reportDesignerService = {
     const response = await fetch('/api/reports/export/json', {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reportPid, parameters }),
+      body: JSON.stringify({ reportPid, parameters, usageId: crypto.randomUUID() }),
     });
 
     if (!response.ok) {

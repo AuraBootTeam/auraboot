@@ -1,6 +1,9 @@
 /** Deterministic tool execution over a real model. This is not a real-LLM reasoning test. */
 import { test, expect } from '../../fixtures';
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 
 test.use({
   storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
@@ -13,6 +16,7 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   page.on('console', (message) => {
     if (message.type() === 'error') console.log('[analytics-console-error]', message.text());
   });
+  const funnelFrom = new Date().toISOString();
   const title = `Analytics fixture ${Date.now()}`;
   const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
     data: {
@@ -62,9 +66,41 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   await card.getByTestId('chatbi-save-report').click();
   const created = await createdPromise;
   expect(created.status()).toBe(200);
+  const analysisId = await card.getAttribute('data-analysis-id');
+  expect(created.request().postDataJSON().sourceAnalysisId).toBe(analysisId);
   const persistedQuery = created.request().postDataJSON().dsl.dataSources.analysis.aggregateQuery;
   expect(persistedQuery).toMatchObject({ type: 'aggregate', ...query });
   const saved = (await created.json()).data;
+  const db = new Client(PG_CONN);
+  await db.connect();
+  try {
+    await expect
+      .poll(async () => {
+        const outbox = await db.query(
+          "SELECT target_key, interaction_id, payload, status FROM ab_behavior_outcome_outbox WHERE event_name = 'analytics_report_saved' AND target_key = $1",
+          [saved.pid],
+        );
+        return outbox.rows;
+      })
+      .toEqual([
+        {
+          target_key: saved.pid,
+          interaction_id: analysisId,
+          payload: { queryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+          status: 'published',
+        },
+      ]);
+  } finally {
+    await db.end();
+  }
+  const forged = structuredClone(created.request().postDataJSON());
+  forged.code += '_forged';
+  forged.dsl.dataSources.analysis.aggregateQuery.limit = 4;
+  const rejected = await page.request.post('/api/report-definitions', { data: forged });
+  expect(rejected.status()).toBe(400);
+  const absent = await page.request.get(`/api/report-definitions/by-code/${forged.code}`);
+  expect(absent.status()).toBe(404);
+
   await expect(card.getByTestId('chatbi-saved-report')).toHaveAttribute(
     'href',
     `/report-designer/${saved.pid}`,
@@ -95,8 +131,11 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   expect(queried.request().postDataJSON()).toEqual(persistedQuery);
   expect((await queried.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
   await expect(page.locator('main').getByText(title, { exact: true }).first()).toBeVisible();
-  const reloadDefinition = page.waitForResponse(response =>
-    new URL(response.url()).pathname === `/api/report-definitions/${saved.pid}` && response.request().method() === 'GET');
+  const reloadDefinition = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/api/report-definitions/${saved.pid}` &&
+      response.request().method() === 'GET',
+  );
   await page.reload();
   expect((await reloadDefinition).status()).toBe(200);
   await page.waitForFunction(() => {
@@ -113,17 +152,134 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     .getByRole('button', { name: '预览', exact: true });
   await expect(previewButton).toBeVisible();
   await previewButton.click();
-  await expect(page.getByTestId('report-designer-toolbar').getByRole('button', { name: '编辑', exact: true })).toBeVisible();
+  await expect(
+    page.getByTestId('report-designer-toolbar').getByRole('button', { name: '编辑', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('main').getByText(title, { exact: true }).first()).toBeVisible();
-  await expect(page.getByTestId('report-aggregate-limit-hint')).toContainText('预览与导出使用相同查询');
+  await expect(page.getByTestId('report-aggregate-limit-hint')).toContainText(
+    '预览与导出使用相同查询',
+  );
   await expect(page.getByText('模型和命名查询预览最多 500 行', { exact: false })).toHaveCount(0);
+  const exportResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/reports/export/json' &&
+      response.request().method() === 'POST',
+  );
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /导出 JSON|Export JSON/ }).click();
   const download = await downloadPromise;
+  const exportRequest = (await exportResponse).request().postDataJSON();
+  expect(exportRequest.usageId).toMatch(/^[0-9a-f-]{36}$/);
   const path = await download.path();
   expect(path).toBeTruthy();
   const artifact = JSON.parse(await readFile(path!, 'utf8'));
   expect(artifact.dataSets.analysis).toEqual([{ cnt: 1, e2et_order_title: title }]);
   expect(artifact.reportDsl.dataSources.analysis.aggregateQuery).toEqual(persistedQuery);
   await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/reopened.png`, fullPage: true });
+  await expect
+    .poll(async () => {
+      const response = await page.request.get('/api/analytics/behavior/analysis-funnel', {
+        params: { from: funnelFrom, to: new Date().toISOString() },
+      });
+      expect(response.status()).toBe(200);
+      const funnel = (await response.json()).data;
+      expect(funnel.definitionVersion).toBe('analysis-task-funnel-v2');
+      return funnel.records.map((stage: { tasks: number }) => stage.tasks);
+    })
+    .toEqual([1, 1, 1, 1, 1]);
+
+  const usageDb = new Client(PG_CONN);
+  await usageDb.connect();
+  try {
+    await expect
+      .poll(async () => {
+        const result = await usageDb.query(
+          "SELECT props FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2",
+          [analysisId, saved.pid],
+        );
+        return result.rows;
+      })
+      .toEqual([
+        {
+          props: {
+            targetType: 'report',
+            targetKey: saved.pid,
+            queryHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            originalQuery: true,
+            usageKind: 'export_generated',
+            format: 'json',
+          },
+        },
+      ]);
+  } finally {
+    await usageDb.end();
+  }
+  const retention = await page.request.get('/api/analytics/behavior/retention', {
+    params: { unit: 'artifact', from: funnelFrom, to: new Date().toISOString() },
+  });
+  expect(retention.status()).toBe(200);
+  const points = (await retention.json()).data.records;
+  expect(points).toHaveLength(3);
+  for (const point of points) {
+    expect(point.cohortSize).toBe(1);
+    expect(point.status).toBe('immature');
+    expect(point.retentionRate ?? null).toBeNull();
+  }
+
+  // API adversarial checks complement the browser-driven export above.
+  const replay = await page.request.post('/api/reports/export/json', { data: exportRequest });
+  expect(replay.status()).toBe(200);
+  expect((await replay.json()).dataSets.analysis).toEqual(artifact.dataSets.analysis);
+  const changedDsl = structuredClone(artifact.reportDsl);
+  changedDsl.dataSources.analysis.aggregateQuery.limit = 4;
+  const changedSave = await page.request.put(`/api/report-definitions/${saved.pid}`, {
+    data: { dsl: changedDsl },
+  });
+  expect(changedSave.status()).toBe(200);
+  const changedExport = await page.request.post('/api/reports/export/json', {
+    data: { reportPid: saved.pid, usageId: randomUUID() },
+  });
+  expect(changedExport.status()).toBe(200);
+  expect((await changedExport.json()).reportDsl.dataSources.analysis.aggregateQuery.limit).toBe(4);
+  const boundaryDb = new Client(PG_CONN);
+  await boundaryDb.connect();
+  try {
+    await expect
+      .poll(async () => {
+        const result = await boundaryDb.query(
+          "SELECT props->>'originalQuery' AS original FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2 ORDER BY occurred_at, id",
+          [analysisId, saved.pid],
+        );
+        return result.rows.map((row) => row.original);
+      })
+      .toEqual(['true', 'false']);
+    changedDsl.dataSources.analysis.aggregateQuery.limit = 1001;
+    expect(
+      (
+        await page.request.put(`/api/report-definitions/${saved.pid}`, {
+          data: { dsl: changedDsl },
+        })
+      ).status(),
+    ).toBe(200);
+    const failedExport = await page.request.post('/api/reports/export/json', {
+      data: { reportPid: saved.pid, usageId: randomUUID() },
+    });
+    expect(failedExport.status()).toBeGreaterThanOrEqual(400);
+    expect(failedExport.status()).toBeLessThan(500);
+    const remaining = await boundaryDb.query(
+      "SELECT count(*)::int AS count FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2",
+      [analysisId, saved.pid],
+    );
+    expect(remaining.rows).toEqual([{ count: 2 }]);
+  } finally {
+    await boundaryDb.end();
+  }
+  // Keep the retained fixture usable after testing an invalid definition.
+  expect(
+    (
+      await page.request.put(`/api/report-definitions/${saved.pid}`, {
+        data: { dsl: artifact.reportDsl },
+      })
+    ).status(),
+  ).toBe(200);
 });

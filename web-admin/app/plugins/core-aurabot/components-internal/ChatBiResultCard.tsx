@@ -276,7 +276,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           columns: effectiveColumns.map((field) => ({ field, label: field })),
         },
       ];
-      const pid = await reportDesignerService.save(report);
+      const pid = await reportDesignerService.save(report, undefined, result.analysisId);
       if (!pid) throw new Error('Saved report identity is missing');
       setSavedReportPid(pid);
       toast.success(text({ 'zh-CN': '已存为报表', 'en-US': 'Saved as report' }));

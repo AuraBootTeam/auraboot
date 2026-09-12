@@ -15,6 +15,16 @@ import java.util.List;
 @Mapper
 public interface BehaviorOutcomeOutboxMapper extends BaseMapper<BehaviorOutcomeOutbox> {
 
+    @Select("""
+            SELECT interaction_id AS "analysisId", payload->>'queryHash' AS "queryHash"
+            FROM ab_behavior_outcome_outbox
+            WHERE tenant_id = #{tenantId} AND target_type = 'report' AND target_key = #{reportPid}
+              AND event_name = 'analytics_report_saved'
+            ORDER BY created_at, id LIMIT 1
+            """)
+    java.util.Map<String, String> findReportOrigin(@Param("tenantId") Long tenantId,
+                                                 @Param("reportPid") String reportPid);
+
     @Insert("""
             INSERT INTO ab_behavior_outcome_outbox
                 (tenant_id, event_id, user_id, event_name, target_type, target_key, payload,

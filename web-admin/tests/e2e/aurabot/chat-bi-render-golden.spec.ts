@@ -229,7 +229,7 @@ test('AuraBot filtered analysis saves its complete query to a dashboard', async 
   });
   expect(funnel.status()).toBe(200);
   const funnelData = (await funnel.json()).data;
-  expect(funnelData.definitionVersion).toBe('analysis-task-funnel-v1');
+  expect(funnelData.definitionVersion).toBe('analysis-task-funnel-v2');
   expect(funnelData.records.map((stage: { tasks: number }) => stage.tasks)).toEqual([
     1, 1, 1, 1, 1,
   ]);

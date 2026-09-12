@@ -51,6 +51,18 @@ public class AnalyticsJourneyService {
                 UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(), occurredAt);
     }
 
+    public void reportExported(String analysisId, String reportPid, UUID usageId,
+                               String queryHash, boolean originalQuery, String format) {
+        Instant occurredAt = Instant.now();
+        String identity = MetaContext.getCurrentTenantId() + ":" + MetaContext.getCurrentUserId()
+                + ":report-exported:" + reportPid + ":" + usageId + ":" + format
+                + ":" + occurredAt.atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        publish(analysisId, "analytics_report_used", Map.of("targetType", "report",
+                "targetKey", reportPid, "queryHash", queryHash, "originalQuery", originalQuery,
+                "usageKind", "export_generated", "format", format),
+                UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(), occurredAt);
+    }
+
     private void publish(String analysisId, String name, Map<String, Object> props) {
         publish(analysisId, name, props, UUID.randomUUID().toString());
     }

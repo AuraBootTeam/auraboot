@@ -33,6 +33,9 @@ class AnalyticsFunnelServiceTest {
         assertThat(result.records().get(4).previousStageRate()).isEqualByComparingTo("0.5");
         assertThat(result.quality().unmatchedStageEvents()).isEqualTo(3);
         assertThat(result.dataCutoff()).isEqualTo(cutoff);
+        assertThat(result.definitionVersion()).isEqualTo("analysis-task-funnel-v2");
+        assertThat(result.records()).extracting(AnalyticsFunnel.Stage::code).containsExactly(
+                "requested", "query_succeeded", "result_viewed", "artifact_saved", "artifact_used");
     }
 
     @Test

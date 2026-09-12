@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 class ReportDefinitionVersionTest {
     private final ReportStorageService storage = mock(ReportStorageService.class);
     private final VersionHistoryService versions = mock(VersionHistoryService.class);
-    private final ReportDefinitionController controller = new ReportDefinitionController(storage, new ObjectMapper(), versions);
+    private final ReportDefinitionController controller = new ReportDefinitionController(storage, new ObjectMapper(), versions, org.mockito.Mockito.mock(com.auraboot.framework.behavior.service.AnalyticsArtifactService.class));
 
     @BeforeEach void setup() { MetaContext.setContext(7L, 99L, "user", "tester"); }
     @AfterEach void clear() { MetaContext.clear(); }

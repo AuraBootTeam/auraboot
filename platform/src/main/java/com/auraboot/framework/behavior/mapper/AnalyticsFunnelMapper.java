@@ -14,8 +14,8 @@ public interface AnalyticsFunnelMapper {
                 WHERE tenant_id = #{tenantId} AND created_at <= #{cutoff}
                   AND occurred_at >= #{from} AND occurred_at < #{to}
                   AND source = 'server' AND ((producer_name = 'aurabot-analytics' AND event_name IN
-                    ('analytics_requested','analytics_query_succeeded','analytics_result_viewed','analytics_dashboard_used'))
-                    OR (producer_name = 'server-outcome-outbox' AND event_name = 'analytics_dashboard_saved'))
+                    ('analytics_requested','analytics_query_succeeded','analytics_result_viewed','analytics_dashboard_used','analytics_report_used'))
+                    OR (producer_name = 'server-outcome-outbox' AND event_name IN ('analytics_dashboard_saved','analytics_report_saved')))
 
                   AND sampling_probability = 1 AND user_id IS NOT NULL AND NULLIF(interaction_id, '') IS NOT NULL
             """;
@@ -26,8 +26,8 @@ public interface AnalyticsFunnelMapper {
                 WHERE tenant_id = #{tenantId} AND created_at <= #{cutoff}
                   AND occurred_at >= #{from} AND occurred_at < #{to}
                   AND source = 'server' AND ((producer_name = 'aurabot-analytics' AND event_name IN
-                    ('analytics_requested','analytics_query_succeeded','analytics_result_viewed','analytics_dashboard_used'))
-                    OR (producer_name = 'server-outcome-outbox' AND event_name = 'analytics_dashboard_saved'))
+                    ('analytics_requested','analytics_query_succeeded','analytics_result_viewed','analytics_dashboard_used','analytics_report_used'))
+                    OR (producer_name = 'server-outcome-outbox' AND event_name IN ('analytics_dashboard_saved','analytics_report_saved')))
             ), eligible AS (
                 SELECT * FROM observed WHERE sampling_probability = 1
                   AND user_id IS NOT NULL AND NULLIF(interaction_id, '') IS NOT NULL
@@ -46,7 +46,7 @@ public interface AnalyticsFunnelMapper {
                 SELECT c.tenant_id, c.user_id, c.interaction_id, c.occurred_at AS requested_at,
                        s.occurred_at AS succeeded_at, s.props->>'queryHash' AS query_hash,
                        v.occurred_at AS viewed_at, d.occurred_at AS saved_at,
-                       d.props->>'targetKey' AS dashboard_pid, u.occurred_at AS used_at
+                       d.props->>'targetKey' AS artifact_pid, d.props->>'targetType' AS artifact_type, u.occurred_at AS used_at
                 FROM cohort c
                 LEFT JOIN LATERAL (
                     SELECT e.* FROM (""" + ELIGIBLE_EVENTS + """
@@ -66,16 +66,18 @@ public interface AnalyticsFunnelMapper {
                 LEFT JOIN LATERAL (
                     SELECT e.* FROM (""" + ELIGIBLE_EVENTS + """
                     ) e WHERE e.user_id = c.user_id AND e.interaction_id = c.interaction_id
-                      AND e.event_name = 'analytics_dashboard_saved' AND e.occurred_at > v.occurred_at
-                      AND e.props->>'queryHash' = s.props->>'queryHash' AND e.props->>'targetType' = 'dashboard'
+                      AND ((e.event_name = 'analytics_dashboard_saved' AND e.props->>'targetType' = 'dashboard')
+                        OR (e.event_name = 'analytics_report_saved' AND e.props->>'targetType' = 'report')) AND e.occurred_at > v.occurred_at
+                      AND e.props->>'queryHash' = s.props->>'queryHash'
                       AND NULLIF(e.props->>'targetKey', '') IS NOT NULL
                     ORDER BY e.occurred_at, e.id LIMIT 1
                 ) d ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT e.* FROM (""" + ELIGIBLE_EVENTS + """
                     ) e WHERE e.user_id = c.user_id AND e.interaction_id = c.interaction_id
-                      AND e.event_name = 'analytics_dashboard_used' AND e.occurred_at > d.occurred_at
-                      AND e.props->>'queryHash' = s.props->>'queryHash' AND e.props->>'targetType' = 'dashboard'
+                      AND ((e.event_name = 'analytics_dashboard_used' AND e.props->>'targetType' = 'dashboard') OR (e.event_name = 'analytics_report_used' AND e.props->>'targetType' = 'report' AND e.props->>'usageKind' = 'export_generated')) AND e.occurred_at > d.occurred_at
+                      AND e.props->>'queryHash' = s.props->>'queryHash'
+                      AND e.props->>'targetType' = d.props->>'targetType'
                       AND e.props->>'targetKey' = d.props->>'targetKey' AND e.props->>'originalQuery' = 'true'
                     ORDER BY e.occurred_at, e.id LIMIT 1
                 ) u ON TRUE
@@ -89,8 +91,8 @@ public interface AnalyticsFunnelMapper {
                       WHERE e.event_name <> 'analytics_requested' AND CASE
                         WHEN e.event_name = 'analytics_query_succeeded' AND e.occurred_at > c.requested_at AND NULLIF(e.props->>'queryHash', '') IS NOT NULL THEN 1
                         WHEN e.event_name = 'analytics_result_viewed' AND e.occurred_at > c.succeeded_at AND e.props->>'queryHash' = c.query_hash AND e.props->>'signalSource' = 'client_visible' THEN 1
-                        WHEN e.event_name = 'analytics_dashboard_saved' AND e.occurred_at > c.viewed_at AND e.props->>'queryHash' = c.query_hash AND e.props->>'targetType' = 'dashboard' AND NULLIF(e.props->>'targetKey', '') IS NOT NULL THEN 1
-                        WHEN e.event_name = 'analytics_dashboard_used' AND e.occurred_at > c.saved_at AND e.props->>'queryHash' = c.query_hash AND e.props->>'targetType' = 'dashboard' AND e.props->>'targetKey' = c.dashboard_pid AND e.props->>'originalQuery' = 'true' THEN 1
+                        WHEN ((e.event_name = 'analytics_dashboard_saved' AND e.props->>'targetType' = 'dashboard') OR (e.event_name = 'analytics_report_saved' AND e.props->>'targetType' = 'report')) AND e.occurred_at > c.viewed_at AND e.props->>'queryHash' = c.query_hash AND NULLIF(e.props->>'targetKey', '') IS NOT NULL THEN 1
+                        WHEN ((e.event_name = 'analytics_dashboard_used' AND e.props->>'targetType' = 'dashboard') OR (e.event_name = 'analytics_report_used' AND e.props->>'targetType' = 'report' AND e.props->>'usageKind' = 'export_generated')) AND e.occurred_at > c.saved_at AND e.props->>'queryHash' = c.query_hash AND e.props->>'targetType' = c.artifact_type AND e.props->>'targetKey' = c.artifact_pid AND e.props->>'originalQuery' = 'true' THEN 1
                         ELSE 0 END = 0) AS unmatched_stage_events,
                    (SELECT count(*) FROM observed WHERE sampling_probability IS DISTINCT FROM 1) AS sampled_events
             FROM chain
