@@ -604,17 +604,17 @@ public class AgentApprovalGateService {
                     "Approval " + approvalPid + " rejected: plan_hash mismatch (request_data modified after creation)");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> update = new HashMap<>();
-        update.put("approval_status", "approved");
-        update.put("approver_id", approverId);
-        update.put("approved_at", now);
-        update.put("updated_at", now);
-        int updated = dynamicDataMapper.update("ab_agent_approval", update,
-                Map.of("pid", approvalPid, "approval_status", "pending"));
-        if (updated == 0) {
-            log.warn("Approve race blocked: approval {} was no longer pending", approvalPid);
-            throw new IllegalStateException("Approval already processed: " + approvalPid);
+        int updated = dynamicDataMapper.updateByQuery("""
+                UPDATE ab_agent_approval
+                SET approval_status = 'approved', approver_id = #{params.approverId},
+                    approved_at = NOW(), updated_at = NOW()
+                WHERE pid = #{params.pid} AND tenant_id = #{params.tenantId}
+                  AND approval_status = 'pending'
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                """, Map.of("pid", approvalPid, "tenantId", tenantId, "approverId", approverId));
+        if (updated != 1) {
+            log.warn("Approve blocked: approval {} was processed or expired", approvalPid);
+            throw new IllegalStateException("Approval already processed or expired: " + approvalPid);
         }
         log.info("Approval approved: pid={}, approver={}, triggerAutoResume={}",
                 approvalPid, approverId, triggerAutoResume);

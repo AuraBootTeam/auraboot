@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
-for (const mode of ['approve', 'reject', 'race']) {
+for (const mode of ['approve', 'reject', 'race', 'expired']) {
   test(`ACP authorized decision after foreign-user denial: ${mode}`, async ({ request }) => {
     let approved = mode !== 'reject';
     test.setTimeout(90000);
@@ -61,7 +61,7 @@ for (const mode of ['approve', 'reject', 'race']) {
         approver_rules: JSON.stringify([{ type: 'USER', userId: owners[0].created_by }]),
         policy_status: 'active',
         auto_approve: false,
-        timeout_hours: 24,
+        timeout_hours: mode === 'expired' ? 0 : 24,
         timeout_action: 'reject',
       });
       const started = await request.post('/api/ai/aurabot/chat/stream', {
@@ -179,6 +179,34 @@ for (const mode of ['approve', 'reject', 'race']) {
         expect(response.status()).toBe(200);
         return response.text();
       };
+      if (mode === 'expired') {
+        const expiry = (
+          await db.query(
+            'SELECT expires_at <= NOW() AS elapsed FROM ab_agent_approval WHERE pid=$1',
+            [approval.pid],
+          )
+        ).rows;
+        expect(expiry[0].elapsed).toBe(true);
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const result = await decide(true);
+          expect(result).toContain('event:error');
+          expect(result).not.toContain('event:done');
+          expect(await actions()).toEqual([]);
+          const state = (
+            await db.query(
+              'SELECT approval_status, consumed_at FROM ab_agent_approval WHERE pid=$1',
+              [approval.pid],
+            )
+          ).rows;
+          expect(['pending', 'expired']).toContain(state[0].approval_status);
+          expect(state[0].consumed_at).toBeNull();
+          const taskRuns = (
+            await db.query('SELECT pid FROM ab_agent_run WHERE task_id=$1', [approval.task_id])
+          ).rows;
+          expect(taskRuns).toEqual([{ pid: approval.run_id }]);
+        }
+        return;
+      }
       let text: string;
       if (mode === 'race') {
         const results = await Promise.all([decide(true), decide(false)]);

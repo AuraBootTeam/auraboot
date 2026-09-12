@@ -41,16 +41,20 @@ class AgentApprovalGateServiceConcurrencyTest {
                 .thenReturn(List.of(pendingApproval()))
                 .thenReturn(List.of());
         when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any())).thenReturn(List.of());
-        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+        when(dynamicDataMapper.updateByQuery(anyString(), any())).thenReturn(1);
 
         service.approve(1L, "apv-1", 99L, false);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), conditions.capture());
         assertThat(conditions.getValue())
                 .containsEntry("pid", "apv-1")
-                .containsEntry("approval_status", "pending");
+                .containsEntry("tenantId", 1L)
+                .containsEntry("approverId", 99L);
+        assertThat(sql.getValue()).contains("approval_status = 'pending'",
+                "tenant_id = #{params.tenantId}", "expires_at IS NULL OR expires_at > NOW()");
     }
 
     @Test
@@ -60,7 +64,7 @@ class AgentApprovalGateServiceConcurrencyTest {
         when(dynamicDataMapper.selectByQuery(anyString(), any()))
                 .thenReturn(List.of(Map.of("pid", "apv-1", "approval_status", "pending")))
                 .thenReturn(List.of(pendingApproval()));
-        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+        when(dynamicDataMapper.updateByQuery(anyString(), any())).thenReturn(0);
 
         assertThatThrownBy(() -> service.approve(1L, "apv-1", 99L, false))
                 .isInstanceOf(IllegalStateException.class)
