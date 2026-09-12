@@ -189,8 +189,11 @@ public class RunLifecycleService {
         runUpdate.put("duration_ms", ChronoUnit.MILLIS.between(startedAt, now));
         runUpdate.put("error_message", diagnostic);
         runUpdate.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
-        failTask(tenantId, taskPid, diagnostic);
+        Map<String, Object> taskUpdate = Map.of(
+                "task_status", "blocked", "completed_at", now, "updated_at", now);
+        boolean changed = terminalStore.complete(tenantId, runPid, taskPid, runUpdate, taskUpdate,
+                () -> publishTaskCompleted(tenantId, taskPid, "blocked"));
+        if (changed) cancelChildTasks(tenantId, taskPid);
     }
 
     void failTask(Long tenantId, String taskPid, String error) {

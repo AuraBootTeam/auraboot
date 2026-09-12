@@ -140,4 +140,33 @@ class AgentRunTerminalStoreIT {
         } finally { start.countDown(); pool.shutdownNow(); }
     }
 
+    private RunLifecycleService lifecycle(AtomicInteger signals) {
+        return new RunLifecycleService(data, new ObjectMapper(), null, null, null, jdbc,
+                event -> signals.incrementAndGet(), store);
+    }
+    @Test void exceptionalRunFailureCommitsStatusDiagnosticAndOutcome() {
+        AtomicInteger signals = new AtomicInteger();
+        String childPid = UUID.randomUUID().toString().replace("-", "").substring(0, 26);
+        assertThat(data.insert("ab_agent_task", Map.of("tenant_id", tenant, "pid", childPid,
+                "parent_id", taskPid, "title", "Pending child", "task_status", "todo"))).isEqualTo(1);
+        lifecycle(signals).failRun(tenant, runPid, taskPid, java.time.LocalDateTime.now().minusSeconds(1), "tool failed");
+        assertThat(runStatus()).isEqualTo("failed");
+        assertThat(taskStatus()).isEqualTo("blocked");
+        assertThat(events()).isEqualTo(1); assertThat(signals.get()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT task_status FROM ab_agent_task WHERE tenant_id=? AND pid=?", String.class, tenant, childPid))
+                .isEqualTo("cancelled");
+        assertThat(jdbc.queryForObject("SELECT error_message FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid))
+                .isEqualTo("tool failed");
+        assertThat(jdbc.queryForObject("SELECT payload->>'status' FROM ab_behavior_outcome_outbox WHERE tenant_id=? AND run_id=?", String.class, tenant, runPid))
+                .isEqualTo("failed");
+    }
+    @Test void lateFailureCannotOverwriteCommittedSuccess() {
+        AtomicInteger signals = new AtomicInteger();
+        assertThat(store.complete(tenant, runPid, taskPid, runUpdate, taskUpdate, signals::incrementAndGet)).isTrue();
+        lifecycle(signals).failRun(tenant, runPid, taskPid, java.time.LocalDateTime.now(), "late error");
+        assertThat(runStatus()).isEqualTo("success"); assertThat(taskStatus()).isEqualTo("done");
+        assertThat(events()).isEqualTo(1); assertThat(signals.get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT error_message FROM ab_agent_run WHERE tenant_id=? AND pid=?", String.class, tenant, runPid)).isNull();
+    }
+
 }
