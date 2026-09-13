@@ -28,17 +28,24 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   expect((await imported.json()).success).toBe(true);
   const code = `suggestion_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const outcomeTitle = `outcome_${code}`;
+  const paginateResults = process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
+  const outcomeTitles = Array.from(
+    { length: paginateResults ? 11 : 1 },
+    (_, index) => `${outcomeTitle}-${index}`,
+  );
+  const calls = outcomeTitles.map((title, index) => ({
+    id: `customer-${index}`,
+    name: 'cmd:e2et:create_customer',
+    input: {
+      e2et_cust_code: title,
+      e2et_cust_name: title,
+      e2et_cust_region: 'east',
+      e2et_cust_active: true,
+    },
+  }));
   const executionGoal =
-    'Create one e2et_customer follow-up record using the existing customer creation command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
-    JSON.stringify({
-      name: 'cmd:e2et:create_customer',
-      input: {
-        e2et_cust_code: outcomeTitle,
-        e2et_cust_name: outcomeTitle,
-        e2et_cust_region: 'east',
-        e2et_cust_active: true,
-      },
-    });
+    'Create e2et_customer follow-up records using the existing customer creation command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+    JSON.stringify(paginateResults ? { calls } : calls[0]);
   const role = await admin.request.post('/api/roles', {
     data: {
       code,
@@ -474,15 +481,20 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-execute-restored.png`,
         fullPage: true,
       });
-      const orders = await db.query('SELECT pid FROM mt_e2et_customer WHERE e2et_cust_name=$1', [
-        outcomeTitle,
-      ]);
-      expect(orders.rows).toHaveLength(1);
-      const businessFacts = await db.query(
-        "SELECT event_id FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_business_command_committed' AND target_key=$2",
-        [analysisId, orders.rows[0].pid],
+      const orders = await db.query(
+        'SELECT pid FROM mt_e2et_customer WHERE e2et_cust_name=ANY($1)',
+        [outcomeTitles],
       );
-      expect(businessFacts.rows).toHaveLength(1);
+      expect(orders.rows).toHaveLength(outcomeTitles.length);
+      const businessFacts = await db.query(
+        "SELECT event_id, target_key FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_business_command_committed' ORDER BY id",
+        [analysisId],
+      );
+      expect(businessFacts.rows).toHaveLength(outcomeTitles.length);
+      expect(businessFacts.rows.map((row) => row.target_key).sort()).toEqual(
+        orders.rows.map((row) => row.pid).sort(),
+      );
+      const expectedFirstPage = businessFacts.rows.slice(0, 10).map((row) => row.event_id);
       const resultUrl = `/api/analytics/suggestions/${adoptionPid}/business-results`;
       const resultResponse = () =>
         page.waitForResponse(
@@ -493,11 +505,11 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await latest.getByRole('button', { name: '查看业务结果', exact: true }).click();
       const read = await readable;
       expect(read.status()).toBe(200);
-      expect((await read.json()).data.records.map((row: any) => row.eventId)).toEqual([
-        businessFacts.rows[0].event_id,
-      ]);
+      expect((await read.json()).data.records.map((row: any) => row.eventId)).toEqual(
+        expectedFirstPage,
+      );
       const results = page.getByRole('dialog', { name: '已提交的业务操作' });
-      await expect(results.getByRole('listitem')).toHaveCount(1);
+      await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results).toContainText('新增已提交');
       await expect(results).toContainText('客户');
       await page.screenshot({
@@ -539,10 +551,10 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         await results.getByRole('button', { name: '重新读取', exact: true }).click();
         const restored = await restoredRead;
         expect(restored.status(), permission).toBe(200);
-        expect((await restored.json()).data.records.map((row: any) => row.eventId)).toEqual([
-          businessFacts.rows[0].event_id,
-        ]);
-        await expect(results.getByRole('listitem')).toHaveCount(1);
+        expect((await restored.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
         await expect(results.getByRole('alert')).toHaveCount(0);
       }
       const setTargetScope = async (scopeType: 'none' | 'all') => {
@@ -579,10 +591,52 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       expect(restoredScopeResponse.status()).toBe(200);
       expect(
         (await restoredScopeResponse.json()).data.records.map((row: any) => row.eventId),
-      ).toEqual([businessFacts.rows[0].event_id]);
-      await expect(results.getByRole('listitem')).toHaveCount(1);
+      ).toEqual(expectedFirstPage);
+      await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (paginateResults) {
+        await grant('model.e2et_customer.read', false);
+        const sourceRead = await page.request.get('/api/analytics/suggestions', {
+          params: { analysisId: analysisId! },
+        });
+        expect(sourceRead.status()).toBe(200);
+        const deniedNext = resultResponse();
+        await results.getByRole('button', { name: '下一页', exact: true }).click();
+        const deniedNextResponse = await deniedNext;
+        expect(new URL(deniedNextResponse.url()).searchParams.get('page')).toBe('2');
+        expect(deniedNextResponse.status()).toBe(403);
+        const deniedBody = await deniedNextResponse.text();
+        for (const fact of businessFacts.rows) expect(deniedBody).not.toContain(fact.event_id);
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await expect(results.getByRole('alert')).toBeVisible();
+        await page.screenshot({
+          path: `${process.env.AURA_EVIDENCE_DIR}/result-page-two-denied.png`,
+        });
+        await grant('model.e2et_customer.read', true);
+        const restart = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const restartResponse = await restart;
+        expect(restartResponse.status()).toBe(200);
+        expect((await restartResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+        const next = resultResponse();
+        await results.getByRole('button', { name: '下一页', exact: true }).click();
+        const nextResponse = await next;
+        expect(nextResponse.status()).toBe(200);
+        const nextPage = (await nextResponse.json()).data;
+        expect(nextPage.page).toBe(2);
+        expect(nextPage.hasMore).toBe(false);
+        expect(nextPage.records.map((row: any) => row.eventId)).toEqual([
+          businessFacts.rows[10].event_id,
+        ]);
+        await expect(results.getByRole('listitem')).toHaveCount(1);
+        await expect(results.getByRole('alert')).toHaveCount(0);
+        await page.screenshot({
+          path: `${process.env.AURA_EVIDENCE_DIR}/result-page-two-restored.png`,
+        });
+      }
     } finally {
       await db.end();
     }
