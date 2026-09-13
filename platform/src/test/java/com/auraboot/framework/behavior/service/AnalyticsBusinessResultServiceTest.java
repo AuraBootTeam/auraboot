@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -22,7 +23,8 @@ class AnalyticsBusinessResultServiceTest {
     private final UserPermissionService permissions = mock(UserPermissionService.class);
     private final MetaModelService models = mock(MetaModelService.class);
     private final ObjectMapper json = new ObjectMapper();
-    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, jdbc, data, permissions, models, json, mock(AnalyticsDeletedRecordAuthorization.class));
+    private final AnalyticsDeletedRecordAuthorization deletedRecords = mock(AnalyticsDeletedRecordAuthorization.class);
+    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, jdbc, data, permissions, models, json, deletedRecords);
     @BeforeEach void setup() { MetaContext.setContext(1L, 2L, "user", "user"); }
     @AfterEach void close() { MetaContext.clear(); }
     private void results(List<Map<String, Object>> rows) {
@@ -70,6 +72,36 @@ class AnalyticsBusinessResultServiceTest {
         when(data.getById("orders", "ORDER")).thenReturn(Map.of("pid", "ORDER"));
         assertThatThrownBy(() -> service.read("ADOPTION", 1, 10)).isInstanceOf(IllegalStateException.class);
     }
+    @Test void deletedCreateTargetFallsBackToThePrivateBasisContract() {
+        results(List.of(row()));
+        when(permissions.hasPermission(2L, "model.orders.read")).thenReturn(true);
+        when(data.getById("orders", "ORDER")).thenThrow(new MetaRecordNotFoundException("orders", "ORDER"));
+        var result = service.read("ADOPTION", 1, 10);
+        assertThat(result.records()).hasSize(1);
+        verify(deletedRecords).requireReadable("EVENT", "orders", "ORDER");
+    }
+
+    @Test void createTargetWithoutBasisFailsClosed() {
+        results(List.of(row()));
+        when(permissions.hasPermission(2L, "model.orders.read")).thenReturn(true);
+        when(data.getById("orders", "ORDER")).thenThrow(new MetaRecordNotFoundException("orders", "ORDER"));
+        doThrow(new AccessDeniedException("Historical business result basis is unavailable"))
+                .when(deletedRecords).requireReadable("EVENT", "orders", "ORDER");
+        assertThatThrownBy(() -> service.read("ADOPTION", 1, 10))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Historical business result basis is unavailable");
+    }
+
+    @Test void deletedUpdateTargetAlsoFallsBackToThePrivateBasisContract() {
+        var row = new HashMap<>(row());
+        row.put("payload", row.get("payload").toString().replace("\"operation\":\"create\"", "\"operation\":\"update\""));
+        results(List.of(row));
+        when(permissions.hasPermission(2L, "model.orders.read")).thenReturn(true);
+        when(data.getById("orders", "ORDER")).thenThrow(new MetaRecordNotFoundException("orders", "ORDER"));
+        service.read("ADOPTION", 1, 10);
+        verify(deletedRecords).requireReadable("EVENT", "orders", "ORDER");
+    }
+
     @Test void invalidPageDoesNotTouchSourceOrStorage() {
         assertThatThrownBy(() -> service.read("ADOPTION", 0, 10)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(sources, jdbc, data);

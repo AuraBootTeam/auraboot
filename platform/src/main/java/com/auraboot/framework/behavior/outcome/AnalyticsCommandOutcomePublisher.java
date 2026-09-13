@@ -2,6 +2,7 @@ package com.auraboot.framework.behavior.outcome;
 
 import com.auraboot.framework.agent.service.StepContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class AnalyticsCommandOutcomePublisher {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final BehaviorOutcomePublisher outcomes;
+    private final RecordSnapshotReader snapshots;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(CommandPipelineContext ctx) {
@@ -80,7 +82,7 @@ public class AnalyticsCommandOutcomePublisher {
         props.put("analyticsExecution", binding);
         props.put("principalType", origin.get("principal_type"));
         String eventId = UUID.randomUUID().toString();
-        if ("delete".equals(operation)) captureDeletedRecordBasis(ctx, recordPid, eventId);
+        captureRecordBasis(ctx, recordPid, eventId, operation);
         outcomes.publish(BehaviorOutcomeEvent.builder()
                 .tenantId(ctx.getTenantId()).userId(ctx.getUserId())
                 .eventId(eventId).eventName("analytics_business_command_committed")
@@ -88,16 +90,26 @@ public class AnalyticsCommandOutcomePublisher {
                 .causedByEventId(origin.get("started_event_id").toString())
                 .targetType(ctx.getCommand().getModelCode()).targetKey(recordPid).props(props).build());
     }
-    private void captureDeletedRecordBasis(CommandPipelineContext ctx, String target, String eventId) {
-        Map<String, Object> before = ctx.getBeforeSnapshot();
-        if (before == null || !(before.get("id") instanceof Number id)
-                || !(before.get("tenant_id") instanceof Number tenant)
+
+    /**
+     * Every committed analytics command persists the private record identity basis so later
+     * business-result reads can re-authorize against current permissions once the target is
+     * deleted. Delete and update reuse the pre-command snapshot; create re-reads the inserted
+     * row inside this transaction. Only identity columns are stored — business fields never
+     * enter the basis and no historical event is backfilled.
+     */
+    private void captureRecordBasis(CommandPipelineContext ctx, String target, String eventId, Object operation) {
+        Map<String, Object> identity = "create".equals(operation)
+                ? snapshots.readRecordSnapshot(ctx.getTenantId(), ctx.getCommand().getModelCode(), target)
+                : ctx.getBeforeSnapshot();
+        if (identity == null || !(identity.get("id") instanceof Number id)
+                || !(identity.get("tenant_id") instanceof Number tenant)
                 || tenant.longValue() != ctx.getTenantId()
-                || !(before.get("pid") instanceof String pid) || pid.isBlank()
+                || !(identity.get("pid") instanceof String pid) || pid.isBlank()
                 || !(target.equals(pid) || target.equals(id.toString()))
-                || !before.containsKey("created_by")
-                || (before.get("created_by") != null && !(before.get("created_by") instanceof Number))) {
-            throw new IllegalStateException("Analytics deletion has no trusted record identity basis");
+                || !identity.containsKey("created_by")
+                || (identity.get("created_by") != null && !(identity.get("created_by") instanceof Number))) {
+            throw new IllegalStateException("Analytics command has no trusted record identity basis");
         }
         // Insert before the event so a post-insert outbox failure exercises both writes' rollback.
         // The deferred FK requires the matching outbox event before transaction commit.
@@ -106,8 +118,8 @@ public class AnalyticsCommandOutcomePublisher {
                   (tenant_id, event_id, model_code, target_key, record_id, record_pid, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, ctx.getTenantId(), eventId, ctx.getCommand().getModelCode(), target,
-                id.longValue(), pid, before.get("created_by")) != 1) {
-            throw new IllegalStateException("Analytics deletion identity basis was not persisted");
+                id.longValue(), pid, identity.get("created_by")) != 1) {
+            throw new IllegalStateException("Analytics command identity basis was not persisted");
         }
     }
 }

@@ -781,7 +781,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
            JOIN ab_behavior_outcome_outbox o ON o.tenant_id=b.tenant_id AND o.event_id=b.event_id
            JOIN ab_agent_run r ON r.tenant_id=o.tenant_id AND r.pid=o.run_id
            JOIN ab_analytics_task_execution a ON a.tenant_id=r.tenant_id AND a.task_pid=r.task_id
-           WHERE a.adoption_pid=$1 ORDER BY o.id`, [adoptionPid],
+           WHERE a.adoption_pid=$1 AND o.payload->>'operation'='delete' ORDER BY o.id`, [adoptionPid],
         );
         expect(ownership.rows).toEqual(outcomeTitles.map(() => ({ owned: actorOwnsTarget })));
         await setTargetScope('self');
@@ -1041,6 +1041,40 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         );
         await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
         await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-mixed-allowed.png` });
+
+        const createdPid = businessFacts.rows
+          .map((row: { target_key: string }) => row.target_key)
+          .find((key: string) => !deletedTargets.includes(key));
+        expect(createdPid).toBeTruthy();
+        const removed = await admin.request.delete(`/api/dynamic/e2et_customer/${createdPid}`);
+        expect(removed.status(), await removed.text()).toBe(200);
+        mixed = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        mixedResponse = await mixed;
+        expect(
+          mixedResponse.status(),
+          'create-event basis keeps authorized reads after the target is deleted',
+        ).toBe(200);
+        expect((await mixedResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-mixed-target-deleted-allowed.png` });
+        await setTargetScope('none');
+        mixed = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        mixedResponse = await mixed;
+        expect(
+          mixedResponse.status(),
+          'deleted create target under none scope denies without leaking either event',
+        ).toBe(403);
+        expect(await mixedResponse.text()).not.toContain(businessFacts.rows[0].event_id);
+        expect(await mixedResponse.text()).not.toContain(
+          businessFacts.rows[businessFacts.rows.length - 1].event_id,
+        );
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-mixed-target-deleted-denied.png` });
+        await setTargetScope('all');
       }
       if (peerOwnsTarget) {
         const members = await db.query(

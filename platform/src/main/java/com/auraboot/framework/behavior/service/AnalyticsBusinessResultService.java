@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -64,8 +65,17 @@ public class AnalyticsBusinessResultService {
                 }
                 if ("delete".equals(payload.path("operation").asText())) {
                     deletedRecords.requireReadable(row.get("event_id").toString(), model, pid);
-                } else if (data.getById(model, pid) == null) {
-                    throw new AccessDeniedException("Business result target is unavailable");
+                } else {
+                    try {
+                        if (data.getById(model, pid) == null) {
+                            throw new AccessDeniedException("Business result target is unavailable");
+                        }
+                    } catch (MetaRecordNotFoundException targetDeleted) {
+                        // A create/update target that was later deleted follows the same private
+                        // basis contract as delete events: current authorization decides, and
+                        // legacy events without a basis fail closed.
+                        deletedRecords.requireReadable(row.get("event_id").toString(), model, pid);
+                    }
                 }
                 String label = models.getModelDefinition(model).map(def -> def.getDisplayName()).orElse(null);
                 if (model.equals(label)) label = null;
