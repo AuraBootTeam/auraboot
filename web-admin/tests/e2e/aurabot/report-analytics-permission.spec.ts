@@ -103,7 +103,10 @@ metrics:
           blockType: 'table',
           title: 'Orders',
           dataSource: 'orders',
-          columns: [{ field: 'e2et_order_title', label: 'Title' }],
+          columns: [
+            { field: 'e2et_order_title', label: 'Title' },
+            ...(sourceType !== 'model' ? [{ field: 'cnt', label: 'Count' }] : []),
+          ],
           showHeader: true,
         },
       ],
@@ -231,6 +234,7 @@ metrics:
             const data = await response.json();
             expect(data.dataSets.orders).toHaveLength(1);
             expect(data.dataSets.orders[0].e2et_order_title).toBe(key);
+            if (sourceType !== 'model') expect(Number(data.dataSets.orders[0].cnt)).toBe(1);
           }
           statuses.push({ format, status: response.status() });
         }
@@ -272,23 +276,26 @@ metrics:
           const event = session.page.waitForEvent('download');
           await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
           const artifact = await event;
-          const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-role-allowed.json`;
+          const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-role-allowed.json`;
           await artifact.saveAs(path);
           expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
             key,
           );
-          if (sourceType === 'model') {
-            const pdfDownload = session.page.waitForEvent('download');
-            await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
-            const pdf = await pdfDownload;
-            expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
-            const pdfPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-model-allowed.pdf`;
-            await pdf.saveAs(pdfPath);
-            const bytes = await readFile(pdfPath);
-            expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
-            if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1') {
-              expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
-            }
+          if (sourceType !== 'model') {
+            await expect(
+              session.page.getByRole('row').filter({ hasText: key }).getByRole('cell', { name: '1', exact: true }),
+            ).toBeVisible();
+          }
+          const pdfDownload = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
+          const pdf = await pdfDownload;
+          expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
+          const pdfPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-allowed.pdf`;
+          await pdf.saveAs(pdfPath);
+          const bytes = await readFile(pdfPath);
+          expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+          if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1') {
+            expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
           }
         } else {
           await expect(session.page.getByRole('alert')).toContainText('查询未成功');
@@ -355,7 +362,7 @@ metrics:
               );
               return result.rows[0].count;
             };
-            if (hasModelRead) await expect.poll(count).toBe(4);
+            if (hasModelRead) await expect.poll(count).toBe(5);
             else expect(await count()).toBe(0);
           } finally {
             await db.end();
@@ -423,7 +430,7 @@ metrics:
               ).toBeDisabled();
             }
             expect(downloads).toEqual([]);
-            await assertUsageCount(4);
+            await assertUsageCount(5);
             await session.page.screenshot({
               path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-revoked.png`,
               fullPage: true,
@@ -440,7 +447,7 @@ metrics:
           expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
             key,
           );
-          await assertUsageCount(5);
+          await assertUsageCount(6);
           await session.page.screenshot({
             path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-restored.png`,
             fullPage: true,
