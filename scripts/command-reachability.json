@@ -72,6 +72,10 @@
       "crm:create_sla_breach": "SLA breaches are immutable evaluator-generated incidents; users inspect them through the read-only breach list.",
       "crm:list_sla_breaches": "Agent/API query surface; the read-only dynamic list page reads the standard data endpoint.",
       "crm:list_sla_policies": "Agent/API query surface; the dynamic list page reads the standard data endpoint."
+    },
+    "core-dashboard": {
+      "core_dashboard:propose_suggestion": "Save suggestion version is invoked by web-admin/app/plugins/core-aurabot/components-internal/AnalyticsSuggestions.tsx through /api/meta/commands/execute/core_dashboard:propose_suggestion; this platform React result-card action is outside the DSL scanner. Browser journey: web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts.",
+      "core_dashboard:adopt_suggestion": "Confirm adoption is invoked by web-admin/app/plugins/core-aurabot/components-internal/AnalyticsSuggestions.tsx through /api/meta/commands/execute/core_dashboard:adopt_suggestion; this platform React result-card action is outside the DSL scanner. Browser journey: web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts."
     }
   },
   "baseline": {

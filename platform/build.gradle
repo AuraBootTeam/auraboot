@@ -1052,7 +1052,8 @@ tasks.register('integrationTest', Test) {
     description = 'Run integration tests (real Postgres, full Spring context).'
     useJUnitPlatform()
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
-    classpath = sourceSets.integrationTest.runtimeClasspath
+    // Match bootJar: current platform classes must precede the standalone plugin API jar.
+    classpath = sourceSets.main.output.classesDirs + sourceSets.integrationTest.runtimeClasspath
     shouldRunAfter test
 
     // Mirror `test` task JVM args so behavior matches.

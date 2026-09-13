@@ -447,5 +447,111 @@
         }
       }
     ]
+  },
+  {
+    "pageKey": "report_management",
+    "modelCode": "report_definition",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "报表管理",
+      "en-US": "Reports"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/report-definitions",
+        "method": "get"
+      },
+      "skipFieldMeta": true,
+      "hideListToolbar": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "report_actions",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "create_report",
+            "content": {
+              "zh-CN": "新建报表",
+              "en-US": "New report"
+            },
+            "primary": true,
+            "permissionCode": "report.definition.manage",
+            "navigateTo": "/report-designer"
+          }
+        ]
+      },
+      {
+        "id": "reports",
+        "blockType": "table",
+        "table": {
+          "rowKey": "pid",
+          "pagination": {
+            "pageSize": 20
+          },
+          "empty": {
+            "title": {
+              "zh-CN": "还没有报表",
+              "en-US": "No reports yet"
+            },
+            "description": {
+              "zh-CN": "点击“新建报表”，设计并保存第一份报表。",
+              "en-US": "Select New report to design and save your first report."
+            }
+          },
+          "columns": [
+            {
+              "field": "title",
+              "label": {
+                "zh-CN": "报表名称",
+                "en-US": "Report name"
+              }
+            },
+            {
+              "field": "version",
+              "label": {
+                "zh-CN": "版本",
+                "en-US": "Version"
+              },
+              "width": 100
+            },
+            {
+              "field": "updatedAt",
+              "label": {
+                "zh-CN": "更新时间",
+                "en-US": "Updated"
+              },
+              "width": 200,
+              "format": "YYYY-MM-DD HH:mm"
+            }
+          ],
+          "rowActions": [
+            {
+              "code": "open_report",
+              "label": {
+                "zh-CN": "打开",
+                "en-US": "Open"
+              },
+              "permissionCode": "report.definition.view",
+              "action": {
+                "type": "navigate",
+                "to": "/report-designer/{pid}"
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
 ]

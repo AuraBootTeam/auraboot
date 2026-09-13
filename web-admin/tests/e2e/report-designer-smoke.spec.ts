@@ -28,14 +28,14 @@ test.describe('Report Designer', () => {
     await expect(page.getByTestId('block-property-panel')).toBeVisible();
 
     // Toolbar elements
-    await expect(page.locator('input[placeholder="Report Title"]')).toBeVisible();
+    await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(预览|Preview)$/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(导出 PDF|Export PDF)$/ })).toBeVisible();
   });
 
   test('should set report title', async ({ page }) => {
-    const titleInput = page.locator('input[placeholder="Report Title"]');
+    const titleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/);
     await titleInput.fill(reportTitle);
     await expect(titleInput).toHaveValue(reportTitle);
   });
@@ -95,30 +95,30 @@ test.describe('Report Designer', () => {
 
   test('should open page settings dialog', async ({ page }) => {
     // Click Settings button in toolbar
-    await page.getByRole('button', { name: /Settings/ }).click();
+    await page.getByTestId('report-designer-toolbar').getByRole('button', { name: /^(设置|Settings)$/ }).click();
 
     // Settings dialog should appear
-    await expect(page.getByText('Page Settings')).toBeVisible();
+    await expect(page.getByText(/^(页面设置|Page Settings)$/)).toBeVisible();
     // Check page size select has A4 selected
     await expect(page.locator('select').first()).toHaveValue('A4');
 
     // Close dialog
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByText('Page Settings')).not.toBeVisible();
+    await page.getByRole('button', { name: /^(取消|Cancel)$/ }).click();
+    await expect(page.getByText(/^(页面设置|Page Settings)$/)).not.toBeVisible();
   });
 
   test('should toggle preview mode', async ({ page }) => {
     // Enter preview mode
-    await page.getByRole('button', { name: 'Preview' }).click();
+    await page.getByRole('button', { name: /^(预览|Preview)$/ }).click();
 
     // In preview mode, the button should say "Edit"
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(编辑|Edit)$/ })).toBeVisible();
 
     // Canvas/palette should not be visible in preview mode
     await expect(page.getByTestId('block-palette')).not.toBeVisible();
 
     // Toggle back to design mode
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: /^(编辑|Edit)$/ }).click();
     await expect(page.getByTestId('block-palette')).toBeVisible();
   });
 

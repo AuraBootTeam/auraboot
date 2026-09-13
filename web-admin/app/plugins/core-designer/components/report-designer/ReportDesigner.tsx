@@ -1,3 +1,6 @@
+import { useSmartText } from '~/utils/i18n';
+import { useToastContext } from '~/contexts/ToastContext';
+import { usePermission } from '~/contexts/AuthContext';
 /**
  * Report Designer Main Component
  *
@@ -16,13 +19,22 @@ import { useReportStore } from './store/useReportStore';
 import { ReportDocumentProvider, useReportDocument } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
 import { BlockPalette } from './components/BlockPalette';
+import { ReportTableBlock } from './blocks/ReportTableBlock';
+import { ReportGroupedTableBlock } from './blocks/ReportGroupedTableBlock';
+import { ReportStatCardBlock } from './blocks/ReportStatCardBlock';
+import { ReportRichTextBlock } from './blocks/ReportRichTextBlock';
+import { ReportCrossTabBlock } from './blocks/ReportCrossTabBlock';
+import { ReportChartBlock } from './blocks/ReportChartBlock';
+import { ReportBarcodeBlock } from './blocks/ReportBarcodeBlock';
+import { ReportWatermarkBlock } from './blocks/ReportWatermarkBlock';
 import { ReportCanvas } from './components/ReportCanvas';
 import { BlockPropertyPanel } from './components/BlockPropertyPanel';
-import { fetchReportData } from './services/fetchReportData';
+import { useReportQuery, type ReportQuery } from './services/useReportQuery';
+import { ReportQueryControls } from './components/ReportQueryControls';
 import { reportDesignerService } from './services/reportDesignerService';
-import { createEmptyReport } from './types';
+import { createEmptyReport, type ReportDsl } from './types';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
-import { pageSchemaVersionService } from '~/shared/versioning/versionService';
+import { reportVersionService } from '~/shared/versioning/versionService';
 
 const AUTO_SAVE_DELAY = 30000; // 30 seconds
 
@@ -32,6 +44,17 @@ interface ReportDesignerProps {
 }
 
 const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
+  const text = useSmartText();
+  const { showErrorToast } = useToastContext();
+  const notifyExportFailure = useCallback(() => {
+    showErrorToast(text({
+      zh: '导出未完成。请检查数据源和访问权限后重试。',
+      en: 'Export could not be completed. Check the data source and access permissions, then retry.',
+    }));
+  }, [text, showErrorToast]);
+  const canManage = usePermission('report.definition.manage');
+  const canExport = usePermission('report.export.execute');
+  const [loadFailed, setLoadFailed] = React.useState(false);
   const { report, isDirty, loadDocument, markSaved, setDirty, undo, redo } = useReportDocument();
   const {
     isSaving,
@@ -45,6 +68,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     reset,
   } = useReportStore();
 
+  const viewing = previewMode || !canManage;
+
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
 
@@ -52,14 +77,15 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   const loadReportById = useCallback(
     async (pid: string) => {
       setLoading(true);
+      setLoadFailed(false);
       try {
         const result = await reportDesignerService.loadByPid(pid);
         loadDocument(result.dsl);
         setPageId(result.pid);
         setLoading(false);
-      } catch (error) {
+      } catch {
         setLoading(false);
-        throw error;
+        setLoadFailed(true);
       }
     },
     [loadDocument, setPageId, setLoading],
@@ -76,6 +102,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   );
 
   const saveReport = useCallback(async () => {
+    if (!canManage) throw new Error('Report is read only');
     if (!report) throw new Error('No report to save');
     setSaving(true);
     try {
@@ -88,17 +115,19 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       setSaving(false);
       throw error;
     }
-  }, [report, pageId, setSaving, setPageId, markSaved]);
+  }, [report, pageId, setSaving, setPageId, markSaved, canManage]);
 
   // Version history management
   const versioning = useVersioning({
-    service: pageSchemaVersionService,
+    service: reportVersionService,
     resourcePid: pageId || undefined,
     onRollbackComplete: () => {
       // Reload report after rollback
       if (pageId) loadReportById(pageId);
     },
   });
+
+  const previewQuery = useReportQuery(report, viewing && !versioning.viewingVersionPid);
 
   // Load or create on mount
   useEffect(() => {
@@ -116,7 +145,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Auto-save
   useEffect(() => {
-    if (!isDirty || isSaving) {
+    if (!canManage || !isDirty || isSaving || versioning.viewingVersionPid) {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
@@ -141,10 +170,11 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         autoSaveTimerRef.current = null;
       }
     };
-  }, [isDirty, isSaving, saveReport]);
+  }, [isDirty, isSaving, saveReport, versioning.viewingVersionPid, canManage]);
 
   // Ctrl+S + Undo/Redo
   const handleSave = useCallback(async () => {
+    if (!canManage || versioning.viewingVersionPid) return;
     try {
       await saveReport();
       lastSaveTimeRef.current = Date.now();
@@ -152,10 +182,18 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       console.error('Save failed:', error);
       alert(error instanceof Error ? error.message : 'Save failed');
     }
-  }, [saveReport]);
+  }, [saveReport, versioning.viewingVersionPid, canManage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (!canManage || versioning.viewingVersionPid) &&
+        (e.ctrlKey || e.metaKey) &&
+        ['s', 'z', 'y'].includes(e.key.toLowerCase())
+      ) {
+        e.preventDefault();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
@@ -172,7 +210,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, undo, redo]);
+  }, [handleSave, undo, redo, versioning.viewingVersionPid, canManage]);
 
   // beforeunload
   useEffect(() => {
@@ -194,12 +232,16 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   // Excel Export
   const handleExportExcel = useCallback(async () => {
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to Excel.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportExcel(pageId);
+      const blob = await reportDesignerService.exportExcel(
+        pageId,
+        viewing ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -210,18 +252,32 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Excel export failed:', error);
-      alert(error instanceof Error ? error.message : 'Excel export failed');
+      notifyExportFailure();
     }
-  }, [report, pageId]);
+  }, [
+    notifyExportFailure,
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    viewing,
+    canExport,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
 
   // JSON Export
   const handleExportJson = useCallback(async () => {
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to JSON.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportJson(pageId);
+      const blob = await reportDesignerService.exportJson(
+        pageId,
+        viewing ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -232,18 +288,32 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('JSON export failed:', error);
-      alert(error instanceof Error ? error.message : 'JSON export failed');
+      notifyExportFailure();
     }
-  }, [report, pageId]);
+  }, [
+    notifyExportFailure,
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    viewing,
+    canExport,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
 
   // PDF Export
   const handleExportPdf = useCallback(async () => {
+    if (!canExport || isDirty || isSaving || (viewing && !previewQuery.canExport)) return;
     if (!pageId) {
       alert('Please save the report before exporting to PDF.');
       return;
     }
     try {
-      const blob = await reportDesignerService.exportPdf(pageId);
+      const blob = await reportDesignerService.exportPdf(
+        pageId,
+        viewing ? previewQuery.appliedParameters : undefined,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -254,9 +324,44 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF export failed:', error);
-      alert(error instanceof Error ? error.message : 'PDF export failed');
+      notifyExportFailure();
     }
-  }, [report, pageId]);
+  }, [
+    notifyExportFailure,
+    report,
+    pageId,
+    isDirty,
+    isSaving,
+    viewing,
+    canExport,
+    previewQuery.canExport,
+    previewQuery.appliedParameters,
+  ]);
+
+  const historyPanel = (
+    <VersionHistoryPanel
+      isOpen={versioning.isOpen}
+      onClose={versioning.closePanel}
+      versions={versioning.versions}
+      isLoading={versioning.isLoading}
+      viewingVersionPid={versioning.viewingVersionPid}
+      onPreview={versioning.previewVersion}
+      onExitPreview={versioning.exitPreview}
+      canRollback={canManage}
+      onRollback={versioning.rollbackToVersion}
+      isRollingBack={versioning.isRollingBack}
+    />
+  );
+
+  if (loadFailed)
+    return (
+      <div role="alert" className="p-8 text-red-600">
+        {text({
+          zh: '报表加载失败，请检查访问权限后重新打开。',
+          en: 'Report could not be loaded. Check access permissions and reopen it.',
+        })}
+      </div>
+    );
 
   if (isLoading) {
     return (
@@ -269,11 +374,51 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
     );
   }
 
+  if (versioning.viewingVersionPid) {
+    const historical = versioning.viewingSnapshot?.dsl as ReportDsl | undefined;
+    return (
+      <div className="flex h-screen flex-col bg-gray-50" data-testid="report-version-preview">
+        <div className="border-b border-amber-200 bg-amber-50 p-4 pr-80">
+          <h2 className="font-semibold">{historical?.title}</h2>
+          <p className="mt-1 text-sm">
+            {text({
+              zh: '历史版本只读预览；数据按当前访问权限重新查询。',
+              en: 'Read-only historical definition; data is queried using current access permissions.',
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={versioning.exitPreview}
+            className="mt-2 text-sm text-blue-700 underline"
+          >
+            {text({ zh: '返回当前报表', en: 'Return to current report' })}
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto pr-80">
+          {historical ? (
+            <PreviewContent key={versioning.viewingVersionPid} report={historical} />
+          ) : (
+            <p role="alert" className="p-6">
+              {text({
+                zh: '历史版本缺少报表定义，请返回当前报表。',
+                en: 'This version has no report definition. Return to the current report.',
+              })}
+            </p>
+          )}
+        </div>
+        {historyPanel}
+      </div>
+    );
+  }
+
   // Preview mode: render as runtime
-  if (previewMode && report) {
+  if (viewing && report) {
     return (
       <div className="flex h-screen flex-col bg-gray-50">
         <ReportToolbar
+          readOnly={!canManage}
+          exportAllowed={canExport}
+          exportReady={previewQuery.canExport}
           onSave={handleSave}
           onPreview={handlePreview}
           onExportPdf={handleExportPdf}
@@ -283,8 +428,9 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
           versionCount={versioning.versions.length}
         />
         <div className="flex-1 overflow-auto">
-          <PreviewContent report={report} />
+          <PreviewContent report={report} query={previewQuery} />
         </div>
+        {historyPanel}
       </div>
     );
   }
@@ -292,6 +438,8 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <ReportToolbar
+        readOnly={!canManage}
+        exportAllowed={canExport}
         onSave={handleSave}
         onPreview={handlePreview}
         onExportPdf={handleExportPdf}
@@ -307,17 +455,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       </div>
 
       {/* Version History Panel */}
-      <VersionHistoryPanel
-        isOpen={versioning.isOpen}
-        onClose={versioning.closePanel}
-        versions={versioning.versions}
-        isLoading={versioning.isLoading}
-        viewingVersionPid={versioning.viewingVersionPid}
-        onPreview={versioning.previewVersion}
-        onExitPreview={versioning.exitPreview}
-        onRollback={versioning.rollbackToVersion}
-        isRollingBack={versioning.isRollingBack}
-      />
+      {historyPanel}
     </div>
   );
 };
@@ -333,35 +471,34 @@ export const ReportDesigner: React.FC<ReportDesignerProps> = (props) => {
 /**
  * Preview content fetches data and renders runtime view
  */
-const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ report }) => {
-  const [dataSets, setDataSets] = React.useState<Record<string, Record<string, unknown>[]>>({});
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let mounted = true;
-    fetchReportData(report)
-      .then((data) => {
-        if (mounted) setDataSets(data);
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [report]);
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-      </div>
-    );
-  }
+const PreviewContent: React.FC<{ report: ReportDsl; query?: ReportQuery }> = ({
+  report,
+  query: supplied,
+}) => {
+  const text = useSmartText();
+  const internal = useReportQuery(report, !supplied);
+  const query = supplied ?? internal;
+  const { dataSets } = query;
 
   return (
     <div className="mx-auto my-8 max-w-4xl rounded-lg bg-white p-8 shadow-sm">
+      <ReportQueryControls report={report} query={query} />
+      {Object.values(report.dataSources).some(source => source.type === 'aggregate') && (
+        <p className="mb-4 text-sm text-gray-500" data-testid="report-aggregate-limit-hint">
+          {text({
+            zh: '聚合数据按查询定义的范围和条数上限计算，预览与导出使用相同查询。',
+            en: 'Aggregate data uses the scope and row limit defined by the query. Preview and export use the same query.',
+          })}
+        </p>
+      )}
+      {Object.values(report.dataSources).some(source => source.type === 'model' || source.type === 'namedQuery') && (
+        <p className="mb-4 text-sm text-gray-500">
+          {text({
+            zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',
+            en: 'Model and named-query sources preview up to 500 rows and export up to 1000 rows. Narrow filters for larger results.',
+          })}
+        </p>
+      )}
       {report.header && (
         <>
           <div className="mb-4">
@@ -391,55 +528,49 @@ const PreviewContent: React.FC<{ report: import('./types').ReportDsl }> = ({ rep
       {report.body.map((block) => (
         <div key={block.id} className="mb-6">
           {block.blockType === 'table' && (
-            <div>
-              {block.title && <h3 className="mb-2 text-base font-semibold">{block.title}</h3>}
-              <table className="w-full border-collapse border border-gray-300 text-sm">
-                {block.showHeader !== false && (
-                  <thead>
-                    <tr>
-                      {block.columns.map((col, i) => (
-                        <th
-                          key={i}
-                          className="border border-gray-300 bg-gray-100 px-3 py-2 font-semibold"
-                          style={{ textAlign: col.align || 'left' }}
-                        >
-                          {col.label || col.field}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                )}
-                <tbody>
-                  {(dataSets[block.dataSource] || []).map((row, rowIdx) => (
-                    <tr
-                      key={rowIdx}
-                      className={block.stripe !== false && rowIdx % 2 === 1 ? 'bg-gray-50' : ''}
-                    >
-                      {block.columns.map((col, colIdx) => (
-                        <td
-                          key={colIdx}
-                          className="border border-gray-300 px-3 py-1.5"
-                          style={{ textAlign: col.align || 'left' }}
-                        >
-                          {String(row[col.field] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {(dataSets[block.dataSource] || []).length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={block.columns.length}
-                        className="border border-gray-300 px-3 py-4 text-center text-gray-400"
-                      >
-                        No data
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <ReportTableBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
           )}
+          {block.blockType === 'grouped-table' && (
+            <ReportGroupedTableBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'stat-card' && (
+            <ReportStatCardBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'rich-text' && <ReportRichTextBlock block={block} mode="runtime" />}
+          {block.blockType === 'cross-tab' && (
+            <ReportCrossTabBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'chart' && (
+            <ReportChartBlock
+              block={block}
+              mode="runtime"
+              data={dataSets[block.dataSource] || []}
+            />
+          )}
+          {block.blockType === 'barcode' && (
+            <ReportBarcodeBlock
+              block={block}
+              mode="runtime"
+              data={block.dataSource ? dataSets[block.dataSource] || [] : []}
+            />
+          )}
+          {block.blockType === 'watermark' && <ReportWatermarkBlock block={block} mode="runtime" />}
         </div>
       ))}
 

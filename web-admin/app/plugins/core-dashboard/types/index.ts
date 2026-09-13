@@ -120,6 +120,9 @@ export interface DataSourceConfig {
    * `<semanticModelCode>.<metric_code>`. Leave blank for the raw SQL path.
    */
   semanticModelCode?: string;
+  timeRange?: import('~/framework/smart/types/chart').SemanticTimeRange;
+  orderBy?: { field: string; direction: string }[];
+  limit?: number;
 }
 
 /**

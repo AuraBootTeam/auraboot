@@ -1,3 +1,4 @@
+import type { AggregateQueryRequest } from '~/framework/smart/types/chart';
 /**
  * ReportDSL Types — independent from PageSchema
  *
@@ -39,12 +40,13 @@ export interface PageMargin {
 // ==================== Data Sources ====================
 
 export interface ReportDataSource {
-  type: 'model' | 'namedQuery' | 'api' | 'static';
+  type: 'model' | 'namedQuery' | 'api' | 'static' | 'aggregate';
+  aggregateQuery?: AggregateQueryRequest;
   modelCode?: string;
   queryCode?: string;
   url?: string;
   data?: Record<string, unknown>[];
-  filters?: Array<{ field: string; operator: string; value: string }>;
+  filters?: Array<{ field: string; operator: string; value?: string | number; values?: string[] }>;
   sortBy?: Array<{ field: string; order: 'asc' | 'desc' }>;
 }
 

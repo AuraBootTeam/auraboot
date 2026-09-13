@@ -6,16 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
- * Create request for a first-class low-code report ({@code ab_report}, Phase 4 slice 2a).
- *
- * <p>PURELY ADDITIVE: this DTO backs the additive {@code /api/report-definitions} CRUD API
- * (slice 2a). The live report designer still persists via {@code ab_page_schema} +
- * {@code extension.reportDsl}; nothing in the existing UI calls this endpoint yet (slice 2b).
- *
- * <p>The DTO is a thin transport shape and intentionally does NOT expose the
- * {@code ReportEntity} (no {@code id}, {@code tenantId}, audit columns, or soft-delete flag).
- * {@code dsl} is the report JSON carried as a {@link JsonNode} so the client round-trips the
- * ReportDsl object as-is; the controller serializes it to the entity's String/jsonb column.
+ * Create request for the canonical report-definition store.
+ * Excludes persistence identities, tenant context and audit fields from client input.
+ * The report DSL is stored as JSON; optional analysis provenance is verified by the server.
  */
 @Data
 public class ReportDefinitionCreateRequest {
@@ -31,7 +24,10 @@ public class ReportDefinitionCreateRequest {
     /** Render/layout profile; optional — defaults to {@code paged-media} when blank. */
     private String profile;
 
-    /** The whole ReportDsl as a JSON object (1:1 with {@code extension.reportDsl}). */
+    /** Optional successful analysis owned by the current user; verified against the saved query. */
+    private String sourceAnalysisId;
+
+    /** The complete ReportDsl as a JSON object. */
     @NotNull
     private JsonNode dsl;
 }

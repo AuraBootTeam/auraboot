@@ -408,6 +408,16 @@ public class AgentRunService {
      */
     public RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
                                       String resumeFromRunPid, String existingRunPid) {
+        return executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid, existingRunPid, false);
+    }
+
+    /** Retries unadmitted analytics tasks without creating another execution attempt. */
+    public RunOutcome executeInitialAnalyticsTaskSync(Long tenantId, String taskPid, String agentCode) {
+        return executeTaskSync(tenantId, taskPid, agentCode, null, null, true);
+    }
+
+    private RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
+                                       String resumeFromRunPid, String existingRunPid, boolean initialAnalytics) {
         if (!agentProperties.isEnabled()) {
             log.warn("Agent runtime is disabled, skipping task: {}", taskPid);
             return new RunOutcome.Skipped("Agent runtime disabled");
@@ -433,10 +443,14 @@ public class AgentRunService {
             if (agentDef == null) {
                 String agentMissingMsg = "Agent not found: " + agentCode;
                 if (existingRunPid == null) {
-                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt);
+                    if (initialAnalytics) {
+                        runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt, true);
+                    } else {
+                        runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt);
+                    }
                 }
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, agentMissingMsg);
-                return new RunOutcome.Failed(runPid, agentMissingMsg);
+                return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
             }
             String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(objectMapper, providerFactory, agentDef);
             if (providerCode == null || providerCode.isBlank()) {
@@ -459,7 +473,11 @@ public class AgentRunService {
             // so we don't double-write a parallel un-linked run record for the
             // same logical execution.
             if (existingRunPid == null) {
-                runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+                if (initialAnalytics) {
+                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt, true);
+                } else {
+                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+                }
             } else {
                 // Refresh model + updated_at so the pre-seeded row reflects the
                 // executor's resolved configuration. run_status stays 'running'.
@@ -482,7 +500,7 @@ public class AgentRunService {
                 String noProviderMsg = "No LLM provider configured for agent: " + agentCode +
                         ". Define guardrails.provider, guardrails.preferredProvider, or a known model.";
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
-                return new RunOutcome.Failed(runPid, noProviderMsg);
+                return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
             }
 
             // Concurrency control: check active runs for this agent
@@ -516,7 +534,7 @@ public class AgentRunService {
                     if (candidateProvider == null) {
                         String noProviderMsg = "LLM provider not available: " + effectiveProviderCode;
                         runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
-                        return new RunOutcome.Failed(runPid, noProviderMsg);
+                        return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
                     }
                     provider = candidateProvider;
                     config = candidateConfig;
@@ -535,14 +553,14 @@ public class AgentRunService {
                 String noProviderMsg = "No LLM provider configured. Tried: " + providerChain +
                         ". Add API key via Settings \u2192 Cloud Config \u2192 LLM.";
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
-                return new RunOutcome.Failed(runPid, noProviderMsg);
+                return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
             }
 
             Map<String, Object> task = loadTask(tenantId, taskPid);
             if (task == null) {
                 String taskMissingMsg = "Task not found: " + taskPid;
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, taskMissingMsg);
-                return new RunOutcome.Failed(runPid, taskMissingMsg);
+                return runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
             }
 
             String userMessage = buildUserMessage(task);
@@ -579,7 +597,7 @@ public class AgentRunService {
 
             // D1 Grounding: compile user message → BusinessIntentFrame
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = groundingService.ground(
-                    tenantId, userMessage,
+                    tenantId, groundingTaskText(task),
                     GroundingService.GroundingContext.builder()
                             .userId(currentInitiatorUserIdText())
                             .agentCode(agentCode)
@@ -662,6 +680,27 @@ public class AgentRunService {
                 }
             }
 
+            // Recommendations write a separate analytics model; retain provider permission
+            // checks and the agent scope filter below when discovering that exact command.
+            if (bif != null && ("recommend".equals(bif.getIntent()) || "analyze".equals(bif.getIntent()))) {
+                ToolDiscoveryContext analytics = ToolDiscoveryContext.builder()
+                        .tenantId(tenantId).userId(currentActorUserId()).agentCode(agentCode)
+                        .modelHint("core_dashboard_suggestion").intentHint("create").maxResults(20).build();
+                List<AgentToolDefinition> proposals = toAgentToolDefinitions(
+                        toolProviderRegistry.discoverAll(analytics).stream()
+                                .filter(tool -> "cmd:core_dashboard:propose_suggestion".equals(tool.getToolCode()))
+                                .toList());
+                List<AgentToolDefinition> merged = new ArrayList<>(tools);
+                Set<String> names = tools.stream().map(AgentToolDefinition::getName)
+                        .collect(java.util.stream.Collectors.toSet());
+                for (AgentToolDefinition proposal : proposals) {
+                    if (names.add(proposal.getName())) {
+                        merged.add(proposal);
+                    }
+                }
+                tools = merged;
+            }
+
             // B4: the allowed_models / allowed_operations guardrails restrict what the
             // assembled tool list may contain. The tool list is the enforcement
             // boundary on this engine — ToolLoopService rejects any call not in it —
@@ -690,6 +729,9 @@ public class AgentRunService {
             runSetupUpdate.put("updated_at", LocalDateTime.now());
             dynamicDataMapper.update("ab_agent_run", runSetupUpdate, Map.of("pid", runPid));
 
+            // Admission and setup succeeded; persist the execution fact before plan work.
+            runLifecycleService.recordExecutionStarted(tenantId, runPid, taskPid);
+
             // Generate or load plan
             List<AgentPlanStep> plan;
             int startStep = 0;
@@ -716,6 +758,7 @@ public class AgentRunService {
             // Start heartbeat to keep run alive (updated_at refreshed every 30s)
             runLifecycleService.startHeartbeat(runPid);
             AgentLoopResult result;
+            RunOutcome terminalOutcome;
             try {
                 // Execute plan steps (replaces executeAgentLoop for multi-step plans)
                 boolean skipApprovalForResumedStep = resumeFromRunPid != null
@@ -735,33 +778,37 @@ public class AgentRunService {
                 // Persist final plan state
                 planService.persistPlan(runPid, plan, plan.size());
 
-                completeRun(tenantId, runPid, taskPid, agentCode, plan, startedAt, result, model);
-
+                terminalOutcome = completeRun(tenantId, runPid, taskPid, agentCode, plan, startedAt, result, model);
+                String terminalStatus = terminalOutcome instanceof RunOutcome.Success ? "success"
+                        : terminalOutcome instanceof RunOutcome.Cancelled ? "cancelled" : "failed";
+                Map<String, Object> completionDetails = new HashMap<>(Map.of(
+                        "task_id", taskPid, "status", terminalStatus, "provider", resolvedProviderCode));
+                if (model != null) {
+                    completionDetails.put("model", model);
+                }
+                if (terminalOutcome instanceof RunOutcome.Success success) {
+                    completionDetails.put("input_tokens", success.inputTokens());
+                    completionDetails.put("output_tokens", success.outputTokens());
+                    completionDetails.put("total_cost", success.totalCost());
+                }
                 observationService.publish(tenantId, "run_completed", agentCode, "agent_run", runPid,
-                        Map.of("task_id", taskPid, "status", result.success ? "success" : "failed",
-                               "provider", resolvedProviderCode, "model", model,
-                               "input_tokens", result.totalInputTokens, "output_tokens", result.totalOutputTokens,
-                               "total_cost", result.totalCost));
+                        completionDetails);
 
-                // End trace on success
-                try { aiTraceService.endTrace(traceCtx, result.lastResponse, result.success ? "success" : "failed"); }
+                try { aiTraceService.endTrace(traceCtx,
+                        terminalOutcome instanceof RunOutcome.Success success ? success.finalResponse() : null,
+                        terminalStatus); }
                 catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
             } finally {
                 runLifecycleService.stopHeartbeat(runPid);
             }
 
-            // Map AgentLoopResult to RunOutcome — success carries the LLM final
-            // response + token / cost telemetry so the chokepoint can attach
-            // them to its outbound metric / memory rows; non-success here means
-            // the plan loop reported a soft failure (no exception, but a step
-            // could not complete) which is still a Failed outcome at the
-            // chokepoint level.
-            if (result.success) {
-                return new RunOutcome.Success(runPid, result.lastResponse,
-                        result.totalInputTokens, result.totalOutputTokens, result.totalCost);
-            }
-            return new RunOutcome.Failed(runPid, "Plan execution did not reach success terminal state");
+            return terminalOutcome;
 
+        } catch (AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
+            // No new run exists: never fail or mutate the already admitted attempt.
+            try { aiTraceService.endTrace(traceCtx, null, "skipped"); }
+            catch (RuntimeException traceError) { log.debug("Failed to end duplicate admission trace", traceError); }
+            throw admitted;
         } catch (AgentApprovalPendingException e) {
             log.info("Run {} paused for approval (approvalPid={}): {}",
                     runPid, e.getApprovalPid(), e.getMessage());
@@ -778,19 +825,17 @@ public class AgentRunService {
         } catch (Exception e) {
             log.error("Agent execution failed: task={}, agent={}, error={}", taskPid, agentCode, e.getMessage(), e);
             runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, e.getMessage());
-            observationService.publish(tenantId, "run_failed", agentCode, "agent_run", runPid,
-                    Map.of("task_id", taskPid, "error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
-            // End trace with error
-            try { aiTraceService.endTraceWithError(traceCtx, e.getMessage()); }
-            catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
-            // Fire SessionEndedEvent on FAILED terminal state so any L1
-            // memories written before the failure still get promotion
-            // evaluation (otherwise they wait for the orphan cron and
-            // pollute OrphanBacklogGrowing alerts).
-            publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
-                    SessionEndedEvent.TerminalOutcome.FAILED);
-            return new RunOutcome.Failed(runPid,
-                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            RunOutcome terminalOutcome = runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
+            if (terminalOutcome instanceof RunOutcome.Failed failed) {
+                observationService.publish(tenantId, "run_failed", agentCode, "agent_run", runPid,
+                        Map.of("task_id", taskPid, "error", failed.errorMessage()));
+                try { aiTraceService.endTraceWithError(traceCtx, failed.errorMessage()); }
+                catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
+                publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
+                        SessionEndedEvent.TerminalOutcome.FAILED);
+            }
+            return terminalOutcome;
+
         } finally {
             currentTraceCtx.remove();
         }
@@ -905,7 +950,7 @@ public class AgentRunService {
      * Complete a run: update records + dispatch child tasks + update mission + save memory.
      * Record updates are delegated to RunLifecycleService; dispatch stays here to avoid circular dependency.
      */
-    private void completeRun(Long tenantId, String runPid, String taskPid, String agentCode,
+    private RunOutcome completeRun(Long tenantId, String runPid, String taskPid, String agentCode,
                               List<AgentPlanStep> plan, LocalDateTime startedAt,
                               AgentLoopResult result, String model) {
         boolean success = runLifecycleService.completeRunRecord(tenantId, runPid, taskPid, startedAt, result, model);
@@ -913,7 +958,10 @@ public class AgentRunService {
         // CAP-03: after the run is marked terminal, derive and record the
         // outcome/goal verdict. Best-effort + observation-only — never changes
         // the run and never disturbs completion (mirrors the CAP-02 promotion).
-        publishRunOutcome(tenantId, runPid, agentCode, plan, result);
+        RunOutcome terminalOutcome = runLifecycleService.readTerminalOutcome(tenantId, runPid, taskPid);
+        if (success || (!result.success && terminalOutcome instanceof RunOutcome.Failed)) {
+            publishRunOutcome(tenantId, runPid, agentCode, plan, result);
+        }
 
         // Dispatch child tasks when parent completes successfully
         if (success) {
@@ -953,6 +1001,7 @@ public class AgentRunService {
                         SessionEndedEvent.TerminalOutcome.SUCCEEDED);
             }
         }
+        return terminalOutcome;
     }
 
     /**
@@ -1441,6 +1490,14 @@ public class AgentRunService {
                     tenantId, agentCode, e.getMessage(), e);
             return null;
         }
+    }
+
+    /** Classify the task itself, excluding runner instructions and serialized input data. */
+    private String groundingTaskText(Map<String, Object> task) {
+        Object description = task.get("description");
+        if (description instanceof String text && !text.isBlank()) return text;
+        Object title = task.get("title");
+        return title == null ? "" : title.toString();
     }
 
     private String buildUserMessage(Map<String, Object> task) {

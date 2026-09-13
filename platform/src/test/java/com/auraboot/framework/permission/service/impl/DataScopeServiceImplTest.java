@@ -411,4 +411,67 @@ class DataScopeServiceImplTest {
 
         assertThat(service.getScopesByRole(100L, 7L)).hasSize(1);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"member", "employee", "department", "tree"})
+    void historicalDepartmentDoesNotFallBackToSelf(String missing) {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("tree".equals(missing) ? "dept_and_sub" : "dept");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        if (!"member".equals(missing)) {
+            TenantMember member = new TenantMember();
+            member.setId(5L);
+            member.setPid("history-member");
+            when(tenantMemberMapper.selectById(5L)).thenReturn(member);
+            if (!"employee".equals(missing)) {
+                when(organizationService.getEmployeeByMemberPid("history-member")).thenReturn(
+                        "department".equals(missing) ? Map.of() : Map.of("org_emp_dept_id", "dept-1"));
+                if ("tree".equals(missing)) when(organizationService.getDeptAndSubPids("dept-1")).thenReturn(List.of());
+            }
+        }
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void historicalDepartmentUsesCurrentOrganizationOnEveryResolution() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("dept");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember member = new TenantMember();
+        member.setId(5L);
+        member.setPid("history-member");
+        when(tenantMemberMapper.selectById(5L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("history-member")).thenReturn(
+                Map.of("org_emp_dept_id", "dept-1"), Map.of("org_emp_dept_id", "dept-2"));
+        when(metaModelService.getModelDefinition("model.user")).thenReturn(Optional.empty());
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").deptPids()).containsExactly("dept-1");
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").deptPids()).containsExactly("dept-2");
+    }
+
+    @Test
+    void numericCreatorDepartmentLookupUsesCurrentTenantAndMembership() {
+        TenantMember member = new TenantMember();
+        member.setPid("creator-member");
+        when(tenantMemberMapper.findByTenantIdAndUserId(100L, 77L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(
+                Map.of("org_emp_dept_id", "dept-a"), Map.of("org_emp_dept_id", "dept-b"));
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isTrue();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        MetaContext.setContext(200L, 1L, "u-pid", "tester");
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        MetaContext.clear();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
+    @Test
+    void numericCreatorWithoutEmployeeOrDepartmentIsDenied() {
+        TenantMember member = new TenantMember();
+        member.setPid("creator-member");
+        when(tenantMemberMapper.findByTenantIdAndUserId(100L, 77L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(null, Map.of());
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
 }

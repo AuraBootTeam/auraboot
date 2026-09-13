@@ -17,6 +17,10 @@ import java.util.List;
 @Mapper
 public interface MetaModelMapper extends BaseMapper<Model> {
 
+    @Select("SELECT * FROM ab_meta_model WHERE tenant_id = #{tenantId} AND is_current = TRUE AND deleted_flag = false")
+    List<Model> findCurrentForTenant(@Param("tenantId") Long tenantId);
+
+
     // ==================== 幂等INSERT方法（统一使用） ====================
     
     /**

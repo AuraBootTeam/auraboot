@@ -27,6 +27,17 @@ class IntentParserTest {
         assertIntent("录入采购订单", "create");
     }
 
+    @Test
+    void explicitCreationOpeningWinsOverAnalysisNouns() {
+        assertIntent("创建分析建议版本", "create");
+        assertIntent("请帮我创建订单统计报告", "create");
+        assertIntent("Create a trend report for these orders", "create");
+        assertIntent("Please create a suggestion to review the query results", "create");
+        assertIntent("分析创建建议后的转化率", "analyze");
+        assertIntent("查看已创建的分析建议", "query");
+        assertIntent("Show newly created analysis suggestions", "query");
+    }
+
     // ─── QUERY ───────────────────────────────────────────────────────────────
 
     @Test

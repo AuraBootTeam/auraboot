@@ -4,13 +4,12 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderProperties;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -50,7 +49,8 @@ import static org.mockito.Mockito.when;
 class ReportExportServiceLiveIT {
 
     @Mock
-    private PageSchemaMapper pageSchemaMapper;
+    private UserPermissionService userPermissionService;
+
     @Mock
     private DynamicDataService dynamicDataService;
     @Mock
@@ -99,16 +99,15 @@ class ReportExportServiceLiveIT {
         props.setTimeoutSeconds(90);
         ReportRenderClient client = new ReportRenderClient(new ObjectMapper(), props);
 
-        ReportExportServiceImpl service = new ReportExportServiceImpl(
-                pageSchemaMapper, new ObjectMapper(), dynamicDataService, namedQueryService,
-                reportStorageService, auditTrailService, client, BrandingIdentity::community);
+        ReportExportServiceImpl service = new ReportExportServiceImpl(org.mockito.Mockito.mock(com.auraboot.framework.behavior.service.AnalyticsReportUsageService.class), org.mockito.Mockito.mock(com.auraboot.framework.bi.service.ReportAggregateQueryService.class),
+                new ObjectMapper(), dynamicDataService, namedQueryService,
+                reportStorageService, auditTrailService, client, BrandingIdentity::community, userPermissionService);
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
 
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", chartReportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-live-service")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(chartReportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-live-service")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-live-service");

@@ -56,6 +56,9 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class NamedQueryServiceImpl extends BaseMetaService implements NamedQueryService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private NamedQueryFieldProtection fieldProtection;
+
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
     private final NamedQueryVersionMapper namedQueryVersionMapper;
@@ -682,7 +685,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         String fromSql = query.getFromSql().trim();
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(String.join(", ", selectColumns));
-        if (fromSql.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(fromSql)) {
             sql.append(" FROM (").append(fromSql).append(") AS _nq");
         } else {
             sql.append(" FROM ").append(fromSql);
@@ -715,7 +718,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         authorizeRootRecord(query, policy, params);
 
-        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
 
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -741,8 +745,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
+        sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
+
         // Count total
-        // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
+        // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
         String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);
@@ -753,6 +759,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
         List<Map<String, Object>> records = dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
 
+        records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
     }
 
@@ -825,6 +832,32 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 query.getCode(), modelCode, recordPid);
     }
 
+    @Override
+    public void authorizeExportDownload(String code, NamedQueryDataExportRequest request, JsonNode definitionSnapshot) {
+        NamedQuery query = namedQueryMapper.findByCode(code);
+        if (query == null || !query.isExecutable()) {
+            throw new AccessDeniedException("Export query is no longer available");
+        }
+        authorizeDeclaredResource(query);
+        Map<String, Object> params = new HashMap<>();
+        if (request.getParameters() != null) params.putAll(request.getParameters());
+        params.put("tenantId", getCurrentTenantId());
+        Long userId = getCurrentUserId();
+        params.put("currentUserId", userId != null ? userId.toString() : null);
+        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+        List<String> currentScope = new ArrayList<>();
+        List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code);
+        List<NamedQueryField> selected = fields.stream().filter(field -> request.getFields() == null
+                || request.getFields().isEmpty() || request.getFields().contains(field.getFieldCode())).toList();
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, selected);
+        appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope, protection);
+        JsonNode currentDefinition = NamedQueryExportDefinition.capture(query, fields, currentScope, protection.evidence());
+        if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
+            throw new AccessDeniedException("Export query definition has changed; create a new export");
+        }
+
+    }
+
     // ==================== Export ====================
 
     @Override
@@ -842,6 +875,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         Long tenantId = getCurrentTenantId();
+        authorizeDeclaredResource(query);
 
         try {
             // 2. Get field whitelist
@@ -879,13 +913,14 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             String exportFromSql = query.getFromSql().trim();
             StringBuilder sql = new StringBuilder("SELECT ");
             sql.append(String.join(", ", selectColumns));
-            if (exportFromSql.toUpperCase().startsWith("SELECT ")) {
+            if (NamedQuerySqlSource.isQuery(exportFromSql)) {
                 sql.append(" FROM (").append(exportFromSql).append(") AS _nq");
             } else {
                 sql.append(" FROM ").append(exportFromSql);
             }
 
             Map<String, Object> params = new HashMap<>();
+            if (request.getParameters() != null) params.putAll(request.getParameters());
             List<String> whereClauses = new ArrayList<>();
 
             if (query.hasBaseWhere()) {
@@ -899,8 +934,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             params.put("tenantId", tenantId);
             Long userId = getCurrentUserId();
             params.put("currentUserId", userId != null ? userId.toString() : null);
+            authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
 
-            appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+            List<String> exportScope = new ArrayList<>();
+            NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
+                    exportFieldCodes.stream().map(fieldMap::get).toList());
+            appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
+            whereClauses.addAll(exportScope);
 
             if (!whereClauses.isEmpty()) {
                 sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -925,8 +965,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             int limit = request.getLimit() != null ? Math.min(request.getLimit(), policyExportMax) : Math.min(10000, policyExportMax);
             sql.append(" LIMIT ").append(limit);
 
+
+
             // 8. Execute query
-            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(sql.toString(), params);
+            // Physical source scopes already enforce tenant isolation, including CTE bodies.
+            List<Map<String, Object>> data = dynamicDataMapper.selectByQueryWithoutTenant(fieldProtection.rewrite(protection, sql.toString()), params);
+            data = fieldProtection.apply(protection, data);
 
             // 9. Generate export file
             DataExportRequest.ExportFormat format = request.getFormat() != null
@@ -952,6 +996,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             long fileSize = java.nio.file.Files.size(tempFile);
             return ExportResult.builder()
                     .success(true)
+                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields, exportScope, protection.evidence()))
                     .filePath(tempFile.toString())
                     .recordCount((long) data.size())
                     .fileSize(fileSize)
@@ -959,6 +1004,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     .exportTime(startTime)
                     .build();
 
+        } catch (AccessDeniedException denied) {
+            throw denied;
         } catch (MetaServiceException e) {
             throw e;
         } catch (Exception e) {
@@ -1233,11 +1280,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
         }
 
-        if (sqlToValidate.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(sqlToValidate)) {
             // Full SELECT statement — validate for forbidden DML/DDL keywords
             // (allows nested subqueries, window functions, COALESCE, CASE, etc.)
             try {
-                SqlSafetyUtils.validateSelectOnlySql(sqlToValidate);
+                SqlSafetyUtils.validateSelectOnlySql("SELECT * FROM (" + sqlToValidate + ") _validation");
             } catch (IllegalArgumentException e) {
                 throw new MetaServiceException("FROM SQL contains dangerous patterns: " + e.getMessage());
             }
@@ -1263,8 +1310,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQuery query,
             Long tenantId,
             Long userId,
-            List<String> whereClauses) {
+            List<String> whereClauses,
+            NamedQueryFieldProtection.Plan protection) {
         String resourceCode = trimToNull(query.getResourceCode());
+        // Physical sources already apply this exact model/read scope before projection.
+        // Reapplying it outside the projection can reference columns that are not selected.
+        if (protection != null && resourceCode != null
+                && protection.coversDeclaredScope(resourceCode, trimToNull(query.getActionCode()))) return;
         String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             if (!permitFilter.isBlank()) {

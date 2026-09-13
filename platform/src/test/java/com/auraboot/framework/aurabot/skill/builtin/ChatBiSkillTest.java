@@ -36,12 +36,19 @@ class ChatBiSkillTest {
     private final ObjectMapper om = new ObjectMapper();
     private AggregateQueryService aggregateQueryService;
     private ChatBiSkill skill;
+    private com.auraboot.framework.behavior.service.AnalyticsJourneyService journey;
+    private com.auraboot.framework.semantic.service.SemanticCatalogService catalog;
+    private com.auraboot.framework.permission.service.UserPermissionService permissions;
+
 
     @BeforeEach
     void setup() throws Exception {
         aggregateQueryService = mock(AggregateQueryService.class);
-        skill = new ChatBiSkill(aggregateQueryService, om);
-        skill.init(); // @PostConstruct
+        catalog = mock(com.auraboot.framework.semantic.service.SemanticCatalogService.class);
+        permissions = mock(com.auraboot.framework.permission.service.UserPermissionService.class);
+        journey = mock(com.auraboot.framework.behavior.service.AnalyticsJourneyService.class);
+        org.mockito.Mockito.lenient().when(journey.requested()).thenReturn("analysis-1");
+        skill = new ChatBiSkill(aggregateQueryService, om, catalog, permissions, journey);
     }
 
     private ObjectNode baseParams() {
@@ -69,8 +76,7 @@ class ChatBiSkillTest {
         ObjectNode params = baseParams();
         params.put("chartType", "bar");
         // adversarial: the model tries to smuggle a semantic model / named query — must be stripped.
-        params.put("semanticModelCode", "evil");
-        params.put("queryCode", "evil_query");
+
 
         SkillResult r = run(params);
 
@@ -78,8 +84,8 @@ class ChatBiSkillTest {
         verify(aggregateQueryService).execute(cap.capture());
         AggregateQueryRequest req = cap.getValue();
         assertThat(req.getType()).isEqualTo("aggregate");
-        assertThat(req.getSemanticModelCode()).as("raw path forced; smuggled semantic model stripped").isNull();
-        assertThat(req.getQueryCode()).as("smuggled named query stripped").isNull();
+        assertThat(req.getSemanticModelCode()).as("raw query has no semantic model").isNull();
+        assertThat(req.getQueryCode()).as("raw query has no named query").isNull();
         assertThat(req.getModelCode()).isEqualTo("crm_lead_common");
         assertThat(req.getDimensions()).containsExactly("crm_lead_status");
         assertThat(req.getMetrics()).hasSize(1);
@@ -96,10 +102,18 @@ class ChatBiSkillTest {
         assertThat(payload.get("records").get(0).get("crm_lead_status").asText()).isEqualTo("new");
         assertThat(payload.get("rowCount").asInt()).isEqualTo(2);
         // aggregate spec carried for the "save as dashboard" bridge (Slice E)
+        assertThat(payload.path("dataSource").path("limit").asInt()).isEqualTo(100);
         assertThat(payload.get("dimensions").toString()).contains("crm_lead_status");
         assertThat(payload.get("metrics")).hasSize(1);
         assertThat(payload.get("metrics").get(0).get("field").asText()).isEqualTo("pid");
         assertThat(payload.get("metrics").get(0).get("aggregation").asText()).isEqualTo("count");
+    }
+
+    @Test
+    void rejectsUnsupportedQueryParameters() {
+        ObjectNode params = baseParams();
+        params.put("queryCode", "unguarded_query");
+        assertThatThrownBy(() -> run(params)).isInstanceOf(SkillSpiException.class);
     }
 
     @Test
@@ -143,4 +157,76 @@ class ChatBiSkillTest {
         params.putArray("metrics").addObject().put("field", "crm_lead_score").put("aggregation", "median");
         assertThatThrownBy(() -> run(params)).isInstanceOf(SkillSpiException.class);
     }
+    @org.junit.jupiter.api.AfterEach
+    void clearContext() { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+
+    private void setupCatalog() {
+        com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(7L);
+        com.auraboot.framework.application.tenant.MetaContext.setCurrentUserId(9L);
+        when(permissions.hasPermission(9L,
+                com.auraboot.framework.permission.constants.MetaPermission.META_SEMANTIC_USE)).thenReturn(true);
+        var result = new com.auraboot.framework.semantic.dto.SemanticMetaResponse();
+        var model = new com.auraboot.framework.semantic.dto.SemanticMetaResponse.ModelMeta();
+        model.setCode("sales"); model.setModelRef("orders");
+        var visible = new com.auraboot.framework.semantic.dto.SemanticMetaResponse.MetricMeta();
+        visible.setCode("revenue");
+        var restricted = new com.auraboot.framework.semantic.dto.SemanticMetaResponse.MetricMeta();
+        restricted.setCode("margin"); restricted.setRequiredPermissions(List.of("finance.margin"));
+        model.setMetrics(List.of(visible, restricted));
+        result.setModels(List.of(model));
+        when(catalog.listCatalog(7L)).thenReturn(result);
+    }
+
+    @Test
+    void catalogFiltersRestrictedMetricsWithoutModifyingSharedCatalog() {
+        setupCatalog();
+        JsonNode payload = om.valueToTree(run(om.createObjectNode().put("action", "catalog")).getPayload());
+        assertThat(payload.at("/models/0/metrics")).hasSize(1);
+        assertThat(payload.at("/models/0/metrics/0/code").asText()).isEqualTo("revenue");
+        assertThat(catalog.listCatalog(7L).getModels().get(0).getMetrics()).hasSize(2);
+    }
+
+    @Test
+    void semanticQueryCarriesGovernedIdentityAndCompleteFiltersIntoSavedDefinition() {
+        setupCatalog();
+        ObjectNode params = om.createObjectNode().put("semanticModelCode", "sales").put("limit", 5);
+        params.putArray("metrics").addObject().put("field", "revenue").put("aggregation", "sum");
+        params.putArray("filters").addObject().put("field", "region").put("operator", "eq").put("value", "East");
+        params.putArray("orderBy").addObject().put("field", "revenue").put("direction", "desc");
+        params.putObject("timeRange").put("field", "created").put("preset", "mtd");
+        AggregateQueryResponse response = new AggregateQueryResponse();
+        response.setRows(List.of(Map.of("revenue", 120)));
+        when(aggregateQueryService.execute(any())).thenReturn(response);
+        JsonNode payload = om.valueToTree(run(params).getPayload());
+        assertThat(payload.at("/dataSource/semanticModelCode").asText()).isEqualTo("sales");
+        assertThat(payload.at("/dataSource/modelCode").asText()).isEqualTo("orders");
+        assertThat(payload.at("/dataSource/filters/0/value").asText()).isEqualTo("East");
+        assertThat(payload.at("/dataSource/orderBy")).isEqualTo(params.get("orderBy"));
+        assertThat(payload.at("/dataSource/timeRange/preset").asText()).isEqualTo("mtd");
+        assertThat(payload.at("/dataSource/limit").asInt()).isEqualTo(5);
+        assertThat(payload.at("/columns/0").asText()).isEqualTo("revenue");
+    }
+
+    @Test
+    void restrictedMetricAndMissingCatalogPermissionAreRejectedBeforeQuery() {
+        setupCatalog();
+        ObjectNode params = om.createObjectNode().put("semanticModelCode", "sales");
+        params.putArray("metrics").addObject().put("field", "margin").put("aggregation", "sum");
+        assertThatThrownBy(() -> run(params)).isInstanceOf(SkillSpiException.class);
+        when(permissions.hasPermission(9L,
+                com.auraboot.framework.permission.constants.MetaPermission.META_SEMANTIC_USE)).thenReturn(false);
+        assertThatThrownBy(() -> run(om.createObjectNode().put("action", "catalog")))
+                .isInstanceOf(SkillSpiException.class);
+        org.mockito.Mockito.verifyNoInteractions(aggregateQueryService);
+    }
+
+    @Test
+    void queryFailureRecordsFailureWithoutSuccess() {
+        when(aggregateQueryService.execute(any())).thenThrow(new IllegalStateException("query failed"));
+        assertThatThrownBy(() -> skill.execute(SkillRequest.builder().params(baseParams()).build()))
+                .isInstanceOf(IllegalStateException.class);
+        verify(journey).failed("analysis-1");
+        org.mockito.Mockito.verify(journey, org.mockito.Mockito.never()).succeeded(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+    }
+
 }

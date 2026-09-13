@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +48,8 @@ public class ReportRenderClient {
 
         Path outFile = null;
         Path errFile = null;
+        Path requestFile = null;
+        Process process = null;
         try {
             outFile = Files.createTempFile("auraboot-report-", ".pdf");
             errFile = Files.createTempFile("auraboot-report-", ".log");
@@ -67,14 +68,15 @@ public class ReportRenderClient {
             request.put("model", reportDsl);
             request.put("dataSets", dataSets == null ? Map.of() : dataSets);
 
-            Process process = pb.start();
-            try (OutputStream stdin = process.getOutputStream()) {
-                objectMapper.writeValue(stdin, request);
-            }
+            // A pipe write can block before waitFor starts if the renderer never reads.
+            // File-backed stdin keeps the subprocess deadline independent of input consumption.
+            requestFile = Files.createTempFile("auraboot-report-request-", ".json");
+            objectMapper.writeValue(requestFile.toFile(), request);
+            pb.redirectInput(requestFile.toFile());
+            process = pb.start();
 
             boolean finished = process.waitFor(properties.getTimeoutSeconds(), TimeUnit.SECONDS);
             if (!finished) {
-                process.destroyForcibly();
                 throw new ReportRenderException(
                         "report renderer timed out after " + properties.getTimeoutSeconds() + "s");
             }
@@ -95,8 +97,13 @@ public class ReportRenderClient {
             Thread.currentThread().interrupt();
             throw new ReportRenderException("report renderer interrupted", e);
         } finally {
+            if (process != null && process.isAlive()) {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+            }
             deleteQuietly(outFile);
             deleteQuietly(errFile);
+            deleteQuietly(requestFile);
         }
     }
 

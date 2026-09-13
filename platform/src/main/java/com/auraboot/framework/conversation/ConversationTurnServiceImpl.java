@@ -455,7 +455,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()), route);
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()), route);
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller,
             // but the failure must not vanish silently (P-006).
@@ -599,7 +599,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
                     TurnRoute.resumedAfterConfirmation());
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
@@ -658,6 +658,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
+        if (!agentApprovalGateService.isAuthorizedApprover(tenantId, approvalPid, approverId)) {
+            String msg = "Insufficient permission to decide this approval";
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
+        }
         if (!"pending".equals(existingStatus)) {
             String msg = "Approval " + approvalPid + " is no longer pending (status=" + existingStatus + ")";
             log.warn(msg);
@@ -707,12 +712,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     yield syncResumeAcpRun(ctx, taskPid, runPid, capturingSink);
                 }
                 case DENIED -> {
-                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation");
+                    if (agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation") == null) {
+                        throw new IllegalStateException("Approval already processed: " + approvalPid);
+                    }
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User denied the operation", "user_denied");
                 }
                 case CANCELLED -> {
-                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation");
+                    if (agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation") == null) {
+                        throw new IllegalStateException("Approval already processed: " + approvalPid);
+                    }
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User cancelled the operation", "user_cancelled");
                 }
@@ -728,7 +737,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             // ACP approval resume: continuation executes on the durable engine.
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
                     new TurnRoute(
                             TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW.name(),
                             "RESUMED_AFTER_APPROVAL",
@@ -1620,8 +1629,9 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     return;
                 }
             }
+            // Durable execution owns terminal task states; only close an unfinished conversation task.
             dynamicDataMapper.update("ab_agent_task", updates,
-                    java.util.Map.of("pid", taskPid));
+                    java.util.Map.of("tenant_id", ctx.tenantId(), "pid", taskPid, "task_status", "in_progress"));
         } catch (Exception e) {
             String msg = "Named-agent task close failed: " + safeExceptionMessage(e);
             log.warn("closeNamedAgentTask failed for taskPid={}: {}", taskPid, safeExceptionMessage(e));

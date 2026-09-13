@@ -63,6 +63,10 @@ public class AuraBotController {
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
+        if (request.getAnalyticsExecution() != null) {
+            if (request.getOptions() == null) request.setOptions(new ChatRequest.ChatOptions());
+            request.getOptions().setExplicitDurableRequest(true);
+        }
         SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
 
         // Snapshot identity BEFORE the async hop — MetaContext is a ThreadLocal that
@@ -98,7 +102,8 @@ public class AuraBotController {
                         request.getClientMsgId(),             // Phase B.1: dedup key
                         request.getMessage(),
                         null,                                 // pageContext — carried in legacyRequest
-                        null,                                 // options — carried in legacyRequest
+                        request.getOptions() == null ? null : objectMapper.convertValue(
+                                request.getOptions(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}),
                         InboundMode.NEW_FROM_REQUEST,
                         null,                                 // precomputedBucket — Phase B+
                         null,                                 // inboundMessageId — D.1: only set when EXISTING_MESSAGE_ID

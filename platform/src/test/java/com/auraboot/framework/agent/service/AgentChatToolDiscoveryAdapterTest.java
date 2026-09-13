@@ -32,6 +32,36 @@ import static org.mockito.Mockito.when;
  */
 class AgentChatToolDiscoveryAdapterTest {
 
+    @Test
+    void analysisSuggestionDiscoveryPreservesConfirmationAndAgentScope() {
+        ToolProviderRegistry registry = mock(ToolProviderRegistry.class);
+        GroundingService grounding = mock(GroundingService.class);
+        when(grounding.ground(anyLong(), anyString(), any())).thenReturn(
+                com.auraboot.framework.agent.dto.BusinessIntentFrame.builder()
+                        .intent("analyze").object("e2et_order").build());
+        ToolDefinition proposal = ToolDefinition.builder()
+                .toolCode("cmd:core_dashboard:propose_suggestion").toolType("dsl_command")
+                .modelCode("core_dashboard_suggestion").operationKind("create")
+                .riskLevel("L2").requiresConfirmation(true).build();
+        when(registry.discoverAlwaysOn(any())).thenReturn(List.of());
+        when(registry.discoverAll(any())).thenAnswer(invocation -> {
+            ToolDiscoveryContext context = invocation.getArgument(0);
+            assertThat(context.getTenantId()).isEqualTo(1L);
+            assertThat(context.getUserId()).isEqualTo(2L);
+            return "core_dashboard_suggestion".equals(context.getModelHint())
+                    ? List.of(proposal, tool("cmd:core_dashboard:adopt_suggestion"))
+                    : List.of();
+        });
+
+        assertThat(adapter(registry, grounding).discover(
+                1L, 2L, "analyst", "web", "analyze orders", Map.of()))
+                .containsExactly(proposal);
+        assertThat(proposal.isRequiresConfirmation()).isTrue();
+        assertThat(adapter(registry, grounding).discover(
+                1L, 2L, "analyst", "web", "analyze orders",
+                Map.of("allowed_models", List.of("e2et_order")))).isEmpty();
+    }
+
     private ToolDefinition tool(String code) {
         return ToolDefinition.builder().toolCode(code).toolName(code).description("d").build();
     }

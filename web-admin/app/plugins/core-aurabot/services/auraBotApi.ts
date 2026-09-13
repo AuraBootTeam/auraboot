@@ -155,6 +155,7 @@ export interface AuraBotConversationItem {
 }
 
 export interface AuraBotConversationMessage {
+  resultContracts?: import('../types/ResultContract').ResultContract[];
   id: number;
   conversationId: number;
   seq: number;
@@ -192,12 +193,15 @@ export const auraBotApi = {
     return result.data || [];
   },
 
-  async ensureConversation(agentCode?: string): Promise<AuraBotConversationItem> {
+  async ensureConversation(
+    agentCode?: string,
+    newConversation = false,
+  ): Promise<AuraBotConversationItem> {
     const response = await fetch(`${API_BASE_URL}/conversations`, {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ agentCode }),
+      body: JSON.stringify({ agentCode, newConversation }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
@@ -205,10 +209,13 @@ export const auraBotApi = {
   },
 
   async getConversationMessages(conversationId: number): Promise<AuraBotConversationMessage[]> {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`, {
-      method: 'get',
-      credentials: 'include',
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`,
+      {
+        method: 'get',
+        credentials: 'include',
+      },
+    );
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
     return result.data || [];
@@ -458,6 +465,7 @@ export const auraBotApi = {
       history?: Array<{ role: string; content: string }>;
       conversationId?: number;
       clientMsgId?: string;
+      analyticsExecution?: { adoptionPid: string; requestId: string };
       attachments?: Array<{ mediaType: string; data: string; name?: string }>;
     },
     callbacks: ChatStreamOptions,
@@ -594,9 +602,7 @@ async function processSSEStream(
                 );
                 break;
               case 'retrieval_evidence': {
-                const evidence = Array.isArray(
-                  (data as { evidence?: unknown }).evidence,
-                )
+                const evidence = Array.isArray((data as { evidence?: unknown }).evidence)
                   ? (data as { evidence: RetrievalEvidence[] }).evidence
                   : [];
                 callbacks.onRetrievalEvidence?.(evidence);

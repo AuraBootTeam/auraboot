@@ -82,9 +82,10 @@ export function createVersionService(apiBase: string) {
 export const dashboardVersionService = createVersionService('/api/dashboards');
 
 /**
- * Pre-configured version service for page schemas (pages + reports)
+ * Pre-configured version service for page schemas
  */
 export const pageSchemaVersionService = createVersionService('/api/pages');
+export const reportVersionService = createVersionService('/api/report-definitions');
 
 /**
  * Pre-configured version service for BPMN process definitions.

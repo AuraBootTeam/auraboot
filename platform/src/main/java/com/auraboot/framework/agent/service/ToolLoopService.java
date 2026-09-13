@@ -261,10 +261,8 @@ public class ToolLoopService {
                         "message", "This tool requires human approval. Approval request " +
                                 approvalPid + " has been created."));
             }
-            return toJsonResult(Map.of(
-                    "success", false,
-                    "approvalRequired", true,
-                        "error", "This tool requires human approval, but no matching approval policy could create a request. No data was changed."));
+            // A null result now means an exact approved grant was consumed.
+            // Missing policy is an explicit denial from the gate.
         }
 
         if (toolDef.isRequiresConfirmation() && !auraBotSkill) {
@@ -845,9 +843,7 @@ public class ToolLoopService {
                 String modelCode = resolveModelCodeForCommand(tenantId, commandCode);
                 if (modelCode != null) {
                     if (recordPid == null && cmdResult.getData() != null) {
-                        Object newPid = cmdResult.getData().get("pid");
-                        if (newPid == null) newPid = cmdResult.getData().get("id");
-                        if (newPid != null) recordPid = newPid.toString();
+                        recordPid = ActionRecorder.commandRecordPid(cmdResult);
                     }
                     if (recordPid != null) {
                         afterData = actionRecorder.readRecordByPid(modelCode, recordPid);
@@ -1195,18 +1191,7 @@ public class ToolLoopService {
     }
 
     private boolean isToolResultSuccess(String result) {
-        if (result == null || result.startsWith("Error")) {
-            return false;
-        }
-        try {
-            Object parsed = objectMapper.readValue(result, Object.class);
-            if (parsed instanceof Map<?, ?> map && map.containsKey("success")) {
-                return Boolean.TRUE.equals(map.get("success"));
-            }
-        } catch (Exception ignored) {
-            // Non-JSON tool output is considered successful unless it starts with Error.
-        }
-        return true;
+        return ToolResultOutcome.isSuccess(result, objectMapper);
     }
 
     private Map<String, Object> parseToolResultMap(String result) {

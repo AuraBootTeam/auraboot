@@ -318,4 +318,33 @@ class SemanticAggregateAdapterTest {
         SemanticQueryRequest sem = adapter.translate(req, "sales");
         assertThat(sem.getDimensions()).containsExactly("region", "order_date__month");
     }
+    @Test
+    void preservesTimeRangeAndPropagatesExecutionFailure() {
+        AggregateQueryRequest request = baseRequest();
+        request.setMetrics(List.of(metric("revenue", null)));
+        request.setTimeRange(new SemanticQueryRequest.TimeRange("created", "mtd", null, null));
+        assertThat(adapter.translate(request, "sales").getTimeRange()).isEqualTo(request.getTimeRange());
+        when(queryService.executeQuery(any(), any()))
+                .thenThrow(new org.springframework.jdbc.BadSqlGrammarException("query", "invalid", new java.sql.SQLException()));
+        assertThatThrownBy(() -> adapter.execute(request))
+                .isInstanceOf(org.springframework.jdbc.BadSqlGrammarException.class);
+    }
+
+
+    @Test
+    void rebuildAlignsQualifiedSemanticColumnsWithChartBindings() {
+        var request = new AggregateQueryRequest();
+        request.setSemanticModelCode("sales");
+        request.setDimensions(List.of("region"));
+        var metric = new MetricConfig();
+        metric.setField("revenue"); metric.setAlias("revenue"); metric.setAggregation("sum");
+        request.setMetrics(List.of(metric));
+        var response = new SemanticQueryResponse();
+        response.setRows(List.of(Map.of("sales.region", "East", "sales.revenue", 120)));
+        var rebuilt = adapter.rebuild(response, request);
+        assertThat(rebuilt.getRows()).containsExactly(Map.of("region", "East", "revenue", 120));
+        assertThat(rebuilt.getMeta().getDimensions()).containsExactly("region");
+        assertThat(rebuilt.getMeta().getMetrics()).containsExactly("revenue");
+        assertThat(response.getRows().get(0)).containsKey("sales.region");
+    }
 }

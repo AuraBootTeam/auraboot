@@ -318,4 +318,50 @@ class PolicyEvaluatorTest {
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
                 .hasSize(1);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "UNKNOWN,false,DENY", "ERROR,false,DENY", "SKIPPED,false,DENY",
+            "NOT_MATCHED,true,DENY", "NOT_MATCHED,false,ALLOW"
+    })
+    void negativeGuardRequiresDefiniteNonMatch(DecisionStatus status, boolean fallback,
+                                              EvaluationVerdict expected) {
+        String conditions = """
+                {"expectedMatched":false,"ruleBinding":{"consumerType":"PERMISSION",
+                "bindingKind":"DECISION_REF","enabled":true,
+                "decisionBinding":{"decisionCode":"owner_guard","versionPolicy":"LATEST_PUBLISHED"}}}
+                """;
+        var record = Map.<String, Object>of("pid", "DELETED_1", "created_by", 8L);
+        when(policyService.getConditionGuards(1L, "orders:read")).thenReturn(List.of(
+                new PermissionPolicyService.ConditionGuard(904L, null, conditions)));
+        when(ruleEvaluationServiceProvider.getIfAvailable()).thenReturn(ruleEvaluationService);
+        when(fieldVocabulary.buildScopes(1L, "orders", record)).thenReturn(Map.of(
+                Scope.RECORD, Map.of("data", record)));
+        when(ruleEvaluationService.evaluateDecisionBinding(any(), any())).thenReturn(new RuleEvaluationTrace(
+                "trace-negative", "PERMISSION", "orders:read", "guard", RuleBindingKind.DECISION_REF,
+                "owner_guard", 1, DecisionVersionPolicy.LATEST_PUBLISHED, null, status, false,
+                Map.of(), Map.of(), fallback, 1L, null, List.of(), List.of(), List.of(), List.of()));
+        assertThat(evaluator.evaluate(1L, "orders", "read", record).verdict()).isEqualTo(expected);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void actualConditionRuntimeDistinguishesMissingOwnerFromDefiniteNonMatch(boolean ownerPresent) throws Exception {
+        var mapper = new ObjectMapper();
+        var condition = com.auraboot.framework.decision.ast.ConditionNode.CompareNode.of(
+                new com.auraboot.framework.decision.ast.Operand.PathOperand(Scope.RECORD, "data.owner", com.auraboot.framework.decision.ast.DataType.INTEGER),
+                com.auraboot.framework.decision.ast.Operator.EQ,
+                new com.auraboot.framework.decision.ast.Operand.LiteralOperand(99, com.auraboot.framework.decision.ast.DataType.INTEGER));
+        String conditions = mapper.writeValueAsString(Map.of("expectedMatched", false, "ruleBinding", Map.of(
+                "consumerType", "PERMISSION", "bindingKind", "CONDITION", "enabled", true,
+                "conditionSpec", com.auraboot.framework.decision.rule.ConditionSpec.of(condition))));
+        Map<String, Object> record = ownerPresent ? Map.of("owner", 8) : Map.of("pid", "DELETED_1");
+        when(policyService.getConditionGuards(1L, "orders:read")).thenReturn(List.of(
+                new PermissionPolicyService.ConditionGuard(905L, null, conditions)));
+        when(fieldVocabulary.buildScopes(1L, "orders", record)).thenReturn(Map.of(Scope.RECORD, Map.of("data", record)));
+        when(ruleEvaluationServiceProvider.getIfAvailable()).thenReturn(
+                new com.auraboot.framework.decision.rule.RuleEvaluationServiceImpl(null));
+        assertThat(evaluator.evaluate(1L, "orders", "read", record).verdict())
+                .isEqualTo(ownerPresent ? EvaluationVerdict.ALLOW : EvaluationVerdict.DENY);
+    }
+
 }

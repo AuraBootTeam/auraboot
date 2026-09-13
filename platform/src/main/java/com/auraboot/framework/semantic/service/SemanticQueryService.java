@@ -71,8 +71,7 @@ public class SemanticQueryService {
 
     /**
      * JdbcTemplate is optional: in unit tests we mock the mappers and the
-     * compiler, so JdbcTemplate may not be wired. {@code execute()} still
-     * works for {@code /sql} debug because it skips JdbcTemplate.
+     * compiler, so compile-only tests do not need it. Execution requires it.
      */
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
@@ -84,26 +83,17 @@ public class SemanticQueryService {
         Compiled c = compile(req, user);
         SemanticQueryResponse out = baseResponse(c);
         if (jdbcTemplate == null) {
-            out.getWarnings().add(
-                "JdbcTemplate not wired; returning compiled SQL only. "
-                + "Wire spring-jdbc bean for live execution.");
-            out.setSql(c.compiled.getSql());
-            out.setParams(c.compiled.getParams());
-            return out;
+            throw new IllegalStateException("Semantic query execution requires JdbcTemplate");
         }
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     c.compiled.getSql(), c.compiled.getParams().toArray());
             out.setRows(rows);
             out.setRowcount(rows.size());
-        } catch (Exception e) {
-            log.warn("Semantic query execution failed: {}", e.getMessage(), e);
-            out.getWarnings().add("execution_failed: " + e.getMessage());
+        } finally {
+            out.setDurationMs((System.nanoTime() - t0) / 1_000_000);
+            audit(req, c, out, user);
         }
-        long durationMs = (System.nanoTime() - t0) / 1_000_000;
-        out.setDurationMs(durationMs);
-
-        audit(req, c, out, user);
         return out;
     }
 
@@ -221,6 +211,7 @@ public class SemanticQueryService {
             resolvePhysicalModelRef(model);
             return model;
         } catch (Exception e) {
+            if (e instanceof AccessDeniedException denied) throw denied;
             if (e instanceof MetricCompileException metricCompileException) {
                 throw metricCompileException;
             }
@@ -240,6 +231,8 @@ public class SemanticQueryService {
         try {
             String tableName = metaModelService.getTableName(modelCode);
             model.getSemanticModel().setModelRef(tableName);
+        } catch (AccessDeniedException denied) {
+            throw denied;
         } catch (RuntimeException e) {
             throw new MetricCompileException(
                     "UNKNOWN_MODEL_REF",

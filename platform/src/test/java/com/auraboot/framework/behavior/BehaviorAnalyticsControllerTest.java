@@ -5,7 +5,9 @@ import com.auraboot.framework.behavior.controller.BehaviorAnalyticsController;
 import com.auraboot.framework.behavior.dto.BehaviorAnalyticsRecords;
 import com.auraboot.framework.behavior.dto.BehaviorEventCount;
 import com.auraboot.framework.behavior.dto.BehaviorOverview;
-import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
+import com.auraboot.framework.behavior.service.BehaviorAnalyticsService;
+import com.auraboot.framework.behavior.dto.BehaviorQueryWindow;
+import java.time.Instant;
 import com.auraboot.framework.common.dto.ApiResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,12 +34,16 @@ import static org.mockito.Mockito.when;
 class BehaviorAnalyticsControllerTest {
 
     @Mock
-    private BehaviorEventMapper behaviorEventMapper;
+    private BehaviorAnalyticsService analyticsService;
 
     @InjectMocks
     private BehaviorAnalyticsController controller;
 
     private MockedStatic<MetaContext> metaContextMock;
+
+    private static final Instant FROM = Instant.parse("2026-09-01T00:00:00Z");
+    private static final Instant TO = Instant.parse("2026-09-02T00:00:00Z");
+    private static final BehaviorQueryWindow WINDOW = new BehaviorQueryWindow(FROM, TO);
 
     private static final Long TENANT_ID = 42L;
 
@@ -61,9 +67,9 @@ class BehaviorAnalyticsControllerTest {
         overview.setUniqueVisitors(5L);
         overview.setSessions(10L);
 
-        when(behaviorEventMapper.overview(TENANT_ID)).thenReturn(overview);
+        when(analyticsService.overview(TENANT_ID, WINDOW)).thenReturn(overview);
 
-        ApiResponse<BehaviorAnalyticsRecords<BehaviorOverview>> resp = controller.overview();
+        ApiResponse<BehaviorAnalyticsRecords<BehaviorOverview>> resp = controller.overview(FROM, TO);
 
         assertEquals("0", resp.getCode(), "Response code must be '0' (OK)");
         assertNotNull(resp.getData(), "Response data must not be null");
@@ -84,9 +90,9 @@ class BehaviorAnalyticsControllerTest {
         e2.setEventName("page_view");
         e2.setCount(50L);
 
-        when(behaviorEventMapper.topEvents(TENANT_ID)).thenReturn(List.of(e1, e2));
+        when(analyticsService.topEvents(TENANT_ID, WINDOW)).thenReturn(List.of(e1, e2));
 
-        ApiResponse<BehaviorAnalyticsRecords<BehaviorEventCount>> resp = controller.topEvents();
+        ApiResponse<BehaviorAnalyticsRecords<BehaviorEventCount>> resp = controller.topEvents(FROM, TO);
 
         assertEquals("0", resp.getCode(), "Response code must be '0' (OK)");
         assertNotNull(resp.getData(), "Response data must not be null");

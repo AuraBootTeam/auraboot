@@ -12,6 +12,12 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
+import { useSmartText } from '~/utils/i18n';
+import { resolveFieldLabel } from '~/framework/meta/utils/i18nResolver';
+import { reportDesignerService } from '~/plugins/core-designer/components/report-designer/services/reportDesignerService';
+import { createEmptyReport } from '~/plugins/core-designer/components/report-designer/types';
+import { useAnalyticsResultView } from './useAnalyticsResultView';
+import { AnalyticsSuggestions } from './AnalyticsSuggestions';
 import { useI18n } from '~/contexts/I18nContext';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
@@ -23,7 +29,10 @@ interface ChatBiMetric {
   alias?: string;
 }
 
-interface ChatBiResult {
+export interface ChatBiResult {
+  analysisId?: string;
+  historyRefreshed?: boolean;
+  dataSource?: ChartDataSource;
   interpretation?: string;
   modelCode?: string;
   chartType?: string;
@@ -160,9 +169,11 @@ function ChatBiChart({
 function DataTable({
   records,
   columns,
+  labels = {},
 }: {
   records: Record<string, unknown>[];
   columns: string[];
+  labels?: Record<string, string>;
 }) {
   return (
     <div className="max-h-[300px] overflow-auto">
@@ -174,7 +185,7 @@ function DataTable({
                 key={col}
                 className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400"
               >
-                {col}
+                {labels[col] || col}
               </th>
             ))}
           </tr>
@@ -221,16 +232,9 @@ function inferChartType(records: Record<string, unknown>[], columns: string[]): 
 export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { t } = useI18n();
   const [showSql, setShowSql] = useState(false);
+  const resultViewRef = useAnalyticsResultView(result.analysisId);
 
-  const {
-    interpretation,
-    chartConfig,
-    columns = [],
-    records = [],
-    total,
-    sql,
-    truncated,
-  } = result;
+  const { interpretation, chartConfig, columns = [], records = [], total, sql, truncated } = result;
 
   const effectiveColumns =
     columns.length > 0 ? columns : records.length > 0 ? Object.keys(records[0]) : [];
@@ -250,7 +254,72 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { modelCode, dimensions = [], metrics = [] } = result;
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
-  const canSave = !!modelCode && metrics.length > 0 && records.length > 0 && !savedPid;
+  const [savedCode, setSavedCode] = useState<string | null>(null);
+  const text = useSmartText();
+  const columnLabels: Record<string, string> = {};
+  const aggregations: Record<string, string> = {
+    count: text({ 'zh-CN': '数量', 'en-US': 'Count' }),
+    sum: text({ 'zh-CN': '合计', 'en-US': 'Sum' }),
+    avg: text({ 'zh-CN': '平均值', 'en-US': 'Average' }),
+    min: text({ 'zh-CN': '最小值', 'en-US': 'Minimum' }),
+    max: text({ 'zh-CN': '最大值', 'en-US': 'Maximum' }),
+    count_distinct: text({ 'zh-CN': '去重数量', 'en-US': 'Distinct count' }),
+  };
+  for (const column of effectiveColumns) {
+    const metric = (result.metrics || result.dataSource?.metrics || []).find(
+      (candidate) => (candidate.alias || candidate.field) === column,
+    );
+    const field = metric?.field || column;
+    const fieldLabel = resolveFieldLabel(
+      field,
+      result.modelCode || result.dataSource?.modelCode || '',
+      t,
+    );
+    columnLabels[column] =
+      metric && aggregations[metric.aggregation]
+        ? metric.aggregation === 'count' && field === 'pid'
+          ? aggregations.count
+          : `${fieldLabel} · ${aggregations[metric.aggregation]}`
+        : fieldLabel;
+  }
+  const [savingReport, setSavingReport] = useState(false);
+  const [savedReportPid, setSavedReportPid] = useState<string | null>(null);
+  const dataSource = result.dataSource;
+  const canSaveReport = dataSource?.type === 'aggregate' && records.length > 0 && !savedReportPid;
+  const handleSaveReport = async () => {
+    if (!canSaveReport || savingReport || !dataSource) return;
+    setSavingReport(true);
+    try {
+      const report = createEmptyReport(
+        String(
+          interpretation || modelCode || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' }),
+        ).slice(0, 200),
+      );
+      report.dataSources = {
+        analysis: { type: 'aggregate', aggregateQuery: { ...dataSource, type: 'aggregate' } },
+      };
+      report.body = [
+        {
+          id: 'analysis',
+          blockType: 'table',
+          dataSource: 'analysis',
+          showHeader: true,
+          columns: effectiveColumns.map((field) => ({ field, label: columnLabels[field] })),
+        },
+      ];
+      const pid = await reportDesignerService.save(report, undefined, result.analysisId);
+      if (!pid) throw new Error('Saved report identity is missing');
+      setSavedReportPid(pid);
+      toast.success(text({ 'zh-CN': '已存为报表', 'en-US': 'Saved as report' }));
+    } catch {
+      toast.error(
+        text({ 'zh-CN': '存为报表失败，请重试', 'en-US': 'Could not save report. Please retry.' }),
+      );
+    } finally {
+      setSavingReport(false);
+    }
+  };
+  const canSave = !!dataSource && records.length > 0 && !savedPid;
 
   const handleSaveDashboard = async () => {
     if (!canSave || saving) return;
@@ -269,13 +338,20 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           title,
           config: {
             title,
-            dataSource: { type: 'aggregate', modelCode, dimensions, metrics },
+            dataSource,
           },
         },
       ];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dash: any = await dashboardService.create({ title, scope: 'personal', widgets } as any);
-      setSavedPid(dash?.pid || dash?.code || 'saved');
+      const dash: any = await dashboardService.create({
+        title,
+        scope: 'personal',
+        widgets,
+        sourceAnalysisId: result.analysisId,
+      } as any);
+      if (!dash?.pid || !dash?.code) throw new Error('Saved dashboard identity is missing');
+      setSavedPid(dash.pid);
+      setSavedCode(dash.code);
       toast.success(t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板'));
     } catch {
       toast.error(t('aurabot.chatbi.save_failed', undefined, '存为看板失败'));
@@ -287,7 +363,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   return (
     <div className="mb-3 flex justify-start">
       <div
+        ref={resultViewRef}
         data-testid="chatbi-result-card"
+        data-analysis-id={result.analysisId}
         data-chart-type={chartType}
         data-row-count={records.length}
         className="w-full max-w-[95%] overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-700 dark:bg-gray-800"
@@ -316,6 +394,15 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
         </div>
 
         {/* Interpretation */}
+        {result.historyRefreshed && (
+          <p className="mb-2 text-xs text-gray-500">
+            {text({
+              'zh-CN': '已按当前权限重新查询；建议仍关联原分析。',
+              'en-US':
+                'Data refreshed with current permissions; suggestions remain linked to the original analysis.',
+            })}
+          </p>
+        )}
         {interpretation && (
           <div className="border-b border-gray-100 px-3 py-2 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
             {interpretation}
@@ -335,17 +422,44 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               title={interpretation}
             />
           ) : (
-            <DataTable records={records} columns={effectiveColumns} />
+            <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />
           )}
         </div>
 
+        {result.analysisId && dataSource?.type === 'aggregate' && (
+          <AnalyticsSuggestions analysisId={result.analysisId} query={dataSource} />
+        )}
         {/* Actions: ad-hoc → persisted bridge (save this chart as a dashboard widget) */}
-        {(canSave || savedPid) && (
+        {(canSave || savedPid || canSaveReport || savedReportPid) && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
+            {savedReportPid ? (
+              <a
+                data-testid="chatbi-saved-report"
+                href={`/report-designer/${encodeURIComponent(savedReportPid)}`}
+                className="text-xs font-medium text-green-600 underline dark:text-green-400"
+              >
+                {text({ 'zh-CN': '打开报表', 'en-US': 'Open report' })}
+              </a>
+            ) : canSaveReport ? (
+              <button
+                data-testid="chatbi-save-report"
+                onClick={handleSaveReport}
+                disabled={savingReport}
+                className="rounded-md px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+              >
+                {savingReport
+                  ? text({ 'zh-CN': '保存中…', 'en-US': 'Saving…' })
+                  : text({ 'zh-CN': '存为报表', 'en-US': 'Save as report' })}
+              </button>
+            ) : null}
             {savedPid ? (
-              <span data-testid="chatbi-saved-dashboard" className="text-xs font-medium text-green-600 dark:text-green-400">
+              <a
+                data-testid="chatbi-saved-dashboard"
+                href={`/dashboards/view/${encodeURIComponent(savedCode!)}`}
+                className="text-xs font-medium text-green-600 underline dark:text-green-400"
+              >
                 {t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板')} ✓
-              </span>
+              </a>
             ) : (
               <button
                 data-testid="chatbi-save-dashboard"
@@ -353,7 +467,13 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
                 disabled={saving}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
               >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <rect x="3" y="3" width="7" height="7" />
                   <rect x="14" y="3" width="7" height="7" />
                   <rect x="14" y="14" width="7" height="7" />

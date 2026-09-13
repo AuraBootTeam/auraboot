@@ -1,0 +1,170 @@
+[
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_title",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_content",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_analysis_id",
+    "sequence": 3,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_query_hash",
+    "sequence": 4,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_group_key",
+    "sequence": 5,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_version",
+    "sequence": 6,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_previous_pid",
+    "sequence": 7,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_origin",
+    "sequence": 8,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_query",
+    "sequence": 9,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_request_key",
+    "sequence": 10,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_title",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_analysis_id",
+    "sequence": 2,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_query_hash",
+    "sequence": 3,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_group_key",
+    "sequence": 4,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_version",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_version_pid",
+    "sequence": 6,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_decision_mode",
+    "sequence": 7,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_request_key",
+    "sequence": 8,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_proposal_hash",
+    "sequence": 20,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_adoption",
+    "fieldCode": "core_dashboard_adoption_key",
+    "sequence": 20,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "core_dashboard_suggestion",
+    "fieldCode": "core_dashboard_execution_intent",
+    "sequence": 21,
+    "required": false,
+    "visible": false,
+    "editable": false
+  }
+]

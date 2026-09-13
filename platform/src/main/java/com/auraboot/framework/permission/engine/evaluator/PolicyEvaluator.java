@@ -368,6 +368,17 @@ public class PolicyEvaluator {
             trace = ruleEvaluationService.evaluateDecisionBinding(binding.decisionBinding(), context);
         }
         boolean expected = expectedMatched == null || expectedMatched;
+        boolean definite = trace != null && !trace.fallbackApplied()
+                && trace.errorCode() == null && trace.errors().isEmpty() && trace.unknownReasons().isEmpty()
+                && (binding.bindingKind() == RuleBindingKind.CONDITION
+                    ? trace.conditionResult() == Truth.TRUE || trace.conditionResult() == Truth.FALSE
+                    : trace.decisionStatus() == com.auraboot.framework.decision.model.DecisionStatus.MATCHED
+                        || trace.decisionStatus() == com.auraboot.framework.decision.model.DecisionStatus.NOT_MATCHED
+                        || trace.decisionStatus() == com.auraboot.framework.decision.model.DecisionStatus.VIOLATED);
+        if (!definite) {
+            return new RuleGuardResult(false, describe(binding) + " did not produce a definite permission decision",
+                    trace == null ? Map.of("error", "RULE_TRACE_UNAVAILABLE") : buildRuleCenterDetails(binding, trace));
+        }
         boolean matchedExpected = trace.matched() == expected;
         Map<String, Object> details = buildRuleCenterDetails(binding, trace);
         return new RuleGuardResult(matchedExpected,

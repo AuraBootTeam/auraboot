@@ -1,0 +1,210 @@
+[
+  {
+    "code": "core_dashboard_title",
+    "displayName:zh-CN": "\u5efa\u8bae\u6807\u9898",
+    "displayName:en": "Suggestion title",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    }
+  },
+  {
+    "code": "core_dashboard_content",
+    "displayName:zh-CN": "\u5efa\u8bae\u5185\u5bb9",
+    "displayName:en": "Suggestion content",
+    "dataType": "text",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 4000
+    }
+  },
+  {
+    "code": "core_dashboard_analysis_id",
+    "displayName:zh-CN": "\u6765\u6e90\u5206\u6790",
+    "displayName:en": "Source analysis",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 40
+    }
+  },
+  {
+    "code": "core_dashboard_query_hash",
+    "displayName:zh-CN": "\u67e5\u8be2\u6307\u7eb9",
+    "displayName:en": "Query fingerprint",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    }
+  },
+  {
+    "code": "core_dashboard_group_key",
+    "displayName:zh-CN": "\u5efa\u8bae\u6807\u8bc6",
+    "displayName:en": "Suggestion identity",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 40
+    }
+  },
+  {
+    "code": "core_dashboard_version",
+    "displayName:zh-CN": "\u7248\u672c\u5e8f\u53f7",
+    "displayName:en": "Version number",
+    "dataType": "integer",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "min": 1
+    }
+  },
+  {
+    "code": "core_dashboard_previous_pid",
+    "displayName:zh-CN": "\u4e0a\u4e00\u7248\u672c",
+    "displayName:en": "Previous version",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": false,
+      "maxLength": 26
+    }
+  },
+  {
+    "code": "core_dashboard_origin",
+    "displayName:zh-CN": "\u751f\u6210\u65b9\u5f0f",
+    "displayName:en": "Proposal origin",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 32
+    }
+  },
+  {
+    "code": "core_dashboard_query",
+    "displayName:zh-CN": "\u6765\u6e90\u67e5\u8be2",
+    "displayName:en": "Source query",
+    "dataType": "json",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true
+    }
+  },
+  {
+    "code": "core_dashboard_request_key",
+    "displayName:zh-CN": "\u8bf7\u6c42\u6807\u8bc6",
+    "displayName:en": "Request identity",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 64,
+      "unique": true
+    }
+  },
+  {
+    "code": "core_dashboard_version_pid",
+    "displayName:zh-CN": "\u91c7\u7eb3\u7248\u672c",
+    "displayName:en": "Adopted version",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 26
+    }
+  },
+  {
+    "code": "core_dashboard_decision_mode",
+    "displayName:zh-CN": "\u51b3\u7b56\u65b9\u5f0f",
+    "displayName:en": "Decision mode",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion",
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 32
+    }
+  },
+  {
+    "code": "core_dashboard_proposal_hash",
+    "displayName:zh-CN": "\u5185\u5bb9\u6821\u9a8c",
+    "displayName:en": "Proposal fingerprint",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 64,
+      "unique": false
+    }
+  },
+  {
+    "code": "core_dashboard_adoption_key",
+    "displayName:zh-CN": "\u91c7\u7eb3\u6807\u8bc6",
+    "displayName:en": "Adoption identity",
+    "dataType": "string",
+    "allowedWriterCommands": [
+      "core_dashboard:adopt_suggestion"
+    ],
+    "constraints": {
+      "required": true,
+      "maxLength": 64,
+      "unique": true
+    }
+  },
+  {
+    "code": "core_dashboard_execution_intent",
+    "displayName:zh-CN": "\u6267\u884c\u76ee\u6807",
+    "displayName:en": "Execution goal",
+    "dataType": "json",
+    "allowedWriterCommands": [
+      "core_dashboard:propose_suggestion"
+    ],
+    "constraints": {
+      "required": false
+    }
+  }
+]

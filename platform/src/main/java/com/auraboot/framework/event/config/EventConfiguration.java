@@ -57,7 +57,7 @@ public class EventConfiguration {
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("Export-");
         executor.setTaskDecorator(new TenantAwareTaskDecorator());
-        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
         executor.initialize();
         return executor;
     }

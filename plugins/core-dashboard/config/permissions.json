@@ -1,0 +1,30 @@
+[
+  {
+    "code": "analytics.suggestion.propose",
+    "name:zh-CN": "\u5f62\u6210\u5206\u6790\u5efa\u8bae",
+    "name:en": "Create analysis suggestions",
+    "resourceType": "operation",
+    "module": "analytics"
+  },
+  {
+    "code": "analytics.suggestion.adopt",
+    "name:zh-CN": "\u91c7\u7eb3\u5206\u6790\u5efa\u8bae",
+    "name:en": "Adopt analysis suggestions",
+    "resourceType": "operation",
+    "module": "analytics"
+  },
+  {
+    "code": "analytics.suggestion.read",
+    "name:zh-CN": "\u67e5\u770b\u4e2a\u4eba\u5206\u6790\u5efa\u8bae",
+    "name:en": "Read personal analysis suggestions",
+    "resourceType": "data",
+    "module": "analytics"
+  },
+  {
+    "code": "analytics.suggestion.execute",
+    "name:zh-CN": "\u6267\u884c\u5df2\u91c7\u7eb3\u5efa\u8bae",
+    "name:en": "Execute adopted suggestions",
+    "resourceType": "operation",
+    "module": "analytics"
+  }
+]

@@ -135,6 +135,55 @@ class AgentRunServiceSyncTest {
         // job. Bind a system tenant for tests so the deeper code paths that
         // read MetaContext.getCurrentUserId() / .exists() do not throw.
         MetaContext.setSystemTenantContext(TENANT_ID);
+        org.mockito.Mockito.doAnswer(inv -> {
+            String runPid = inv.getArgument(1);
+            when(runLifecycleService.readTerminalOutcome(TENANT_ID, runPid, TASK_PID))
+                    .thenReturn(new RunOutcome.Failed(runPid, inv.getArgument(4)));
+            return null;
+        }).when(runLifecycleService).failRun(any(), anyString(), anyString(), any(), any());
+    }
+
+    private boolean persistLoopResult(org.mockito.invocation.InvocationOnMock inv) {
+        String runPid = inv.getArgument(1);
+        AgentRunService.AgentLoopResult result = inv.getArgument(4);
+        RunOutcome outcome = result.success
+                ? new RunOutcome.Success(runPid, result.lastResponse, result.totalInputTokens,
+                        result.totalOutputTokens, result.totalCost)
+                : new RunOutcome.Failed(runPid, "Plan execution did not reach success terminal state");
+        when(runLifecycleService.readTerminalOutcome(TENANT_ID, runPid, TASK_PID)).thenReturn(outcome);
+        return result.success;
+    }
+
+    @Test
+    void cancelledRunDoesNotReturnLateLoopSuccess() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "Late success must not escape";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(ok);
+        when(runLifecycleService.readTerminalOutcome(eq(TENANT_ID), anyString(), eq(TASK_PID)))
+                .thenAnswer(inv -> new RunOutcome.Cancelled(inv.getArgument(1), "cancelled by user interrupt"));
+        assertThat(service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null))
+                .isInstanceOf(RunOutcome.Cancelled.class);
+        verify(observationService, never()).publish(any(), eq("agent_run.outcome"), any(), any(), any(), any());
+        verify(observationService).publish(eq(TENANT_ID), eq("run_completed"), eq(AGENT_CODE),
+                eq("agent_run"), anyString(), argThat(detail -> "cancelled".equals(detail.get("status"))));
+    }
+
+    @Test
+    void cancelledRunDoesNotReturnLateExceptionAsFailure() throws Exception {
+        primeHappyPath();
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenThrow(new IllegalStateException("teardown after cancellation"));
+        org.mockito.Mockito.doNothing().when(runLifecycleService).failRun(any(), anyString(), anyString(), any(), any());
+        when(runLifecycleService.readTerminalOutcome(eq(TENANT_ID), anyString(), eq(TASK_PID)))
+                .thenAnswer(inv -> new RunOutcome.Cancelled(inv.getArgument(1), "cancelled"));
+        assertThat(service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null))
+                .isInstanceOf(RunOutcome.Cancelled.class);
+        verify(observationService, never()).publish(any(), eq("run_failed"), any(), any(), any(), any());
+        verify(runLifecycleService, never()).markSessionEndedPublished(anyString());
     }
 
     @AfterEach
@@ -302,6 +351,7 @@ class AgentRunServiceSyncTest {
                 anyMap());
         // Plan loop must not have started
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -328,6 +378,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
                 any(), argThat(msg -> msg != null && msg.contains("No LLM provider configured")));
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -344,6 +395,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
                 any(), argThat(msg -> msg != null && msg.contains("LLM provider not available: provider-under-test")));
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -366,6 +418,7 @@ class AgentRunServiceSyncTest {
         verify(providerFactory, never()).resolveConfig(any(), anyString());
         verify(providerFactory, never()).getProvider(anyString());
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -393,6 +446,7 @@ class AgentRunServiceSyncTest {
         verify(runLifecycleService, never()).countActiveRuns(any(), any(), any());
         verify(providerFactory, never()).resolveConfig(any(), anyString());
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
     }
 
     @Test
@@ -436,6 +490,18 @@ class AgentRunServiceSyncTest {
                 .contains("preferred-provider");
         verify(providerFactory, never()).getProvider("unrelated-provider");
         verifyNoInteractions(stepLoopService);
+        verify(runLifecycleService, never()).recordExecutionStarted(any(), anyString(), anyString());
+    }
+
+    @Test
+    void startFactFailureStopsBeforePlanOrToolExecution() {
+        primeHappyPath();
+        org.mockito.Mockito.doThrow(new IllegalStateException("execution fact unavailable"))
+                .when(runLifecycleService).recordExecutionStarted(any(), anyString(), anyString());
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage()).isEqualTo("execution fact unavailable");
+        verifyNoInteractions(planService, stepLoopService);
     }
 
     @Test
@@ -453,7 +519,7 @@ class AgentRunServiceSyncTest {
                 .thenReturn(ok);
         // completeRunRecord — caller of completeRun expects this to return true on success
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -464,6 +530,38 @@ class AgentRunServiceSyncTest {
         assertThat(success.outputTokens()).isEqualTo(45);
         assertThat(success.totalCost()).isEqualTo(0.0123d);
         assertThat(success.runPid()).isNotBlank();
+        verify(runLifecycleService).recordExecutionStarted(TENANT_ID, success.runPid(), TASK_PID);
+    }
+
+    @Test
+    void successfulRunWithoutResolvedModelPublishesCompletionWithoutFailing() throws Exception {
+        primeHappyPath();
+        Map<String, Object> definition = baseAgentDef();
+        definition.remove("model");
+        definition.put("guardrails", "{\"provider\":\"provider-under-test\"}");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap())).thenReturn(List.of(definition));
+        when(providerFactory.getDefaultModel("provider-under-test")).thenReturn(null);
+        when(planService.generatePlan(any(), any(), org.mockito.ArgumentMatchers.isNull(),
+                anyString(), anyString(), any()))
+                .thenReturn(new ArrayList<>(List.of(new AgentPlanStep(0, "do-it"))));
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "Completed with provider-managed model.";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(),
+                org.mockito.ArgumentMatchers.isNull())).thenAnswer(this::persistLoopResult);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Success.class);
+        verify(observationService).publish(eq(TENANT_ID), eq("run_completed"), eq(AGENT_CODE),
+                eq("agent_run"), anyString(), argThat(detail -> "success".equals(detail.get("status"))
+                        && "provider-under-test".equals(detail.get("provider")) && !detail.containsKey("model")));
+        verify(runLifecycleService, never()).failRun(any(), anyString(), anyString(), any(), any());
+        verify(aiTraceService).endTrace(any(), eq(ok.lastResponse), eq("success"));
     }
 
     @Test
@@ -477,7 +575,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -552,7 +650,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -582,7 +680,7 @@ class AgentRunServiceSyncTest {
                 anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -677,7 +775,7 @@ class AgentRunServiceSyncTest {
                     return ok;
                 });
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(true);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -706,7 +804,7 @@ class AgentRunServiceSyncTest {
                     return failed;
                 });
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(false);
+                .thenAnswer(this::persistLoopResult);
 
         service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -769,6 +867,20 @@ class AgentRunServiceSyncTest {
         List<AgentPlanStep> plan = new ArrayList<>(List.of(step));
         when(planService.generatePlan(any(), any(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(plan);
+    }
+
+    @Test
+    void groundingReceivesTaskDescriptionWithoutRunnerInstructions() {
+        primeHappyPath();
+        var task = new java.util.HashMap<>(baseTask());
+        task.put("description", "Update the order delivery address.");
+        task.put("input_data", "{\"summary\":\"Historical context\"}");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_task")),
+                anyMap())).thenReturn(List.of(task));
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        verify(groundingService).ground(eq(TENANT_ID), eq("Update the order delivery address."), any());
     }
 
     private Map<String, Object> baseAgentDef() {

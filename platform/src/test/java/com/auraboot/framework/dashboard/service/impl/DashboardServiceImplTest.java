@@ -61,7 +61,7 @@ class DashboardServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new DashboardServiceImpl(dashboardMapper, dashboardModuleMapper, objectMapper, versionHistoryService,
-                userPermissionService, currentUserTeamResolver, menuService, permissionMapper);
+                userPermissionService, currentUserTeamResolver, menuService, permissionMapper, org.mockito.Mockito.mock(com.auraboot.framework.behavior.service.AnalyticsArtifactService.class));
         MetaContext.setContext(10L, 1L, "u-1", "user");
     }
 

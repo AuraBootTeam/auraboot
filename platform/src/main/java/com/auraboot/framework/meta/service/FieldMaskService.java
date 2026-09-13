@@ -27,6 +27,9 @@ public interface FieldMaskService {
      */
     List<FieldMaskConfig> getEnabledConfigs(String modelCode);
 
+    /** Resolve applicable configurations after role and permission exemptions. */
+    List<FieldMaskConfig> getEffectiveConfigs(String modelCode, Long userId, String context);
+
     /**
      * Create or update a mask config (upsert by model_code + field_code).
      */

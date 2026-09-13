@@ -38,6 +38,7 @@ public class RunLifecycleService {
     private final LlmProviderFactory providerFactory;
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final AgentRunTerminalStore terminalStore;
 
     static final int DEFAULT_MAX_CONCURRENT_RUNS = 3;
     static final int HEARTBEAT_INTERVAL_SECONDS = 30;
@@ -58,6 +59,11 @@ public class RunLifecycleService {
 
     void createRunRecord(Long tenantId, String runPid, String taskPid, String agentCode,
                          String model, LocalDateTime startedAt) {
+        createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt, false);
+    }
+
+    void createRunRecord(Long tenantId, String runPid, String taskPid, String agentCode,
+                         String model, LocalDateTime startedAt, boolean initialAnalytics) {
         Map<String, Object> run = new HashMap<>();
         run.put("pid", runPid);
         run.put("tenant_id", tenantId);
@@ -84,10 +90,17 @@ public class RunLifecycleService {
         });
         run.put("created_at", startedAt);
         run.put("updated_at", startedAt);
-        dynamicDataMapper.insert("ab_agent_run", run);
 
         Map<String, Object> taskUpdate = Map.of("task_status", "in_progress", "started_at", startedAt, "updated_at", LocalDateTime.now());
-        dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
+        if (initialAnalytics) {
+            terminalStore.createInitialAnalyticsRun(tenantId, runPid, taskPid, run, taskUpdate);
+        } else {
+            terminalStore.create(tenantId, runPid, taskPid, run, taskUpdate);
+        }
+    }
+
+    void recordExecutionStarted(Long tenantId, String runPid, String taskPid) {
+        terminalStore.started(tenantId, runPid, taskPid);
     }
 
     private String serializeContextEnvelope(ContextEnvelope envelope) {
@@ -117,11 +130,11 @@ public class RunLifecycleService {
         runUpdate.put("input_tokens", result.totalInputTokens);
         runUpdate.put("output_tokens", result.totalOutputTokens);
         runUpdate.put("total_cost", result.totalCost);
+        runUpdate.put("final_response", result.lastResponse);
         if (!result.success) {
             runUpdate.put("error_message", "Plan execution did not reach success terminal state");
         }
         runUpdate.put("updated_at", completedAt);
-        dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
 
         Map<String, Object> taskUpdate = new HashMap<>();
         taskUpdate.put("task_status", result.success ? "done" : "blocked");
@@ -131,11 +144,27 @@ public class RunLifecycleService {
         if (result.lastResponse != null && !result.lastResponse.isBlank()) {
             taskUpdate.put("output_data", result.lastResponse);
         }
-        dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
+        boolean changed = terminalStore.complete(tenantId, runPid, taskPid, runUpdate, taskUpdate,
+                () -> publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked"));
+        return changed && result.success;
+    }
 
-        publishTaskCompleted(tenantId, taskPid, result.success ? "done" : "blocked");
-
-        return result.success;
+    /** Read the winning terminal result, scoped to the run's persisted task and tenant. */
+    RunOutcome readTerminalOutcome(Long tenantId, String runPid, String taskPid) {
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT run_status, final_response, input_tokens, output_tokens, total_cost, error_message "
+                        + "FROM ab_agent_run WHERE tenant_id = ? AND pid = ? AND task_id = ?",
+                tenantId, runPid, taskPid);
+        String status = (String) row.get("run_status");
+        return switch (status) {
+            case "success" -> new RunOutcome.Success(runPid, (String) row.get("final_response"),
+                    ((Number) row.get("input_tokens")).intValue(),
+                    ((Number) row.get("output_tokens")).intValue(),
+                    ((Number) row.get("total_cost")).doubleValue());
+            case "failed" -> new RunOutcome.Failed(runPid, (String) row.get("error_message"));
+            case "cancelled" -> new RunOutcome.Cancelled(runPid, (String) row.get("error_message"));
+            default -> throw new IllegalStateException("Run has not reached a terminal state: " + status);
+        };
     }
 
     /**
@@ -191,8 +220,26 @@ public class RunLifecycleService {
         runUpdate.put("duration_ms", ChronoUnit.MILLIS.between(startedAt, now));
         runUpdate.put("error_message", diagnostic);
         runUpdate.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
-        failTask(tenantId, taskPid, diagnostic);
+        Map<String, Object> taskUpdate = Map.of(
+                "task_status", "blocked", "completed_at", now, "updated_at", now);
+        boolean changed = terminalStore.complete(tenantId, runPid, taskPid, runUpdate, taskUpdate,
+                () -> publishTaskCompleted(tenantId, taskPid, "blocked"));
+        if (changed) cancelChildTasks(tenantId, taskPid);
+    }
+
+    boolean cancelRun(Long tenantId, String runPid) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT task_id, error_message FROM ab_agent_run WHERE tenant_id = ? AND pid = ? AND run_status = 'running'",
+                tenantId, runPid);
+        if (rows.isEmpty()) return false;
+        String taskPid = (String) rows.get(0).get("task_id");
+        Object previousError = rows.get(0).get("error_message");
+        String diagnostic = (previousError == null ? "" : previousError + "\n") + "cancelled by user interrupt";
+        LocalDateTime now = LocalDateTime.now();
+        return terminalStore.complete(tenantId, runPid, taskPid,
+                Map.of("run_status", "cancelled", "completed_at", now, "updated_at", now, "error_message", diagnostic),
+                Map.of("task_status", "cancelled", "completed_at", now, "updated_at", now),
+                () -> publishTaskCompleted(tenantId, taskPid, "cancelled"));
     }
 
     void failTask(Long tenantId, String taskPid, String error) {

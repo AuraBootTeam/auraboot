@@ -18,6 +18,9 @@ public class ExportResult {
      * 导出是否成功
      */
     private Boolean success;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private com.fasterxml.jackson.databind.JsonNode definitionSnapshot;
     
     /**
      * 导出文件路径

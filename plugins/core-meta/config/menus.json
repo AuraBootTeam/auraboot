@@ -9,7 +9,7 @@
     "component": null,
     "icon": "database",
     "type": 0,
-    "permissionCode": "meta_management",
+    "permissionCode": null,
     "orderNo": 10,
     "visible": true,
     "extension": {
@@ -119,6 +119,20 @@
     "type": 1,
     "permissionCode": "query_builder",
     "orderNo": 18,
+    "visible": true
+  },
+  {
+    "code": "report_management",
+    "parentCode": "meta_management",
+    "name": "报表管理",
+    "name:zh-CN": "报表管理",
+    "name:en": "Reports",
+    "path": "/p/c/report_management",
+    "component": null,
+    "icon": "file-text",
+    "type": 1,
+    "permissionCode": "report.definition.view",
+    "orderNo": 19,
     "visible": true
   }
 ]

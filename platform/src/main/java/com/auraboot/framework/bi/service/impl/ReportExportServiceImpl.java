@@ -12,12 +12,12 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.SortField;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.exception.PermissionDeniedException;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -31,6 +31,8 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -57,6 +59,7 @@ import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.util.StringUtils;
 
 import java.awt.Color;
@@ -74,14 +77,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Report Designer export renderer backed by the PageSchema extension payload.
+ * Report Designer export renderer backed by the canonical report-definition store.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReportExportServiceImpl implements ReportExportService {
 
-    private static final String REPORT_DSL_EXTENSION_KEY = "reportDsl";
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final String PDF_CONTENT_TYPE = "application/pdf";
@@ -94,7 +96,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private static final String DATA_SOURCE_TABLE = "table";
     private static final String DATA_SOURCE_NAMED_QUERY = "namedQuery";
     private static final String DATA_SOURCE_API = "api";
-    private static final int DEFAULT_EXPORT_ROW_LIMIT = 200;
+    private static final int DEFAULT_EXPORT_ROW_LIMIT = 1000;
     private static final int MAX_EXPORT_ROW_LIMIT = 1000;
     private static final Set<String> CANONICAL_API_DATA_SOURCE_ENDPOINTS = Set.of(
             "/api/datasource/list",
@@ -117,7 +119,8 @@ public class ReportExportServiceImpl implements ReportExportService {
             "reportingCurrency"
     );
 
-    private final PageSchemaMapper pageSchemaMapper;
+    private final com.auraboot.framework.behavior.service.AnalyticsReportUsageService analyticsReportUsage;
+    private final com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
@@ -125,6 +128,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final AuditTrailService auditTrailService;
     private final ReportRenderClient reportRenderClient;
     private final BrandingProvider brandingProvider;
+    private final UserPermissionService userPermissionService;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -138,7 +142,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             CellStyle titleStyle = createTitleStyle(workbook);
             CellStyle headerStyle = createHeaderStyle(workbook);
-            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
+            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters()));
             int renderedBlocks = renderBody(workbook, reportDsl, dataSets, titleStyle, headerStyle);
 
             if (renderedBlocks == 0) {
@@ -153,13 +157,14 @@ public class ReportExportServiceImpl implements ReportExportService {
             ReportExportFile file = new ReportExportFile(
                     output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "excel");
             return file;
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as Excel: reportPid={}", request.getReportPid(), e);
             throw new ValidationException(
-                    ResponseCode.CommonValidationFailed, "Excel export failed: " + e.getMessage());
+                    ResponseCode.CommonValidationFailed, "Excel export failed");
         }
     }
 
@@ -171,11 +176,12 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
         String title = stringValue(reportDsl.get("title"), "report");
-        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters()));
 
         byte[] pdfBytes = applyPdfBranding(renderPdf(reportDsl, dataSets, title), title);
         ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
         recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "pdf");
         return file;
     }
 
@@ -207,11 +213,11 @@ public class ReportExportServiceImpl implements ReportExportService {
             writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
             return output.toByteArray();
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as PDF: title={}", title, e);
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed");
         }
     }
 
@@ -232,14 +238,15 @@ public class ReportExportServiceImpl implements ReportExportService {
         try (PDDocument document = PDDocument.load(pdfBytes);
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             float fontSize = 8f;
-            float textWidth = PDType1Font.HELVETICA.getStringWidth(branding.generatedByText())
+            PDFont font = new PdfFonts(document).forText(branding.generatedByText(), false);
+            float textWidth = font.getStringWidth(branding.generatedByText())
                     / 1000f * fontSize;
             for (PDPage page : document.getPages()) {
                 float x = Math.max(8f, (page.getMediaBox().getWidth() - textWidth) / 2f);
                 try (PDPageContentStream content = new PDPageContentStream(
                         document, page, AppendMode.APPEND, true, true)) {
                     content.beginText();
-                    content.setFont(PDType1Font.HELVETICA, fontSize);
+                    content.setFont(font, fontSize);
                     content.setNonStrokingColor(Color.GRAY);
                     content.newLineAtOffset(x, 10f);
                     content.showText(branding.generatedByText());
@@ -252,7 +259,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             log.error("Failed to apply Community branding to PDF: title={}", title, e);
             throw new ValidationException(
                     ResponseCode.CommonValidationFailed,
-                    "PDF branding failed: " + e.getMessage());
+                    "PDF branding failed");
         }
     }
 
@@ -270,17 +277,18 @@ public class ReportExportServiceImpl implements ReportExportService {
             payload.put("format", "auraboot.report.export.v1");
             payload.put("reportPid", request.getReportPid());
             payload.put("reportDsl", reportDsl);
-            payload.put("dataSets", resolveDataSets(reportDsl));
+            payload.put("dataSets", resolveDataSets(ReportParameterBindings.apply(reportDsl, request.getParameters())));
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
             ReportExportFile file = new ReportExportFile(
                     bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
+        analyticsReportUsage.exported(request.getReportPid(), objectMapper.valueToTree(ReportParameterBindings.apply(reportDsl, request.getParameters())), request.getUsageId(), "json");
             return file;
-        } catch (ValidationException e) {
+        } catch (ValidationException | AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as JSON: reportPid={}", request.getReportPid(), e);
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed: " + e.getMessage());
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed");
         }
     }
 
@@ -314,62 +322,54 @@ public class ReportExportServiceImpl implements ReportExportService {
                 .build());
     }
 
-    /**
-     * Load the ReportDsl for a report, preferring the first-class {@code ab_report} store and
-     * falling back to the legacy page-schema {@code extension.reportDsl} (Phase 4 slice 2b-2).
-     *
-     * <p>Since slice 2b-1 the report designer dual-writes every save into {@code ab_report} keyed
-     * by the SAME pid, so a report saved after that slice is in both stores and the {@code dsl}
-     * stored in {@code ab_report} is the EXACT same ReportDsl JSON the page-schema holds — the
-     * parsed map is structurally identical regardless of source. Reports created before the
-     * dual-write (not yet backfilled into {@code ab_report}) are read from the page-schema; that
-     * fallback is preserved verbatim so no report becomes unreadable. The page-schema read is
-     * removed in a later slice after the backfill.
-     */
+    /** Read a report definition under the current tenant; there is no secondary store. */
     private Map<String, Object> loadReportDsl(String reportPid) {
         ReportEntity report = reportStorageService.findByPid(reportPid);
-        if (report != null && StringUtils.hasText(report.getDsl())) {
-            return parseAbReportDsl(report.getDsl(), reportPid);
+        if (report == null || !java.util.Objects.equals(MetaContext.getCurrentTenantId(), report.getTenantId())) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found");
         }
-        return loadReportDslFromPageSchema(reportPid);
-    }
-
-    /**
-     * Parse the {@code ab_report.dsl} jsonb String into the same {@code Map<String,Object>} shape
-     * {@code loadReportDsl} returns from the page-schema path. The stored value is the exact
-     * ReportDsl JSON written by the dual-write, so the parsed map mirrors the page-schema read.
-     */
-    private Map<String, Object> parseAbReportDsl(String dsl, String reportPid) {
+        if (!StringUtils.hasText(report.getDsl())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report DSL not found");
+        }
         try {
-            return objectMapper.readValue(dsl, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            // ab_report.dsl is a jsonb column, so it is always syntactically valid JSON; a parse
-            // failure here is a server fault, not a client validation error.
-            log.error("Failed to parse ab_report dsl: reportPid={}", reportPid, e);
-            throw new ValidationException(ResponseCode.SystemError,
-                    "Stored report dsl is not valid JSON: " + reportPid);
+            Map<String, Object> dsl = objectMapper.readValue(report.getDsl(), new TypeReference<Map<String, Object>>() {});
+            requireDataSourceReadPermissions(dsl);
+            return dsl;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ValidationException(ResponseCode.SystemError, "Stored report DSL is invalid");
         }
     }
 
-    /**
-     * Legacy read path: the report's DSL lives in the page-schema {@code extension.reportDsl}.
-     * Unchanged from before slice 2b-2; retained as the fallback for reports not yet in
-     * {@code ab_report}.
-     */
-    private Map<String, Object> loadReportDslFromPageSchema(String reportPid) {
-        PageSchema page = pageSchemaMapper.selectByPid(reportPid);
-        if (page == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found: " + reportPid);
+    /** Enforce the same source-read boundaries used by preview APIs before querying any source. */
+    private void requireDataSourceReadPermissions(Map<String, Object> reportDsl) {
+        Object rawSources = reportDsl.get("dataSources");
+        if (!(rawSources instanceof Map<?, ?> sources)) return;
+        for (Object rawSource : sources.values()) {
+            if (!(rawSource instanceof Map<?, ?> source)) continue;
+            if ("aggregate".equals(source.get("type"))) {
+                aggregateQueries.validateAccess(readAggregateQuery(toStringObjectMap(source)));
+                continue;
+            }
+            if (DATA_SOURCE_NAMED_QUERY.equals(source.get("type")) || DATA_SOURCE_API.equals(source.get("type"))) {
+                requireReadPermission("data.datasource.read");
+                continue;
+            }
+            if (!(DATA_SOURCE_MODEL.equals(source.get("type")) || DATA_SOURCE_TABLE.equals(source.get("type")))) continue;
+            Map<String, Object> dataSource = toStringObjectMap(source);
+            String modelCode = stringValue(firstPresent(dataSource, "modelCode", "model", "entityCode"), "");
+            if (!modelCode.matches("[a-zA-Z][a-zA-Z0-9_]*")) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid report model code");
+            }
+            requireReadPermission("model." + modelCode + ".read");
         }
+    }
 
-        ExtensionBean extension = page.getExtension();
-        Object reportDsl = extension != null ? extension.get(REPORT_DSL_EXTENSION_KEY) : null;
-        if (reportDsl == null) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "Report DSL not found in page extension: " + reportPid);
+    private void requireReadPermission(String permission) {
+        Long userId = MetaContext.getCurrentUserId();
+        if (userId == null || !userPermissionService.hasPermission(userId, permission)) {
+            throw new PermissionDeniedException(ResponseCode.PermissionDenied, permission,
+                    "You do not have permission to read this report data source.");
         }
-
-        return objectMapper.convertValue(reportDsl, new TypeReference<Map<String, Object>>() {});
     }
 
     @SuppressWarnings("unchecked")
@@ -564,6 +564,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                                List<PdfLine> lines,
                                PDRectangle pageSize,
                                PdfMargins margins) throws java.io.IOException {
+        PdfFonts fonts = new PdfFonts(document);
         PDPage page = new PDPage(pageSize);
         document.addPage(page);
         PDPageContentStream content = new PDPageContentStream(document, page);
@@ -571,7 +572,8 @@ public class ReportExportServiceImpl implements ReportExportService {
         float availableWidth = Math.max(72f, pageSize.getWidth() - margins.left() - margins.right());
         try {
             for (PdfLine line : lines) {
-                for (String wrappedLine : wrapPdfLine(line.text(), line.fontSize(), availableWidth)) {
+                PDFont font = fonts.forText(line.text(), line.bold());
+                for (String wrappedLine : wrapPdfLine(line.text(), font, line.fontSize(), availableWidth)) {
                     if (y < margins.bottom()) {
                         content.close();
                         page = new PDPage(pageSize);
@@ -580,9 +582,9 @@ public class ReportExportServiceImpl implements ReportExportService {
                         y = pageSize.getHeight() - margins.top();
                     }
                     content.beginText();
-                    content.setFont(line.bold() ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, line.fontSize());
+                    content.setFont(font, line.fontSize());
                     content.newLineAtOffset(margins.left(), y);
-                    content.showText(sanitizePdfText(wrappedLine));
+                    content.showText(wrappedLine);
                     content.endText();
                     y -= line.lineHeight();
                 }
@@ -592,21 +594,56 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
-    private List<String> wrapPdfLine(String line, float fontSize, float availableWidth) {
-        String text = sanitizePdfText(line);
-        int maxChars = Math.max(20, (int) Math.floor(availableWidth / Math.max(4f, fontSize * 0.5f)));
-        if (text.length() <= maxChars) {
-            return List.of(text);
-        }
+    private List<String> wrapPdfLine(String line, PDFont font, float fontSize, float availableWidth)
+            throws java.io.IOException {
         List<String> result = new ArrayList<>();
-        for (int start = 0; start < text.length(); start += maxChars) {
-            result.add(text.substring(start, Math.min(text.length(), start + maxChars)));
+        for (String paragraph : stringValue(line, "").replace("\t", "    ").split("\\R", -1)) {
+            StringBuilder current = new StringBuilder();
+            float width = 0;
+            for (int offset = 0; offset < paragraph.length();) {
+                int codePoint = paragraph.codePointAt(offset);
+                String glyph = new String(Character.toChars(codePoint));
+                float glyphWidth = font.getStringWidth(glyph) / 1000f * fontSize;
+                if (!current.isEmpty() && width + glyphWidth > availableWidth) {
+                    result.add(current.toString());
+                    current.setLength(0);
+                    width = 0;
+                }
+                current.append(glyph);
+                width += glyphWidth;
+                offset += Character.charCount(codePoint);
+            }
+            result.add(current.toString());
         }
         return result;
     }
 
-    private String sanitizePdfText(String text) {
-        return stringValue(text, "").replaceAll("[^\\x20-\\x7E]", "?");
+    /** Fonts belong to one PDF document; embed only the glyphs used by that document. */
+    private static final class PdfFonts {
+        private final PDDocument document;
+        private final Map<Boolean, PDFont> unicodeFonts = new HashMap<>();
+
+        private PdfFonts(PDDocument document) {
+            this.document = document;
+        }
+
+        private PDFont forText(String text, boolean bold) throws java.io.IOException {
+            if (text == null || text.codePoints().allMatch(codePoint -> codePoint < 128)) {
+                return bold ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA;
+            }
+            PDFont font = unicodeFonts.get(bold);
+            if (font == null) {
+                String resource = "/fonts/report/NotoSansSC-" + (bold ? "Bold" : "Regular") + ".ttf";
+                try (var stream = ReportExportServiceImpl.class.getResourceAsStream(resource)) {
+                    if (stream == null) {
+                        throw new java.io.IOException("Report PDF font resource is missing: " + resource);
+                    }
+                    font = PDType0Font.load(document, stream, true);
+                }
+                unicodeFonts.put(bold, font);
+            }
+            return font;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -725,8 +762,19 @@ public class ReportExportServiceImpl implements ReportExportService {
         return renderedBlocks;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, List<Map<String, Object>>> resolveDataSets(Map<String, Object> reportDsl) {
+        try {
+            return loadDataSets(reportDsl);
+        } catch (ValidationException | AccessDeniedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Failed to load report export data", e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report data could not be loaded");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, List<Map<String, Object>>> loadDataSets(Map<String, Object> reportDsl) {
         Object dataSourcesObject = reportDsl.get("dataSources");
         if (!(dataSourcesObject instanceof Map<?, ?> dataSources)) {
             return Map.of();
@@ -751,6 +799,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
 
         return switch (type) {
+            case "aggregate" -> aggregateQueries.execute(readAggregateQuery(dataSource)).getRows();
             case DATA_SOURCE_STATIC -> normalizeRows(inlineRows);
             case DATA_SOURCE_MODEL, DATA_SOURCE_TABLE -> resolveModelRows(dataSource);
             case DATA_SOURCE_NAMED_QUERY -> {
@@ -761,6 +810,14 @@ public class ReportExportServiceImpl implements ReportExportService {
             default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Unsupported report dataSource type: " + type);
         };
+    }
+
+    private com.auraboot.framework.meta.dto.AggregateQueryRequest readAggregateQuery(Map<String, Object> source) {
+        if (!(source.get("aggregateQuery") instanceof Map<?, ?>)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report aggregateQuery is required");
+        }
+        return objectMapper.convertValue(source.get("aggregateQuery"),
+                com.auraboot.framework.meta.dto.AggregateQueryRequest.class);
     }
 
     private List<Map<String, Object>> resolveModelRows(Map<String, Object> dataSource) {
@@ -776,10 +833,11 @@ public class ReportExportServiceImpl implements ReportExportService {
                 .pageSize(resolveRowLimit(dataSource, params))
                 .keyword(stringValue(firstPresent(dataSource, "keyword"), null))
                 .conditions(resolveModelConditions(dataSource, params))
+                .sortFields(resolveModelSort(dataSource))
                 .extraParams(removeControlParams(params))
                 .build();
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
-        return result == null ? List.of() : normalizeRows(result.getRecords());
+        return completeExportRows(result, resolveRowLimit(dataSource, params));
     }
 
     private List<Map<String, Object>> resolveNamedQueryRows(String queryCode,
@@ -796,7 +854,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         request.setExecuteQuery(true);
         request.setParameters(removeControlParams(params));
         PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(queryCode, request);
-        return result == null ? List.of() : normalizeRows(result.getRecords());
+        return completeExportRows(result, resolveRowLimit(dataSource, params));
     }
 
     private List<Map<String, Object>> resolveApiRows(Map<String, Object> dataSource) {
@@ -859,9 +917,9 @@ public class ReportExportServiceImpl implements ReportExportService {
                 }
                 conditions = objectMapper.readValue(filterText, new TypeReference<List<QueryCondition>>() {});
             } else if (filters instanceof List<?>) {
-                conditions = objectMapper.convertValue(filters, new TypeReference<List<QueryCondition>>() {});
+                conditions = ((List<?>) filters).stream().map(this::reportModelCondition).toList();
             } else if (filters instanceof Map<?, ?>) {
-                QueryCondition condition = objectMapper.convertValue(filters, QueryCondition.class);
+                QueryCondition condition = reportModelCondition(filters);
                 conditions = List.of(condition);
             } else {
                 throw new IllegalArgumentException("unsupported filters payload");
@@ -871,6 +929,63 @@ public class ReportExportServiceImpl implements ReportExportService {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Report model dataSource filters must be a QueryCondition array");
         }
+    }
+
+    /** Translate the report DSL field binding into the dynamic query contract. */
+    private QueryCondition reportModelCondition(Object filter) {
+        Map<String, Object> binding = objectMapper.convertValue(filter,
+                new TypeReference<LinkedHashMap<String, Object>>() {});
+        Object reportField = binding.remove("field");
+        if (reportField != null) {
+            Object queryField = binding.putIfAbsent("fieldName", reportField);
+            if (queryField != null && !queryField.equals(reportField)) {
+                throw new IllegalArgumentException("Conflicting report filter fields");
+            }
+        }
+        return objectMapper.convertValue(binding, QueryCondition.class);
+    }
+
+    private List<SortField> resolveModelSort(Map<String, Object> dataSource) {
+        Object raw = dataSource.get("sortBy");
+        if (raw == null) return null;
+        if (!(raw instanceof List<?> entries) || entries.size() > 5) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report sortBy supports up to 5 fields");
+        }
+        List<SortField> fields = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Object entry : entries) {
+            if (!(entry instanceof Map<?, ?> sort)) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid report sort entry");
+            }
+            String field = stringValue(sort.get("field"), "");
+            String order = stringValue(sort.get("order"), "");
+            if (!field.matches("[a-zA-Z_][a-zA-Z0-9_]*") || !seen.add(field.toLowerCase(java.util.Locale.ROOT))
+                    || !("asc".equals(order) || "desc".equals(order))) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed, "Invalid or duplicate report sort field or direction");
+            }
+            fields.add(SortField.builder().fieldName(field)
+                    .direction("asc".equals(order) ? SortField.SortDirection.ASC : SortField.SortDirection.DESC)
+                    .priority(fields.size()).build());
+        }
+        return fields.isEmpty() ? null : fields;
+    }
+
+    private List<Map<String, Object>> completeExportRows(
+            PaginationResult<Map<String, Object>> result, int limit) {
+        if (result == null || result.getTotal() == null || result.getRecords() == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report query did not provide a complete result count");
+        }
+        if (result.getTotal() > limit) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report result exceeds the export limit of " + limit + " rows. Narrow the report filters.");
+        }
+        List<Map<String, Object>> rows = normalizeRows(result.getRecords());
+        if (result.getTotal() != rows.size()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Report query returned incomplete rows. Export was cancelled.");
+        }
+        return rows;
     }
 
     private int resolveRowLimit(Map<String, Object> dataSource, Map<String, Object> params) {
@@ -883,7 +998,11 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
         try {
             int parsed = Integer.parseInt(rawLimit.toString());
-            return Math.max(1, Math.min(parsed, MAX_EXPORT_ROW_LIMIT));
+            if (parsed < 1 || parsed > MAX_EXPORT_ROW_LIMIT) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Report row limit must be between 1 and " + MAX_EXPORT_ROW_LIMIT);
+            }
+            return parsed;
         } catch (NumberFormatException e) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Report dataSource row limit must be a number");

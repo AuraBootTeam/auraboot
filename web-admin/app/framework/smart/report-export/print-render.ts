@@ -175,7 +175,8 @@ export function renderReportChartSvg(
     height: opts.height ?? 360,
   });
   try {
-    chart.setOption(option as Parameters<typeof chart.setOption>[0]);
+    // Printed charts must represent final values, never an animation frame.
+    chart.setOption({ ...option, animation: false } as Parameters<typeof chart.setOption>[0]);
     return chart.renderToSVGString();
   } finally {
     chart.dispose();

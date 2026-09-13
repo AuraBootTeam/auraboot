@@ -30,49 +30,37 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import com.auraboot.framework.versioning.service.VersionHistoryService;
+import com.auraboot.framework.versioning.dto.DesignVersionDTO;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.stream.Collectors;
 
 /**
- * Additive CRUD API for first-class low-code report definitions ({@code ab_report}, Phase 4 slice 2a).
- *
- * <p>PURELY ADDITIVE: the live report designer still persists via {@code ab_page_schema} +
- * {@code extension.reportDsl}; NOTHING in the existing UI calls these endpoints yet — wiring the
- * frontend is slice 2b. This controller only exposes the slice-1 {@link ReportStorageService}
- * spine. Base path is {@code /api/report-definitions} (deliberately distinct from the already-taken
- * {@code /api/reports}, owned by {@code ReportExportController} + {@code PivotQueryController}) so
- * there is no Spring ambiguous-mapping at startup.
- *
- * <p>All endpoints are tenant-scoped via the existing tenant interceptor ({@link MetaContext}) and
- * every one is guarded with {@link RequirePermission}. (The sibling {@code ReportScheduleController}
- * in this package ships with ZERO guards — a known gap; this controller deliberately does not
- * replicate that.)
- *
- * <p>Permissions — guarded by the clean first-class {@code report.*} family (B6 complete): this
- * controller now uses {@link MetaPermission#REPORT_DEFINITION_VIEW} (reads) and
- * {@link MetaPermission#REPORT_DEFINITION_MANAGE} (mutations), replacing the former
- * template-aliased STOPGAP codes ({@code REPORT_READ}=meta.template.read,
- * {@code REPORT_MANAGE}=meta.template.update). B6-1 (#972) introduced these clean codes and granted
- * them to every existing-tenant role that held the old stopgaps plus registered them for new
- * tenants, so the B6-2 flip from the stopgaps to this clean family cannot 403 any existing
- * principal.
- *
- * <p>{@code dsl} is carried as a JSON object ({@link JsonNode}) over the wire and round-trips to the
- * entity's String/jsonb column via the package {@link ObjectMapper} (object in -&gt; object out).
+ * Canonical CRUD API for low-code report definitions in ab_report.
+ * Reads and writes are tenant-scoped and permission-guarded.
+ * The DSL travels as a JSON object and is stored in the entity's jsonb column.
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/report-definitions")
 @RequiredArgsConstructor
-@Tag(name = "Report Definitions", description = "Additive CRUD for first-class low-code report definitions (ab_report)")
+@Tag(name = "Report Definitions", description = "CRUD for first-class low-code report definitions (ab_report)")
 public class ReportDefinitionController {
 
     private final ReportStorageService reportStorageService;
     private final ObjectMapper objectMapper;
+    private final VersionHistoryService versionHistoryService;
+    private final com.auraboot.framework.behavior.service.AnalyticsArtifactService analyticsArtifacts;
 
     @PostMapping
+    @Transactional
     @Operation(summary = "Create a report definition", description = "Persists a new ab_report row and returns the minted pid")
     @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<ReportDefinitionResponse> create(@Valid @RequestBody ReportDefinitionCreateRequest request) {
+        String analysisId = request.getSourceAnalysisId();
+        String queryHash = analysisId != null && !analysisId.isBlank()
+                ? analyticsArtifacts.verifyReportQuery(analysisId, request.getDsl()) : null;
         ReportEntity entity = new ReportEntity();
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCode(request.getCode());
@@ -82,13 +70,16 @@ public class ReportDefinitionController {
         entity.setCreatedBy(MetaContext.getCurrentUserId());
         entity.setUpdatedBy(MetaContext.getCurrentUserId());
         ReportEntity created = reportStorageService.create(entity);
+        versionHistoryService.recordVersion("report", created.getPid(), "create", null);
+        if (queryHash != null) analyticsArtifacts.reportSaved(analysisId, created.getPid(), queryHash);
         return ApiResponse.success(toResponse(created));
     }
 
     @PutMapping("/{pid}")
+    @Transactional
     @Operation(summary = "Upsert a report definition",
             description = "Idempotent upsert by pid: updates an existing ab_report row, or creates one with the "
-                    + "supplied pid if it does not exist (REST-idempotent). Enables the Phase 4 dual-write shadow.")
+                    + "supplied pid if it does not exist (REST-idempotent). Uses the report-definition store.")
     @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
     public ApiResponse<ReportDefinitionResponse> upsert(@PathVariable String pid,
                                                         @Valid @RequestBody ReportDefinitionUpdateRequest request) {
@@ -117,6 +108,7 @@ public class ReportDefinitionController {
         report.setUpdatedBy(MetaContext.getCurrentUserId());
 
         ReportEntity saved = reportStorageService.upsertByPid(report);
+        versionHistoryService.recordVersion("report", saved.getPid(), existing == null ? "create" : "update", null);
         return ApiResponse.success(toResponse(saved));
     }
 
@@ -130,8 +122,7 @@ public class ReportDefinitionController {
     @GetMapping("/by-code/{code}")
     @Operation(summary = "Get a report definition by code",
             description = "Loads one live ab_report row by its tenant-unique code (== the report's pageKey); "
-                    + "404 if not found / soft-deleted. Powers the Phase 4 slice 2b-2 viewer read path that "
-                    + "reads ab_report first and falls back to the page-schema.")
+                    + "404 if not found / soft-deleted.")
     @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
     public ApiResponse<ReportDefinitionResponse> getByCode(@PathVariable String code) {
         return ApiResponse.success(toResponse(requireOwnedByCode(code)));
@@ -156,6 +147,43 @@ public class ReportDefinitionController {
         requireOwned(pid);
         reportStorageService.softDelete(pid);
         return ApiResponse.success();
+    }
+
+    @GetMapping("/{pid}/versions")
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
+    public ApiResponse<List<DesignVersionDTO>> history(@PathVariable String pid) {
+        requireOwned(pid);
+        return ApiResponse.success(versionHistoryService.getHistory("report", pid));
+    }
+
+    @GetMapping("/{pid}/versions/count")
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
+    public ApiResponse<Map<String, Integer>> versionCount(@PathVariable String pid) {
+        requireOwned(pid);
+        return ApiResponse.success(Map.of("count", versionHistoryService.countVersions("report", pid)));
+    }
+
+    @GetMapping("/{pid}/versions/{versionPid}")
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_VIEW)
+    public ApiResponse<DesignVersionDTO> version(@PathVariable String pid, @PathVariable String versionPid) {
+        requireOwned(pid);
+        return ApiResponse.success(requireReportVersion(pid, versionPid));
+    }
+
+    @PostMapping("/{pid}/versions/{versionPid}/rollback")
+    @RequirePermission(MetaPermission.REPORT_DEFINITION_MANAGE)
+    public ApiResponse<DesignVersionDTO> rollback(@PathVariable String pid, @PathVariable String versionPid) {
+        requireOwned(pid);
+        requireReportVersion(pid, versionPid);
+        return ApiResponse.success(versionHistoryService.rollback("report", pid, versionPid));
+    }
+
+    private DesignVersionDTO requireReportVersion(String pid, String versionPid) {
+        DesignVersionDTO version = versionHistoryService.getVersion(versionPid);
+        if (version == null || !"report".equals(version.getResourceType()) || !pid.equals(version.getResourceId())) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "Report version not found");
+        }
+        return version;
     }
 
     /**

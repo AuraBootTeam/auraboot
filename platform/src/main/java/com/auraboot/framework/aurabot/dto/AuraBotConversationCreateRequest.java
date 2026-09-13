@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class AuraBotConversationCreateRequest {
     private String agentCode;
+    private boolean newConversation;
 }

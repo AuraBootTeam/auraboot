@@ -17,6 +17,13 @@ describe('shouldForwardRequestBody', () => {
     expect(shouldForwardRequestBody('POST', {})).toBe(false);
   });
 
+  it('preserves an explicit empty JSON object using the captured bytes', () => {
+    expect(shouldForwardRequestBody('PUT', {}, Buffer.from('{}'))).toBe(true);
+    expect(shouldForwardRequestBody('POST', {}, Buffer.alloc(0))).toBe(false);
+    expect(shouldForwardRequestBody('GET', {}, Buffer.from('{}'))).toBe(false);
+    expect(shouldForwardRequestBody('HEAD', {}, Buffer.from('{}'))).toBe(false);
+  });
+
   it('forwards a non-empty object body', () => {
     expect(shouldForwardRequestBody('POST', { a: 1 })).toBe(true);
   });

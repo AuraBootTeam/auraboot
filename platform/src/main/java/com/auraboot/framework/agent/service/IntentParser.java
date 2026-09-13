@@ -53,6 +53,10 @@ public class IntentParser {
     // ========== Phase 1: Sentence patterns (zh + en + ja) ==========
     // ORDER MATTERS: more specific intents before broader ones
     private static final List<PatternRule> SENTENCE_PATTERNS = List.of(
+        // An explicit creation opening governs nouns and quoted data that follow it.
+        // Do not turn a question or a read request mentioning creation into a write.
+        new PatternRule("create", Pattern.compile("^\\s*(?:(?:请帮我|帮我|请)\\s*)?(?:新建|创建|添加|录入|新增)"), 0.88),
+        new PatternRule("create", Pattern.compile("(?i)^\\s*(?:please\\s+)?(?:create|add|insert|register)\\b"), 0.88),
         // --- Chinese ---
         new PatternRule("query", Pattern.compile("(看看|查看|查一下|列出|有哪些|搜索|找).{0,10}"), 0.88),
         new PatternRule("query", Pattern.compile("(帮我|请).{0,5}(查|看|找|列)"), 0.85),

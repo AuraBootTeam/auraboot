@@ -57,6 +57,13 @@ export interface OrderByConfig {
 /**
  * Request payload for aggregate queries
  */
+export interface SemanticTimeRange {
+  field: string;
+  preset: 'ytd' | 'mtd' | 'qtd' | 'last_7_days' | 'last_30_days' | 'last_month' | 'custom';
+  from?: string;
+  to?: string;
+}
+
 export interface AggregateQueryRequest {
   /** Query type: aggregate for dynamic queries, namedQuery for predefined queries */
   type: 'aggregate' | 'namedQuery';
@@ -88,6 +95,7 @@ export interface AggregateQueryRequest {
    * or qualified as `<semanticModelCode>.<metric_code>`.
    */
   semanticModelCode?: string;
+  timeRange?: SemanticTimeRange;
 }
 
 /**
@@ -158,6 +166,7 @@ export interface ChartDataSource {
    * Metric codes may be bare or qualified as `<semanticModelCode>.<metric_code>`.
    */
   semanticModelCode?: string;
+  timeRange?: SemanticTimeRange;
   /**
    * Dimension field -> dict code, for dimensions whose values are dict-coded.
    *

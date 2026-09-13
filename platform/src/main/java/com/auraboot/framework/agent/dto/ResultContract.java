@@ -36,6 +36,7 @@ public class ResultContract {
     // metadata (no engine internals)
     private String skillCode;
     private long durationMs;
+    private String errorCode;           // optional stable code for localized failure rendering
     private String status;              // success | partial_success | failed
 
     @Data

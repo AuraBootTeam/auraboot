@@ -63,6 +63,7 @@ export interface ReportBlockTreeResult {
 
 const DATA_SOURCE_TYPE_MAP: Record<ReportDataSource['type'], ChartDataSource['type']> = {
   model: 'aggregate',
+  aggregate: 'aggregate',
   namedQuery: 'namedQuery',
   api: 'api',
   static: 'static',
@@ -71,6 +72,12 @@ const DATA_SOURCE_TYPE_MAP: Record<ReportDataSource['type'], ChartDataSource['ty
 /** Map a report (page-level) data source to a renderer-agnostic ChartDataSource. */
 function toChartDataSource(ds: ReportDataSource | undefined): ChartDataSource {
   if (!ds) return { type: 'static' };
+  if (ds.type === 'aggregate') {
+    if (!ds.aggregateQuery || ds.aggregateQuery.type !== 'aggregate') {
+      throw new Error('Report aggregate query is required');
+    }
+    return { ...ds.aggregateQuery, type: 'aggregate' };
+  }
   const out: ChartDataSource = { type: DATA_SOURCE_TYPE_MAP[ds.type] };
   if (ds.modelCode) out.modelCode = ds.modelCode;
   if (ds.queryCode) out.queryCode = ds.queryCode;

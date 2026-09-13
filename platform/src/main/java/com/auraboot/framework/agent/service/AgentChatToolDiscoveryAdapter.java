@@ -91,6 +91,18 @@ class AgentChatToolDiscoveryAdapter {
                     .build();
 
             List<ToolDefinition> defs = toolProviderRegistry.discoverAll(ctx);
+            // An analysis recommendation targets the analytics model rather than the
+            // source business model. Preserve normal provider authorization and the
+            // final agent-scope filter for this exact confirmation-gated command.
+            if (bif != null && ("recommend".equals(bif.getIntent()) || "analyze".equals(bif.getIntent()))) {
+                ToolDiscoveryContext analytics = ToolDiscoveryContext.builder()
+                        .tenantId(tenantId).userId(userId).agentCode(agentCode).channel(channel)
+                        .modelHint("core_dashboard_suggestion").intentHint("create").maxResults(20).build();
+                List<ToolDefinition> proposals = toolProviderRegistry.discoverAll(analytics).stream()
+                        .filter(tool -> "cmd:core_dashboard:propose_suggestion".equals(tool.getToolCode()))
+                        .toList();
+                defs = mergeTools(defs, proposals, List.of());
+            }
             List<ToolDefinition> merged = mergeTools(alwaysOnDefs, explicitDefs, defs);
             // B4: allowed_models / allowed_operations bind on the chat engine too.
             // Non-model tools (always-on escalation, platform, custom, mcp) pass

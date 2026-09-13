@@ -53,6 +53,7 @@ public class BehaviorCollectService {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "tenant_required");
         }
+        rejectReservedEvents(events);
         int enqueued = publisher.publish(tenantId, MetaContext.getCurrentUserId(), events);
         metrics.recordAccepted("authenticated", enqueued);
         return enqueued;
@@ -67,8 +68,24 @@ public class BehaviorCollectService {
         if (events == null || events.isEmpty()) {
             return 0;
         }
+        rejectReservedEvents(events);
         int enqueued = publisher.publish(tenantId, null, events);
         metrics.recordAccepted("keyed", enqueued);
         return enqueued;
     }
+    private void rejectReservedEvents(List<BehaviorEventInput> events) {
+        if (events.stream().anyMatch(event -> event != null && (
+                normalized(event.getEventName()).startsWith("analytics_")
+                || "server".equals(normalized(event.getSource()))
+                || "business_outcome".equals(normalized(event.getEventCategory()))
+                || normalized(event.getProducerName()).startsWith("server-")
+                || "aurabot-analytics".equals(normalized(event.getProducerName()))))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reserved_server_event");
+        }
+    }
+
+    private static String normalized(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
 }

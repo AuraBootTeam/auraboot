@@ -187,4 +187,11 @@ class SecureSqlRewriterUnitTest {
         assertThatThrownBy(() -> rewriter.rewriteForDelete("UPDATE t SET x = 1", "t"))
                 .isInstanceOfAny(IllegalArgumentException.class, MetaServiceException.class);
     }
+    @Test
+    void referencedTablesIncludesNestedSourcesAndNormalizesBindings() {
+        assertThat(rewriter.referencedTables("SELECT count(*) FROM (SELECT p.pid FROM public.mt_private p JOIN mt_orders o ON o.pid=p.pid WHERE p.tenant_id=#{params.tenantId}) x"))
+                .contains("public.mt_private", "mt_orders");
+        assertThatThrownBy(() -> rewriter.referencedTables("SELECT FROM ???"))
+                .isInstanceOf(MetaServiceException.class);
+    }
 }

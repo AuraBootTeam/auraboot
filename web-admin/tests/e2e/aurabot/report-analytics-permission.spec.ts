@@ -1,0 +1,744 @@
+import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
+import { test, expect } from '../../fixtures';
+import { executeCommandViaApi } from '../helpers';
+import { ensureRoleUser, makeRoleUser, openAsRole, fetchRoleSnapshot } from '../rbac/rbac-helpers';
+
+test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+for (const sourceType of ['model', 'aggregate', 'semantic'] as const) {
+  test(`${sourceType} report export requires model read permission in addition to artifact permissions`, async ({
+    page,
+    browser,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    const actorResponse = await page.request.get('/api/auth/me');
+    expect(actorResponse.status()).toBe(200);
+    const actor = (await actorResponse.json()).data.user;
+    expect(actor.name).toBeTruthy();
+    expect(actor.pid).toBeTruthy();
+    const key = `rpt_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+    const order = await executeCommandViaApi(
+      page,
+      'e2et:create_order',
+      {
+        e2et_order_title: key,
+        e2et_order_type: 'normal',
+        e2et_order_customer: 'Permission fixture',
+        e2et_order_urgent: false,
+      },
+      undefined,
+      'create',
+    );
+    expect(order.code).toBe('0');
+    if (sourceType === 'semantic') {
+      const yaml = `version: "0.1"
+semantic_model:
+  code: ${key}
+  label: { en-US: Protected orders, zh-CN: 受保护订单 }
+  model_ref: e2et_order
+  primary_entity: order_id
+entities:
+  - { name: order_id, type: primary, field_ref: id }
+dimensions:
+  - code: e2et_order_title
+    label: { en-US: Title, zh-CN: 标题 }
+    field_ref: e2et_order_title
+    type: categorical
+measures:
+  - { code: count_orders, agg: COUNT, expr: "*" }
+metrics:
+  - code: cnt
+    label: { en-US: Orders, zh-CN: 订单数 }
+    type: simple
+    type_params: { measure: count_orders }
+    required_permissions: [model.e2et_order.read]
+`;
+      const published = await page.request.post('/api/semantic/publish', {
+        data: { yaml, pluginCode: 'test-fixtures' },
+      });
+      expect(published.status(), await published.text()).toBe(200);
+    }
+    const dsl = {
+      $schema: 'auraboot://schemas/report/v1',
+      version: '1.0.0',
+      title: key,
+      page: {
+        size: 'A4',
+        orientation: 'portrait',
+        margin: { top: 20, right: 20, bottom: 20, left: 20 },
+      },
+      dataSources: {
+        orders:
+          sourceType !== 'model'
+            ? {
+                type: 'aggregate',
+                aggregateQuery: {
+                  type: 'aggregate',
+                  modelCode: 'e2et_order',
+                  ...(sourceType === 'semantic' ? { semanticModelCode: key } : {}),
+                  dimensions: ['e2et_order_title'],
+                  metrics: [
+                    {
+                      field: sourceType === 'semantic' ? 'cnt' : 'pid',
+                      aggregation: 'count',
+                      alias: 'cnt',
+                    },
+                  ],
+                  filters: [{ field: 'e2et_order_title', operator: 'eq', value: key }],
+                  limit: 5,
+                },
+              }
+            : {
+                type: 'model',
+                modelCode: 'e2et_order',
+                filters: [{ field: 'e2et_order_title', operator: 'EQ', value: key }],
+              },
+      },
+      body: [
+        {
+          id: 'orders',
+          blockType: 'table',
+          title: 'Orders',
+          dataSource: 'orders',
+          columns: [
+            { field: 'e2et_order_title', label: 'Title' },
+            ...(sourceType !== 'model' ? [{ field: 'cnt', label: 'Count' }] : []),
+          ],
+          showHeader: true,
+        },
+      ],
+    };
+    let sourceAnalysisId: string | undefined;
+    if (sourceType !== 'model') {
+      const { type: ignoredType, ...toolQuery } = dsl.dataSources.orders.aggregateQuery!;
+      expect(ignoredType).toBe('aggregate');
+      const chat = await page.request.post('/api/ai/aurabot/chat/stream', {
+        headers: { Accept: 'text/event-stream' },
+        data: {
+          sessionId: key,
+          clientMsgId: randomUUID(),
+          message:
+            '@@AURABOOT_STUB_TOOL_USE@@ ' +
+            JSON.stringify({
+              name: 'aurabot_chat-bi',
+              input: { ...toolQuery, chartType: 'table' },
+            }),
+        },
+      });
+      expect(chat.status()).toBe(200);
+      const contracts = (await chat.text())
+        .split(/\r?\n\r?\n/)
+        .filter((block) => /^event: ?result_contract/.test(block))
+        .map((block) => {
+          const raw = block
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trim())
+            .join('\n');
+          const decoded = JSON.parse(raw);
+          return typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+        });
+      const analysis = contracts.find((contract) => contract?.data?.data?.analysisId)?.data.data;
+      expect(analysis, JSON.stringify(contracts)).toBeDefined();
+      sourceAnalysisId = analysis.analysisId;
+      dsl.dataSources.orders.aggregateQuery = analysis.dataSource;
+    }
+    const created = await page.request.post('/api/report-definitions', {
+      data: { code: key, title: key, profile: 'paged-media', dsl, sourceAnalysisId },
+    });
+    expect(created.status()).toBe(200);
+    const { pid } = (await created.json()).data;
+    expect(
+      (
+        await page.request.put(`/api/report-definitions/${pid}`, {
+          data: {
+            title: key,
+            profile: 'paged-media',
+            dsl: { ...dsl, description: 'Second revision' },
+          },
+        })
+      ).status(),
+    ).toBe(200);
+
+    const tree = await page.request.get('/api/permissions/tree');
+    expect(tree.status()).toBe(200);
+    const permissions = new Map<string, unknown>();
+    const collect = (nodes: any[]) => {
+      for (const node of nodes) {
+        permissions.set(node.code, node.id);
+        collect(node.children ?? []);
+      }
+    };
+    collect((await tree.json()).data);
+    const evidence = [];
+    for (const hasModelRead of [false, true]) {
+      const code = `${key}_${hasModelRead ? 'reader' : 'exporter'}`;
+      const role = await page.request.post('/api/roles', {
+        data: {
+          code,
+          name: code,
+          type: 'custom',
+          status: 'active',
+          scopeType: 'tenant',
+          defaultDataScopeType: 'all',
+        },
+      });
+      expect(role.status()).toBe(200);
+      const rolePid = (await role.json()).data.pid;
+      const codes = [
+        'report.definition.view',
+        'report.export.execute',
+        ...(sourceType === 'semantic' ? ['meta.semantic.use'] : []),
+        ...(hasModelRead ? ['model.e2et_order.read'] : []),
+      ];
+      const grants = codes.map((permission) => {
+        expect(permissions.get(permission), permission).toBeTruthy();
+        return { permissionId: permissions.get(permission), granted: true };
+      });
+      expect(
+        (
+          await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, { data: grants })
+        ).status(),
+      ).toBe(200);
+      const user = makeRoleUser(code, [code]);
+      await ensureRoleUser(page, user);
+      const session = await openAsRole(browser, user.email, user.password, 'zh-CN');
+      try {
+        const snapshot = await fetchRoleSnapshot(session.page);
+        expect(snapshot.roleCodes).not.toContain('tenant_admin');
+        if (sourceType === 'semantic')
+          expect(snapshot.permissionCodes).toContain('meta.semantic.use');
+        expect(snapshot.permissionCodes.includes('model.e2et_order.read')).toBe(hasModelRead);
+        const definition = await session.page.request.get(`/api/report-definitions/${pid}`);
+        expect(definition.status()).toBe(200);
+        expect(
+          (await session.page.request.get(`/api/report-definitions/${pid}/versions`)).status(),
+        ).toBe(200);
+        expect(
+          (
+            await session.page.request.put(`/api/report-definitions/${pid}`, {
+              data: { title: 'forbidden', profile: 'paged-media', dsl },
+            })
+          ).status(),
+        ).toBe(403);
+        const statuses = [];
+        for (const format of ['json', 'excel', 'pdf']) {
+          const response = await session.page.request.post(`/api/reports/export/${format}`, {
+            data: { reportPid: pid },
+          });
+          expect(response.status(), `${code} ${format}`).toBe(hasModelRead ? 200 : 403);
+          if (hasModelRead && format === 'json') {
+            const data = await response.json();
+            expect(data.dataSets.orders).toHaveLength(1);
+            expect(data.dataSets.orders[0].e2et_order_title).toBe(key);
+            if (sourceType !== 'model') expect(Number(data.dataSets.orders[0].cnt)).toBe(1);
+          }
+          statuses.push({ format, status: response.status() });
+        }
+
+        expect(snapshot.menuPaths).toContain('/p/c/report_management');
+        expect(snapshot.menuPaths).not.toContain('/meta/models');
+        expect(snapshot.menuPaths).not.toContain('/meta/fields');
+        const sidebar = session.page.getByTestId('sidebar');
+        const entry = sidebar.locator('a[href="/p/c/report_management"]');
+        if (!(await entry.isVisible()))
+          await sidebar.getByText('元数据管理', { exact: true }).click();
+        await entry.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+        await entry.click();
+        await session.page
+          .getByRole('row')
+          .filter({ hasText: key })
+          .getByRole('button', { name: /打开|Open/ })
+          .click();
+
+        await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toContainText('只读报表');
+        await expect(session.page.getByPlaceholder('报表标题')).toHaveCount(0);
+        for (const name of ['预览', '编辑', '设置', '保存'])
+          await expect(session.page.getByRole('button', { name, exact: true })).toHaveCount(0);
+        const writes: string[] = [];
+        session.page.on('request', (request) => {
+          if (
+            request.url().includes('/api/report-definitions') &&
+            ['POST', 'PUT', 'DELETE'].includes(request.method())
+          )
+            writes.push(request.url());
+        });
+        await session.page.keyboard.press('ControlOrMeta+s');
+        const stillSaved = await session.page.request.get(`/api/report-definitions/${pid}`);
+        expect((await stillSaved.json()).data.dsl.description).toBe('Second revision');
+        expect(writes).toEqual([]);
+
+        if (hasModelRead) {
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+          const event = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+          const artifact = await event;
+          const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-role-allowed.json`;
+          await artifact.saveAs(path);
+          expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
+            key,
+          );
+          if (sourceType !== 'model') {
+            await expect(
+              session.page.getByRole('row').filter({ hasText: key }).getByRole('cell', { name: '1', exact: true }),
+            ).toBeVisible();
+          }
+          const pdfDownload = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
+          const pdf = await pdfDownload;
+          expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
+          const pdfPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-allowed.pdf`;
+          await pdf.saveAs(pdfPath);
+          const bytes = await readFile(pdfPath);
+          expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+          if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1') {
+            expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
+          }
+        } else {
+          await expect(session.page.getByRole('alert')).toContainText('查询未成功');
+          await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+          await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+          const retried = session.page.waitForResponse(
+            (response) =>
+              response
+                .url()
+                .includes(sourceType !== 'model' ? '/api/reports/query/aggregate' : '/list?') &&
+              response.status() === 403,
+          );
+          await session.page.getByRole('button', { name: '重新查询', exact: true }).click();
+          await retried;
+          await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+          for (const format of ['JSON', 'Excel', 'PDF'])
+            await expect(
+              session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
+            ).toBeDisabled();
+        }
+
+        await session.page.getByRole('button', { name: '版本历史', exact: true }).click();
+        await session.page.getByRole('button', { name: /^v1\b/ }).click();
+        await expect(session.page.getByTestId('report-version-preview')).toBeVisible();
+        const history = session.page.getByTestId('version-history-panel');
+        await expect(history).toContainText(actor.name);
+        await expect(history).not.toContainText(actor.pid);
+        await expect(session.page.getByText('正在查询报表数据…', { exact: true })).toHaveCount(0);
+        if (hasModelRead) {
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        } else {
+          await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+        }
+        await session.page.screenshot({
+          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-reader-history-${hasModelRead ? 'allowed' : 'denied'}.png`,
+          fullPage: true,
+        });
+
+        await expect(session.page.getByRole('button', { name: /^(回滚|Rollback)$/ })).toHaveCount(
+          0,
+        );
+        await session.page.getByRole('button', { name: '返回当前报表', exact: true }).click();
+        await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
+        expect(writes).toEqual([]);
+        await session.page.getByRole('button', { name: /关闭版本面板|Close version/ }).click();
+        await expect(session.page.getByTestId('version-history-panel')).not.toBeInViewport();
+        await expect(session.page.getByText('正在查询报表数据…', { exact: true })).toHaveCount(0);
+        await session.page.screenshot({
+          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-role-${hasModelRead ? 'allowed' : 'denied'}.png`,
+          fullPage: true,
+        });
+        if (sourceType !== 'model') {
+          const me = await session.page.request.get('/api/auth/me');
+          const userId = (await me.json()).data.user.id;
+          const db = new Client(PG_CONN);
+          await db.connect();
+          try {
+            const count = async () => {
+              const result = await db.query(
+                "SELECT count(*)::int AS count FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2 AND user_id = $3",
+                [sourceAnalysisId, pid, userId],
+              );
+              return result.rows[0].count;
+            };
+            if (hasModelRead) await expect.poll(count).toBe(5);
+            else expect(await count()).toBe(0);
+          } finally {
+            await db.end();
+          }
+        }
+        if (hasModelRead) {
+          const assertUsageCount = async (expected: number) => {
+            if (sourceType === 'model') return;
+            const db = new Client(PG_CONN);
+            await db.connect();
+            try {
+              await expect
+                .poll(async () => {
+                  const result = await db.query(
+                    "SELECT count(*)::int AS count FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2",
+                    [sourceAnalysisId, pid],
+                  );
+                  return result.rows[0].count;
+                })
+                .toBe(expected);
+            } finally {
+              await db.end();
+            }
+          };
+          const setSourceRead = async (granted: boolean) => {
+            const response = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+              data: [{ permissionId: permissions.get('model.e2et_order.read'), granted }],
+            });
+            expect(response.status()).toBe(200);
+            await expect
+              .poll(async () =>
+                (await fetchRoleSnapshot(session.page)).permissionCodes.includes(
+                  'model.e2et_order.read',
+                ),
+              )
+              .toBe(granted);
+          };
+          await setSourceRead(false);
+          try {
+            const downloads: string[] = [];
+            session.page.on('download', (download) => downloads.push(download.suggestedFilename()));
+            const rejected = session.page.waitForResponse(
+              (response) =>
+                response.url().includes('/api/reports/export/json') && response.status() === 403,
+            );
+
+            await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+            await rejected;
+            await expect(session.page.getByText('导出未完成。请检查数据源和访问权限后重试。', { exact: true })).toBeVisible();
+            for (const format of ['json', 'excel', 'pdf']) {
+              const denied = await session.page.request.post(`/api/reports/export/${format}`, {
+                data: { reportPid: pid },
+              });
+              expect(denied.status()).toBe(403);
+            }
+            await session.page.reload();
+            await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+            await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+            for (const format of ['JSON', 'Excel', 'PDF']) {
+              await expect(
+                session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
+              ).toBeDisabled();
+            }
+            expect(downloads).toEqual([]);
+            await assertUsageCount(5);
+            await session.page.screenshot({
+              path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-revoked.png`,
+              fullPage: true,
+            });
+          } finally {
+            await setSourceRead(true);
+          }
+          await session.page.reload();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+          const download = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+          const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-restored.json`;
+          await (await download).saveAs(path);
+          expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
+            key,
+          );
+          await assertUsageCount(6);
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-restored.png`,
+            fullPage: true,
+          });
+        }
+        evidence.push({ hasModelRead, statuses });
+      } finally {
+        await session.context.close();
+      }
+    }
+    await testInfo.attach('report-permission-matrix', {
+      body: JSON.stringify(evidence),
+      contentType: 'application/json',
+    });
+  });
+}
+
+test('named-query reports require source and declared resource permissions', async ({
+  page,
+  browser,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  const key = `nqr_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  expect(
+    (
+      await executeCommandViaApi(
+        page,
+        'e2et:create_order',
+        {
+          e2et_order_title: key,
+          e2et_order_type: 'normal',
+          e2et_order_customer: 'Named query permissions',
+          e2et_order_urgent: false,
+        },
+        undefined,
+        'create',
+      )
+    ).code,
+  ).toBe('0');
+  const query = await page.request.post('/api/meta/named-queries', {
+    data: {
+      code: key,
+      title: key,
+      resourceCode: 'e2et_order',
+      actionCode: 'read',
+      fromSql: `SELECT o.e2et_order_title FROM mt_e2et_order o WHERE o.tenant_id = #{params.tenantId} AND o.e2et_order_title IN ('${key}', '${key}_own')`,
+      fields: [
+        {
+          fieldCode: 'e2et_order_title',
+          columnExpr: 'e2et_order_title',
+          dataType: 'string',
+          displayName: 'Title',
+          sortable: true,
+          searchable: true,
+          sortOrder: 1,
+        },
+      ],
+    },
+  });
+  expect(query.status()).toBe(200);
+  expect((await query.json()).code).toBe('0');
+  const queryPid = (await query.json()).data.pid;
+  const dsl = {
+    $schema: 'auraboot://schemas/report/v1',
+    version: '1.0.0',
+    title: key,
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+    },
+    dataSources: { orders: { type: 'namedQuery', queryCode: key } },
+    body: [
+      {
+        id: 'orders',
+        blockType: 'table',
+        title: 'Orders',
+        dataSource: 'orders',
+        columns: [{ field: 'e2et_order_title', label: 'Title' }],
+        showHeader: true,
+      },
+    ],
+  };
+  const created = await page.request.post('/api/report-definitions', {
+    data: { code: key, title: key, profile: 'paged-media', dsl },
+  });
+  expect(created.status()).toBe(200);
+  const { pid } = (await created.json()).data;
+  const tree = await page.request.get('/api/permissions/tree');
+  expect(tree.status()).toBe(200);
+  const permissions = new Map<string, unknown>();
+  const collect = (nodes: any[]) => {
+    for (const node of nodes) {
+      permissions.set(node.code, node.id);
+      collect(node.children ?? []);
+    }
+  };
+  collect((await tree.json()).data);
+  const evidence = [];
+  for (const mode of ['source-denied', 'resource-denied', 'allowed']) {
+    const code = `${key}_${mode.replaceAll('-', '_')}`;
+    const role = await page.request.post('/api/roles', {
+      data: {
+        code,
+        name: code,
+        type: 'custom',
+        status: 'active',
+        scopeType: 'tenant',
+        defaultDataScopeType: 'all',
+      },
+    });
+    expect(role.status()).toBe(200);
+    const rolePid = (await role.json()).data.pid;
+    const codes = [
+      'report.definition.view',
+      'report.export.execute',
+      ...(mode !== 'source-denied' ? ['data.datasource.read'] : []),
+      ...(mode !== 'resource-denied' ? ['model.e2et_order.read'] : []),
+      ...(mode === 'allowed' ? ['meta.command.execute', 'e2et.order.manage'] : []),
+    ];
+    expect(
+      (
+        await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+          data: codes.map((permission) => {
+            expect(permissions.get(permission), permission).toBeTruthy();
+            return { permissionId: permissions.get(permission), granted: true };
+          }),
+        })
+      ).status(),
+    ).toBe(200);
+    const user = makeRoleUser(code, [code]);
+    await ensureRoleUser(page, user);
+    const session = await openAsRole(browser, user.email, user.password, 'zh-CN');
+    try {
+      const snapshot = await fetchRoleSnapshot(session.page);
+      expect(snapshot.roleCodes).not.toContain('tenant_admin');
+      expect(snapshot.permissionCodes.includes('data.datasource.read')).toBe(
+        mode !== 'source-denied',
+      );
+      expect(snapshot.permissionCodes.includes('model.e2et_order.read')).toBe(
+        mode !== 'resource-denied',
+      );
+      const statuses = [];
+      for (const format of ['json', 'excel', 'pdf']) {
+        const response = await session.page.request.post(`/api/reports/export/${format}`, {
+          data: { reportPid: pid },
+        });
+        expect(response.status(), `${mode} ${format}`).toBe(mode === 'allowed' ? 200 : 403);
+        if (mode === 'allowed' && format === 'json')
+          expect((await response.json()).dataSets.orders).toEqual([{ e2et_order_title: key }]);
+        statuses.push({ format, status: response.status() });
+      }
+      const sidebar = session.page.getByTestId('sidebar');
+      const entry = sidebar.locator('a[href="/p/c/report_management"]');
+      if (!(await entry.isVisible()))
+        await sidebar.getByText('元数据管理', { exact: true }).click();
+      await entry.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await entry.click();
+      await session.page
+        .getByRole('row')
+        .filter({ hasText: key })
+        .getByRole('button', { name: /打开|Open/ })
+        .click();
+      await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
+      if (mode === 'allowed') {
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        const download = session.page.waitForEvent('download');
+        await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+        const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-allowed.json`;
+        await (await download).saveAs(path);
+        expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders).toEqual([
+          { e2et_order_title: key },
+        ]);
+        const exportPdf = async (scope: string) => {
+          const pending = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
+          const pdf = await pending;
+          expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
+          const artifactPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-${scope}.pdf`;
+          await pdf.saveAs(artifactPath);
+          const bytes = await readFile(artifactPath);
+          expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+          if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1')
+            expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
+        };
+        const setScope = async (scopeType: 'none' | 'self' | 'all') => {
+          const response = await page.request.put(`/api/permissions/matrix/${rolePid}/scope`, {
+            data: { resourceCode: 'e2et_order', actionCode: 'read', scopeType, mergeStrategy: 'MIN' },
+          });
+          expect(response.status()).toBe(200);
+        };
+        await exportPdf('allowed');
+        try {
+          await setScope('none');
+          expect((await fetchRoleSnapshot(session.page)).permissionCodes).toContain('model.e2et_order.read');
+          const empty = await session.page.request.post('/api/reports/export/json', { data: { reportPid: pid } });
+          expect(empty.status()).toBe(200);
+          expect((await empty.json()).dataSets.orders).toEqual([]);
+          await session.page.reload();
+          await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+          await exportPdf('scope-none');
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-scope-none.png`,
+            fullPage: true,
+          });
+        } finally {
+          await setScope('all');
+        }
+        await session.page.reload();
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        await exportPdf('scope-restored');
+        const ownTitle = `${key}_own`;
+        const own = await executeCommandViaApi(session.page, 'e2et:create_order', {
+          e2et_order_title: ownTitle,
+          e2et_order_type: 'normal',
+          e2et_order_customer: 'Self-scope fixture',
+          e2et_order_urgent: false,
+        }, undefined, 'create');
+        expect(own.code).toBe('0');
+        try {
+          await setScope('self');
+          const selfData = await session.page.request.post('/api/reports/export/json', { data: { reportPid: pid } });
+          expect(selfData.status()).toBe(200);
+          expect((await selfData.json()).dataSets.orders).toEqual([{ e2et_order_title: ownTitle }]);
+          await session.page.reload();
+          await expect(session.page.getByRole('cell', { name: ownTitle, exact: true })).toBeVisible();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+          await exportPdf('scope-self');
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-scope-self.png`,
+            fullPage: true,
+          });
+        } finally {
+          await setScope('all');
+        }
+        await session.page.reload();
+        await expect(session.page.getByRole('cell', { name: ownTitle, exact: true })).toBeVisible();
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        await exportPdf('scope-mixed-all');
+        const originalSql = (await (await page.request.get(`/api/meta/named-queries/${queryPid}`)).json()).data.fromSql;
+        expect(originalSql).toContain('SELECT');
+        const broken = await page.request.put(`/api/meta/named-queries/${queryPid}`, {
+          data: { fromSql: `SELECT 1 / 0 AS e2et_order_title FROM mt_e2et_order WHERE e2et_order_title = '${key}'` },
+        });
+        expect(broken.status(), await broken.text()).toBe(200);
+        const failedDownloads: string[] = [];
+        const collectDownload = (download: { suggestedFilename(): string }) => failedDownloads.push(download.suggestedFilename());
+        session.page.on('download', collectDownload);
+        try {
+          for (const [format, label] of [['json', 'JSON'], ['excel', 'Excel'], ['pdf', 'PDF']]) {
+            const response = session.page.waitForResponse((r) => r.url().includes(`/api/reports/export/${format}`) && r.status() === 422);
+            await session.page.getByRole('button', { name: `导出 ${label}`, exact: true }).click();
+            const failed = await response;
+            expect(await failed.text()).not.toContain('mt_e2et_order');
+            await expect(session.page.getByText('导出未完成。请检查数据源和访问权限后重试。', { exact: true }).last()).toBeVisible();
+          }
+          expect(failedDownloads).toEqual([]);
+          await session.page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-export-error.png`, fullPage: true });
+        } finally {
+          session.page.off('download', collectDownload);
+          const repaired = await page.request.put(`/api/meta/named-queries/${queryPid}`, { data: { fromSql: originalSql } });
+          expect(repaired.status()).toBe(200);
+        }
+        await exportPdf('error-restored');
+
+
+      } else {
+        await expect(session.page.getByRole('alert')).toContainText('查询未成功');
+        await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+        const retried = session.page.waitForResponse(
+          (response) => response.url().includes('/list?') && response.status() === 403,
+        );
+        await session.page.getByRole('button', { name: '重新查询', exact: true }).click();
+        await retried;
+        await expect(session.page.getByRole('alert')).toContainText('当前没有可用结果');
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+        for (const format of ['JSON', 'Excel', 'PDF'])
+          await expect(
+            session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
+          ).toBeDisabled();
+      }
+      await session.page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-${mode}.png`,
+        fullPage: true,
+      });
+      evidence.push({ mode, statuses });
+    } finally {
+      await session.context.close();
+    }
+  }
+  await testInfo.attach('named-query-report-permission-matrix', {
+    body: JSON.stringify(evidence),
+    contentType: 'application/json',
+  });
+});

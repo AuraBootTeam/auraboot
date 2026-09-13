@@ -65,6 +65,14 @@ class NamedQueryServiceImplTest {
             permissionEvaluator,
             dynamicDataServiceProvider);
 
+    @org.junit.jupiter.api.BeforeEach
+    void configureFieldProtection() {
+        NamedQueryFieldProtection protection = mock(NamedQueryFieldProtection.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", protection);
+        when(protection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        when(protection.apply(any(), org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> invocation.getArgument(1));
+    }
+
     @AfterEach
     void clearContext() {
         MetaContext.clear();
@@ -340,5 +348,19 @@ class NamedQueryServiceImplTest {
         query.setFromSql("mt_e2et_order WHERE tenant_id = #{params.tenantId}");
         query.setStatus("draft");
         return query;
+    }
+    @Test
+    void exportDownloadRejectsRevokedResourceWithoutExecutingSql() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        MetaContext.setMemberId(30L);
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("e2et_order");
+        query.setActionCode("read");
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "e2et_order", "read")).thenReturn(false);
+        assertThatThrownBy(() -> service.authorizeExportDownload("order_summary",
+                new com.auraboot.framework.meta.dto.NamedQueryDataExportRequest(), null))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
     }
 }

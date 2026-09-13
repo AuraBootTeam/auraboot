@@ -33,6 +33,12 @@ class ExportTaskServiceTenantAuthzTest {
     @Mock
     private ExportTaskMapper exportTaskMapper;
 
+    @Mock
+    private com.auraboot.framework.meta.service.NamedQueryService namedQueryService;
+
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
     @InjectMocks
     private ExportTaskService service;
 
@@ -44,8 +50,13 @@ class ExportTaskServiceTenantAuthzTest {
     private ExportTask task(Long tenantId, String fileKey) {
         ExportTask t = new ExportTask();
         t.setTenantId(tenantId);
+        com.fasterxml.jackson.databind.node.ObjectNode metadata = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        metadata.set("request", com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        t.setRequestParams(metadata);
+        t.setCreatedBy(100L);
         t.setFileKey(fileKey);
         t.setStatus("completed");
+        t.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
         return t;
     }
 
@@ -71,5 +82,45 @@ class ExportTaskServiceTenantAuthzTest {
         MetaContext.setContext(1L, 100L, "u", "user");
         lenient().when(exportTaskMapper.findByPid("t-other")).thenReturn(task(2L, "/tmp/other.xlsx"));
         assertThrows(MetaServiceException.class, () -> service.getTaskStatus("t-other"));
+    }
+
+    @Test
+    void sameTenantPeerCannotReadStatusOrFile() {
+        MetaContext.setContext(1L, 200L, "peer", "user");
+        when(exportTaskMapper.findByPid("private-task")).thenReturn(task(1L, "/tmp/private.xlsx"));
+        assertThrows(MetaServiceException.class, () -> service.getTaskStatus("private-task"));
+        assertNull(service.getFileKey("private-task"));
+    }
+
+    @Test
+    void ownerCanReadStatus() {
+        MetaContext.setContext(1L, 100L, "owner", "user");
+        when(exportTaskMapper.findByPid("own-task")).thenReturn(task(1L, "/tmp/own.xlsx"));
+        assertEquals("completed", service.getTaskStatus("own-task").getStatus());
+    }
+
+    @Test
+    void recentTasksRequireBothTenantAndUserBeforeQuerying() {
+        MetaContext.clear();
+        assertThrows(IllegalStateException.class, () -> service.getRecentTasks("query", 10));
+        org.mockito.Mockito.verifyNoInteractions(exportTaskMapper);
+    }
+
+    @Test
+    void recentTasksPassOwnerScopeToDatabaseBeforeLimit() {
+        MetaContext.setContext(1L, 100L, "owner", "user");
+        when(exportTaskMapper.findByQueryCode("query", 1L, 100L, 2))
+                .thenReturn(java.util.List.of(task(1L, "/tmp/own.xlsx")));
+        assertEquals(1, service.getRecentTasks("query", 2).size());
+        org.mockito.Mockito.verify(exportTaskMapper).findByQueryCode("query", 1L, 100L, 2);
+    }
+    @Test
+    void expiredArtifactIsUnavailableBeforeScheduledCleanup() {
+        MetaContext.setContext(1L, 100L, "owner", "user");
+        ExportTask expired = task(1L, "/tmp/expired.xlsx");
+        expired.setExpiresAt(java.time.Instant.now().minusSeconds(1));
+        when(exportTaskMapper.findByPid("expired")).thenReturn(expired);
+        assertNull(service.getFileKey("expired"));
+        assertNull(service.getTaskStatus("expired").getDownloadUrl());
     }
 }
