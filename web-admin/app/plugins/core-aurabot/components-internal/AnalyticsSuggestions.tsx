@@ -17,6 +17,7 @@ import {
 } from '~/ui/ui/dialog';
 import type { ChartDataSource } from '~/framework/smart/types/chart';
 import { toast } from 'sonner';
+import { AnalyticsBusinessResults } from './AnalyticsBusinessResults';
 import { useAuraBot } from '../components-shell/AuraBotProvider';
 
 type Suggestion = {
@@ -330,6 +331,9 @@ export function AnalyticsSuggestions({
                   {executionLabel(row.execution.state)} · {l('运行次数', 'Attempts')}:{' '}
                   {row.execution.attempts}
                 </span>
+              )}
+              {row.adoptionPid && row.execution && (
+                <AnalyticsBusinessResults adoptionPid={row.adoptionPid} />
               )}
               {row.adoptionPid &&
                 row.executionGoal &&

@@ -22,6 +22,23 @@ class AnalyticsExecutionSourceServiceTest {
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(data, queries);
     }
+    @Test void readerCanResolveOwnedSourceWithoutExecutionPermission() throws Exception {
+        var json = new ObjectMapper();
+        var query = json.readTree("{\"modelCode\":\"orders\",\"dimensions\":[\"title\"]}");
+        when(permissions.hasPermission(eq(2L), anyString())).thenAnswer(inv -> !inv.getArgument(1).equals("analytics.suggestion.execute"));
+        when(data.getById(AnalyticsSuggestionCommandHandler.ADOPTION, "a".repeat(26))).thenReturn(Map.of(
+                "created_by", 2L, "core_dashboard_version_pid", "VERSION", "core_dashboard_analysis_id", "ANALYSIS",
+                "core_dashboard_decision_mode", "human"));
+        when(data.getById(AnalyticsSuggestionCommandHandler.VERSION, "VERSION")).thenReturn(Map.of(
+                "created_by", 2L, "core_dashboard_query", query.toString(),
+                "core_dashboard_query_hash", AnalyticsQueryFingerprint.of(query),
+                "core_dashboard_analysis_id", "ANALYSIS",
+                "core_dashboard_execution_intent", "{\"type\":\"agent_task\",\"goal\":\"Review orders\"}"));
+        assertThat(service.resolveForRead("a".repeat(26)).binding()).containsEntry("analysisId", "ANALYSIS");
+        verify(permissions, never()).hasPermission(2L, "analytics.suggestion.execute");
+        verify(queries).execute(any());
+    }
+
     @Test void anotherUsersAdoptionCannotAuthorizeExecution() {
         when(permissions.hasPermission(2L, "analytics.suggestion.execute")).thenReturn(true);
         when(data.getById(AnalyticsSuggestionCommandHandler.ADOPTION, "a".repeat(26)))

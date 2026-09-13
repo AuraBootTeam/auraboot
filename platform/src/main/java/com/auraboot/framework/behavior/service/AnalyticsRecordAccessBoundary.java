@@ -27,6 +27,7 @@ public class AnalyticsRecordAccessBoundary {
 
     @Around("execution(* com.auraboot.framework.behavior.service.AnalyticsSuggestionCommandHandler.execute(..))"
             + " || execution(* com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.resolve(..))"
+            + " || execution(* com.auraboot.framework.behavior.service.AnalyticsExecutionSourceService.resolveForRead(..))"
             + " || execution(* com.auraboot.framework.behavior.controller.AnalyticsSuggestionController.list(..))")
     public Object domainOperation(ProceedingJoinPoint call) throws Throwable {
         Principal previous = domainRead.get();

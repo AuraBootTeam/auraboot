@@ -26,10 +26,23 @@ public class AnalyticsExecutionSourceService {
     public record Source(String goal, Map<String, Object> binding) {}
 
     public Source resolve(String adoptionPid) {
+        return resolve(adoptionPid, "analytics.suggestion.execute");
+    }
+
+    public Source resolveForRead(String adoptionPid) {
+        Long user = MetaContext.getCurrentUserId();
+        if (user == null || !permissions.hasPermission(user, "model.core_dashboard_adoption.read")
+                || !permissions.hasPermission(user, "model.core_dashboard_suggestion.read")) {
+            throw new AccessDeniedException("Analytics source records are not readable");
+        }
+        return resolve(adoptionPid, "analytics.suggestion.read");
+    }
+
+    private Source resolve(String adoptionPid, String permission) {
         Long user = MetaContext.getCurrentUserId();
         Long tenant = MetaContext.getCurrentTenantId();
-        if (user == null || tenant == null || !permissions.hasPermission(user, "analytics.suggestion.execute")) {
-            throw new AccessDeniedException("Analytics execution permission required");
+        if (user == null || tenant == null || !permissions.hasPermission(user, permission)) {
+            throw new AccessDeniedException("Analytics source permission required");
         }
         com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().ifPresent(principal -> {
             if (principal.type() == com.auraboot.framework.agent.identity.ExecutionPrincipal.Type.SANDBOX
