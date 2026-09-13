@@ -366,19 +366,82 @@ for (const withBusinessCommand of [false, true]) {
       expect((await reloaded).status()).toBe(200);
       await expect(resultDialog.getByRole('status')).toHaveCount(0);
       await shot('business-results-reloaded');
+      // Hold an actual response to expose loading and close/reopen races without inventing data.
+      let releaseResponse!: () => void;
+      const held = new Promise<void>((resolve) => {
+        releaseResponse = resolve;
+      });
+      let responseReady!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        responseReady = resolve;
+      });
+      let responseDelivered!: () => void;
+      const delivered = new Promise<void>((resolve) => {
+        responseDelivered = resolve;
+      });
+      const resultPattern = '**/api/analytics/suggestions/*/business-results*';
+      await page.route(
+        resultPattern,
+        async (route) => {
+          const response = await route.fetch();
+          expect(response.status()).toBe(200);
+          responseReady();
+          await held;
+          await route.fulfill({ response });
+          responseDelivered();
+        },
+        { times: 1 },
+      );
+      await resultDialog.getByRole('button', { name: '重新读取', exact: true }).click();
+      await ready;
+      await expect(resultDialog.getByRole('status')).toContainText('正在读取业务结果');
+      await expect(resultDialog.getByRole('listitem')).toHaveCount(0);
+      await expect(
+        resultDialog.getByRole('button', { name: '重新读取', exact: true }),
+      ).toBeDisabled();
+      await shot('business-results-loading');
+      await page.keyboard.press('Escape');
+      await expect(resultDialog).toHaveCount(0);
+      await expect(panel).toBeVisible();
+      await expect(
+        version.getByRole('button', { name: '查看业务结果', exact: true }),
+      ).toBeFocused();
       if (withBusinessCommand) {
         const orders = await db.query('SELECT pid FROM mt_e2et_order WHERE e2et_order_title=$1', [
           outcomeTitle,
         ]);
         const removed = await page.request.delete(`/api/dynamic/e2et_order/${orders.rows[0].pid}`);
         expect(removed.status()).toBe(200);
-        const unavailable = page.waitForResponse((r) => r.url().includes('/business-results'));
-        await resultDialog.getByRole('button', { name: '重新读取', exact: true }).click();
-        expect((await unavailable).status()).toBeGreaterThanOrEqual(400);
-        await expect(resultDialog.getByRole('alert')).toContainText('无法读取业务结果');
-        await expect(resultDialog.getByRole('listitem')).toHaveCount(0);
-        await shot('business-results-unavailable');
       }
+      const reopened = page.waitForResponse((r) => r.url().includes('/business-results'));
+      await version.getByRole('button', { name: '查看业务结果', exact: true }).click();
+      const reopenedResponse = await reopened;
+      if (withBusinessCommand) {
+        expect(reopenedResponse.status()).toBeGreaterThanOrEqual(400);
+        await expect(resultDialog.getByRole('alert')).toContainText('无法读取业务结果');
+      } else {
+        expect(reopenedResponse.status()).toBe(200);
+        await expect(resultDialog).toContainText('尚无已记录的提交结果');
+      }
+      await expect(resultDialog.getByRole('status')).toHaveCount(0);
+      await expect(resultDialog.getByRole('listitem')).toHaveCount(0);
+      releaseResponse();
+      await delivered;
+      // Wait for the old fetch continuation, not just delivery of its HTTP response.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      await expect(resultDialog.getByRole('status')).toHaveCount(0);
+      await expect(
+        resultDialog.getByRole('button', { name: '重新读取', exact: true }),
+      ).toBeEnabled();
+      await expect(resultDialog.getByRole('listitem')).toHaveCount(0);
+      if (withBusinessCommand)
+        await expect(resultDialog.getByRole('alert')).toContainText('无法读取业务结果');
+      await shot('business-results-reopened');
       await page.keyboard.press('Escape');
       await expect(resultDialog).toHaveCount(0);
       const persistedStatus = await page.request.get('/api/analytics/suggestions', {

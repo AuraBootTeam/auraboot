@@ -66,7 +66,10 @@ export function AnalyticsBusinessResults({ adoptionPid }: { adoptionPid: string 
           {l('查看业务结果', 'View business results')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-lg"
+        onEscapeKeyDown={(event) => event.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle>{l('已提交的业务操作', 'Committed business operations')}</DialogTitle>
           <DialogDescription>
