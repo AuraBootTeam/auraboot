@@ -49,4 +49,27 @@ class ViewConfigLocalizedLabelTest {
         localized = assertInstanceOf(Map.class, roundTrip.getCardFields().get(0).getLabel());
         assertEquals("Inbound Type", localized.get("en"));
     }
+
+    @Test
+    void aggregationMapLabelsSurviveConversionIntoViewConfig() throws Exception {
+        String json = """
+                {
+                  "groupByField": "inv_in_status",
+                  "kanbanAggregations": [
+                    { "field": "inv_in_total_amount", "function": "sum",
+                      "label": { "zh-CN": "总金额", "en": "Total Amount" } },
+                    { "field": null, "function": "count",
+                      "label": { "zh-CN": "计数", "en": "Count" } }
+                  ]
+                }
+                """;
+
+        ViewConfig config = objectMapper.convertValue(objectMapper.readTree(json), ViewConfig.class);
+
+        assertEquals(2, config.getKanbanAggregations().size());
+        Map<?, ?> sum = assertInstanceOf(Map.class, config.getKanbanAggregations().get(0).getLabel());
+        assertEquals("总金额", sum.get("zh-CN"));
+        Map<?, ?> count = assertInstanceOf(Map.class, config.getKanbanAggregations().get(1).getLabel());
+        assertEquals("计数", count.get("zh-CN"));
+    }
 }
