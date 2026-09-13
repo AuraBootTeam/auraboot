@@ -48,12 +48,19 @@ wait_for_final_postgres() {
 : "${AURA_PRODUCT_IMAGE_LAYOUT:?AURA_PRODUCT_IMAGE_LAYOUT is required}"
 : "${AURA_PRODUCT_LIFECYCLE:?AURA_PRODUCT_LIFECYCLE is required}"
 : "${AURA_RELEASE_SCREENSHOT_IDS:?AURA_RELEASE_SCREENSHOT_IDS is required}"
-: "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required}"
-: "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required}"
-: "${AURA_RELEASE_REGISTRY_PASSWORD_FILE:?AURA_RELEASE_REGISTRY_PASSWORD_FILE is required}"
-[[ -f "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" && ! -L "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" \
-  && -r "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" ]] \
-  || fatal 'release registry password file must be a readable regular non-symlink file'
+PUBLISH_REGISTRY="${AURA_RELEASE_PUBLISH_REGISTRY:-0}"
+case "$PUBLISH_REGISTRY" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_PUBLISH_REGISTRY must be 0 or 1' ;;
+esac
+if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
+  : "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required when remote publication is enabled}"
+  : "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required when remote publication is enabled}"
+  : "${AURA_RELEASE_REGISTRY_PASSWORD_FILE:?AURA_RELEASE_REGISTRY_PASSWORD_FILE is required when remote publication is enabled}"
+  [[ -f "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" && ! -L "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" \
+    && -r "$AURA_RELEASE_REGISTRY_PASSWORD_FILE" ]] \
+    || fatal 'release registry password file must be a readable regular non-symlink file'
+fi
 
 for command_name in curl docker git node openssl pnpm python3 sha256sum tar; do need "$command_name"; done
 [[ "$(uname -s)" == Linux ]] || fatal 'release images must be built on the admitted Linux CI host'
@@ -280,45 +287,64 @@ node "$CORE_ROOT/scripts/application/create-release-screenshot-manifest.mjs" \
   >"$ARTIFACTS/logs/screenshot-manifest.log" 2>&1 \
   || fail 'required release screenshots are incomplete or invalid'
 
-REGISTRY_HOST="${AURA_RELEASE_REGISTRY%%/*}"
-REGISTRY_REPOSITORY="${AURA_RELEASE_REGISTRY%/}/$AURA_PRODUCT_ID"
-REGISTRY_IMAGE="$REGISTRY_REPOSITORY:${LAYOUT_DIGEST#sha256:}"
-install -d -m 0700 "$DOCKER_CONFIG_ROOT"
-docker --config "$DOCKER_CONFIG_ROOT" login "$REGISTRY_HOST" \
-  --username "$AURA_RELEASE_REGISTRY_USERNAME" --password-stdin \
-  <"$AURA_RELEASE_REGISTRY_PASSWORD_FILE" >"$ARTIFACTS/logs/docker-login.log" 2>&1 \
-  || fatal 'release registry login failed'
-docker tag "$IMAGE_REF" "$REGISTRY_IMAGE"
-docker --config "$DOCKER_CONFIG_ROOT" push "$REGISTRY_IMAGE" \
-  >"$ARTIFACTS/logs/docker-push.log" 2>&1 || fatal 'validated release image push failed'
-PUSH_DIGEST="$(sed -n 's/.*digest: \(sha256:[0-9a-f]\{64\}\).*/\1/p' "$ARTIFACTS/logs/docker-push.log" | tail -1)"
-[[ "$PUSH_DIGEST" == "$LAYOUT_DIGEST" ]] \
-  || fail "registry digest mismatch: layout=$LAYOUT_DIGEST pushed=${PUSH_DIGEST:-missing}"
-REGISTRY_DIGEST_REF="$REGISTRY_REPOSITORY@$PUSH_DIGEST"
-docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
-docker --config "$DOCKER_CONFIG_ROOT" pull "$REGISTRY_DIGEST_REF" \
-  >"$ARTIFACTS/logs/docker-pull.log" 2>&1 || fatal 'release image digest pull failed'
-PULLED_IMAGE_ID="$(docker image inspect "$REGISTRY_DIGEST_REF" --format '{{.Id}}')"
-[[ "$PULLED_IMAGE_ID" == "$IMAGE_ID" ]] \
-  || fail "registry pull changed image identity: loaded=$IMAGE_ID pulled=$PULLED_IMAGE_ID"
-docker run --rm --entrypoint sh "$REGISTRY_DIGEST_REF" -ec \
-  'test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json' \
-  >"$ARTIFACTS/logs/registry-payload-check.log" 2>&1 \
-  || fail 'registry-pulled image payload is incomplete'
-docker --config "$DOCKER_CONFIG_ROOT" logout "$REGISTRY_HOST" >/dev/null 2>&1 || true
-find "$DOCKER_CONFIG_ROOT" -depth -delete
+PULLED_IMAGE_ID=''
+if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
+  REGISTRY_HOST="${AURA_RELEASE_REGISTRY%%/*}"
+  REGISTRY_REPOSITORY="${AURA_RELEASE_REGISTRY%/}/$AURA_PRODUCT_ID"
+  REGISTRY_IMAGE="$REGISTRY_REPOSITORY:${LAYOUT_DIGEST#sha256:}"
+  install -d -m 0700 "$DOCKER_CONFIG_ROOT"
+  docker --config "$DOCKER_CONFIG_ROOT" login "$REGISTRY_HOST" \
+    --username "$AURA_RELEASE_REGISTRY_USERNAME" --password-stdin \
+    <"$AURA_RELEASE_REGISTRY_PASSWORD_FILE" >"$ARTIFACTS/logs/docker-login.log" 2>&1 \
+    || fatal 'release registry login failed'
+  docker tag "$IMAGE_REF" "$REGISTRY_IMAGE"
+  docker --config "$DOCKER_CONFIG_ROOT" push "$REGISTRY_IMAGE" \
+    >"$ARTIFACTS/logs/docker-push.log" 2>&1 || fatal 'validated release image push failed'
+  PUSH_DIGEST="$(sed -n 's/.*digest: \(sha256:[0-9a-f]\{64\}\).*/\1/p' "$ARTIFACTS/logs/docker-push.log" | tail -1)"
+  [[ "$PUSH_DIGEST" == "$LAYOUT_DIGEST" ]] \
+    || fail "registry digest mismatch: layout=$LAYOUT_DIGEST pushed=${PUSH_DIGEST:-missing}"
+  REGISTRY_DIGEST_REF="$REGISTRY_REPOSITORY@$PUSH_DIGEST"
+  docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
+  docker --config "$DOCKER_CONFIG_ROOT" pull "$REGISTRY_DIGEST_REF" \
+    >"$ARTIFACTS/logs/docker-pull.log" 2>&1 || fatal 'release image digest pull failed'
+  PULLED_IMAGE_ID="$(docker image inspect "$REGISTRY_DIGEST_REF" --format '{{.Id}}')"
+  [[ "$PULLED_IMAGE_ID" == "$IMAGE_ID" ]] \
+    || fail "registry pull changed image identity: loaded=$IMAGE_ID pulled=$PULLED_IMAGE_ID"
+  docker run --rm --entrypoint sh "$REGISTRY_DIGEST_REF" -ec \
+    'test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json' \
+    >"$ARTIFACTS/logs/registry-payload-check.log" 2>&1 \
+    || fail 'registry-pulled image payload is incomplete'
+  docker --config "$DOCKER_CONFIG_ROOT" logout "$REGISTRY_HOST" >/dev/null 2>&1 || true
+  find "$DOCKER_CONFIG_ROOT" -depth -delete
+fi
 
 cp "$CORE_RELEASE/release-receipt.json" "$ARTIFACTS/core-build-receipt.json"
 cp "$PRODUCT_RELEASE/release-receipt.json" "$ARTIFACTS/product-build-receipt.json"
-python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" <<'PY'
+cp "$PRODUCT_RELEASE/application.lock" "$ARTIFACTS/application.lock"
+cp "$PRODUCT_RELEASE/artifact-catalog.json" "$ARTIFACTS/artifact-catalog.json"
+cp "$PRODUCT_RELEASE/sbom.cdx.json" "$ARTIFACTS/sbom.cdx.json"
+python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" "$PUBLISH_REGISTRY" <<'PY'
 import datetime, json, sys
-path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port = sys.argv[1:]
+from hashlib import sha256
+path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port, publish_registry = sys.argv[1:]
+def digest(relative_path):
+    with open(f"{evidence_root}/{relative_path}", "rb") as stream:
+        return "sha256:" + sha256(stream.read()).hexdigest()
 receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "coreCommit": core, "productCommit": source, "lockIdentity": lock,
            "ociLayoutDigest": layout, "loadedImageId": image_id, "builder": builder,
-           "registryImage": registry_image, "registryPulledImageId": pulled_id,
+           "publication": {"mode": "remote-registry" if publish_registry == "1" else "ci-local-oci",
+                           "remoteRegistryRequested": publish_registry == "1",
+                           "registryImage": registry_image or None,
+                           "registryPulledImageId": pulled_id or None},
            "job": job, "freshDatabase": "PASS", "payload": "PASS",
            "readiness": "PASS", "browserJourney": "PASS",
+           "artifacts": {
+               "applicationLock": {"path": "application.lock", "digest": digest("application.lock")},
+               "artifactCatalog": {"path": "artifact-catalog.json", "digest": digest("artifact-catalog.json")},
+               "sbom": {"path": "sbom.cdx.json", "format": "CycloneDX-1.5", "digest": digest("sbom.cdx.json")},
+               "coreBuildReceipt": {"path": "core-build-receipt.json", "digest": digest("core-build-receipt.json")},
+               "productBuildReceipt": {"path": "product-build-receipt.json", "digest": digest("product-build-receipt.json")}},
            "database": {"engine": "PostgreSQL", "name": "aura_product_ci",
                         "container": pg_container, "fresh": True},
            "runtime": {"applicationContainer": app_container,
