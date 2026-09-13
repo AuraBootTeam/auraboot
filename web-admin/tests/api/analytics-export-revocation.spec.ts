@@ -74,7 +74,7 @@ for (const boundary of ['resource', 'root'] as const) {
         ...(boundary === 'resource' ? { resourceCode: 'e2et_order', actionCode: 'read' } : {}),
         policy: exportPolicy,
         fromSql:
-          'SELECT pid, created_by FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}',
+          'SELECT pid FROM mt_e2et_order WHERE e2et_order_title = #{params.marker}',
         fields: [
           { fieldCode: 'record_key', columnExpr: 'pid', dataType: 'string', operators: ['eq'] },
         ],
