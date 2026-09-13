@@ -29,6 +29,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /uname -m.*x86_64/);
   assert.match(productImageGate, /AURA_OCI_BUILDER must be docker/);
   assert.match(productImageGate, /docker load --input/);
+  assert.match(productImageGate, /docker network create --subnet "10\.247\.\$\{subnet_index\}\.0\/24"/);
+  assert.match(productImageGate, /no free isolated release-image network in 10\.247\.0\.0\/16/);
   assert.match(productImageGate, /AURA_RELEASE_REGISTRY_PASSWORD_FILE/);
   assert.match(productImageGate, /docker --config "\$DOCKER_CONFIG_ROOT" push/);
   assert.match(productImageGate, /PUSH_DIGEST" == "\$LAYOUT_DIGEST/);

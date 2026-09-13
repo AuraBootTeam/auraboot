@@ -6,6 +6,21 @@ fail() { printf 'product-release-image-gate: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 
+create_isolated_network() {
+  local subnet_index
+  # Docker's default address pools are shared with every CI Compose project on
+  # the host and can be exhausted by retained evidence environments. Allocate
+  # release-image networks explicitly from a dedicated /16, one /24 at a time.
+  # `docker network create` is the concurrency-safe arbiter for overlapping
+  # candidates, so parallel gates simply advance to the next subnet.
+  for subnet_index in $(seq 0 255); do
+    if docker network create --subnet "10.247.${subnet_index}.0/24" "$NETWORK" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  fatal 'no free isolated release-image network in 10.247.0.0/16'
+}
+
 : "${AURA_CI_JOB_ID:?run through the local CI control plane}"
 : "${AURA_REGRESSION_ARTIFACTS:?AURA_REGRESSION_ARTIFACTS is required}"
 : "${AURA_CI_BUILDER_ID:?AURA_CI_BUILDER_ID is required}"
@@ -115,7 +130,7 @@ info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
 CI=1 pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/product-pnpm-install.log" 2>&1 \
   || fatal 'product artifact build dependencies unavailable'
-docker network create "$NETWORK" >/dev/null
+create_isolated_network
 docker run -d --name "$BUILD_PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_build_ci \
   "$PG_IMAGE" >/dev/null || fatal 'product build PostgreSQL container failed to start'
