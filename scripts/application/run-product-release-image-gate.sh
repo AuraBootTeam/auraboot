@@ -177,7 +177,7 @@ AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
 docker rm -f "$BUILD_PG_CONTAINER" >/dev/null
 
 if [[ "$MUTATION" == locked-plugin-byte ]]; then
-  MUTATION_TARGET="$(node -e "const l=require(process.argv[1]); const a=l.artifacts.find(x=>x.type==='plugin'); if(!a)process.exit(2); process.stdout.write(a.localPath)" "$PRODUCT_RELEASE/application.lock")" \
+  MUTATION_TARGET="$(node -e "const fs=require('node:fs'); const l=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); const a=l.artifacts.find(x=>x.type==='plugin'); if(!a)process.exit(2); process.stdout.write(a.localPath)" "$PRODUCT_RELEASE/application.lock")" \
     || fatal 'controlled mutation could not resolve the locked plugin artifact'
   printf '\nAURA_CONTROLLED_RELEASE_MUTATION\n' >>"$PRODUCT_RELEASE/$MUTATION_TARGET"
   if node "$PRODUCT_RELEASE/bin/application/application-artifact-verifier.mjs" \
