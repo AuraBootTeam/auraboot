@@ -24,4 +24,24 @@ public interface WorkflowCapability {
         }
         public static WorkflowResult empty() { return new WorkflowResult(Map.of()); }
     }
+
+    /**
+     * A workflow operation failed after producing caller-visible partial state.
+     *
+     * <p>The exception preserves failure semantics while carrying a narrow,
+     * serializable payload such as completed/failed action results. Platform
+     * callers must still treat the operation as failed.</p>
+     */
+    final class WorkflowExecutionException extends RuntimeException {
+        private final Map<String, Object> payload;
+
+        public WorkflowExecutionException(String message, Throwable cause, Map<String, Object> payload) {
+            super(message, cause);
+            this.payload = payload == null ? Map.of() : Map.copyOf(payload);
+        }
+
+        public Map<String, Object> payload() {
+            return payload;
+        }
+    }
 }

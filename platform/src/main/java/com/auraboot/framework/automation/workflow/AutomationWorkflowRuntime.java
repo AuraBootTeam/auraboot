@@ -51,8 +51,16 @@ public class AutomationWorkflowRuntime {
         try {
             Object rows = execute("automation.run", payload).get("actionResults");
             return rows == null ? List.of() : objectMapper.convertValue(rows, new TypeReference<List<ActionResult>>() {});
+        } catch (WorkflowCapability.WorkflowExecutionException e) {
+            Object rows = e.payload().get("actionResults");
+            List<ActionResult> partialResults = rows == null
+                    ? List.of()
+                    : objectMapper.convertValue(rows, new TypeReference<List<ActionResult>>() {});
+            throw new AutomationWorkflowRunException(
+                    "Workflow product failed to run automation " + automation.getPid(), e, partialResults);
         } catch (RuntimeException e) {
-            throw new AutomationWorkflowRunException("Workflow product failed to run automation " + automation.getPid(), e, List.of());
+            throw new AutomationWorkflowRunException(
+                    "Workflow product failed to run automation " + automation.getPid(), e, List.of());
         }
     }
 
