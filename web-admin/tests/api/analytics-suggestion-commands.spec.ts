@@ -23,6 +23,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
   const importResult = await imported.json();
   expect(importResult.success, JSON.stringify(importResult)).toBe(true);
   const marker = `suggestion-${randomUUID()}`;
+  const outcomeTitle = `${marker}-followup`;
   for (const title of [marker, marker, `${marker}-excluded`]) {
     const fixture = await request.post('/api/dynamic/e2et_order/create', {
       data: {
@@ -104,10 +105,20 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       analysisId: analysis.analysisId,
       query: analysis.dataSource,
       title: marker,
-      content: 'Review this analysis before deciding on a business action.',
+      content: 'Create one follow-up test order after reviewing the selected orders.',
       executionIntent: {
         type: 'agent_task',
-        goal: 'Review the selected orders and report findings.',
+        goal:
+          'Create one follow-up test order using the existing order command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+          JSON.stringify({
+            name: 'cmd:e2et:create_order',
+            input: {
+              e2et_order_title: outcomeTitle,
+              e2et_order_type: 'normal',
+              e2et_order_customer: 'Analysis follow-up fixture',
+              e2et_order_urgent: false,
+            },
+          }),
       },
       requestId: randomUUID(),
     };
@@ -280,6 +291,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
           sessionId: marker,
           clientMsgId: randomUUID(),
           message: proposal.executionIntent.goal,
+          context: { modelCode: 'e2et_order', pageType: 'custom' },
           analyticsExecution: { adoptionPid: adopted.pid, requestId: randomUUID() },
           options: { provider: 'stub', model: 'stub-model' },
         },
@@ -287,6 +299,14 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       expect(response.status(), await response.text()).toBe(200);
       return response.text();
     };
+    const businessRecords = async () =>
+      (
+        await db.query(
+          'SELECT pid, e2et_order_title, e2et_order_status FROM mt_e2et_order WHERE e2et_order_title=$1',
+          [outcomeTitle],
+        )
+      ).rows;
+    expect(await businessRecords()).toEqual([]);
     const completed = await dispatch();
     expect(completed).toContain('event:done');
     expect(completed).not.toContain('event:error');
@@ -303,6 +323,31 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     const linked = await executionRows();
     expect(linked).toHaveLength(1);
     expect(linked[0].run_status).toBe('success');
+    const createdOrders = await businessRecords();
+    expect(createdOrders).toHaveLength(1);
+    expect(createdOrders[0]).toMatchObject({
+      e2et_order_title: outcomeTitle,
+      e2et_order_status: 'draft',
+    });
+    const actions = async () =>
+      (
+        await db.query(
+          'SELECT pid, target_record_pid, target_model, action_status, after_snapshot FROM ab_agent_action WHERE run_id=$1 AND command_code=$2 ORDER BY pid',
+          [linked[0].run_pid, 'e2et:create_order'],
+        )
+      ).rows;
+    const recordedActions = await actions();
+    expect(recordedActions).toHaveLength(1);
+    expect(recordedActions[0]).toMatchObject({
+      target_record_pid: createdOrders[0].pid,
+      target_model: 'e2et_order',
+      action_status: 'success',
+      after_snapshot: {
+        pid: createdOrders[0].pid,
+        e2et_order_title: outcomeTitle,
+        e2et_order_status: 'draft',
+      },
+    });
     expect(linked[0].goal).toBe(proposal.executionIntent.goal);
     expect(linked[0].binding).toMatchObject({
       adoptionPid: adopted.pid,
@@ -360,6 +405,8 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     });
     await dispatch();
     expect(await executionRows()).toEqual(linked);
+    expect(await businessRecords()).toEqual(createdOrders);
+    expect(await actions()).toEqual(recordedActions);
     expect(
       (
         await db.query(
