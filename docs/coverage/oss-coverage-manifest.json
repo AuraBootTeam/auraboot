@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "114f12a4c",
+    "commit": "d7429c770",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -1636,12 +1636,37 @@
       "title": "core-dashboard",
       "rows": [
         {
+          "id": "core_dashboard:adopt_suggestion",
+          "action": "core_dashboard:adopt_suggestion",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "core_dashboard:propose_suggestion",
+          "action": "core_dashboard:propose_suggestion",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "page:behavior_analytics",
           "action": "behavior_analytics",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
             "web-admin/tests/e2e/behavior/anonymous-keyed-collect.golden.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts"
           ],
@@ -2017,6 +2042,20 @@
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
           "note": "kind=list model=meta_models"
+        },
+        {
+          "id": "page:report_management",
+          "action": "report_management",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=report_definition"
         }
       ]
     },
@@ -9633,9 +9672,11 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
-            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts"
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
+            "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -11095,6 +11136,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/_golden-stack-warm.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-save-report.spec.ts",
             "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts",
             "web-admin/tests/e2e/designer/designer-lifecycle.spec.ts",
             "web-admin/tests/e2e/designer/designer-unified-architecture.spec.ts",
@@ -11258,7 +11300,12 @@
           "evidence": [
             "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
             "web-admin/tests/e2e/aurabot/admin-agent-runs.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts",
             "web-admin/tests/e2e/aurabot/chat-bi-render-golden.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-save-report.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-suggestions.spec.ts",
             "web-admin/tests/e2e/automation/rule-binding-designer-host.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts",
             "web-admin/tests/e2e/bpm/rule-binding-designer-host.spec.ts",
@@ -11375,6 +11422,7 @@
             "web-admin/tests/e2e/aurabot/ai-modeling-entry.spec.ts",
             "web-admin/tests/e2e/aurabot/ai-panel.spec.ts",
             "web-admin/tests/e2e/aurabot/ai-result-contract.spec.ts",
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
             "web-admin/tests/e2e/auth/logout.spec.ts",
             "web-admin/tests/e2e/command/command-management.spec.ts",
             "web-admin/tests/e2e/formula/formula-editor.spec.ts",
@@ -11915,9 +11963,9 @@
     }
   ],
   "stats": {
-    "commands": 533,
-    "untested": 323,
-    "pages": 316,
+    "commands": 535,
+    "untested": 325,
+    "pages": 317,
     "pagesUntested": 212,
     "platformPages": 98,
     "platformPagesUntested": 41
