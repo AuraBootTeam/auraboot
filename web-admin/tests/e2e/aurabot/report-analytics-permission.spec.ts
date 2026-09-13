@@ -254,7 +254,7 @@ metrics:
           .getByRole('button', { name: /打开|Open/ })
           .click();
 
-        await expect(session.page.getByTestId('report-reader-toolbar')).toContainText('只读报表');
+        await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toContainText('只读报表');
         await expect(session.page.getByPlaceholder('报表标题')).toHaveCount(0);
         for (const name of ['预览', '编辑', '设置', '保存'])
           await expect(session.page.getByRole('button', { name, exact: true })).toHaveCount(0);
@@ -340,7 +340,7 @@ metrics:
           0,
         );
         await session.page.getByRole('button', { name: '返回当前报表', exact: true }).click();
-        await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();
+        await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
         expect(writes).toEqual([]);
         await session.page.getByRole('button', { name: /关闭版本面板|Close version/ }).click();
         await expect(session.page.getByTestId('version-history-panel')).not.toBeInViewport();
@@ -408,13 +408,10 @@ metrics:
               (response) =>
                 response.url().includes('/api/reports/export/json') && response.status() === 403,
             );
-            const dialog = session.page.waitForEvent('dialog').then(async (dialog) => {
-              expect(dialog.type()).toBe('alert');
-              expect(dialog.message().length).toBeGreaterThan(0);
-              await dialog.dismiss();
-            });
+
             await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
-            await Promise.all([rejected, dialog]);
+            await rejected;
+            await expect(session.page.getByText('导出未完成。请检查数据源和访问权限后重试。', { exact: true })).toBeVisible();
             for (const format of ['json', 'excel', 'pdf']) {
               const denied = await session.page.request.post(`/api/reports/export/${format}`, {
                 data: { reportPid: pid },
@@ -509,6 +506,7 @@ test('named-query reports require source and declared resource permissions', asy
   });
   expect(query.status()).toBe(200);
   expect((await query.json()).code).toBe('0');
+  const queryPid = (await query.json()).data.pid;
   const dsl = {
     $schema: 'auraboot://schemas/report/v1',
     version: '1.0.0',
@@ -610,7 +608,7 @@ test('named-query reports require source and declared resource permissions', asy
         .filter({ hasText: key })
         .getByRole('button', { name: /打开|Open/ })
         .click();
-      await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();
+      await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
       if (mode === 'allowed') {
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         const download = session.page.waitForEvent('download');
@@ -646,7 +644,7 @@ test('named-query reports require source and declared resource permissions', asy
           expect(empty.status()).toBe(200);
           expect((await empty.json()).dataSets.orders).toEqual([]);
           await session.page.reload();
-          await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();
+          await expect(session.page.getByTestId('report-reader-toolbar').filter({ visible: true })).toBeVisible();
           await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
           await exportPdf('scope-none');
           await session.page.screenshot({
@@ -687,6 +685,32 @@ test('named-query reports require source and declared resource permissions', asy
         await expect(session.page.getByRole('cell', { name: ownTitle, exact: true })).toBeVisible();
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         await exportPdf('scope-mixed-all');
+        const originalSql = (await (await page.request.get(`/api/meta/named-queries/${queryPid}`)).json()).data.fromSql;
+        expect(originalSql).toContain('SELECT');
+        const broken = await page.request.put(`/api/meta/named-queries/${queryPid}`, {
+          data: { fromSql: `SELECT 1 / 0 AS e2et_order_title FROM mt_e2et_order WHERE e2et_order_title = '${key}'` },
+        });
+        expect(broken.status(), await broken.text()).toBe(200);
+        const failedDownloads: string[] = [];
+        const collectDownload = (download: { suggestedFilename(): string }) => failedDownloads.push(download.suggestedFilename());
+        session.page.on('download', collectDownload);
+        try {
+          for (const [format, label] of [['json', 'JSON'], ['excel', 'Excel'], ['pdf', 'PDF']]) {
+            const response = session.page.waitForResponse((r) => r.url().includes(`/api/reports/export/${format}`) && r.status() === 422);
+            await session.page.getByRole('button', { name: `导出 ${label}`, exact: true }).click();
+            const failed = await response;
+            expect(await failed.text()).not.toContain('mt_e2et_order');
+            await expect(session.page.getByText('导出未完成。请检查数据源和访问权限后重试。', { exact: true }).last()).toBeVisible();
+          }
+          expect(failedDownloads).toEqual([]);
+          await session.page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-export-error.png`, fullPage: true });
+        } finally {
+          session.page.off('download', collectDownload);
+          const repaired = await page.request.put(`/api/meta/named-queries/${queryPid}`, { data: { fromSql: originalSql } });
+          expect(repaired.status()).toBe(200);
+        }
+        await exportPdf('error-restored');
+
 
       } else {
         await expect(session.page.getByRole('alert')).toContainText('查询未成功');

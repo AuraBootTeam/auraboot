@@ -1,4 +1,5 @@
 import { useSmartText } from '~/utils/i18n';
+import { useToastContext } from '~/contexts/ToastContext';
 /**
  * ReportPageContent — runtime report viewer
  * Loads report DSL, fetches data, renders the report, and provides export options
@@ -25,6 +26,7 @@ interface ReportPageContentProps {
 
 export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey }) => {
   const text = useSmartText();
+  const { showErrorToast } = useToastContext();
   const [report, setReport] = useState<ReportDsl | null>(null);
   const [reportPid, setReportPid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,11 +75,11 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('PDF export failed:', err);
-      alert(err instanceof Error ? err.message : 'PDF export failed');
+      showErrorToast(text({ zh: '导出未完成。请检查数据源和访问权限后重试。', en: 'Export could not be completed. Check the data source and access permissions, then retry.' }));
     } finally {
       setExporting(false);
     }
-  }, [report, reportPid, query.canExport, query.appliedParameters]);
+  }, [report, reportPid, query.canExport, query.appliedParameters, text, showErrorToast]);
 
   const handlePrint = useCallback(() => {
     window.print();

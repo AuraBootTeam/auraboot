@@ -1,4 +1,5 @@
 import { useSmartText } from '~/utils/i18n';
+import { useToastContext } from '~/contexts/ToastContext';
 import { usePermission } from '~/contexts/AuthContext';
 /**
  * Report Designer Main Component
@@ -44,6 +45,13 @@ interface ReportDesignerProps {
 
 const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialTitle }) => {
   const text = useSmartText();
+  const { showErrorToast } = useToastContext();
+  const notifyExportFailure = useCallback(() => {
+    showErrorToast(text({
+      zh: '导出未完成。请检查数据源和访问权限后重试。',
+      en: 'Export could not be completed. Check the data source and access permissions, then retry.',
+    }));
+  }, [text, showErrorToast]);
   const canManage = usePermission('report.definition.manage');
   const canExport = usePermission('report.export.execute');
   const [loadFailed, setLoadFailed] = React.useState(false);
@@ -244,9 +252,10 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Excel export failed:', error);
-      alert(error instanceof Error ? error.message : 'Excel export failed');
+      notifyExportFailure();
     }
   }, [
+    notifyExportFailure,
     report,
     pageId,
     isDirty,
@@ -279,9 +288,10 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('JSON export failed:', error);
-      alert(error instanceof Error ? error.message : 'JSON export failed');
+      notifyExportFailure();
     }
   }, [
+    notifyExportFailure,
     report,
     pageId,
     isDirty,
@@ -314,9 +324,10 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF export failed:', error);
-      alert(error instanceof Error ? error.message : 'PDF export failed');
+      notifyExportFailure();
     }
   }, [
+    notifyExportFailure,
     report,
     pageId,
     isDirty,
