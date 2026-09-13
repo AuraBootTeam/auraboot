@@ -312,7 +312,7 @@ metrics:
           await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
         }
         await session.page.screenshot({
-          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-reader-history-${hasModelRead ? 'allowed' : 'denied'}.png`,
+          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-reader-history-${hasModelRead ? 'allowed' : 'denied'}.png`,
           fullPage: true,
         });
 
@@ -326,7 +326,7 @@ metrics:
         await expect(session.page.getByTestId('version-history-panel')).not.toBeInViewport();
         await expect(session.page.getByText('正在查询报表数据…', { exact: true })).toHaveCount(0);
         await session.page.screenshot({
-          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-role-${hasModelRead ? 'allowed' : 'denied'}.png`,
+          path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-role-${hasModelRead ? 'allowed' : 'denied'}.png`,
           fullPage: true,
         });
         if (sourceType !== 'model') {
@@ -344,41 +344,94 @@ metrics:
             };
             if (hasModelRead) await expect.poll(count).toBe(4);
             else expect(await count()).toBe(0);
-            if (sourceType === 'semantic' && hasModelRead) {
-              const revoked = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
-                data: [{ permissionId: permissions.get('model.e2et_order.read'), granted: false }],
-              });
-              expect(revoked.status()).toBe(200);
-              await expect
-                .poll(async () =>
-                  (await fetchRoleSnapshot(session.page)).permissionCodes.includes(
-                    'model.e2et_order.read',
-                  ),
-                )
-                .toBe(false);
-              for (const format of ['json', 'excel', 'pdf']) {
-                const denied = await session.page.request.post(`/api/reports/export/${format}`, {
-                  data: { reportPid: pid },
-                });
-                expect(denied.status()).toBe(403);
-              }
-              await session.page.reload();
-              await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
-              await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(
-                0,
-              );
-              await expect(
-                session.page.getByRole('button', { name: '导出 JSON', exact: true }),
-              ).toBeDisabled();
-              expect(await count()).toBe(4);
-              await session.page.screenshot({
-                path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-role-revoked.png`,
-                fullPage: true,
-              });
-            }
           } finally {
             await db.end();
           }
+        }
+        if (hasModelRead) {
+          const assertUsageCount = async (expected: number) => {
+            if (sourceType === 'model') return;
+            const db = new Client(PG_CONN);
+            await db.connect();
+            try {
+              await expect
+                .poll(async () => {
+                  const result = await db.query(
+                    "SELECT count(*)::int AS count FROM ab_behavior_event WHERE event_name = 'analytics_report_used' AND interaction_id = $1 AND props->>'targetKey' = $2",
+                    [sourceAnalysisId, pid],
+                  );
+                  return result.rows[0].count;
+                })
+                .toBe(expected);
+            } finally {
+              await db.end();
+            }
+          };
+          const setSourceRead = async (granted: boolean) => {
+            const response = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+              data: [{ permissionId: permissions.get('model.e2et_order.read'), granted }],
+            });
+            expect(response.status()).toBe(200);
+            await expect
+              .poll(async () =>
+                (await fetchRoleSnapshot(session.page)).permissionCodes.includes(
+                  'model.e2et_order.read',
+                ),
+              )
+              .toBe(granted);
+          };
+          await setSourceRead(false);
+          try {
+            const downloads: string[] = [];
+            session.page.on('download', (download) => downloads.push(download.suggestedFilename()));
+            const rejected = session.page.waitForResponse(
+              (response) =>
+                response.url().includes('/api/reports/export/json') && response.status() === 403,
+            );
+            const dialog = session.page.waitForEvent('dialog').then(async (dialog) => {
+              expect(dialog.type()).toBe('alert');
+              expect(dialog.message().length).toBeGreaterThan(0);
+              await dialog.dismiss();
+            });
+            await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+            await Promise.all([rejected, dialog]);
+            for (const format of ['json', 'excel', 'pdf']) {
+              const denied = await session.page.request.post(`/api/reports/export/${format}`, {
+                data: { reportPid: pid },
+              });
+              expect(denied.status()).toBe(403);
+            }
+            await session.page.reload();
+            await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
+            await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+            for (const format of ['JSON', 'Excel', 'PDF']) {
+              await expect(
+                session.page.getByRole('button', { name: `导出 ${format}`, exact: true }),
+              ).toBeDisabled();
+            }
+            expect(downloads).toEqual([]);
+            await assertUsageCount(4);
+            await session.page.screenshot({
+              path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-revoked.png`,
+              fullPage: true,
+            });
+          } finally {
+            await setSourceRead(true);
+          }
+          await session.page.reload();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+          const download = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
+          const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-restored.json`;
+          await (await download).saveAs(path);
+          expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
+            key,
+          );
+          await assertUsageCount(5);
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-restored.png`,
+            fullPage: true,
+          });
         }
         evidence.push({ hasModelRead, statuses });
       } finally {
