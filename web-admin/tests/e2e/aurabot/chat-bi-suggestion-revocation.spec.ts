@@ -654,6 +654,63 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (deleteResults && process.env.AURA_HISTORY_CUSTOM_SCOPE === '1') {
+        const policyBase = { name: `History scope ${code}`, modelCode: 'e2et_customer',
+          policyType: 'row', scopeType: 'custom', enabled: true };
+        const condition = (path: string, value: string | boolean) => ({ type: 'compare', enabled: true,
+          left: { type: 'path', scope: 'RECORD', path, dataType: typeof value === 'boolean' ? 'BOOLEAN' : 'STRING' },
+          operator: 'EQ', right: { type: 'literal', value, dataType: typeof value === 'boolean' ? 'BOOLEAN' : 'STRING' },
+        });
+        const created = await admin.request.post('/api/meta/data-permissions', {
+          data: { ...policyBase, conditionAst: condition('data.pid', deletedTargets[0]) },
+        });
+        expect(created.status(), await created.text()).toBe(200);
+        const policyPid = (await created.json()).data.pid;
+        expect(policyPid).toBeTruthy();
+        const policyUrl = `/api/meta/data-permissions/${policyPid}`;
+        const bindingUrl = `${policyUrl}/roles/${rolePid}`;
+        expect((await admin.request.post(bindingUrl)).status()).toBe(200);
+        try {
+          for (const [name, path, value, expectedStatus] of [
+            ['match', 'data.pid', deletedTargets[0], 200],
+            ['mismatch', 'data.pid', 'different-record', 403],
+            ['missing', 'data.e2et_cust_active', true, 403],
+          ] as const) {
+            const ast = condition(path, value);
+            const updated = await admin.request.put(policyUrl, { data: { ...policyBase, conditionAst: ast } });
+            expect(updated.status(), await updated.text()).toBe(200);
+            const loaded = await admin.request.get(policyUrl);
+            expect(loaded.status()).toBe(200);
+            const storedAst = (await loaded.json()).data.conditionAst;
+            expect(typeof storedAst).toBe('string');
+            expect(JSON.parse(storedAst)).toEqual(ast);
+            const pending = resultResponse();
+            await results.getByRole('button', { name: '重新读取', exact: true }).click();
+            const response = await pending;
+            expect(response.status(), name).toBe(expectedStatus);
+            if (expectedStatus === 200) {
+              expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+              await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+              await expect(results.getByRole('alert')).toHaveCount(0);
+            } else {
+              expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+              await expect(results.getByRole('listitem')).toHaveCount(0);
+              await expect(results.getByRole('alert')).toBeVisible();
+            }
+            await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-custom-${name}.png` });
+          }
+        } finally {
+          expect((await admin.request.delete(bindingUrl)).status()).toBe(200);
+        }
+        const pending = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const restored = await pending;
+        expect(restored.status()).toBe(200);
+        expect((await restored.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+        await expect(results.getByRole('alert')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-custom-restored.png` });
+      }
       if (deleteResults && process.env.AURA_HISTORY_RULE_GUARD === '1') {
         const policyUrl = `/api/permissions/matrix/${rolePid}/policy/${permissionPids.get('model.e2et_customer.read')}`;
         const originalResponse = await admin.request.get(policyUrl);
