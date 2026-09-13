@@ -129,6 +129,58 @@ class ReportRenderClientTest {
         }
     }
 
+    @Test
+    void timeoutAppliesWhenRendererNeverReadsItsInput(@TempDir Path dir) throws Exception {
+        Path pidFile = dir.resolve("blocked-renderer.pid");
+        Path stub = executableScript(dir, "#!/bin/sh",
+                "echo $$ > \"" + pidFile + "\"", "exec sleep 30");
+        var props = new ReportRenderProperties();
+        props.setCommand(List.of(stub.toString()));
+        props.setTimeoutSeconds(1);
+        var rendererClient = new ReportRenderClient(objectMapper, props);
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Thread worker = new Thread(() -> {
+            try { rendererClient.renderPdf(Map.of("payload", "x".repeat(2_000_000)), Map.of()); }
+            catch (Throwable error) { failure.set(error); }
+        });
+        ProcessHandle renderer = null;
+        try {
+            worker.start();
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+                while (!Files.exists(pidFile) || Files.size(pidFile) == 0) Thread.sleep(10);
+            });
+            renderer = ProcessHandle.of(Long.parseLong(Files.readString(pidFile).trim())).orElseThrow();
+            worker.join(5000);
+            assertThat(worker.isAlive()).as("Input backpressure must not bypass the render deadline").isFalse();
+            assertThat(failure.get()).isInstanceOf(ReportRenderException.class).hasMessageContaining("timed out");
+            renderer.onExit().get(3, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(renderer.isAlive()).isFalse();
+        } finally {
+            if (renderer != null && renderer.isAlive()) renderer.destroyForcibly();
+            worker.interrupt();
+            worker.join(5000);
+        }
+    }
+
+    @Test
+    void serializationFailureRemovesThePrivateRequestFile() {
+        var captured = new java.util.concurrent.atomic.AtomicReference<Path>();
+        var failingMapper = new ObjectMapper() {
+            @Override public void writeValue(java.io.File file, Object value) throws IOException {
+                captured.set(file.toPath());
+                assertThat(Files.getPosixFilePermissions(file.toPath())).containsExactlyInAnyOrder(
+                        PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+                throw new IOException("serialization failed");
+            }
+        };
+        var props = new ReportRenderProperties();
+        props.setCommand(List.of("must-not-start-before-serialization"));
+        assertThatThrownBy(() -> new ReportRenderClient(failingMapper, props).renderPdf(model, Map.of()))
+                .isInstanceOf(ReportRenderException.class).hasMessageContaining("serialization failed");
+        assertThat(captured.get()).isNotNull();
+        assertThat(Files.exists(captured.get())).isFalse();
+    }
+
     private Path executableScript(Path dir, String... lines) throws IOException {
         Path script = dir.resolve("stub-renderer.sh");
         Files.writeString(script, String.join("\n", lines) + "\n");
