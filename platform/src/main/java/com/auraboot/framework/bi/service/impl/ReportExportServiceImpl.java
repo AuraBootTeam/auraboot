@@ -31,6 +31,8 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -236,14 +238,15 @@ public class ReportExportServiceImpl implements ReportExportService {
         try (PDDocument document = PDDocument.load(pdfBytes);
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             float fontSize = 8f;
-            float textWidth = PDType1Font.HELVETICA.getStringWidth(branding.generatedByText())
+            PDFont font = new PdfFonts(document).forText(branding.generatedByText(), false);
+            float textWidth = font.getStringWidth(branding.generatedByText())
                     / 1000f * fontSize;
             for (PDPage page : document.getPages()) {
                 float x = Math.max(8f, (page.getMediaBox().getWidth() - textWidth) / 2f);
                 try (PDPageContentStream content = new PDPageContentStream(
                         document, page, AppendMode.APPEND, true, true)) {
                     content.beginText();
-                    content.setFont(PDType1Font.HELVETICA, fontSize);
+                    content.setFont(font, fontSize);
                     content.setNonStrokingColor(Color.GRAY);
                     content.newLineAtOffset(x, 10f);
                     content.showText(branding.generatedByText());
@@ -561,6 +564,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                                List<PdfLine> lines,
                                PDRectangle pageSize,
                                PdfMargins margins) throws java.io.IOException {
+        PdfFonts fonts = new PdfFonts(document);
         PDPage page = new PDPage(pageSize);
         document.addPage(page);
         PDPageContentStream content = new PDPageContentStream(document, page);
@@ -568,7 +572,8 @@ public class ReportExportServiceImpl implements ReportExportService {
         float availableWidth = Math.max(72f, pageSize.getWidth() - margins.left() - margins.right());
         try {
             for (PdfLine line : lines) {
-                for (String wrappedLine : wrapPdfLine(line.text(), line.fontSize(), availableWidth)) {
+                PDFont font = fonts.forText(line.text(), line.bold());
+                for (String wrappedLine : wrapPdfLine(line.text(), font, line.fontSize(), availableWidth)) {
                     if (y < margins.bottom()) {
                         content.close();
                         page = new PDPage(pageSize);
@@ -577,9 +582,9 @@ public class ReportExportServiceImpl implements ReportExportService {
                         y = pageSize.getHeight() - margins.top();
                     }
                     content.beginText();
-                    content.setFont(line.bold() ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA, line.fontSize());
+                    content.setFont(font, line.fontSize());
                     content.newLineAtOffset(margins.left(), y);
-                    content.showText(sanitizePdfText(wrappedLine));
+                    content.showText(wrappedLine);
                     content.endText();
                     y -= line.lineHeight();
                 }
@@ -589,21 +594,56 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
-    private List<String> wrapPdfLine(String line, float fontSize, float availableWidth) {
-        String text = sanitizePdfText(line);
-        int maxChars = Math.max(20, (int) Math.floor(availableWidth / Math.max(4f, fontSize * 0.5f)));
-        if (text.length() <= maxChars) {
-            return List.of(text);
-        }
+    private List<String> wrapPdfLine(String line, PDFont font, float fontSize, float availableWidth)
+            throws java.io.IOException {
         List<String> result = new ArrayList<>();
-        for (int start = 0; start < text.length(); start += maxChars) {
-            result.add(text.substring(start, Math.min(text.length(), start + maxChars)));
+        for (String paragraph : stringValue(line, "").replace("\t", "    ").split("\\R", -1)) {
+            StringBuilder current = new StringBuilder();
+            float width = 0;
+            for (int offset = 0; offset < paragraph.length();) {
+                int codePoint = paragraph.codePointAt(offset);
+                String glyph = new String(Character.toChars(codePoint));
+                float glyphWidth = font.getStringWidth(glyph) / 1000f * fontSize;
+                if (!current.isEmpty() && width + glyphWidth > availableWidth) {
+                    result.add(current.toString());
+                    current.setLength(0);
+                    width = 0;
+                }
+                current.append(glyph);
+                width += glyphWidth;
+                offset += Character.charCount(codePoint);
+            }
+            result.add(current.toString());
         }
         return result;
     }
 
-    private String sanitizePdfText(String text) {
-        return stringValue(text, "").replaceAll("[^\\x20-\\x7E]", "?");
+    /** Fonts belong to one PDF document; embed only the glyphs used by that document. */
+    private static final class PdfFonts {
+        private final PDDocument document;
+        private final Map<Boolean, PDFont> unicodeFonts = new HashMap<>();
+
+        private PdfFonts(PDDocument document) {
+            this.document = document;
+        }
+
+        private PDFont forText(String text, boolean bold) throws java.io.IOException {
+            if (text == null || text.codePoints().allMatch(codePoint -> codePoint < 128)) {
+                return bold ? PDType1Font.HELVETICA_BOLD : PDType1Font.HELVETICA;
+            }
+            PDFont font = unicodeFonts.get(bold);
+            if (font == null) {
+                String resource = "/fonts/report/NotoSansSC-" + (bold ? "Bold" : "Regular") + ".ttf";
+                try (var stream = ReportExportServiceImpl.class.getResourceAsStream(resource)) {
+                    if (stream == null) {
+                        throw new java.io.IOException("Report PDF font resource is missing: " + resource);
+                    }
+                    font = PDType0Font.load(document, stream, true);
+                }
+                unicodeFonts.put(bold, font);
+            }
+            return font;
+        }
     }
 
     @SuppressWarnings("unchecked")

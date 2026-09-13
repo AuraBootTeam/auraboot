@@ -248,6 +248,38 @@ class ReportExportServiceTest {
         }
     }
 
+    @Test
+    void exportPdf_preservesChineseAndWrapsUsingEmbeddedFontWidths() throws Exception {
+        String rowText = "订单分析验证".repeat(60);
+        String json = new ObjectMapper().writeValueAsString(reportDsl())
+                .replace("Operations Export", "订单数量分析")
+                .replace("Orders Export", "订单明细")
+                .replace("Region", "订单标题")
+                .replace("Cases", "数量")
+                .replace("North", rowText);
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(json);
+        when(reportStorageService.findByPid("report-chinese")).thenReturn(report);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("report-chinese");
+        ReportExportFile file = reportExportService.exportPdf(request);
+        try (PDDocument document = PDDocument.load(file.getBytes())) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("订单数量分析", "订单明细", "订单标题 | 数量");
+            assertThat(text.replaceAll("\\R", "")).contains(rowText + " | 12");
+            PDFTextStripper bounds = new PDFTextStripper() {
+                @Override
+                protected void processTextPosition(TextPosition position) {
+                    assertThat(position.getXDirAdj() + position.getWidthDirAdj())
+                            .isLessThanOrEqualTo(PDRectangle.A4.getWidth() - 30f);
+                    super.processTextPosition(position);
+                }
+            };
+            bounds.getText(document);
+        }
+    }
+
     // ---------- Phase 3: WYSIWYG renderer with PDFBox fallback ----------
 
     @Test

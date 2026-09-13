@@ -312,4 +312,35 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       })
     ).status(),
   ).toBe(200);
+  for (const format of ['excel', 'pdf'] as const) {
+    const responsePromise = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/reports/export/${format}` &&
+        response.request().method() === 'POST',
+    );
+    const filePromise = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: format === 'excel' ? '导出 Excel' : '导出 PDF', exact: true })
+      .click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON().reportPid).toBe(saved.pid);
+    const file = await filePromise;
+    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    expect(file.suggestedFilename()).toBe(`订单数量分析.${extension}`);
+    const artifactPath = `${process.env.AURA_EVIDENCE_DIR}/report-data.${extension}`;
+    await file.saveAs(artifactPath);
+    const bytes = await readFile(artifactPath);
+    if (format === 'excel') {
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(bytes, { type: 'buffer' });
+      expect(workbook.SheetNames).toHaveLength(1);
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      expect(rows).toContainEqual(['数量', '订单标题']);
+      expect(rows).toContainEqual([1, title]);
+    } else {
+      expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    }
+    await shot(format);
+  }
 });
