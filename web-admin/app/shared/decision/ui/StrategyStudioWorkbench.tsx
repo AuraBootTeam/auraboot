@@ -484,7 +484,7 @@ const CONDITION_OPERATORS = new Set<Operator>([
 function scenarioKeyForFragment(fragment: ConditionFragment): StrategyScenarioKey | null {
   const scope = String(fragment.scopeType ?? '').trim().toUpperCase()
   if (scope === 'SLA' || scope === 'SLA_RULE') return 'SLA'
-  if (scope === 'BPM' || scope === 'BPM_PROCESS' || scope === 'WORKFLOW') return 'BPM'
+  if (scope === 'BPM' || scope === 'WORKFLOW_PROCESS' || scope === 'WORKFLOW') return 'BPM'
   if (scope === 'AUTOMATION') return 'AUTOMATION'
   if (scope === 'PERMISSION' || scope === 'ABAC') return 'PERMISSION'
   if (scope === 'EVENT_POLICY' || scope === 'EVENTPOLICY' || scope === 'POLICY') {

@@ -204,15 +204,12 @@ class BuiltinPluginImportServiceImplTest {
     void shouldNotImportRemovedAcpShowcaseDirectory(@TempDir Path tempDir) throws IOException {
         String[] pluginDirs = {
                 "core-meta",
-                "core-bpm",
                 "core-aurabot",
                 "page-manager",
                 "org-management",
                 "platform-admin",
-                "crm",
                 "showcase",
                 "agent-control-plane",
-                "workflow-demo",
                 "acp-showcase"
         };
         for (String pluginDir : pluginDirs) {

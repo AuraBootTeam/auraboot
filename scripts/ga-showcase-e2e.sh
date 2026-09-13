@@ -7,7 +7,8 @@
 #   ./scripts/ga-showcase-e2e.sh deep
 #   ./scripts/ga-showcase-e2e.sh all
 #
-# The GA stack must already be running via docker-ga-e2e-up/bootstrap.
+# A platform-only host runtime must already be running. Product data and product
+# journeys are owned by aura-crm and aura-bpm, not by this Core showcase gate.
 #
 # Worker tuning:
 #   GA_SHOWCASE_AUTH_WORKERS=1
@@ -34,7 +35,7 @@ cd "$WEB_ADMIN_DIR"
 if [[ "${GA_SHOWCASE_SKIP_RUNNER_GUARD:-0}" != "1" ]]; then
   ACTIVE_RUNNERS="$(
     ps -Ao pid=,command= \
-      | grep -E 'playwright.*test|test:agent:crm' \
+      | grep -E 'playwright.*test' \
       | grep -v 'grep -E' \
       | grep -v '@playwright/mcp' \
       | grep -v "$$" \
@@ -81,7 +82,7 @@ DEEP_WORKERS="$(worker_count GA_SHOWCASE_DEEP_WORKERS 1)"
 find_competing_runners() {
   local marker="${1:-}"
   ps -Ao pid=,command= \
-    | grep -E 'playwright.*test|test:agent:crm' \
+    | grep -E 'playwright.*test' \
     | grep -v 'grep -E' \
     | grep -v '@playwright/mcp' \
     | grep -v "$$" \

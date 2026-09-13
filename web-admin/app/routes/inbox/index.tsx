@@ -28,7 +28,7 @@ import {
   type InboxPage,
   type UnreadSummary,
 } from '~/shared/services/inboxService';
-import { BpmTaskDrawer } from '~/plugins/core-bpm/components/BpmTaskDrawer';
+import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import { cn } from '~/utils/cn';
 
 // One tab per item_type the backend can produce (APPROVAL / TASK / MENTION /
@@ -874,7 +874,8 @@ export default function UnifiedInboxPage() {
         </div>
       </section>
 
-      <BpmTaskDrawer
+      <LazyContributedComponent
+        contributionId="workflow-task-drawer"
         taskId={drawerTaskId || ''}
         open={!!drawerTaskId}
         onClose={() => {

@@ -154,8 +154,6 @@ const contractScopeDirs = [
 const scopeRegex = (dirs: string[]) => new RegExp(`.*\\/(${dirs.join('|')})\\/.*\\.spec\\.ts$`);
 const enterpriseScopeFilePatterns = [
   /.*\/aurabot\/pcba-.*\.spec\.ts$/,
-  /.*\/crm\/crm-(agent-ui-smoke|calendar-sync|campaign-sla|dashboard|dashboard-enhanced|email-features|inbound-channel|inbound-lifecycle|inbound-smoke|merge-queue|opportunity-currency|quote-complaint|web-form)\.spec\.ts$/,
-  /.*\/cs-agent\/cs-agent-email-lifecycle\.spec\.ts$/,
   /.*\/plugin\/asset-.*\.spec\.ts$/,
   /.*\/plugin\/pcba-.*\.spec\.ts$/,
   /.*\/plugin\/pm-.*\.spec\.ts$/,
@@ -464,7 +462,8 @@ export default defineConfig({
     ...(runProfile === 'full'
       ? [
           {
-            // API tests (excludes setup/seed — those run via reset-and-init.sh or playwright.seed.config.ts)
+            // API tests exclude setup; platform initialization runs through reset-and-init.sh,
+            // while product seed suites are owned by their independent applications.
             name: 'api',
             testDir: './tests/api',
             testIgnore: /setup\//,

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 function read(path) {
   return readFileSync(path, 'utf8');
 }
 
-test('OSS reset init contract gate covers reset, DB, marketplace, and seed runner checks', () => {
+test('OSS reset init contract gate covers reset, DB, marketplace, and platform bootstrap checks', () => {
   assert.ok(existsSync('scripts/check-reset-init-contracts.sh'));
 
   const gate = read('scripts/check-reset-init-contracts.sh');
@@ -38,7 +38,6 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
-  assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
   assert.match(gate, /bash scripts\/lib\/test-runtime-process-owner\.sh/);
 });
 
@@ -117,7 +116,7 @@ test('OSS reset init contract gate is executable for direct local use', () => {
   );
 });
 
-test('OSS CI runs reset init contract gate when reset or seed files change', () => {
+test('OSS CI runs reset init contract gate when reset or platform bootstrap files change', () => {
   assert.ok(existsSync('.github/workflows/reset-init-contracts.yml'));
 
   const workflow = read('.github/workflows/reset-init-contracts.yml');
@@ -127,12 +126,10 @@ test('OSS CI runs reset init contract gate when reset or seed files change', () 
   assert.match(workflow, /scripts\/reset-db\.sh/);
   assert.match(workflow, /scripts\/seed-marketplace\.sh/);
   assert.match(workflow, /web-admin\/package\.json/);
-  assert.match(workflow, /web-admin\/scripts\/run-showcase-seed-sequence\.mjs/);
-  assert.match(workflow, /web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
   assert.match(workflow, /bash scripts\/check-reset-init-contracts\.sh/);
 });
 
-test('OSS reset script fails fast and delegates showcase seeds through the ordered runner', () => {
+test('OSS reset stays platform-only and delegates product seed to independent apps', () => {
   const reset = read('scripts/oss-reset-and-init.sh');
 
   assert.match(reset, /set -o pipefail/);
@@ -141,8 +138,9 @@ test('OSS reset script fails fast and delegates showcase seeds through the order
   assert.doesNotMatch(reset, /bootstrap seedDemoData/);
   assert.doesNotMatch(reset, /\"seedDemoData\"/);
   assert.match(reset, /"\$SCRIPT_DIR\/seed-marketplace\.sh" 2>&1 \| tail -1/);
-  assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*"\$\{seed_phases\[@\]\}"/);
-  assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*dashboard-default invariants/);
+  assert.match(reset, /Product seed not run by Core/);
+  assert.doesNotMatch(reset, /seed-cs-agent|crm:create_quote|crm_dashboard|seed_phases/);
+  assert.doesNotMatch(reset, /node scripts\/run-showcase-seed-sequence\.mjs/);
   assert.doesNotMatch(reset, /npx playwright test tests\/api\/setup\/seed-showcase-/);
 });
 
@@ -240,7 +238,6 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   ]);
   assert.deepEqual(profiles.core, [
     'core-meta',
-    'core-bpm',
     'platform-admin',
     'core-decisionops',
     'core-aurabot',
@@ -350,8 +347,6 @@ test('Product Catalog smoke fails closed on list PID and current DOM business-ce
 test('host-side build scripts never fall back to the system Gradle executable', () => {
   const scripts = [
     'scripts/oss-golden-stack.sh',
-    'scripts/p1-verify-in-docker.sh',
-    'scripts/mes-wms-golden-run.sh',
     'plugins/scripts/build-plugin.sh',
   ];
 
@@ -364,45 +359,9 @@ test('host-side build scripts never fall back to the system Gradle executable', 
     );
   }
 
-  const mesWms = read('scripts/mes-wms-golden-run.sh');
-  assert.match(mesWms, /--project-dir "\$2" jar --console=plain -q --no-daemon/);
-
   const buildPlugin = read('plugins/scripts/build-plugin.sh');
   assert.match(buildPlugin, /publishToMavenLocal --quiet --no-daemon/);
   assert.match(buildPlugin, /clean build -x test --quiet --no-daemon/);
-});
-
-test('MES/WMS golden runner stages backend jars from their current owning repositories', () => {
-  const mesWms = read('scripts/mes-wms-golden-run.sh');
-
-  assert.match(mesWms, /CORE_HYBRID_JARS=\(crm\)/);
-  assert.match(
-    mesWms,
-    /build_jar "\$p" "\$CORE_ROOT\/plugins\/\$p\/backend"/,
-    'Core-owned CRM must be built from the Core plugin tree',
-  );
-  assert.doesNotMatch(
-    mesWms,
-    /(?:CORE|ENTERPRISE)_HYBRID_JARS=\([^)]*pcba-warehouse/s,
-    'config-only pcba-warehouse must not be treated as a backend jar',
-  );
-  assert.match(
-    mesWms,
-    /ENTERPRISE_HYBRID_JARS=\([^)]*\bsales\b/s,
-    'handler-backed Sales must be present before its commands are imported',
-  );
-  assert.doesNotMatch(
-    mesWms,
-    /IMPORT_PLUGINS=\([^)]*\breq\b/s,
-    'the focused MES/WMS closure must not import the unrelated, independently invalid req package',
-  );
-  assert.match(mesWms, /EXPECTED_STAGED_COUNT="\$\{#STAGED_PLUGIN_JARS\[@\]\}"/);
-  assert.doesNotMatch(mesWms, /expected exactly 16/);
-  assert.match(
-    mesWms,
-    /Registered plugin background component: inventoryReliableEventBridge/,
-    'backend readiness must include the Inventory reliable-integration bridge, not health alone',
-  );
 });
 
 test('MES/WMS downstream goldens follow immutable baseline and current Inventory owner contracts', () => {
@@ -471,18 +430,10 @@ test('Docker quickstart CI always runs on main and manual dispatch, and detects 
   assert.ok(workflow.includes('scripts/docker-bootstrap\\.sh'));
 });
 
-test('Gradle resolves SmartEngine artifacts from Maven Central before Aliyun mirrors', () => {
+test('Core Gradle declares no product-owned SmartEngine dependency or repository exception', () => {
   const build = read('platform/build.gradle');
-  const smartEngineCentral = build.indexOf("name = 'Maven Central SmartEngine'");
-  const aliyunPublic = build.indexOf("https://maven.aliyun.com/repository/public");
-
-  assert.ok(smartEngineCentral >= 0, 'SmartEngine artifacts need a dedicated Maven Central repository block');
-  assert.ok(aliyunPublic >= 0, 'Aliyun public mirror repository should still be declared');
-  assert.ok(
-    smartEngineCentral < aliyunPublic,
-    'SmartEngine artifacts must resolve from Maven Central before Aliyun mirror stickiness can cache partial syncs',
-  );
-  assert.match(build, /includeGroup ['"]com\.auraboot\.smart\.framework['"]/);
+  assert.doesNotMatch(build, /com\.auraboot\.smart\.framework/);
+  assert.doesNotMatch(build, /Maven Central SmartEngine/);
 });
 
 test('Gradle plugin markers resolve from Maven Central before Gradle Plugin Portal', () => {
@@ -524,83 +475,6 @@ test('markdownlint MD025 ignores frontmatter title without disabling single-h1 c
 
   assert.match(config, /"MD025"\s*:\s*\{\s*"front_matter_title"\s*:\s*""\s*\}/);
   assert.doesNotMatch(config, /"MD025"\s*:\s*false/);
-});
-
-test('seeded CS agent declares only official CRM tools that can be imported', () => {
-  const seed = read('scripts/seed-cs-agent.sql');
-  const officialTools = [
-    'get:crm_account_common,',
-    'get:crm_contact_common,',
-    'list:crm_activity_common,',
-    'get:crm_activity_common,',
-  ];
-  for (const staleReference of officialTools.map((tool) => tool.replace('_common', ''))) {
-    assert.doesNotMatch(seed, new RegExp(staleReference), `${staleReference} is a removed CRM starter alias`);
-  }
-
-  const models = JSON.parse(read('plugins/crm/config/models.json'));
-  const modelCodes = new Set(models.map((model) => model.code));
-
-  const commandCodes = new Set();
-  for (const file of readdirSync('plugins/crm/config/commands')) {
-    if (!file.endsWith('.json')) continue;
-    for (const command of JSON.parse(read(`plugins/crm/config/commands/${file}`))) {
-      commandCodes.add(command.code);
-    }
-  }
-
-  const namedQueryCodes = new Set(
-    JSON.parse(read('plugins/crm/config/named-queries.json')).map((query) => query.code),
-  );
-
-  const toolsMatch = seed.match(/'([^']*custom:send_customer_reply[^']*)',\s*\n\s*120,/);
-  assert.ok(toolsMatch, 'seed-cs-agent.sql must define the cs_agent tools list');
-  const declaredTools = toolsMatch[1].split(',').map((tool) => tool.trim()).filter(Boolean);
-
-  for (const tool of declaredTools) {
-    if (tool.startsWith('cmd:')) {
-      assert.ok(commandCodes.has(tool.slice(4)), `${tool} must exist in official CRM commands`);
-    } else if (tool.startsWith('get:') || tool.startsWith('list:')) {
-      assert.ok(modelCodes.has(tool.slice(tool.indexOf(':') + 1)), `${tool} must reference an official CRM model`);
-    } else if (tool.startsWith('nq:')) {
-      assert.ok(namedQueryCodes.has(tool.slice(3)), `${tool} must exist in official CRM named queries`);
-    } else if (tool === 'custom:send_customer_reply') {
-      assert.match(seed, /'send_customer_reply'/);
-    } else {
-      assert.fail(`Unexpected cs_agent tool declaration: ${tool}`);
-    }
-  }
-
-  assert.match(
-    seed,
-    /\[\{"type":"role","roleCode":"tenant_admin"\}\]/,
-    'cs_agent approval policy must use the bootstrap role code tenant_admin',
-  );
-});
-
-test('customer service agent integration scenario follows official CRM activity flow', () => {
-  const integrationTest = read('platform/src/test/java/com/auraboot/framework/agent/CustomerServiceAgentIntegrationTest.java');
-  const officialReferences = [
-    '"mt_crm_account_common"',
-    '"mt_crm_contact_common"',
-    '"mt_crm_activity_common"',
-    'get:crm_account_common\\"',
-    'get:crm_contact_common\\"',
-    'list:crm_activity_common\\"',
-  ];
-  for (const staleReference of officialReferences.map((reference) => reference.replace('_common', ''))) {
-    assert.doesNotMatch(
-      integrationTest,
-      new RegExp(staleReference),
-      `${staleReference} belongs to the removed CRM starter contract`,
-    );
-  }
-
-  assert.match(integrationTest, /mt_crm_account_common/);
-  assert.match(integrationTest, /mt_crm_contact_common/);
-  assert.match(integrationTest, /mt_crm_activity_common/);
-  assert.match(integrationTest, /cmd:crm:create_activity/);
-  assert.match(integrationTest, /custom:send_customer_reply/);
 });
 
 test('direct schema init includes agent observability and command audit correlation tables', () => {
@@ -685,41 +559,14 @@ test('plugin import seeds BOM defaults when bom-standardization is imported', ()
   );
 });
 
-test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
-  for (const file of [
-    'web-admin/tests/api/setup/seed-showcase-data.spec.ts',
-    'web-admin/tests/api/setup/seed-showcase-extended.spec.ts',
-  ]) {
-    const source = read(file);
-    assert.doesNotMatch(
-      source,
-      /crm_opp_expected_close_date:\s*dateTimeAt\(/,
-      `${file} must not feed datetime values into crm_opp_expected_close_date`,
-    );
-    assert.doesNotMatch(
-      source,
-      /closeDate:\s*dateTimeAt\(/,
-      `${file} must keep opportunity closeDate seed values date-only`,
-    );
-  }
-});
-
 test('deployment-neutral knowledge-base seeds use the configured embedding profile', () => {
   for (const path of [
-    'web-admin/tests/api/setup/seed-showcase-ai.spec.ts',
-    'web-admin/tests/api/setup/seed-showcase-arsenal.spec.ts',
     'web-admin/tests/e2e/ai/knowledge-base-smoke.spec.ts',
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /embeddingProvider:\s*['"]openai['"]/);
     assert.doesNotMatch(source, /embeddingModel:\s*['"]text-embedding-3-small['"]/);
   }
-
-  const aiSeed = read('web-admin/tests/api/setup/seed-showcase-ai.spec.ts');
-  assert.match(aiSeed, /\/api\/ai\/knowledge\/embedding-profiles/);
-  assert.match(aiSeed, /embeddingProfiles\.length[\s\S]*toBeGreaterThan\(0\)/);
-  assert.match(aiSeed, /embeddingProvider\)\.toBe\(expectedProfile\.providerCode\)/);
-  assert.match(aiSeed, /embeddingModel\)\.toBe\(expectedProfile\.defaultModel\)/);
 });
 
 test('Vite prebundles lazy rich-text form dependencies before an operator can type', () => {
@@ -743,6 +590,8 @@ test('docker GA bootstrap initializes a blank stack before admin login', () => {
   assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /--profile="\$PLUGIN_IMPORT_PROFILE"/);
   assert.doesNotMatch(script, /seedDemoData/);
+  assert.doesNotMatch(script, /seed-showcase|run-showcase-seed-sequence|crm:create_quote/i);
+  assert.match(script, /Product seed not run by Core/);
   assert.match(script, /aura_bootstrap_setup_if_needed[\s\S]*scripts\/import-plugins\.sh[\s\S]*# 1\. Login as admin -> JWT/);
 });
 

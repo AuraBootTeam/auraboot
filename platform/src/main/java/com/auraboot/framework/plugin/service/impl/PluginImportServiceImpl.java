@@ -86,6 +86,7 @@ import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -155,8 +156,6 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final CommandActionDeriver commandActionDeriver;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
-    private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
-    private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
     private final AutomationService automationService;
     private final DrtDefinitionService drtDefinitionService;
     private final DecisionVersionService decisionVersionService;
@@ -352,18 +351,6 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             // Load resources from resourceDirs configuration in ZIP
             loadResourcesFromZipFiles(manifest, files);
-
-            // Process BPMN files from ZIP
-            if (manifest.getProcesses() != null) {
-                for (ProcessDefinitionDTO process : manifest.getProcesses()) {
-                    if (process.getBpmnFile() != null && process.getBpmnContent() == null) {
-                        byte[] bpmnContent = files.get(process.getBpmnFile());
-                        if (bpmnContent != null) {
-                            process.setBpmnContent(new String(bpmnContent, StandardCharsets.UTF_8));
-                        }
-                    }
-                }
-            }
 
             ImportPreviewResult result = createPreviewFromManifest(manifest, fileName, "zip");
 
@@ -565,14 +552,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (!automations.isEmpty()) {
                     manifest.setAutomations(
                             mergeResourceList(manifest.getAutomations(), automations));
-                }
-            }
-
-            // Load processes
-            if (resourceDirs.containsKey("processes")) {
-                List<ProcessDefinitionDTO> processes = loadResourceListFromZip(files, resourceDirs.get("processes"), ProcessDefinitionDTO.class);
-                if (!processes.isEmpty()) {
-                    manifest.setProcesses(mergeResourceList(manifest.getProcesses(), processes));
                 }
             }
 
@@ -1012,21 +991,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .resourceType(ResourceType.MENU)
                         .resourceCode(menu.getCode())
                         .resourceName(menu.getEffectiveName())
-                        .action(action)
-                        .build()));
-            }
-        }
-
-        // Preview processes
-        if (manifest.getProcesses() != null) {
-            for (ProcessDefinitionDTO process : manifest.getProcesses()) {
-                ResourceAction action = resourceImporter.checkProcessExists(tenantId, process.getKey())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
-                result.addChange(ResourceType.PROCESS, enrichWithUserModified(tenantId, ResourceType.PROCESS, process.getKey(),
-                        ImportPreviewResult.ResourceChange.builder()
-                        .resourceType(ResourceType.PROCESS)
-                        .resourceCode(process.getKey())
-                        .resourceName(process.getEffectiveName())
                         .action(action)
                         .build()));
             }
@@ -1612,7 +1576,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
                 case SAVED_VIEW -> importSavedViews(manifest, result, tenantId);
                 case NOTIFICATION_TEMPLATE -> importNotificationTemplates(manifest, result, tenantId);
-                case PROCESS -> importProcesses(manifest, request, result, pluginPid, importId, tenantId);
                 case I18N -> importI18nResources(manifest, result, tenantId);
                 default -> {} // Skip DICT_ITEM as it's handled with DICT
             }
@@ -1626,14 +1589,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         pageSchemaContributionImportService.replaceForPlugin(
                 pluginPid, manifest.getVersion(), tenantId, manifest.getPageContributions());
 
-        // Import Drools rules and SLA configs (extension resources — not tracked via
-        // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
         importDecisionDefinitions(manifest);
         importConditionFragments(manifest);
         importEventPolicies(manifest);
         importAutomations(manifest);
-        importRules(manifest);
-        importSlaConfigs(manifest);
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
@@ -2320,31 +2279,6 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
     }
 
-    private void importProcesses(PluginManifestExtended manifest, ImportRequest request,
-                                 ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
-        if (manifest.getProcesses() == null) return;
-
-        for (ProcessDefinitionDTO process : manifest.getProcesses()) {
-            if (!process.isValid()) {
-                log.warn("Skipping invalid process entry (missing key): index={}", manifest.getProcesses().indexOf(process));
-                continue;
-            }
-            PluginResource resource = resourceImporter.importProcess(process, pluginPid, importId, tenantId,
-                    request.getConflictStrategy(), request.getAutoDeployProcesses());
-            if (resource != null) {
-                captureImportSnapshot(resource, process);
-                saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.PROCESS, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.PROCESS, resource.getResourcePid());
-                    if (Boolean.TRUE.equals(request.getAutoDeployProcesses())) {
-                        result.getDeployedProcesses().add(process.getKey());
-                    }
-                }
-            }
-        }
-    }
-
     private void importNamedQueries(PluginManifestExtended manifest, ImportRequest request,
                                     ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
         if (manifest.getNamedQueries() == null) return;
@@ -2393,28 +2327,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                     result.addCreatedResource(ResourceType.AGENT_DEFINITION, resource.getResourcePid());
                 }
             }
-        }
-    }
-
-    private void importRules(PluginManifestExtended manifest) {
-        if (manifest.getRules() == null || manifest.getRules().isEmpty()) return;
-        int created = 0;
-        for (BpmRuleDefinitionDTO dto : manifest.getRules()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid rule (missing ruleCode): index={}",
-                        manifest.getRules().indexOf(dto));
-                continue;
-            }
-            if (dto.getRuleContent() == null || dto.getRuleContent().isBlank()) {
-                log.warn("Skipping rule '{}' — no ruleContent or resolved ruleContentFile",
-                        logSafe(dto.getRuleCode()));
-                continue;
-            }
-            droolsRuleService.importRule(dto);
-            created++;
-        }
-        if (created > 0) {
-            log.info("Imported {} Drools rule(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
     }
 
@@ -2715,23 +2627,6 @@ public class PluginImportServiceImpl implements PluginImportService {
             return fallback;
         }
         return Enum.valueOf(enumType, value);
-    }
-
-    private void importSlaConfigs(PluginManifestExtended manifest) {
-        if (manifest.getSlaConfigs() == null || manifest.getSlaConfigs().isEmpty()) return;
-        int created = 0;
-        for (SlaConfigDefinitionDTO dto : manifest.getSlaConfigs()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid SLA config (missing name): index={}",
-                        manifest.getSlaConfigs().indexOf(dto));
-                continue;
-            }
-            slaConfigService.importSlaConfig(dto);
-            created++;
-        }
-        if (created > 0) {
-            log.info("Imported {} SLA config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
-        }
     }
 
     private void importAutomations(PluginManifestExtended manifest) {
@@ -3833,16 +3728,6 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
         }
 
-        // Processes: require key + bpmn content
-        if (manifest.getProcesses() != null) {
-            for (ProcessDefinitionDTO process : manifest.getProcesses()) {
-                if (process == null || isBlank(process.getKey())) continue;
-                if (process.getBpmnFile() == null && process.getBpmnContent() == null && process.getDesignerJson() == null) {
-                    errors.add("Process '" + process.getKey() + "' has no bpmnFile, bpmnContent, or designerJson");
-                }
-            }
-        }
-
         // SavedViews: require modelCode + viewType + name
         if (manifest.getSavedViews() != null) {
             for (SavedViewDefinitionDTO sv : manifest.getSavedViews()) {
@@ -4076,8 +3961,6 @@ public class PluginImportServiceImpl implements PluginImportService {
                 RoleDefinitionDTO::getCode, "Role");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.MENU, manifest.getMenus(),
                 MenuDefinitionDTO::getCode, "Menu");
-        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.PROCESS, manifest.getProcesses(),
-                ProcessDefinitionDTO::getKey, "Process");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.PAGE, manifest.getPages(),
                 PageSchemaDTO::getPageKey, "Page");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.DICT, manifest.getDicts(),

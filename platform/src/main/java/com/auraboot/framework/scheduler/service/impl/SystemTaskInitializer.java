@@ -2,7 +2,6 @@ package com.auraboot.framework.scheduler.service.impl;
 
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Initializes system-level scheduled tasks in the database on startup.
+ * Idempotently initializes system-level scheduled tasks in the database.
  * These tasks replace hard-coded @Scheduled annotations with DB-driven scheduling.
  *
  * @since 5.1.0
@@ -69,7 +68,6 @@ public class SystemTaskInitializer {
                             + "(max 3 attempts, then failed)")
     );
 
-    @PostConstruct
     public void initializeSystemTasks() {
         int created = 0;
         for (TaskDef def : SYSTEM_TASKS) {

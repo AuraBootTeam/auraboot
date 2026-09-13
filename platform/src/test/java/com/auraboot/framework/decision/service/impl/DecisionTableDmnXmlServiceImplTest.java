@@ -1,19 +1,34 @@
 package com.auraboot.framework.decision.service.impl;
 
+import com.auraboot.framework.decision.adapter.WorkflowDmnAdapter;
 import com.auraboot.framework.decision.dto.DecisionTableDmnXmlDTO;
 import com.auraboot.framework.decision.dto.DecisionTableDmnXmlRequest;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DecisionTableDmnXmlServiceImplTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private final DecisionTableDmnXmlServiceImpl service = new DecisionTableDmnXmlServiceImpl(mapper);
+    private final WorkflowCapabilityRegistry workflowCapabilities = mock(WorkflowCapabilityRegistry.class);
+    private final DecisionTableDmnXmlServiceImpl service;
+
+    DecisionTableDmnXmlServiceImplTest() {
+        when(workflowCapabilities.execute(anyString(), any()))
+                .thenReturn(new WorkflowCapability.WorkflowResult(Map.of("errors", java.util.List.of())));
+        service = new DecisionTableDmnXmlServiceImpl(mapper, new WorkflowDmnAdapter(workflowCapabilities));
+    }
 
     @Test
     void exportsKieCompilableDmnDecisionTableAndImportsItBack() throws Exception {

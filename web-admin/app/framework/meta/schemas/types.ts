@@ -344,16 +344,16 @@ export type ActionDef =
   | { type: 'flow'; steps: FlowStep[] }
   | { type: 'flow'; handler: string }
   | {
-      type: 'bpm';
-      /** BPMN process definition key (matches <process id="..."> in the .bpmn file) */
-      processDefinitionKey: string;
+      type: 'workflow';
+      /** Provider-owned workflow definition key. */
+      workflowKey: string;
       /** Field name on the source record that provides the businessKey */
       businessKeyField: string;
       /**
        * Variable name → expression mapping. Expression grammar:
        * - "$.field" / "$.parent.child" — JSONPath-style record lookup (dot paths only)
        * - Any non-"$"-prefixed value — treated as literal
-       * Bracket syntax ("$.list[0]") is rejected at runtime to match backend BpmActionExecutor.
+       * Bracket syntax ("$.list[0]") is rejected by the platform dispatcher.
        */
       variables?: Record<string, string>;
     };

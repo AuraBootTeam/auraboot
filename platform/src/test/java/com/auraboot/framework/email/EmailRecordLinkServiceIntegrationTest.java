@@ -24,9 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for {@link EmailRecordLinkService}.
  *
- * <p>Tests run against real PostgreSQL. CRM dynamic tables (mt_crm_*)
- * are not assumed to exist, so autoLink is exercised indirectly via
- * manual link / remove operations which only touch ab_email_record_link.
+ * <p>Tests run against real PostgreSQL and use arbitrary model codes; the platform does not
+ * assume any product schema.
  *
  * @since 6.5.0
  */
@@ -113,7 +112,7 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("ERL-01: manualLink creates link with link_type=manual")
     void erl01_manualLinkCreatesManualLink() {
-        String modelCode = "crm_contact_common";
+        String modelCode = "customer_record";
         String recordPid = "01KEMAILREC";
         String threadId  = "gmail-thread-" + runId;
 
@@ -144,20 +143,20 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(2)
-    @DisplayName("ERL-02: manualLink supports different CRM model codes")
+    @DisplayName("ERL-02: manualLink supports different model codes")
     void erl02_manualLinkSupportsMultipleModels() {
         String threadId = "gmail-thread-" + runId;
 
         EmailRecordLink contactLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_contact_common", "1");
+                testTenantId, testMessageId, threadId, "customer_record", "1");
         EmailRecordLink leadLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_lead_common", "2");
+                testTenantId, testMessageId, threadId, "case_record", "2");
         EmailRecordLink oppLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_opportunity_common", "3");
+                testTenantId, testMessageId, threadId, "activity_record", "3");
 
-        assertThat(contactLink.getModelCode()).isEqualTo("crm_contact_common");
-        assertThat(leadLink.getModelCode()).isEqualTo("crm_lead_common");
-        assertThat(oppLink.getModelCode()).isEqualTo("crm_opportunity_common");
+        assertThat(contactLink.getModelCode()).isEqualTo("customer_record");
+        assertThat(leadLink.getModelCode()).isEqualTo("case_record");
+        assertThat(oppLink.getModelCode()).isEqualTo("activity_record");
 
         // Verify all three are persisted
         List<EmailRecordLink> links = emailRecordLinkMapper.findByThread(testTenantId, threadId);
@@ -176,7 +175,7 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
     void erl03_removeLinkDeletesFromDb() {
         // Create a link first
         EmailRecordLink link = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, "gmail-thread-" + runId, "crm_contact_common", "99");
+                testTenantId, testMessageId, "gmail-thread-" + runId, "customer_record", "99");
         Long linkId = link.getId();
         assertThat(emailRecordLinkMapper.selectById(linkId)).isNotNull();
 

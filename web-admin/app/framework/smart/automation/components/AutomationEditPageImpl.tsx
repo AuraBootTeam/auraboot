@@ -26,7 +26,7 @@ const TRIGGER_NODE_TYPE_BY_TRIGGER: Record<string, string> = {
   on_state_change: 'trigger-state-change',
   scheduled: 'trigger-scheduled',
   webhook: 'trigger-webhook',
-  on_bpm_event: 'trigger-bpm-event',
+  on_workflow_event: 'trigger-workflow-event',
   on_inactivity: 'trigger-inactivity',
 };
 

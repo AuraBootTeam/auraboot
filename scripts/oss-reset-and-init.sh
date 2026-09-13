@@ -6,14 +6,8 @@
 #                 NEVER auto-compensate missing data — that masks bootstrap failures.
 #
 # History:
-#   2026-05-10 — §8 seed is capability-aware for the OSS/full-CRM split:
-#                base showcase seed remains fail-fast; commercial CRM seed runs
-#                only when full CRM quote/complaint commands are present unless
-#                SHOWCASE_COMMERCIAL_SEED=required; dashboard-default targets
-#                SHOWCASE_DEFAULT_DASHBOARD_CODE or the official CRM dashboard.
-#   2026-05-10 — §8 seed is now fail-fast: Playwright seed output is written to
-#                per-step logs, failures print the tail and stop the script, and
-#                final invariants verify CRM/showcase/arsenal/default dashboard.
+#   2026-09-12 — Product seed and demo ownership moved to independent applications;
+#                Core reset now initializes platform state only.
 #   2026-05-17 — §7.5 restored as explicit profile-based plugin import.
 #                /api/bootstrap/setup is now minimal system bootstrap only;
 #                core/demo/e2e plugin selection is owned by scripts/import-plugins.sh.
@@ -73,8 +67,6 @@ for arg in "$@"; do
             echo "  PLUGIN_IMPORT_PROFILE=core|demo|e2e  Override plugin import profile"
             echo "  AURA_RESET_ALLOW_TARGETS=\"<pg_db>,<be_port>\"  REQUIRED allow-list: reset only proceeds when both the target PG_DB and BE_PORT appear in it (\"@any\" overrides)"
             echo "  AURABOOT_DEMO_SEED=false  Backward-compatible alias for PLUGIN_IMPORT_PROFILE=core"
-            echo "  SHOWCASE_COMMERCIAL_SEED=auto|required|skip  Control full-CRM commercial seed"
-            echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard  Override demo default dashboard"
             exit 0
             ;;
     esac
@@ -132,7 +124,6 @@ export PG_USER="${PG_USER:-${USER:-ghj}}"
 export PG_DB="${PG_DB:-aura_boot}"
 export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
 export PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-}"
-export SHOWCASE_COMMERCIAL_SEED="${SHOWCASE_COMMERCIAL_SEED:-auto}"
 export AURA_PSQL_BASE="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}"
 
 # ── Target designation gate (fail-closed) ────────────────────────────────────
@@ -184,14 +175,6 @@ case "$PLUGIN_IMPORT_PROFILE" in
     *)
         echo "PLUGIN_IMPORT_PROFILE must be one of: core, demo, e2e, pcba-agent"
         exit 2
-        ;;
-esac
-
-case "$SHOWCASE_COMMERCIAL_SEED" in
-    auto|required|skip) ;;
-    *)
-        echo "SHOWCASE_COMMERCIAL_SEED must be one of: auto, required, skip"
-        exit 1
         ;;
 esac
 
@@ -322,39 +305,6 @@ psql_scalar() {
     psql_run -tAc "$1" | tr -d '[:space:]'
 }
 
-command_definition_exists() {
-    local command_code="$1"
-    [ "$(psql_scalar "select exists(select 1 from ab_command_definition where code = '${command_code}')")" = "t" ]
-}
-
-dashboard_definition_exists() {
-    local dashboard_code="$1"
-    [ "$(psql_scalar "select exists(select 1 from ab_dashboard where code = '${dashboard_code}')")" = "t" ]
-}
-
-ensure_dashboard_definition_exists() {
-    local dashboard_code="$1"
-    if ! dashboard_definition_exists "$dashboard_code"; then
-        echo -e "${RED}   Required dashboard '${dashboard_code}' is not imported.${NC}"
-        echo "   Set SHOWCASE_DEFAULT_DASHBOARD_CODE to an imported dashboard code or import the matching plugin resources."
-        exit 1
-    fi
-}
-
-select_default_showcase_dashboard() {
-    if [ -n "${SHOWCASE_DEFAULT_DASHBOARD_CODE:-}" ]; then
-        ensure_dashboard_definition_exists "$SHOWCASE_DEFAULT_DASHBOARD_CODE"
-        return
-    fi
-
-    if ! dashboard_definition_exists "crm_dashboard"; then
-        echo -e "${RED}   No CRM dashboard is imported for demo default selection.${NC}"
-        echo "   Expected crm_dashboard from the official CRM plugin."
-        exit 1
-    fi
-    export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_dashboard"
-}
-
 # Step 0: Preflight — required local services must be running.
 # PG / Redis are external dependencies the platform connects to. If absent
 # the rest of the script fails inside `set -e` with cryptic JDBC errors.
@@ -427,10 +377,9 @@ BOOT_JAR="$(resolve_boot_jar)"
 # populated at ApplicationReadyEvent from @Extension classes discovered via the
 # plugin jar's META-INF/extensions.idx. Config-only directory imports never load
 # backend classes, so a plugin whose commands declare `handler:` refs (today:
-# crm) fails import with ~50 unregistered-handler errors unless its jar was
-# loaded at startup. Build it from source (cached, up-to-date after first run)
-# and stage it into the boot-relative plugins dir (aura.plugins.dir defaults to
-# "plugins" resolved from the platform cwd).
+# Hybrid plugins fail import when their handler JAR is absent at startup. Build
+# platform-owned hybrids from source and stage them into the boot-relative
+# plugins directory when a caller explicitly requests one.
 mkdir -p "$PLATFORM_DIR/plugins"
 stage_plugin_jar() {
     local plugin_name="$1"
@@ -460,7 +409,6 @@ stage_plugin_jar() {
     fi
     [ "$staged" = "yes" ]
 }
-stage_plugin_jar "crm"
 
 aura_reset_assert_port_available "backend" "$BE_PORT"
 BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env \
@@ -768,79 +716,17 @@ WHERE u.email = 'admin@auraboot.com'
     "$SCRIPT_DIR/seed-marketplace.sh" 2>&1 | tail -1
     echo -e "${GREEN}   Marketplace seed complete${NC}"
 
-    # Step 7.8: Seed CS Agent definition
-    echo -e "${YELLOW}Step 7.8: Seeding CS Agent definition...${NC}"
-    CS_AGENT_LOG="/tmp/aura-seed-cs-agent.log"
-    psql_run -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off > "$CS_AGENT_LOG" 2>&1
-    grep -E "NOTICE|ERROR" "$CS_AGENT_LOG" | tail -5 || tail -5 "$CS_AGENT_LOG" || true
-    echo -e "${GREEN}   CS Agent seed complete${NC}"
-
-    # Step 7.9: Seed AuraBot agent definition (GAP-296)
+    # Step 7.8: Seed AuraBot agent definition (GAP-296)
     # Per-tenant aurabot agent_definition row so AuraBotAgentResolver hot-paths
     # never fall back to the inline LAZY_SEED_AURABOT branch.
-    echo -e "${YELLOW}Step 7.9: Seeding AuraBot agent definition...${NC}"
+    echo -e "${YELLOW}Step 7.8: Seeding AuraBot agent definition...${NC}"
     AURABOT_AGENT_LOG="/tmp/aura-seed-aurabot-agent.log"
     psql_run -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off > "$AURABOT_AGENT_LOG" 2>&1
     grep -E "NOTICE|ERROR" "$AURABOT_AGENT_LOG" | tail -5 || tail -5 "$AURABOT_AGENT_LOG" || true
     echo -e "${GREEN}   AuraBot agent seed complete${NC}"
 
-    # Step 8: Seed showcase demo data (optional — skip with SKIP_SEED=1)
-    if [ "${SKIP_SEED:-0}" != "1" ]; then
-        echo -e "${YELLOW}Step 8: Seeding showcase demo data...${NC}"
-        cd "$WEB_ADMIN_DIR"
-
-        SEED_CONFIG="playwright.seed.config.ts"
-        SEED_LOG_DIR="$WEB_ADMIN_DIR/test-results/seed/reset-and-init"
-
-        seed_phases=(data extended workflow ai arsenal supplement)
-
-        case "$SHOWCASE_COMMERCIAL_SEED" in
-            skip)
-                echo -e "${YELLOW}   Commercial seed skipped (SHOWCASE_COMMERCIAL_SEED=skip)${NC}"
-                ;;
-            auto)
-                if command_definition_exists "crm:create_quote" && command_definition_exists "crm:create_complaint"; then
-                    seed_phases+=(commercial)
-                else
-                    echo -e "${YELLOW}   Commercial seed skipped: full CRM quote/complaint commands are not imported.${NC}"
-                    echo "     The optional showcase quote seed requires Sales quote commands outside the CRM core."
-                fi
-                ;;
-            required)
-                if ! command_definition_exists "crm:create_quote" || ! command_definition_exists "crm:create_complaint"; then
-                    echo -e "${RED}   Commercial seed required but full CRM quote/complaint commands are not imported.${NC}"
-                    echo "   Import a Sales quote extension, or set SHOWCASE_COMMERCIAL_SEED=auto/skip."
-                    exit 1
-                fi
-                seed_phases+=(commercial)
-                ;;
-        esac
-
-        run_seed_step "Showcase seed sequence (${seed_phases[*]})" "$SEED_LOG_DIR/showcase-seed-sequence.log" \
-            node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
-                --output-prefix="$SEED_LOG_DIR/showcase" "${seed_phases[@]}"
-
-        # workflow-demo carries its own business data (leave balances + requests + approval
-        # tasks). Without a balance row, wd_leave_validation rejects every annual leave
-        # request the demo can submit, so this is part of a usable demo, not an extra.
-        if command_definition_exists "wd:create_leave_balance"; then
-            run_seed_step "Workflow-demo seed (leave balances + requests)" "$SEED_LOG_DIR/workflow-demo-seed.log" \
-                node scripts/seed-workflow-demo.mjs --base-url="$AURA_VITE_BASE"
-        else
-            echo -e "${YELLOW}   Workflow-demo seed skipped: workflow-demo plugin is not imported.${NC}"
-        fi
-
-        select_default_showcase_dashboard
-        export SHOWCASE_DEFAULT_DASHBOARD_CODE
-        echo "   Demo default dashboard target: ${SHOWCASE_DEFAULT_DASHBOARD_CODE}"
-        run_seed_step "Showcase seed finalization (dashboard-default + invariants)" "$SEED_LOG_DIR/showcase-seed-finalization.log" \
-            node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
-                --output-prefix="$SEED_LOG_DIR/showcase" dashboard-default invariants
-
-        echo -e "${GREEN}   All showcase data seeded successfully${NC}"
-    else
-        echo -e "${YELLOW}Step 8: Skipping showcase seed (SKIP_SEED=1)${NC}"
-    fi
+    echo -e "${YELLOW}Step 8: Product seed not run by Core.${NC}"
+    echo "   Run the explicit seed command from aura-crm or aura-bpm after application composition."
 fi
 
 # Final summary

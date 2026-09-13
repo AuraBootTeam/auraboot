@@ -12,7 +12,7 @@ import java.time.Instant;
  * Per-node runtime status row for a single automation run (G5).
  *
  * <p>One row is inserted per (automation_log, node) when the
- * {@code AutomationActionServiceTaskDelegate} enters a node and updated on exit.
+ * {@code AutomationActionAccessorImpl} enters a node and updated on exit.
  * Lets the designer overlay a "what actually ran / where it failed" view on top of
  * the flow graph — SmartEngine runs automations in MEMORY (CUSTOM) storage mode and
  * does not otherwise persist execution state.

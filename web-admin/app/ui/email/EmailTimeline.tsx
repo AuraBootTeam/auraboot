@@ -1,8 +1,8 @@
 /**
- * EmailTimeline — shows emails linked to a CRM record.
+ * EmailTimeline — shows emails linked to a business record.
  *
  * Props:
- *  - modelCode: the model code of the parent record (e.g., 'crm-contact')
+ *  - modelCode: the model code of the parent record (e.g., 'customer-account')
  *  - recordPid: the public pid of the record
  *
  * Fetches via getMessagesByRecord, renders a timeline with:

@@ -62,7 +62,6 @@
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
-| `mes-wms-golden-run.sh` | 0 | 2026-07-24 | mes-wms-golden-run.sh — self-contained golden gate runner for the 8 delivered MES/WMS FRs. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
 | `validate-permission-codes.mjs` | 2 | 2026-05-08 | Cross-source permission-code validator. |
@@ -76,9 +75,9 @@
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `db/generate-schema-snapshot.sh` | 3 | 2026-06-23 | Generate a deterministic schema-only snapshot from a freshly migrated DB. |
-| `deploy/oss-remote/gen-admin-storage.mjs` | 1 | 2026-07-15 | Generate a Playwright admin storageState for a deployed AuraBoot instance, |
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
+| `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
 
 ## entrypoint (27)
 
@@ -93,7 +92,6 @@
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
 | `dev/rotate-license-keypair.sh` | 0 | 2026-05-09 | Rotate the AuraBoot commercial-license signing keypair. |
 | `dev/run-agent-runtime-backend-gate.sh` | 0 | 2026-07-23 | Focused backend gate for the generic agent runtime architecture. |
-| `dev/run-p0-e2e-docker.sh` | 0 | 2026-05-11 | run-p0-e2e-docker.sh — fully self-contained docker-only validation of the |
 | `dev/xxl-job-true-stack-smoke.sh` | 0 | 2026-06-07 |  |
 | `digital-employee-golden-run.sh` | 0 | 2026-07-23 | digital-employee-golden-run.sh — self-contained browser golden for the digital |
 | `docker-bootstrap.sh` | 0 | 2026-06-08 | docker-bootstrap.sh — Import plugins into an already-running Docker E2E backend. |
@@ -105,13 +103,19 @@
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
 | `oss-backend-unit-ci.sh` | 1 | 2026-08-24 | Self-contained Linux CI runner for the complete OSS Gradle test task and its dedicated PostgreSQL/Redis dependencies. |
+| `oss-backend-nightly-coverage.sh` | 0 | 2026-09-12 | Linux CI entrypoint for full backend coverage evidence. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
-| `p1-verify-in-docker.sh` | 0 | 2026-05-08 | P1' ACP platformization — docker isolated stack verification. |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
 | `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
+| `application/application-cli.mjs` | 1 | 2026-09-12 | Validate application manifests, resolve immutable locks, and verify staged artifact checksums. |
+| `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
+| `application/audit-core-only-schema.sh` | 1 | 2026-09-12 | Fail closed when a migrated core-only database contains BPM/CRM tables or persisted product literals. |
+| `application/migration-ownership.mjs` | 1 | 2026-09-12 | Split legacy core migrations into deterministic core, CRM, and BPM ownership sets without Flyway version collisions. |
+| `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
+| `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
 
 ## pipeline/lib (12)
 
@@ -129,6 +133,8 @@
 | `lib/runtime-process-owner.sh` | 4 | 2026-08-19 | Runtime-scoped process ownership and exact cleanup safeguards. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 | `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
+| `application/application-contract.mjs` | 2 | 2026-09-12 | Shared manifest, lock, artifact identity, and checksum contract implementation. |
+| `application/oci-layout.mjs` | 1 | 2026-09-12 | Build a digest-addressed Linux OCI layout with Docker on the admitted CI builder. |
 
 ## tooling (67)
 
@@ -136,6 +142,8 @@
 |---|--:|---|---|
 | `agent-git-guard.mjs` | 4 | 2026-06-24 |  |
 | `agent-write-guard.mjs` | 2 | 2026-06-24 |  |
+| `application/application-artifact-verifier.mjs` | 1 | 2026-09-12 | Dependency-free verifier for staged application lock identities, checksums, and migrations. |
+| `application/auraboot-core-env.sh` | 1 | 2026-09-12 | Lifecycle driver for a staged Core artifact set. |
 | `aps-fixtures/compare-strategies.sh` | 1 | 2026-05-28 | Compare APS V2 scheduling strategies on the fixture data set. |
 | `db/cleanup-scheduler-residue.sh` | 0 | 2026-07-26 | Read-only-by-default cleanup for three exact retired system scheduler definitions. |
 | `behavior-keyed-load-test.mjs` | 0 | 2026-06-23 |  |
@@ -173,20 +181,18 @@
 | `docker-ga-e2e-down.sh` | 2 | 2026-05-26 | GA Follow-up E2E stack teardown — thin wrapper over stop-isolated. |
 | `docker-ga-e2e-logs.sh` | 1 | 2026-04-25 | Tail logs from the GA Follow-up E2E stack. |
 | `docker-ga-e2e-up.sh` | 9 | 2026-06-07 | GA Follow-up E2E stack — thin wrapper over the converged isolated stack. |
-| `docker-ga-showcase-e2e.sh` | 2 | 2026-05-26 | Run the GA showcase E2E gate from an isolated Docker Playwright runner. |
 | `env/reset-and-init.sh` | 50 | 2026-05-17 |  |
 | `faq-loop-golden-run.sh` | 3 | 2026-07-23 | faq-loop-golden-run.sh — one-click, self-contained golden for the conversation → FAQ loop. |
 | `ga-e2e-prepare-deps.sh` | 3 | 2026-05-17 | Prepare pnpm dependencies for the GA Docker E2E frontend/runner containers. |
 | `ga-showcase-e2e.sh` | 3 | 2026-05-10 | Run the GA community showcase E2E gate with isolated Playwright storage. |
-| `host-oee-dashboard-golden.sh` | 1 | 2026-06-22 | Host-first OEE dashboard golden. |
 | `import-plugins.sh` | 16 | 2026-06-13 | Import AuraBoot plugins into a running backend. |
 | `import-templates.sh` | 2 | 2026-05-11 |  |
 | `install-agent-git-hooks.mjs` | 2 | 2026-06-24 |  |
 | `migrate-dsl-buttons.mjs` | 0 | 2026-03-26 | Migration script: batch-convert legacy button configs to unified action format. |
-| `bpm-release-gate.pins.json` | 1 | 2026-09-03 | Skip allow-list + flip conditions for `bpm-release-gate.sh` hard tiers; an unpinned hard-tier skip fails the gate. |
-| `bpm-release-gate.sh` | 1 | 2026-09-03 | BPM release gate orchestrator (P1 env/schema gate → smoke/showcase/designer hard tiers → bpm contract advisory tier). Denominator SOT: workspace `docs/plans/2026-09-03-bpm-functional-acceptance-matrix.md`. |
 | `oss-golden-stack.sh` | 19 | 2026-07-23 | oss-golden-stack.sh — one-click host-first golden stack for OSS auraboot. |
 | `oss-reset-and-init.sh` | 24 | 2026-08-28 | AuraBoot OSS Environment Reset and Initialization Script. Requires `AURA_RESET_ALLOW_TARGETS="<pg_db>,<be_port>"` (target designation gate; `@any` overrides). |
+| `observability-grafana-browser.mjs` | 0 | 2026-09-12 | Browser verification helper for the observability Grafana surface. |
+| `observability-real-stack-ci.sh` | 0 | 2026-09-12 | CI entrypoint for the real-stack observability gate. |
 | `oss-test.sh` | 7 | 2026-06-22 | Run Playwright E2E tests restricted to the OSS scope defined in oss-scope.json. |
 | `perf-ci/compare-baseline.sh` | 2 | 2026-03-26 | compare-baseline.sh — Compare k6 summary JSON files against a baseline. |
 | `perf-ci/notify.sh` | 1 | 2026-03-26 | notify.sh — Send performance regression result notifications. |
@@ -195,8 +201,6 @@
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
-| `run-bpm-release-image-gate.sh` | 1 | 2026-09-03 | CI-only BPM release-image gate (L6): builds the OSS platform runtime image at the pinned ref, boots it against an ephemeral Postgres stack, requires green health. |
-| `run-wf-e2e.sh` | 1 | 2026-06-22 | Thin wrapper over oss-test.sh for BPM / workflow-designer E2E suites. |
 | `seed-acp-runtime-test.sh` | 1 | 2026-05-09 |  |
 | `seed-marketplace.sh` | 5 | 2026-05-17 |  |
 | `suspended-tenant-login-golden.sh` | 1 | 2026-07-17 | suspended-tenant-login-golden.sh — E5: a suspended organization cannot log in. |

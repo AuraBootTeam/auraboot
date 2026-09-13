@@ -73,63 +73,6 @@ export const WORKBENCH_WIDGET_CATALOG: WidgetCategory[] = [
     ],
   },
   {
-    key: 'crm',
-    label: 'workbench.category.crm',
-    items: [
-      {
-        type: 'smart-pipeline',
-        name: 'workbench.widget.pipeline',
-        icon: '🔄',
-        description: 'workbench.widget.pipeline_desc',
-        defaultSize: { w: 6, h: 4 },
-        minSize: { w: 4, h: 3 },
-        maxSize: { w: 12, h: 8 },
-      },
-      {
-        type: 'smart-leads',
-        name: 'workbench.widget.leads',
-        icon: '🎯',
-        description: 'workbench.widget.leads_desc',
-        defaultSize: { w: 6, h: 4 },
-        minSize: { w: 4, h: 3 },
-        maxSize: { w: 12, h: 8 },
-      },
-      {
-        type: 'smart-activities',
-        name: 'workbench.widget.activities',
-        icon: '📝',
-        description: 'workbench.widget.activities_desc',
-        defaultSize: { w: 6, h: 4 },
-        minSize: { w: 4, h: 3 },
-        maxSize: { w: 12, h: 8 },
-      },
-    ],
-  },
-  {
-    key: 'bpm',
-    label: 'workbench.category.bpm',
-    items: [
-      {
-        type: 'smart-my-process',
-        name: 'workbench.widget.my_process',
-        icon: '🚀',
-        description: 'workbench.widget.my_process_desc',
-        defaultSize: { w: 6, h: 4 },
-        minSize: { w: 4, h: 3 },
-        maxSize: { w: 12, h: 8 },
-      },
-      {
-        type: 'smart-process-stats',
-        name: 'workbench.widget.process_stats',
-        icon: '📊',
-        description: 'workbench.widget.process_stats_desc',
-        defaultSize: { w: 6, h: 3 },
-        minSize: { w: 4, h: 2 },
-        maxSize: { w: 12, h: 6 },
-      },
-    ],
-  },
-  {
     key: 'general',
     label: 'workbench.category.general',
     items: [

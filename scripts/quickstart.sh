@@ -58,16 +58,13 @@ PLUGINS_PATH="${PLUGINS_PATH:-/app/plugins}"
 # later in the list — so anything that fails is retried once at the end.
 PLUGINS=(
   core-meta
-  core-bpm
   platform-admin
   core-decisionops
   core-aurabot
   page-manager
   org-management
-  crm
   showcase
   agent-control-plane
-  workflow-demo
 )
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; DIM='\033[2m'; NC='\033[0m'

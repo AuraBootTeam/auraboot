@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.com/schemas/web-contribution-v1.json",
+  "title": "AuraBoot Web Contribution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "package", "plugin", "peerDependencies", "routes", "contributions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^@auraboot/[a-z0-9-]+$" },
+        "version": { "$ref": "#/definitions/releaseVersion" }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "activationPhase", "dependsOn"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
+        "activationPhase": { "enum": ["foundation", "feature", "application"] },
+        "dependsOn": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" }
+        }
+      }
+    },
+    "peerDependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["react", "reactDom", "router", "pluginSdk"],
+      "properties": {
+        "react": { "type": "string", "minLength": 1 },
+        "reactDom": { "type": "string", "minLength": 1 },
+        "router": { "type": "string", "minLength": 1 },
+        "pluginSdk": { "type": "string", "minLength": 1 }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "export", "rendering"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
+          "path": { "type": "string", "pattern": "^/" },
+          "export": { "$ref": "#/definitions/exportPath" },
+          "rendering": { "const": "universal" },
+          "permission": { "type": "string", "minLength": 1 },
+          "featureKey": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "contributions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id", "export"],
+        "properties": {
+          "kind": { "enum": ["block", "action", "widget", "provider", "i18n"] },
+          "id": { "type": "string", "minLength": 1 },
+          "export": { "$ref": "#/definitions/exportPath" },
+          "permission": { "type": "string", "minLength": 1 },
+          "featureKey": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "releaseVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+      "not": { "pattern": "[sS][nN][aA][pP][sS][hH][oO][tT]|[lL][aA][tT][eE][sS][tT]|[wW][oO][rR][kK][sS][pP][aA][cC][eE]|[bB][rR][aA][nN][cC][hH]" }
+    },
+    "exportPath": { "type": "string", "pattern": "^\\./[a-zA-Z0-9][a-zA-Z0-9._/-]*$" }
+  }
+}

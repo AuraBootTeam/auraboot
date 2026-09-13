@@ -16,11 +16,11 @@ public final class PreActionConstants {
     /** preAction type: evaluate a Drools rule pre-flight (abort on invalid). */
     public static final String TYPE_RUN_RULE = "bpm:run-rule";
 
-    /** postAction type: start a BPM process via BpmIntegrationService. */
+    /** postAction type: start a workflow through the installed workflow capability. */
     public static final String POST_TYPE_START_PROCESS = "start_process";
 
     /**
-     * postAction type: withdraw the running BPM process instance referenced by
+     * postAction type: withdraw the running workflow instance referenced by
      * the current record (typically used in tandem with a {@code state_transition}
      * command that flips the business status to {@code cancelled}). Resolves
      * the active task for the instance and delegates to {@code WithdrawService}

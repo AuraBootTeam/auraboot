@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { utils as XLSXUtils, write } from 'xlsx';
 import { expect } from '../../fixtures';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,

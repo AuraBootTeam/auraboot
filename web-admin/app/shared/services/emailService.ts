@@ -1,5 +1,5 @@
 /**
- * Email Service — API client for Gmail CRM integration endpoints.
+ * Email Service — API client for Gmail and generic record-link endpoints.
  *
  * Covers:
  *  - Email accounts (connect, sync, members)
@@ -123,7 +123,7 @@ export interface EmailPage {
   pages: number;
 }
 
-export interface CrmLink {
+export interface RecordLink {
   id: number;
   messageId: number;
   modelCode: string;
@@ -296,7 +296,7 @@ export async function markMessageRead(messageId: number): Promise<void> {
 }
 
 /**
- * Link an email message to a CRM record.
+ * Link an email message to a business record.
  */
 export async function linkToRecord(
   messageId: number,
@@ -310,7 +310,7 @@ export async function linkToRecord(
 }
 
 /**
- * Unlink an email message from a CRM record.
+ * Unlink an email message from a business record.
  */
 export async function unlinkRecord(messageId: number, linkId: number): Promise<void> {
   await fetchResult(`${BASE}/messages/${messageId}/links/${linkId}`, {
@@ -319,7 +319,7 @@ export async function unlinkRecord(messageId: number, linkId: number): Promise<v
 }
 
 /**
- * Get email messages linked to a specific CRM record.
+ * Get email messages linked to a specific business record.
  */
 export async function getMessagesByRecord(
   modelCode: string,
@@ -336,10 +336,10 @@ export async function getMessagesByRecord(
 }
 
 /**
- * Get CRM links for a message.
+ * Get record links for a message.
  */
-export async function getMessageLinks(messageId: number): Promise<CrmLink[]> {
-  const result = await fetchResult<CrmLink[]>(`${BASE}/messages/${messageId}/links`, {
+export async function getMessageLinks(messageId: number): Promise<RecordLink[]> {
+  const result = await fetchResult<RecordLink[]>(`${BASE}/messages/${messageId}/links`, {
     method: 'get',
   });
   if (ResultHelper.isSuccess(result) && result.data) {

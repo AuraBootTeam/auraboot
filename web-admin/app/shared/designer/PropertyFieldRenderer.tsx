@@ -19,7 +19,7 @@ import {
 import {
   fetchPageOptions,
   fetchDashboardOptions,
-  fetchProcessOptions,
+  fetchWorkflowOptions,
   fetchAutomationOptions,
   fetchCommandOptions,
   fetchModelOptions,
@@ -268,14 +268,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
-    case 'process-select':
+    case 'workflow-select':
       return (
         <ResourceSelectField
           adapter={adapter}
           label={label}
           placeholder={placeholder || 'Select process...'}
           helpText={helpText}
-          fetchOptions={fetchProcessOptions}
+          fetchOptions={fetchWorkflowOptions}
         />
       );
 
@@ -661,7 +661,7 @@ function workflowContextFields(
     },
   ];
   const triggerType = context?._flowTriggerType;
-  if (triggerType === 'on_bpm_event') {
+  if (triggerType === 'on_workflow_event') {
     fields.push(
       {
         code: 'processKey',

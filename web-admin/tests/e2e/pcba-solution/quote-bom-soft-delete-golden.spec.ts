@@ -6,7 +6,7 @@ import {
   findRowInPaginatedList,
   waitForDynamicPageLoad,
 } from '../helpers';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { dynamicCreate, queryDynamicRecords } from './quote-e2e-helpers';
 
 /**

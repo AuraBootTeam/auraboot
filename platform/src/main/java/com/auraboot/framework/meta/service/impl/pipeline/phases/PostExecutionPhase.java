@@ -14,6 +14,8 @@ import com.auraboot.framework.meta.service.impl.RollUpFieldRegistry;
 import com.auraboot.framework.meta.service.impl.RollUpSummaryService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,14 +48,8 @@ public class PostExecutionPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
-    @Autowired(required = false)
-    private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
-
-    @Autowired(required = false)
-    private com.auraboot.framework.bpm.service.WithdrawService withdrawService;
-
-    @Autowired(required = false)
-    private com.auraboot.smart.framework.engine.SmartEngine smartEngine;
+    @Autowired
+    private WorkflowCapabilityRegistry workflowCapabilities;
 
     @Override public String name() { return "post_execution"; }
 
@@ -235,22 +231,22 @@ public class PostExecutionPhase implements CommandPhase {
                                 .replace("${recordPid}", parentRecordId != null ? parentRecordId : "")
                                 .replace("${pid}", parentRecordId != null ? parentRecordId : "");
                     }
-                    var chainService = applicationContext.getBean(
-                            com.auraboot.framework.bpm.chain.CommandChainService.class);
-                    var chainDef = new com.auraboot.framework.bpm.chain.CommandChainDefinition();
                     @SuppressWarnings("unchecked")
                     var chainConfig = (Map<String, Object>) postAction.get("chainDefinition");
-                    if (chainConfig != null) {
-                        chainDef = objectMapper.convertValue(chainConfig, com.auraboot.framework.bpm.chain.CommandChainDefinition.class);
-                    } else if (chainProcessKey != null) {
-                        log.warn("Chain definition loading by processKey not yet implemented, chainProcessKey={}", chainProcessKey);
-                        break;
+                    if (chainConfig == null) {
+                        throw new BusinessException(ResponseCode.BadParam,
+                                "start_approval_chain requires chainDefinition");
                     }
                     Map<String, Object> chainPayload = new java.util.HashMap<>(payload);
                     if (parentRecordId != null) {
                         chainPayload.put("_chain_business_record_id", parentRecordId);
                     }
-                    chainService.executeChain(chainDef, businessKey, chainPayload);
+                    workflowCapabilities.execute("chain.execute", new WorkflowCapability.WorkflowRequest(
+                            tenantId, userId, Map.of(
+                            "chainDefinition", chainConfig,
+                            "chainProcessKey", chainProcessKey == null ? "" : chainProcessKey,
+                            "businessKey", businessKey == null ? "" : businessKey,
+                            "payload", chainPayload)));
                 }
                 default -> log.warn("Unknown postAction: {}", action);
             }
@@ -258,18 +254,14 @@ public class PostExecutionPhase implements CommandPhase {
     }
 
     /**
-     * Execute a {@code start_process} postAction: starts a BPM process via
-     * {@link com.auraboot.framework.bpm.service.BpmIntegrationService} and
+     * Execute a {@code start_process} postAction: starts a workflow via
+     * the installed workflow capability and
      * optionally writes the resulting processInstanceId back onto the current
      * record at field {@code storeInstanceIdIn}.
      */
     @SuppressWarnings("unchecked")
     private void executePostActionStartProcess(Map<String, Object> postAction, String parentRecordId,
                                                 Map<String, Object> payload, CommandDefinition command) {
-        if (bpmIntegrationService == null) {
-            throw new BusinessException(ResponseCode.BadParam,
-                    "start_process postAction requires BpmIntegrationService");
-        }
         String processKey = (String) postAction.get("processKey");
         if (processKey == null || processKey.isBlank()) {
             throw new BusinessException(ResponseCode.BadParam,
@@ -296,15 +288,23 @@ public class PostExecutionPhase implements CommandPhase {
             }
         }
 
-        var instance = bpmIntegrationService.startBusinessProcess(processKey, businessKey, variables, title);
+        Map<String, Object> started = workflowCapabilities.execute("start",
+                new WorkflowCapability.WorkflowRequest(
+                        MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                        MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                        Map.of("processDefinitionKey", processKey,
+                                "businessKey", businessKey == null ? "" : businessKey,
+                                "variables", variables,
+                                "title", title == null ? "" : title))).payload();
+        Object processInstanceId = started.get("processInstanceId");
 
         String storeInstanceIdIn = (String) postAction.get("storeInstanceIdIn");
         if (storeInstanceIdIn != null && !storeInstanceIdIn.isBlank()
-                && instance != null && instance.getInstanceId() != null
+                && processInstanceId != null
                 && parentRecordId != null && command != null && command.getModelCode() != null) {
             try {
                 Map<String, Object> update = new HashMap<>();
-                update.put(storeInstanceIdIn, instance.getInstanceId());
+                update.put(storeInstanceIdIn, processInstanceId);
                 dynamicDataService.update(command.getModelCode(), parentRecordId, update);
             } catch (Exception e) {
                 log.warn("start_process: failed to write processInstanceId to {}.{}: {}",
@@ -314,7 +314,7 @@ public class PostExecutionPhase implements CommandPhase {
     }
 
     /**
-     * Execute a {@code withdraw_process} postAction: resolves the BPM process
+     * Execute a {@code withdraw_process} postAction: resolves the workflow
      * instance recorded on the current row at field
      * {@code instanceIdField} (default {@code wd_req_process_instance}),
      * looks up its current pending task via
@@ -334,15 +334,6 @@ public class PostExecutionPhase implements CommandPhase {
     private void executePostActionWithdrawProcess(Map<String, Object> postAction, String parentRecordId,
                                                    Map<String, Object> payload, CommandDefinition command,
                                                    Long tenantId) {
-        if (withdrawService == null) {
-            throw new BusinessException(ResponseCode.BadParam,
-                    "withdraw_process postAction requires WithdrawService");
-        }
-        if (smartEngine == null) {
-            throw new BusinessException(ResponseCode.BadParam,
-                    "withdraw_process postAction requires SmartEngine");
-        }
-
         String instanceIdField = (String) postAction.getOrDefault("instanceIdField",
                 "wd_req_process_instance");
         if (!StringUtils.hasText(instanceIdField)) {
@@ -374,17 +365,6 @@ public class PostExecutionPhase implements CommandPhase {
                             + instanceIdField + " for record " + parentRecordId);
         }
 
-        // Active-task resolution mirrors WdCancelLeaveRequestHandler — pick
-        // the first pending task on the instance. SmartEngine's pending list
-        // is the authoritative source; do NOT bypass with raw SQL.
-        String tenantIdStr = tenantId == null ? null : String.valueOf(tenantId);
-        java.util.List<com.auraboot.smart.framework.engine.model.instance.TaskInstance> pendingTasks =
-                smartEngine.getTaskQueryService().findAllPendingTaskList(processInstanceId, tenantIdStr);
-        if (pendingTasks == null || pendingTasks.isEmpty()) {
-            throw new BusinessException(
-                    "withdraw_process: no active task found for process instance " + processInstanceId);
-        }
-
         String reasonTemplate = (String) postAction.get("reason");
         String reason = StringUtils.hasText(reasonTemplate)
                 ? resolveStartProcessTemplate(reasonTemplate, payload, parentRecordId, command)
@@ -393,7 +373,10 @@ public class PostExecutionPhase implements CommandPhase {
         // Let WithdrawService throw — its initiator/policy/strict gates and
         // any SmartEngine errors propagate to GlobalExceptionHandler so the
         // outer command transaction rolls back the state_transition write.
-        withdrawService.withdraw(pendingTasks.get(0).getInstanceId(), reason);
+        workflowCapabilities.execute("process.withdraw", new WorkflowCapability.WorkflowRequest(
+                tenantId,
+                MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                Map.of("processInstanceId", processInstanceId, "reason", reason)));
 
         log.info("withdraw_process postAction: withdrew processInstanceId={} for {} record={}",
                 processInstanceId, command.getModelCode(), parentRecordId);

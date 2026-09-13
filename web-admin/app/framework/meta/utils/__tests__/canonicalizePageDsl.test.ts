@@ -612,7 +612,7 @@ describe('canonicalizePageSchemaDto', () => {
     expect(detailSchema.extension).toMatchObject({
       dataSource: {
         type: 'api',
-        endpoint: '/api/bpm/sla-configs/{pid}',
+        endpoint: '/api/extensions/workflow/sla-configs/{pid}',
         method: 'get',
       },
     });
@@ -699,7 +699,7 @@ describe('canonicalizePageSchemaDto', () => {
     const schema = canonicalizePageSchemaDto(listPage!);
     expect(schema.dataSource).toMatchObject({
       type: 'api',
-      endpoint: '/api/bpm/process-definitions',
+      endpoint: '/api/extensions/workflow/process-definitions',
       method: 'get',
     });
     const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;

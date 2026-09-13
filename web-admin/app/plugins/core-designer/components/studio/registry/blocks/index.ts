@@ -22,7 +22,6 @@ import { detailSectionBlock } from './detail-section';
 import { richTextBlock } from './rich-text';
 import { dividerBlock } from './divider';
 import { formButtonsBlock } from './form-buttons';
-import { bpmPanelBlock } from './bpm-panel';
 
 export function registerAllBlocks(): void {
   BlockRegistry.register(tableBlock);
@@ -38,7 +37,6 @@ export function registerAllBlocks(): void {
   BlockRegistry.register(richTextBlock);
   BlockRegistry.register(dividerBlock);
   BlockRegistry.register(formButtonsBlock);
-  BlockRegistry.register(bpmPanelBlock);
 }
 
 export {
@@ -55,5 +53,4 @@ export {
   richTextBlock,
   dividerBlock,
   formButtonsBlock,
-  bpmPanelBlock,
 };

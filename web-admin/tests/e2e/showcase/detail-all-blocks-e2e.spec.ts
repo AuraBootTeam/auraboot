@@ -1,5 +1,5 @@
 /**
- * D — Detail-kind block coverage: bpm-panel + activity-timeline + record-comments.
+ * D — Core detail-kind block coverage: activity-timeline + record-comments.
  *
  * Existing detail-page coverage:
  *   - form-section / detail-section: covered by detail-configpanel-e2e,
@@ -12,9 +12,6 @@
  * by `web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx` but
  * never asserted at runtime in the existing showcase specs:
  *
- *   - D.bpm-panel     — empty-state assertion (no process definition seeded
- *                       in OSS, so the panel's `data-state="empty"` branch
- *                       is the honest assertion).
  *   - D.activity      — activity-timeline renders with its container after
  *                       record creation injects a CREATE activity.
  *   - D.comments      — record-comments renders its container (even empty).
@@ -27,7 +24,9 @@
  *                       fallback, but DetailBlockRenderer doesn't route
  *                       through BlockRenderer — it uses a hardcoded switch
  *                       over form-section/sub-table/activity-timeline/
- *                       record-comments/field-history/bpm-panel/monthly-grid.
+ *                       record-comments/field-history/monthly-grid. Product
+ *                       contribution blocks such as bpm-panel are verified by
+ *                       their owning application.
  *                       Coverage belongs in the designer canvas or
  *                       report-designer E2E.
  *   - `divider`       : No renderer branch in DetailBlockRenderer or in the
@@ -255,7 +254,7 @@ async function openDetailViaListRow(page: Page, seed: SeededRecord): Promise<voi
  * Build a detail-page layout where the tested block is rendered at the top
  * level (direct mode) OR inside a tab. DetailPageContent gates non-form-section
  * / non-sub-table / non-monthly-grid blocks (activity-timeline, record-
- * comments, field-history, bpm-panel) so that they only render inside a
+ * comments and field-history) so that they only render inside a
  * `tabs` block. Putting them in a tab is therefore the only runtime-visible
  * wiring.
  */
@@ -451,77 +450,6 @@ test.describe('D — Detail-kind block/layout coverage', () => {
     await expect(overviewTab).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('grid-layout')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('layout-overview-content')).toBeVisible();
-  });
-
-  // ---------------------------------------------------------------------------
-  // D.bpm-panel — empty-state render assertion (no process seeded in OSS).
-  //
-  // BpmPanelBlock fetches /api/bpm/instances/for-record/{businessKey}. In OSS
-  // without a running process, the service returns null which triggers the
-  // `data-state="empty"` branch and renders "No workflow instance for this
-  // record." at the container with `data-testid="bpm-panel"`. That is the
-  // truthful assertion the test can make without fabricating a process.
-  // ---------------------------------------------------------------------------
-  test('D.bpm-panel: renders with data-state in a detail-page tab', async ({
-    page,
-    request,
-  }) => {
-    const seed = await seedRecord(request);
-    createdPids.push(seed.pid);
-
-    detailSnapshot = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
-    // Preserve non-tabs/non-toolbar blocks so the existing identity fields
-    // still render; inject our tabs block with bpm-panel inside.
-    const keep = detailSnapshot.blocks.filter(
-      (b: any) => b?.blockType !== 'tabs' && b?.blockType !== 'toolbar',
-    );
-    const nextBlocks = [
-      ...keep,
-      // Ensure there's at least one visible identity block above the tabs.
-      {
-        id: 'd_identity',
-        blockType: 'detail-section',
-        title: 'D Detail Identity',
-        columns: 2,
-        fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
-      },
-      buildTabsBlock(
-        [
-          {
-            id: 'd_bpm',
-            blockType: 'bpm-panel',
-            bpmPanel: {
-              sections: ['status', 'operations'],
-            },
-          },
-        ],
-        'd_bpm_tab',
-      ),
-    ];
-    await replacePageBlocks(request, detailSnapshot, nextBlocks);
-
-    await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed);
-
-    // Tabs render — the tab nav button is visible.
-    const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
-    await expect(tabButton, 'injected tab button should render').toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Assert the BPM panel container is in the DOM. Even without a process
-    // it renders with `data-testid="bpm-panel"` in the empty/loading/error
-    // state. We only require it to EXIST and carry one of the documented
-    // `data-state` values — not that it reaches any particular lifecycle.
-    const bpmPanel = page.locator('[data-testid="bpm-panel"]').first();
-    await expect(bpmPanel, 'bpm-panel container should render inside tab').toBeVisible({
-      timeout: 10_000,
-    });
-    const state = await bpmPanel.getAttribute('data-state');
-    expect(
-      state,
-      `bpm-panel data-state must be one of loading|error|empty|ready (got: ${state})`,
-    ).toMatch(/^(loading|error|empty|ready)$/);
   });
 
   // ---------------------------------------------------------------------------

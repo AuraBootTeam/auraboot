@@ -2841,9 +2841,7 @@ function ListPageContentInner(props: PageContentProps) {
           const recordLabel =
             record.name ||
             record.title ||
-            record.crm_opp_name ||
             record.code ||
-            record.crm_opp_code ||
             id;
           return [id, String(recordLabel)] as const;
         }),

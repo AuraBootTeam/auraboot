@@ -41,7 +41,7 @@ const PASSTHROUGH_BLOCK_TYPES = new Set([
   'activity-timeline',
   'record-comments',
   'field-history',
-  'bpm-panel',
+  'workflow-panel',
   'metric-strip',
   'stage-rail',
   'record-inspector',

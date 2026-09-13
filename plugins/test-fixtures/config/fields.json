@@ -681,7 +681,7 @@
     }
   },
   {
-    "code": "e2et_crm_opp_name",
+    "code": "e2et_stage_record_name",
     "displayName:zh-CN": "商机名称",
     "displayName:en": "Opportunity Name",
     "dataType": "string",
@@ -692,19 +692,19 @@
     }
   },
   {
-    "code": "e2et_crm_opp_stage",
+    "code": "e2et_stage_record_stage",
     "displayName:zh-CN": "销售阶段",
     "displayName:en": "Sales Stage",
     "dataType": "enum",
     "description": "Pipeline stage driving the stage-rail block; values mirror CRM crm_opp_stage",
-    "dictCode": "e2et_crm_opp_stage",
+    "dictCode": "e2et_stage_record_stage",
     "defaultValue": "discovery",
     "constraints": {
       "required": true
     }
   },
   {
-    "code": "e2et_crm_opp_amount",
+    "code": "e2et_stage_record_amount",
     "displayName:zh-CN": "商机金额",
     "displayName:en": "Opportunity Amount",
     "dataType": "decimal",

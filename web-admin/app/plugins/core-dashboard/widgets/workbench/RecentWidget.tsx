@@ -15,20 +15,12 @@ interface RecentWidgetProps {
 }
 
 const MODEL_ICONS: Record<string, string> = {
-  crm_lead_common: '🎯',
-  crm_opportunity_common: '💰',
-  crm_account_common: '🏢',
-  crm_contact_common: '👤',
   pm_project: '📁',
   pm_task: '✅',
   cc_contract: '📄',
 };
 
 const MODEL_BG_COLORS: Record<string, string> = {
-  crm_lead_common: 'bg-blue-50',
-  crm_opportunity_common: 'bg-amber-50',
-  crm_account_common: 'bg-green-50',
-  crm_contact_common: 'bg-teal-50',
   pm_project: 'bg-violet-50',
   pm_task: 'bg-indigo-50',
   cc_contract: 'bg-orange-50',

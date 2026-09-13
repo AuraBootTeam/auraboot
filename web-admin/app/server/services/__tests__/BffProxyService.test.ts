@@ -506,8 +506,8 @@ describe('BffProxyService', () => {
         }): Promise<Record<string, string>>;
       }
     ).sanitizeHeaders({
-      originalUrl: '/api/crm/forms/abc/sdk.js',
-      url: '/api/crm/forms/abc/sdk.js',
+      originalUrl: '/api/ext/example/public/embed.js',
+      url: '/api/ext/example/public/embed.js',
       headers: { accept: '*/*' },
     });
 

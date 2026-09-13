@@ -4,15 +4,15 @@
 #
 # Builds the OSS backend + frontend images OFF the target host, ships them with
 # `docker save | ssh docker load`, brings up a single-instance stack, bootstraps
-# the admin + plugins, seeds showcase demo data, and verifies the live URL.
+# the admin + platform plugins, and verifies the live URL. Product initialization
+# is owned by the independent application release.
 #
 # Designed for hosts that can't pull the images from a registry (air-gapped /
 # GHCR-blocked / CN networks) — nothing is compiled on the target host.
 #
 #   ./deploy.sh                       # full flow using env below
 #   SKIP_BUILD=1 ./deploy.sh          # reuse already-built local images
-#   SKIP_SEED=1 ./deploy.sh           # deploy without demo data
-#   STEP=verify ./deploy.sh           # run a single phase (build|ship|up|bootstrap|seed|verify)
+#   STEP=verify ./deploy.sh           # run a single phase (build|ship|up|bootstrap|verify)
 #   STEP=config ./deploy.sh           # update ICP runtime config; do not build or upload images
 #
 # Required env:
@@ -26,8 +26,6 @@
 #   STOP_CONTAINERS="a b c"           # containers to `docker stop` before bringing OSS up
 #   PUBLIC_HTTP_PORT=80               # (direct) host port for the gateway
 #   ADMIN_EMAIL / ADMIN_PASSWORD      # default admin@auraboot.com / Test2026x
-#   SEED_PHASES="data extended workflow ai supplement"
-#   SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard
 #   APK_MIRROR=mirrors.aliyun.com  NPM_REGISTRY=https://registry.npmmirror.com
 #   PLATFORM=linux/amd64              # target arch of the host
 #   ICP_COMPLIANCE_ENABLED=1          # show the temporary ICP review profile
@@ -36,7 +34,7 @@
 #
 # Host prereqs: docker + docker compose, python3 + curl (for bootstrap).
 # Build-host prereqs: docker buildx, JDK 21 + gradle (bundled wrapper), and
-#   web-admin deps installed (`pnpm -C web-admin install`) if seeding.
+#   web-admin dependencies installed for frontend builds.
 # =============================================================================
 set -euo pipefail
 
@@ -61,8 +59,6 @@ NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 ICP_COMPLIANCE_ENABLED="${ICP_COMPLIANCE_ENABLED:-0}"
 ICP_SITE_TITLE="${ICP_SITE_TITLE:-个人技术}"
 ICP_RECORD_NUMBER="${ICP_RECORD_NUMBER:-浙ICP备2023054087号}"
-SEED_PHASES="${SEED_PHASES:-data extended workflow ai supplement}"
-SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_dashboard}"
 STEP="${STEP:-all}"
 SSH=(ssh -o BatchMode=yes "$HOST")
 BE_IMG="auraboot-oss/backend:$TAG"; FE_IMG="auraboot-oss/frontend:$TAG"
@@ -221,26 +217,6 @@ bootstrap(){
     ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' COMPANY_NAME='$COMPANY_NAME' bash quickstart.sh"
 }
 
-# --- seed showcase demo data (from the build host, over HTTP) ----------------
-seed(){
-  [ "${SKIP_SEED:-0}" = "1" ] && { log "SKIP_SEED=1 — no demo data"; return; }
-  local ss; ss="$(mktemp -d)/admin.json"
-  log "seed: minting admin storageState for $PUBLIC_URL"
-  SEED_BASE_URL="$PUBLIC_URL" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-    node "$SELF_DIR/gen-admin-storage.mjs" "$ss"
-  log "seed: showcase sequence [$SEED_PHASES] + dashboard-default"
-  ( cd "$WEB_ADMIN" && PLAYWRIGHT_BASE_URL="$PUBLIC_URL" PW_ADMIN_STORAGE_STATE="$ss" PW_SKIP_WEBSERVER=1 \
-      SHOWCASE_DEFAULT_DASHBOARD_CODE="$SHOWCASE_DEFAULT_DASHBOARD_CODE" \
-      node scripts/run-showcase-seed-sequence.mjs --config=playwright.seed.config.ts \
-        --output-prefix="$(dirname "$ss")/seed" $SEED_PHASES dashboard-default )
-  log "seed: workflow-demo leave balances (best-effort)"
-  ( cd "$WEB_ADMIN" && PLAYWRIGHT_BASE_URL="$PUBLIC_URL" PW_ADMIN_STORAGE_STATE="$ss" \
-      node scripts/seed-workflow-demo.mjs --base-url="$PUBLIC_URL" --storage-state="$ss" ) || \
-      log "seed: workflow-demo leave requests skipped (BPM rule) — non-fatal"
-  rm -rf "$(dirname "$ss")"
-  log "seed: OK"
-}
-
 # --- verify the live URL -----------------------------------------------------
 verify(){
   log "verify: on-host health"
@@ -258,9 +234,12 @@ if [ "$STEP" = "config" ]; then
   verify
   exit 0
 fi
+if [ "$STEP" = "seed" ]; then
+  echo "ERROR: Core no longer seeds product data; use the aura-bpm or aura-crm application runner." >&2
+  exit 2
+fi
 want build     && build
 want ship      && ship
 want up        && up
 want bootstrap && bootstrap
-want seed      && seed
 want verify    && verify

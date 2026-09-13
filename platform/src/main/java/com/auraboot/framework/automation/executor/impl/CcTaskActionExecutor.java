@@ -3,7 +3,8 @@ package com.auraboot.framework.automation.executor.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
-import com.auraboot.framework.bpm.service.CcService;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -27,7 +28,7 @@ public class CcTaskActionExecutor implements ActionExecutor {
 
     private final InboxService inboxService;
     private final UserRoleMapper userRoleMapper;
-    private final CcService ccService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -64,7 +65,13 @@ public class CcTaskActionExecutor implements ActionExecutor {
         List<Long> targetUserIds = resolveUserTargets(target, tenantId);
         if (taskId != null) {
             String dedupKey = bpmDedupKey(automationPid, recordPid, taskId);
-            ccService.ccForUserIds(taskId, targetUserIds, message, "AUTOMATION", dedupKey);
+            workflowCapabilities.execute("task.cc-users", new WorkflowCapability.WorkflowRequest(
+                    tenantId, MetaContext.getCurrentUserId(), Map.of(
+                    "taskId", taskId,
+                    "receiverUserIds", targetUserIds,
+                    "comment", message,
+                    "sourceType", "AUTOMATION",
+                    "dedupKey", dedupKey)));
             return bpmResult(taskId, targetUserIds, modelCode, recordPid);
         }
         return inboxResult(targetUserIds, tenantId, title, message, automationPid, modelCode, recordPid);

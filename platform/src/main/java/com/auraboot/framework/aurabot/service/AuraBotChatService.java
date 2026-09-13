@@ -324,7 +324,7 @@ public class AuraBotChatService {
         }
 
         hint.append("\nRules:\n");
-        hint.append("- Table names use 'mt_' prefix (e.g., model 'crm_lead_common' → table 'mt_crm_lead_common').\n");
+        hint.append("- Table names use 'mt_' prefix (e.g., model 'sales_lead' → table 'mt_sales_lead').\n");
         hint.append("- Each tool may be called at most 5 times per turn; total tool rounds capped by the runtime.\n");
         hint.append("- NEVER call the same tool with identical parameters twice.\n");
         hint.append("- Present results as tables in Chinese.\n");

@@ -1043,7 +1043,7 @@ describe('Unified designer existing-block move guards', () => {
                   blockType: 'tab',
                   blocks: [
                     { id: 'table_main', blockType: 'table' },
-                    { id: 'bpm_panel_from_detail', blockType: 'bpm-panel' },
+                    { id: 'bpm_panel_from_detail', blockType: 'workflow-panel' },
                   ],
                 },
               ],
@@ -1425,7 +1425,7 @@ describe('Recursive PageSchema V3 migration', () => {
           id: 'tabs',
           blockType: 'tabs',
           tabs: [
-            { key: 'workflow', blocks: [{ id: 'workflow_diagram', blockType: 'bpm-panel' }] },
+            { key: 'workflow', blocks: [{ id: 'workflow_diagram', blockType: 'workflow-panel' }] },
             { key: 'activity', blocks: [{ id: 'activity', blockType: 'activity-timeline' }] },
             { key: 'history', blocks: [{ id: 'history', blockType: 'field-history' }] },
           ],
@@ -1617,7 +1617,7 @@ describe('Inspector schema registry', () => {
     const registry = createDefaultInspectorSchemaRegistry();
 
     const aiSchema = registry.getFields('ai-fill-banner');
-    const bpmSchema = registry.getFields('bpm-panel');
+    const bpmSchema = registry.getFields('workflow-panel');
     const timelineSchema = registry.getFields('activity-timeline');
     const historySchema = registry.getFields('field-history');
 

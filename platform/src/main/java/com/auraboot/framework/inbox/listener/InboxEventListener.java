@@ -1,7 +1,7 @@
 package com.auraboot.framework.inbox.listener;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.bpm.event.BpmEvent;
+import com.auraboot.framework.plugin.extension.WorkflowEvent;
 import com.auraboot.framework.inbox.model.InboxItem;
 import com.auraboot.framework.inbox.service.InboxService;
 import com.auraboot.framework.rbac.entity.Role;
@@ -29,10 +29,10 @@ import java.util.stream.Collectors;
  * Listens to system events and creates materialized inbox items.
  *
  * Event sources:
- * - BpmEvent(TASK_ASSIGNED/TASK_CREATED) → APPROVAL inbox item for each assignee
- * - BpmEvent(TASK_COMPLETED/TASK_CANCELED) → Close all inbox items for the task
- * - BpmEvent(TASK_TRANSFERRED) → Close old assignee's item, create new assignee's item
- * - BpmEvent(SLA_WARNING/SLA_ESCALATED) → ALERT inbox item
+ * - WorkflowEvent(TASK_ASSIGNED/TASK_CREATED) → APPROVAL inbox item for each assignee
+ * - WorkflowEvent(TASK_COMPLETED/TASK_CANCELED) → Close all inbox items for the task
+ * - WorkflowEvent(TASK_TRANSFERRED) → Close old assignee's item, create new assignee's item
+ * - WorkflowEvent(SLA_WARNING/SLA_ESCALATED) → ALERT inbox item
  * - CommandCompletedEvent(STATE_TRANSITION) → ASSIGNMENT inbox item for record owner
  *
  * @since 6.3.0
@@ -48,17 +48,17 @@ public class InboxEventListener {
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
 
-    // ───────── BPM Events ─────────
+    // ───────── Workflow Events ─────────
 
     @Async("eventTaskExecutor")
     // fallbackExecution: SmartEngine callbacks may publish outside any Spring
     // transaction; without this the AFTER_COMMIT listener silently drops those
     // events and group-assigned tasks never reach any inbox.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    public void onBpmEvent(BpmEvent event) {
+    public void onWorkflowEvent(WorkflowEvent event) {
         try {
-            String bpmType = event.getBpmEventType();
-            switch (bpmType) {
+            String workflowType = event.getWorkflowEventType();
+            switch (workflowType) {
                 case "task_assigned" -> handleTaskAssigned(event);
                 case "task_created" -> handleTaskAssigned(event); // backward compat
                 case "task_completed" -> handleTaskCompleted(event);
@@ -68,16 +68,16 @@ public class InboxEventListener {
                 case "task_delegated" -> handleTaskDelegated(event);
                 case "task_revoked" -> handleTaskRevoked(event);
                 case "sla_warning", "sla_escalated" -> handleSlaAlert(event);
-                default -> log.debug("Skipping BPM event type {} for inbox", bpmType);
+                default -> log.debug("Skipping workflow event type {} for inbox", workflowType);
             }
         } catch (Exception e) {
-            log.error("Failed to create inbox item for BPM event: type={}, error={}",
-                    event.getBpmEventType(), e.getMessage(), e);
+            log.error("Failed to create inbox item for workflow event: type={}, error={}",
+                    event.getWorkflowEventType(), e.getMessage(), e);
         }
     }
 
     @SuppressWarnings("unchecked")
-    private void handleTaskAssigned(BpmEvent event) {
+    private void handleTaskAssigned(WorkflowEvent event) {
         Long tenantId = event.getTenantId();
         MetaContext.setContext(tenantId, null, null, null);
         try {
@@ -118,7 +118,7 @@ public class InboxEventListener {
         }
     }
 
-    private void createApprovalInboxItem(BpmEvent event, Long assigneeUserId, Long tenantId) {
+    private void createApprovalInboxItem(WorkflowEvent event, Long assigneeUserId, Long tenantId) {
         String taskName = getPayloadString(event.getPayload(), "taskName");
         String processKey = event.getProcessKey();
 
@@ -153,12 +153,12 @@ public class InboxEventListener {
         item.setTitle(readableTitle);
         item.setSubtitle(subtitle);
         item.setPriority(resolvePriority(event.getPayload()));
-        item.setSourceType("bpm");
+        item.setSourceType("workflow");
         item.setSourceId(getPayloadString(event.getPayload(), "taskInstanceId"));
-        item.setDeepLink("auraboot://bpm/task/" + item.getSourceId());
+        item.setDeepLink(getPayloadString(event.getPayload(), "deepLink"));
         item.setCardPayload(toJson(card));
         // New format: clientItemId includes userId to support per-assignee close
-        item.setClientItemId("bpm_task_" + item.getSourceId() + "_" + assigneeUserId);
+        item.setClientItemId("workflow_task_" + item.getSourceId() + "_" + assigneeUserId);
 
         if (businessKey != null && businessKey.contains(":")) {
             String[] parts = businessKey.split(":", 2);
@@ -170,24 +170,24 @@ public class InboxEventListener {
         log.debug("APPROVAL inbox item created for userId={}, task={}", assigneeUserId, taskName);
     }
 
-    private void handleTaskCompleted(BpmEvent event) {
+    private void handleTaskCompleted(WorkflowEvent event) {
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         if (taskInstanceId == null) return;
 
         // Close all inbox items for this task (prefix match covers old and new clientItemId formats)
-        inboxService.closeByClientItemIdPrefix("bpm_task_" + taskInstanceId);
+        inboxService.closeByClientItemIdPrefix("workflow_task_" + taskInstanceId);
         log.debug("Inbox items closed for completed task: {}", taskInstanceId);
     }
 
-    private void handleTaskCanceled(BpmEvent event) {
+    private void handleTaskCanceled(WorkflowEvent event) {
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         if (taskInstanceId == null) return;
 
-        inboxService.closeByClientItemIdPrefix("bpm_task_" + taskInstanceId);
+        inboxService.closeByClientItemIdPrefix("workflow_task_" + taskInstanceId);
         log.debug("Inbox items closed for canceled task: {}", taskInstanceId);
     }
 
-    private void handleTaskTransferred(BpmEvent event) {
+    private void handleTaskTransferred(WorkflowEvent event) {
         Long tenantId = event.getTenantId();
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         String fromUserId = getPayloadString(event.getPayload(), "fromUserId");
@@ -198,7 +198,7 @@ public class InboxEventListener {
         if (fromUserId != null) {
             Long fromId = resolveUserIdFromString(fromUserId, tenantId);
             if (fromId != null) {
-                inboxService.closeByClientItemId("bpm_task_" + taskInstanceId + "_" + fromId);
+                inboxService.closeByClientItemId("workflow_task_" + taskInstanceId + "_" + fromId);
             }
         }
 
@@ -223,7 +223,7 @@ public class InboxEventListener {
      *
      * Payload: {taskInstanceId, claimUserId, taskName, activityId}
      */
-    private void handleTaskClaimed(BpmEvent event) {
+    private void handleTaskClaimed(WorkflowEvent event) {
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         String claimUserId = getPayloadString(event.getPayload(), "claimUserId");
         if (taskInstanceId == null || claimUserId == null) return;
@@ -236,8 +236,8 @@ public class InboxEventListener {
         }
 
         // Close all other candidates' inbox items, keep claimer's
-        String prefix = "bpm_task_" + taskInstanceId + "_";
-        String claimerClientItemId = "bpm_task_" + taskInstanceId + "_" + claimerId;
+        String prefix = "workflow_task_" + taskInstanceId + "_";
+        String claimerClientItemId = "workflow_task_" + taskInstanceId + "_" + claimerId;
         inboxService.closeByClientItemIdPrefixExcluding(prefix, claimerClientItemId, "claimed_by_other");
 
         // A4: guarantee the claimer sees the task. Group-assigned tasks may have no
@@ -259,7 +259,7 @@ public class InboxEventListener {
      *
      * Payload: {taskInstanceId, newAssigneeId, reason, taskName, activityId}
      */
-    private void handleTaskDelegated(BpmEvent event) {
+    private void handleTaskDelegated(WorkflowEvent event) {
         Long tenantId = event.getTenantId();
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         String newAssigneeId = getPayloadString(event.getPayload(), "newAssigneeId");
@@ -287,7 +287,7 @@ public class InboxEventListener {
      *
      * Payload: {taskInstanceId, removedAssigneeId, reason, taskName, activityId}
      */
-    private void handleTaskRevoked(BpmEvent event) {
+    private void handleTaskRevoked(WorkflowEvent event) {
         Long tenantId = event.getTenantId();
         String taskInstanceId = getPayloadString(event.getPayload(), "taskInstanceId");
         String removedAssigneeId = getPayloadString(event.getPayload(), "removedAssigneeId");
@@ -299,13 +299,13 @@ public class InboxEventListener {
             return;
         }
 
-        String clientItemId = "bpm_task_" + taskInstanceId + "_" + removedUserId;
+        String clientItemId = "workflow_task_" + taskInstanceId + "_" + removedUserId;
         inboxService.closeByClientItemIdWithReason(clientItemId, "sign_revoked");
 
         log.debug("Inbox item closed for task_revoked: task={}, removedUser={}", taskInstanceId, removedUserId);
     }
 
-    private void handleSlaAlert(BpmEvent event) {
+    private void handleSlaAlert(WorkflowEvent event) {
         Long tenantId = event.getTenantId();
         MetaContext.setContext(tenantId, null, null, null);
         try {
@@ -313,7 +313,7 @@ public class InboxEventListener {
             if (assigneeUserId == null) return;
             MetaContext.setContext(tenantId, assigneeUserId, null, null);
 
-            boolean isEscalated = "sla_escalated".equals(event.getBpmEventType());
+            boolean isEscalated = "sla_escalated".equals(event.getWorkflowEventType());
 
             Map<String, Object> card = new LinkedHashMap<>();
             card.put("cardType", isEscalated ? "sla_escalated" : "sla_warning");
@@ -327,10 +327,10 @@ public class InboxEventListener {
             item.setTitle(isEscalated ? "SLA Escalated" : "SLA Warning");
             item.setSubtitle("Process: " + event.getProcessKey());
             item.setPriority(isEscalated ? "urgent" : "high");
-            item.setSourceType("bpm");
+            item.setSourceType("workflow");
             item.setSourceId(event.getInstanceId());
             item.setCardPayload(toJson(card));
-            item.setClientItemId("bpm_sla_" + event.getInstanceId() + "_" + event.getBpmEventType().toLowerCase());
+            item.setClientItemId("workflow_sla_" + event.getInstanceId() + "_" + event.getWorkflowEventType().toLowerCase());
 
             inboxService.createItem(item);
         } finally {
@@ -507,7 +507,7 @@ public class InboxEventListener {
 
     // ───────── Helpers ─────────
 
-    private Long resolveAssignee(BpmEvent event) {
+    private Long resolveAssignee(WorkflowEvent event) {
         if (event.getPayload() == null) return null;
         Object assignee = event.getPayload().get("assigneeUserId");
         if (assignee != null) {

@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.extension;
 
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * Host-provided file byte bridge for plugin command handlers.
@@ -87,6 +88,16 @@ public interface FileAccessor {
             String fieldName
     ) {
         throw new UnsupportedOperationException("generated file relation capability is unavailable");
+    }
+
+    /** List tenant-visible files linked to one business object field. */
+    default List<FileMetadata> listLinked(String entityType, String entityId, String fieldName) {
+        throw new UnsupportedOperationException("linked file listing capability is unavailable");
+    }
+
+    /** Delete a tenant-visible file by public pid. */
+    default boolean delete(String fileId, String actorUserId) {
+        throw new UnsupportedOperationException("file deletion capability is unavailable");
     }
 
     /** Saved platform file metadata returned to plugin handlers. */

@@ -12,4 +12,11 @@ class WhiteListTest {
                 .contains("/api/qr/label-ai/billing/webhooks/stripe")
                 .doesNotContain("/api/qr/label-ai/billing/webhooks/**");
     }
+
+    @Test
+    void delegatesProductPublicRoutesToThePluginExtensionNamespace() {
+        assertThat(WhiteList.whiteList)
+                .contains("/api/ext/*/public/**")
+                .noneMatch(path -> path.startsWith("/api/crm/"));
+    }
 }

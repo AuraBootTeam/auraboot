@@ -81,12 +81,12 @@ public class BootstrapRepairService {
     public static final List<String> ORDERED_STEPS = List.of(
             STEP_SYSTEM_CONFIG,
             STEP_SYSTEM_TENANT,
-            STEP_PLATFORM_ADMIN_ROLE,
             STEP_ADMIN_USER,
-            STEP_ADMIN_MEMBERSHIP,
-            STEP_ADMIN_ROLE_GRANT,
             STEP_BUSINESS_TENANT,
+            STEP_ADMIN_MEMBERSHIP,
             STEP_BUSINESS_TENANT_BOOTSTRAP,
+            STEP_PLATFORM_ADMIN_ROLE,
+            STEP_ADMIN_ROLE_GRANT,
             STEP_BUILTIN_PLUGINS,
             STEP_JWT_SECRET);
 

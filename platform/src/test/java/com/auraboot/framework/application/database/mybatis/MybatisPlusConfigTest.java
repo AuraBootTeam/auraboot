@@ -255,8 +255,8 @@ public class MybatisPlusConfigTest {
     }
 
     @Test
-    @DisplayName("验证se_前缀表被正确忽略")
-    public void testSeTablesIgnored() {
+    @DisplayName("验证产品外部表前缀默认不被平台忽略")
+    public void testProductTablePrefixesAreNotIgnoredByDefault() {
         // Given
         String[] seTables = {
                 "se_config",
@@ -277,12 +277,30 @@ public class MybatisPlusConfigTest {
 
             // Then
             for (String tableName : seTables) {
-                assertTrue(handler.ignoreTable(tableName),
-                        "se_前缀表 '" + tableName + "' 应该被忽略");
+                assertFalse(handler.ignoreTable(tableName),
+                        "产品表前缀 '" + tableName + "' 不应成为 Core 默认策略");
             }
         } catch (Exception e) {
-            fail("Failed to test se_ tables: " + e.getMessage());
+            fail("Failed to test product-owned table prefixes: " + e.getMessage());
         }
+    }
+
+    @Test
+    @DisplayName("验证应用可通过显式属性注册外部表前缀")
+    public void testConfiguredExternalTablePrefixIsIgnored() throws Exception {
+        var prefixes = MybatisPlusConfig.class.getDeclaredField("tenantBypassTablePrefixes");
+        prefixes.setAccessible(true);
+        prefixes.set(config, "ext_, vendor_");
+
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        TenantLineInnerInterceptor tenantInterceptor = findTenantInterceptor(interceptor);
+        var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
+        field.setAccessible(true);
+        TenantLineHandler handler = (TenantLineHandler) field.get(tenantInterceptor);
+
+        assertTrue(handler.ignoreTable("ext_runtime"));
+        assertTrue(handler.ignoreTable("vendor_state"));
+        assertFalse(handler.ignoreTable("se_config"));
     }
 
     @Test

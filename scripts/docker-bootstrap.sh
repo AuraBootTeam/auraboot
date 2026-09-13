@@ -30,16 +30,13 @@ CONTAINER_PLUGINS_PATH="/app/plugins"
 # Plugins are imported in dependency order: base first, then dependent.
 PLUGINS_TO_IMPORT=(
   core-meta
-  core-bpm
   platform-admin
   core-decisionops
   core-aurabot
   page-manager
   org-management
-  crm
   showcase
   agent-control-plane
-  workflow-demo
 )
 
 if [[ "${IMPORT_TEST_FIXTURES}" == "true" ]]; then

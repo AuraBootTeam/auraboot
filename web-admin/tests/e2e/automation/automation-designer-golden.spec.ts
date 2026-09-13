@@ -1310,7 +1310,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     });
   });
 
-  test('N-TRIGGER-BPM-EVENT: drag trigger-bpm-event→action-create-record, pick a BPM process and event type, start BPM → automation runs from task_assigned @golden', async ({
+  test('N-TRIGGER-BPM-EVENT: drag trigger-workflow-event→action-create-record, pick a BPM process and event type, start BPM → automation runs from task_assigned @golden', async ({
     page,
   }) => {
     const tag = uniqueId();
@@ -1320,7 +1320,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await openNewDesigner(page);
     await setAutomationName(page, `N-TRIGGER-BPM-EVENT ${tag}`);
 
-    const trigger = await dragNodeToCanvas(page, 'trigger-bpm-event', { x: 150, y: 80 });
+    const trigger = await dragNodeToCanvas(page, 'trigger-workflow-event', { x: 150, y: 80 });
     const action = await dragNodeToCanvas(page, 'action-create-record', { x: 150, y: 240 });
     await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
     await connectEdge(page, trigger, action);

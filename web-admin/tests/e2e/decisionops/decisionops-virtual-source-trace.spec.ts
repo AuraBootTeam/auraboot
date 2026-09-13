@@ -1,7 +1,7 @@
 import { test, expect, type APIResponse, type Page } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { PG_ENV, PSQL_BASE } from '../../helpers/environments';
 import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
 

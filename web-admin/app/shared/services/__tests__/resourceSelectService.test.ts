@@ -21,7 +21,6 @@ vi.mock('~/shared/services/http-client', () => ({
 import {
   fetchPageOptions,
   fetchDashboardOptions,
-  fetchProcessOptions,
   fetchAutomationOptions,
   fetchCommandOptions,
   fetchModelOptions,
@@ -43,35 +42,6 @@ describe('resourceSelectService — error propagation', () => {
   it('fetchDashboardOptions: rejects on network error, does NOT return []', async () => {
     fetchResultMock.mockRejectedValue(new Error('Network error'));
     await expect(fetchDashboardOptions()).rejects.toThrow('Network error');
-  });
-
-  it('fetchProcessOptions: rejects on network error, does NOT return []', async () => {
-    fetchResultMock.mockRejectedValue(new Error('Network error'));
-    await expect(fetchProcessOptions()).rejects.toThrow('Network error');
-  });
-
-  it('fetchProcessOptions: maps current BPM processDefinition DTO fields', async () => {
-    fetchResultMock.mockResolvedValue({
-      data: [
-        {
-          processKey: 'e2et_payment_approval',
-          processName: '付款审批流程',
-          version: 1,
-          status: 'deployed',
-        },
-      ],
-    });
-
-    const result = await fetchProcessOptions();
-
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/bpm/process-definitions/deployed');
-    expect(result).toEqual([
-      {
-        label: '付款审批流程 (e2et_payment_approval)',
-        value: 'e2et_payment_approval',
-        description: 'v1',
-      },
-    ]);
   });
 
   it('fetchAutomationOptions: rejects on network error, does NOT return []', async () => {

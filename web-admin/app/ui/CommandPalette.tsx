@@ -952,11 +952,6 @@ function extractDisplayText(record: any): string {
     'code',
     'display_name',
     'subject',
-    // CRM patterns
-    'crm_acc_name',
-    'crm_lead_company',
-    'crm_opp_name',
-    'crm_qt_name',
     // PM patterns
     'pm_prj_name',
     'pm_task_title',

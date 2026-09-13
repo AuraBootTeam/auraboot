@@ -151,7 +151,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             cleanupMetaContext(previousContext);
         }
     }
-    
+
     @Override
     public TenantBootstrapTemplate loadTemplate(String templateName) {
         try {

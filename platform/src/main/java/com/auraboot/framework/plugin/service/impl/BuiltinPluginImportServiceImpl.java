@@ -28,8 +28,8 @@ import java.util.List;
  * via {@code gradlew bootRun}) or configured via {@code aura.builtin-plugins.dir}.
  *
  * <p>Phase 3 uses a 2-profile split (see {@link BuiltinPluginImportService}
- * javadoc): {@link Profile#CORE} (always imported, 6 plugins) vs
- * {@link Profile#DEMO} (opt-in, 4 plugins). The
+ * javadoc): {@link Profile#CORE} (always imported) vs
+ * {@link Profile#DEMO} (opt-in platform showcases). The
  * {@code includeDemoPlugins} flag is used only by explicit repair/admin flows.
  * The first-install {@code /api/bootstrap/setup} path is intentionally minimal;
  * reset/init scripts import plugin profiles through {@code scripts/import-plugins.sh}.
@@ -62,20 +62,17 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
     private static final List<BuiltinPlugin> BUILTIN_PLUGINS = List.of(
             // ── Core profile (always imported) ──────────────────────────
             // Order matters: dependencies first. platform-admin's menus
-            // reference parents/permissions defined in core-meta and core-bpm,
-            // so those must import before platform-admin or validation fails
+            // reference parents/permissions defined in core-meta, so it must
+            // import before platform-admin or validation fails
             // ("Menu X references missing parent Y / missing permission Z").
             new BuiltinPlugin("core-meta",             "com.auraboot.core-meta",           Profile.CORE),
-            new BuiltinPlugin("core-bpm",              "com.auraboot.core-bpm",            Profile.CORE),
             new BuiltinPlugin("core-aurabot",          "com.auraboot.core-aurabot",        Profile.CORE),
             new BuiltinPlugin("page-manager",          "com.auraboot.page-manager",        Profile.CORE),
             new BuiltinPlugin("org-management",        "com.auraboot.org-management",      Profile.CORE),
             new BuiltinPlugin("platform-admin",        "com.auraboot.platform-admin",      Profile.CORE),
             // ── Demo profile (only when includeDemoPlugins=true) ────────
-            new BuiltinPlugin("crm",                   "com.auraboot.crm",                 Profile.DEMO),
             new BuiltinPlugin("showcase",              "com.auraboot.showcase",            Profile.DEMO),
-            new BuiltinPlugin("agent-control-plane",   "com.auraboot.agent-control-plane", Profile.DEMO),
-            new BuiltinPlugin("workflow-demo",         "com.auraboot.workflow-demo",       Profile.DEMO)
+            new BuiltinPlugin("agent-control-plane",   "com.auraboot.agent-control-plane", Profile.DEMO)
     );
 
     @Override

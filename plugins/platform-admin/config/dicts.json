@@ -1,101 +1,5 @@
 [
   {
-    "code": "sla_target_type",
-    "name": "SLA Target Type",
-    "name:zh-CN": "SLA 目标类型",
-    "dictType": "static",
-    "items": [
-      {
-        "value": "process",
-        "label": "Process",
-        "label:zh-CN": "流程",
-        "sortNo": 10,
-        "status": "enabled",
-        "extension": {
-          "color": "blue"
-        }
-      },
-      {
-        "value": "node",
-        "label": "Node",
-        "label:zh-CN": "节点",
-        "sortNo": 20,
-        "status": "enabled",
-        "extension": {
-          "color": "blue"
-        }
-      },
-      {
-        "value": "task",
-        "label": "Task",
-        "label:zh-CN": "任务",
-        "sortNo": 30,
-        "status": "enabled",
-        "extension": {
-          "color": "blue"
-        }
-      }
-    ]
-  },
-  {
-    "code": "sla_deadline_mode",
-    "name": "SLA Deadline Mode",
-    "name:zh-CN": "SLA 截止模式",
-    "dictType": "static",
-    "items": [
-      {
-        "value": "fixed",
-        "label": "Fixed Duration",
-        "label:zh-CN": "固定时长",
-        "sortNo": 10,
-        "status": "enabled"
-      },
-      {
-        "value": "expression",
-        "label": "Expression",
-        "label:zh-CN": "表达式",
-        "sortNo": 20,
-        "status": "enabled"
-      },
-      {
-        "value": "field",
-        "label": "Field Reference",
-        "label:zh-CN": "字段引用",
-        "sortNo": 30,
-        "status": "enabled"
-      }
-    ]
-  },
-  {
-    "code": "sla_suspend_policy",
-    "name": "SLA Suspend Policy",
-    "name:zh-CN": "SLA 暂停策略",
-    "dictType": "static",
-    "items": [
-      {
-        "value": "pause",
-        "label": "Pause Timer",
-        "label:zh-CN": "暂停计时",
-        "sortNo": 10,
-        "status": "enabled"
-      },
-      {
-        "value": "continue",
-        "label": "Continue Timer",
-        "label:zh-CN": "继续计时",
-        "sortNo": 20,
-        "status": "enabled"
-      },
-      {
-        "value": "cancel",
-        "label": "Cancel SLA",
-        "label:zh-CN": "取消SLA",
-        "sortNo": 30,
-        "status": "enabled"
-      }
-    ]
-  },
-  {
     "code": "dp_policy_type",
     "name": "Data Permission Policy Type",
     "name:zh-CN": "数据权限策略类型",
@@ -274,16 +178,6 @@
         "extension": {
           "color": "blue"
         }
-      },
-      {
-        "value": "bpm_completed",
-        "label": "BPM Completed",
-        "label:zh-CN": "流程完成",
-        "sortNo": 50,
-        "status": "enabled",
-        "extension": {
-          "color": "blue"
-        }
       }
     ]
   },
@@ -442,58 +336,6 @@
         "label:zh-CN": "已离职",
         "sortNo": 50,
         "color": "#8c8c8c",
-        "status": "enabled",
-        "extension": {
-          "color": "gray"
-        }
-      }
-    ]
-  },
-  {
-    "code": "bpm_process_status",
-    "name": "BPM Process Status",
-    "name:zh-CN": "BPM 流程状态",
-    "dictType": "static",
-    "items": [
-      {
-        "value": "draft",
-        "label": "Draft",
-        "label:zh-CN": "草稿",
-        "sortNo": 10,
-        "color": "#8c8c8c",
-        "status": "enabled",
-        "extension": {
-          "color": "gray"
-        }
-      },
-      {
-        "value": "deployed",
-        "label": "Deployed",
-        "label:zh-CN": "已部署",
-        "sortNo": 20,
-        "color": "#52c41a",
-        "status": "enabled",
-        "extension": {
-          "color": "green"
-        }
-      },
-      {
-        "value": "suspended",
-        "label": "Suspended",
-        "label:zh-CN": "已暂停",
-        "sortNo": 30,
-        "color": "#faad14",
-        "status": "enabled",
-        "extension": {
-          "color": "amber"
-        }
-      },
-      {
-        "value": "archived",
-        "label": "Archived",
-        "label:zh-CN": "已归档",
-        "sortNo": 40,
-        "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
           "color": "gray"

@@ -7,8 +7,9 @@
  */
 
 import { fetchResult } from '~/shared/services/http-client';
+import { getKernel } from '~/framework/bootstrap';
 
-interface ResourceOption {
+export interface ResourceOption {
   label: string;
   value: string;
   description?: string;
@@ -31,14 +32,6 @@ interface DashboardRecord {
     pid: string;
     status: string;
   }>;
-}
-
-interface ProcessDefinitionRecord {
-  name?: string;
-  key?: string;
-  processName?: string;
-  processKey?: string;
-  version: number;
 }
 
 interface AutomationRecord {
@@ -100,23 +93,14 @@ export async function fetchDashboardOptions(): Promise<ResourceOption[]> {
   }));
 }
 
-export async function fetchProcessOptions(): Promise<ResourceOption[]> {
-  const result = await fetchResult<{ records?: ProcessDefinitionRecord[] } | ProcessDefinitionRecord[]>(
-    '/api/bpm/process-definitions/deployed',
-  );
-  const records = Array.isArray(result?.data) ? result.data : result?.data?.records || [];
-  const options: ResourceOption[] = [];
-  for (const p of records) {
-    const key = p.key || p.processKey;
-    const name = p.name || p.processName || key;
-    if (!key) continue;
-    options.push({
-      label: `${name} (${key})`,
-      value: key,
-      description: `v${p.version}`,
-    });
-  }
-  return options;
+export async function fetchWorkflowOptions(): Promise<ResourceOption[]> {
+  const provider = getKernel().contributionRegistry.getPrimaryService(
+    'aura.resource.workflow',
+  )?.provider as
+    | { fetchOptions?: () => Promise<ResourceOption[]> }
+    | undefined;
+  if (!provider?.fetchOptions) return [];
+  return provider.fetchOptions();
 }
 
 export async function fetchAutomationOptions(): Promise<ResourceOption[]> {

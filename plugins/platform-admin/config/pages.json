@@ -1,662 +1,5 @@
 [
   {
-    "pageKey": "sla_config_list",
-    "name:zh-CN": "SLA 配置",
-    "name:en": "SLA Configuration",
-    "modelCode": "sla_config",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "variant": "primary",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "Create"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "sla_config_form",
-              "command": "admin:create_sla_config"
-            }
-          }
-        ]
-      },
-      {
-        "id": "table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "name",
-            "width": 200,
-            "sortable": true
-          },
-          {
-            "field": "target_type",
-            "width": 120,
-            "renderType": "tag",
-            "dictCode": "sla_target_type"
-          },
-          {
-            "field": "target_key",
-            "width": 150
-          },
-          {
-            "field": "deadline_mode",
-            "width": 120,
-            "renderType": "tag",
-            "dictCode": "sla_deadline_mode"
-          },
-          {
-            "field": "deadline_value",
-            "width": 150
-          },
-          {
-            "field": "suspend_policy",
-            "width": 120,
-            "dictCode": "sla_suspend_policy"
-          },
-          {
-            "field": "enabled",
-            "width": 80
-          },
-          {
-            "field": "created_at",
-            "width": 160,
-            "format": "YYYY-MM-DD HH:mm"
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "detail",
-            "label": {
-              "zh-CN": "详情",
-              "en-US": "Detail"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "sla_config_detail"
-            }
-          },
-          {
-            "code": "edit",
-            "label": {
-              "zh-CN": "编辑",
-              "en-US": "Edit"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "sla_config_form",
-              "command": "admin:update_sla_config"
-            }
-          },
-          {
-            "code": "delete",
-            "variant": "danger",
-            "label": {
-              "zh-CN": "删除",
-              "en-US": "Delete"
-            },
-            "confirm": "delete.confirm",
-            "action": {
-              "type": "command",
-              "command": "admin:delete_sla_config"
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        }
-      }
-    ]
-  },
-  {
-    "pageKey": "sla_config_form",
-    "name:zh-CN": "SLA 配置表单",
-    "name:en": "SLA Configuration Form",
-    "modelCode": "sla_config",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
-        },
-        "fields": [
-          {
-            "field": "name",
-            "colSpan": 6,
-            "required": true
-          },
-          {
-            "field": "enabled",
-            "colSpan": 6
-          },
-          {
-            "field": "target_type",
-            "colSpan": 4,
-            "required": true
-          },
-          {
-            "field": "target_key",
-            "colSpan": 4
-          },
-          {
-            "field": "domain_code",
-            "colSpan": 4
-          },
-          {
-            "field": "deadline_mode",
-            "colSpan": 4,
-            "required": true
-          },
-          {
-            "field": "deadline_value",
-            "colSpan": 4
-          },
-          {
-            "field": "suspend_policy",
-            "colSpan": 4
-          },
-          {
-            "field": "business_calendar",
-            "colSpan": 4
-          },
-          {
-            "field": "model_code",
-            "colSpan": 4
-          },
-          {
-            "field": "deadline_field",
-            "colSpan": 4
-          },
-          {
-            "field": "priority_field",
-            "colSpan": 4
-          }
-        ]
-      },
-      {
-        "id": "sla_rule_binding",
-        "blockType": "custom",
-        "component": "DecisionRuleBindingBlock",
-        "props": {
-          "mode": "decision",
-          "valueField": "rule_binding",
-          "fieldCatalogMode": "merge",
-          "fieldCatalogModelCodeField": "model_code",
-          "consumerType": "SLA",
-          "consumerCodeField": "pid",
-          "showImpactPreview": true,
-          "showTestRunner": true,
-          "initialDecisionCode": "complaint_sla_deadline",
-          "initialContextJson": "{\n  \"record\": {\n    \"data\": {\n      \"targetType\": \"NODE\",\n      \"targetKey\": \"approve_task\",\n      \"priority\": \"HIGH\"\n    }\n  }\n}",
-          "fields": [
-            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum", "options": ["PROCESS", "NODE", "TASK"] },
-            { "scope": "record", "path": "data.targetKey", "label": "目标键", "dataType": "string" },
-            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
-            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
-            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
-          ],
-          "decisions": [
-            {
-              "code": "complaint_sla_deadline",
-              "name": "投诉 SLA 截止时间",
-              "outputs": [
-                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
-                { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
-              ]
-            },
-            {
-              "code": "sla_deadline",
-              "name": "SLA 截止时间",
-              "outputs": [
-                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
-              ]
-            },
-            {
-              "code": "approval_routing",
-              "name": "审批路由",
-              "outputs": [
-                { "id": "candidateGroups", "label": "候选组", "dataType": "collection" },
-                { "id": "assigneeUserId", "label": "审批人", "dataType": "string" }
-              ]
-            }
-          ]
-        }
-      },
-      {
-        "id": "sla_action_policy",
-        "blockType": "custom",
-        "component": "DecisionActionPlanBlock",
-        "props": {
-          "valueField": "action_policy",
-          "title": "超时后动作",
-          "triggerLabel": "SLA 超时",
-          "defaultTrigger": "SLA_TIMEOUT",
-          "consumerType": "SLA",
-          "logsUrl": "/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}",
-          "fieldCatalogModelCodeField": "model_code",
-          "fields": [
-            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum" },
-            { "scope": "record", "path": "data.targetKey", "label": "SLA 节点", "dataType": "string" },
-            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
-            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
-            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum" },
-            { "scope": "sla", "path": "recordPid", "label": "SLA 记录", "dataType": "string" },
-            { "scope": "sla", "path": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-            { "scope": "sla", "path": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
-          ],
-          "decisionOutputs": ["deadlineMinutes", "warningBeforeMinutes", "escalationLevel"],
-          "decisionOutputSchema": {
-            "outputs": [
-              { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-              { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
-              { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
-            ]
-          }
-        }
-      },
-      {
-        "id": "buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "submit",
-            "primary": true,
-            "label": {
-              "zh-CN": "保存",
-              "en-US": "Save"
-            },
-            "action": {
-              "type": "command",
-              "command": "admin:update_sla_config"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en-US": "Cancel"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "pageKey": "sla_config_detail",
-    "name:zh-CN": "SLA 配置详情",
-    "name:en": "SLA Configuration Detail",
-    "modelCode": "sla_config",
-    "kind": "detail",
-    "schemaVersion": 4,
-    "extension": {
-      "dataSource": {
-        "type": "api",
-        "endpoint": "/api/bpm/sla-configs/{pid}",
-        "method": "get"
-      },
-      "showShare": false,
-      "showReport": false,
-      "showPrint": false
-    },
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "actions",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "edit",
-            "primary": true,
-            "label": {
-              "zh-CN": "编辑配置",
-              "en-US": "Edit Configuration"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "sla_config_form",
-              "command": "admin:update_sla_config"
-            }
-          }
-        ]
-      },
-      {
-        "id": "basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
-        },
-        "readOnly": true,
-        "fields": [
-          {
-            "field": "name",
-            "colSpan": 6
-          },
-          {
-            "field": "enabled",
-            "colSpan": 6
-          },
-          {
-            "field": "target_type",
-            "colSpan": 4
-          },
-          {
-            "field": "target_key",
-            "colSpan": 4
-          },
-          {
-            "field": "domain_code",
-            "colSpan": 4
-          },
-          {
-            "field": "model_code",
-            "colSpan": 4
-          }
-        ]
-      },
-      {
-        "id": "timer_policy",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "计时策略",
-          "en-US": "Timer Policy"
-        },
-        "readOnly": true,
-        "fields": [
-          {
-            "field": "deadline_mode",
-            "colSpan": 4
-          },
-          {
-            "field": "deadline_value",
-            "colSpan": 4
-          },
-          {
-            "field": "suspend_policy",
-            "colSpan": 4
-          },
-          {
-            "field": "business_calendar",
-            "colSpan": 4
-          },
-          {
-            "field": "deadline_field",
-            "colSpan": 4
-          },
-          {
-            "field": "priority_field",
-            "colSpan": 4
-          }
-        ]
-      },
-      {
-        "id": "sla_rule_binding",
-        "blockType": "custom",
-        "component": "DecisionRuleBindingBlock",
-        "props": {
-          "mode": "decision",
-          "valueField": "rule_binding",
-          "fieldCatalogMode": "merge",
-          "fieldCatalogModelCodeField": "model_code",
-          "consumerType": "SLA",
-          "consumerCodeField": "pid",
-          "readOnly": true,
-          "variant": "summary",
-          "showImpactPreview": true,
-          "showTestRunner": false,
-          "initialDecisionCode": "complaint_sla_deadline",
-          "initialContextJson": "{\n  \"record\": {\n    \"data\": {\n      \"targetType\": \"NODE\",\n      \"targetKey\": \"approve_task\",\n      \"priority\": \"HIGH\"\n    }\n  }\n}",
-          "fields": [
-            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum", "options": ["PROCESS", "NODE", "TASK"] },
-            { "scope": "record", "path": "data.targetKey", "label": "目标键", "dataType": "string" },
-            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
-            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
-            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
-          ],
-          "decisions": [
-            {
-              "code": "complaint_sla_deadline",
-              "name": "投诉 SLA 截止时间",
-              "outputs": [
-                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
-                { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
-              ]
-            },
-            {
-              "code": "sla_deadline",
-              "name": "SLA 截止时间",
-              "outputs": [
-                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
-                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
-              ]
-            },
-            {
-              "code": "approval_routing",
-              "name": "审批路由",
-              "outputs": [
-                { "id": "candidateGroups", "label": "候选组", "dataType": "collection" },
-                { "id": "assigneeUserId", "label": "审批人", "dataType": "string" }
-              ]
-            }
-          ]
-        }
-      },
-      {
-        "id": "sla_action_policy",
-        "blockType": "custom",
-        "component": "DecisionActionPlanBlock",
-        "props": {
-          "valueField": "action_policy",
-          "title": "超时后动作",
-          "triggerLabel": "SLA 超时",
-          "defaultTrigger": "SLA_TIMEOUT",
-          "consumerType": "SLA",
-          "readOnly": true,
-          "logsUrl": "/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}"
-        }
-      }
-    ]
-  },
-  {
-    "pageKey": "bpm_domain_config_list",
-    "name:zh-CN": "BPM 域配置",
-    "name:en": "BPM Domain Configuration",
-    "modelCode": "bpm_domain_config",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "variant": "primary",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "Create"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "bpm_domain_config_form",
-              "command": "admin:create_bpm_domain_config"
-            }
-          }
-        ]
-      },
-      {
-        "id": "table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "domain_code",
-            "width": 150,
-            "sortable": true
-          },
-          {
-            "field": "domain_name",
-            "width": 200,
-            "sortable": true
-          },
-          {
-            "field": "model_code",
-            "width": 150
-          },
-          {
-            "field": "enabled",
-            "width": 80
-          },
-          {
-            "field": "created_at",
-            "width": 160,
-            "format": "YYYY-MM-DD HH:mm"
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "edit",
-            "label": {
-              "zh-CN": "编辑",
-              "en-US": "Edit"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "bpm_domain_config_form",
-              "command": "admin:update_bpm_domain_config"
-            }
-          },
-          {
-            "code": "delete",
-            "variant": "danger",
-            "label": {
-              "zh-CN": "删除",
-              "en-US": "Delete"
-            },
-            "confirm": "delete.confirm",
-            "action": {
-              "type": "command",
-              "command": "admin:delete_bpm_domain_config"
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        }
-      }
-    ]
-  },
-  {
-    "pageKey": "bpm_domain_config_form",
-    "name:zh-CN": "BPM 域配置表单",
-    "name:en": "BPM Domain Configuration Form",
-    "modelCode": "bpm_domain_config",
-    "kind": "form",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "grid",
-      "cols": 12
-    },
-    "blocks": [
-      {
-        "id": "basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
-        },
-        "fields": [
-          {
-            "field": "domain_code",
-            "colSpan": 6,
-            "required": true
-          },
-          {
-            "field": "domain_name",
-            "colSpan": 6,
-            "required": true
-          },
-          {
-            "field": "model_code",
-            "colSpan": 6
-          },
-          {
-            "field": "enabled",
-            "colSpan": 6
-          },
-          {
-            "field": "process_keys",
-            "colSpan": 12
-          },
-          {
-            "field": "list_fields",
-            "colSpan": 12
-          },
-          {
-            "field": "filter_fields",
-            "colSpan": 12
-          },
-          {
-            "field": "sort_fields",
-            "colSpan": 12
-          }
-        ]
-      },
-      {
-        "id": "buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "submit",
-            "primary": true,
-            "label": {
-              "zh-CN": "保存",
-              "en-US": "Save"
-            },
-            "action": {
-              "type": "command",
-              "command": "admin:update_bpm_domain_config"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en-US": "Cancel"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
     "pageKey": "data_permission_list",
     "name:zh-CN": "数据权限策略",
     "name:en": "Data Permission Policies",
@@ -1401,374 +744,6 @@
     ]
   },
   {
-    "pageKey": "bpm_process_management_list",
-    "modelCode": "bpm_process_management",
-    "name:zh-CN": "BPM 流程定义",
-    "name:en": "BPM Process Management",
-    "kind": "list",
-    "schemaVersion": 4,
-    "layout": {
-      "type": "stack"
-    },
-    "blocks": [
-      {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "create",
-            "label": {
-              "zh-CN": "新建",
-              "en-US": "Create"
-            },
-            "variant": "primary",
-            "action": {
-              "type": "navigate",
-              "to": "/bpmn-designer"
-            }
-          }
-        ]
-      },
-      {
-        "id": "tabs",
-        "blockType": "tabs",
-        "tabs": [
-          {
-            "key": "all",
-            "label": {
-              "zh-CN": "全部",
-              "en-US": "All"
-            }
-          },
-          {
-            "key": "draft",
-            "label": {
-              "zh-CN": "草稿",
-              "en-US": "Draft"
-            },
-            "filter": {
-              "field": "status",
-              "operator": "EQ",
-              "value": "draft"
-            }
-          },
-          {
-            "key": "deployed",
-            "label": {
-              "zh-CN": "已部署",
-              "en-US": "Deployed"
-            },
-            "filter": {
-              "field": "status",
-              "operator": "EQ",
-              "value": "deployed"
-            }
-          },
-          {
-            "key": "suspended",
-            "label": {
-              "zh-CN": "已暂停",
-              "en-US": "Suspended"
-            },
-            "filter": {
-              "field": "status",
-              "operator": "EQ",
-              "value": "suspended"
-            }
-          }
-        ]
-      },
-      {
-        "id": "table",
-        "blockType": "table",
-        "columns": [
-          {
-            "field": "process_key",
-            "label": {
-              "zh-CN": "流程标识",
-              "en-US": "Process Key"
-            },
-            "width": 180
-          },
-          {
-            "field": "process_name",
-            "label": {
-              "zh-CN": "流程名称",
-              "en-US": "Process Name"
-            },
-            "width": 220
-          },
-          {
-            "field": "category",
-            "label": {
-              "zh-CN": "分类",
-              "en-US": "Category"
-            },
-            "width": 140
-          },
-          {
-            "field": "version",
-            "label": {
-              "zh-CN": "版本",
-              "en-US": "Version"
-            },
-            "width": 90
-          },
-          {
-            "field": "status",
-            "label": {
-              "zh-CN": "状态",
-              "en-US": "Status"
-            },
-            "width": 120,
-            "renderType": "tag",
-            "dictCode": "bpm_process_status"
-          },
-          {
-            "field": "deployed_at",
-            "label": {
-              "zh-CN": "部署时间",
-              "en-US": "Deployed At"
-            },
-            "width": 180,
-            "valueType": "datetime",
-            "format": "YYYY-MM-DD HH:mm"
-          }
-        ],
-        "rowActions": [
-          {
-            "code": "configure_rules",
-            "label": {
-              "zh-CN": "配置规则",
-              "en-US": "Configure Rules"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "/p/bpm_process_management/edit/{pid}"
-            }
-          },
-          {
-            "code": "open_bpmn_designer",
-            "label": {
-              "zh-CN": "设计流程",
-              "en-US": "Design Process"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "/bpmn-designer?pid={pid}"
-            }
-          },
-          {
-            "code": "deploy",
-            "visibleWhen": "row.status === 'draft'",
-            "label": { "zh-CN": "部署", "en-US": "Deploy" },
-            "action": {
-              "type": "flow",
-              "steps": [
-                {
-                  "action": "api.request",
-                  "endpoint": "/api/bpm/process-definitions/${record.pid}/deploy",
-                  "method": "post"
-                }
-              ]
-            }
-          },
-          {
-            "code": "suspend",
-            "visibleWhen": "row.status === 'deployed'",
-            "label": { "zh-CN": "暂停", "en-US": "Suspend" },
-            "action": {
-              "type": "flow",
-              "steps": [
-                {
-                  "action": "api.request",
-                  "endpoint": "/api/bpm/process-definitions/${record.pid}/suspend",
-                  "method": "post"
-                }
-              ]
-            }
-          },
-          {
-            "code": "resume",
-            "visibleWhen": "row.status === 'suspended'",
-            "label": { "zh-CN": "恢复", "en-US": "Resume" },
-            "action": {
-              "type": "flow",
-              "steps": [
-                {
-                  "action": "api.request",
-                  "endpoint": "/api/bpm/process-definitions/${record.pid}/resume",
-                  "method": "post"
-                }
-              ]
-            }
-          },
-          {
-            "code": "delete",
-            "visibleWhen": "row.status === 'draft'",
-            "danger": true,
-            "label": { "zh-CN": "删除", "en-US": "Delete" },
-            "confirm": "confirm.delete",
-            "action": {
-              "type": "flow",
-              "steps": [
-                {
-                  "action": "api.request",
-                  "endpoint": "/api/bpm/process-definitions/${record.pid}",
-                  "method": "delete"
-                }
-              ]
-            }
-          }
-        ],
-        "defaultSort": {
-          "field": "deployedAt",
-          "order": "desc"
-        },
-        "onRowClick": "navigate",
-        "detailUrl": "/p/bpm_process_management/edit/{pid}"
-      }
-    ],
-    "extension": {
-      "dataSource": {
-        "type": "api",
-        "endpoint": "/api/bpm/process-definitions",
-        "method": "get"
-      }
-    }
-  },
-  {
-    "pageKey": "bpm_process_management_form",
-    "modelCode": "bpm_process_management",
-    "name:zh-CN": "BPM 流程定义配置",
-    "name:en": "BPM Process Definition Configuration",
-    "kind": "form",
-    "schemaVersion": 4,
-    "title": {
-      "zh-CN": "流程定义配置",
-      "en-US": "Process Definition Configuration"
-    },
-    "layout": {
-      "type": "stack",
-      "gap": 12
-    },
-    "blocks": [
-      {
-        "id": "process_identity",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "流程信息",
-          "en-US": "Process Information"
-        },
-        "fields": [
-          { "field": "process_name", "colSpan": 6, "readonly": true, "required": true },
-          { "field": "process_key", "colSpan": 6, "readonly": true, "required": true },
-          { "field": "category", "colSpan": 3, "readonly": true },
-          { "field": "version", "colSpan": 3, "readonly": true },
-          { "field": "status", "colSpan": 3, "readonly": true, "dictCode": "bpm_process_status" },
-          { "field": "deployed_at", "colSpan": 3, "readonly": true }
-        ]
-      },
-      {
-        "id": "bpm_rule_binding",
-        "blockType": "custom",
-        "component": "DecisionRuleBindingBlock",
-        "props": {
-          "mode": "decision",
-          "consumerType": "BPM",
-          "consumerNodeId": "gw_approver",
-          "showImpactPreview": true,
-          "showTestRunner": true,
-          "fieldCatalogMode": "fallback",
-          "initialDecisionCode": "approval_routing",
-          "initialVersionPolicy": "LATEST_PUBLISHED",
-          "fields": [
-            { "scope": "process", "path": "nodeId", "label": "BPM 节点", "dataType": "string" },
-            { "scope": "process", "path": "processKey", "label": "流程标识", "dataType": "string" },
-            { "scope": "record", "path": "data.wd_req_days", "label": "请假天数", "dataType": "decimal" },
-            { "scope": "record", "path": "data.wd_req_type", "label": "请假类型", "dataType": "enum", "options": ["annual", "sick", "personal"] },
-            { "scope": "actor", "path": "departmentId", "label": "当前处理人部门", "dataType": "department" }
-          ],
-          "decisions": [
-            { "code": "approval_routing", "name": "审批路由" },
-            { "code": "task_assignee", "name": "任务分派" },
-            { "code": "sla_deadline", "name": "SLA 截止时间" }
-          ],
-          "initialContextJson": "{\n  \"process\": {\n    \"nodeId\": \"task_manager_approve\",\n    \"processKey\": \"wd_leave_approval\"\n  },\n  \"record\": {\n    \"data\": {\n      \"wd_req_days\": 4,\n      \"wd_req_type\": \"annual\"\n    }\n  }\n}",
-          "initialValue": {
-            "consumerType": "BPM",
-            "consumerCode": "wd_leave_approval",
-            "consumerNodeId": "gw_approver",
-            "bindingKind": "DECISION_REF",
-            "enabled": true,
-            "decisionBinding": {
-              "decisionCode": "approval_routing",
-              "versionPolicy": "LATEST_PUBLISHED",
-              "inputMappings": [
-                {
-                  "input": "nodeId",
-                  "source": { "kind": "FIELD", "scope": "process", "path": "nodeId" }
-                },
-                {
-                  "input": "leaveDays",
-                  "source": { "kind": "FIELD", "scope": "record", "path": "data.wd_req_days" }
-                }
-              ],
-              "outputMappings": [
-                {
-                  "output": "approverRole",
-                  "target": { "kind": "PROCESS_VARIABLE", "path": "approverRole" }
-                }
-              ],
-              "fallbackPolicy": { "mode": "FAIL_CLOSED" },
-              "traceMode": "ALWAYS",
-              "enabled": true
-            }
-          }
-        }
-      },
-      {
-        "id": "designer_actions",
-        "blockType": "toolbar",
-        "buttons": [
-          {
-            "code": "open_bpmn_designer",
-            "label": {
-              "zh-CN": "打开 BPMN 设计器",
-              "en-US": "Open BPMN Designer"
-            },
-            "variant": "primary",
-            "action": {
-              "type": "navigate",
-              "to": "/bpmn-designer?pid={pid}"
-            }
-          },
-          {
-            "code": "back_to_list",
-            "label": {
-              "zh-CN": "返回列表",
-              "en-US": "Back"
-            },
-            "action": {
-              "type": "navigate",
-              "to": "/p/bpm_process_management"
-            }
-          }
-        ]
-      }
-    ],
-    "extension": {
-      "recordSource": {
-        "type": "api",
-        "endpoint": "/api/bpm/process-definitions/{pid}",
-        "method": "get"
-      },
-      "hideBuiltInImport": true,
-      "hideBuiltInExport": true,
-      "hideBuiltInPrint": true
-    }
-  },
-  {
     "pageKey": "dashboard_management_list",
     "modelCode": "dashboard_management",
     "name:zh-CN": "仪表盘管理",
@@ -1823,16 +798,16 @@
           }
         ]
       },
-          {
-      "id": "block_module_tree",
-      "blockType": "custom",
-      "component": "DashboardModuleTree",
-      "layout": {
-        "colSpan": 3,
-        "rowSpan": 1
-      }
-    },
-{
+      {
+        "id": "block_module_tree",
+        "blockType": "custom",
+        "component": "DashboardModuleTree",
+        "layout": {
+          "colSpan": 3,
+          "rowSpan": 1
+        }
+      },
+      {
         "id": "block_table",
         "blockType": "table",
         "onRowClick": "navigate",
@@ -1987,7 +962,7 @@
           }
         },
         "layout": {
-          "colSpan":  8,
+          "colSpan": 8,
           "rowSpan": 1
         }
       },
@@ -2327,7 +1302,10 @@
               "inputFields": [
                 {
                   "field": "reason",
-                  "label": { "zh-CN": "暂停原因", "en-US": "Reason" },
+                  "label": {
+                    "zh-CN": "暂停原因",
+                    "en-US": "Reason"
+                  },
                   "type": "textarea",
                   "required": true
                 }
@@ -2354,7 +1332,10 @@
               "inputFields": [
                 {
                   "field": "reason",
-                  "label": { "zh-CN": "离职说明", "en-US": "Reason" },
+                  "label": {
+                    "zh-CN": "离职说明",
+                    "en-US": "Reason"
+                  },
                   "type": "textarea"
                 }
               ]
@@ -3213,7 +2194,9 @@
     "name:en": "Account Security Policy",
     "kind": "detail",
     "schemaVersion": 4,
-    "layout": { "type": "stack" },
+    "layout": {
+      "type": "stack"
+    },
     "title": {
       "zh-CN": "账号安全策略",
       "en": "Account Security Policy"
@@ -3249,23 +2232,38 @@
         "fields": [
           {
             "field": "modeDisplay",
-            "label": { "zh-CN": "托管模式", "en": "Mode" }
+            "label": {
+              "zh-CN": "托管模式",
+              "en": "Mode"
+            }
           },
           {
             "field": "publicRegistrationDisplay",
-            "label": { "zh-CN": "公开注册", "en": "Public registration" }
+            "label": {
+              "zh-CN": "公开注册",
+              "en": "Public registration"
+            }
           },
           {
             "field": "selfServicePasswordDisplay",
-            "label": { "zh-CN": "自助密码", "en": "Self-service password" }
+            "label": {
+              "zh-CN": "自助密码",
+              "en": "Self-service password"
+            }
           },
           {
             "field": "adminManagedPasswordDisplay",
-            "label": { "zh-CN": "管理员重置", "en": "Admin managed reset" }
+            "label": {
+              "zh-CN": "管理员重置",
+              "en": "Admin managed reset"
+            }
           },
           {
             "field": "mustChangePasswordAfterAdminResetDisplay",
-            "label": { "zh-CN": "重置后强制改密", "en": "Force change after reset" }
+            "label": {
+              "zh-CN": "重置后强制改密",
+              "en": "Force change after reset"
+            }
           }
         ]
       },
@@ -3288,23 +2286,38 @@
         "fields": [
           {
             "field": "lengthDisplay",
-            "label": { "zh-CN": "长度", "en": "Length" }
+            "label": {
+              "zh-CN": "长度",
+              "en": "Length"
+            }
           },
           {
             "field": "requireLowercaseDisplay",
-            "label": { "zh-CN": "小写字母", "en": "Lowercase letter" }
+            "label": {
+              "zh-CN": "小写字母",
+              "en": "Lowercase letter"
+            }
           },
           {
             "field": "requireDigitDisplay",
-            "label": { "zh-CN": "数字", "en": "Digit" }
+            "label": {
+              "zh-CN": "数字",
+              "en": "Digit"
+            }
           },
           {
             "field": "requireUppercaseDisplay",
-            "label": { "zh-CN": "大写字母", "en": "Uppercase letter" }
+            "label": {
+              "zh-CN": "大写字母",
+              "en": "Uppercase letter"
+            }
           },
           {
             "field": "requireSpecialDisplay",
-            "label": { "zh-CN": "特殊字符", "en": "Special character" }
+            "label": {
+              "zh-CN": "特殊字符",
+              "en": "Special character"
+            }
           }
         ]
       },
@@ -3327,19 +2340,31 @@
         "fields": [
           {
             "field": "historyCountDisplay",
-            "label": { "zh-CN": "历史密码复用限制", "en": "History reuse block" }
+            "label": {
+              "zh-CN": "历史密码复用限制",
+              "en": "History reuse block"
+            }
           },
           {
             "field": "expiryDaysDisplay",
-            "label": { "zh-CN": "密码过期", "en": "Password expiry" }
+            "label": {
+              "zh-CN": "密码过期",
+              "en": "Password expiry"
+            }
           },
           {
             "field": "resetTokenExpiryDisplay",
-            "label": { "zh-CN": "重置令牌有效期", "en": "Reset token lifetime" }
+            "label": {
+              "zh-CN": "重置令牌有效期",
+              "en": "Reset token lifetime"
+            }
           },
           {
             "field": "recoveryModeDisplay",
-            "label": { "zh-CN": "找回模式", "en": "Recovery mode" }
+            "label": {
+              "zh-CN": "找回模式",
+              "en": "Recovery mode"
+            }
           }
         ]
       },
@@ -3362,11 +2387,17 @@
         "fields": [
           {
             "field": "maxAttemptsDisplay",
-            "label": { "zh-CN": "失败次数", "en": "Failed attempts" }
+            "label": {
+              "zh-CN": "失败次数",
+              "en": "Failed attempts"
+            }
           },
           {
             "field": "durationDisplay",
-            "label": { "zh-CN": "锁定时长", "en": "Lock duration" }
+            "label": {
+              "zh-CN": "锁定时长",
+              "en": "Lock duration"
+            }
           }
         ]
       },
@@ -3388,8 +2419,13 @@
         "fields": [
           {
             "field": "notesText",
-            "label": { "zh-CN": "说明", "en": "Notes" },
-            "layout": { "colSpan": 12 }
+            "label": {
+              "zh-CN": "说明",
+              "en": "Notes"
+            },
+            "layout": {
+              "colSpan": 12
+            }
           }
         ]
       }
@@ -3401,7 +2437,9 @@
     "name:en": "System Preferences",
     "kind": "form",
     "schemaVersion": 4,
-    "layout": { "type": "stack" },
+    "layout": {
+      "type": "stack"
+    },
     "title": {
       "zh-CN": "系统偏好",
       "en": "System Preferences"
@@ -3441,11 +2479,16 @@
         "fields": [
           {
             "field": "datetimeFormat",
-            "label": { "zh-CN": "日期时间格式", "en": "Datetime Format" },
+            "label": {
+              "zh-CN": "日期时间格式",
+              "en": "Datetime Format"
+            },
             "dataType": "string",
             "component": "SmartInput",
             "required": true,
-            "layout": { "colSpan": 6 },
+            "layout": {
+              "colSpan": 6
+            },
             "props": {
               "data-testid": "system-datetime-format-input",
               "placeholder": "YYYY-MM-DD HH:mm:ss"
@@ -3453,22 +2496,32 @@
           },
           {
             "field": "timezone",
-            "label": { "zh-CN": "默认时区", "en": "Default Timezone" },
+            "label": {
+              "zh-CN": "默认时区",
+              "en": "Default Timezone"
+            },
             "dataType": "string",
             "component": "TimezoneSelect",
             "required": true,
-            "layout": { "colSpan": 6 },
+            "layout": {
+              "colSpan": 6
+            },
             "props": {
               "data-testid": "system-timezone-select"
             }
           },
           {
             "field": "timezoneStatusText",
-            "label": { "zh-CN": "配置状态", "en": "Configuration Status" },
+            "label": {
+              "zh-CN": "配置状态",
+              "en": "Configuration Status"
+            },
             "dataType": "string",
             "component": "SmartInput",
             "readOnly": true,
-            "layout": { "colSpan": 12 },
+            "layout": {
+              "colSpan": 12
+            },
             "props": {
               "data-testid": "system-timezone-status"
             }
@@ -3502,7 +2555,9 @@
     "name": "$i18n:template.gallery.title",
     "kind": "detail",
     "schemaVersion": 4,
-    "layout": { "type": "stack" },
+    "layout": {
+      "type": "stack"
+    },
     "dataSources": {
       "templates": {
         "type": "api",
@@ -3539,7 +2594,10 @@
                   "id": "confirm",
                   "action": "dialog.confirm",
                   "args": {
-                    "message": { "zh-CN": "确认应用此模板？这将在当前租户创建模板包含的模型与页面。", "en-US": "Install this template? It will create the template's models and pages in your tenant." }
+                    "message": {
+                      "zh-CN": "确认应用此模板？这将在当前租户创建模板包含的模型与页面。",
+                      "en-US": "Install this template? It will create the template's models and pages in your tenant."
+                    }
                   }
                 },
                 {
@@ -3553,7 +2611,10 @@
                   "id": "toast",
                   "action": "toast.success",
                   "args": {
-                    "message": { "zh-CN": "模板已应用", "en-US": "Template installed" }
+                    "message": {
+                      "zh-CN": "模板已应用",
+                      "en-US": "Template installed"
+                    }
                   }
                 },
                 {

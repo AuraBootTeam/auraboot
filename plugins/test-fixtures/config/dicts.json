@@ -365,7 +365,7 @@
     ]
   },
   {
-    "code": "e2et_crm_opp_stage",
+    "code": "e2et_stage_record_stage",
     "name": "Opportunity Stage",
     "name:zh-CN": "商机阶段",
     "dictType": "static",

@@ -290,7 +290,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
           blockPath={blockPath}
         />
       );
-    case 'bpm-panel':
+    case 'workflow-panel':
       return (
         <RuntimeBpmPanel
           block={block}
@@ -582,7 +582,7 @@ function RuntimeBpmPanel({ block, runtimeServices, pageContext, blockPath }: Run
   return (
     <section
       className="rounded-lg border border-indigo-200 bg-white p-4"
-      data-testid={`runtime-bpm-panel-${block.id}`}
+      data-testid={`runtime-workflow-panel-${block.id}`}
       style={getSpanGridStyle(block)}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

@@ -49,10 +49,10 @@ describe('StatsCardWidget — redesign', () => {
 
   it('renders no sparkline svg when series is missing (avoids dead-UI baseline)', () => {
     mocked.mockReturnValue({
-      stats: { bpm_running: { value: 0, label: 'workbench.stats.bpm_running' } },
+      stats: { inbox_urgent: { value: 0, label: 'workbench.stats.inbox_urgent' } },
       loading: false,
     });
-    const { container } = render(<StatsCardWidget statKey="bpm_running" />);
+    const { container } = render(<StatsCardWidget statKey="inbox_urgent" />);
     expect(container.querySelector('polyline')).toBeNull();
     expect(container.querySelector('svg')).toBeNull();
   });

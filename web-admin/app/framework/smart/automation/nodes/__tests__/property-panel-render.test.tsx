@@ -75,7 +75,7 @@ const EXPECTED_AUTOMATION_FIELD_TYPES = [
   'model-select',
   'multiselect',
   'number',
-  'process-select',
+  'workflow-select',
   'rule-binding',
   'select',
   'text',

@@ -32,7 +32,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { uniqueId } from '../helpers';
 
 // ab_announcement is a published platform meta-model present in every OSS stack.

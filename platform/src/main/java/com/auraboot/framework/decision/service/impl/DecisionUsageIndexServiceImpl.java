@@ -5,8 +5,6 @@ import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
-import com.auraboot.framework.bpm.entity.SlaConfigEntity;
-import com.auraboot.framework.bpm.mapper.SlaConfigMapper;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
@@ -27,8 +25,6 @@ import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
-import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
-import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -60,17 +56,14 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private static final Set<String> INDEXABLE_VERSION_STATUSES = Set.of(
             "VALIDATED", "PENDING_APPROVAL", "PUBLISHED", "DEPRECATED");
     private static final Set<String> SUPPORTED_SOURCE_TYPES = Set.of(
-            "DECISION_VERSION", "AUTOMATION", "SLA_RULE", "EVENT_POLICY", "NAMED_QUERY",
-            "BPM_PROCESS", "PERMISSION_POLICY");
+            "DECISION_VERSION", "AUTOMATION", "EVENT_POLICY", "NAMED_QUERY", "PERMISSION_POLICY");
 
     private final DecisionUsageRefMapper usageRefMapper;
     private final DrtVersionMapper versionMapper;
     private final AutomationMapper automationMapper;
-    private final SlaConfigMapper slaConfigMapper;
     private final DrtPolicyVersionMapper policyVersionMapper;
     private final DrtPolicyDefinitionMapper policyDefinitionMapper;
     private final NamedQueryMapper namedQueryMapper;
-    private final BpmProcessDefinitionMapper bpmProcessDefinitionMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
@@ -84,10 +77,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
         refs.addAll(scanDecisionVersions(tenantId));
         refs.addAll(scanAutomations(tenantId));
-        refs.addAll(scanSlaRules(tenantId));
         refs.addAll(scanEventPolicies(tenantId));
         refs.addAll(scanNamedQueries(tenantId));
-        refs.addAll(scanBpmProcesses(tenantId));
         refs.addAll(scanPermissionPolicies(tenantId));
 
         return insertRefs(tenantId, refs);
@@ -108,10 +99,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return switch (normalized) {
             case "DECISION_VERSION" -> refreshDecisionVersion(tenantId, sourcePid);
             case "AUTOMATION" -> refreshAutomation(tenantId, sourcePid);
-            case "SLA_RULE" -> refreshSlaRule(tenantId, sourcePid);
             case "EVENT_POLICY" -> refreshEventPolicyVersion(tenantId, sourcePid);
             case "NAMED_QUERY" -> refreshNamedQuery(tenantId, sourcePid);
-            case "BPM_PROCESS" -> refreshBpmProcess(tenantId, sourcePid);
             case "PERMISSION_POLICY" -> refreshPermissionPolicy(tenantId, sourcePid);
             default -> throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Unsupported usage-index source type: " + sourceType);
@@ -155,18 +144,6 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return insertRefs(tenantId, refsForAutomation(tenantId, automation));
     }
 
-    private DecisionUsageIndexRebuildDTO refreshSlaRule(Long tenantId, String slaPid) {
-        SlaConfigEntity sla = slaConfigMapper.selectOne(new LambdaQueryWrapper<SlaConfigEntity>()
-                .eq(SlaConfigEntity::getTenantId, tenantId)
-                .eq(SlaConfigEntity::getPid, slaPid)
-                .eq(SlaConfigEntity::getDeletedFlag, false));
-        if (sla == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "SLA rule source not found: " + slaPid);
-        }
-
-        usageRefMapper.deleteBySource(tenantId, "SLA_RULE", slaPid);
-        return insertRefs(tenantId, refsForSlaRule(tenantId, sla));
-    }
 
     private DecisionUsageIndexRebuildDTO refreshEventPolicyVersion(Long tenantId, String versionPid) {
         DrtPolicyVersionEntity version = policyVersionMapper.selectOne(new LambdaQueryWrapper<DrtPolicyVersionEntity>()
@@ -195,19 +172,6 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return insertRefs(tenantId, refsForNamedQuery(tenantId, query));
     }
 
-    private DecisionUsageIndexRebuildDTO refreshBpmProcess(Long tenantId, String processPid) {
-        BpmProcessDefinition process = bpmProcessDefinitionMapper.selectOne(
-                new LambdaQueryWrapper<BpmProcessDefinition>()
-                        .eq(BpmProcessDefinition::getTenantId, tenantId)
-                        .eq(BpmProcessDefinition::getPid, processPid)
-                        .eq(BpmProcessDefinition::getDeletedFlag, false));
-        if (process == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "BPM process source not found: " + processPid);
-        }
-
-        usageRefMapper.deleteBySource(tenantId, "BPM_PROCESS", processPid);
-        return insertRefs(tenantId, refsForBpmProcess(tenantId, process));
-    }
 
     private DecisionUsageIndexRebuildDTO refreshPermissionPolicy(Long tenantId, String rolePermissionPid) {
         RolePermission rolePermission = rolePermissionMapper.selectOne(new LambdaQueryWrapper<RolePermission>()
@@ -371,40 +335,7 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return refs;
     }
 
-    private List<DecisionUsageRefEntity> scanSlaRules(Long tenantId) {
-        return slaConfigMapper.selectList(new LambdaQueryWrapper<SlaConfigEntity>()
-                        .eq(SlaConfigEntity::getTenantId, tenantId)
-                        .eq(SlaConfigEntity::getDeletedFlag, false))
-                .stream()
-                .flatMap(sla -> refsForSlaRule(tenantId, sla).stream())
-                .toList();
-    }
 
-    private List<DecisionUsageRefEntity> refsForSlaRule(Long tenantId, SlaConfigEntity sla) {
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(sla.getRuleBinding());
-        Map<String, Object> baseMetadata = metadata("sourceName", sla.getName(),
-                "targetType", sla.getTargetType(), "targetKey", sla.getTargetKey(),
-                "enabled", sla.getEnabled());
-        for (String decisionRef : ruleRefs.decisionRefs()) {
-            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
-                    "DECISION", decisionRef, null, "RULE_BINDING", baseMetadata));
-        }
-        for (String fieldRef : ruleRefs.fieldRefs()) {
-            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
-                    "FIELD", null, fieldRef, "RULE_BINDING", baseMetadata));
-        }
-        addConditionFragmentRefs(refs, tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
-                ruleRefs, null, "RULE_BINDING", baseMetadata);
-
-        if ("RULE".equalsIgnoreCase(nullToBlank(sla.getDeadlineMode()))
-                && !nullToBlank(sla.getDeadlineValue()).isBlank()) {
-            refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
-                    "DECISION", sla.getDeadlineValue(), null, "LATEST",
-                    baseMetadata));
-        }
-        return refs;
-    }
 
     private List<DecisionUsageRefEntity> scanEventPolicies(Long tenantId) {
         List<DrtPolicyVersionEntity> versions = policyVersionMapper.selectList(
@@ -484,19 +415,6 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                 metadata("sourceName", query.getTitle(), "status", query.getStatus())));
     }
 
-    private List<DecisionUsageRefEntity> scanBpmProcesses(Long tenantId) {
-        List<BpmProcessDefinition> processes = bpmProcessDefinitionMapper.selectList(
-                new LambdaQueryWrapper<BpmProcessDefinition>()
-                        .eq(BpmProcessDefinition::getTenantId, tenantId)
-                        .eq(BpmProcessDefinition::getDeletedFlag, false)
-                        .eq(BpmProcessDefinition::getIsCurrent, true));
-        if (processes == null || processes.isEmpty()) {
-            return List.of();
-        }
-        return processes.stream()
-                .flatMap(process -> refsForBpmProcess(tenantId, process).stream())
-                .toList();
-    }
 
     private List<DecisionUsageRefEntity> scanPermissionPolicies(Long tenantId) {
         List<RolePermission> rolePermissions = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>()
@@ -552,142 +470,13 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return refs;
     }
 
-    private List<DecisionUsageRefEntity> refsForBpmProcess(Long tenantId, BpmProcessDefinition process) {
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        JsonNode designerRoot = parseDesignerJson(process);
-        refs.addAll(refsForBpmDesignerNodes(tenantId, process, designerRoot));
-        refs.addAll(refsForBpmDesignerEdges(tenantId, process, designerRoot));
-        refs.addAll(refsForBpmBindingMap(tenantId, process, process.getFormBindings(), "FORM_BINDING"));
-        refs.addAll(refsForBpmJson(tenantId, process,
-                objectMapper.valueToTree(process.getBusinessDataBindings()), "BUSINESS_DATA_BINDING",
-                metadata("sourceName", process.getProcessName(), "processKey", process.getProcessKey(),
-                        "status", process.getStatus(), "version", process.getVersion())));
-        return refs;
-    }
 
-    private List<DecisionUsageRefEntity> refsForBpmDesignerNodes(
-            Long tenantId, BpmProcessDefinition process, JsonNode designerRoot) {
-        JsonNode nodes = designerRoot == null ? null : designerRoot.get("nodes");
-        if (nodes == null || !nodes.isArray()) {
-            return List.of();
-        }
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        for (JsonNode node : nodes) {
-            if (node == null || !node.isObject()) {
-                continue;
-            }
-            String nodeId = jsonText(node.get("id"));
-            String nodeType = jsonText(node.path("data").get("type"));
-            if (nodeType.isBlank()) {
-                nodeType = jsonText(node.get("type"));
-            }
-            refs.addAll(refsForBpmJson(tenantId, process, node, "DESIGNER_NODE",
-                    metadata("sourceName", process.getProcessName(),
-                            "processKey", process.getProcessKey(),
-                            "status", process.getStatus(),
-                            "version", process.getVersion(),
-                            "nodeId", nodeId,
-                            "nodeType", nodeType,
-                            "nodeLabel", jsonText(node.path("data").get("label"))),
-                    bpmDesignerPath("nodes", nodeId)));
-        }
-        return refs;
-    }
 
-    private List<DecisionUsageRefEntity> refsForBpmDesignerEdges(
-            Long tenantId, BpmProcessDefinition process, JsonNode designerRoot) {
-        JsonNode edges = designerRoot == null ? null : designerRoot.get("edges");
-        if (edges == null || !edges.isArray()) {
-            return List.of();
-        }
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        for (JsonNode edge : edges) {
-            if (edge == null || !edge.isObject()) {
-                continue;
-            }
-            String edgeId = jsonText(edge.get("id"));
-            refs.addAll(refsForBpmJson(tenantId, process, edge, "DESIGNER_EDGE",
-                    metadata("sourceName", process.getProcessName(),
-                            "processKey", process.getProcessKey(),
-                            "status", process.getStatus(),
-                            "version", process.getVersion(),
-                            "edgeId", edgeId,
-                            "nodeId", jsonText(edge.get("source")),
-                            "sourceNodeId", jsonText(edge.get("source")),
-                            "targetNodeId", jsonText(edge.get("target")),
-                            "edgeLabel", jsonText(edge.path("data").get("label"))),
-                    bpmDesignerPath("edges", edgeId)));
-        }
-        return refs;
-    }
 
-    private List<DecisionUsageRefEntity> refsForBpmBindingMap(Long tenantId, BpmProcessDefinition process,
-                                                              Map<String, Object> bindingMap, String binding) {
-        if (bindingMap == null || bindingMap.isEmpty()) {
-            return List.of();
-        }
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        for (Map.Entry<String, Object> entry : bindingMap.entrySet()) {
-            refs.addAll(refsForBpmJson(tenantId, process, objectMapper.valueToTree(entry.getValue()), binding,
-                    metadata("sourceName", process.getProcessName(),
-                            "processKey", process.getProcessKey(),
-                            "status", process.getStatus(),
-                            "version", process.getVersion(),
-                            "nodeId", entry.getKey())));
-        }
-        return refs;
-    }
 
-    private List<DecisionUsageRefEntity> refsForBpmJson(Long tenantId, BpmProcessDefinition process, JsonNode node,
-                                                        String binding, Map<String, Object> metadata) {
-        return refsForBpmJson(tenantId, process, node, binding, metadata, null);
-    }
 
-    private List<DecisionUsageRefEntity> refsForBpmJson(Long tenantId, BpmProcessDefinition process, JsonNode node,
-                                                        String binding, Map<String, Object> metadata,
-                                                        String decisionTargetPath) {
-        RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(node);
-        if (ruleRefs.decisionRefs().isEmpty()
-                && ruleRefs.fieldRefs().isEmpty()
-                && ruleRefs.conditionFragmentRefs().isEmpty()) {
-            return List.of();
-        }
-        List<DecisionUsageRefEntity> refs = new ArrayList<>();
-        for (String decisionRef : ruleRefs.decisionRefs()) {
-            refs.add(ref(tenantId, "BPM_PROCESS", process.getProcessKey(), versionNumber(process),
-                    process.getPid(), "DECISION", decisionRef, decisionTargetPath, binding, metadata));
-        }
-        for (String fieldRef : ruleRefs.fieldRefs()) {
-            refs.add(ref(tenantId, "BPM_PROCESS", process.getProcessKey(), versionNumber(process),
-                    process.getPid(), "FIELD", null, fieldRef, binding, metadata));
-        }
-        addConditionFragmentRefs(refs, tenantId, "BPM_PROCESS", process.getProcessKey(),
-                versionNumber(process), process.getPid(), ruleRefs, decisionTargetPath, binding, metadata);
-        return refs;
-    }
 
-    private String bpmDesignerPath(String prefix, String id) {
-        return id == null || id.isBlank() ? null : prefix + "." + id;
-    }
 
-    private JsonNode parseDesignerJson(BpmProcessDefinition process) {
-        Object value = process.getExtension() == null ? null : process.getExtension().get("designerJson");
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof JsonNode node) {
-            return node;
-        }
-        try {
-            return value instanceof String text
-                    ? objectMapper.readTree(text)
-                    : objectMapper.valueToTree(value);
-        } catch (Exception e) {
-            log.warn("Failed to parse BPM designerJson for usage-index: processKey={}, pid={}, error={}",
-                    process.getProcessKey(), process.getPid(), e.getMessage());
-            return null;
-        }
-    }
 
     private JsonNode toJsonNode(Object value) {
         if (value == null) {
@@ -900,9 +689,6 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return version.getVersion() == null ? null : String.valueOf(version.getVersion());
     }
 
-    private String versionNumber(BpmProcessDefinition process) {
-        return process.getVersion() == null ? null : String.valueOf(process.getVersion());
-    }
 
     private String defaultBinding(String binding) {
         return binding == null || binding.isBlank() ? "LATEST" : binding;

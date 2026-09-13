@@ -6,14 +6,6 @@ import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.automation.dto.AutomationLogDTO;
 import com.auraboot.framework.automation.service.AutomationService;
-import com.auraboot.framework.bpm.event.BpmEvent;
-import com.auraboot.framework.bpm.entity.SlaConfigEntity;
-import com.auraboot.framework.bpm.entity.SlaRecordEntity;
-import com.auraboot.framework.bpm.listener.SlaActivationListener;
-import com.auraboot.framework.bpm.service.BpmRuleBindingRuntimeService;
-import com.auraboot.framework.bpm.service.ProcessDeploymentService;
-import com.auraboot.framework.bpm.service.SlaConfigService;
-import com.auraboot.framework.bpm.service.SlaRecordService;
 import com.auraboot.framework.decision.dto.DecisionFieldImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
 import com.auraboot.framework.decision.model.DecisionStatus;
@@ -55,7 +47,6 @@ import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
-import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -151,26 +142,6 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Autowired(required = false)
     @Lazy
     private AutomationService automationService;
-
-    @Autowired(required = false)
-    @Lazy
-    private ProcessDeploymentService processDeploymentService;
-
-    @Autowired(required = false)
-    @Lazy
-    private BpmRuleBindingRuntimeService bpmRuleBindingRuntimeService;
-
-    @Autowired(required = false)
-    @Lazy
-    private SlaConfigService slaConfigService;
-
-    @Autowired(required = false)
-    @Lazy
-    private SlaActivationListener slaActivationListener;
-
-    @Autowired(required = false)
-    @Lazy
-    private SlaRecordService slaRecordService;
 
     @Autowired(required = false)
     @Lazy
@@ -3081,7 +3052,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if ("AUTOMATION".equals(nullToBlank(step.getConsumerType()))) {
             return replayAutomationStep(step, request);
         }
-        if ("BPM_PROCESS".equals(nullToBlank(step.getConsumerType()))) {
+        if ("WORKFLOW_PROCESS".equals(nullToBlank(step.getConsumerType()))) {
             return replayBpmStep(step, request);
         }
         if ("SLA_RULE".equals(nullToBlank(step.getConsumerType()))) {
@@ -3107,387 +3078,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private ModelPublishReplayResultDTO replayBpmStep(
             ModelPublishReplayStepDTO step,
             MetaModelPublishReplayRequest request) {
-        if (processDeploymentService == null || bpmRuleBindingRuntimeService == null) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("BPM_UNAVAILABLE")
-                    .automated(true)
-                    .executed(false)
-                    .message("BPM replay service is unavailable in this runtime.")
-                    .errors(List.of("BPM_REPLAY_SERVICE_UNAVAILABLE"))
-                    .outputs(Map.of())
-                    .build();
-        }
-        if (!StringUtils.hasText(step.getSourcePid())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("BPM replay requires sourcePid.")
-                    .errors(List.of("MISSING_BPM_PROCESS_PID"))
-                    .outputs(Map.of())
-                    .build();
-        }
-
-        BpmProcessDefinition process = processDeploymentService.getByPid(step.getSourcePid());
-        if (process == null) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("BPM process was not found for replay.")
-                    .errors(List.of("BPM_PROCESS_NOT_FOUND"))
-                    .outputs(Map.of("processPid", step.getSourcePid()))
-                    .build();
-        }
-
-        BpmReplayBinding replayBinding = resolveBpmReplayBinding(process, step);
-        if (replayBinding == null || replayBinding.binding() == null) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("MANUAL_REQUIRED")
-                    .automated(false)
-                    .executed(false)
-                    .message("BPM replay requires node ruleBinding or edge conditionSpec metadata. Rebuild the Rule Center usage index or open the BPMN designer for manual review.")
-                    .errors(List.of())
-                    .outputs(bpmReplayBaseOutputs(process, step, replayBinding, null, null, null))
-                    .build();
-        }
-
-        if (request == null || !Boolean.TRUE.equals(request.getExecuteAutomated())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("READY")
-                    .automated(true)
-                    .executed(false)
-                    .message("BPM replay is available. Pass executeAutomated=true with sampleContext.record data; sampleContext.bpm.processInstanceId is optional for execution-log persistence.")
-                    .errors(List.of())
-                    .outputs(bpmReplayBaseOutputs(process, step, replayBinding, null, null, null))
-                    .build();
-        }
-        if (request.getSampleContext() == null || request.getSampleContext().isEmpty()) {
-            return bpmNeedsSampleContext(process, step, replayBinding,
-                    "BPM replay requires representative sampleContext.");
-        }
-
-        Map<String, Object> variables = bpmReplayVariables(request.getSampleContext());
-        String processInstanceId = sampleBpmProcessInstanceId(request.getSampleContext());
-        try {
-            BpmReplayExecution execution = executeBpmReplay(replayBinding, process, processInstanceId, variables);
-            RuleEvaluationTrace trace = execution.trace();
-            boolean failed = bpmTraceFailed(trace) || execution.failClosed();
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status(failed ? "FAILED" : "EXECUTED")
-                    .automated(true)
-                    .executed(!failed)
-                    .message(bpmReplayMessage(replayBinding, trace, execution.failClosed()))
-                    .traceId(trace != null ? trace.traceId() : null)
-                    .matched(trace != null && trace.matched())
-                    .outputs(bpmReplayBaseOutputs(process, step, replayBinding, variables, trace, execution.assignment()))
-                    .errors(bpmReplayErrors(trace, execution.failClosed()))
-                    .build();
-        } catch (RuntimeException e) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("BPM replay failed: " + e.getMessage())
-                    .errors(List.of(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()))
-                    .outputs(bpmReplayBaseOutputs(process, step, replayBinding, variables, null, null))
-                    .build();
-        }
+        return productOwnedReplay(step, "BPM");
     }
-
-    private String bpmReplayMessage(
-            BpmReplayBinding replayBinding,
-            RuleEvaluationTrace trace,
-            boolean failClosed) {
-        if (trace == null) {
-            return "BPM replay returned no rule trace.";
-        }
-        if (failClosed) {
-            return "BPM rule binding failed closed after decision evaluation error.";
-        }
-        return "BPM replay evaluated " + replayBinding.surfaceLabel() + " with matched=" + trace.matched() + ".";
-    }
-
-    private ModelPublishReplayResultDTO bpmNeedsSampleContext(
-            BpmProcessDefinition process,
-            ModelPublishReplayStepDTO step,
-            BpmReplayBinding replayBinding,
-            String message) {
-        return ModelPublishReplayResultDTO.builder()
-                .step(step)
-                .status("NEEDS_SAMPLE_CONTEXT")
-                .automated(true)
-                .executed(false)
-                .message(message)
-                .errors(List.of())
-                .outputs(bpmReplayBaseOutputs(process, step, replayBinding, null, null, null))
-                .build();
-    }
-
-    private BpmReplayExecution executeBpmReplay(
-            BpmReplayBinding replayBinding,
-            BpmProcessDefinition process,
-            String processInstanceId,
-            Map<String, Object> variables) {
-        RuleConsumerBinding binding = replayBinding.binding();
-        boolean assignmentNode = "userTask".equalsIgnoreCase(replayBinding.nodeType());
-        if (assignmentNode && binding.bindingKind() == RuleBindingKind.DECISION_REF) {
-            BpmRuleBindingRuntimeService.TaskAssignmentResult assignment =
-                    bpmRuleBindingRuntimeService.resolveTaskAssignment(
-                            binding,
-                            process.getProcessKey(),
-                            replayBinding.nodeId(),
-                            processInstanceId,
-                            variables);
-            return new BpmReplayExecution(assignment.trace(), assignment.failClosed(), assignment);
-        }
-        Optional<RuleEvaluationTrace> trace = StringUtils.hasText(processInstanceId)
-                ? bpmRuleBindingRuntimeService.evaluateAndApply(
-                        binding,
-                        process.getProcessKey(),
-                        replayBinding.nodeId(),
-                        processInstanceId,
-                        variables)
-                : bpmRuleBindingRuntimeService.evaluate(
-                        binding,
-                        process.getProcessKey(),
-                        replayBinding.nodeId(),
-                        null,
-                        variables);
-        return new BpmReplayExecution(trace.orElse(null), false, null);
-    }
-
-    private boolean bpmTraceFailed(RuleEvaluationTrace trace) {
-        if (trace == null) {
-            return true;
-        }
-        if (trace.decisionStatus() == DecisionStatus.ERROR) {
-            return true;
-        }
-        return trace.errorCode() != null && !trace.errorCode().isBlank();
-    }
-
-    private List<String> bpmReplayErrors(RuleEvaluationTrace trace, boolean failClosed) {
-        List<String> errors = new ArrayList<>();
-        if (trace == null) {
-            errors.add("BPM_REPLAY_RETURNED_NO_TRACE");
-        } else if (trace.errors() != null) {
-            errors.addAll(trace.errors());
-        }
-        if (failClosed) {
-            errors.add("BPM_RULE_BINDING_FAIL_CLOSED");
-        }
-        return List.copyOf(errors);
-    }
-
-    private Map<String, Object> bpmReplayVariables(Map<String, Map<String, Object>> sampleContext) {
-        Map<String, Object> variables = new LinkedHashMap<>();
-        Map<String, Object> bpm = sampleContext == null ? null : sampleContext.get("bpm");
-        if (bpm != null) {
-            variables.putAll(bpm);
-        }
-        Map<String, Object> meta = sampleContext == null ? null : sampleContext.get("meta");
-        if (meta != null && !meta.isEmpty()) {
-            variables.put("meta", new LinkedHashMap<>(meta));
-        }
-        Map<String, Object> recordData = sampleRecordData(sampleContext);
-        Map<String, Object> record = new LinkedHashMap<>(recordData);
-        String recordPid = sampleRecordPid(sampleContext);
-        if (StringUtils.hasText(recordPid)) {
-            record.put("pid", recordPid);
-            record.put("recordPid", recordPid);
-        }
-        record.put("data", new LinkedHashMap<>(recordData));
-        variables.put("record", record);
-        variables.putAll(recordData);
-        return variables;
-    }
-
-    private BpmReplayBinding resolveBpmReplayBinding(
-            BpmProcessDefinition process,
-            ModelPublishReplayStepDTO step) {
-        JsonNode designer = bpmDesignerJson(process);
-        if (designer == null || designer.isMissingNode() || designer.isNull()) {
-            return null;
-        }
-        Map<String, Object> metadata = step.getMetadata() == null ? Map.of() : step.getMetadata();
-        String nodeId = metadataText(metadata, "nodeId");
-        if (StringUtils.hasText(nodeId)) {
-            JsonNode node = findDesignerItem(designer.path("nodes"), nodeId);
-            JsonNode ruleBinding = node.path("data").path("config").path("ruleBinding");
-            if (ruleBinding.isObject() && !ruleBinding.isEmpty()) {
-                return new BpmReplayBinding(
-                        bpmRuleBinding(ruleBinding, process.getProcessKey(), nodeId),
-                        nodeId,
-                        text(node.path("type")),
-                        null,
-                        null,
-                        null,
-                        "node ruleBinding");
-            }
-        }
-        String edgeId = metadataText(metadata, "edgeId");
-        if (StringUtils.hasText(edgeId)) {
-            JsonNode edge = findDesignerItem(designer.path("edges"), edgeId);
-            JsonNode conditionSpec = edge.path("data").path("conditionSpec");
-            if (conditionSpec.isObject() && !conditionSpec.isEmpty()) {
-                String source = text(edge.path("source"));
-                return new BpmReplayBinding(
-                        new RuleConsumerBinding(
-                                "BPM",
-                                process.getProcessKey(),
-                                StringUtils.hasText(source) ? source : edgeId,
-                                RuleBindingKind.CONDITION,
-                                objectMapper.convertValue(conditionSpec, ConditionSpec.class),
-                                null,
-                                true),
-                        StringUtils.hasText(source) ? source : edgeId,
-                        "sequenceFlow",
-                        edgeId,
-                        source,
-                        text(edge.path("target")),
-                        "edge conditionSpec");
-            }
-        }
-        return null;
-    }
-
-    private RuleConsumerBinding bpmRuleBinding(JsonNode node, String processKey, String nodeId) {
-        RuleConsumerBinding parsed = objectMapper.convertValue(node, RuleConsumerBinding.class);
-        return new RuleConsumerBinding(
-                StringUtils.hasText(parsed.consumerType()) ? parsed.consumerType() : "BPM",
-                StringUtils.hasText(parsed.consumerCode()) ? parsed.consumerCode() : processKey,
-                StringUtils.hasText(parsed.consumerNodeId()) ? parsed.consumerNodeId() : nodeId,
-                parsed.bindingKind(),
-                parsed.conditionSpec(),
-                parsed.decisionBinding(),
-                parsed.enabled(),
-                parsed.conditionFragmentRefs());
-    }
-
-    private JsonNode bpmDesignerJson(BpmProcessDefinition process) {
-        if (process == null || process.getExtension() == null) {
-            return null;
-        }
-        Object value = process.getExtension().get("designerJson");
-        if (value == null) {
-            return null;
-        }
-        try {
-            if (value instanceof JsonNode node) {
-                return node;
-            }
-            if (value instanceof String text) {
-                return objectMapper.readTree(text);
-            }
-            return objectMapper.valueToTree(value);
-        } catch (Exception e) {
-            throw new IllegalStateException("Malformed BPM designerJson for replay: " + e.getMessage(), e);
-        }
-    }
-
-    private JsonNode findDesignerItem(JsonNode items, String id) {
-        if (items == null || !items.isArray() || !StringUtils.hasText(id)) {
-            return com.fasterxml.jackson.databind.node.MissingNode.getInstance();
-        }
-        for (JsonNode item : items) {
-            if (id.equals(text(item.path("id")))) {
-                return item;
-            }
-        }
-        return com.fasterxml.jackson.databind.node.MissingNode.getInstance();
-    }
-
-    private String text(JsonNode node) {
-        return node != null && node.isTextual() ? node.asText() : "";
-    }
-
-    private Map<String, Object> bpmReplayBaseOutputs(
-            BpmProcessDefinition process,
-            ModelPublishReplayStepDTO step,
-            BpmReplayBinding replayBinding,
-            Map<String, Object> variables,
-            RuleEvaluationTrace trace,
-            BpmRuleBindingRuntimeService.TaskAssignmentResult assignment) {
-        Map<String, Object> outputs = new LinkedHashMap<>();
-        if (process != null) {
-            outputs.put("processPid", process.getPid());
-            outputs.put("processKey", process.getProcessKey());
-            outputs.put("processName", process.getProcessName());
-            outputs.put("processVersion", process.getVersion());
-            outputs.put("processStatus", process.getStatus());
-        } else if (step != null) {
-            outputs.put("processPid", step.getSourcePid());
-            outputs.put("processKey", step.getSourceCode());
-        }
-        if (replayBinding != null) {
-            outputs.put("nodeId", replayBinding.nodeId());
-            outputs.put("nodeType", replayBinding.nodeType());
-            outputs.put("edgeId", replayBinding.edgeId());
-            outputs.put("edgeSource", replayBinding.edgeSource());
-            outputs.put("edgeTarget", replayBinding.edgeTarget());
-            outputs.put("bindingSurface", replayBinding.surfaceLabel());
-            RuleConsumerBinding binding = replayBinding.binding();
-            if (binding != null) {
-                outputs.put("bindingKind", binding.bindingKind() != null ? binding.bindingKind().name() : null);
-                outputs.put("decisionCode", binding.decisionBinding() != null
-                        ? binding.decisionBinding().decisionCode()
-                        : null);
-            }
-        }
-        if (trace != null) {
-            outputs.put("traceId", trace.traceId());
-            outputs.put("matched", trace.matched());
-            outputs.put("decisionStatus", trace.decisionStatus() != null ? trace.decisionStatus().name() : null);
-            outputs.put("conditionResult", trace.conditionResult() != null ? trace.conditionResult().name() : null);
-            outputs.put("fallbackApplied", trace.fallbackApplied());
-            outputs.put("durationMs", trace.durationMs());
-            outputs.put("errorCode", trace.errorCode());
-            outputs.put("inputs", trace.inputSnapshot());
-            outputs.put("outputs", trace.outputSnapshot());
-            outputs.put("fieldRefs", trace.fieldRefs());
-            outputs.put("decisionRefs", trace.decisionRefs());
-        }
-        if (assignment != null) {
-            outputs.put("candidateUserIds", assignment.userIds());
-            outputs.put("candidateGroupIds", assignment.groupIds());
-            outputs.put("failClosed", assignment.failClosed());
-        }
-        Object processInstanceId = variables == null ? null : variables.get("processInstanceId");
-        if (processInstanceId instanceof String value && StringUtils.hasText(value)) {
-            outputs.put("processInstanceId", value);
-        }
-        return outputs.entrySet().stream()
-                .filter(entry -> entry.getValue() != null)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (left, right) -> left,
-                        LinkedHashMap::new));
-    }
-
-    private record BpmReplayBinding(
-            RuleConsumerBinding binding,
-            String nodeId,
-            String nodeType,
-            String edgeId,
-            String edgeSource,
-            String edgeTarget,
-            String surfaceLabel
-    ) {}
-
-    private record BpmReplayExecution(
-            RuleEvaluationTrace trace,
-            boolean failClosed,
-            BpmRuleBindingRuntimeService.TaskAssignmentResult assignment
-    ) {}
 
     private ModelPublishReplayResultDTO replayPermissionStep(
             ModelPublishReplayStepDTO step,
@@ -3596,393 +3188,20 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private ModelPublishReplayResultDTO replaySlaStep(
             ModelPublishReplayStepDTO step,
             MetaModelPublishReplayRequest request) {
-        if (slaConfigService == null || slaActivationListener == null || slaRecordService == null) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("SLA_UNAVAILABLE")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA replay service is unavailable in this runtime.")
-                    .errors(List.of("SLA_REPLAY_SERVICE_UNAVAILABLE"))
-                    .outputs(Map.of())
-                    .build();
-        }
-        if (!StringUtils.hasText(step.getSourcePid())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA replay requires sourcePid.")
-                    .errors(List.of("MISSING_SLA_CONFIG_PID"))
-                    .outputs(Map.of())
-                    .build();
-        }
-
-        SlaConfigEntity config = slaConfigService.getByPid(step.getSourcePid());
-        if (config == null) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA config was not found for replay.")
-                    .errors(List.of("SLA_CONFIG_NOT_FOUND"))
-                    .outputs(Map.of("slaConfigPid", step.getSourcePid()))
-                    .build();
-        }
-
-        String targetType = nullToBlank(config.getTargetType()).trim().toUpperCase(Locale.ROOT);
-        if ("NODE".equals(targetType)) {
-            return replaySlaNodeStep(step, config, request);
-        }
-        if (!"RECORD".equals(targetType)) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("MANUAL_REQUIRED")
-                    .automated(false)
-                    .executed(false)
-                    .message("SLA replay currently supports RECORD-level and BPM NODE activation.")
-                    .errors(List.of())
-                    .outputs(slaReplayOutputs(config, null, null))
-                    .build();
-        }
-
-        if (request == null || !Boolean.TRUE.equals(request.getExecuteAutomated())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("READY")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA RECORD replay is available. Pass executeAutomated=true with sampleContext.record.pid and record.data.")
-                    .errors(List.of())
-                    .outputs(slaReplayOutputs(config, null, null))
-                    .build();
-        }
-        if (request.getSampleContext() == null || request.getSampleContext().isEmpty()) {
-            return slaNeedsSampleContext(step, config, "SLA RECORD replay requires representative sampleContext.");
-        }
-
-        String recordPid = sampleRecordPid(request.getSampleContext());
-        if (!StringUtils.hasText(recordPid)) {
-            return slaNeedsSampleContext(step, config,
-                    "SLA RECORD replay requires sampleContext.record.pid or sampleContext.record.recordPid.");
-        }
-        if (!StringUtils.hasText(config.getTargetKey())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA RECORD replay requires targetKey model code on the SLA config.")
-                    .errors(List.of("MISSING_SLA_TARGET_KEY"))
-                    .outputs(slaReplayOutputs(config, recordPid, null))
-                    .build();
-        }
-
-        Map<String, Object> recordData = sampleRecordData(request.getSampleContext());
-        try {
-            slaActivationListener.onRecordCreate(config.getTargetKey(), recordPid, recordData);
-            SlaRecordEntity record = latestSlaRecord(recordPid, config);
-            boolean created = record != null;
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status(created ? "EXECUTED" : "FAILED")
-                    .automated(true)
-                    .executed(created)
-                    .message(created
-                            ? "SLA RECORD replay activated an SLA record."
-                            : "SLA RECORD replay did not create an SLA record.")
-                    .traceId(record != null ? record.getPid() : null)
-                    .matched(created)
-                    .outputs(slaReplayOutputs(config, recordPid, record))
-                    .errors(created ? List.of() : List.of("SLA_RECORD_NOT_CREATED"))
-                    .build();
-        } catch (RuntimeException e) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA RECORD replay failed: " + e.getMessage())
-                    .errors(List.of(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()))
-                    .outputs(slaReplayOutputs(config, recordPid, null))
-                    .build();
-        }
+        return productOwnedReplay(step, "SLA");
     }
 
-    private ModelPublishReplayResultDTO replaySlaNodeStep(
-            ModelPublishReplayStepDTO step,
-            SlaConfigEntity config,
-            MetaModelPublishReplayRequest request) {
-        if (request == null || !Boolean.TRUE.equals(request.getExecuteAutomated())) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("READY")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA NODE replay is available. Pass executeAutomated=true with sampleContext.bpm.processInstanceId, tenantId and taskId.")
-                    .errors(List.of())
-                    .outputs(slaNodeReplayOutputs(config, null, null, null))
-                    .build();
-        }
-        Map<String, Map<String, Object>> sampleContext = request.getSampleContext();
-        if (sampleContext == null || sampleContext.isEmpty()) {
-            return slaNodeNeedsSampleContext(step, config, null, null,
-                    "SLA NODE replay requires representative sampleContext.");
-        }
-        String activityId = config.getTargetKey();
-        if (!StringUtils.hasText(activityId)) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA NODE replay requires targetKey activity id on the SLA config.")
-                    .errors(List.of("MISSING_SLA_TARGET_KEY"))
-                    .outputs(slaNodeReplayOutputs(config, null, null, null))
-                    .build();
-        }
-        String processInstanceId = sampleBpmProcessInstanceId(sampleContext);
-        String taskId = sampleBpmTaskId(sampleContext);
-        if (!StringUtils.hasText(processInstanceId)) {
-            return slaNodeNeedsSampleContext(step, config, null, taskId,
-                    "SLA NODE replay requires sampleContext.bpm.processInstanceId or sampleContext.bpm.instanceId.");
-        }
-        Long tenantId = sampleBpmTenantId(sampleContext);
-        if (tenantId == null || tenantId == 0L) {
-            return slaNodeNeedsSampleContext(step, config, processInstanceId, taskId,
-                    "SLA NODE replay requires sampleContext.bpm.tenantId or an active MetaContext tenant.");
-        }
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        Map<String, Object> bpm = sampleContext.get("bpm");
-        if (bpm != null) {
-            payload.putAll(bpm);
-        }
-        if (StringUtils.hasText(taskId)) {
-            payload.put("taskInstanceId", taskId);
-        }
-        Map<String, Object> recordData = sampleRecordData(sampleContext);
-        if (!recordData.isEmpty()) {
-            payload.put("record", Map.of("data", recordData));
-        }
-        String processKey = sampleBpmProcessKey(sampleContext);
-        try {
-            BpmEvent event = BpmEvent.of(
-                    tenantId,
-                    "task_assigned",
-                    "bpm",
-                    processKey,
-                    processInstanceId,
-                    activityId,
-                    payload);
-            slaActivationListener.onBpmEvent(event);
-            SlaRecordEntity record = latestSlaRecord(processInstanceId, config);
-            boolean created = record != null;
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status(created ? "EXECUTED" : "FAILED")
-                    .automated(true)
-                    .executed(created)
-                    .message(created
-                            ? "SLA NODE replay activated an SLA record from a BPM task assignment sample."
-                            : "SLA NODE replay did not create an SLA record from the BPM task assignment sample.")
-                    .traceId(record != null ? record.getPid() : null)
-                    .matched(created)
-                    .outputs(slaNodeReplayOutputs(config, processInstanceId, taskId, record))
-                    .errors(created ? List.of() : List.of("SLA_NODE_RECORD_NOT_CREATED"))
-                    .build();
-        } catch (RuntimeException e) {
-            return ModelPublishReplayResultDTO.builder()
-                    .step(step)
-                    .status("FAILED")
-                    .automated(true)
-                    .executed(false)
-                    .message("SLA NODE replay failed: " + e.getMessage())
-                    .errors(List.of(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()))
-                    .outputs(slaNodeReplayOutputs(config, processInstanceId, taskId, null))
-                    .build();
-        }
-    }
-
-    private ModelPublishReplayResultDTO slaNodeNeedsSampleContext(
-            ModelPublishReplayStepDTO step,
-            SlaConfigEntity config,
-            String processInstanceId,
-            String taskId,
-            String message) {
+    private ModelPublishReplayResultDTO productOwnedReplay(
+            ModelPublishReplayStepDTO step, String productArea) {
         return ModelPublishReplayResultDTO.builder()
                 .step(step)
-                .status("NEEDS_SAMPLE_CONTEXT")
-                .automated(true)
+                .status("MANUAL_REQUIRED")
+                .automated(false)
                 .executed(false)
-                .message(message)
+                .message(productArea + " replay is owned by the installed workflow product.")
                 .errors(List.of())
-                .outputs(slaNodeReplayOutputs(config, processInstanceId, taskId, null))
+                .outputs(Map.of("owner", "workflow-capability"))
                 .build();
-    }
-
-    private ModelPublishReplayResultDTO slaNeedsSampleContext(
-            ModelPublishReplayStepDTO step,
-            SlaConfigEntity config,
-            String message) {
-        return ModelPublishReplayResultDTO.builder()
-                .step(step)
-                .status("NEEDS_SAMPLE_CONTEXT")
-                .automated(true)
-                .executed(false)
-                .message(message)
-                .errors(List.of())
-                .outputs(slaReplayOutputs(config, null, null))
-                .build();
-    }
-
-    private Map<String, Object> sampleRecordData(Map<String, Map<String, Object>> sampleContext) {
-        if (sampleContext == null || sampleContext.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Object> record = sampleContext.get("record");
-        if (record != null && record.get("data") instanceof Map<?, ?> data) {
-            return data.entrySet().stream()
-                    .filter(entry -> entry.getKey() instanceof String)
-                    .collect(Collectors.toMap(
-                            entry -> (String) entry.getKey(),
-                            Map.Entry::getValue,
-                            (left, right) -> right,
-                            LinkedHashMap::new));
-        }
-        return record == null ? Map.of() : record.entrySet().stream()
-                .filter(entry -> !"pid".equals(entry.getKey())
-                        && !"recordPid".equals(entry.getKey())
-                        && !"publicId".equals(entry.getKey()))
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (left, right) -> right,
-                        LinkedHashMap::new));
-    }
-
-    private SlaRecordEntity latestSlaRecord(String recordPid, SlaConfigEntity config) {
-        if (!StringUtils.hasText(recordPid) || config == null || !StringUtils.hasText(config.getPid())) {
-            return null;
-        }
-        List<SlaRecordEntity> records = slaRecordService.findByProcessInstance(recordPid);
-        if (records == null || records.isEmpty()) {
-            return null;
-        }
-        return records.stream()
-                .filter(record -> record != null
-                        && config.getPid().equals(record.getSlaConfigId())
-                        && Objects.equals(config.getTargetKey(), record.getNodeId()))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private Map<String, Object> slaReplayOutputs(
-            SlaConfigEntity config,
-            String recordPid,
-            SlaRecordEntity record) {
-        Map<String, Object> outputs = new LinkedHashMap<>();
-        if (config != null) {
-            outputs.put("slaConfigPid", config.getPid());
-            outputs.put("targetType", config.getTargetType());
-            outputs.put("targetKey", config.getTargetKey());
-            outputs.put("deadlineMode", config.getDeadlineMode());
-            outputs.put("deadlineValue", config.getDeadlineValue());
-            outputs.put("enabled", config.getEnabled());
-            outputs.put("modelCode", config.getModelCode());
-            if (config.getActionPolicy() != null) {
-                Object actions = config.getActionPolicy().get("actions");
-                outputs.put("actionCount", actions instanceof List<?> list ? list.size() : 0);
-                outputs.put("actionPolicyTrigger", config.getActionPolicy().get("trigger"));
-            }
-        }
-        outputs.put("recordPid", recordPid);
-        if (record != null) {
-            outputs.put("slaRecordPid", record.getPid());
-            outputs.put("slaRecordStatus", record.getStatus());
-            outputs.put("deadlineTime", record.getDeadlineTime() != null ? record.getDeadlineTime().toString() : null);
-            outputs.put("startTime", record.getStartTime() != null ? record.getStartTime().toString() : null);
-            outputs.put("nodeId", record.getNodeId());
-            outputs.put("processInstanceId", record.getProcessInstanceId());
-        }
-        return outputs.entrySet().stream()
-                .filter(entry -> entry.getValue() != null)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (left, right) -> left,
-                        LinkedHashMap::new));
-    }
-
-    private String sampleBpmProcessInstanceId(Map<String, Map<String, Object>> sampleContext) {
-        if (sampleContext == null || sampleContext.isEmpty()) {
-            return "";
-        }
-        String processInstanceId = firstString(sampleContext.get("bpm"),
-                "processInstanceId", "instanceId", "processId");
-        if (StringUtils.hasText(processInstanceId)) {
-            return processInstanceId;
-        }
-        return firstString(sampleContext.get("meta"), "processInstanceId", "bpmProcessInstanceId");
-    }
-
-    private String sampleBpmTaskId(Map<String, Map<String, Object>> sampleContext) {
-        if (sampleContext == null || sampleContext.isEmpty()) {
-            return "";
-        }
-        String taskId = firstString(sampleContext.get("bpm"), "taskId", "taskInstanceId");
-        if (StringUtils.hasText(taskId)) {
-            return taskId;
-        }
-        return firstString(sampleContext.get("meta"), "taskId", "bpmTaskId");
-    }
-
-    private String sampleBpmProcessKey(Map<String, Map<String, Object>> sampleContext) {
-        if (sampleContext == null || sampleContext.isEmpty()) {
-            return "";
-        }
-        String processKey = firstString(sampleContext.get("bpm"),
-                "processKey", "processDefinitionKey", "processDefinitionId");
-        if (StringUtils.hasText(processKey)) {
-            return processKey;
-        }
-        return firstString(sampleContext.get("meta"), "processKey", "bpmProcessKey");
-    }
-
-    private Long sampleBpmTenantId(Map<String, Map<String, Object>> sampleContext) {
-        Long tenantId = firstLong(sampleContext != null ? sampleContext.get("bpm") : null, "tenantId");
-        if (tenantId != null) {
-            return tenantId;
-        }
-        tenantId = firstLong(sampleContext != null ? sampleContext.get("meta") : null, "tenantId");
-        if (tenantId != null) {
-            return tenantId;
-        }
-        try {
-            return MetaContext.getCurrentTenantId();
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    private Map<String, Object> slaNodeReplayOutputs(
-            SlaConfigEntity config,
-            String processInstanceId,
-            String taskId,
-        SlaRecordEntity record) {
-        Map<String, Object> outputs = new LinkedHashMap<>(
-                slaReplayOutputs(config, null, record));
-        outputs.put("processInstanceId", processInstanceId);
-        outputs.put("taskId", taskId);
-        return outputs.entrySet().stream()
-                .filter(entry -> entry.getValue() != null)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (left, right) -> left,
-                        LinkedHashMap::new));
     }
 
     private ModelPublishReplayResultDTO replayAutomationStep(
@@ -4255,6 +3474,23 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             }
         }
         return record;
+    }
+
+    private Map<String, Object> sampleRecordData(Map<String, Map<String, Object>> sampleContext) {
+        if (sampleContext == null || sampleContext.isEmpty()) return Map.of();
+        Map<String, Object> record = sampleContext.get("record");
+        if (record != null && record.get("data") instanceof Map<?, ?> data) {
+            return data.entrySet().stream()
+                    .filter(entry -> entry.getKey() instanceof String)
+                    .collect(Collectors.toMap(entry -> (String) entry.getKey(), Map.Entry::getValue,
+                            (left, right) -> right, LinkedHashMap::new));
+        }
+        return record == null ? Map.of() : record.entrySet().stream()
+                .filter(entry -> !"pid".equals(entry.getKey())
+                        && !"recordPid".equals(entry.getKey())
+                        && !"publicId".equals(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (left, right) -> right, LinkedHashMap::new));
     }
 
     private Map<String, Object> permissionReplayOutputs(
@@ -4726,7 +3962,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private String normalizeReplayConsumerType(String sourceType) {
         String normalized = nullToBlank(sourceType).trim().toUpperCase(Locale.ROOT);
         return switch (normalized) {
-            case "BPM" -> "BPM_PROCESS";
+            case "BPM" -> "WORKFLOW_PROCESS";
             case "SLA" -> "SLA_RULE";
             case "EVENT" -> "EVENT_POLICY";
             case "PERMISSION" -> "PERMISSION_POLICY";
@@ -4738,7 +3974,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private String replayConsumerLabel(String consumerType) {
         return switch (nullToBlank(consumerType)) {
             case "DECISION_VERSION" -> "决策版本";
-            case "BPM_PROCESS" -> "BPM 流程";
+            case "WORKFLOW_PROCESS" -> "BPM 流程";
             case "SLA_RULE" -> "SLA 策略";
             case "AUTOMATION" -> "自动化";
             case "EVENT_POLICY" -> "事件策略";
@@ -4751,7 +3987,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private String replayRecommendedAction(String consumerType) {
         return switch (nullToBlank(consumerType)) {
             case "DECISION_VERSION" -> "重新校验并发布受影响决策版本，使用代表性记录回放命中结果。";
-            case "BPM_PROCESS" -> "打开 BPMN 设计器校验规则绑定、候选人、网关条件和服务任务参数，重新部署流程。";
+            case "WORKFLOW_PROCESS" -> "打开 BPMN 设计器校验规则绑定、候选人、网关条件和服务任务参数，重新部署流程。";
             case "SLA_RULE" -> "重新校验 SLA 条件与超时动作，回放 deadline 和升级策略。";
             case "AUTOMATION" -> "重新校验自动化触发条件和动作字段映射，执行一次测试运行。";
             case "EVENT_POLICY" -> "重新校验事件条件、动作 payload 和 Trace 链路，执行一次策略回放。";

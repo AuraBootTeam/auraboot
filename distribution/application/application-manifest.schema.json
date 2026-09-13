@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.com/schemas/application-manifest-v1.json",
+  "title": "AuraBoot Application Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "app", "platform", "backend", "frontend", "config"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version", "defaultRoute"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/definitions/releaseVersion" },
+        "defaultRoute": { "type": "string", "pattern": "^/" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "baseImage", "pluginApi", "webShell", "pluginSdk", "webPackages", "dslSchema"],
+      "properties": {
+        "runtime": { "$ref": "#/definitions/releaseVersion" },
+        "baseImage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "version": { "$ref": "#/definitions/releaseVersion" }
+          }
+        },
+        "pluginApi": { "$ref": "#/definitions/releaseVersion" },
+        "webShell": { "$ref": "#/definitions/releaseVersion" },
+        "pluginSdk": { "$ref": "#/definitions/releaseVersion" },
+        "webPackages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version"],
+            "properties": {
+              "package": { "type": "string", "pattern": "^@auraboot/[a-z0-9-]+$" },
+              "version": { "$ref": "#/definitions/releaseVersion" }
+            }
+          }
+        },
+        "dslSchema": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "plugins", "migrationSets"],
+      "properties": {
+        "mode": { "enum": ["core-only", "application"] },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "version": { "$ref": "#/definitions/releaseVersion" }
+            }
+          }
+        },
+        "migrationSets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contributions"],
+      "properties": {
+        "contributions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version"],
+            "properties": {
+              "package": { "type": "string", "pattern": "^@auraboot/[a-z0-9-]+$" },
+              "version": { "$ref": "#/definitions/releaseVersion" }
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["importOrder"],
+      "properties": {
+        "importOrder": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "releaseVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+      "not": { "pattern": "[sS][nN][aA][pP][sS][hH][oO][tT]|[lL][aA][tT][eE][sS][tT]|[wW][oO][rR][kK][sS][pP][aA][cC][eE]|[bB][rR][aA][nN][cC][hH]" }
+    }
+  }
+}

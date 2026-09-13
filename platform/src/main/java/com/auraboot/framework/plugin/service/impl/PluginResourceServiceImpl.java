@@ -524,7 +524,6 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         return switch (type) {
             case MENU -> "name";
             case PAGE -> "page_key";
-            case PROCESS -> "process_key";
             case AGENT_DEFINITION -> "agent_code";
             default -> "code";
         };
