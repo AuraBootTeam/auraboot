@@ -24,6 +24,19 @@ fail() { printf 'bpm-release-image-gate: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || fatal "missing dependency: $1"; }
 
+PUSH_ENABLED=1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-push) PUSH_ENABLED=0 ;;
+    --help|-h)
+      printf 'Usage: %s [--no-push]\nRun through the local CI control plane. --no-push verifies packaging without registry login or publication.\n' "$0"
+      exit 0
+      ;;
+    *) fatal "unknown argument: $1" ;;
+  esac
+  shift
+done
+
 : "${AURA_CI_JOB_ID:?AURA_CI_JOB_ID is required; run through the local CI control plane}"
 : "${AURA_REGRESSION_ARTIFACTS:?AURA_REGRESSION_ARTIFACTS is required}"
 : "${AURA_CI_BUILDER_ID:?AURA_CI_BUILDER_ID is required}"
@@ -170,7 +183,10 @@ info "health UP after ~$((i * 3))s"
 docker logs "$APP_CONTAINER" > "$ARTIFACTS/logs/app-container.log" 2>&1 || true
 
 PUSH_STATUS="skipped:no-registry-credentials"
-if [[ -n "${AURA_RELEASE_REGISTRY:-}" && -n "${AURA_RELEASE_REGISTRY_USERNAME:-}" \
+if [[ "$PUSH_ENABLED" -eq 0 ]]; then
+  PUSH_STATUS="skipped:disabled"
+fi
+if [[ "$PUSH_ENABLED" -eq 1 && -n "${AURA_RELEASE_REGISTRY:-}" && -n "${AURA_RELEASE_REGISTRY_USERNAME:-}" \
     && -n "${AURA_RELEASE_REGISTRY_PASSWORD_FILE:-}" && -r "${AURA_RELEASE_REGISTRY_PASSWORD_FILE}" ]]; then
   FULL_IMAGE="${AURA_RELEASE_REGISTRY}/auraboot-platform:${IMAGE_TAG}"
   docker tag "$IMAGE_NAME" "$FULL_IMAGE"
