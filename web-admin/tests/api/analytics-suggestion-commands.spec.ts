@@ -334,6 +334,30 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
           ).rows,
       )
       .toEqual([{ status: 'success' }]);
+    if (process.env.AURA_ANALYTICS_EXPECT_COMMAND_ROLLBACK === 'true') {
+      test
+        .info()
+        .annotations.push({
+          type: 'fault-injection',
+          description: 'Actual outbox post-insert failure',
+        });
+      expect(await businessRecords()).toEqual([]);
+      const committed = await db.query(
+        'SELECT event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name=$2',
+        [linked[0].run_pid, 'analytics_business_command_committed'],
+      );
+      expect(committed.rows).toEqual([]);
+      const failed = await db.query(
+        'SELECT action_status, error_message FROM ab_agent_action WHERE run_id=$1 AND command_code=$2',
+        [linked[0].run_pid, 'e2et:create_order'],
+      );
+      expect(failed.rows).toHaveLength(1);
+      expect(failed.rows[0].action_status).toBe('failed');
+      expect(failed.rows[0].error_message).toContain(
+        'injected after analytics business outcome insert',
+      );
+      return;
+    }
     const createdOrders = await businessRecords();
     expect(createdOrders).toHaveLength(1);
     expect(createdOrders[0]).toMatchObject({
