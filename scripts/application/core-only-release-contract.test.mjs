@@ -32,6 +32,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /docker --config "\$DOCKER_CONFIG_ROOT" pull "\$REGISTRY_DIGEST_REF"/);
   assert.match(productImageGate, /PULLED_IMAGE_ID" == "\$IMAGE_ID/);
   assert.match(productImageGate, /fresh database migration failed/);
+  assert.match(productImageGate, /pnpm --dir "\$CORE_ROOT" install --frozen-lockfile --ignore-scripts/);
+  assert.match(productImageGate, /core-pnpm-install\.log/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
   assert.match(productImageGate, /release-image-receipt\.json/);
   assert.match(productImageGate, /git -C "\$PRODUCT_ROOT" archive "\$PRODUCT_SHA" "\$FIXTURE_REL"/);
