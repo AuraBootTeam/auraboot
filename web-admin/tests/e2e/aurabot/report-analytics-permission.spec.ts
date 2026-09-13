@@ -619,6 +619,45 @@ test('named-query reports require source and declared resource permissions', asy
         expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders).toEqual([
           { e2et_order_title: key },
         ]);
+        const exportPdf = async (scope: string) => {
+          const pending = session.page.waitForEvent('download');
+          await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
+          const pdf = await pending;
+          expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
+          const artifactPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-${scope}.pdf`;
+          await pdf.saveAs(artifactPath);
+          const bytes = await readFile(artifactPath);
+          expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+          if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1')
+            expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
+        };
+        const setScope = async (scopeType: 'none' | 'all') => {
+          const response = await page.request.put(`/api/permissions/matrix/${rolePid}/scope`, {
+            data: { resourceCode: 'e2et_order', actionCode: 'read', scopeType, mergeStrategy: 'MIN' },
+          });
+          expect(response.status()).toBe(200);
+        };
+        await exportPdf('allowed');
+        try {
+          await setScope('none');
+          expect((await fetchRoleSnapshot(session.page)).permissionCodes).toContain('model.e2et_order.read');
+          const empty = await session.page.request.post('/api/reports/export/json', { data: { reportPid: pid } });
+          expect(empty.status()).toBe(200);
+          expect((await empty.json()).dataSets.orders).toEqual([]);
+          await session.page.reload();
+          await expect(session.page.getByTestId('report-reader-toolbar')).toBeVisible();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+          await exportPdf('scope-none');
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-scope-none.png`,
+            fullPage: true,
+          });
+        } finally {
+          await setScope('all');
+        }
+        await session.page.reload();
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        await exportPdf('scope-restored');
       } else {
         await expect(session.page.getByRole('alert')).toContainText('查询未成功');
         await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');
