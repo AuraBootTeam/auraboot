@@ -575,7 +575,10 @@ public class TestFixtureController {
 
             int dismissedTotal = 0;
             for (int round = 0; round < 10; round++) {
-                Object page = listByUser.invoke(inboxService, userId, tenantId, null, "PENDING", 1, 200);
+                // Status is matched case-sensitively (wrapper.eq) and stored
+                // lowercase ("pending") — "PENDING" here silently matched 0
+                // rows and the fixture reported success with 0 dismissed.
+                Object page = listByUser.invoke(inboxService, userId, tenantId, null, "pending", 1, 200);
                 List<?> records = (List<?>) page.getClass().getMethod("getRecords").invoke(page);
                 if (records == null || records.isEmpty()) {
                     break;
