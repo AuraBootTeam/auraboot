@@ -48,6 +48,7 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /wait_for_final_postgres "\$PG_CONTAINER" aura_product_ci 'runtime'/);
   assert.match(productImageGate, /SPRING_DATASOURCE_PASSWORD=auraboot_ci/);
   assert.match(productImageGate, /docker rm -f "\$BUILD_PG_CONTAINER"/);
+  assert.match(productImageGate, /docker logs "\$APP_CONTAINER" >"\$ARTIFACTS\/logs\/application-final\.log"/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
   assert.match(productImageGate, /release-image-receipt\.json/);
   assert.match(productImageGate, /git -C "\$PRODUCT_ROOT" archive "\$PRODUCT_SHA" "\$FIXTURE_REL"/);

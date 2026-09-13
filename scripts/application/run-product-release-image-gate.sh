@@ -119,6 +119,13 @@ FLYWAY_IMAGE="${AURA_CI_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 
 cleanup() {
   local status=$?
+  # Preserve the final application log even when the runtime became healthy and
+  # failed later during browser acceptance. The earlier runtime snapshot is
+  # intentionally retained as startup evidence; this file captures shutdown-time
+  # diagnostics before the ephemeral container is removed.
+  if docker inspect "$APP_CONTAINER" >/dev/null 2>&1; then
+    docker logs "$APP_CONTAINER" >"$ARTIFACTS/logs/application-final.log" 2>&1 || true
+  fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
     AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
       "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
