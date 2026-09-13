@@ -7,6 +7,7 @@ import { PG_CONN } from '../helpers/environments';
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
 test('async export task and file belong to their creator', async ({ request }) => {
+  test.setTimeout(120000);
   const code = `export_owner_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const created = await request.post('/api/meta/named-queries', {
     data: {
@@ -70,6 +71,54 @@ test('async export task and file belong to their creator', async ({ request }) =
     expect(rawDynamic.status()).toBe(403);
   } finally {
     await db.end();
+  }
+
+  if (process.env.AURA_EXPORT_CROSS_TENANT === '1') {
+    const before = await request.get('/api/auth/me');
+    expect(before.status()).toBe(200);
+    const original = (await before.json()).data.user;
+    const createdTenant = await request.post('/api/tenant-selection/process', {
+      timeout: 30000,
+      data: { action: 'create', tenantName: code, displayName: 'Export isolation' },
+    });
+    expect(createdTenant.status()).toBe(200);
+    const tenant = (await createdTenant.json()).data;
+    expect(tenant.jwt).toBeTruthy();
+    const foreign = await requestFactory.newContext({
+      baseURL: process.env.BACKEND_URL,
+      extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
+    });
+    try {
+      const me = await foreign.get('/api/auth/me');
+      expect(me.status()).toBe(200);
+      const identity = (await me.json()).data;
+      expect(identity.user.id).toBe(original.id);
+      expect(String(identity.user.tenantId)).not.toBe(String(original.tenantId));
+      expect(String(identity.user.tenantId)).toBe(String(tenant.tenantId));
+      expect(identity.permissions.permissionCodes).toContain('meta.query.read');
+      const paramVariants: Array<Record<string, string>> = [
+        {},
+        { tenantId: String(original.tenantId) },
+      ];
+      for (const target of [path, `${path}/download`, syncUrl]) {
+        for (const params of paramVariants) {
+          const denied = await foreign.get(target, { params });
+          expect(denied.status(), await denied.text()).toBe(400);
+          const body = await denied.text();
+          expect(body).toContain('Export task not found');
+          expect(body).not.toContain('fileKey');
+          expect(denied.headers()['content-disposition']).toBeUndefined();
+        }
+      }
+      const unchangedSync = await request.get(syncUrl);
+      expect(unchangedSync.status()).toBe(200);
+      expect(await unchangedSync.body()).toEqual(await syncFile.body());
+      const unchangedAsync = await request.get(`${path}/download`);
+      expect(unchangedAsync.status()).toBe(200);
+      expect(await unchangedAsync.body()).toEqual(await download.body());
+    } finally {
+      await foreign.dispose();
+    }
   }
 
   const email = `export-${randomUUID()}@e2e.local`;
