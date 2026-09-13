@@ -27,6 +27,16 @@ for (const withBusinessCommand of [false, true]) {
     expect((await imported.json()).success).toBe(true);
     const marker = `建议验证 ${Date.now()}`;
     const outcomeTitle = `${marker}-followup`;
+    const paginateResults =
+      withBusinessCommand && process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
+    const outcomeTitles = Array.from({ length: paginateResults ? 11 : 1 }, (_, index) =>
+      index === 0 ? outcomeTitle : `${outcomeTitle}-${index}`,
+    );
+    const outcomeCalls = outcomeTitles.map((title, index) => ({
+      id: `business-order-${index}`,
+      name: 'cmd:e2et:create_order',
+      input: { e2et_order_title: title, e2et_order_type: 'normal', e2et_order_urgent: false },
+    }));
     const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
       data: {
         e2et_order_title: marker,
@@ -163,14 +173,7 @@ for (const withBusinessCommand of [false, true]) {
           type: 'agent_task',
           goal: withBusinessCommand
             ? 'Create one follow-up test order using the existing order command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
-              JSON.stringify({
-                name: 'cmd:e2et:create_order',
-                input: {
-                  e2et_order_title: outcomeTitle,
-                  e2et_order_type: 'normal',
-                  e2et_order_urgent: false,
-                },
-              })
+              JSON.stringify(paginateResults ? { calls: outcomeCalls } : outcomeCalls[0])
             : 'Review the selected order and report findings.',
         },
         requestId: randomUUID(),
@@ -334,21 +337,68 @@ for (const withBusinessCommand of [false, true]) {
         (r) => r.url().includes('/business-results') && r.request().method() === 'GET',
       );
       await version.getByRole('button', { name: '查看业务结果', exact: true }).click();
-      expect((await resultResponse).status()).toBe(200);
+      const firstResultResponse = await resultResponse;
+      expect(firstResultResponse.status()).toBe(200);
+      const firstResultPage = (await firstResultResponse.json()).data;
       const resultDialog = page.getByRole('dialog');
       await expect(resultDialog).toContainText('已提交的业务操作');
       if (withBusinessCommand) {
-        await expect(resultDialog.getByRole('listitem')).toHaveCount(1);
+        await expect(resultDialog.getByRole('listitem')).toHaveCount(
+          Math.min(outcomeTitles.length, 10),
+        );
         await expect(resultDialog).toContainText('新增已提交');
-        const orders = await db.query('SELECT pid FROM mt_e2et_order WHERE e2et_order_title=$1', [
-          outcomeTitle,
-        ]);
-        expect(orders.rows).toHaveLength(1);
+        const orders = await db.query(
+          'SELECT pid FROM mt_e2et_order WHERE e2et_order_title=ANY($1)',
+          [outcomeTitles],
+        );
+        expect(orders.rows).toHaveLength(outcomeTitles.length);
         const facts = await db.query(
-          "SELECT target_key FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name='analytics_business_command_committed'",
+          "SELECT event_id, target_key FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name='analytics_business_command_committed' ORDER BY id",
           [linked.rows[0].pid],
         );
-        expect(facts.rows).toEqual([{ target_key: orders.rows[0].pid }]);
+        expect(facts.rows).toHaveLength(outcomeTitles.length);
+        expect(facts.rows.map((fact) => fact.target_key).sort()).toEqual(
+          orders.rows.map((order) => order.pid).sort(),
+        );
+        expect(firstResultPage.records.map((record: any) => record.eventId)).toEqual(
+          facts.rows.slice(0, 10).map((fact) => fact.event_id),
+        );
+        if (paginateResults) {
+          expect(firstResultPage.hasMore).toBe(true);
+          await expect(
+            resultDialog.getByRole('button', { name: '下一页', exact: true }),
+          ).toBeInViewport();
+          await shot('business-results-page-one');
+          const next = page.waitForResponse(
+            (response) =>
+              response.url().includes('/business-results') &&
+              new URL(response.url()).searchParams.get('page') === '2',
+          );
+          await resultDialog.getByRole('button', { name: '下一页', exact: true }).click();
+          const nextResponse = await next;
+          expect(nextResponse.status()).toBe(200);
+          const nextPage = (await nextResponse.json()).data;
+          expect(nextPage.records.map((record: any) => record.eventId)).toEqual([
+            facts.rows[10].event_id,
+          ]);
+          expect(nextPage.hasMore).toBe(false);
+          await expect(resultDialog.getByRole('listitem')).toHaveCount(1);
+          await expect(
+            resultDialog.getByRole('button', { name: '下一页', exact: true }),
+          ).toHaveCount(0);
+          await shot('business-results-page-two');
+          const previous = page.waitForResponse(
+            (response) =>
+              response.url().includes('/business-results') &&
+              new URL(response.url()).searchParams.get('page') === '1',
+          );
+          await resultDialog.getByRole('button', { name: '上一页', exact: true }).click();
+          const previousResponse = await previous;
+          expect(previousResponse.status()).toBe(200);
+          expect((await previousResponse.json()).data.records).toEqual(firstResultPage.records);
+          await expect(resultDialog.getByRole('listitem')).toHaveCount(10);
+          await shot('business-results-page-return');
+        }
       } else {
         await expect(resultDialog).toContainText('尚无已记录的提交结果');
         await expect(resultDialog.getByRole('listitem')).toHaveCount(0);
@@ -356,6 +406,9 @@ for (const withBusinessCommand of [false, true]) {
       await shot('business-results');
       const resultsViewport = page.viewportSize()!;
       await page.setViewportSize({ width: 390, height: 844 });
+      await expect(
+        resultDialog.getByRole('heading', { name: '已提交的业务操作' }),
+      ).toBeInViewport();
       await expect(
         resultDialog.getByRole('button', { name: '重新读取', exact: true }),
       ).toBeInViewport();

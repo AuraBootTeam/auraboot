@@ -16,6 +16,45 @@ class StubLlmProviderTest {
     private final StubLlmProvider provider = new StubLlmProvider();
 
     @Test
+    void fixtureBatchContinuesAfterFiveRealToolResults() throws Exception {
+        var calls = java.util.stream.IntStream.range(0, 6)
+                .mapToObj(index -> Map.of("name", "tool-" + index)).toList();
+        String directive = StubLlmProvider.TOOL_USE_MARKER + " "
+                + new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(Map.of("calls", calls));
+        var first = provider.chat(LlmChatRequest.builder().messages(List.of(
+                LlmChatRequest.Message.text("user", directive))).build(), StubLlmProvider.STUB_API_KEY_SENTINEL, "stub://local");
+        assertThat(first.getContent()).hasSize(5);
+        var results = java.util.stream.IntStream.range(0, 5).mapToObj(index ->
+                LlmChatRequest.ContentBlock.builder().type("tool_result").toolUseId("toolu-stub-" + index).result("ok").build()).toList();
+        var next = provider.chat(LlmChatRequest.builder().messages(List.of(
+                LlmChatRequest.Message.text("user", directive),
+                LlmChatRequest.Message.builder().role("user").content(results).build())).build(), StubLlmProvider.STUB_API_KEY_SENTINEL, "stub://local");
+        assertThat(next.getContent()).hasSize(1);
+        assertThat(next.getContent().get(0).getName()).isEqualTo("tool-5");
+        assertThat(next.getContent().get(0).getId()).isEqualTo("toolu-stub-5");
+    }
+
+    @Test
+    void batchCallsPreserveOrderAndHaveDistinctIds() {
+        var response = provider.chat(LlmChatRequest.builder().messages(List.of(
+                LlmChatRequest.Message.text("user", StubLlmProvider.TOOL_USE_MARKER
+                        + " {\"calls\":[{\"name\":\"first\",\"input\":{\"title\":\"one\"}},{\"name\":\"second\",\"input\":{\"title\":\"two\"}}]}")))
+                .build(), StubLlmProvider.STUB_API_KEY_SENTINEL, "stub://local");
+        assertThat(response.getContent()).extracting(LlmChatResponse.ContentBlock::getName).containsExactly("first", "second");
+        assertThat(response.getContent()).extracting(LlmChatResponse.ContentBlock::getId).doesNotHaveDuplicates();
+        assertThat(response.getContent().get(1).getInput()).isEqualTo(Map.of("title", "two"));
+    }
+
+    @Test
+    void duplicateBatchIdsDoNotProduceToolCalls() {
+        var response = provider.chat(LlmChatRequest.builder().messages(List.of(
+                LlmChatRequest.Message.text("user", StubLlmProvider.TOOL_USE_MARKER
+                        + " {\"calls\":[{\"id\":\"same\",\"name\":\"first\"},{\"id\":\"same\",\"name\":\"second\"}]}")))
+                .build(), StubLlmProvider.STUB_API_KEY_SENTINEL, "stub://local");
+        assertThat(response.getStopReason()).isNotEqualTo("tool_use");
+    }
+
+    @Test
     @DisplayName("scripted tool_use marker produces one deterministic tool call")
     void scriptedToolUseMarkerProducesDeterministicToolCall() {
         String message = "Create model\n" + StubLlmProvider.TOOL_USE_MARKER + " "

@@ -281,7 +281,7 @@ public class StubLlmProvider implements LlmProvider {
             return null;
         }
         ToolUseDirective directive = latestToolUseDirective(request);
-        if (directive == null || hasToolResultAfter(request, directive.messageIndex())) {
+        if (directive == null) {
             return null;
         }
         String json = directive.json();
@@ -291,23 +291,31 @@ public class StubLlmProvider implements LlmProvider {
         try {
             Map<String, Object> payload = OBJECT_MAPPER.readValue(
                     json, new TypeReference<Map<String, Object>>() {});
-            Object name = payload.get("name");
-            if (name == null || String.valueOf(name).isBlank()) {
-                return null;
+            // Explicit fixture batches exercise real multi-command runs, with bounded output.
+            List<Map<String, Object>> calls = payload.containsKey("calls")
+                    ? OBJECT_MAPPER.convertValue(payload.get("calls"), new TypeReference<List<Map<String, Object>>>() {})
+                    : List.of(payload);
+            if (calls == null || calls.isEmpty() || calls.size() > 20) return null;
+            List<LlmChatResponse.ContentBlock> toolUses = new ArrayList<>();
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            int completed = countToolResultsAfter(request, directive.messageIndex());
+            if (completed >= calls.size()) return null;
+            // Keep fixture batches within the runtime's ordinary fanout limit.
+            for (int index = completed; index < Math.min(calls.size(), completed + 5); index++) {
+                Map<String, Object> call = calls.get(index);
+                Object name = call.get("name");
+                if (name == null || String.valueOf(name).isBlank()) return null;
+                String id = call.get("id") == null
+                        ? (calls.size() == 1 ? "toolu-stub" : "toolu-stub-" + index)
+                        : String.valueOf(call.get("id"));
+                if (!ids.add(id)) return null;
+                toolUses.add(LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use").id(id).name(String.valueOf(name))
+                        .input(toStringObjectMap(call.get("input"))).build());
             }
-            Object input = payload.get("input");
-            String id = payload.get("id") == null
-                    ? "toolu-stub"
-                    : String.valueOf(payload.get("id"));
-            LlmChatResponse.ContentBlock toolUse = LlmChatResponse.ContentBlock.builder()
-                    .type("tool_use")
-                    .id(id)
-                    .name(String.valueOf(name))
-                    .input(toStringObjectMap(input))
-                    .build();
             return LlmChatResponse.builder()
                     .stopReason("tool_use")
-                    .content(List.of(toolUse))
+                    .content(toolUses)
                     .inputTokens(estimateInputTokens(request))
                     .outputTokens(1)
                     .build();
@@ -333,7 +341,8 @@ public class StubLlmProvider implements LlmProvider {
         return null;
     }
 
-    private boolean hasToolResultAfter(LlmChatRequest request, int messageIndex) {
+    private int countToolResultsAfter(LlmChatRequest request, int messageIndex) {
+        int count = 0;
         for (int i = messageIndex + 1; i < request.getMessages().size(); i++) {
             LlmChatRequest.Message message = request.getMessages().get(i);
             if (message == null || message.getContent() == null) continue;
@@ -342,16 +351,16 @@ public class StubLlmProvider implements LlmProvider {
                 for (Object item : list) {
                     if (item instanceof LlmChatRequest.ContentBlock block
                             && "tool_result".equals(block.getType())) {
-                        return true;
+                        count++;
                     }
                     if (item instanceof Map<?, ?> map
                             && "tool_result".equals(String.valueOf(map.get("type")))) {
-                        return true;
+                        count++;
                     }
                 }
             }
         }
-        return false;
+        return count;
     }
 
     private Map<String, Object> toStringObjectMap(Object input) {
