@@ -128,7 +128,7 @@ export interface KanbanAggregationConfig {
   field: string;
   /** Aggregation function: COUNT, SUM, AVG, MIN, MAX */
   function: 'count' | 'sum' | 'avg' | 'min' | 'max';
-  label?: string;
+  label?: string | Record<string, string>; // localized map via getLocalizedText (WMS-UX-02)
 }
 
 /**
