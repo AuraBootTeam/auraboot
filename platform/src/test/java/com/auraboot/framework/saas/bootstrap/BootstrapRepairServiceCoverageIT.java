@@ -33,18 +33,6 @@ class BootstrapRepairServiceCoverageIT extends BaseIntegrationTest {
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
-    private static final List<String> ALL_STEPS = List.of(
-            BootstrapRepairService.STEP_SYSTEM_CONFIG,
-            BootstrapRepairService.STEP_SYSTEM_TENANT,
-            BootstrapRepairService.STEP_PLATFORM_ADMIN_ROLE,
-            BootstrapRepairService.STEP_ADMIN_USER,
-            BootstrapRepairService.STEP_ADMIN_MEMBERSHIP,
-            BootstrapRepairService.STEP_ADMIN_ROLE_GRANT,
-            BootstrapRepairService.STEP_BUSINESS_TENANT,
-            BootstrapRepairService.STEP_BUSINESS_TENANT_BOOTSTRAP,
-            BootstrapRepairService.STEP_BUILTIN_PLUGINS,
-            BootstrapRepairService.STEP_JWT_SECRET);
-
     private BootstrapRepairService.RepairOptions opts() {
         return BootstrapRepairService.RepairOptions.of(
                 "admin@auraboot.com", "Test2026x", "Platform Admin", "AuraBoot IT", "multi", "http://localhost:6443");
@@ -55,7 +43,7 @@ class BootstrapRepairServiceCoverageIT extends BaseIntegrationTest {
     void everyStepIdempotent() {
         // Run in production order so this test establishes its own prerequisites instead
         // of depending on seed rows left by another test or CI setup phase.
-        for (String step : ALL_STEPS) {
+        for (String step : BootstrapRepairService.ORDERED_STEPS) {
             var first = bootstrapRepairService.repair(step, opts());
             assertNotNull(first, step);
             assertEquals(step, first.stepName(), step);
