@@ -24,6 +24,24 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
   expect(importResult.success, JSON.stringify(importResult)).toBe(true);
   const marker = `suggestion-${randomUUID()}`;
   const outcomeTitle = `${marker}-followup`;
+  const operation = process.env.AURA_ANALYTICS_COMMAND_OPERATION || 'create';
+  expect(['create', 'update', 'delete']).toContain(operation);
+  const commandCode = `e2et:${operation}_order`;
+  let targetPid: string | undefined;
+  if (operation !== 'create') {
+    const target = await request.post('/api/dynamic/e2et_order/create', {
+      data: {
+        e2et_order_title: outcomeTitle,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+        e2et_order_status: 'draft',
+      },
+    });
+    expect(target.status(), await target.text()).toBe(200);
+    const body = await target.json();
+    targetPid = body.data.pid;
+    expect(targetPid, JSON.stringify(body)).toBeTruthy();
+  }
   for (const title of [marker, marker, `${marker}-excluded`]) {
     const fixture = await request.post('/api/dynamic/e2et_order/create', {
       data: {
@@ -109,10 +127,12 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       executionIntent: {
         type: 'agent_task',
         goal:
-          'Create one follow-up test order using the existing order command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+          `${operation} the follow-up test order using the existing order command.\n@@AURABOOT_STUB_TOOL_RESULT_DIGEST@@\n@@AURABOOT_STUB_TOOL_USE@@ ` +
           JSON.stringify({
-            name: 'cmd:e2et:create_order',
+            name: `cmd:${commandCode}`,
             input: {
+              recordPid: targetPid,
+              e2et_order_desc: 'Updated by adopted analysis',
               e2et_order_title: outcomeTitle,
               e2et_order_type: 'normal',
               e2et_order_customer: 'Analysis follow-up fixture',
@@ -302,12 +322,14 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     const businessRecords = async () =>
       (
         await db.query(
-          'SELECT pid, e2et_order_title, e2et_order_status FROM mt_e2et_order WHERE e2et_order_title=$1',
+          'SELECT pid, e2et_order_title, e2et_order_status, e2et_order_desc FROM mt_e2et_order WHERE e2et_order_title=$1',
           [outcomeTitle],
         )
       ).rows;
-    expect(await businessRecords()).toEqual([]);
+    const beforeRecords = await businessRecords();
+    expect(beforeRecords).toHaveLength(operation === 'create' ? 0 : 1);
     const completed = await dispatch();
+    await test.info().attach('execution-response', { body: completed, contentType: 'text/plain' });
     expect(completed).toContain('event:done');
     expect(completed).not.toContain('event:error');
     const executionRows = async () =>
@@ -339,7 +361,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         type: 'fault-injection',
         description: 'Actual outbox post-insert failure',
       });
-      expect(await businessRecords()).toEqual([]);
+      expect(await businessRecords()).toEqual(beforeRecords);
       const committed = await db.query(
         'SELECT event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name=$2',
         [linked[0].run_pid, 'analytics_business_command_committed'],
@@ -347,7 +369,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       expect(committed.rows).toEqual([]);
       const failed = await db.query(
         'SELECT action_status, error_message FROM ab_agent_action WHERE run_id=$1 AND command_code=$2',
-        [linked[0].run_pid, 'e2et:create_order'],
+        [linked[0].run_pid, commandCode],
       );
       expect(failed.rows).toHaveLength(1);
       expect(failed.rows[0].action_status).toBe('failed');
@@ -357,6 +379,37 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       return;
     }
     const createdOrders = await businessRecords();
+    if (operation !== 'create') {
+      if (operation === 'update') {
+        expect(createdOrders).toHaveLength(1);
+        expect(createdOrders[0]).toMatchObject({
+          pid: targetPid, e2et_order_desc: 'Updated by adopted analysis',
+        });
+      } else {
+        expect(createdOrders).toEqual([]);
+      }
+      const committed = (await db.query(
+        'SELECT event_id, target_key, payload FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name=$2',
+        [linked[0].run_pid, 'analytics_business_command_committed'],
+      )).rows;
+      expect(committed).toHaveLength(1);
+      expect(committed[0]).toMatchObject({ target_key: targetPid, payload: {
+        commandCode, operation, recordPid: targetPid,
+        analyticsExecution: { adoptionPid: adopted.pid, analysisId: analysis.analysisId },
+      }});
+      expect((await db.query(
+        'SELECT action_status, target_record_pid FROM ab_agent_action WHERE run_id=$1 AND command_code=$2',
+        [linked[0].run_pid, commandCode],
+      )).rows).toEqual([{ action_status: 'success', target_record_pid: targetPid }]);
+      await dispatch();
+      expect(await executionRows()).toEqual(linked);
+      expect(await businessRecords()).toEqual(createdOrders);
+      expect((await db.query(
+        'SELECT event_id FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name=$2',
+        [linked[0].run_pid, 'analytics_business_command_committed'],
+      )).rows).toEqual([{ event_id: committed[0].event_id }]);
+      return;
+    }
     expect(createdOrders).toHaveLength(1);
     expect(createdOrders[0]).toMatchObject({
       e2et_order_title: outcomeTitle,
@@ -366,7 +419,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       (
         await db.query(
           'SELECT pid, target_record_pid, target_model, action_status, after_snapshot FROM ab_agent_action WHERE run_id=$1 AND command_code=$2 ORDER BY pid',
-          [linked[0].run_pid, 'e2et:create_order'],
+          [linked[0].run_pid, commandCode],
         )
       ).rows;
     const recordedActions = await actions();

@@ -597,7 +597,7 @@ public class AgentRunService {
 
             // D1 Grounding: compile user message → BusinessIntentFrame
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = groundingService.ground(
-                    tenantId, userMessage,
+                    tenantId, groundingTaskText(task),
                     GroundingService.GroundingContext.builder()
                             .userId(currentInitiatorUserIdText())
                             .agentCode(agentCode)
@@ -1490,6 +1490,14 @@ public class AgentRunService {
                     tenantId, agentCode, e.getMessage(), e);
             return null;
         }
+    }
+
+    /** Classify the task itself, excluding runner instructions and serialized input data. */
+    private String groundingTaskText(Map<String, Object> task) {
+        Object description = task.get("description");
+        if (description instanceof String text && !text.isBlank()) return text;
+        Object title = task.get("title");
+        return title == null ? "" : title.toString();
     }
 
     private String buildUserMessage(Map<String, Object> task) {

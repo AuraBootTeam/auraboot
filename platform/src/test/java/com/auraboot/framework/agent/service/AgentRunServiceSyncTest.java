@@ -869,6 +869,20 @@ class AgentRunServiceSyncTest {
                 .thenReturn(plan);
     }
 
+    @Test
+    void groundingReceivesTaskDescriptionWithoutRunnerInstructions() {
+        primeHappyPath();
+        var task = new java.util.HashMap<>(baseTask());
+        task.put("description", "Update the order delivery address.");
+        task.put("input_data", "{\"summary\":\"Historical context\"}");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_task")),
+                anyMap())).thenReturn(List.of(task));
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        verify(groundingService).ground(eq(TENANT_ID), eq("Update the order delivery address."), any());
+    }
+
     private Map<String, Object> baseAgentDef() {
         java.util.Map<String, Object> def = new java.util.HashMap<>();
         def.put("agent_code", AGENT_CODE);
