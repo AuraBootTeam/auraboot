@@ -101,7 +101,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 info "building AuraBoot artifacts core=$CORE_SHA"
-pnpm --dir "$CORE_ROOT" install --frozen-lockfile --ignore-scripts \
+CI=1 pnpm --dir "$CORE_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/core-pnpm-install.log" 2>&1 \
   || fatal 'AuraBoot artifact build dependencies unavailable'
 AURA_OCI_BUILDER=docker node "$CORE_ROOT/scripts/application/stage-core-only-artifacts.mjs" \

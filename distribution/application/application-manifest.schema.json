@@ -112,7 +112,7 @@
     "releaseVersion": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
-      "not": { "pattern": "(?i:snapshot|latest|workspace|branch)" }
+      "not": { "pattern": "[sS][nN][aA][pP][sS][hH][oO][tT]|[lL][aA][tT][eE][sS][tT]|[wW][oO][rR][kK][sS][pP][aA][cC][eE]|[bB][rR][aA][nN][cC][hH]" }
     }
   }
 }
