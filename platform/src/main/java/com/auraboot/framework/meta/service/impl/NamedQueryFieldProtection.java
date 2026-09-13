@@ -26,9 +26,17 @@ public class NamedQueryFieldProtection {
     public record Protection(Map<String, String> aliases,
                              List<FieldMaskRule> policies, List<FieldMaskConfig> configs) { }
     public record Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes,
-                       Map<String, String> views) {
+                       Map<String, String> views, Set<String> scopedReadModels) {
         public Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes) {
-            this(evidence, protections, sourceScopes, Map.of());
+            this(evidence, protections, sourceScopes, Map.of(), Set.of());
+        }
+        public Plan(JsonNode evidence, List<Protection> protections, Map<String, String> sourceScopes,
+                    Map<String, String> views) {
+            this(evidence, protections, sourceScopes, views, Set.of());
+        }
+
+        public boolean coversDeclaredScope(String resource, String action) {
+            return "read".equals(action) && scopedReadModels.contains(resource);
         }
     }
 
@@ -72,7 +80,7 @@ public class NamedQueryFieldProtection {
             groups.set(resource, group.evidence());
             protections.addAll(group.protections());
         }
-        return new Plan(evidence, List.copyOf(protections), Map.copyOf(sourceScopes), resolved.views());
+        return new Plan(evidence, List.copyOf(protections), Map.copyOf(sourceScopes), resolved.views(), Set.copyOf(sourceModels.values()));
     }
 
     private Plan prepareResource(NamedQuery query, List<NamedQueryField> fields, String resource, String context, NamedQuerySourceModels.Sources resolved) {

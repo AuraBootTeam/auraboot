@@ -45,6 +45,20 @@ class NamedQueryFieldProtectionAuthorizationTest {
         verify(permissions).canAction(30L, "customers", "read");
         verify(permissions, never()).canAction(eq(20L), anyString(), anyString());
     }
+    @Test void onlyResolvedPhysicalReadScopesReplaceDeclaredOuterFilters() {
+        when(permissions.canAction(eq(30L), anyString(), eq("read"))).thenReturn(true);
+        when(policies.buildRowFilter(10L, "orders", "read", 20L)).thenReturn("created_by = 20");
+        var plan = protection.prepare(query, List.of(), "list");
+        assertTrue(plan.sourceScopes().get("orders").contains("created_by = 20"));
+        assertTrue(plan.coversDeclaredScope("orders", "read"));
+        assertTrue(plan.coversDeclaredScope("customers", "read"));
+        assertFalse(plan.coversDeclaredScope("unrelated", "read"));
+        assertFalse(plan.coversDeclaredScope("orders", "export"));
+        assertFalse(plan.coversDeclaredScope("orders", null));
+        var unverified = new NamedQueryFieldProtection.Plan(plan.evidence(), List.of(), plan.sourceScopes());
+        assertFalse(unverified.coversDeclaredScope("orders", "read"));
+    }
+
     @Test void missingMemberUsesCurrentUserWithoutSkippingAuthorization() {
         MetaContext.setMemberId(null);
         when(permissions.canAction(20L, "orders", "read")).thenReturn(true);

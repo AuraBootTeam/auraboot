@@ -493,7 +493,7 @@ test('named-query reports require source and declared resource permissions', asy
       title: key,
       resourceCode: 'e2et_order',
       actionCode: 'read',
-      fromSql: `SELECT o.e2et_order_title FROM mt_e2et_order o WHERE o.tenant_id = #{params.tenantId} AND o.e2et_order_title = '${key}'`,
+      fromSql: `SELECT o.e2et_order_title FROM mt_e2et_order o WHERE o.tenant_id = #{params.tenantId} AND o.e2et_order_title IN ('${key}', '${key}_own')`,
       fields: [
         {
           fieldCode: 'e2et_order_title',
@@ -565,6 +565,7 @@ test('named-query reports require source and declared resource permissions', asy
       'report.export.execute',
       ...(mode !== 'source-denied' ? ['data.datasource.read'] : []),
       ...(mode !== 'resource-denied' ? ['model.e2et_order.read'] : []),
+      ...(mode === 'allowed' ? ['meta.command.execute', 'e2et.order.manage'] : []),
     ];
     expect(
       (
@@ -631,7 +632,7 @@ test('named-query reports require source and declared resource permissions', asy
           if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1')
             expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
         };
-        const setScope = async (scopeType: 'none' | 'all') => {
+        const setScope = async (scopeType: 'none' | 'self' | 'all') => {
           const response = await page.request.put(`/api/permissions/matrix/${rolePid}/scope`, {
             data: { resourceCode: 'e2et_order', actionCode: 'read', scopeType, mergeStrategy: 'MIN' },
           });
@@ -658,6 +659,35 @@ test('named-query reports require source and declared resource permissions', asy
         await session.page.reload();
         await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
         await exportPdf('scope-restored');
+        const ownTitle = `${key}_own`;
+        const own = await executeCommandViaApi(session.page, 'e2et:create_order', {
+          e2et_order_title: ownTitle,
+          e2et_order_type: 'normal',
+          e2et_order_customer: 'Self-scope fixture',
+          e2et_order_urgent: false,
+        }, undefined, 'create');
+        expect(own.code).toBe('0');
+        try {
+          await setScope('self');
+          const selfData = await session.page.request.post('/api/reports/export/json', { data: { reportPid: pid } });
+          expect(selfData.status()).toBe(200);
+          expect((await selfData.json()).dataSets.orders).toEqual([{ e2et_order_title: ownTitle }]);
+          await session.page.reload();
+          await expect(session.page.getByRole('cell', { name: ownTitle, exact: true })).toBeVisible();
+          await expect(session.page.getByRole('cell', { name: key, exact: true })).toHaveCount(0);
+          await exportPdf('scope-self');
+          await session.page.screenshot({
+            path: `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-named-scope-self.png`,
+            fullPage: true,
+          });
+        } finally {
+          await setScope('all');
+        }
+        await session.page.reload();
+        await expect(session.page.getByRole('cell', { name: ownTitle, exact: true })).toBeVisible();
+        await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
+        await exportPdf('scope-mixed-all');
+
       } else {
         await expect(session.page.getByRole('alert')).toContainText('查询未成功');
         await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');

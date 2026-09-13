@@ -718,7 +718,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         authorizeRootRecord(query, policy, params);
 
-        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
 
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -744,7 +745,6 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
-        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
         sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
 
         // Count total
@@ -846,11 +846,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         params.put("currentUserId", userId != null ? userId.toString() : null);
         authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
         List<String> currentScope = new ArrayList<>();
-        appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope);
         List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(getCurrentTenantId(), code);
         List<NamedQueryField> selected = fields.stream().filter(field -> request.getFields() == null
                 || request.getFields().isEmpty() || request.getFields().contains(field.getFieldCode())).toList();
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, selected);
+        appendDeclaredDataScopeClause(query, getCurrentTenantId(), getCurrentUserId(), currentScope, protection);
         JsonNode currentDefinition = NamedQueryExportDefinition.capture(query, fields, currentScope, protection.evidence());
         if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
             throw new AccessDeniedException("Export query definition has changed; create a new export");
@@ -937,7 +937,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
 
             List<String> exportScope = new ArrayList<>();
-            appendDeclaredDataScopeClause(query, tenantId, userId, exportScope);
+            NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
+                    exportFieldCodes.stream().map(fieldMap::get).toList());
+            appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
             whereClauses.addAll(exportScope);
 
             if (!whereClauses.isEmpty()) {
@@ -963,8 +965,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             int limit = request.getLimit() != null ? Math.min(request.getLimit(), policyExportMax) : Math.min(10000, policyExportMax);
             sql.append(" LIMIT ").append(limit);
 
-            NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
-                    exportFieldCodes.stream().map(fieldMap::get).toList());
+
 
             // 8. Execute query
             // Physical source scopes already enforce tenant isolation, including CTE bodies.
@@ -1309,8 +1310,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQuery query,
             Long tenantId,
             Long userId,
-            List<String> whereClauses) {
+            List<String> whereClauses,
+            NamedQueryFieldProtection.Plan protection) {
         String resourceCode = trimToNull(query.getResourceCode());
+        // Physical sources already apply this exact model/read scope before projection.
+        // Reapplying it outside the projection can reference columns that are not selected.
+        if (protection != null && resourceCode != null
+                && protection.coversDeclaredScope(resourceCode, trimToNull(query.getActionCode()))) return;
         String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             if (!permitFilter.isBlank()) {
