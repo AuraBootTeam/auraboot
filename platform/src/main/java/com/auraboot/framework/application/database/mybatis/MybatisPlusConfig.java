@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -25,6 +26,9 @@ import java.util.Set;
 @Slf4j
 @Configuration
 public class MybatisPlusConfig {
+
+    @Value("${aura.persistence.tenant-bypass-table-prefixes:}")
+    private String tenantBypassTablePrefixes = "";
 
     /** Static cache populated on first access. Drop-in replacement for the prior hardcoded Set. */
     private static volatile Set<String> envScopedTables;
@@ -160,24 +164,16 @@ public class MybatisPlusConfig {
                     || "ab_cloud_config".equals(tableName)            // PLATFORM-level rows have tenant_id=NULL
                     || "ab_invariant_definition".equals(tableName)    // InvariantAlarmWorker scans across all tenants in thread pool
                     || "ab_decision_definition".equals(tableName)     // DecisionAlarmWorker scans across all tenants in thread pool
-                    || "ab_calendar_sync".equals(tableName)             // CalendarSyncJob scans across all tenants every 5min
-                    || "ab_calendar_event_map".equals(tableName)        // CalendarSyncJob event mapping, tenant_id passed explicitly
 
                     // ── Mobile config (no tenant_id, no auth required) ──
                     || "ab_mobile_config".equals(tableName)
                     || "ab_mobile_client_log".equals(tableName)
 
-                    // ── Email CRM (join tables without tenant_id) ──
+                    // ── Email record-linking (join tables without tenant_id) ──
                     || "ab_email_account_member".equals(tableName)    // Join table: account_id + user_id, no tenant_id
 
-                    // ── CRM public inbound endpoint ──
-                    // InboundController is a public (no-auth) endpoint; it resolves the tenant
-                    // from the channel record itself and then sets MetaContext manually.
-                    // The global PID lookup (findByPidGlobal) must bypass the tenant filter.
-                    || "ab_inbound_channel".equals(tableName)
-
-                    // ── External engines ──
-                    || tableName.startsWith("se_")                    // SmartEngine BPM tables
+                    // ── Application-contributed external stores ──
+                    || hasConfiguredBypassPrefix(tableName)
 
                     // ── PostgreSQL system tables ──
                     || tableName.startsWith("information_schema.")
@@ -229,6 +225,14 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(dbType));
 
         return interceptor;
+    }
+
+    private boolean hasConfiguredBypassPrefix(String tableName) {
+        if (tableName == null || tenantBypassTablePrefixes == null) return false;
+        return java.util.Arrays.stream(tenantBypassTablePrefixes.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .anyMatch(tableName::startsWith);
     }
 
 }

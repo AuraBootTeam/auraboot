@@ -14,6 +14,7 @@ import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,6 +90,7 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Mock private ExecutorRegistry executorRegistry;
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
+    @Mock private WorkflowCapabilityRegistry workflowCapabilityRegistry;
 
     @InjectMocks
     private DynamicDataServiceImpl service;
@@ -133,6 +135,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
                 .thenReturn(List.of(Map.of("pid", RECORD_ID, "name", "written-value")));
 
         lenient().when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        lenient().when(applicationContext.getBean(WorkflowCapabilityRegistry.class))
+                .thenReturn(workflowCapabilityRegistry);
         // NOTE: canOperate is deliberately NOT stubbed here — each test states the
         // read verdict it needs, so there is no ambiguity about which stub wins.
     }

@@ -274,4 +274,5 @@ class TenantBootstrapServiceImplTest {
 
         assertThrows(TemplateParseException.class, () -> service.loadTemplate("broken"));
     }
+
 }

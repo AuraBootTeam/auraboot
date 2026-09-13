@@ -21,7 +21,7 @@
  *
  * Mirrored from: web-admin/tests/e2e/templates/templates-smoke.spec.ts (auth/config
  * conventions), web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts (sidebar
- * navigation pattern), and web-admin/tests/e2e/bpm-designer specs (BACKEND_URL usage).
+ * navigation pattern), and aura-bpm/e2e/bpm specs (BACKEND_URL usage).
  *
  * Auth: storageState admin.json (global-setup.ts writes it from admin@auraboot.com /
  *       Test2026x). Tests start fully authenticated — no login step needed.

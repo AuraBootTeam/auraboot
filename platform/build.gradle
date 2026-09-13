@@ -141,26 +141,11 @@ tasks.register('verifyMultiWorktreeGuard') {
 
 repositories {
     mavenLocal()
-    // SmartEngine fork artifacts are published to Maven Central. Keep this
-    // before Aliyun mirrors so Gradle does not stick to a partially synced
-    // mirror that has metadata but not all jars.
-    mavenCentral {
-        name = 'Maven Central SmartEngine'
-        content {
-            includeGroup 'com.auraboot.smart.framework'
-        }
-    }
     maven {
         url = 'https://maven.aliyun.com/repository/public'
-        content {
-            excludeGroup 'com.auraboot.smart.framework'
-        }
     }
     maven {
         url = 'https://maven.aliyun.com/repository/spring'
-        content {
-            excludeGroup 'com.auraboot.smart.framework'
-        }
     }
     mavenCentral()
     // Apache repository for snapshots and releases
@@ -186,7 +171,11 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-version = '1.0.0-SNAPSHOT'
+version = file('../VERSION').text.trim()
+
+allprojects {
+    version = rootProject.version
+}
 
 // Java工具链配置
 java {
@@ -220,8 +209,6 @@ ext {
     // PF4J Plugin Framework
     pf4jVersion = '3.15.1'
     pf4jSpringVersion = '0.10.0'
-    // Drools Rule Engine
-    droolsVersion = '8.44.2.Final'
     xxlJobVersion = '3.4.2'
     springKafkaVersion = '3.3.16'
     kafkaClientsVersion = '3.9.2'
@@ -318,25 +305,6 @@ dependencies {
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
 
-    // SmartEngine - Workflow engine
-    // 4.0.1 adds explicit-operator overloads (rollback / add-sign / remove-sign)
-    // so operator_user_id is populated for assigned-but-unclaimed tasks (G-B5).
-    // 4.0.2 makes sequential multi-instance countersign advance through all
-    // candidates (cached candidate list + full nrOfInstances) — unblocks SEQ-01.
-    // 4.0.3 implements rollbackTask as a real rollback (cancel pending task,
-    // deactivate the abandoned branch, enter the target node so a fresh task is
-    // created with standard events) and completes the storage-custom persister
-    // (task insert/update/find/remove/updateFromStatus + activity/execution
-    // update/findWithShading/remove) so automation flows can drive BPM actions.
-    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-mysql:4.0.3') {
-        // Pin transitive dependencies to avoid unexpected changes
-        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
-    }
-    implementation ('com.auraboot.smart.framework:smart-engine-extension-storage-custom:4.0.3') {
-        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
-    }
-    implementation 'org.mvel:mvel2:2.5.3.Final'
-    implementation 'com.esotericsoftware:reflectasm:1.11.3:shaded'
 
     // Spring Boot 核心
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -489,15 +457,6 @@ dependencies {
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
     implementation 'com.google.http-client:google-http-client-jackson2:1.47.1'
 
-    // Drools Rule Engine
-    implementation "org.drools:drools-core:${droolsVersion}"
-    implementation "org.drools:drools-compiler:${droolsVersion}"
-    implementation "org.drools:drools-mvel:${droolsVersion}"
-    implementation "org.drools:drools-xml-support:${droolsVersion}"
-    implementation "org.kie:kie-api:${droolsVersion}"
-    implementation "org.kie:kie-internal:${droolsVersion}"
-    // DMN runtime for the DecisionOps DROOLS_DMN adapter (same KIE version as Drools above)
-    implementation "org.kie:kie-dmn-core:${droolsVersion}"
 }
 
 

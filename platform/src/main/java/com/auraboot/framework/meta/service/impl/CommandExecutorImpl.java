@@ -105,9 +105,6 @@ public class CommandExecutorImpl implements CommandExecutor {
     private com.auraboot.framework.infrastructure.metrics.CommandMetrics commandMetrics;
 
     @Autowired(required = false)
-    private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
-
-    @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
     /** Cache for column existence checks — table structure rarely changes. Bounded to prevent OOM. */

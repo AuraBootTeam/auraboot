@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// The 16 bundled core plugins are replaced with minimal manifest stand-ins so the
+// The 15 bundled core plugins are replaced with minimal manifest stand-ins so the
 // boot loop (not each plugin's own setup graph) is the unit under test.
 vi.mock('~/plugins/core-demo', () => ({ default: { manifest: { code: 'core-demo' } } }))
-vi.mock('~/plugins/core-bpm', () => ({ default: { manifest: { code: 'core-bpm' } } }))
 vi.mock('~/plugins/core-designer', () => ({ default: { manifest: { code: 'core-designer' } } }))
 vi.mock('~/plugins/core-automation', () => ({ default: { manifest: { code: 'core-automation' } } }))
 vi.mock('~/plugins/core-organization', () => ({ default: { manifest: { code: 'core-organization' } } }))
@@ -48,8 +47,8 @@ describe('bootCorePlugins', () => {
   it('installs and enables every bundled core plugin on first boot', async () => {
     const activated = await bootCorePlugins()
 
-    expect(pluginLoader.install).toHaveBeenCalledTimes(16)
-    expect(pluginLoader.enable).toHaveBeenCalledTimes(16)
+    expect(pluginLoader.install).toHaveBeenCalledTimes(15)
+    expect(pluginLoader.enable).toHaveBeenCalledTimes(15)
     expect(pluginLoader.enable).toHaveBeenCalledWith('core-demo')
     expect(pluginLoader.enable).toHaveBeenCalledWith('core-decisionops')
     expect(pluginLoader.activateAll).toHaveBeenCalledTimes(1)
@@ -62,13 +61,13 @@ describe('bootCorePlugins', () => {
 
     pluginLoader.list.mockReturnValue([
       { state: 'active', definition: { manifest: { code: 'core-demo' } } },
-      { state: 'disabled', definition: { manifest: { code: 'core-bpm' } } },
+      { state: 'disabled', definition: { manifest: { code: 'core-designer' } } },
     ])
 
     const second = await bootCorePlugins()
 
     expect(second).toEqual(['core-demo'])
-    expect(pluginLoader.install).toHaveBeenCalledTimes(16) // only from the first boot
+    expect(pluginLoader.install).toHaveBeenCalledTimes(15) // only from the first boot
     expect(pluginLoader.activateAll).toHaveBeenCalledTimes(1)
   })
 
@@ -92,7 +91,7 @@ describe('bootCorePlugins', () => {
     const second = await bootCorePlugins({ hasFeature, force: true })
 
     expect(resetKernel).toHaveBeenCalledWith({ hasFeature })
-    expect(pluginLoader.install).toHaveBeenCalledTimes(32)
+    expect(pluginLoader.install).toHaveBeenCalledTimes(30)
     expect(pluginLoader.activateAll).toHaveBeenCalledTimes(2)
     expect(second).toEqual(['core-demo'])
   })
@@ -106,7 +105,7 @@ describe('bootCorePlugins', () => {
 
     await bootCorePlugins()
 
-    expect(pluginLoader.enable).toHaveBeenCalledTimes(15)
+    expect(pluginLoader.enable).toHaveBeenCalledTimes(14)
     expect(console.warn).toHaveBeenCalledWith(
       '[boot-plugins] install failed for core-designer:',
       expect.any(Error),
@@ -118,7 +117,7 @@ describe('bootCorePlugins', () => {
     await bootCorePlugins()
 
     expect(console.info).toHaveBeenCalledWith(
-      expect.stringContaining('16 core + 0 ent'),
+      expect.stringContaining('15 core + 0 ent'),
       'core-demo',
     )
   })

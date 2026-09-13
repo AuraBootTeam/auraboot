@@ -7,18 +7,18 @@ describe('routesFromResources', () => {
     const resources: NavigationResource[] = [
       {
         key: 'bpm.task-center',
-        path: '/bpm/task-center',
+        path: '/extensions/tasks',
         title: 'Task Center',
         source: 'plugin',
-        meta: { file: './plugins/core-bpm/pages/TaskCenter.tsx' },
+        meta: { file: './extensions/tasks.tsx' },
       },
     ]
     const out = routesFromResources(resources)
     expect(out).toHaveLength(1)
     // RouteConfigEntry shape comes from React Router 7 — assert structural fields.
     expect(out[0]).toMatchObject({
-      path: '/bpm/task-center',
-      file: './plugins/core-bpm/pages/TaskCenter.tsx',
+      path: '/extensions/tasks',
+      file: './extensions/tasks.tsx',
     })
   })
 

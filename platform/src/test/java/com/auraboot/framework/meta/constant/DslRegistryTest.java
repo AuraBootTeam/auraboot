@@ -159,7 +159,7 @@ class DslRegistryTest {
         // (DETAIL_SPECIALIZED_BLOCK_TYPES); previously a frontend/backend enum drift.
         assertTrue(codes.containsAll(Set.of(
                 "detail-section", "activity-timeline", "record-comments",
-                "field-history", "bpm-panel")));
+                "field-history", "workflow-panel")));
         // 1.4 — workbench blocks used for composite analysis pages.
         assertTrue(codes.containsAll(Set.of(
                 "metric-strip", "record-inspector", "candidate-list",
@@ -225,7 +225,7 @@ class DslRegistryTest {
         assertTrue(codes.containsAll(Set.of(
                 "on_record_create", "on_record_update", "on_field_change",
                 "on_state_change", "scheduled", "webhook",
-                "on_bpm_event", "on_inactivity")));
+                "on_workflow_event", "on_inactivity")));
     }
 
     @Test

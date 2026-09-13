@@ -9,10 +9,9 @@
 # Scenarios:
 #   smoke        — Smoke tests only (@smoke tag, fast ~2min)
 #   critical     — Critical + smoke tests (@critical|@smoke)
-#   crm          — CRM module tests
 #   admin        — Admin/platform management tests
 #   dashboard    — Dashboard tests
-#   bpm          — BPM/approval workflow tests
+#   approval     — Platform approval tests
 #   designer     — Designer tests (page/report/etc)
 #   inventory    — Inventory module tests
 #   finance      — Finance module tests
@@ -35,7 +34,7 @@
 #
 # Examples:
 #   ./scripts/e2e-run.sh smoke
-#   ./scripts/e2e-run.sh crm --headed
+#   ./scripts/e2e-run.sh approval --headed
 #   ./scripts/e2e-run.sh all --ci --report
 #   ./scripts/e2e-run.sh "@smoke|@critical"
 #   ./scripts/e2e-run.sh --help
@@ -165,10 +164,6 @@ map_scenario() {
       SCENARIO_LABEL="Critical Tests"
       PW_ENV+=("PW_PROFILE=critical")
       ;;
-    crm)
-      SCENARIO_LABEL="CRM Module"
-      PW_ARGS+=(tests/e2e/crm/)
-      ;;
     admin)
       SCENARIO_LABEL="Admin / Platform"
       PW_ARGS+=(tests/e2e/admin/)
@@ -177,9 +172,9 @@ map_scenario() {
       SCENARIO_LABEL="Dashboard"
       PW_ARGS+=(tests/e2e/dashboard/)
       ;;
-    bpm|approval)
-      SCENARIO_LABEL="BPM / Approval"
-      PW_ARGS+=(tests/e2e/bpm/ tests/e2e/approval/)
+    approval)
+      SCENARIO_LABEL="Platform Approval"
+      PW_ARGS+=(tests/e2e/approval/)
       ;;
     designer)
       SCENARIO_LABEL="Designers"

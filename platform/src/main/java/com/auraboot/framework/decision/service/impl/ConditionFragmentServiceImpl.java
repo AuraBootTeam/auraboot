@@ -422,7 +422,7 @@ public class ConditionFragmentServiceImpl implements ConditionFragmentService {
         }
         return switch (scopeType) {
             case "SLA" -> "SLA_RULE".equals(ref.getSourceType());
-            case "BPM" -> "BPM_PROCESS".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+            case "BPM" -> "WORKFLOW_PROCESS".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
             case "AUTOMATION" -> "AUTOMATION".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
             case "EVENT_POLICY" -> "EVENT_POLICY".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
             case "PERMISSION" -> "PERMISSION_POLICY".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);

@@ -431,7 +431,7 @@ DEMO_OUTPUT="$(
 assert_contains "env demo dry-run names scenario" "$DEMO_OUTPUT" "scenario:        bugfix-oss-demo"
 assert_contains "env demo dry-run reuses host web server" "$DEMO_OUTPUT" "export PW_SKIP_WEBSERVER=1"
 assert_contains "env demo dry-run uses e2e plugin profile" "$DEMO_OUTPUT" "plugin profile:  e2e"
-assert_contains "env demo dry-run includes workflow data" "$DEMO_OUTPUT" "workflow data:"
+assert_contains "env demo dry-run delegates product seed ownership" "$DEMO_OUTPUT" "product seed skipped; run it from aura-crm or aura-bpm"
 assert_contains "env demo dry-run includes invariants" "$DEMO_OUTPUT" "node scripts/oss-demo-invariants.mjs"
 REBUILD_DEMO_OUTPUT="$(
     cd "$PROJECT_ROOT" &&

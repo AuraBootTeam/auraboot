@@ -13,7 +13,7 @@
 #   ./scripts/docker-ga-e2e-bootstrap.sh                    # e2e plugin profile
 #   PLUGIN_IMPORT_PROFILE=demo ./scripts/docker-ga-e2e-bootstrap.sh
 #   PLUGIN_IMPORT_PROFILE=enterprise-demo PLUGIN_IMPORT_EDITION=enterprise ./scripts/docker-ga-e2e-bootstrap.sh
-#   PLUGINS="showcase workflow-demo" ./scripts/docker-ga-e2e-bootstrap.sh
+#   PLUGINS="showcase test-fixtures" ./scripts/docker-ga-e2e-bootstrap.sh
 
 set -euo pipefail
 
@@ -84,22 +84,6 @@ api_post() {
     -H "Authorization: Bearer $JWT" \
     -H 'Content-Type: application/json' \
     -d "$2"
-}
-
-command_exists() {
-  local command_code="$1"
-  local encoded_code="${command_code//:/%3A}"
-  local resp
-  resp=$(NO_PROXY=localhost curl -s "$API_BASE/api/meta/commands/by-code/$encoded_code" \
-    -H "Authorization: Bearer $JWT")
-  printf '%s' "$resp" | python3 -c "
-import sys, json
-try:
-    d = json.loads(sys.stdin.read())
-except Exception:
-    print('no'); sys.exit(0)
-print('yes' if d.get('code') == '0' and d.get('data') else 'no')
-"
 }
 
 # 2. Provision operator / viewer test users (idempotent — backend rejects
@@ -225,102 +209,47 @@ print('yes' if any(r.get('code') == 'platform_admin' for r in roles if isinstanc
   fi
 fi
 
-# 4. Seed showcase records via the OSS playwright seed config.
-# Skip with SKIP_SEED=1 if the operator has already seeded (e.g. during a
-# tight rerun loop). The seed run uses tests/storage/admin.json from a
-# prior auth.setup; if missing, generate it via a quick auth-only run.
-if [ "${SKIP_SEED:-0}" = "1" ]; then
-  echo "[ga-e2e-bootstrap] SKIP_SEED=1 — skipping showcase data seed"
-else
-  echo "[ga-e2e-bootstrap] seeding showcase records..."
-  cd web-admin
+# 4. Refresh platform auth storage only. Product data is initialized by the
+# independent application that owns it; Core must not infer or seed BPM/CRM.
+echo "[ga-e2e-bootstrap] refreshing platform auth storage..."
+cd web-admin
 
-  if [ ! -d "$PROJECT_ROOT/node_modules" ] || [ ! -e "$PROJECT_ROOT/web-admin/node_modules/@playwright/test" ]; then
-    echo "  web-admin Playwright dependencies missing — installing pnpm workspace deps..."
-    if ! (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile); then
-      echo "  ERROR: pnpm install --frozen-lockfile failed; cannot generate Playwright storage" >&2
-      exit 1
-    fi
-  fi
-
-  echo "  Refreshing Playwright storage for the current GA stack..."
-  rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
-  auth_setup_log="$PROJECT_ROOT/web-admin/test-results/ga-e2e-auth-setup.log"
-  mkdir -p "$(dirname "$auth_setup_log")"
-  if ! BACKEND_URL="$API_BASE" \
-       BE_PORT=6444 \
-       PGHOST=localhost \
-       PGPORT=5433 \
-       PGUSER=auraboot \
-       PGDATABASE=aura_boot \
-       PGPASSWORD=auraboot_dev \
-       PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
-       PW_SKIP_WEBSERVER=1 \
-       NO_PROXY=localhost,127.0.0.1 \
-       pnpm exec playwright test tests/auth.setup.ts \
-         --project=auth --no-deps --reporter=line > "$auth_setup_log" 2>&1; then
-    echo "  ERROR: auth.setup failed; last 80 log lines:" >&2
-    tail -80 "$auth_setup_log" >&2 || true
-    echo "  Full log: $auth_setup_log" >&2
+if [ ! -d "$PROJECT_ROOT/node_modules" ] || [ ! -e "$PROJECT_ROOT/web-admin/node_modules/@playwright/test" ]; then
+  echo "  web-admin Playwright dependencies missing — installing pnpm workspace deps..."
+  if ! (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile); then
+    echo "  ERROR: pnpm install --frozen-lockfile failed; cannot generate Playwright storage" >&2
     exit 1
   fi
-
-  if [ ! -f tests/storage/admin.json ]; then
-    echo "  ERROR: admin.json still missing — cannot run showcase seed (auth.setup failed)" >&2
-    echo "  Full log: $auth_setup_log" >&2
-    exit 1
-  else
-    seed_names=(data extended workflow ai arsenal supplement)
-    case "${SHOWCASE_COMMERCIAL_SEED:-auto}" in
-      skip)
-        echo "  seed-showcase-commercial ... SKIP (SHOWCASE_COMMERCIAL_SEED=skip)"
-        ;;
-      required)
-        if [ "$(command_exists 'crm:create_quote')" != "yes" ] || [ "$(command_exists 'crm:create_complaint')" != "yes" ]; then
-          echo "  seed-showcase-commercial ... FAIL (full CRM quote/complaint commands are not imported)" >&2
-          exit 1
-        else
-          seed_names+=(commercial)
-        fi
-        ;;
-      auto|"")
-        if [ "$(command_exists 'crm:create_quote')" = "yes" ] && [ "$(command_exists 'crm:create_complaint')" = "yes" ]; then
-          seed_names+=(commercial)
-        else
-          echo "  seed-showcase-commercial ... SKIP (Sales quote commands are not installed)"
-        fi
-        ;;
-      *)
-        echo "  seed-showcase-commercial ... FAIL (SHOWCASE_COMMERCIAL_SEED must be auto|required|skip)" >&2
-        exit 1
-        ;;
-    esac
-    seed_names+=(dashboard-default invariants)
-
-    seed_log="/tmp/ga-e2e-seed-sequence.log"
-    if BACKEND_URL="$API_BASE" \
-         BE_PORT=6444 \
-         PGHOST=localhost \
-         PGPORT=5433 \
-         PGUSER=auraboot \
-         PGDATABASE=aura_boot \
-         PGPASSWORD=auraboot_dev \
-         SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_dashboard}" \
-         PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
-         NO_PROXY=localhost,127.0.0.1 \
-         node scripts/run-showcase-seed-sequence.mjs \
-           --output-prefix=test-results/ga-e2e-seed "${seed_names[@]}" \
-           > "$seed_log" 2>&1; then
-      passed=$(grep -oE "[0-9]+ passed" "$seed_log" | tail -1)
-      echo "  showcase seed sequence ... OK (${passed:-completed})"
-    else
-      echo "  showcase seed sequence ... FAIL (see $seed_log)" >&2
-      tail -80 "$seed_log" >&2 || true
-      exit 1
-    fi
-  fi
-  cd ..
 fi
+
+rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
+auth_setup_log="$PROJECT_ROOT/web-admin/test-results/ga-e2e-auth-setup.log"
+mkdir -p "$(dirname "$auth_setup_log")"
+if ! BACKEND_URL="$API_BASE" \
+     BE_PORT=6444 \
+     PGHOST=localhost \
+     PGPORT=5433 \
+     PGUSER=auraboot \
+     PGDATABASE=aura_boot \
+     PGPASSWORD=auraboot_dev \
+     PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
+     PW_SKIP_WEBSERVER=1 \
+     NO_PROXY=localhost,127.0.0.1 \
+     pnpm exec playwright test tests/auth.setup.ts \
+       --project=auth --no-deps --reporter=line > "$auth_setup_log" 2>&1; then
+  echo "  ERROR: auth.setup failed; last 80 log lines:" >&2
+  tail -80 "$auth_setup_log" >&2 || true
+  echo "  Full log: $auth_setup_log" >&2
+  exit 1
+fi
+
+if [ ! -f tests/storage/admin.json ]; then
+  echo "  ERROR: admin.json still missing — auth.setup failed" >&2
+  echo "  Full log: $auth_setup_log" >&2
+  exit 1
+fi
+cd ..
+echo "  Product seed not run by Core; use the aura-bpm or aura-crm application runner."
 
 echo
 echo "[ga-e2e-bootstrap] done. Run Playwright with:"

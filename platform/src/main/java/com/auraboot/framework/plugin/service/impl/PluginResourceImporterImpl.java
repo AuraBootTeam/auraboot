@@ -67,16 +67,13 @@ import com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
-import com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RoleDataScopeDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
-import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.exception.PluginException;
-import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.entity.Role;
@@ -148,7 +145,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     // LEGITIMATE: JdbcTemplate kept only for resurrectSoftDeleted() which uses dynamic table names
     private final JdbcTemplate jdbcTemplate;
     private final MetaModelFieldBindingMapper fieldBindingMapper;
-    private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final RoleMapper roleMapper;
     private final MenuMapper menuMapper;
     private final ObjectMapper objectMapper;
@@ -178,10 +174,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final ExtensionConverter extensionConverter;
     private final PluginResourceMapper pluginResourceMapper;
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
-
-    // Dependencies for deploying BPMN to SmartEngine at import time.
-    private final com.auraboot.framework.bpm.converter.JsonToBpmnConverter jsonToBpmnConverter;
-    private final com.auraboot.smart.framework.engine.SmartEngine smartEngine;
 
     // Optional dependency - may not be configured in all environments
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -241,11 +233,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
      */
     public void clearMenuCodeMap() {
         menuCodeToIdMap.clear();
-    }
-
-    @Override
-    public boolean checkProcessExists(Long tenantId, String key) {
-        return processDefinitionMapper.existsByProcessKey(tenantId, key);
     }
 
     @Override
@@ -1605,253 +1592,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
     }
 
-    @Override
-    public PluginResource importProcess(ProcessDefinitionDTO dto, String pluginPid, String importId,
-                                         Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
-                                         Boolean autoDeploy) {
-        String pid = UlidGenerator.generate();
-        boolean exists = checkProcessExists(tenantId, dto.getKey());
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
-            throw new PluginException("Process already exists: " + dto.getKey());
-        }
-
-        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
-                    null, null, dto.getKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PROCESS, dto.getKey())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.PROCESS, logSafe(dto.getKey()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
-                    null, null, dto.getKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
-        }
-
-        // Build extension map, including designerJson if present
-        Map<String, Object> extension = new HashMap<>();
-        if (dto.getDesignerJson() != null) {
-            extension.put("designerJson", dto.getDesignerJson());
-        }
-
-        // Derive form bindings from designerJson node `data.formPageKey` when the
-        // DTO did not declare an explicit top-level `formBindings` map. Plugin
-        // authors editing processes.json in designer form carry the user-task ↔
-        // page binding inline on each node; without this derivation the
-        // BpmProcessDefinition.form_bindings column stays empty and runtime
-        // /api/bpm/forms/task/{id} returns a null formBinding even though the
-        // page exists. Explicit DTO-level formBindings always win so callers
-        // that already supply the richer FormBindingConfig shape are untouched.
-        Map<String, Object> derivedFormBindings = null;
-        if (dto.getFormBindings() == null || dto.getFormBindings().isEmpty()) {
-            derivedFormBindings = deriveFormBindingsFromDesigner(dto);
-        }
-
-        // Determine BPMN XML at import time so the DB row always carries a
-        // non-empty bpmn_content when we are (auto-)deploying. SmartEngine
-        // registration still happens in deployProcessToSmartEngine, but now we
-        // share the compiled XML with the persisted entity instead of leaving
-        // bpmn_content='' while status='deployed' (runtime then fails with
-        // bpm.rule.execution_failed or missing-definition errors).
-        Integer initialVersion = 1;
-        Instant now = Instant.now();
-        boolean deployRequested = Boolean.TRUE.equals(autoDeploy);
-        String initialBpmnContent = compileBpmnContent(dto, initialVersion);
-
-        BpmProcessDefinition process = BpmProcessDefinition.builder()
-                .pid(pid)
-                .tenantId(tenantId)
-                .pluginPid(pluginPid)
-                .processKey(dto.getKey())
-                .processName(dto.getEffectiveName())
-                .description(dto.getDescription())
-                .category(dto.getCategory())
-                .bpmnContent(initialBpmnContent)
-                .extension(extension.isEmpty() ? null : extension)
-                .formBindings(dto.getFormBindings() != null && !dto.getFormBindings().isEmpty()
-                        ? objectMapper.convertValue(dto.getFormBindings(), new TypeReference<>() {})
-                        : (derivedFormBindings != null ? derivedFormBindings : new HashMap<>()))
-                .businessDataBindings(dto.getBusinessDataBindings() != null
-                        ? Map.of("bindings", dto.getBusinessDataBindings())
-                        : new HashMap<>())
-                .status(deployRequested ? "deployed" : "draft")
-                .deploymentId(deployRequested ? dto.getKey() + ":" + initialVersion : null)
-                .deployedAt(deployRequested ? now : null)
-                .version(1)
-                .isCurrent(true)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        if (exists) {
-            // Create new version
-            processDefinitionMapper.clearCurrentVersion(tenantId, dto.getKey());
-            int nextVersion = processDefinitionMapper.getNextVersion(tenantId, dto.getKey());
-            process.setVersion(nextVersion);
-            if (deployRequested) {
-                process.setDeploymentId(dto.getKey() + ":" + nextVersion);
-            }
-            // Recompile BPMN with the new version attribute so the persisted
-            // XML and the SmartEngine deployment stay in lock-step.
-            String recompiled = compileBpmnContent(dto, nextVersion);
-            process.setBpmnContent(recompiled);
-        }
-
-        processDefinitionMapper.insert(process);
-
-        if (Boolean.TRUE.equals(autoDeploy)) {
-            deployProcessToSmartEngine(dto, tenantId, process.getVersion(), process.getBpmnContent());
-        }
-
-        return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
-                pid, process.getId(), dto.getKey(), dto.getEffectiveName(),
-                exists ? ResourceAction.UPDATE : ResourceAction.CREATE, null, null);
-    }
-
-    /**
-     * Compile a {@link ProcessDefinitionDTO}'s designerJson (or pass-through
-     * BPMN XML) into a version-stamped BPMN XML string. Returns empty string
-     * when neither designerJson nor bpmnContent is provided; callers that need
-     * non-empty content should validate upstream.
-     */
-    @SuppressWarnings("unchecked")
-    private String compileBpmnContent(ProcessDefinitionDTO dto, Integer version) {
-        Map<String, Object> designerJson = dto.getDesignerJson() != null
-                ? objectMapper.convertValue(dto.getDesignerJson(), new TypeReference<Map<String, Object>>() {})
-                : null;
-        if (designerJson != null && !designerJson.isEmpty()) {
-            // Prefer designerJson when both sources are present. It is the editable source of truth
-            // and avoids importing stale embedded BPMN XML from older plugin manifests.
-            designerJson.putIfAbsent("key", dto.getKey());
-            if (dto.getEffectiveName() != null) {
-                designerJson.putIfAbsent("name", dto.getEffectiveName());
-            }
-            try {
-                String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
-                return stampVersion(bpmnXml, version);
-            } catch (Exception e) {
-                log.error("Failed to compile BPMN for {}: {}", logSafe(dto.getKey()), logSafe(e.getMessage()), e);
-                throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
-            }
-        }
-
-        if (dto.getBpmnContent() != null && !dto.getBpmnContent().isBlank()) {
-            return stampVersion(dto.getBpmnContent(), version);
-        }
-
-        if (designerJson == null || designerJson.isEmpty()) {
-            return "";
-        }
-        return "";
-    }
-
-    /**
-     * Scan {@code dto.designerJson.nodes} and derive a {@code formBindings}
-     * map compatible with {@link com.auraboot.framework.bpm.dto.FormBindingConfig}
-     * for every {@code userTask} node that carries {@code data.formPageKey}.
-     *
-     * <p>Resulting map shape (keyed by node id): <pre>
-     *   { "task_manager_approve": { "formType": "PAGE", "formRef": "wd_leave_request_detail" } }
-     * </pre>
-     *
-     * <p>If the referenced page does not exist in {@code ab_page_schema}, we log
-     * a warning but still emit the binding — deploy-time / runtime form lookup
-     * will surface the missing page with a clearer error. This matches the
-     * project's fail-late philosophy for form bindings (page may be imported
-     * later in the same transaction).
-     *
-     * @return a non-empty map with derived bindings, or {@code null} if the
-     *         designerJson has no qualifying userTask nodes.
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> deriveFormBindingsFromDesigner(ProcessDefinitionDTO dto) {
-        Map<String, Object> designerJson = dto.getDesignerJson();
-        if (designerJson == null || designerJson.isEmpty()) {
-            return null;
-        }
-        Object nodesObj = designerJson.get("nodes");
-        if (!(nodesObj instanceof List<?> nodes) || nodes.isEmpty()) {
-            return null;
-        }
-        Map<String, Object> derived = new LinkedHashMap<>();
-        for (Object nodeObj : nodes) {
-            if (!(nodeObj instanceof Map)) continue;
-            Map<String, Object> node = (Map<String, Object>) nodeObj;
-            Object type = node.get("type");
-            if (!"userTask".equals(type)) continue;
-            Object dataObj = node.get("data");
-            if (!(dataObj instanceof Map)) continue;
-            Map<String, Object> data = (Map<String, Object>) dataObj;
-            Object pageKeyObj = data.get("formPageKey");
-            if (!(pageKeyObj instanceof String pageKey) || pageKey.isBlank()) continue;
-            Object nodeIdObj = node.get("id");
-            if (!(nodeIdObj instanceof String nodeId) || nodeId.isBlank()) continue;
-
-            // Verify the page exists; warn (not throw) so a stale reference
-            // does not wedge the entire plugin import. Deploy-time runtime
-            // will report the missing page through the form probe endpoint.
-            try {
-                if (pageSchemaMapper.selectAnyByPageKey(pageKey) == null) {
-                    log.warn("Process {} node {} declares formPageKey={} but no matching row in ab_page_schema; binding will be emitted anyway",
-                            logSafe(dto.getKey()), logSafe(nodeId), logSafe(pageKey));
-                }
-            } catch (Exception e) {
-                log.warn("Failed to verify page_key={} for process {} node {}: {}",
-                        logSafe(pageKey), logSafe(dto.getKey()), logSafe(nodeId), logSafe(e.getMessage()));
-            }
-
-            Map<String, Object> binding = new LinkedHashMap<>();
-            binding.put("formType", "PAGE");
-            binding.put("formRef", pageKey);
-            derived.put(nodeId, binding);
-        }
-        return derived.isEmpty() ? null : derived;
-    }
-
-    private String stampVersion(String bpmnXml, Integer version) {
-        if (bpmnXml.contains("version=\"")) {
-            return bpmnXml;
-        }
-        String versionStr = String.valueOf(version);
-        int processStart = bpmnXml.indexOf("<process");
-        if (processStart < 0) {
-            return bpmnXml;
-        }
-        int tagEnd = bpmnXml.indexOf('>', processStart);
-        if (tagEnd < 0) {
-            return bpmnXml;
-        }
-        return bpmnXml.substring(0, tagEnd)
-                + " version=\"" + versionStr + ".0.0\""
-                + bpmnXml.substring(tagEnd);
-    }
-
-    /**
-     * Register a pre-compiled BPMN XML with SmartEngine. Idempotent by
-     * (tenantId, processKey, version): SmartEngine's deploy is safe to
-     * re-invoke. Failures are wrapped in {@link PluginException} so the
-     * import transaction rolls back cleanly.
-     */
-    private void deployProcessToSmartEngine(ProcessDefinitionDTO dto, Long tenantId,
-                                             Integer version, String bpmnXml) {
-        if (bpmnXml == null || bpmnXml.isBlank()) {
-            log.info("Process {} has no BPMN content; skipping SmartEngine deploy", logSafe(dto.getKey()));
-            return;
-        }
-        try {
-            // Use tenant-aware deploy so the cache key includes tenantId.
-            // Without tenantId the key is processKey:version; but ProcessEngineService.startProcess
-            // passes TENANT_ID in variables, causing SmartEngine to look up by
-            // processKey:version:tenantId — which would be absent.
-            smartEngine.getRepositoryCommandService()
-                    .deployWithUTF8Content(bpmnXml, String.valueOf(tenantId));
-            log.info("Deployed BPMN process to SmartEngine: tenantId={}, processKey={}, version={}",
-                    tenantId, logSafe(dto.getKey()), version);
-        } catch (Exception e) {
-            log.error("Failed to deploy BPMN process {} to SmartEngine: {}",
-                    logSafe(dto.getKey()), logSafe(e.getMessage()), e);
-            throw new PluginException("Failed to deploy process " + dto.getKey() + ": " + e.getMessage(), e);
-        }
-    }
 
     @Override
     public PluginResource importPage(PageSchemaDTO dto, String pluginPid, String importId,
@@ -2165,8 +1905,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             }
 
             DictDTO created = dictService.create(request);
-            // Mark all items as PLUGIN-sourced for source-aware reimport
-            dictService.markItemsAsPluginSource(created.getPid());
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DICT,
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),
@@ -2734,7 +2472,6 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                         WHERE tenant_id = ? AND agent_code = ?
                         """, resource.getTenantId(), resource.getResourceCode());
             }
-            case PROCESS -> processDefinitionMapper.updateStatus(resource.getResourcePid(), "archived");
             default -> log.warn("Rollback not implemented for resource type: {}", type);
         }
     }

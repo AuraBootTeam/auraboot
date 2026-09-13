@@ -32,26 +32,6 @@ public class SolutionSeeder {
         Object[][] solutions = {
             {
                 UniqueIdGenerator.generate(),
-                "pcba-manufacturing",
-                "PCBA Manufacturing Solution",
-                "PCBA 电子制造解决方案",
-                "PCBA Manufacturing Solution",
-                "Complete solution for PCBA manufacturing including BOM management, process control, quality inspection, and inventory tracking.",
-                "完整的 PCBA 电子制造解决方案，包含 BOM 管理、工序控制、质量检测和库存追踪。",
-                "Complete solution for PCBA manufacturing including BOM management, process control, quality inspection, and inventory tracking.",
-                "manufacturing",
-                "[\"pcba-base\",\"pcba-crm\",\"pcba-industry\",\"inventory\",\"quality\"]",
-                null,
-                "free",
-                "published",
-                true,
-                10,
-                "# PCBA Manufacturing Solution\n\nA comprehensive solution for printed circuit board assembly manufacturing.\n\n## Included Plugins\n- **PCBA Base** — Core PCBA models and workflows\n- **PCBA CRM** — Customer management for electronics manufacturing\n- **PCBA Industry** — Industry-specific fields and extensions\n- **Inventory** — Stock management and warehouse operations\n- **Quality** — Quality control and inspection workflows\n\n## Use Cases\n- SMT production line management\n- BOM and component tracking\n- Incoming/outgoing quality inspection\n- Customer order and delivery management",
-                "[\"pcba\",\"manufacturing\",\"electronics\",\"smt\"]",
-                now, now, now
-            },
-            {
-                UniqueIdGenerator.generate(),
                 "project-management-suite",
                 "Project Management Suite",
                 "项目管理套件",
@@ -69,26 +49,6 @@ public class SolutionSeeder {
                 "# Project Management Suite\n\nEverything you need to manage projects efficiently.\n\n## Included Plugins\n- **Project Management** — Projects, tasks, milestones, Kanban boards\n- **Document & Knowledge** — Document library, knowledge base, wiki\n\n## Use Cases\n- Software development project tracking\n- Product launch planning\n- Team task management\n- Knowledge sharing and documentation",
                 "[\"project\",\"task\",\"document\",\"collaboration\"]",
                 now, now, now
-            },
-            {
-                UniqueIdGenerator.generate(),
-                "crm-sales",
-                "CRM & Sales",
-                "CRM 与销售",
-                "CRM & Sales",
-                "Complete customer relationship management with leads, opportunities, sales pipeline, quotes, and orders.",
-                "完整的客户关系与销售管理，包含线索、商机、销售管道、报价和订单。",
-                "Complete customer relationship management with leads, opportunities, sales pipeline, quotes, and orders.",
-                "general",
-                "[\"crm\",\"sales\"]",
-                null,
-                "free",
-                "published",
-                true,
-                30,
-                "# CRM & Sales\n\nA complete CRM and sales solution for managing the customer lifecycle.\n\n## Included Plugins\n- **CRM** — Leads, contacts, accounts, opportunities, activities\n- **Sales** — Sales orders, quotes, revenue tracking\n\n## Use Cases\n- Lead management and conversion\n- Sales pipeline visualization\n- Customer account management\n- Quote and order processing",
-                "[\"crm\",\"sales\",\"pipeline\",\"leads\"]",
-                now, now, now
             }
         };
 
@@ -102,4 +62,5 @@ public class SolutionSeeder {
         }
         log.info("SolutionSeeder: seeded {} solutions (skipped {} existing)", count, solutions.length - count);
     }
+
 }

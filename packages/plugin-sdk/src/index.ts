@@ -32,4 +32,13 @@ export type {
 
 export type { PluginState } from './lifecycle.js'
 
+export type {
+  WebActivationPhase,
+  WebContributionKind,
+  WebContributionManifest,
+  WebContributionRoute,
+  WebRegistryContribution,
+} from './web-contribution.js'
+
 export { definePlugin } from './definition.js'
+export { defineWebContribution } from './web-contribution.js'

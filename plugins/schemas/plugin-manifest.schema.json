@@ -43,7 +43,7 @@
       "examples": [
         "asset",
         "workflow",
-        "core-bpm"
+        "automation"
       ]
     },
     "version": {

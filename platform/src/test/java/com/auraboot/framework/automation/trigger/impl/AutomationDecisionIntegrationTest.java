@@ -42,7 +42,7 @@ class AutomationDecisionIntegrationTest {
     private final RuleEvaluationService ruleEvaluationService = mock(RuleEvaluationService.class);
 
     private AutomationTriggerServiceImpl service() {
-        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, null);
+        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider());
         ReflectionTestUtils.setField(s, "decisionEvaluationService", decisionService);
         ReflectionTestUtils.setField(s, "ruleEvaluationService", ruleEvaluationService);
         return s;
@@ -225,8 +225,14 @@ class AutomationDecisionIntegrationTest {
 
     @Test
     void noDecisionService_returnsPayloadUnchanged() {
-        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, null); // service null
+        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider());
         Map<String, Object> payload = Map.of("a", 1);
         assertThat(s.withDecision(automation("routing"), payload)).isSameAs(payload);
+    }
+
+    private static org.springframework.beans.factory.ObjectProvider<
+            com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime> emptyRuntimeProvider() {
+        return new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                .getBeanProvider(com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.class);
     }
 }

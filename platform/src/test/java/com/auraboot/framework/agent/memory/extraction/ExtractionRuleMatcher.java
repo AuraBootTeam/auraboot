@@ -89,7 +89,7 @@ public final class ExtractionRuleMatcher {
 
     // ---- p4 ----
     static ExtractedMemoryCandidate tryMatchTaskAssigned(ExtractionSignal s) {
-        if (!"bpm_event".equals(s.type())) return null;
+        if (!"workflow_event".equals(s.type())) return null;
         if (!"task_assigned".equals(s.name())) return null;
         String who = String.valueOf(s.payload().getOrDefault("assignee", "?"));
         String task = String.valueOf(s.payload().getOrDefault("taskTitle", s.payload().getOrDefault("taskId", "?")));
@@ -103,7 +103,7 @@ public final class ExtractionRuleMatcher {
 
     // ---- p5 ----
     static ExtractedMemoryCandidate tryMatchTaskCompleted(ExtractionSignal s) {
-        if (!"bpm_event".equals(s.type())) return null;
+        if (!"workflow_event".equals(s.type())) return null;
         if (!"task_completed".equals(s.name())) return null;
         String task = String.valueOf(s.payload().getOrDefault("taskTitle", "?"));
         String outcome = String.valueOf(s.payload().getOrDefault("outcome", "completed"));

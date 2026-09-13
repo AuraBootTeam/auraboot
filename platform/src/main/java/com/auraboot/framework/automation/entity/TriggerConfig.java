@@ -116,17 +116,17 @@ public class TriggerConfig {
      */
     private Integer maxExecutionTime;
 
-    // ==================== ON_BPM_EVENT specific ====================
+    // ==================== ON_WORKFLOW_EVENT specific ====================
 
     /**
-     * BPM event types to listen for (for ON_BPM_EVENT).
+     * workflow event types to listen for (for ON_WORKFLOW_EVENT).
      * e.g. ["process_started", "task_completed", "process_ended"]
-     * If empty, triggers on all BPM events for the process.
+     * If empty, triggers on all workflow events for the process.
      */
     private List<String> eventTypes;
 
     /**
-     * Process key to filter (for ON_BPM_EVENT).
+     * Process key to filter (for ON_WORKFLOW_EVENT).
      * Stored in modelCode field of automation, this is for documentation.
      */
     private String processKey;

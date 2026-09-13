@@ -1,7 +1,8 @@
 package com.auraboot.framework.eventpolicy.executor.handler;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.bpm.service.CcService;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
@@ -35,7 +36,7 @@ public class CcTaskActionHandler implements ActionHandler {
 
     private final InboxService inboxService;
     private final UserRoleMapper userRoleMapper;
-    private final CcService ccService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -97,8 +98,13 @@ public class CcTaskActionHandler implements ActionHandler {
         List<Long> targetUserIds = resolveUserTargets(plan, target, tenantId, modelCode, recordPid);
         if (taskId != null && !taskId.isBlank()) {
             try {
-                ccService.ccForUserIds(taskId, targetUserIds, message, "EVENT_POLICY",
-                        bpmDedupKey(plan, taskId, recordPid));
+                workflowCapabilities.execute("task.cc-users", new WorkflowCapability.WorkflowRequest(
+                        tenantId, MetaContext.getCurrentUserId(), Map.of(
+                        "taskId", taskId,
+                        "receiverUserIds", targetUserIds,
+                        "comment", message,
+                        "sourceType", "EVENT_POLICY",
+                        "dedupKey", bpmDedupKey(plan, taskId, recordPid))));
             } catch (RuntimeException e) {
                 throw ccFailure(plan, "cc_task_write_failed", target, targetUserIds, null,
                         modelCode, recordPid, taskId, "CC_TASK failed: " + ActionFailurePayload.messageOf(e), e);

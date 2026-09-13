@@ -15,7 +15,7 @@ import { expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

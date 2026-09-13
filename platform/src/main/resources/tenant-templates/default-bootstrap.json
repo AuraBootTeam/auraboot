@@ -67,7 +67,7 @@
     {
       "code": "acp.runtime.manage",
       "name": "Agent 运行时操作",
-      "description": "派发任务给 Agent、脚手架、调度重载/触发、工具契约派生、dry-run/沙箱、协作与 BPM 桥接、技能同步",
+      "description": "派发任务给 Agent、脚手架、调度重载/触发、工具契约派生、dry-run/沙箱、协作与工作流能力桥接、技能同步",
       "type": "function",
       "module": "acp",
       "resource": "/api/agent",
@@ -143,126 +143,6 @@
       "resource": "/automations",
       "action": "admin",
       "resourceType": "menu"
-    },
-    {
-      "code": "bpm.form.manage",
-      "name": "BPM表单管理",
-      "description": "管理BPM任务表单（查看、提交）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:form",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.monitor.read",
-      "name": "流程监控查看",
-      "description": "查看流程实例状态、SLA记录和审计日志",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:monitor",
-      "action": "read",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.monitor.manage",
-      "name": "流程监控管理",
-      "description": "挂起、恢复、终止流程实例和节点跳转",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:monitor",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.signature.manage",
-      "name": "BPM签名管理",
-      "description": "管理BPM电子签名（签署、验证）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:signature",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.definition.manage",
-      "name": "流程定义导入导出",
-      "description": "导出和导入BPM流程定义包",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:definition",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.rule.manage",
-      "name": "BPM规则管理",
-      "description": "管理BPM业务规则（创建、编辑、删除、验证、执行）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:rule",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.hook.manage",
-      "name": "节点钩子管理",
-      "description": "管理BPM节点钩子（创建、编辑、删除）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:hook",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.sla.manage",
-      "name": "SLA配置管理",
-      "description": "管理SLA时效配置（创建、编辑、删除）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:sla",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.config.manage",
-      "name": "BPM领域配置管理",
-      "description": "管理BPM领域配置（创建、编辑、删除）",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:config",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.task.read",
-      "name": "工作台查看",
-      "description": "查看工作台数据和流程详情",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:task",
-      "action": "read",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.task.manage",
-      "name": "工作台操作",
-      "description": "启动流程、批量处理任务",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:task",
-      "action": "manage",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.report.read",
-      "name": "BPM报表查看",
-      "description": "查看BPM审批链和审计报告",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:report",
-      "action": "read",
-      "resourceType": "function"
     },
     {
       "code": "plugin.plugin.read",
@@ -641,136 +521,6 @@
       "type": "function",
       "module": "automation",
       "resource": "automation:automation",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.config.update",
-      "name": "BPM config update",
-      "description": "BPM config — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:config",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.definition.update",
-      "name": "BPM definition update",
-      "description": "BPM definition — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:definition",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.form.update",
-      "name": "BPM form update",
-      "description": "BPM form — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:form",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.hook.update",
-      "name": "BPM hook update",
-      "description": "BPM hook — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:hook",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.monitor.update",
-      "name": "BPM monitor update",
-      "description": "BPM monitor — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:monitor",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.process.admin",
-      "name": "BPM process admin",
-      "description": "BPM process — admin",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process",
-      "action": "admin",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.process.execute",
-      "name": "BPM process execute",
-      "description": "BPM process — execute",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process",
-      "action": "execute",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.process.read",
-      "name": "BPM process read",
-      "description": "BPM process — read",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process",
-      "action": "read",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.process.update",
-      "name": "BPM process update",
-      "description": "BPM process — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:process",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.rule.update",
-      "name": "BPM rule update",
-      "description": "BPM rule — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:rule",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.signature.update",
-      "name": "BPM signature update",
-      "description": "BPM signature — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:signature",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.sla.update",
-      "name": "BPM sla update",
-      "description": "BPM sla — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:sla",
-      "action": "update",
-      "resourceType": "function"
-    },
-    {
-      "code": "bpm.task.update",
-      "name": "BPM task update",
-      "description": "BPM task — update",
-      "type": "function",
-      "module": "bpm",
-      "resource": "bpm:task",
       "action": "update",
       "resourceType": "function"
     },
@@ -1836,7 +1586,6 @@
         "page.page.read",
         "party.party.read",
         "dashboard.saved_view.read",
-        "bpm.process.read",
         "notification.view"
       ]
     }

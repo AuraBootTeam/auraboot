@@ -458,29 +458,121 @@
     "zh-CN": "能力",
     "en-US": "Capabilities"
   },
-  { "key": "admin.permission.members.add", "zh-CN": "添加成员", "en-US": "Add Members" },
-  { "key": "admin.permission.members.addTitle", "zh-CN": "添加成员", "en-US": "Add Members" },
-  { "key": "admin.permission.members.addConfirm", "zh-CN": "添加所选", "en-US": "Add Selected" },
-  { "key": "admin.permission.members.addSuccess", "zh-CN": "已添加 {count} 名成员", "en-US": "{count} member(s) added" },
-  { "key": "admin.permission.members.empty", "zh-CN": "该角色暂无成员", "en-US": "No members in this role" },
-  { "key": "admin.permission.members.totalCount", "zh-CN": "共 {count} 名成员", "en-US": "{count} member(s)" },
-  { "key": "admin.permission.members.selectedCount", "zh-CN": "已选 {count} 项", "en-US": "{count} selected" },
-  { "key": "admin.permission.members.selectRole", "zh-CN": "请选择角色以查看成员", "en-US": "Select a role to view members" },
-  { "key": "admin.permission.members.searchMembers", "zh-CN": "搜索成员…", "en-US": "Search members..." },
-  { "key": "admin.permission.members.noCandidates", "zh-CN": "无可添加的成员", "en-US": "No candidates" },
-  { "key": "admin.permission.members.tabOrg", "zh-CN": "组织架构", "en-US": "Organization" },
-  { "key": "admin.permission.members.tabList", "zh-CN": "成员列表", "en-US": "Member List" },
-  { "key": "admin.permission.members.removeTitle", "zh-CN": "移除成员", "en-US": "Remove Member" },
-  { "key": "admin.permission.members.removeContent", "zh-CN": "确认将该成员从此角色中移除?", "en-US": "Remove this member from the role?" },
-  { "key": "admin.permission.members.removeSuccess", "zh-CN": "已移除成员", "en-US": "Member removed" },
-  { "key": "admin.permission.members.colName", "zh-CN": "姓名", "en-US": "Name" },
-  { "key": "admin.permission.members.colEmail", "zh-CN": "邮箱", "en-US": "Email" },
-  { "key": "admin.permission.members.colDepartment", "zh-CN": "部门", "en-US": "Department" },
-  { "key": "admin.permission.members.colPosition", "zh-CN": "岗位", "en-US": "Position" },
-  { "key": "admin.permission.members.colAssignedAt", "zh-CN": "分配时间", "en-US": "Assigned At" },
-  { "key": "sidebar.noMenus", "zh-CN": "暂无可用菜单", "en-US": "No menus available" },
-  { "key": "sidebar.openMenu", "zh-CN": "打开导航菜单", "en-US": "Open navigation menu" },
-  { "key": "sidebar.closeMenu", "zh-CN": "关闭导航菜单", "en-US": "Close navigation menu" },
+  {
+    "key": "admin.permission.members.add",
+    "zh-CN": "添加成员",
+    "en-US": "Add Members"
+  },
+  {
+    "key": "admin.permission.members.addTitle",
+    "zh-CN": "添加成员",
+    "en-US": "Add Members"
+  },
+  {
+    "key": "admin.permission.members.addConfirm",
+    "zh-CN": "添加所选",
+    "en-US": "Add Selected"
+  },
+  {
+    "key": "admin.permission.members.addSuccess",
+    "zh-CN": "已添加 {count} 名成员",
+    "en-US": "{count} member(s) added"
+  },
+  {
+    "key": "admin.permission.members.empty",
+    "zh-CN": "该角色暂无成员",
+    "en-US": "No members in this role"
+  },
+  {
+    "key": "admin.permission.members.totalCount",
+    "zh-CN": "共 {count} 名成员",
+    "en-US": "{count} member(s)"
+  },
+  {
+    "key": "admin.permission.members.selectedCount",
+    "zh-CN": "已选 {count} 项",
+    "en-US": "{count} selected"
+  },
+  {
+    "key": "admin.permission.members.selectRole",
+    "zh-CN": "请选择角色以查看成员",
+    "en-US": "Select a role to view members"
+  },
+  {
+    "key": "admin.permission.members.searchMembers",
+    "zh-CN": "搜索成员…",
+    "en-US": "Search members..."
+  },
+  {
+    "key": "admin.permission.members.noCandidates",
+    "zh-CN": "无可添加的成员",
+    "en-US": "No candidates"
+  },
+  {
+    "key": "admin.permission.members.tabOrg",
+    "zh-CN": "组织架构",
+    "en-US": "Organization"
+  },
+  {
+    "key": "admin.permission.members.tabList",
+    "zh-CN": "成员列表",
+    "en-US": "Member List"
+  },
+  {
+    "key": "admin.permission.members.removeTitle",
+    "zh-CN": "移除成员",
+    "en-US": "Remove Member"
+  },
+  {
+    "key": "admin.permission.members.removeContent",
+    "zh-CN": "确认将该成员从此角色中移除?",
+    "en-US": "Remove this member from the role?"
+  },
+  {
+    "key": "admin.permission.members.removeSuccess",
+    "zh-CN": "已移除成员",
+    "en-US": "Member removed"
+  },
+  {
+    "key": "admin.permission.members.colName",
+    "zh-CN": "姓名",
+    "en-US": "Name"
+  },
+  {
+    "key": "admin.permission.members.colEmail",
+    "zh-CN": "邮箱",
+    "en-US": "Email"
+  },
+  {
+    "key": "admin.permission.members.colDepartment",
+    "zh-CN": "部门",
+    "en-US": "Department"
+  },
+  {
+    "key": "admin.permission.members.colPosition",
+    "zh-CN": "岗位",
+    "en-US": "Position"
+  },
+  {
+    "key": "admin.permission.members.colAssignedAt",
+    "zh-CN": "分配时间",
+    "en-US": "Assigned At"
+  },
+  {
+    "key": "sidebar.noMenus",
+    "zh-CN": "暂无可用菜单",
+    "en-US": "No menus available"
+  },
+  {
+    "key": "sidebar.openMenu",
+    "zh-CN": "打开导航菜单",
+    "en-US": "Open navigation menu"
+  },
+  {
+    "key": "sidebar.closeMenu",
+    "zh-CN": "关闭导航菜单",
+    "en-US": "Close navigation menu"
+  },
   {
     "key": "admin.permission.selectRole",
     "zh-CN": "请选择角色",
@@ -557,11 +649,6 @@
     "key": "permission.module.dynamic",
     "zh-CN": "动态数据",
     "en-US": "Dynamic Data"
-  },
-  {
-    "key": "permission.module.crm",
-    "zh-CN": "CRM",
-    "en-US": "CRM"
   },
   {
     "key": "permission.module.pm",
@@ -922,11 +1009,6 @@
     "key": "permission.module.billing",
     "zh-CN": "计费",
     "en-US": "Billing"
-  },
-  {
-    "key": "permission.module.bpm",
-    "zh-CN": "流程",
-    "en-US": "BPM"
   },
   {
     "key": "permission.module.dashboard",
@@ -2447,26 +2529,6 @@
     "en-US": "Urgent Tasks"
   },
   {
-    "key": "workbench.stats.crm_opportunity_amount",
-    "zh-CN": "活跃商机",
-    "en-US": "Active Opportunities"
-  },
-  {
-    "key": "workbench.stats.crm_account_active",
-    "zh-CN": "活跃客户",
-    "en-US": "Active Accounts"
-  },
-  {
-    "key": "workbench.stats.bpm_running",
-    "zh-CN": "运行中流程",
-    "en-US": "Running Processes"
-  },
-  {
-    "key": "workbench.stats.bpm_completed_week",
-    "zh-CN": "本周完成",
-    "en-US": "Completed This Week"
-  },
-  {
     "key": "workbench.stats.this_week",
     "zh-CN": "本周",
     "en-US": "this week"
@@ -2682,16 +2744,6 @@
     "en-US": "Tasks"
   },
   {
-    "key": "workbench.category.crm",
-    "zh-CN": "CRM 销售",
-    "en-US": "CRM"
-  },
-  {
-    "key": "workbench.category.bpm",
-    "zh-CN": "流程管理",
-    "en-US": "BPM"
-  },
-  {
     "key": "workbench.category.general",
     "zh-CN": "通用组件",
     "en-US": "General"
@@ -2762,11 +2814,6 @@
     "en-US": "Activities"
   },
   {
-    "key": "workbench.widget.activities_desc",
-    "zh-CN": "近期跟进活动时间线",
-    "en-US": "Recent CRM activities"
-  },
-  {
     "key": "workbench.widget.my_process",
     "zh-CN": "我的流程",
     "en-US": "My Processes"
@@ -2780,11 +2827,6 @@
     "key": "workbench.widget.process_stats",
     "zh-CN": "流程统计",
     "en-US": "Process Stats"
-  },
-  {
-    "key": "workbench.widget.process_stats_desc",
-    "zh-CN": "完成率/平均耗时",
-    "en-US": "BPM completion and duration"
   },
   {
     "key": "workbench.widget.shortcuts",
@@ -2885,11 +2927,6 @@
     "key": "workbench.pipeline.empty",
     "zh-CN": "暂无商机数据",
     "en-US": "No opportunity data"
-  },
-  {
-    "key": "workbench.pipeline.goToCrm",
-    "zh-CN": "前往 CRM",
-    "en-US": "Go to CRM"
   },
   {
     "key": "workbench.pipeline.total",

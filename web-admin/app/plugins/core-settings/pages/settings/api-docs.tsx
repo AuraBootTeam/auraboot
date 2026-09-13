@@ -93,7 +93,6 @@ const API_GROUPS = [
     group: 'connectors',
     description: 'External REST API connector management',
   },
-  { name: 'BPM / Workflow', group: 'bpm', description: 'Business process management endpoints' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────

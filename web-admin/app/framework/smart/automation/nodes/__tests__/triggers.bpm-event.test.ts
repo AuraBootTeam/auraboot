@@ -2,34 +2,34 @@ import { describe, it, expect } from 'vitest';
 import { automationNodes, triggerNodes } from '~/framework/smart/automation/nodes';
 
 /**
- * trigger-bpm-event node definition tests.
+ * trigger-workflow-event node definition tests.
  *
  * Asserts that:
  *  - automationNodes and triggerNodes contain the new node
- *  - defaultConfig.triggerType === 'on_bpm_event'
- *  - configSchema has a required 'modelCode' field of type 'process-select'
- *  - configSchema has an 'eventTypes' field of type 'multiselect' with all 5 BPM event options
+ *  - defaultConfig.triggerType === 'on_workflow_event'
+ *  - configSchema has a required 'modelCode' field of type 'workflow-select'
+ *  - configSchema has an 'eventTypes' field of type 'multiselect' with all 5 workflow event options
  */
-describe('trigger-bpm-event node definition', () => {
-  const nodeFromAutomationNodes = automationNodes.find((n) => n.type === 'trigger-bpm-event');
-  const nodeFromTriggerNodes = triggerNodes.find((n) => n.type === 'trigger-bpm-event');
+describe('trigger-workflow-event node definition', () => {
+  const nodeFromAutomationNodes = automationNodes.find((n) => n.type === 'trigger-workflow-event');
+  const nodeFromTriggerNodes = triggerNodes.find((n) => n.type === 'trigger-workflow-event');
 
-  it('automationNodes contains trigger-bpm-event', () => {
+  it('automationNodes contains trigger-workflow-event', () => {
     expect(nodeFromAutomationNodes).toBeDefined();
   });
 
-  it('triggerNodes contains trigger-bpm-event', () => {
+  it('triggerNodes contains trigger-workflow-event', () => {
     expect(nodeFromTriggerNodes).toBeDefined();
   });
 
-  it('defaultConfig.triggerType is on_bpm_event', () => {
-    expect(nodeFromTriggerNodes!.defaultConfig?.triggerType).toBe('on_bpm_event');
+  it('defaultConfig.triggerType is on_workflow_event', () => {
+    expect(nodeFromTriggerNodes!.defaultConfig?.triggerType).toBe('on_workflow_event');
   });
 
-  it('configSchema has required modelCode field of type process-select', () => {
+  it('configSchema has required modelCode field of type workflow-select', () => {
     const field = nodeFromTriggerNodes!.configSchema!.find((f) => f.key === 'modelCode');
     expect(field).toBeDefined();
-    expect(field!.type).toBe('process-select');
+    expect(field!.type).toBe('workflow-select');
     expect(field!.required).toBe(true);
     expect(field!.group).toBe('trigger_source');
   });

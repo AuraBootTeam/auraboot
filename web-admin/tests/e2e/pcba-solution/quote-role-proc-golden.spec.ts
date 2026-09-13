@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import type { Browser, BrowserContext, Response } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
 import { ensureSidebarExpanded } from '../helpers';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   isTransientViteDynamicImportIssue,
   openQuoteRolePage,

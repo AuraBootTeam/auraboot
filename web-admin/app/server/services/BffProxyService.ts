@@ -638,7 +638,7 @@ export class BffProxyService {
     // `*/*` means "any type is acceptable", and rewriting it to `application/json` NARROWS what the
     // client said it would take. Any endpoint that produces something else then answers 406 —
     // including every script we serve for embedding on a customer's website
-    // (/api/crm/forms/{pid}/sdk.js, /api/public/cs/widget.js), because a browser's <script src>
+    // (/api/ext/{plugin}/public/embed.js, /api/public/cs/widget.js), because a browser's <script src>
     // sends exactly `Accept: */*`. The customer pastes the snippet and gets a 406 with nothing to
     // explain it. So `*/*` and an absent Accept are both passed through as `*/*`, and the endpoint's
     // own `produces` decides: JSON endpoints still return JSON, script endpoints return scripts.

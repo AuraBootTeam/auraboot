@@ -10,6 +10,7 @@ import {
   type Scope,
 } from '~/shared/decision/ast/conditionAst';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
+import { getKernel } from '~/framework/bootstrap';
 import {
   factCatalogToFieldOptions,
   mergeFieldOptions,
@@ -78,7 +79,7 @@ const DEFAULT_SAMPLE_CONTEXT = JSON.stringify(
   2,
 );
 
-const SCOPE_OPTIONS = ['SLA', 'BPM', 'AUTOMATION', 'EVENT_POLICY', 'PERMISSION'];
+const SCOPE_OPTIONS = ['SLA', 'WORKFLOW', 'AUTOMATION', 'EVENT_POLICY', 'PERMISSION'];
 const FIELD_SCOPES = new Set<Scope>([
   'meta',
   'event',
@@ -115,8 +116,7 @@ const DATA_TYPES = new Set<DataType>([
 const MODEL_CODES_BY_SCOPE: Record<string, string[]> = {
   SLA: ['sla_config', 'wd_leave_request'],
   SLA_RULE: ['sla_config', 'wd_leave_request'],
-  BPM: ['wd_leave_request'],
-  BPM_PROCESS: ['wd_leave_request'],
+  WORKFLOW_PROCESS: ['wd_leave_request'],
   WORKFLOW: ['wd_leave_request'],
   AUTOMATION: ['wd_leave_request'],
   EVENT_POLICY: ['wd_leave_request'],
@@ -144,7 +144,7 @@ const SCENARIO_FIELDS: Record<string, FieldOption[]> = {
     { scope: 'sla', path: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
     { scope: 'sla', path: 'warningBeforeMinutes', label: '提前提醒', dataType: 'integer' },
   ],
-  BPM: [
+  WORKFLOW: [
     {
       scope: 'process',
       path: 'nodeId',
@@ -254,10 +254,9 @@ function scopeLabel(value: unknown): string {
     case 'SLA':
     case 'SLA_RULE':
       return 'SLA / 超时策略';
-    case 'BPM':
-    case 'BPM_PROCESS':
+    case 'WORKFLOW_PROCESS':
     case 'WORKFLOW':
-      return 'BPM / 审批路由';
+      return '工作流 / 审批路由';
     case 'AUTOMATION':
       return '自动化';
     case 'EVENT_POLICY':
@@ -584,8 +583,8 @@ function impactSourceUrl(ref: DecisionImpactRef): string | null {
   switch (sourceType) {
     case 'SLA_RULE':
       return sourcePid ? `/p/sla_config/view/${encodePath(sourcePid)}` : null;
-    case 'BPM_PROCESS':
-      return sourcePid ? `/p/bpm_process_management/edit/${encodePath(sourcePid)}` : null;
+    case 'WORKFLOW_PROCESS':
+      return contributedImpactSourceUrl(ref);
     case 'AUTOMATION':
       return sourcePid ? `/automation/${encodePath(sourcePid)}` : null;
     case 'EVENT_POLICY':
@@ -597,6 +596,15 @@ function impactSourceUrl(ref: DecisionImpactRef): string | null {
     default:
       return null;
   }
+}
+
+function contributedImpactSourceUrl(ref: DecisionImpactRef): string | null {
+  const provider = getKernel().contributionRegistry.getPrimaryService(
+    'aura.decision.usage-navigation',
+  )?.provider as
+    | { resolveLink?: (impactRef: DecisionImpactRef) => { href: string } | undefined }
+    | undefined;
+  return provider?.resolveLink?.(ref)?.href ?? null;
 }
 
 export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibraryBlockProps) {

@@ -16,7 +16,7 @@ import {
 } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const PASSWORD = 'Test2026x';
 const ENABLED = process.env.MO_TRACE_VISUAL_MATRIX === '1';

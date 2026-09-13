@@ -18,7 +18,6 @@ aura:
   modules:
     meta-core: false
     biz-runtime: false
-    bpm-engine: false
     im-service: false
     agent-runtime: false
 

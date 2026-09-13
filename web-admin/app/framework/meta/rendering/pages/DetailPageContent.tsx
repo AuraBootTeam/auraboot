@@ -59,7 +59,7 @@ import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHisto
 import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTimeline';
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
-import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
+import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
@@ -720,7 +720,7 @@ const DIRECT_DETAIL_SPECIALIZED_BLOCK_TYPES = new Set([
   'activity-timeline',
   'record-comments',
   'field-history',
-  'bpm-panel',
+  'workflow-panel',
 ]);
 
 /**
@@ -1160,7 +1160,7 @@ function DetailPageContentInner(props: PageContentProps) {
     'activity-timeline',
     'record-comments',
     'field-history',
-    'bpm-panel',
+    'workflow-panel',
   ]);
   const directMiscBlocks = useMemo(
     () =>
@@ -1568,7 +1568,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 )}
               </div>
             )}
-            {/* Inline approval panel — shown when the record has an associated BPM process */}
+            {/* Product-contributed approval panel for records associated with a workflow. */}
             {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
           </div>
         ) : (
@@ -1723,7 +1723,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 <FallbackDetailView schema={schema} recordData={recordData} locale={locale} />
               )}
 
-            {/* Inline approval panel — shown when the record has an associated BPM process */}
+            {/* Product-contributed approval panel for records associated with a workflow. */}
             {recordData?.pid && <InlineApprovalPanel recordPid={recordData.pid} />}
 
             {/* Default back/edit buttons (hidden in print) */}
@@ -1778,8 +1778,7 @@ export function resolveDetailPdfFileName(
 ): string {
   const title = getLocalizedText(schema.title, locale, t) || tableName;
   const code = readDetailRecordField(recordData, 'sl_ctr_code')
-    ?? readDetailRecordField(recordData, 'sl_so_code')
-    ?? readDetailRecordField(recordData, 'crm_acc_code');
+    ?? readDetailRecordField(recordData, 'sl_so_code');
   const recordCode = code === undefined || code === null || code === '' ? '' : String(code);
   return recordCode ? `${title}-${recordCode}` : title;
 }
@@ -2269,6 +2268,7 @@ function DetailBlockRenderer({
           (block as any).dataSource ??
           (block as any).subTable?.dataSource
         }
+        businessRecordMapping={(block as any).businessRecordMapping}
       />
     );
   }
@@ -2300,8 +2300,8 @@ function DetailBlockRenderer({
     );
   }
 
-  if (block.blockType === 'bpm-panel') {
-    return <BpmPanelBlock block={block as any} record={recordData} recordPid={recordPid} />;
+  if (block.blockType === 'workflow-panel') {
+    return <LazyContributedComponent contributionId="workflow-panel" block={block as any} record={recordData} recordPid={recordPid} />;
   }
 
   if (block.blockType === 'monthly-grid' && block.monthlyGrid) {

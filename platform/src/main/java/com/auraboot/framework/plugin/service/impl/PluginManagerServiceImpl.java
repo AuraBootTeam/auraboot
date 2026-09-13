@@ -13,6 +13,7 @@ import com.auraboot.framework.plugin.exception.PluginNotFoundException;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.pf4j.AuraPlugin;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
+import com.auraboot.framework.plugin.pf4j.ApplicationModuleRegistry;
 import com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.service.PluginManagerService;
@@ -44,6 +45,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     private final AuraPluginManager auraPluginManager;
     private final ExtensionRegistry extensionRegistry;
     private final BackgroundComponentRegistry backgroundComponentRegistry;
+    private final ApplicationModuleRegistry applicationModuleRegistry;
     private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     /**
@@ -197,6 +199,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
             // / @PostConstruct fire. Done after markAsEnabled so a failure here
             // surfaces as the explicit enableFailed below.
             backgroundComponentRegistry.register(pluginId);
+            applicationModuleRegistry.register(pluginId);
 
             log.info("Plugin enabled successfully: {}", pluginId);
             PluginOperationResult result = PluginOperationResult.enableSuccess(record.getPid(), pluginId, record.getNamespace());
@@ -251,6 +254,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
 
             // Tear down BackgroundComponentExtension beans first so their
             // @PreDestroy runs while plugin instance state is still consistent.
+            applicationModuleRegistry.unregister(pluginId);
             backgroundComponentRegistry.unregister(pluginId);
 
             // Update status
@@ -304,6 +308,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
 
             // Defensive: tear down any leftover BackgroundComponentExtension
             // beans (no-op if plugin was already disabled).
+            applicationModuleRegistry.unregister(pluginId);
             backgroundComponentRegistry.unregister(pluginId);
 
             // Soft delete the record
@@ -467,6 +472,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
             String pluginId = wrapper.getPluginId();
             try {
                 backgroundComponentRegistry.register(pluginId);
+                applicationModuleRegistry.register(pluginId);
             } catch (RuntimeException e) {
                 log.error("Failed to register background components for plugin: {}", pluginId, e);
             }

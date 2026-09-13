@@ -218,11 +218,11 @@ const BLOCK_TEMPLATES: Record<string, { label: string; create: BlockTemplateFact
       },
     }),
   },
-  'bpm-panel': {
+  'workflow-panel': {
     label: 'New BPM panel',
     create: (id) => ({
       id,
-      blockType: 'bpm-panel',
+      blockType: 'workflow-panel',
       title: { en: 'New BPM panel', 'zh-CN': '新流程面板' },
       layout: { span: 12 },
       props: {

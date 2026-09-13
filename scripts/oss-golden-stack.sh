@@ -33,7 +33,7 @@
 #
 # Then run golden specs (the `up` banner prints this, `env` re-prints it):
 #   cd web-admin && eval "$(../scripts/oss-golden-stack.sh env <name>)" \
-#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/<spec>.spec.ts
+#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/<spec>.spec.ts
 #
 set -euo pipefail
 
@@ -760,7 +760,7 @@ export PG_PORT=${pg_port:-5432}
 export PG_USER=${pg_user:-auraboot}
 export PG_DB=${pg_db:-aura_boot}
 # example: cd web-admin && eval "\$(../scripts/oss-golden-stack.sh env $name)" \\
-#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/designer-property-edit.spec.ts
+#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/designer-lifecycle.spec.ts
 # NOTE: 'up' runs an internal warm step (full setup → auth storageState → pre-warm
 #       /report-designer + /dashboard), and web-admin/vite.config.ts pre-bundles the
 #       heavy lazy-route deps (optimizeDeps.include, #947). The FIRST golden run after

@@ -7,7 +7,7 @@
   "displayName": "Platform Admin DSL Pages",
   "displayName:zh-CN": "平台管理 DSL 页面",
   "displayName:en": "Platform Admin DSL Pages",
-  "description": "DSL-driven admin pages for SLA Config, BPM Domain Config, Data Permission, Webhook, and API Connector",
+  "description": "DSL-driven administration pages for AuraBoot platform capabilities",
   "author": "AuraBoot Team",
   "minPlatformVersion": "1.0.0",
   "dependencies": [],

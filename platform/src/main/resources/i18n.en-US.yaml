@@ -257,24 +257,6 @@ notification:
     load_failed: Failed to load notification preferences
     update_failed: Failed to update notification preferences
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: New task assigned to you
-    task_completed:
-      title: Task completed
-    process_started:
-      title: Process started
-    process_ended:
-      title: Process completed
-    sla_warning:
-      title: SLA warning
-    sla_escalated:
-      title: SLA escalated
-    default:
-      title: BPM notification
-
 # Flow Designer SDK
 flow:
   palette:
@@ -316,8 +298,8 @@ automation:
     scheduled.desc: Triggered according to Cron expression
     webhook: Webhook
     webhook.desc: Triggered when an external Webhook request is received
-    bpmEvent: On BPM Event
-    bpmEvent.desc: Triggered when a BPM process event occurs (process started, task completed, etc.)
+    workflowEvent: On Workflow Event
+    workflowEvent.desc: Triggered when a workflow event occurs (process started, task completed, etc.)
     inactivity: On Inactivity
     inactivity.desc: Triggered when a record has had no activity (no update) for the configured duration; driven by a scheduled sweep
 
@@ -414,7 +396,7 @@ automation:
     collection.desc: Array or list to iterate over
     itemVariable: Item Variable Name
     itemVariable.desc: Variable name for current element, default is item
-    bpmProcess: BPM Process
+    workflowProcess: Workflow
     eventTypes: Event Types
     eventTypes.desc: Leave empty to trigger on all event types
     eventTypes.process_started: Process Started
@@ -791,10 +773,6 @@ workbench:
     title: Statistics
     inbox_pending: Pending Tasks
     inbox_urgent: Urgent Tasks
-    crm_opportunity_amount: Active Opportunities
-    crm_account_active: Active Accounts
-    bpm_running: Running Processes
-    bpm_completed_week: Completed This Week
     this_week: this week
     this_month: this month
   inbox:
@@ -904,11 +882,6 @@ workbench:
     done: Done
     customize: Click Edit to customize shortcuts
     customize_hint: Click Edit to customize
-    newLead: New Lead
-    newAccount: New Account
-    newOpportunity: New Opportunity
-    startProcess: Start Process
-    newContract: New Contract
     reports: Reports
   recent:
     title: Recent Visits
@@ -916,8 +889,6 @@ workbench:
   category:
     stats: Statistics
     tasks: Tasks
-    crm: CRM
-    bpm: BPM
     general: General
   widget:
     stats_row: Stats Row
@@ -928,16 +899,6 @@ workbench:
     inbox_desc: Pending approvals and tasks
     calendar: Calendar
     calendar_desc: Monthly calendar with task markers
-    pipeline: Sales Pipeline
-    pipeline_desc: Opportunity stages overview
-    leads: New Leads
-    leads_desc: Recent leads list
-    activities: Activities
-    activities_desc: Recent CRM activities
-    my_process: My Processes
-    my_process_desc: Processes you started
-    process_stats: Process Stats
-    process_stats_desc: BPM completion and duration
     shortcuts: Quick Actions
     shortcuts_desc: Favorite shortcuts
     recent: Recent
@@ -946,50 +907,11 @@ workbench:
     announcement_desc: System announcements
     quick_note: Quick Note
     quick_note_desc: Personal notepad
-  activities:
-    title: Recent Activities
-    empty: No recent activities
-    justNow: Just now
-    minutesAgo: "{minutes}m ago"
-    hoursAgo: "{hours}h ago"
-    daysAgo: "{days}d ago"
   announcement:
     title: Announcements
     empty: No announcements
     pinned: Pinned
     urgent: Urgent
-  pipeline:
-    title: Sales Pipeline
-    empty: No opportunity data
-    goToCrm: Go to CRM
-    total: Total
-  leads:
-    title: New Leads
-    empty: No leads yet
-    viewAll: View All
-    unnamed: Unnamed Lead
-    justNow: Just now
-    hoursAgo: "{hours}h ago"
-    daysAgo: "{days}d ago"
-  processStats:
-    title: Process Stats
-    noData: No data available
-    completionRate: Completion Rate
-    hours: hours
-    avgDuration: Avg Duration
-    processes: processes
-    running: Running
-    completedThisWeek: completed this week
-  process:
-    title: My Processes
-    empty: No processes started
-    viewAll: View All
-    filterAll: All
-    filterRunning: Running
-    filterCompleted: Completed
-    justNow: Just now
-    hoursAgo: "{hours}h ago"
-    daysAgo: "{days}d ago"
   quickNote:
     title: Quick Note
     placeholder: "Write a quick note..."

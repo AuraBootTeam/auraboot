@@ -6,7 +6,7 @@ import {
   type Page,
   type TestInfo,
 } from '@playwright/test';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
 
