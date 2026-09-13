@@ -843,9 +843,7 @@ public class ToolLoopService {
                 String modelCode = resolveModelCodeForCommand(tenantId, commandCode);
                 if (modelCode != null) {
                     if (recordPid == null && cmdResult.getData() != null) {
-                        Object newPid = cmdResult.getData().get("pid");
-                        if (newPid == null) newPid = cmdResult.getData().get("id");
-                        if (newPid != null) recordPid = newPid.toString();
+                        recordPid = ActionRecorder.commandRecordPid(cmdResult);
                     }
                     if (recordPid != null) {
                         afterData = actionRecorder.readRecordByPid(modelCode, recordPid);

@@ -604,11 +604,8 @@ public class ActionRecorder {
         }
 
         // For CREATE: extract from command result or afterData
-        if (cmdResult != null && cmdResult.getData() != null) {
-            Object pid = cmdResult.getData().get("pid");
-            if (pid == null) pid = cmdResult.getData().get("id");
-            if (pid != null) return pid.toString();
-        }
+        String resultPid = commandRecordPid(cmdResult);
+        if (resultPid != null) return resultPid;
 
         if (afterData != null) {
             Object pid = afterData.get("pid");
@@ -616,6 +613,19 @@ public class ActionRecorder {
         }
 
         return null;
+    }
+
+    /** Resolve the command pipeline's effective target before legacy result shapes. */
+    static String commandRecordPid(CommandExecuteResult result) {
+        if (result == null || result.getData() == null) return null;
+        Map<String, Object> data = result.getData();
+        Object pid = data.get("recordPid");
+        if (pid == null) pid = data.get("pid");
+        if (pid == null && data.get("record") instanceof Map<?, ?> record) {
+            pid = record.get("pid");
+        }
+        if (pid == null) pid = data.get("id");
+        return pid == null ? null : pid.toString();
     }
 
     private Map<String, Object> filterSnapshotFields(Map<String, Object> data) {
