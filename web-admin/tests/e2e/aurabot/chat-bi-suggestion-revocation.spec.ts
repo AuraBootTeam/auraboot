@@ -30,13 +30,14 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   const outcomeTitle = `outcome_${code}`;
   const deleteResults = process.env.AURA_BUSINESS_RESULT_OPERATION === 'delete';
   const actorOwnsTarget = deleteResults && process.env.AURA_HISTORY_TARGET_OWNER === 'actor';
+  const peerOwnsTarget = deleteResults && process.env.AURA_HISTORY_TARGET_OWNER === 'peer';
   const deletedTargets: string[] = [];
   const paginateResults = process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
   const outcomeTitles = Array.from(
     { length: paginateResults ? 11 : 1 },
     (_, index) => `${outcomeTitle}-${index}`,
   );
-  if (deleteResults && !actorOwnsTarget) {
+  if (deleteResults && !actorOwnsTarget && !peerOwnsTarget) {
     for (const title of outcomeTitles) {
       const created = await admin.request.post('/api/dynamic/e2et_customer/create', {
         data: { e2et_cust_code: title, e2et_cust_name: title, e2et_cust_region: 'east', e2et_cust_active: true },
@@ -98,6 +99,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     'model.core_dashboard_adoption.read',
   ];
   if (process.env.AURA_HISTORY_DEPARTMENT_SCOPE === '1') codes.push('model.org_employee.read');
+  if (peerOwnsTarget) codes.push('model.org_employee.read', 'model.org_department.read');
   const grants = codes.map((code) => {
     expect(permissions.get(code), code).toBeTruthy();
     return { permissionId: permissions.get(code), granted: true };
@@ -124,9 +126,17 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     const snapshot = await fetchRoleSnapshot(page);
     expect(snapshot.roleCodes).not.toContain('tenant_admin');
     for (const permission of codes) expect(snapshot.permissionCodes).toContain(permission);
-    if (actorOwnsTarget) {
+    if (actorOwnsTarget || peerOwnsTarget) {
+      let creatorSession: Awaited<ReturnType<typeof openAsRole>> | undefined;
+      if (peerOwnsTarget) {
+        const creator = makeRoleUser(`${code}_creator`, [code]);
+        await ensureRoleUser(admin, creator);
+        creatorSession = await openAsRole(browser, creator.email, creator.password, 'zh-CN');
+      }
+      const creatorPage = creatorSession?.page ?? page;
+      try {
       for (const [index, title] of outcomeTitles.entries()) {
-        const created = await page.request.post('/api/meta/commands/execute/e2et:create_customer', {
+        const created = await creatorPage.request.post('/api/meta/commands/execute/e2et:create_customer', {
           data: { payload: { e2et_cust_code: title, e2et_cust_name: title,
             e2et_cust_region: 'east', e2et_cust_active: true } },
         });
@@ -137,6 +147,9 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(pid, JSON.stringify(body)).toBeTruthy();
         deletedTargets.push(pid);
         calls[index].input.recordPid = pid;
+      }
+      } finally {
+        await creatorSession?.context.close();
       }
       executionGoal = 'Delete e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
         JSON.stringify(paginateResults ? { calls } : calls[0]);
@@ -346,7 +359,13 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         });
         expect(response.status()).toBe(200);
         await expect
-          .poll(async () => (await fetchRoleSnapshot(page)).permissionCodes.includes(permission))
+          .poll(async () => {
+            const current = await page.request.get('/api/auth/me', { timeout: 5000 });
+            expect(current.status()).toBe(200);
+            const codes = (await current.json()).data.permissions.permissionCodes;
+            expect(Array.isArray(codes)).toBe(true);
+            return codes.includes(permission);
+          }, { message: `Permission ${permission} must become ${granted}` })
           .toBe(granted);
       };
       const reopen = async () => {
@@ -655,6 +674,82 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (peerOwnsTarget) {
+        const members = await db.query(
+          `SELECT actor.pid AS actor_member, creator.pid AS creator_member,
+                  au.pid AS actor_user, cu.pid AS creator_user
+           FROM ab_analytics_task_execution a
+           JOIN ab_agent_run r ON r.tenant_id=a.tenant_id AND r.task_id=a.task_pid
+           JOIN ab_behavior_outcome_outbox o ON o.tenant_id=r.tenant_id AND o.run_id=r.pid
+           JOIN ab_analytics_deleted_record_basis b ON b.tenant_id=o.tenant_id AND b.event_id=o.event_id
+           JOIN ab_tenant_member actor ON actor.tenant_id=a.tenant_id AND actor.user_id=a.actor_user_id
+           JOIN ab_tenant_member creator ON creator.tenant_id=a.tenant_id AND creator.user_id=b.created_by
+           JOIN ab_user au ON au.id=actor.user_id JOIN ab_user cu ON cu.id=creator.user_id
+           WHERE a.adoption_pid=$1`, [adoptionPid]);
+        expect(members.rows).toHaveLength(1);
+        const identity = members.rows[0];
+        expect(identity.actor_member).not.toBe(identity.creator_member);
+        const createRecord = async (model: string, data: Record<string, unknown>) => {
+          const response = await admin.request.post(`/api/dynamic/${model}/create`, { data });
+          expect(response.status(), await response.text()).toBe(200);
+          const body = await response.json();
+          expect(String(body.code), JSON.stringify(body)).toBe('0');
+          expect(body.data.pid).toBeTruthy();
+          return body.data.pid as string;
+        };
+        const departmentA = await createRecord('org_department', { org_dept_code: `${code}_a`, org_dept_name: `${code} A` });
+        const departmentB = await createRecord('org_department', { org_dept_code: `${code}_b`, org_dept_name: `${code} B` });
+        const position = await createRecord('org_position', { org_pos_code: code, org_pos_name: code,
+          org_pos_level: '1', org_pos_dept_id: departmentA });
+        await createRecord('org_employee', { org_emp_code: `${code}_actor`, org_emp_name: 'History reader',
+          org_emp_dept_id: departmentA, org_emp_position_id: position, org_emp_status: 'active', org_emp_type: 'human',
+          org_emp_member_id: identity.actor_member, org_emp_user_id: identity.actor_user });
+        const creatorEmployee = await createRecord('org_employee', { org_emp_code: `${code}_creator`, org_emp_name: 'History creator',
+          org_emp_dept_id: departmentA, org_emp_position_id: position, org_emp_status: 'active', org_emp_type: 'human',
+          org_emp_member_id: identity.creator_member, org_emp_user_id: identity.creator_user });
+        const modelResponse = await admin.request.get('/api/meta/models/code/e2et_customer');
+        expect(modelResponse.status()).toBe(200);
+        const model = (await modelResponse.json()).data;
+        const originalExtension = model.extension ?? {};
+        const saveExtension = async (extension: Record<string, unknown>) => {
+          const response = await admin.request.put(`/api/meta/models/${model.pid}`, { data: { extension, displayName: model.displayName, description: model.description, modelType: model.modelType } });
+          expect(response.status(), await response.text()).toBe(200);
+          expect(String((await response.json()).code)).toBe('0');
+        };
+        try {
+          await saveExtension({ ...originalExtension, dataScope: { ...(originalExtension.dataScope ?? {}),
+            departmentOwnerField: 'created_by' } });
+          await setTargetScope('dept');
+          for (const [name, department, status] of [
+            ['same', departmentA, 200], ['moved', departmentB, 403], ['returned', departmentA, 200],
+          ] as const) {
+            const updated = await admin.request.put(`/api/dynamic/org_employee/${creatorEmployee}`, {
+              data: { org_emp_dept_id: department },
+            });
+            expect(updated.status(), await updated.text()).toBe(200);
+            expect(String((await updated.json()).code)).toBe('0');
+            const actual = await db.query('SELECT org_emp_dept_id FROM mt_org_employee WHERE pid=$1', [creatorEmployee]);
+            expect(actual.rows).toEqual([{ org_emp_dept_id: department }]);
+            const pending = resultResponse();
+            await results.getByRole('button', { name: '重新读取', exact: true }).click();
+            const response = await pending;
+            expect(response.status(), name).toBe(status);
+            if (status === 200) {
+              expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+              await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+              await expect(results.getByRole('alert')).toHaveCount(0);
+            } else {
+              expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+              await expect(results.getByRole('listitem')).toHaveCount(0);
+              await expect(results.getByRole('alert')).toBeVisible();
+            }
+            await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-creator-${name}.png` });
+          }
+        } finally {
+          await setTargetScope('all');
+          await saveExtension(originalExtension);
+        }
+      }
       if (deleteResults && process.env.AURA_HISTORY_DEPARTMENT_SCOPE === '1') {
         const employees = await db.query(
           `SELECT e.pid FROM mt_org_employee e

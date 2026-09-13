@@ -449,4 +449,29 @@ class DataScopeServiceImplTest {
         assertThat(service.resolveHistoricalScope(5L, "model.user", "read").deptPids()).containsExactly("dept-2");
     }
 
+    @Test
+    void numericCreatorDepartmentLookupUsesCurrentTenantAndMembership() {
+        TenantMember member = new TenantMember();
+        member.setPid("creator-member");
+        when(tenantMemberMapper.findByTenantIdAndUserId(100L, 77L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(
+                Map.of("org_emp_dept_id", "dept-a"), Map.of("org_emp_dept_id", "dept-b"));
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isTrue();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        MetaContext.setContext(200L, 1L, "u-pid", "tester");
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        MetaContext.clear();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
+    @Test
+    void numericCreatorWithoutEmployeeOrDepartmentIsDenied() {
+        TenantMember member = new TenantMember();
+        member.setPid("creator-member");
+        when(tenantMemberMapper.findByTenantIdAndUserId(100L, 77L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(null, Map.of());
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+        assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
 }

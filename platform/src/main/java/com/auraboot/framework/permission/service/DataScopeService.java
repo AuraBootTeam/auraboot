@@ -34,6 +34,12 @@ public interface DataScopeService {
      */
     boolean isOwnerInDepartments(String ownerUserPid, List<String> departmentPids);
 
+    /** Resolve a standard numeric creator identity within the current tenant. */
+    default boolean isCreatorInDepartments(Long userId, List<String> departmentPids) {
+        return false;
+    }
+
+
     /**
      * Set a data scope for a specific role/resource/action combination (upsert).
      */

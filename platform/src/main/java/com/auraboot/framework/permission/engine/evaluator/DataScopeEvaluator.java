@@ -183,7 +183,10 @@ public class DataScopeEvaluator {
                 return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                         "Record has no " + condition.deptOwnerField() + " department-owner field");
             }
-            if (dataScopeService.isOwnerInDepartments(String.valueOf(ownerValue), condition.deptPids())) {
+            boolean inDepartment = "created_by".equals(condition.deptOwnerField()) && ownerValue instanceof Number creator
+                    ? dataScopeService.isCreatorInDepartments(creator.longValue(), condition.deptPids())
+                    : dataScopeService.isOwnerInDepartments(String.valueOf(ownerValue), condition.deptPids());
+            if (inDepartment) {
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
                         "Scope: " + condition.scopeType() + " — owner belongs to accessible department");
             }

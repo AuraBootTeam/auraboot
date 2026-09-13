@@ -95,6 +95,17 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    public boolean isCreatorInDepartments(Long userId, List<String> departmentPids) {
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (tenantId == null || userId == null || departmentPids == null || departmentPids.isEmpty()) return false;
+        TenantMember member = tenantMemberMapper.findByTenantIdAndUserId(tenantId, userId);
+        if (member == null || member.getPid() == null) return false;
+        Map<String, Object> employee = organizationService.getEmployeeByMemberPid(member.getPid());
+        return employee != null && employee.get("org_emp_dept_id") != null
+                && departmentPids.contains(String.valueOf(employee.get("org_emp_dept_id")));
+    }
+
+    @Override
     public boolean isOwnerInDepartments(String ownerUserPid, List<String> departmentPids) {
         if (ownerUserPid == null || ownerUserPid.isBlank()
                 || departmentPids == null || departmentPids.isEmpty()) {
