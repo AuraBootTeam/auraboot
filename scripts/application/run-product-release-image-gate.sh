@@ -75,12 +75,15 @@ STATE_ROOT="$WORK_ROOT/runtime"
 PROJECT="${AURA_PRODUCT_ID}-${AURA_CI_JOB_ID//[^A-Za-z0-9_-]/-}"
 NETWORK="$PROJECT-net"
 PG_CONTAINER="$PROJECT-pg"
+BUILD_PG_CONTAINER="$PROJECT-build-pg"
 APP_CONTAINER="$PROJECT-app"
 IMAGE_REF=''
 IMAGE_ID=''
 REGISTRY_IMAGE=''
 REGISTRY_DIGEST_REF=''
 DOCKER_CONFIG_ROOT="$WORK_ROOT/docker-config"
+PG_IMAGE="${AURA_CI_PGVECTOR_IMAGE:-pgvector/pgvector:pg17}"
+FLYWAY_IMAGE="${AURA_CI_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 
 cleanup() {
   local status=$?
@@ -88,7 +91,7 @@ cleanup() {
     AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
       "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
   fi
-  docker rm -f "$APP_CONTAINER" "$PG_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$APP_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_IMAGE" ]] || docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_DIGEST_REF" ]] || docker image rm "$REGISTRY_DIGEST_REF" >/dev/null 2>&1 || true
@@ -112,10 +115,31 @@ info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
 CI=1 pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/product-pnpm-install.log" 2>&1 \
   || fatal 'product artifact build dependencies unavailable'
+docker network create "$NETWORK" >/dev/null
+docker run -d --name "$BUILD_PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
+  -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_build_ci \
+  "$PG_IMAGE" >/dev/null || fatal 'product build PostgreSQL container failed to start'
+for attempt in $(seq 1 60); do
+  docker exec "$BUILD_PG_CONTAINER" pg_isready -U auraboot -d aura_product_build_ci >/dev/null 2>&1 && break
+  [[ "$attempt" -lt 60 ]] || fatal 'product build PostgreSQL never became ready'
+  sleep 1
+done
+BUILD_PG_PORT="$(docker port "$BUILD_PG_CONTAINER" 5432/tcp | tail -1)"; BUILD_PG_PORT="${BUILD_PG_PORT##*:}"
+docker run --rm --network "$NETWORK" \
+  -v "$CORE_RELEASE/migrations/core":/flyway/core:ro \
+  -v "$PRODUCT_ROOT/migrations/$AURA_PRODUCT_MIGRATION_OWNER":/flyway/product:ro \
+  "$FLYWAY_IMAGE" -url="jdbc:postgresql://$BUILD_PG_CONTAINER:5432/aura_product_build_ci" \
+  -user=auraboot -password=auraboot_ci \
+  -locations=filesystem:/flyway/core,filesystem:/flyway/product \
+  -table=ab_flyway_schema_history -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
+  >"$ARTIFACTS/logs/product-test-flyway.log" 2>&1 || fail 'product test database migration failed'
+SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:$BUILD_PG_PORT/aura_product_build_ci" \
+SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot_ci \
 AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
   --platform-artifacts "$CORE_RELEASE" --output "$PRODUCT_RELEASE" \
   >"$ARTIFACTS/logs/product-artifacts.log" 2>&1 \
   || fail 'product artifact build failed; see logs/product-artifacts.log'
+docker rm -f "$BUILD_PG_CONTAINER" >/dev/null
 
 if [[ "$MUTATION" == locked-plugin-byte ]]; then
   MUTATION_TARGET="$(node -e "const l=require(process.argv[1]); const a=l.artifacts.find(x=>x.type==='plugin'); if(!a)process.exit(2); process.stdout.write(a.localPath)" "$PRODUCT_RELEASE/application.lock")" \
@@ -153,9 +177,6 @@ docker run --rm --entrypoint sh "$IMAGE_REF" -ec \
   "test -f /opt/auraboot/runtime/application.jar && test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json && test -x /opt/auraboot/bin/$AURA_PRODUCT_ID-env.sh && test -f /opt/auraboot/bin/application/application-artifact-verifier.mjs && test -d /opt/auraboot/plugins && test -d /opt/auraboot/config/core-meta && test -d /opt/auraboot/config/$AURA_PRODUCT_MIGRATION_OWNER && test -d /opt/auraboot/migrations/core && test -d /opt/auraboot/migrations/$AURA_PRODUCT_MIGRATION_OWNER && test -d /opt/auraboot/web" \
   >"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image payload is incomplete'
 
-PG_IMAGE="${AURA_CI_PGVECTOR_IMAGE:-pgvector/pgvector:pg17}"
-FLYWAY_IMAGE="${AURA_CI_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
-docker network create "$NETWORK" >/dev/null
 docker run -d --name "$PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_ci \
   "$PG_IMAGE" >/dev/null || fatal 'PostgreSQL container failed to start'
