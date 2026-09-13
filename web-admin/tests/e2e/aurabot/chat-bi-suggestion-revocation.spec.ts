@@ -29,13 +29,14 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   const code = `suggestion_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const outcomeTitle = `outcome_${code}`;
   const deleteResults = process.env.AURA_BUSINESS_RESULT_OPERATION === 'delete';
+  const actorOwnsTarget = deleteResults && process.env.AURA_HISTORY_TARGET_OWNER === 'actor';
   const deletedTargets: string[] = [];
   const paginateResults = process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
   const outcomeTitles = Array.from(
     { length: paginateResults ? 11 : 1 },
     (_, index) => `${outcomeTitle}-${index}`,
   );
-  if (deleteResults) {
+  if (deleteResults && !actorOwnsTarget) {
     for (const title of outcomeTitles) {
       const created = await admin.request.post('/api/dynamic/e2et_customer/create', {
         data: { e2et_cust_code: title, e2et_cust_name: title, e2et_cust_region: 'east', e2et_cust_active: true },
@@ -57,7 +58,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       e2et_cust_active: true,
     },
   }));
-  const executionGoal =
+  let executionGoal =
     `${deleteResults ? 'Delete' : 'Create'} e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ` +
     JSON.stringify(paginateResults ? { calls } : calls[0]);
   const role = await admin.request.post('/api/roles', {
@@ -120,6 +121,24 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     const snapshot = await fetchRoleSnapshot(page);
     expect(snapshot.roleCodes).not.toContain('tenant_admin');
     for (const permission of codes) expect(snapshot.permissionCodes).toContain(permission);
+    if (actorOwnsTarget) {
+      for (const [index, title] of outcomeTitles.entries()) {
+        const created = await page.request.post('/api/meta/commands/execute/e2et:create_customer', {
+          data: { payload: { e2et_cust_code: title, e2et_cust_name: title,
+            e2et_cust_region: 'east', e2et_cust_active: true } },
+        });
+        expect(created.status(), await created.text()).toBe(200);
+        const body = await created.json();
+        expect(String(body.code), JSON.stringify(body)).toBe("0");
+        const pid = body.data.data.recordPid;
+        expect(pid, JSON.stringify(body)).toBeTruthy();
+        deletedTargets.push(pid);
+        calls[index].input.recordPid = pid;
+      }
+      executionGoal = 'Delete e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+        JSON.stringify(paginateResults ? { calls } : calls[0]);
+    }
+
     await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
     const panel = page.getByTestId('aurabot-panel');
     if (!(await panel.getByTestId('aurabot-input').isVisible()))
@@ -599,13 +618,28 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         path: `${process.env.AURA_EVIDENCE_DIR}/result-target-scope-denied.png`,
       });
       if (deleteResults) {
-        // The admin created the deleted record; the executing actor does not own its history.
+        const ownership = await db.query(
+          `SELECT b.created_by=a.actor_user_id AS owned
+           FROM ab_analytics_deleted_record_basis b
+           JOIN ab_behavior_outcome_outbox o ON o.tenant_id=b.tenant_id AND o.event_id=b.event_id
+           JOIN ab_agent_run r ON r.tenant_id=o.tenant_id AND r.pid=o.run_id
+           JOIN ab_analytics_task_execution a ON a.tenant_id=r.tenant_id AND a.task_pid=r.task_id
+           WHERE a.adoption_pid=$1 ORDER BY o.id`, [adoptionPid],
+        );
+        expect(ownership.rows).toEqual(outcomeTitles.map(() => ({ owned: actorOwnsTarget })));
         await setTargetScope('self');
         const deniedSelf = resultResponse();
         await results.getByRole('button', { name: '重新读取', exact: true }).click();
-        expect((await deniedSelf).status()).toBe(403);
-        await expect(results.getByRole('listitem')).toHaveCount(0);
-        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-self-denied.png` });
+        const selfResponse = await deniedSelf;
+        expect(selfResponse.status()).toBe(actorOwnsTarget ? 200 : 403);
+        if (actorOwnsTarget) {
+          expect((await selfResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+          await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+          await expect(results.getByRole('alert')).toHaveCount(0);
+        } else {
+          await expect(results.getByRole('listitem')).toHaveCount(0);
+        }
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-self-${actorOwnsTarget ? 'allowed' : 'denied'}.png` });
       }
       await setTargetScope('all');
       const restoredScope = resultResponse();
