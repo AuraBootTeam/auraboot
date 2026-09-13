@@ -111,6 +111,28 @@ class ReportExportServiceTest {
     }
 
     @Test
+    void unexpectedSourceErrorsDoNotLeakOrRecordSuccessfulExports() {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().valueToTree(Map.of("title", "Safe report",
+                "dataSources", Map.of("source", Map.of("type", "namedQuery", "queryCode", "private_query")),
+                "body", List.of())).toString());
+        when(reportStorageService.findByPid("broken-report")).thenReturn(report);
+        when(namedQueryService.executeQuery(eq("private_query"), any(NamedQueryTestRequest.class)))
+                .thenThrow(new IllegalStateException("SELECT secret FROM private_table; /srv/private/file"));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("broken-report");
+        for (java.util.function.Consumer<ReportExportRequest> export :
+                List.<java.util.function.Consumer<ReportExportRequest>>of(reportExportService::exportJson,
+                        reportExportService::exportExcel, reportExportService::exportPdf)) {
+            assertThatThrownBy(() -> export.accept(request))
+                    .isInstanceOf(com.auraboot.framework.exception.ValidationException.class)
+                    .hasMessage("Report data could not be loaded");
+        }
+        org.mockito.Mockito.verifyNoInteractions(auditTrailService, analyticsReportUsage, reportRenderClient);
+    }
+
+    @Test
     void exportExcel_withStaticTableData_rendersWorkbookArtifact() throws Exception {
         ReportEntity page = new ReportEntity();
         page.setTenantId(MetaContext.getCurrentTenantId());

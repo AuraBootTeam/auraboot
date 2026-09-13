@@ -164,7 +164,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         } catch (Exception e) {
             log.error("Failed to export report as Excel: reportPid={}", request.getReportPid(), e);
             throw new ValidationException(
-                    ResponseCode.CommonValidationFailed, "Excel export failed: " + e.getMessage());
+                    ResponseCode.CommonValidationFailed, "Excel export failed");
         }
     }
 
@@ -217,7 +217,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as PDF: title={}", title, e);
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed");
         }
     }
 
@@ -259,7 +259,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             log.error("Failed to apply Community branding to PDF: title={}", title, e);
             throw new ValidationException(
                     ResponseCode.CommonValidationFailed,
-                    "PDF branding failed: " + e.getMessage());
+                    "PDF branding failed");
         }
     }
 
@@ -288,7 +288,7 @@ public class ReportExportServiceImpl implements ReportExportService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as JSON: reportPid={}", request.getReportPid(), e);
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed: " + e.getMessage());
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "JSON export failed");
         }
     }
 
@@ -762,8 +762,19 @@ public class ReportExportServiceImpl implements ReportExportService {
         return renderedBlocks;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, List<Map<String, Object>>> resolveDataSets(Map<String, Object> reportDsl) {
+        try {
+            return loadDataSets(reportDsl);
+        } catch (ValidationException | AccessDeniedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Failed to load report export data", e);
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "Report data could not be loaded");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, List<Map<String, Object>>> loadDataSets(Map<String, Object> reportDsl) {
         Object dataSourcesObject = reportDsl.get("dataSources");
         if (!(dataSourcesObject instanceof Map<?, ?> dataSources)) {
             return Map.of();
