@@ -1400,20 +1400,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private void enforceRuleCenterRecordPermission(String modelCode, String recordId, Map<String, Object> record) {
-        Long subjectId = currentMemberIdForRuleCenterPermission();
-        if (subjectId == null) {
-            throw new MetaServiceException("Permission context missing for model: " + modelCode);
-        }
-
-        PermissionFacade facade = getPermissionFacade();
-        if (facade == null) {
-            throw new MetaServiceException("Permission facade unavailable for model: " + modelCode);
-        }
-
-        PermissionResult result = facade.canOperate(subjectId, modelCode, "read", record);
-        if (!result.granted()) {
-            throw new AccessDeniedException("Access denied: you do not have permission to view this record");
-        }
+        RuleCenterRecordReadAuthorization.requireReadable(modelCode, record,
+                this::currentMemberIdForRuleCenterPermission, this::getPermissionFacade);
     }
 
     private Long currentMemberIdForRuleCenterPermission() {
