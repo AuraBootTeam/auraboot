@@ -73,6 +73,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         function: agg.function,
         label: agg.label,
       })),
+
       filters: viewConfig.filters
         ?.filter((f) => ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'in'].includes(f.operator))
         .map((f) => ({

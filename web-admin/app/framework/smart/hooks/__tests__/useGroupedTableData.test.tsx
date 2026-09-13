@@ -98,7 +98,8 @@ describe('useGroupedTableData', () => {
     const activeGroup = groups.find((g: { groupKey: string }) => g.groupKey === 'active');
     expect(activeGroup).toBeDefined();
     expect(activeGroup!.rows).toHaveLength(2);
-    expect(activeGroup!.aggregations['Total Amount']).toBe(300);
+    expect(activeGroup!.aggregations['sum_amount']).toBe(300);
+    expect(activeGroup!.aggregationLabels?.['sum_amount']).toBe('Total Amount');
   });
 
   it('calculates global totals', async () => {
@@ -110,6 +111,6 @@ describe('useGroupedTableData', () => {
       useGroupedTableData({ modelCode: 'order', groupBy: groupByConfig }),
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.totals['Total']).toBe(350);
+    expect(result.current.totals['sum_amount']).toBe(350);
   });
 });

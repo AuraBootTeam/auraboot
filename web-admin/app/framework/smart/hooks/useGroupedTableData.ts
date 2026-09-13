@@ -37,7 +37,8 @@ export interface GroupedRow {
   /** Rows in this group */
   rows: Record<string, unknown>[];
   /** Aggregation results for this group */
-  aggregations: Record<string, number>;
+  aggregationLabels?: Record<string, string | Record<string, string>>;
+        aggregations: Record<string, number>;
   /** Whether the group is collapsed */
   collapsed: boolean;
 }
@@ -97,7 +98,15 @@ function calculateAggregation(rows: Record<string, unknown>[], config: Aggregati
  * @returns Unique key for the aggregation
  */
 function getAggregationKey(config: AggregationConfig): string {
-  return config.label || `${config.function}_${config.fieldCode}`;
+  // Stable key independent of the label: labels may be localized maps, which
+  // cannot serve as map keys (WMS-UX-02 aggregation i18n).
+  return `${config.function}_${config.fieldCode}`;
+}
+
+function getAggregationLabel(
+  config: AggregationConfig,
+): string | Record<string, string> | undefined {
+  return config.label;
 }
 
 /**
@@ -271,9 +280,12 @@ export function useGroupedTableData(
       const [groupKey, groupRows] = entry;
       const aggregations: Record<string, number> = {};
 
+      const aggregationLabels: Record<string, string | Record<string, string>> = {};
       for (const aggConfig of aggregationConfigs) {
         const key = getAggregationKey(aggConfig);
         aggregations[key] = calculateAggregation(groupRows, aggConfig);
+        const label = getAggregationLabel(aggConfig);
+        if (label !== undefined) aggregationLabels[key] = label;
       }
 
       result.push({
@@ -281,6 +293,7 @@ export function useGroupedTableData(
         groupValue: groupRows[0]?.[groupFieldCode] ?? null,
         rows: groupRows,
         aggregations,
+        aggregationLabels,
         collapsed: collapsedGroups.has(groupKey),
       });
     }
