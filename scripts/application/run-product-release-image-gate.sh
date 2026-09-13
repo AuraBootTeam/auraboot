@@ -21,6 +21,23 @@ create_isolated_network() {
   fatal 'no free isolated release-image network in 10.247.0.0/16'
 }
 
+wait_for_final_postgres() {
+  local container="$1" database="$2" label="$3" attempt
+  # The official image briefly exposes its temporary init server before
+  # shutting it down and starting the final server. `pg_isready` alone can hit
+  # that transient window, so require both the init-complete marker and a live
+  # connection from the final server.
+  for attempt in $(seq 1 120); do
+    if docker logs "$container" 2>&1 \
+        | grep -q 'PostgreSQL init process complete; ready for start up.' \
+      && docker exec "$container" pg_isready -U auraboot -d "$database" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  fatal "$label PostgreSQL never reached its final ready state"
+}
+
 : "${AURA_CI_JOB_ID:?run through the local CI control plane}"
 : "${AURA_REGRESSION_ARTIFACTS:?AURA_REGRESSION_ARTIFACTS is required}"
 : "${AURA_CI_BUILDER_ID:?AURA_CI_BUILDER_ID is required}"
@@ -134,11 +151,7 @@ create_isolated_network
 docker run -d --name "$BUILD_PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_build_ci \
   "$PG_IMAGE" >/dev/null || fatal 'product build PostgreSQL container failed to start'
-for attempt in $(seq 1 60); do
-  docker exec "$BUILD_PG_CONTAINER" pg_isready -U auraboot -d aura_product_build_ci >/dev/null 2>&1 && break
-  [[ "$attempt" -lt 60 ]] || fatal 'product build PostgreSQL never became ready'
-  sleep 1
-done
+wait_for_final_postgres "$BUILD_PG_CONTAINER" aura_product_build_ci 'product build'
 BUILD_PG_PORT="$(docker port "$BUILD_PG_CONTAINER" 5432/tcp | tail -1)"; BUILD_PG_PORT="${BUILD_PG_PORT##*:}"
 docker run --rm --network "$NETWORK" \
   -v "$CORE_RELEASE/migrations/core":/flyway/core:ro \
@@ -195,11 +208,7 @@ docker run --rm --entrypoint sh "$IMAGE_REF" -ec \
 docker run -d --name "$PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_ci \
   "$PG_IMAGE" >/dev/null || fatal 'PostgreSQL container failed to start'
-for attempt in $(seq 1 60); do
-  docker exec "$PG_CONTAINER" pg_isready -U auraboot -d aura_product_ci >/dev/null 2>&1 && break
-  [[ "$attempt" -lt 60 ]] || fatal 'PostgreSQL never became ready'
-  sleep 1
-done
+wait_for_final_postgres "$PG_CONTAINER" aura_product_ci 'runtime'
 PG_PORT="$(docker port "$PG_CONTAINER" 5432/tcp | tail -1)"; PG_PORT="${PG_PORT##*:}"
 
 docker run --rm --network "$NETWORK" \
