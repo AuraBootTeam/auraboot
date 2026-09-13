@@ -745,6 +745,44 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
             }
             await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-creator-${name}.png` });
           }
+          const outside = await createRecord('org_department', {
+            org_dept_code: `${code}_outside`, org_dept_name: `${code} Outside`,
+          });
+          const moveCreator = await admin.request.put(`/api/dynamic/org_employee/${creatorEmployee}`, {
+            data: { org_emp_dept_id: departmentB },
+          });
+          expect(moveCreator.status(), await moveCreator.text()).toBe(200);
+          expect(String((await moveCreator.json()).code)).toBe('0');
+          for (const [name, scope, parent, status] of [
+            ['direct-denied', 'dept', departmentA, 403],
+            ['included', 'dept_and_sub', departmentA, 200],
+            ['detached', 'dept_and_sub', outside, 403],
+            ['reattached', 'dept_and_sub', departmentA, 200],
+          ] as const) {
+            const changed = await admin.request.put(`/api/dynamic/org_department/${departmentB}`, {
+              data: { org_dept_parent_id: parent },
+            });
+            expect(changed.status(), await changed.text()).toBe(200);
+            expect(String((await changed.json()).code)).toBe('0');
+            const actual = await db.query('SELECT org_dept_parent_id FROM mt_org_department WHERE pid=$1', [departmentB]);
+            expect(actual.rows).toEqual([{ org_dept_parent_id: parent }]);
+            // Leave the scope untouched when only the tree changes; this detects stale resolution.
+            if (name === 'direct-denied' || name === 'included') await setTargetScope(scope);
+            const pending = resultResponse();
+            await results.getByRole('button', { name: '重新读取', exact: true }).click();
+            const response = await pending;
+            expect(response.status(), name).toBe(status);
+            if (status === 200) {
+              expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+              await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+              await expect(results.getByRole('alert')).toHaveCount(0);
+            } else {
+              expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+              await expect(results.getByRole('listitem')).toHaveCount(0);
+              await expect(results.getByRole('alert')).toBeVisible();
+            }
+            await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-subtree-${name}.png` });
+          }
         } finally {
           await setTargetScope('all');
           await saveExtension(originalExtension);
