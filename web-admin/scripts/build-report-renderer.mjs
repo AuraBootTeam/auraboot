@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { copyFile, readFile } from 'node:fs/promises';
+import { chmod, copyFile, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
@@ -40,4 +40,6 @@ await build({
 });
 await copyFile(resolve(runtimeDir, 'package.json'), resolve(outDir, 'package.json'));
 await copyFile(resolve(runtimeDir, 'package-lock.json'), resolve(outDir, 'package-lock.json'));
+await copyFile(resolve(runtimeDir, 'render-report'), resolve(outDir, 'render-report'));
+await chmod(resolve(outDir, 'render-report'), 0o755);
 console.log(`Report renderer runtime written to ${outDir}`);

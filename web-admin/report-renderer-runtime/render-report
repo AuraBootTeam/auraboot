@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+# Resolve beside the installed artifact, independently of the backend working directory.
+renderer_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$renderer_dir/cli.js" "$@"
