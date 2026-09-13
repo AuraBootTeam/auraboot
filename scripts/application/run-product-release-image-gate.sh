@@ -259,6 +259,7 @@ if [[ -n "$FIXTURE_REL" ]]; then
     | docker cp - "$APP_CONTAINER:/tmp/aura-release-fixtures" \
     || fail 'release acceptance fixture injection failed'
   env "${COMMON_ENV[@]}" AURA_RELEASE_FIXTURE_ROOT="$FIXTURE_CONTAINER_ROOT" \
+    AURA_RELEASE_FIXTURE_SOURCE_ROOT="$PRODUCT_ROOT/$FIXTURE_REL" \
     "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish-fixture \
     >"$ARTIFACTS/logs/publish-fixture.log" 2>&1 \
     || fail 'explicit release acceptance fixture publish failed'

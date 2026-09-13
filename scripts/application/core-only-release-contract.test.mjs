@@ -53,6 +53,7 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /release-image-receipt\.json/);
   assert.match(productImageGate, /git -C "\$PRODUCT_ROOT" archive "\$PRODUCT_SHA" "\$FIXTURE_REL"/);
   assert.match(productImageGate, /release acceptance fixture must be a tracked directory at the exact product commit/);
+  assert.match(productImageGate, /AURA_RELEASE_FIXTURE_SOURCE_ROOT="\$PRODUCT_ROOT\/\$FIXTURE_REL"/);
   assert.match(productImageGate, /includedInReleaseImage/);
   assert.match(productImageGate, /AURA_RELEASE_MUTATION/);
   assert.match(productImageGate, /controlled locked-plugin mutation was correctly rejected \(expected red\)/);
