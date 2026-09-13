@@ -10,8 +10,8 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 ENV PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
 WORKDIR /build/web-admin
 RUN corepack enable
-COPY web-admin/package.json web-admin/pnpm-lock.yaml ./
 # web-admin does not commit a root lockfile; the renderer runtime below keeps its own frozen npm lock.
+COPY web-admin/package.json ./
 RUN pnpm install --ignore-scripts --registry https://registry.npmmirror.com
 COPY web-admin ./
 RUN pnpm build:report-renderer
