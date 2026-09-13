@@ -13736,6 +13736,38 @@ CREATE SEQUENCE public.ab_semantic_term_id_seq
 ALTER SEQUENCE public.ab_semantic_term_id_seq OWNED BY public.ab_semantic_term.id;
 
 --
+-- Name: ab_sla_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_sla_config (
+    id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    tenant_id bigint NOT NULL,
+    name character varying(128) NOT NULL,
+    target_type character varying(32) NOT NULL,
+    target_key character varying(128),
+    domain_code character varying(64),
+    deadline_mode character varying(32) NOT NULL,
+    deadline_value character varying(256),
+    business_calendar boolean DEFAULT false,
+    warning_rules jsonb DEFAULT '[]'::jsonb,
+    rule_binding jsonb,
+    model_code character varying(64),
+    deadline_field character varying(64),
+    priority_field character varying(64),
+    enabled boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_by bigint,
+    updated_by bigint,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    suspend_policy character varying(20) DEFAULT 'pause'::character varying,
+    action_policy jsonb DEFAULT '{}'::jsonb
+);
+
+
+--
+
 -- Name: ab_sla_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -13747,6 +13779,40 @@ CREATE SEQUENCE public.ab_sla_config_id_seq
     CACHE 1;
 
 --
+-- Name: ab_sla_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_sla_config_id_seq OWNED BY public.ab_sla_config.id;
+
+
+--
+
+-- Name: ab_sla_record; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_sla_record (
+    id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    tenant_id bigint NOT NULL,
+    sla_config_id character varying(36) NOT NULL,
+    process_instance_id character varying(64),
+    task_id character varying(64),
+    node_id character varying(64),
+    start_time timestamp with time zone NOT NULL,
+    deadline_time timestamp with time zone NOT NULL,
+    completed_time timestamp with time zone,
+    status character varying(32) DEFAULT 'running'::character varying NOT NULL,
+    current_warning_level integer DEFAULT 0,
+    warning_history jsonb DEFAULT '[]'::jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    paused_at timestamp with time zone,
+    total_paused_ms bigint DEFAULT 0
+);
+
+
+--
+
 -- Name: ab_sla_record_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -13758,6 +13824,14 @@ CREATE SEQUENCE public.ab_sla_record_id_seq
     CACHE 1;
 
 --
+-- Name: ab_sla_record_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_sla_record_id_seq OWNED BY public.ab_sla_record.id;
+
+
+--
+
 -- Name: ab_sod_rule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15795,6 +15869,22 @@ ALTER TABLE ONLY public.ab_query_audit_log ALTER COLUMN id SET DEFAULT nextval('
 ALTER TABLE ONLY public.ab_semantic_term ALTER COLUMN id SET DEFAULT nextval('public.ab_semantic_term_id_seq'::regclass);
 
 --
+-- Name: ab_sla_config id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_config ALTER COLUMN id SET DEFAULT nextval('public.ab_sla_config_id_seq'::regclass);
+
+
+--
+
+-- Name: ab_sla_record id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_record ALTER COLUMN id SET DEFAULT nextval('public.ab_sla_record_id_seq'::regclass);
+
+
+--
+
 -- Name: ab_sod_rule id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -19278,6 +19368,42 @@ ALTER TABLE ONLY public.ab_semantic_term
     ADD CONSTRAINT ab_semantic_term_tenant_id_term_model_code_language_key UNIQUE (tenant_id, term, model_code, language);
 
 --
+-- Name: ab_sla_config ab_sla_config_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_config
+    ADD CONSTRAINT ab_sla_config_pid_key UNIQUE (pid);
+
+
+--
+
+-- Name: ab_sla_config ab_sla_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_config
+    ADD CONSTRAINT ab_sla_config_pkey PRIMARY KEY (id);
+
+
+--
+
+-- Name: ab_sla_record ab_sla_record_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_record
+    ADD CONSTRAINT ab_sla_record_pid_key UNIQUE (pid);
+
+
+--
+
+-- Name: ab_sla_record ab_sla_record_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_sla_record
+    ADD CONSTRAINT ab_sla_record_pkey PRIMARY KEY (id);
+
+
+--
+
 -- Name: ab_sod_rule ab_sod_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
