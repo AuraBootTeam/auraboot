@@ -27,7 +27,17 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   expect(imported.status()).toBe(200);
   expect((await imported.json()).success).toBe(true);
   const code = `suggestion_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
-  const executionGoal = `Review order ${code} and report findings.`;
+  const outcomeTitle = `outcome_${code}`;
+  const executionGoal =
+    'Create one follow-up test order using the existing order command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+    JSON.stringify({
+      name: 'cmd:e2et:create_order',
+      input: {
+        e2et_order_title: outcomeTitle,
+        e2et_order_type: 'normal',
+        e2et_order_urgent: false,
+      },
+    });
   const role = await admin.request.post('/api/roles', {
     data: {
       code,
@@ -52,6 +62,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   collect((await tree.json()).data);
   const codes = [
     'meta.command.execute',
+    'e2et.order.manage',
     'model.e2et_order.read',
     'analytics.suggestion.read',
     'analytics.suggestion.propose',
@@ -385,7 +396,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       });
       const bypassBody = await bypass.text();
       expect(bypassBody).toContain('event:error');
-      expect(bypassBody).toContain('Analytics execution permission required');
+      expect(bypassBody).toContain('Analytics source permission required');
       await assertNoExecution();
       await grant('analytics.suggestion.execute', true);
       const peerUser = makeRoleUser(`${code}_peer`, [code]);
@@ -461,6 +472,63 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         path: `${process.env.AURA_EVIDENCE_DIR}/suggestion-execute-restored.png`,
         fullPage: true,
       });
+      const orders = await db.query('SELECT pid FROM mt_e2et_order WHERE e2et_order_title=$1', [
+        outcomeTitle,
+      ]);
+      expect(orders.rows).toHaveLength(1);
+      const businessFacts = await db.query(
+        "SELECT event_id FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_business_command_committed' AND target_key=$2",
+        [analysisId, orders.rows[0].pid],
+      );
+      expect(businessFacts.rows).toHaveLength(1);
+      const resultUrl = `/api/analytics/suggestions/${adoptionPid}/business-results`;
+      const resultResponse = () =>
+        page.waitForResponse(
+          (response) => response.request().method() === 'GET' && response.url().includes(resultUrl),
+        );
+      await grant('analytics.suggestion.execute', false);
+      const readable = resultResponse();
+      await latest.getByRole('button', { name: '查看业务结果', exact: true }).click();
+      const read = await readable;
+      expect(read.status()).toBe(200);
+      expect((await read.json()).data.records.map((row: any) => row.eventId)).toEqual([
+        businessFacts.rows[0].event_id,
+      ]);
+      const results = page.getByRole('dialog', { name: '已提交的业务操作' });
+      await expect(results.getByRole('listitem')).toHaveCount(1);
+      await expect(results).toContainText('新增已提交');
+      await page.screenshot({
+        path: `${process.env.AURA_EVIDENCE_DIR}/result-execute-revoked.png`,
+      });
+      for (const permission of [
+        'analytics.suggestion.read',
+        'model.core_dashboard_adoption.read',
+        'model.core_dashboard_suggestion.read',
+        'model.e2et_order.read',
+      ]) {
+        await grant(permission, false);
+        const deniedRead = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const response = await deniedRead;
+        expect(response.status(), permission).toBe(403);
+        expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+        await expect(results.getByRole('alert')).toBeVisible();
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await page.screenshot({
+          path: `${process.env.AURA_EVIDENCE_DIR}/result-denied-${permission}.png`,
+        });
+        await grant(permission, true);
+        const restoredRead = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const restored = await restoredRead;
+        expect(restored.status(), permission).toBe(200);
+        expect((await restored.json()).data.records.map((row: any) => row.eventId)).toEqual([
+          businessFacts.rows[0].event_id,
+        ]);
+        await expect(results.getByRole('listitem')).toHaveCount(1);
+        await expect(results.getByRole('alert')).toHaveCount(0);
+      }
+      await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
     } finally {
       await db.end();
     }
