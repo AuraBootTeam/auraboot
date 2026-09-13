@@ -3089,6 +3089,30 @@ ALTER SEQUENCE public.ab_ai_trace_span_id_seq OWNED BY public.ab_ai_trace_span.i
 
 
 --
+-- Name: ab_analytics_deleted_record_basis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_analytics_deleted_record_basis (
+    tenant_id bigint NOT NULL,
+    event_id character varying(40) NOT NULL,
+    model_code character varying(64) NOT NULL,
+    target_key character varying(120) NOT NULL,
+    record_id bigint NOT NULL,
+    record_pid character varying(26) NOT NULL,
+    created_by bigint,
+    basis_version integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ab_analytics_deleted_record_basis_basis_version_check CHECK ((basis_version = 1))
+);
+
+
+--
+-- Name: TABLE ab_analytics_deleted_record_basis; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_analytics_deleted_record_basis IS 'Server-captured identity and owner basis from the same transaction as an analytics deletion outcome; not an authorization grant';
+
+
+--
 -- Name: ab_analytics_task_execution; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -19497,6 +19521,14 @@ ALTER TABLE ONLY public.ab_ai_trace
 
 
 --
+-- Name: ab_analytics_deleted_record_basis ab_analytics_deleted_record_basis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_deleted_record_basis
+    ADD CONSTRAINT ab_analytics_deleted_record_basis_pkey PRIMARY KEY (tenant_id, event_id);
+
+
+--
 -- Name: ab_analytics_task_execution ab_analytics_task_execution_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -25860,6 +25892,13 @@ CREATE INDEX idx_alarm_subject ON public.ab_decision_alarm USING btree (tenant_i
 
 
 --
+-- Name: idx_analytics_deleted_record_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_analytics_deleted_record_target ON public.ab_analytics_deleted_record_basis USING btree (tenant_id, model_code, target_key);
+
+
+--
 -- Name: idx_announcement_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -30624,6 +30663,14 @@ CREATE TRIGGER trg_page_schema_ownership_default BEFORE INSERT OR UPDATE OF is_t
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_analytics_deleted_record_basis ab_analytics_deleted_record_basis_tenant_id_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_deleted_record_basis
+    ADD CONSTRAINT ab_analytics_deleted_record_basis_tenant_id_event_id_fkey FOREIGN KEY (tenant_id, event_id) REFERENCES public.ab_behavior_outcome_outbox(tenant_id, event_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --

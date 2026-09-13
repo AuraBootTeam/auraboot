@@ -56,6 +56,33 @@ class AnalyticsCommandOutcomePublisherTest {
         assertThat(event.getValue().getProps().toString()).doesNotContain("not-for-events");
     }
 
+    @Test void deletionStoresOnlyTrustedIdentityAndOwnerOutsideTheEventPayload() {
+        admitted("running", 8L, "{\"analysisId\":\"ANALYSIS_1\"}");
+        var ctx = context();
+        ctx.setExecConfig(Map.of("type", "delete"));
+        ctx.getRequest().setTargetRecordId("ORDER_1");
+        ctx.setBeforeSnapshot(Map.of("id", 12L, "pid", "ORDER_1", "tenant_id", 7L,
+                "created_by", 9L, "private_notes", "never-copy-business-data"));
+        when(jdbc.update(anyString(), eq(7L), anyString(), eq("orders"), eq("ORDER_1"),
+                eq(12L), eq("ORDER_1"), eq(9L))).thenReturn(1);
+        publisher.record(ctx);
+        var event = ArgumentCaptor.forClass(BehaviorOutcomeEvent.class);
+        verify(outbox).publish(event.capture());
+        verify(jdbc).update(contains("ab_analytics_deleted_record_basis"), eq(7L),
+                eq(event.getValue().getEventId()), eq("orders"), eq("ORDER_1"), eq(12L), eq("ORDER_1"), eq(9L));
+        assertThat(event.getValue().getProps()).doesNotContainKeys("created_by", "private_notes", "beforeSnapshot");
+    }
+
+    @Test void deletionRejectsMismatchedSnapshotTenantBeforePublishing() {
+        admitted("running", 8L, "{\"analysisId\":\"ANALYSIS_1\"}");
+        var ctx = context();
+        ctx.setExecConfig(Map.of("type", "delete"));
+        ctx.setBeforeSnapshot(Map.of("id", 12L, "pid", "ORDER_1", "tenant_id", 99L, "created_by", 9L));
+        assertThatThrownBy(() -> publisher.record(ctx)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("Analytics deletion has no trusted record identity basis");
+        verifyNoInteractions(outbox);
+    }
+
     @Test void noRunAndDryRunDoNotPublish() {
         var ctx = context();
         publisher.record(ctx);

@@ -79,11 +79,35 @@ public class AnalyticsCommandOutcomePublisher {
         props.put("operation", operation);
         props.put("analyticsExecution", binding);
         props.put("principalType", origin.get("principal_type"));
+        String eventId = UUID.randomUUID().toString();
+        if ("delete".equals(operation)) captureDeletedRecordBasis(ctx, recordPid, eventId);
         outcomes.publish(BehaviorOutcomeEvent.builder()
                 .tenantId(ctx.getTenantId()).userId(ctx.getUserId())
-                .eventId(UUID.randomUUID().toString()).eventName("analytics_business_command_committed")
+                .eventId(eventId).eventName("analytics_business_command_committed")
                 .runId(runPid).interactionId(binding.get("analysisId").toString())
                 .causedByEventId(origin.get("started_event_id").toString())
                 .targetType(ctx.getCommand().getModelCode()).targetKey(recordPid).props(props).build());
+    }
+    private void captureDeletedRecordBasis(CommandPipelineContext ctx, String target, String eventId) {
+        Map<String, Object> before = ctx.getBeforeSnapshot();
+        if (before == null || !(before.get("id") instanceof Number id)
+                || !(before.get("tenant_id") instanceof Number tenant)
+                || tenant.longValue() != ctx.getTenantId()
+                || !(before.get("pid") instanceof String pid) || pid.isBlank()
+                || !(target.equals(pid) || target.equals(id.toString()))
+                || !before.containsKey("created_by")
+                || (before.get("created_by") != null && !(before.get("created_by") instanceof Number))) {
+            throw new IllegalStateException("Analytics deletion has no trusted record identity basis");
+        }
+        // Insert before the event so a post-insert outbox failure exercises both writes' rollback.
+        // The deferred FK requires the matching outbox event before transaction commit.
+        if (jdbc.update("""
+                INSERT INTO ab_analytics_deleted_record_basis
+                  (tenant_id, event_id, model_code, target_key, record_id, record_pid, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, ctx.getTenantId(), eventId, ctx.getCommand().getModelCode(), target,
+                id.longValue(), pid, before.get("created_by")) != 1) {
+            throw new IllegalStateException("Analytics deletion identity basis was not persisted");
+        }
     }
 }

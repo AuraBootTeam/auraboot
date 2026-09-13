@@ -322,7 +322,7 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     const businessRecords = async () =>
       (
         await db.query(
-          'SELECT pid, e2et_order_title, e2et_order_status, e2et_order_desc FROM mt_e2et_order WHERE e2et_order_title=$1',
+          'SELECT id, tenant_id, created_by, pid, e2et_order_title, e2et_order_status, e2et_order_desc FROM mt_e2et_order WHERE e2et_order_title=$1',
           [outcomeTitle],
         )
       ).rows;
@@ -367,6 +367,11 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         [linked[0].run_pid, 'analytics_business_command_committed'],
       );
       expect(committed.rows).toEqual([]);
+      if (operation === 'delete') {
+        expect((await db.query(
+          'SELECT event_id FROM ab_analytics_deleted_record_basis WHERE record_pid=$1', [targetPid],
+        )).rows).toEqual([]);
+      }
       const failed = await db.query(
         'SELECT action_status, error_message FROM ab_agent_action WHERE run_id=$1 AND command_code=$2',
         [linked[0].run_pid, commandCode],
@@ -393,6 +398,23 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         [linked[0].run_pid, 'analytics_business_command_committed'],
       )).rows;
       expect(committed).toHaveLength(1);
+      if (operation === 'delete') {
+        const basis = (await db.query(
+          'SELECT * FROM ab_analytics_deleted_record_basis WHERE event_id=$1', [committed[0].event_id],
+        )).rows;
+        expect(basis).toHaveLength(1);
+        expect(basis[0]).toMatchObject({
+          model_code: 'e2et_order', target_key: targetPid, record_pid: targetPid, basis_version: 1,
+        });
+        expect(Object.keys(basis[0]).sort()).toEqual([
+          'tenant_id', 'event_id', 'model_code', 'target_key', 'record_id', 'record_pid', 'created_by', 'basis_version',
+        ].sort());
+        expect(basis[0]).toMatchObject({
+          record_id: beforeRecords[0].id,
+          tenant_id: beforeRecords[0].tenant_id,
+          created_by: beforeRecords[0].created_by,
+        });
+      }
       expect(committed[0]).toMatchObject({ target_key: targetPid, payload: {
         commandCode, operation, recordPid: targetPid,
         analyticsExecution: { adoptionPid: adopted.pid, analysisId: analysis.analysisId },
