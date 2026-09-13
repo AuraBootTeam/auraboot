@@ -74,9 +74,11 @@ export function rawRequestBody(req: { rawBody?: Buffer }): Buffer | undefined {
   return Buffer.isBuffer(req.rawBody) && req.rawBody.length > 0 ? req.rawBody : undefined;
 }
 
-export function shouldForwardRequestBody(method: string, body?: unknown): boolean {
+export function shouldForwardRequestBody(method: string, body?: unknown, rawBody?: Buffer): boolean {
   const normalized = method.toUpperCase();
-  return normalized !== 'GET' && normalized !== 'HEAD' && hasNonEmptyBody(body);
+  // Captured bytes distinguish explicit JSON {} from an absent body parsed as {}.
+  return normalized !== 'GET' && normalized !== 'HEAD'
+    && ((Buffer.isBuffer(rawBody) && rawBody.length > 0) || hasNonEmptyBody(body));
 }
 
 const BROWSER_ONLY_PROXY_HEADERS = new Set([
@@ -256,10 +258,11 @@ export class BffProxyService {
         httpsAgent: noProxyHttpsAgent,
         proxy: false as const, // Disable axios built-in proxy detection
       };
-      if (shouldForwardRequestBody(req.method, req.body)) {
+      const capturedBody = rawRequestBody(req as never);
+      if (shouldForwardRequestBody(req.method, req.body, capturedBody)) {
         // Prefer the untouched bytes; fall back to the parsed body when a route
         // consumed the stream without keeping them.
-        axiosConfig.data = rawRequestBody(req as never) ?? req.body;
+        axiosConfig.data = capturedBody ?? req.body;
       }
 
       // 发送请求到后端

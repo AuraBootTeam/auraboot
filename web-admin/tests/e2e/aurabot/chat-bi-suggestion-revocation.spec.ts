@@ -76,9 +76,11 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   const tree = await admin.request.get('/api/permissions/tree');
   expect(tree.status()).toBe(200);
   const permissions = new Map<string, number>();
+  const permissionPids = new Map<string, string>();
   const collect = (nodes: any[]) => {
     for (const node of nodes) {
       permissions.set(node.code, node.id);
+      permissionPids.set(node.code, node.pid);
       collect(node.children ?? []);
     }
   };
@@ -652,6 +654,60 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (deleteResults && process.env.AURA_HISTORY_RULE_GUARD === '1') {
+        const policyUrl = `/api/permissions/matrix/${rolePid}/policy/${permissionPids.get('model.e2et_customer.read')}`;
+        const originalResponse = await admin.request.get(policyUrl);
+        expect(originalResponse.status()).toBe(200);
+        const originalData = (await originalResponse.json()).data;
+        expect(originalData === '' || originalData == null || typeof originalData === 'object').toBe(true);
+        const originalPolicy = originalData && typeof originalData === 'object' ? originalData : {};
+        const savePolicy = async (policy: Record<string, unknown>) => {
+          const saved = await admin.request.put(policyUrl, { data: policy });
+          expect(saved.status(), await saved.text()).toBe(200);
+          const loaded = await admin.request.get(policyUrl);
+          expect(loaded.status()).toBe(200);
+          expect((await loaded.json()).data).toEqual(policy);
+        };
+        try {
+          for (const [path, dataType, value, expectedStatus] of [
+            ['data.pid', 'STRING', 'different-record', 200],
+            ['data.e2et_cust_active', 'BOOLEAN', false, 403],
+          ] as const) {
+            await savePolicy({ expectedMatched: false, ruleBinding: {
+              consumerType: 'PERMISSION', consumerCode: 'model.e2et_customer.read',
+              consumerNodeId: 'history-read', bindingKind: 'CONDITION', enabled: true,
+              conditionSpec: { root: { type: 'compare', enabled: true,
+                left: { type: 'path', scope: 'RECORD', path, dataType }, operator: 'EQ',
+                right: { type: 'literal', value, dataType },
+              }, decisionBindings: [] },
+            } });
+            const pending = resultResponse();
+            await results.getByRole('button', { name: '重新读取', exact: true }).click();
+            const response = await pending;
+            expect(response.status(), path).toBe(expectedStatus);
+            if (expectedStatus === 200) {
+              expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+              await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+              await expect(results.getByRole('alert')).toHaveCount(0);
+            } else {
+              expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+              await expect(results.getByRole('listitem')).toHaveCount(0);
+              await expect(results.getByRole('alert')).toBeVisible();
+            }
+            await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-rule-${expectedStatus}.png` });
+          }
+        } finally {
+          await savePolicy(originalPolicy);
+        }
+        const pending = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const response = await pending;
+        expect(response.status()).toBe(200);
+        expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+        await expect(results.getByRole('alert')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-rule-restored.png` });
+      }
       if (paginateResults) {
         await grant('model.e2et_customer.read', false);
         const sourceRead = await page.request.get('/api/analytics/suggestions', {
