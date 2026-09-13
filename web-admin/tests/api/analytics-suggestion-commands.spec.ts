@@ -366,13 +366,14 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     });
     const executionFacts = (
       await db.query(
-        `SELECT event_id, event_name, caused_by_event_id, interaction_id, payload FROM ab_behavior_outcome_outbox
+        `SELECT event_id, event_name, caused_by_event_id, interaction_id, target_type, target_key, payload FROM ab_behavior_outcome_outbox
        WHERE run_id=$1 ORDER BY id`,
         [linked[0].run_pid],
       )
     ).rows;
     expect(executionFacts.map((row) => row.event_name)).toEqual([
       'agent_execution_started',
+      'analytics_business_command_committed',
       'agent_execution_completed',
     ]);
     expect(executionFacts[0].caused_by_event_id).toBe(facts.rows[2].event_id);
@@ -381,7 +382,29 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
       analysisId: analysis.analysisId,
     });
     expect(executionFacts[1].caused_by_event_id).toBe(executionFacts[0].event_id);
-    expect(executionFacts[1].payload.status).toBe('success');
+    expect(executionFacts[1]).toMatchObject({
+      target_type: 'e2et_order',
+      target_key: createdOrders[0].pid,
+      payload: {
+        commandCode: 'e2et:create_order',
+        modelCode: 'e2et_order',
+        recordPid: createdOrders[0].pid,
+        operation: 'create',
+        analyticsExecution: { adoptionPid: adopted.pid, analysisId: analysis.analysisId },
+      },
+    });
+    expect(Object.keys(executionFacts[1].payload).sort()).toEqual(
+      [
+        'commandCode',
+        'modelCode',
+        'recordPid',
+        'operation',
+        'analyticsExecution',
+        'principalType',
+      ].sort(),
+    );
+    expect(executionFacts[2].caused_by_event_id).toBe(executionFacts[0].event_id);
+    expect(executionFacts[2].payload.status).toBe('success');
     for (const fact of executionFacts) expect(fact.interaction_id).toBe(analysis.analysisId);
     await expect
       .poll(
