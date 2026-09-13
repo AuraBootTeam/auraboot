@@ -49,6 +49,7 @@ public class ReportRenderClient {
 
         Path outFile = null;
         Path errFile = null;
+        Process process = null;
         try {
             outFile = Files.createTempFile("auraboot-report-", ".pdf");
             errFile = Files.createTempFile("auraboot-report-", ".log");
@@ -67,14 +68,13 @@ public class ReportRenderClient {
             request.put("model", reportDsl);
             request.put("dataSets", dataSets == null ? Map.of() : dataSets);
 
-            Process process = pb.start();
+            process = pb.start();
             try (OutputStream stdin = process.getOutputStream()) {
                 objectMapper.writeValue(stdin, request);
             }
 
             boolean finished = process.waitFor(properties.getTimeoutSeconds(), TimeUnit.SECONDS);
             if (!finished) {
-                process.destroyForcibly();
                 throw new ReportRenderException(
                         "report renderer timed out after " + properties.getTimeoutSeconds() + "s");
             }
@@ -95,6 +95,10 @@ public class ReportRenderClient {
             Thread.currentThread().interrupt();
             throw new ReportRenderException("report renderer interrupted", e);
         } finally {
+            if (process != null && process.isAlive()) {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+            }
             deleteQuietly(outFile);
             deleteQuietly(errFile);
         }

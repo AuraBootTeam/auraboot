@@ -97,6 +97,38 @@ class ReportRenderClientTest {
                 .hasMessageContaining("did not produce a PDF");
     }
 
+    @Test
+    void interruptedRenderTerminatesItsProcess(@TempDir Path dir) throws Exception {
+        Path pidFile = dir.resolve("renderer.pid");
+        Path stub = executableScript(dir, "#!/bin/sh", "cat > /dev/null",
+                "echo $$ > \"" + pidFile + "\"", "exec sleep 30");
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Thread worker = new Thread(() -> {
+            try { client(List.of(stub.toString())).renderPdf(model, Map.of()); }
+            catch (Throwable error) { failure.set(error); }
+        });
+        ProcessHandle renderer = null;
+        try {
+            worker.start();
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+                while (!Files.exists(pidFile) || Files.size(pidFile) == 0) Thread.sleep(10);
+            });
+            renderer = ProcessHandle.of(Long.parseLong(Files.readString(pidFile).trim())).orElseThrow();
+            assertThat(renderer.isAlive()).isTrue();
+            worker.interrupt();
+            worker.join(5000);
+            assertThat(worker.isAlive()).isFalse();
+            assertThat(failure.get()).isInstanceOf(ReportRenderException.class)
+                    .hasMessageContaining("interrupted");
+            renderer.onExit().get(3, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(renderer.isAlive()).isFalse();
+        } finally {
+            worker.interrupt();
+            if (renderer != null && renderer.isAlive()) renderer.destroyForcibly();
+            worker.join(5000);
+        }
+    }
+
     private Path executableScript(Path dir, String... lines) throws IOException {
         Path script = dir.resolve("stub-renderer.sh");
         Files.writeString(script, String.join("\n", lines) + "\n");
