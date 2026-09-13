@@ -277,6 +277,19 @@ metrics:
           expect(JSON.parse(await readFile(path, 'utf8')).dataSets.orders[0].e2et_order_title).toBe(
             key,
           );
+          if (sourceType === 'model') {
+            const pdfDownload = session.page.waitForEvent('download');
+            await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
+            const pdf = await pdfDownload;
+            expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
+            const pdfPath = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-model-allowed.pdf`;
+            await pdf.saveAs(pdfPath);
+            const bytes = await readFile(pdfPath);
+            expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+            if (process.env.AURA_REQUIRE_PACKAGED_RENDERER === '1') {
+              expect(bytes.toString('latin1')).toContain('/Creator (Chromium)');
+            }
+          }
         } else {
           await expect(session.page.getByRole('alert')).toContainText('查询未成功');
           await expect(session.page.getByRole('alert')).toContainText('当前账号无权读取');

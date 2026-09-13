@@ -33,6 +33,7 @@ await build({
     ssr: resolve(root, 'app/framework/smart/report-export/cli.ts'),
     outDir,
     emptyOutDir: true,
+    copyPublicDir: false,
     sourcemap: false,
     minify: false,
     rollupOptions: { output: { entryFileNames: 'cli.js' } },
