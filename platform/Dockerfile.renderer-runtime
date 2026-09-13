@@ -47,13 +47,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
         poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && addgroup --gid 1000 appuser && adduser --disabled-password --uid 1000 --ingroup appuser appuser \
     && mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts \
-    && chown -R appuser:appuser /app
+    && chown -R node:node /app
 COPY --from=renderer-build /opt/playwright-browsers /opt/playwright-browsers
-COPY --from=renderer-build --chown=appuser:appuser /build/web-admin/build/report-renderer /app/report-renderer
-COPY --chown=appuser:appuser auraboot-boot.jar app.jar
-USER appuser
+COPY --from=renderer-build --chown=node:node /build/web-admin/build/report-renderer /app/report-renderer
+COPY --chown=node:node auraboot-boot.jar app.jar
+USER node
 EXPOSE 6443
 ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
