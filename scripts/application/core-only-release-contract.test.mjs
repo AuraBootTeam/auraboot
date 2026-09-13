@@ -15,6 +15,9 @@ test('core release stages a compiled Web shell and a self-contained deployment d
   assert.match(stage, /'clean', 'bootJar', '--no-daemon', '-x', 'test'/);
   assert.match(stage, /materializeAndBuildCoreWeb/);
   assert.match(stage, /pnpm', \['--dir', 'web-admin', 'build'\]/);
+  assert.match(stage, /pnpm-overrides\.json/);
+  assert.match(stage, /hydrateCapsuleOverrides\(workRoot\)/);
+  assert.match(stage, /pnpm: rootManifest\.pnpm/);
   assert.match(stage, /bin\/auraboot-core-env\.sh/);
   assert.match(stage, /bin\/application/);
   assert.match(stage, /web: \{ path: 'web', digest:/);

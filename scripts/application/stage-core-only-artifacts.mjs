@@ -71,10 +71,22 @@ function extractTarball(tarball, target) {
   run('tar', ['-xzf', tarball, '-C', target, '--strip-components=1']);
 }
 
+function hydrateCapsuleOverrides(root) {
+  const manifestPath = resolve(root, 'package.json');
+  const overridesPath = resolve(root, 'pnpm-overrides.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.pnpm = {
+    ...(manifest.pnpm ?? {}),
+    overrides: JSON.parse(readFileSync(overridesPath, 'utf8')),
+  };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 function materializeAndBuildCoreWeb({ repoRoot, output, webShell, npmArtifacts }) {
   const workRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-core-web-build-'));
   try {
     extractTarball(webShell, workRoot);
+    hydrateCapsuleOverrides(workRoot);
     run('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts'], {
       cwd: workRoot,
       capture: false,
@@ -241,6 +253,10 @@ function packWebShell(repoRoot, destination, version) {
     const workspaceManifest = YAML.parse(readFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), 'utf8'));
     workspaceManifest.overrides = rootManifest.pnpm?.overrides ?? {};
     writeFileSync(resolve(packageRoot, 'pnpm-workspace.yaml'), YAML.stringify(workspaceManifest));
+    writeFileSync(
+      resolve(packageRoot, 'pnpm-overrides.json'),
+      `${JSON.stringify(rootManifest.pnpm?.overrides ?? {}, null, 2)}\n`,
+    );
     writeFileSync(resolve(packageRoot, 'package.json'), `${JSON.stringify({
       name: '@auraboot/web-shell',
       version,
@@ -254,6 +270,7 @@ function packWebShell(repoRoot, destination, version) {
       files: [
         'LICENSE.txt',
         'pnpm-lock.yaml',
+        'pnpm-overrides.json',
         'pnpm-workspace.yaml',
         'distribution',
         'packages',
