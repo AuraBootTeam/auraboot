@@ -653,7 +653,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             binding.setModelId(modelId);
             binding.setFieldId(field.getId());
             binding.setFieldOrder(getSystemFieldOrder(fieldCode));
-            binding.setRequired("id".equals(fieldCode) || "pid".equals(fieldCode));
+            // A9: id/pid are system-generated on record create — marking them
+            // required makes every direct dynamicDataService.create fail validation
+            // ("Required field 'pid' is missing") before the platform can stamp ids.
+            binding.setRequired(false);
             binding.setVisible(true);
             binding.setEditable(false); // System fields are not editable
             binding.setIsSystemBinding(true); // Mark as system binding
