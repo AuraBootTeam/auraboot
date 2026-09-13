@@ -534,6 +534,37 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    void successfulRunWithoutResolvedModelPublishesCompletionWithoutFailing() throws Exception {
+        primeHappyPath();
+        Map<String, Object> definition = baseAgentDef();
+        definition.remove("model");
+        definition.put("guardrails", "{\"provider\":\"provider-under-test\"}");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap())).thenReturn(List.of(definition));
+        when(providerFactory.getDefaultModel("provider-under-test")).thenReturn(null);
+        when(planService.generatePlan(any(), any(), org.mockito.ArgumentMatchers.isNull(),
+                anyString(), anyString(), any()))
+                .thenReturn(new ArrayList<>(List.of(new AgentPlanStep(0, "do-it"))));
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "Completed with provider-managed model.";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(),
+                org.mockito.ArgumentMatchers.isNull())).thenAnswer(this::persistLoopResult);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Success.class);
+        verify(observationService).publish(eq(TENANT_ID), eq("run_completed"), eq(AGENT_CODE),
+                eq("agent_run"), anyString(), argThat(detail -> "success".equals(detail.get("status"))
+                        && "provider-under-test".equals(detail.get("provider")) && !detail.containsKey("model")));
+        verify(runLifecycleService, never()).failRun(any(), anyString(), anyString(), any(), any());
+        verify(aiTraceService).endTrace(any(), eq(ok.lastResponse), eq("success"));
+    }
+
+    @Test
     @DisplayName("plan setup writes secret-free runtime state and fallback audit into run metadata")
     void planSetupPersistsRuntimeStateMetadata() throws Exception {
         primeHappyPath();

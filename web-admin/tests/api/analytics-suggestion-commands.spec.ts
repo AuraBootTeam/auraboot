@@ -323,6 +323,17 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
     const linked = await executionRows();
     expect(linked).toHaveLength(1);
     expect(linked[0].run_status).toBe('success');
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.query(
+              "SELECT detail::jsonb->>'status' AS status FROM ab_agent_observation WHERE source_id=$1 AND obs_title=$2",
+              [linked[0].run_pid, `run_completed: ${linked[0].run_pid}`],
+            )
+          ).rows,
+      )
+      .toEqual([{ status: 'success' }]);
     const createdOrders = await businessRecords();
     expect(createdOrders).toHaveLength(1);
     expect(createdOrders[0]).toMatchObject({

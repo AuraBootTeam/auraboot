@@ -782,7 +782,10 @@ public class AgentRunService {
                 String terminalStatus = terminalOutcome instanceof RunOutcome.Success ? "success"
                         : terminalOutcome instanceof RunOutcome.Cancelled ? "cancelled" : "failed";
                 Map<String, Object> completionDetails = new HashMap<>(Map.of(
-                        "task_id", taskPid, "status", terminalStatus, "provider", resolvedProviderCode, "model", model));
+                        "task_id", taskPid, "status", terminalStatus, "provider", resolvedProviderCode));
+                if (model != null) {
+                    completionDetails.put("model", model);
+                }
                 if (terminalOutcome instanceof RunOutcome.Success success) {
                     completionDetails.put("input_tokens", success.inputTokens());
                     completionDetails.put("output_tokens", success.outputTokens());
