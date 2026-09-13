@@ -76,7 +76,12 @@ public class AnalyticsExecutionSourceService {
     }
 
     private Map<String, Object> owned(String model, String pid, Long user) {
-        Map<String, Object> row = data.getById(model, pid);
+        Map<String, Object> row;
+        try {
+            row = data.getById(model, pid);
+        } catch (com.auraboot.framework.meta.exception.MetaRecordNotFoundException missing) {
+            throw invalid("Analytics execution source is unavailable to this user");
+        }
         if (row == null || !Objects.equals(String.valueOf(user), String.valueOf(row.get("created_by")))) {
             throw invalid("Analytics execution source is unavailable to this user");
         }

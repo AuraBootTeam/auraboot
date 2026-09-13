@@ -46,4 +46,22 @@ class AnalyticsExecutionSourceServiceTest {
         assertThatThrownBy(() -> service.resolve("a".repeat(26))).hasMessageContaining("unavailable to this user");
         verifyNoInteractions(queries);
     }
+    @Test void absentTenantScopedAdoptionIsUnavailableWithoutQueryExecution() {
+        when(permissions.hasPermission(eq(2L), anyString())).thenReturn(true);
+        when(data.getById(AnalyticsSuggestionCommandHandler.ADOPTION, "a".repeat(26)))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(
+                        AnalyticsSuggestionCommandHandler.ADOPTION, "a".repeat(26)));
+        assertThatThrownBy(() -> service.resolveForRead("a".repeat(26)))
+                .hasMessage("Analytics execution source is unavailable to this user");
+        verifyNoInteractions(queries);
+    }
+
+    @Test void unexpectedMetadataFailureIsNotMaskedAsUnavailable() {
+        when(permissions.hasPermission(eq(2L), anyString())).thenReturn(true);
+        var failure = new com.auraboot.framework.meta.exception.MetaServiceException("Metadata failure");
+        when(data.getById(AnalyticsSuggestionCommandHandler.ADOPTION, "a".repeat(26))).thenThrow(failure);
+        assertThatThrownBy(() -> service.resolveForRead("a".repeat(26))).isSameAs(failure);
+        verifyNoInteractions(queries);
+    }
+
 }

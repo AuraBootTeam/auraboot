@@ -1,5 +1,6 @@
 /** Real role grants and revocation through the existing AuraBot analysis card. */
 import { test, expect } from '../../fixtures';
+import { request as requestFactory } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
@@ -563,6 +564,61 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       expect((await read.json()).data.records.map((row: any) => row.eventId)).toEqual(
         expectedFirstPage,
       );
+      if (process.env.AURA_HISTORY_CROSS_TENANT === '1') {
+        const current = await page.request.get('/api/auth/me');
+        expect(current.status()).toBe(200);
+        const currentUser = (await current.json()).data.user;
+        const createdTenant = await page.request.post('/api/tenant-selection/process', {
+          timeout: 30000,
+          data: { action: 'create', tenantName: `history_${code}`, displayName: 'History isolation' },
+        });
+        expect(createdTenant.status(), await createdTenant.text()).toBe(200);
+        const tenant = (await createdTenant.json()).data;
+        expect(String(tenant.tenantId)).not.toBe(String(currentUser.tenantId));
+        expect(tenant.jwt).toBeTruthy();
+        const foreign = await requestFactory.newContext({
+          baseURL: process.env.BACKEND_URL,
+          extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` },
+        });
+        try {
+          const dashboardImport = await foreign.post('/api/plugins/import/import-directory-sync', {
+            data: {
+              path: resolve(process.cwd(), '../plugins/core-dashboard'),
+              conflictStrategy: 'OVERWRITE', validateReferences: true, autoPublishPages: true,
+            },
+          });
+          expect(dashboardImport.status()).toBe(200);
+          expect((await dashboardImport.json()).success).toBe(true);
+          const foreignMe = await foreign.get('/api/auth/me');
+          expect(foreignMe.status()).toBe(200);
+          const identity = (await foreignMe.json()).data;
+          expect(identity.user.id).toBe(currentUser.id);
+          expect(String(identity.user.tenantId)).toBe(String(tenant.tenantId));
+          for (const required of [
+            'analytics.suggestion.read', 'model.core_dashboard_adoption.read',
+            'model.core_dashboard_suggestion.read',
+          ]) expect(identity.permissions.permissionCodes).toContain(required);
+          const foreignRead = await foreign.get(resultUrl);
+          expect(foreignRead.status()).toBe(400);
+          const deniedBody = await foreignRead.text();
+          expect(deniedBody).toContain('Analytics execution source is unavailable to this user');
+          for (const eventId of expectedFirstPage) expect(deniedBody).not.toContain(eventId);
+          const foreignWithTenant = await foreign.get(resultUrl, {
+            params: { tenantId: String(currentUser.tenantId) },
+          });
+          expect(foreignWithTenant.status()).toBe(400);
+          for (const eventId of expectedFirstPage) {
+            expect(await foreignWithTenant.text()).not.toContain(eventId);
+          }
+          const originalRead = await page.request.get(resultUrl);
+          expect(originalRead.status()).toBe(200);
+          expect((await originalRead.json()).data.records.map((row: any) => row.eventId)).toEqual(
+            expectedFirstPage,
+          );
+        } finally {
+          await foreign.dispose();
+        }
+      }
       const results = page.getByRole('dialog', { name: '已提交的业务操作' });
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results).toContainText(deleteResults ? '删除已提交' : '新增已提交');
