@@ -85,7 +85,8 @@
     "bff:dev": "tsx --watch app/server/bff.server.ts",
     "package:install": "node scripts/install-product-package.mjs",
     "build:community": "EDITION=community pnpm build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "build:report-renderer": "node scripts/build-report-renderer.mjs"
   },
   "lint-staged": {
     "app/**/*.{ts,tsx,js,jsx}": [
