@@ -460,17 +460,35 @@ for (const withBusinessCommand of [false, true]) {
         version.getByRole('button', { name: '查看业务结果', exact: true }),
       ).toBeFocused();
       if (withBusinessCommand) {
-        const orders = await db.query('SELECT pid FROM mt_e2et_order WHERE e2et_order_title=$1', [
-          outcomeTitle,
-        ]);
-        const removed = await page.request.delete(`/api/dynamic/e2et_order/${orders.rows[0].pid}`);
+        const committedTargets = await db.query(
+          "SELECT target_key FROM ab_behavior_outcome_outbox WHERE run_id=$1 AND event_name='analytics_business_command_committed' ORDER BY id",
+          [linked.rows[0].pid],
+        );
+        expect(committedTargets.rows).toHaveLength(outcomeTitles.length);
+        // In the pagination fixture only the lookahead target disappears; every displayed row stays readable.
+        const removedIndex = paginateResults ? 10 : 0;
+        const removed = await page.request.delete(
+          `/api/dynamic/e2et_order/${committedTargets.rows[removedIndex].target_key}`,
+        );
         expect(removed.status()).toBe(200);
+        if (paginateResults) {
+          for (const target of committedTargets.rows.slice(0, 10)) {
+            const readable = await page.request.get(`/api/dynamic/e2et_order/${target.target_key}`);
+            expect(readable.status()).toBe(200);
+            expect((await readable.json()).data.pid).toBe(target.target_key);
+          }
+        }
       }
       const reopened = page.waitForResponse((r) => r.url().includes('/business-results'));
       await version.getByRole('button', { name: '查看业务结果', exact: true }).click();
       const reopenedResponse = await reopened;
       if (withBusinessCommand) {
         expect(reopenedResponse.status()).toBeGreaterThanOrEqual(400);
+        const deniedBody = await reopenedResponse.text();
+        for (const record of firstResultPage.records) {
+          expect(deniedBody).not.toContain(record.eventId);
+        }
+        expect(new URL(reopenedResponse.url()).searchParams.get('page')).toBe('1');
         await expect(resultDialog.getByRole('alert')).toContainText('无法读取业务结果');
       } else {
         expect(reopenedResponse.status()).toBe(200);
