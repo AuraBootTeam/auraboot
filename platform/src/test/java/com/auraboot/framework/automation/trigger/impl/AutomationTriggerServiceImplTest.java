@@ -212,6 +212,26 @@ class AutomationTriggerServiceImplTest {
     }
 
     @Test
+    void executeAutomation_workflowFailurePreservesRootCauseMessage() {
+        Automation automation = new Automation();
+        automation.setPid("AUTO-FAIL-1");
+        automation.setTenantId(424242L);
+        automation.setTriggerType("on_record_create");
+        doThrow(new com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.AutomationWorkflowRunException(
+                "Workflow product failed to run automation AUTO-FAIL-1",
+                new IllegalStateException("synthetic action failure"),
+                List.of()))
+                .when(automationProcessRuntime).run(any(), any(), any(), any());
+
+        AutomationLog result = service.executeAutomation(automation, "rec-fail", Map.of());
+
+        assertThat(result.getStatus()).isEqualTo("failed");
+        assertThat(result.getErrorMessage())
+                .contains("Workflow product failed to run automation AUTO-FAIL-1")
+                .contains("synthetic action failure");
+    }
+
+    @Test
     void executeAutomation_noCallerContext_restoresActorUserAndMemberContext() {
         com.auraboot.framework.application.tenant.MetaContext.clear();
 

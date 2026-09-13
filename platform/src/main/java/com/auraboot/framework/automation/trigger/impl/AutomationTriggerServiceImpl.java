@@ -352,7 +352,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 log.error("Automation run failed: pid={}, error={}",
                         automation.getPid(), e.getMessage(), e);
                 logEntry.setStatus(StatusConstants.FAILED);
-                logEntry.setErrorMessage(e.getMessage());
+                logEntry.setErrorMessage(failureMessage(e));
             } catch (Exception e) {
                 log.error("Automation run failed: pid={}, error={}",
                         automation.getPid(), e.getMessage(), e);
@@ -369,6 +369,19 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 metaContextSnapshot.restore();
             }
         }
+    }
+
+    private String failureMessage(Throwable failure) {
+        String message = failure.getMessage();
+        Throwable root = failure;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String rootMessage = root.getMessage();
+        if (rootMessage == null || rootMessage.isBlank() || rootMessage.equals(message)) {
+            return message;
+        }
+        return message + ": " + rootMessage;
     }
 
     private AutomationWorkflowRuntime requireAutomationWorkflowRuntime() {
