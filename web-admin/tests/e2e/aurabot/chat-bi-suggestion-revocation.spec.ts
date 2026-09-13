@@ -28,15 +28,29 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   expect((await imported.json()).success).toBe(true);
   const code = `suggestion_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const outcomeTitle = `outcome_${code}`;
+  const deleteResults = process.env.AURA_BUSINESS_RESULT_OPERATION === 'delete';
+  const deletedTargets: string[] = [];
   const paginateResults = process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
   const outcomeTitles = Array.from(
     { length: paginateResults ? 11 : 1 },
     (_, index) => `${outcomeTitle}-${index}`,
   );
+  if (deleteResults) {
+    for (const title of outcomeTitles) {
+      const created = await admin.request.post('/api/dynamic/e2et_customer/create', {
+        data: { e2et_cust_code: title, e2et_cust_name: title, e2et_cust_region: 'east', e2et_cust_active: true },
+      });
+      expect(created.status(), await created.text()).toBe(200);
+      const pid = (await created.json()).data.pid;
+      expect(pid).toBeTruthy();
+      deletedTargets.push(pid);
+    }
+  }
   const calls = outcomeTitles.map((title, index) => ({
     id: `customer-${index}`,
-    name: 'cmd:e2et:create_customer',
+    name: deleteResults ? 'cmd:e2et:delete_customer' : 'cmd:e2et:create_customer',
     input: {
+      recordPid: deleteResults ? deletedTargets[index] : undefined,
       e2et_cust_code: title,
       e2et_cust_name: title,
       e2et_cust_region: 'east',
@@ -44,7 +58,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     },
   }));
   const executionGoal =
-    'Create e2et_customer follow-up records using the existing customer creation command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
+    `${deleteResults ? 'Delete' : 'Create'} e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ` +
     JSON.stringify(paginateResults ? { calls } : calls[0]);
   const role = await admin.request.post('/api/roles', {
     data: {
@@ -485,14 +499,14 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         'SELECT pid FROM mt_e2et_customer WHERE e2et_cust_name=ANY($1)',
         [outcomeTitles],
       );
-      expect(orders.rows).toHaveLength(outcomeTitles.length);
+      expect(orders.rows).toHaveLength(deleteResults ? 0 : outcomeTitles.length);
       const businessFacts = await db.query(
         "SELECT event_id, target_key FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_business_command_committed' ORDER BY id",
         [analysisId],
       );
       expect(businessFacts.rows).toHaveLength(outcomeTitles.length);
       expect(businessFacts.rows.map((row) => row.target_key).sort()).toEqual(
-        orders.rows.map((row) => row.pid).sort(),
+        (deleteResults ? deletedTargets : orders.rows.map((row) => row.pid)).sort(),
       );
       const expectedFirstPage = businessFacts.rows.slice(0, 10).map((row) => row.event_id);
       const resultUrl = `/api/analytics/suggestions/${adoptionPid}/business-results`;
@@ -510,7 +524,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       );
       const results = page.getByRole('dialog', { name: '已提交的业务操作' });
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
-      await expect(results).toContainText('新增已提交');
+      await expect(results).toContainText(deleteResults ? '删除已提交' : '新增已提交');
       await expect(results).toContainText('客户');
       await page.screenshot({
         path: `${process.env.AURA_EVIDENCE_DIR}/result-execute-revoked.png`,
@@ -557,7 +571,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
         await expect(results.getByRole('alert')).toHaveCount(0);
       }
-      const setTargetScope = async (scopeType: 'none' | 'all') => {
+      const setTargetScope = async (scopeType: 'none' | 'all' | 'self') => {
         const response = await admin.request.put(`/api/permissions/matrix/${rolePid}/scope`, {
           data: {
             resourceCode: 'e2et_customer',
@@ -584,6 +598,15 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await page.screenshot({
         path: `${process.env.AURA_EVIDENCE_DIR}/result-target-scope-denied.png`,
       });
+      if (deleteResults) {
+        // The admin created the deleted record; the executing actor does not own its history.
+        await setTargetScope('self');
+        const deniedSelf = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        expect((await deniedSelf).status()).toBe(403);
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-self-denied.png` });
+      }
       await setTargetScope('all');
       const restoredScope = resultResponse();
       await results.getByRole('button', { name: '重新读取', exact: true }).click();

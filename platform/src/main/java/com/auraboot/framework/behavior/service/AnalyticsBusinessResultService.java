@@ -26,6 +26,7 @@ public class AnalyticsBusinessResultService {
     private final UserPermissionService permissions;
     private final MetaModelService models;
     private final ObjectMapper json;
+    private final AnalyticsDeletedRecordAuthorization deletedRecords;
 
     public record Result(String eventId, String modelLabel, String operation, Instant recordedAt) {}
     public record Page(List<Result> records, boolean hasMore, int page, int pageSize) {}
@@ -53,8 +54,6 @@ public class AnalyticsBusinessResultService {
             if (model.isBlank() || pid.isBlank() || !permissions.hasPermission(actor, "model." + model + ".read")) {
                 throw new AccessDeniedException("Business result target is not readable");
             }
-            // Includes current rule-center and row-scope checks, even for historical facts.
-            if (data.getById(model, pid) == null) throw new AccessDeniedException("Business result target is unavailable");
             try {
                 var payload = json.readTree(row.get("payload").toString());
                 if (!payload.path("analyticsExecution").equals(json.valueToTree(source.binding()))
@@ -62,6 +61,11 @@ public class AnalyticsBusinessResultService {
                         || !pid.equals(payload.path("recordPid").asText())
                         || !Set.of("create", "update", "delete").contains(payload.path("operation").asText())) {
                     throw new IllegalStateException("Business result provenance is inconsistent");
+                }
+                if ("delete".equals(payload.path("operation").asText())) {
+                    deletedRecords.requireReadable(row.get("event_id").toString(), model, pid);
+                } else if (data.getById(model, pid) == null) {
+                    throw new AccessDeniedException("Business result target is unavailable");
                 }
                 String label = models.getModelDefinition(model).map(def -> def.getDisplayName()).orElse(null);
                 if (model.equals(label)) label = null;

@@ -409,6 +409,12 @@ test('source-bound suggestion versions and explicit adoption remain immutable an
         expect(Object.keys(basis[0]).sort()).toEqual([
           'tenant_id', 'event_id', 'model_code', 'target_key', 'record_id', 'record_pid', 'created_by', 'basis_version',
         ].sort());
+        const history = await request.get(`/api/analytics/suggestions/${adopted.pid}/business-results`);
+        expect(history.status(), await history.text()).toBe(200);
+        expect((await history.json()).data.records).toEqual([{
+          eventId: committed[0].event_id, modelLabel: expect.any(String), operation: 'delete',
+          recordedAt: expect.any(String),
+        }]);
         expect(basis[0]).toMatchObject({
           record_id: beforeRecords[0].id,
           tenant_id: beforeRecords[0].tenant_id,

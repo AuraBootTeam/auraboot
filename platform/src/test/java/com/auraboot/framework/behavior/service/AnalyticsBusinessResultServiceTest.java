@@ -22,7 +22,7 @@ class AnalyticsBusinessResultServiceTest {
     private final UserPermissionService permissions = mock(UserPermissionService.class);
     private final MetaModelService models = mock(MetaModelService.class);
     private final ObjectMapper json = new ObjectMapper();
-    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, jdbc, data, permissions, models, json);
+    private final AnalyticsBusinessResultService service = new AnalyticsBusinessResultService(sources, jdbc, data, permissions, models, json, mock(AnalyticsDeletedRecordAuthorization.class));
     @BeforeEach void setup() { MetaContext.setContext(1L, 2L, "user", "user"); }
     @AfterEach void close() { MetaContext.clear(); }
     private void results(List<Map<String, Object>> rows) {
