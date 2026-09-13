@@ -109,6 +109,9 @@ AURA_OCI_BUILDER=docker node "$CORE_ROOT/scripts/application/stage-core-only-art
   || fail 'AuraBoot artifact build failed; see logs/core-artifacts.log'
 
 info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
+CI=1 pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
+  >"$ARTIFACTS/logs/product-pnpm-install.log" 2>&1 \
+  || fatal 'product artifact build dependencies unavailable'
 AURA_OCI_BUILDER=docker node "$PRODUCT_ROOT/scripts/build-application.mjs" \
   --platform-artifacts "$CORE_RELEASE" --output "$PRODUCT_RELEASE" \
   >"$ARTIFACTS/logs/product-artifacts.log" 2>&1 \
