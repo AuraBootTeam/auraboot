@@ -34,6 +34,10 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   const peerOwnsTarget = deleteResults && process.env.AURA_HISTORY_TARGET_OWNER === 'peer';
   const deletedTargets: string[] = [];
   const paginateResults = process.env.AURA_BUSINESS_RESULT_PAGINATION === '1';
+  const mixedPage = process.env.AURA_HISTORY_MIXED_PAGE === '1';
+  const shareMatrix = process.env.AURA_HISTORY_SHARE_MATRIX === '1';
+  let memberSharePid = '';
+  let roleSharePid = '';
   const outcomeTitles = Array.from(
     { length: paginateResults ? 11 : 1 },
     (_, index) => `${outcomeTitle}-${index}`,
@@ -51,7 +55,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   }
   const calls = outcomeTitles.map((title, index) => ({
     id: `customer-${index}`,
-    name: deleteResults ? 'cmd:e2et:delete_customer' : 'cmd:e2et:create_customer',
+    name: 'cmd:e2et:delete_customer',
     input: {
       recordPid: deleteResults ? deletedTargets[index] : undefined,
       e2et_cust_code: title,
@@ -60,9 +64,23 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       e2et_cust_active: true,
     },
   }));
+  const mixedCreatedName = `${outcomeTitles[0]}-created`;
+  if (mixedPage && deleteResults) {
+    calls.push({
+      id: 'customer-create',
+      name: 'cmd:e2et:create_customer',
+      input: {
+        recordPid: undefined,
+        e2et_cust_code: `${code}_created`,
+        e2et_cust_name: mixedCreatedName,
+        e2et_cust_region: 'east',
+        e2et_cust_active: true,
+      },
+    });
+  }
   let executionGoal =
     `${deleteResults ? 'Delete' : 'Create'} e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ` +
-    JSON.stringify(paginateResults ? { calls } : calls[0]);
+    JSON.stringify(paginateResults || mixedPage ? { calls } : calls[0]);
   const role = await admin.request.post('/api/roles', {
     data: {
       code,
@@ -101,6 +119,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
   ];
   if (process.env.AURA_HISTORY_DEPARTMENT_SCOPE === '1') codes.push('model.org_employee.read');
   if (peerOwnsTarget) codes.push('model.org_employee.read', 'model.org_department.read');
+  if (shareMatrix) codes.push('data.record_share.manage');
   const grants = codes.map((code) => {
     expect(permissions.get(code), code).toBeTruthy();
     return { permissionId: permissions.get(code), granted: true };
@@ -149,11 +168,53 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         deletedTargets.push(pid);
         calls[index].input.recordPid = pid;
       }
+      if (peerOwnsTarget && shareMatrix) {
+        const shareDb = new Client(PG_CONN);
+        await shareDb.connect();
+        try {
+          const actorMember = await shareDb.query(
+            `SELECT u.pid FROM ab_user u
+             JOIN ab_tenant_member m ON m.user_id=u.id AND m.status='active' AND m.deleted_flag=FALSE
+             WHERE u.email=$1 AND m.tenant_id=(SELECT tenant_id FROM mt_e2et_customer WHERE pid=$2)`,
+            [user.email, deletedTargets[0]],
+          );
+          expect(actorMember.rows).toHaveLength(1);
+          for (const [subjectType, subjectPid] of [
+            ['member', actorMember.rows[0].pid],
+            ['role', rolePid],
+          ] as const) {
+            const shared = await creatorPage.request.post('/api/record-share', {
+              data: {
+                resourceCode: 'e2et_customer',
+                recordPid: deletedTargets[0],
+                subjectType,
+                subjectPids: [subjectPid],
+                permissionMask: 'read',
+              },
+            });
+            expect(shared.status(), await shared.text()).toBe(200);
+          }
+          const listed = await admin.request.get('/api/record-share', {
+            params: { resourceCode: 'e2et_customer', recordPid: deletedTargets[0] },
+          });
+          expect(listed.status(), await listed.text()).toBe(200);
+          const payload = (await listed.json()).data;
+          const shares = Array.isArray(payload) ? payload : (payload?.records ?? []);
+          memberSharePid =
+            shares.find((share: { subjectType: string }) => share.subjectType === 'member')?.pid ?? '';
+          roleSharePid =
+            shares.find((share: { subjectType: string }) => share.subjectType === 'role')?.pid ?? '';
+          expect(memberSharePid).toBeTruthy();
+          expect(roleSharePid).toBeTruthy();
+        } finally {
+          await shareDb.end();
+        }
+      }
       } finally {
         await creatorSession?.context.close();
       }
       executionGoal = 'Delete e2et_customer follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ ' +
-        JSON.stringify(paginateResults ? { calls } : calls[0]);
+        JSON.stringify(paginateResults || mixedPage ? { calls } : calls[0]);
     }
 
     await expect(page.locator('header[data-hydrated="true"]')).toBeVisible();
@@ -546,9 +607,18 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         "SELECT event_id, target_key FROM ab_behavior_outcome_outbox WHERE interaction_id=$1 AND event_name='analytics_business_command_committed' ORDER BY id",
         [analysisId],
       );
-      expect(businessFacts.rows).toHaveLength(outcomeTitles.length);
+      expect(businessFacts.rows).toHaveLength(
+        outcomeTitles.length + (mixedPage && deleteResults ? 1 : 0),
+      );
+      const mixedCreated = mixedPage && deleteResults
+        ? await db.query('SELECT pid FROM mt_e2et_customer WHERE e2et_cust_name=$1', [mixedCreatedName])
+        : undefined;
+      if (mixedCreated) expect(mixedCreated.rows).toHaveLength(1);
       expect(businessFacts.rows.map((row) => row.target_key).sort()).toEqual(
-        (deleteResults ? deletedTargets : orders.rows.map((row) => row.pid)).sort(),
+        (deleteResults
+          ? [...deletedTargets, ...(mixedCreated ? mixedCreated.rows.map((row) => row.pid) : [])]
+          : orders.rows.map((row) => row.pid)
+        ).sort(),
       );
       const expectedFirstPage = businessFacts.rows.slice(0, 10).map((row) => row.event_id);
       const resultUrl = `/api/analytics/suggestions/${adoptionPid}/business-results`;
@@ -688,12 +758,21 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       const deniedScope = resultResponse();
       await results.getByRole('button', { name: '重新读取', exact: true }).click();
       const scopeResponse = await deniedScope;
-      expect(scopeResponse.status()).toBe(403);
-      expect(await scopeResponse.text()).not.toContain(businessFacts.rows[0].event_id);
-      await expect(results.getByRole('listitem')).toHaveCount(0);
-      await expect(results.getByRole('alert')).toBeVisible();
+      expect(
+        scopeResponse.status(),
+        shareMatrix ? 'pre-created shares override none scope' : 'none scope denies history reads',
+      ).toBe(shareMatrix ? 200 : 403);
+      if (shareMatrix) {
+        expect((await scopeResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+      } else {
+        expect(await scopeResponse.text()).not.toContain(businessFacts.rows[0].event_id);
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await expect(results.getByRole('alert')).toBeVisible();
+      }
       await page.screenshot({
-        path: `${process.env.AURA_EVIDENCE_DIR}/result-target-scope-denied.png`,
+        path: `${process.env.AURA_EVIDENCE_DIR}/result-target-scope-${shareMatrix ? 'shared' : 'denied'}.png`,
       });
       if (deleteResults) {
         const ownership = await db.query(
@@ -709,15 +788,16 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         const deniedSelf = resultResponse();
         await results.getByRole('button', { name: '重新读取', exact: true }).click();
         const selfResponse = await deniedSelf;
-        expect(selfResponse.status()).toBe(actorOwnsTarget ? 200 : 403);
-        if (actorOwnsTarget) {
+        const selfAllowed = actorOwnsTarget || shareMatrix;
+        expect(selfResponse.status()).toBe(selfAllowed ? 200 : 403);
+        if (selfAllowed) {
           expect((await selfResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
           await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
           await expect(results.getByRole('alert')).toHaveCount(0);
         } else {
           await expect(results.getByRole('listitem')).toHaveCount(0);
         }
-        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-self-${actorOwnsTarget ? 'allowed' : 'denied'}.png` });
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-self-${selfAllowed ? 'allowed' : 'denied'}.png` });
       }
       await setTargetScope('all');
       const restoredScope = resultResponse();
@@ -730,6 +810,238 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (deleteResults && peerOwnsTarget && shareMatrix) {
+        const readShared = async () => {
+          const pending = resultResponse();
+          await results.getByRole('button', { name: '重新读取', exact: true }).click();
+          return pending;
+        };
+        await setTargetScope('none');
+        let shared = await readShared();
+        expect(shared.status(), 'member and role shares override none scope').toBe(200);
+        expect((await shared.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-both-override-none.png` });
+
+        const policyBase = {
+          name: `History share gate ${code}`,
+          modelCode: 'e2et_customer',
+          policyType: 'row',
+          scopeType: 'custom',
+          enabled: true,
+        };
+        const condition = (value: string) => ({
+          type: 'compare',
+          enabled: true,
+          left: { type: 'path', scope: 'RECORD', path: 'data.pid', dataType: 'STRING' },
+          operator: 'EQ',
+          right: { type: 'literal', value, dataType: 'STRING' },
+        });
+        const createPolicy = async (name: string, value: string) => {
+          const created = await admin.request.post('/api/meta/data-permissions', {
+            data: { ...policyBase, name, conditionAst: condition(value) },
+          });
+          expect(created.status(), await created.text()).toBe(200);
+          const policyPid = (await created.json()).data.pid;
+          expect(policyPid).toBeTruthy();
+          expect(
+            (await admin.request.post(`/api/meta/data-permissions/${policyPid}/roles/${rolePid}`))
+              .status(),
+          ).toBe(200);
+          return policyPid;
+        };
+        const mismatchPid = await createPolicy(`History share mismatch ${code}`, 'different-record');
+        try {
+          shared = await readShared();
+          expect(shared.status(), 'unmatched row policy gates even shared records').toBe(403);
+          expect(await shared.text()).not.toContain(businessFacts.rows[0].event_id);
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-policy-gate.png` });
+          const matchPid = await createPolicy(`History share match ${code}`, deletedTargets[0]);
+          shared = await readShared();
+          expect(shared.status(), 'union of row policies: any match passes the gate').toBe(200);
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-policy-union.png` });
+          expect(
+            (
+              await admin.request.delete(
+                `/api/meta/data-permissions/${matchPid}/roles/${rolePid}`,
+              )
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(shared.status(), 'single mismatched policy denies again').toBe(403);
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-policy-sole-mismatch.png` });
+        } finally {
+          for (const policyPid of [mismatchPid]) {
+            await admin.request.delete(`/api/meta/data-permissions/${policyPid}/roles/${rolePid}`);
+          }
+        }
+        shared = await readShared();
+        expect(shared.status(), 'unbound policies leave the share effective').toBe(200);
+
+        expect((await page.request.delete(`/api/record-share/${roleSharePid}`)).status()).toBe(200);
+        shared = await readShared();
+        expect(shared.status(), 'member share alone still overrides none').toBe(200);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-member-only.png` });
+        expect((await page.request.delete(`/api/record-share/${memberSharePid}`)).status()).toBe(200);
+        shared = await readShared();
+        expect(shared.status(), 'revoked share with none scope denies immediately').toBe(403);
+        expect(await shared.text()).not.toContain(businessFacts.rows[0].event_id);
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-revoked-denied.png` });
+
+        await setTargetScope('all');
+        const membership = await db.query(
+          'SELECT m.pid FROM ab_tenant_member m JOIN ab_user u ON u.id=m.user_id WHERE u.email=$1',
+          [user.email],
+        );
+        expect(membership.rows).toHaveLength(1);
+        const memberPid = membership.rows[0].pid;
+        const reader = await admin.request.post('/api/roles', {
+          data: {
+            code: `${code}_reader`,
+            name: `${code}_reader`,
+            type: 'custom',
+            status: 'active',
+            scopeType: 'tenant',
+            defaultDataScopeType: 'all',
+          },
+        });
+        expect(reader.status(), await reader.text()).toBe(200);
+        const readerPid = (await reader.json()).data.pid;
+        expect(
+          (
+            await admin.request.put(`/api/permissions/matrix/${readerPid}/batch`, {
+              data: [
+                'analytics.suggestion.read',
+                'model.core_dashboard_adoption.read',
+                'model.core_dashboard_suggestion.read',
+              ].map((permissionCode) => ({
+                permissionId: permissions.get(permissionCode),
+                granted: true,
+              })),
+            })
+          ).status(),
+        ).toBe(200);
+        const restricted = await admin.request.post('/api/roles', {
+          data: {
+            code: `${code}_restricted`,
+            name: `${code}_restricted`,
+            type: 'custom',
+            status: 'active',
+            scopeType: 'tenant',
+            defaultDataScopeType: 'all',
+          },
+        });
+        expect(restricted.status(), await restricted.text()).toBe(200);
+        const restrictedPid = (await restricted.json()).data.pid;
+        expect(
+          (
+            await admin.request.put(`/api/permissions/matrix/${restrictedPid}/batch`, {
+              data: [
+                { permissionId: permissions.get('model.e2et_customer.read'), granted: true },
+              ],
+            })
+          ).status(),
+        ).toBe(200);
+        expect(
+          (
+            await admin.request.put(`/api/permissions/matrix/${restrictedPid}/scope`, {
+              data: {
+                resourceCode: 'e2et_customer',
+                actionCode: 'read',
+                scopeType: 'none',
+                mergeStrategy: 'MIN',
+              },
+            })
+          ).status(),
+        ).toBe(200);
+        try {
+          expect(
+            (
+              await admin.request.post('/api/user-roles/assign-by-pid', {
+                data: { memberPid, rolePids: [readerPid] },
+              })
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(shared.status(), 'reader role keeps endpoint while main role keeps model read').toBe(
+            200,
+          );
+          expect(
+            (
+              await admin.request.delete('/api/user-roles/remove-by-pid', {
+                data: { memberPid, rolePids: [rolePid] },
+              })
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(
+            shared.status(),
+            'role removal revokes row authorization without polling delay',
+          ).toBe(403);
+          expect(await shared.text()).not.toContain(businessFacts.rows[0].event_id);
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-role-removed.png` });
+          expect(
+            (
+              await admin.request.post('/api/user-roles/assign-by-pid', {
+                data: { memberPid, rolePids: [rolePid] },
+              })
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(shared.status(), 're-assigned role restores reads').toBe(200);
+          expect(
+            (
+              await admin.request.post('/api/user-roles/assign-by-pid', {
+                data: { memberPid, rolePids: [restrictedPid] },
+              })
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(shared.status(), 'MIN-merged none scope from a second role denies').toBe(403);
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-share-min-merge-denied.png` });
+          expect(
+            (
+              await admin.request.delete('/api/user-roles/remove-by-pid', {
+                data: { memberPid, rolePids: [restrictedPid] },
+              })
+            ).status(),
+          ).toBe(200);
+          shared = await readShared();
+          expect(shared.status(), 'removing the restricted role restores reads').toBe(200);
+        } finally {
+          await admin.request.delete('/api/user-roles/remove-by-pid', {
+            data: { memberPid, rolePids: [readerPid, restrictedPid, rolePid].filter(Boolean) },
+          });
+          await admin.request.post('/api/user-roles/assign-by-pid', {
+            data: { memberPid, rolePids: [rolePid] },
+          });
+        }
+      }
+      if (deleteResults && mixedPage) {
+        await setTargetScope('none');
+        let mixed = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        let mixedResponse = await mixed;
+        expect(mixedResponse.status(), 'mixed page fails closed on the denied delete row').toBe(403);
+        expect(await mixedResponse.text()).not.toContain(businessFacts.rows[0].event_id);
+        expect(await mixedResponse.text()).not.toContain(
+          businessFacts.rows[businessFacts.rows.length - 1].event_id,
+        );
+        await expect(results.getByRole('listitem')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-mixed-denied.png` });
+        await setTargetScope('all');
+        mixed = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        mixedResponse = await mixed;
+        expect(mixedResponse.status(), 'mixed page passes when every row is authorized').toBe(200);
+        expect((await mixedResponse.json()).data.records.map((row: any) => row.eventId)).toEqual(
+          expectedFirstPage,
+        );
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-mixed-allowed.png` });
+      }
       if (peerOwnsTarget) {
         const members = await db.query(
           `SELECT actor.pid AS actor_member, creator.pid AS creator_member,
