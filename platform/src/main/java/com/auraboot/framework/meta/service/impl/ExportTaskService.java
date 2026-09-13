@@ -148,7 +148,10 @@ public class ExportTaskService {
         NamedQueryDataExportRequest request = objectMapper.convertValue(
                 task.getRequestParams().get("request"), NamedQueryDataExportRequest.class);
         if (request == null) throw new MetaServiceException("Export authorization request is missing");
-        namedQueryService.authorizeExportDownload(task.getQueryCode(), request, task.getRequestParams().get("definition"));
+        namedQueryService.authorizeExportDownload(task.getQueryCode(), request,
+                task.getRequestParams().get("definition"),
+                task.getRequestParams().hasNonNull("rowDigest")
+                        ? task.getRequestParams().get("rowDigest").asText() : null);
         return task.getFileKey();
     }
 
@@ -219,6 +222,9 @@ public class ExportTaskService {
     private void completeArtifact(ExportTask task, ExportResult result) throws java.io.IOException {
         if (result.getDefinitionSnapshot() == null) throw new MetaServiceException("Export definition evidence is missing");
         ((com.fasterxml.jackson.databind.node.ObjectNode) task.getRequestParams()).set("definition", result.getDefinitionSnapshot());
+        if (result.getRowSetDigest() == null) throw new MetaServiceException("Export row digest evidence is missing");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) task.getRequestParams())
+                .put("rowDigest", result.getRowSetDigest());
             java.nio.file.Path source = java.nio.file.Path.of(result.getFilePath());
             String extension = source.getFileName().toString();
             extension = extension.substring(extension.lastIndexOf('.'));

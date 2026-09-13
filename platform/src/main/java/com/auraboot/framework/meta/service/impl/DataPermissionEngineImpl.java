@@ -461,7 +461,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                     log.warn("Owner-derived DEPT data scope has no tenant context; failing secure");
                     return "1 = 0";
                 }
-                return condition.deptOwnerField()
+                // org_emp_user_id is varchar while owner-derived fields may be numeric
+                // (created_by) or varchar (pid columns); compare as text so both work.
+                return "CAST(" + condition.deptOwnerField() + " AS VARCHAR)"
                         + " IN (SELECT org_emp_user_id FROM mt_org_employee"
                         + " WHERE tenant_id = " + tenantId
                         + " AND deleted_flag = FALSE"

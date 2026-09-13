@@ -21,6 +21,10 @@ public class ExportResult {
 
     @com.fasterxml.jackson.annotation.JsonIgnore
     private com.fasterxml.jackson.databind.JsonNode definitionSnapshot;
+
+    /** Digest over the authorized row set at export time; download re-verifies it. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String rowSetDigest;
     
     /**
      * 导出文件路径
