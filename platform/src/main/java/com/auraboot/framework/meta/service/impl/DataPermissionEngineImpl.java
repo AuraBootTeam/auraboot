@@ -263,12 +263,12 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             // Legacy SQL, department and project approximations are not historical authorization.
             return false;
         })) return false;
-        var condition = dataScopeEvaluator.getCondition(memberId, modelCode, "read");
+        var condition = dataScopeEvaluator.getHistoricalCondition(memberId, modelCode, "read");
         if (condition == null || !Set.of("all", "not_configured", "none", "self", "dept", "dept_and_sub")
                 .contains(condition.scopeType())) return false;
         var share = recordShareEvaluator.evaluate(memberId, modelCode, "read", record);
         if (share != null && share.verdict() == EvaluationVerdict.ALLOW) return true;
-        var step = dataScopeEvaluator.evaluate(memberId, modelCode, "read", record);
+        var step = dataScopeEvaluator.evaluateHistorical(memberId, modelCode, "read", record);
         return step != null && step.verdict() != EvaluationVerdict.DENY;
     }
 

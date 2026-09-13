@@ -411,4 +411,42 @@ class DataScopeServiceImplTest {
 
         assertThat(service.getScopesByRole(100L, 7L)).hasSize(1);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"member", "employee", "department", "tree"})
+    void historicalDepartmentDoesNotFallBackToSelf(String missing) {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("tree".equals(missing) ? "dept_and_sub" : "dept");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        if (!"member".equals(missing)) {
+            TenantMember member = new TenantMember();
+            member.setId(5L);
+            member.setPid("history-member");
+            when(tenantMemberMapper.selectById(5L)).thenReturn(member);
+            if (!"employee".equals(missing)) {
+                when(organizationService.getEmployeeByMemberPid("history-member")).thenReturn(
+                        "department".equals(missing) ? Map.of() : Map.of("org_emp_dept_id", "dept-1"));
+                if ("tree".equals(missing)) when(organizationService.getDeptAndSubPids("dept-1")).thenReturn(List.of());
+            }
+        }
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void historicalDepartmentUsesCurrentOrganizationOnEveryResolution() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("dept");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember member = new TenantMember();
+        member.setId(5L);
+        member.setPid("history-member");
+        when(tenantMemberMapper.selectById(5L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("history-member")).thenReturn(
+                Map.of("org_emp_dept_id", "dept-1"), Map.of("org_emp_dept_id", "dept-2"));
+        when(metaModelService.getModelDefinition("model.user")).thenReturn(Optional.empty());
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").deptPids()).containsExactly("dept-1");
+        assertThat(service.resolveHistoricalScope(5L, "model.user", "read").deptPids()).containsExactly("dept-2");
+    }
+
 }

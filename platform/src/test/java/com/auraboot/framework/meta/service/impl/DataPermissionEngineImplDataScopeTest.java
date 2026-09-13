@@ -294,9 +294,9 @@ class DataPermissionEngineImplDataScopeTest {
     void historicalReadRequiresActualScopeVerdict() {
         var record = Map.<String, Object>of("created_by", USER_ID);
         when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
-        when(dataScopeEvaluator.getCondition(MEMBER_ID, MODEL_CODE, "read")).thenReturn(DataScopeCondition.all());
+        when(dataScopeEvaluator.getHistoricalCondition(MEMBER_ID, MODEL_CODE, "read")).thenReturn(DataScopeCondition.all());
         assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, MEMBER_ID, record)).isFalse();
-        when(dataScopeEvaluator.evaluate(MEMBER_ID, MODEL_CODE, "read", record)).thenReturn(
+        when(dataScopeEvaluator.evaluateHistorical(MEMBER_ID, MODEL_CODE, "read", record)).thenReturn(
                 new EvaluationStep("DataScope", EvaluationVerdict.NOT_APPLICABLE, "Scope: all"));
         assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, MEMBER_ID, record)).isTrue();
     }

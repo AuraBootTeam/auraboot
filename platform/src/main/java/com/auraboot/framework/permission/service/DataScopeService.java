@@ -21,6 +21,12 @@ public interface DataScopeService {
      */
     DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode);
 
+    /** Resolve current historical scope without legacy ownership approximations. */
+    default DataScopeCondition resolveHistoricalScope(Long memberId, String resourceCode, String actionCode) {
+        return DataScopeCondition.none();
+    }
+
+
     /**
      * Resolve whether an owner user PID currently belongs to one of the permitted departments.
      * This supports records such as CRM opportunities whose department is derived from their owner

@@ -97,6 +97,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     'model.core_dashboard_suggestion.read',
     'model.core_dashboard_adoption.read',
   ];
+  if (process.env.AURA_HISTORY_DEPARTMENT_SCOPE === '1') codes.push('model.org_employee.read');
   const grants = codes.map((code) => {
     expect(permissions.get(code), code).toBeTruthy();
     return { permissionId: permissions.get(code), granted: true };
@@ -592,7 +593,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
         await expect(results.getByRole('alert')).toHaveCount(0);
       }
-      const setTargetScope = async (scopeType: 'none' | 'all' | 'self') => {
+      const setTargetScope = async (scopeType: 'none' | 'all' | 'self' | 'dept' | 'dept_and_sub') => {
         const response = await admin.request.put(`/api/permissions/matrix/${rolePid}/scope`, {
           data: {
             resourceCode: 'e2et_customer',
@@ -654,6 +655,34 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
       await expect(results.getByRole('alert')).toHaveCount(0);
       await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-read-restored.png` });
+      if (deleteResults && process.env.AURA_HISTORY_DEPARTMENT_SCOPE === '1') {
+        const employees = await db.query(
+          `SELECT e.pid FROM mt_org_employee e
+           JOIN ab_tenant_member m ON m.tenant_id=e.tenant_id AND m.pid=e.org_emp_member_id
+           JOIN ab_analytics_task_execution a ON a.tenant_id=m.tenant_id AND a.actor_user_id=m.user_id
+           WHERE a.adoption_pid=$1`, [adoptionPid]);
+        expect(employees.rows).toEqual([]);
+        for (const scope of ['dept', 'dept_and_sub'] as const) {
+          await setTargetScope(scope);
+          const pending = resultResponse();
+          await results.getByRole('button', { name: '重新读取', exact: true }).click();
+          const response = await pending;
+          expect(response.status(), scope).toBe(403);
+          expect(await response.text()).not.toContain(businessFacts.rows[0].event_id);
+          await expect(results.getByRole('listitem')).toHaveCount(0);
+          await expect(results.getByRole('alert')).toBeVisible();
+          await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-${scope}-denied.png` });
+        }
+        await setTargetScope('all');
+        const pending = resultResponse();
+        await results.getByRole('button', { name: '重新读取', exact: true }).click();
+        const response = await pending;
+        expect(response.status()).toBe(200);
+        expect((await response.json()).data.records.map((row: any) => row.eventId)).toEqual(expectedFirstPage);
+        await expect(results.getByRole('listitem')).toHaveCount(expectedFirstPage.length);
+        await expect(results.getByRole('alert')).toHaveCount(0);
+        await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/result-history-dept-restored.png` });
+      }
       if (deleteResults && process.env.AURA_HISTORY_CUSTOM_SCOPE === '1') {
         const policyBase = { name: `History scope ${code}`, modelCode: 'e2et_customer',
           policyType: 'row', scopeType: 'custom', enabled: true };

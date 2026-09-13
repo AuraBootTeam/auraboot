@@ -61,6 +61,17 @@ public class DataScopeServiceImpl implements DataScopeService {
             cacheManager = "permissionCacheManager",
             key = "#memberId + ':' + #resourceCode + ':' + #actionCode")
     public DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode) {
+        return resolveScopeInternal(memberId, resourceCode, actionCode, false);
+    }
+
+    @Override
+    public DataScopeCondition resolveHistoricalScope(Long memberId, String resourceCode, String actionCode) {
+        if (memberId == null) return DataScopeCondition.none();
+        return resolveScopeInternal(memberId, resourceCode, actionCode, true);
+    }
+
+    private DataScopeCondition resolveScopeInternal(Long memberId, String resourceCode, String actionCode,
+                                                    boolean strict) {
         // 1. Get member's role IDs
         List<Long> roleIds = userRoleMapper.findRoleIdsByMemberId(memberId);
         if (roleIds == null || roleIds.isEmpty()) {
@@ -80,7 +91,7 @@ public class DataScopeServiceImpl implements DataScopeService {
         DataScopeType merged = mergeScopes(scopes);
 
         // 4. Resolve concrete condition (pass resourceCode for model-specific field config)
-        return resolveCondition(memberId, merged, resourceCode);
+        return resolveCondition(memberId, merged, resourceCode, strict);
     }
 
     @Override
@@ -175,7 +186,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     /**
      * Convert a merged scope type into a concrete DataScopeCondition.
      */
-    private DataScopeCondition resolveCondition(Long memberId, DataScopeType scopeType, String resourceCode) {
+    private DataScopeCondition resolveCondition(Long memberId, DataScopeType scopeType, String resourceCode, boolean strict) {
         switch (scopeType) {
             case ALL:
                 return DataScopeCondition.all();
@@ -184,9 +195,9 @@ public class DataScopeServiceImpl implements DataScopeService {
             case SELF:
                 return buildSelfCondition(resourceCode);
             case DEPT:
-                return buildDeptCondition(memberId, false, resourceCode);
+                return buildDeptCondition(memberId, false, resourceCode, strict);
             case DEPT_AND_SUB:
-                return buildDeptCondition(memberId, true, resourceCode);
+                return buildDeptCondition(memberId, true, resourceCode, strict);
             default:
                 return DataScopeCondition.all();
         }
@@ -248,26 +259,26 @@ public class DataScopeServiceImpl implements DataScopeService {
      * Reads ownerField and departmentField from model extension.dataScope config.
      * Falls back to SELF if member has no linked employee.
      */
-    private DataScopeCondition buildDeptCondition(Long memberId, boolean includeSub, String resourceCode) {
+    private DataScopeCondition buildDeptCondition(Long memberId, boolean includeSub, String resourceCode, boolean strict) {
         // Get member's PID to find linked employee
         TenantMember member = tenantMemberMapper.selectById(memberId);
         if (member == null || member.getPid() == null) {
-            log.warn("Member {} not found, falling back to SELF scope", memberId);
-            return buildSelfCondition(resourceCode);
+            log.warn("Member {} not found, department inputs unavailable", memberId);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
 
         Map<String, Object> employee = organizationService.getEmployeeByMemberPid(member.getPid());
         if (employee == null) {
-            log.warn("No employee linked to member {} (pid={}), falling back to SELF scope",
+            log.warn("No employee linked to member {} (pid={}), department inputs unavailable",
                     memberId, member.getPid());
-            return buildSelfCondition(resourceCode);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
 
         // Get department PID from employee record
         Object deptPidObj = employee.get("org_emp_dept_id");
         if (deptPidObj == null) {
-            log.warn("Employee for member {} has no department, falling back to SELF scope", memberId);
-            return buildSelfCondition(resourceCode);
+            log.warn("Employee for member {} has no department, department inputs unavailable", memberId);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
         String deptPid = String.valueOf(deptPidObj);
 
@@ -279,8 +290,8 @@ public class DataScopeServiceImpl implements DataScopeService {
         }
 
         if (deptPids.isEmpty()) {
-            log.warn("No departments resolved for member {}, falling back to SELF scope", memberId);
-            return buildSelfCondition(resourceCode);
+            log.warn("No departments resolved for member {}, department inputs unavailable", memberId);
+            return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
 
         String ownerField = getDataScopeOwnerField(resourceCode);
