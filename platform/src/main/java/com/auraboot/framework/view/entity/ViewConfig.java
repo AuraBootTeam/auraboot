@@ -390,7 +390,13 @@ public class ViewConfig {
     @AllArgsConstructor
     public static class KanbanCardFieldConfig {
         private String field;
-        private String label;
+        /**
+         * Display label: either a plain string or a localized map ({@code {"zh-CN": "…", "en": "…"}}).
+         * Typed as Object so localized maps survive the jsonb round-trip — a strict String here made
+         * Jackson reject the whole ViewConfig and silently drop saved views carrying map labels
+         * (WMS-UX-02). Renderers resolve maps via getLocalizedText.
+         */
+        private Object label;
         /** Display type: text, number, date, tag, avatar */
         private String type;
     }
