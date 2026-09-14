@@ -49,6 +49,7 @@ export type WidgetType =
   | 'smart-pareto-chart'
   | 'smart-spc-chart'
   | 'smart-gantt-chart'
+  | 'smart-waterfall-chart'
   | 'smart-calendar'
   // New widgets
   | 'smart-gallery'
