@@ -1,11 +1,11 @@
 {
   "pluginId": "com.auraboot.core-dashboard",
-  "namespace": "core-dashboard",
+  "namespace": "core_dashboard",
   "version": "1.0.0",
   "dslVersion": 1,
   "pluginType": "config",
   "displayName": "Core Dashboard Pages",
-  "displayName:zh-CN": "核心仪表板页面",
+  "displayName:zh-CN": "\u6838\u5fc3\u4eea\u8868\u677f\u9875\u9762",
   "displayName:en": "Core Dashboard Pages",
   "description": "Platform-level analytics and telemetry dashboards. Includes UV/PV behavior analytics driven by /api/analytics/behavior/* endpoints.",
   "author": "AuraBoot Team",
@@ -13,12 +13,20 @@
   "dependencies": [],
   "resourceDirs": {
     "pages": "config/pages.json",
-    "menus": "config/menus.json"
+    "menus": "config/menus.json",
+    "models": "config/models.json",
+    "fields": "config/fields.json",
+    "modelFieldBindings": "config/bindings.json",
+    "commands": "config/commands.json",
+    "permissions": "config/permissions.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
     "validateReferences": false,
     "autoPublishPages": true,
-    "createResourcePermissions": false
+    "createResourcePermissions": false,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true
   }
 }

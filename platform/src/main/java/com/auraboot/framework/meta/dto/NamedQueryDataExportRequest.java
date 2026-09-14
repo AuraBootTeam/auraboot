@@ -27,6 +27,9 @@ public class NamedQueryDataExportRequest {
      */
     private List<String> fields;
 
+    /** Bound source parameters, with tenant and user identity supplied by the server. */
+    private java.util.Map<String, Object> parameters;
+
     /**
      * WHERE conditions (same format as NamedQueryTestRequest)
      */

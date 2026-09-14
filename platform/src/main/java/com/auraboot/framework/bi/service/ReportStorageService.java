@@ -17,10 +17,6 @@ import java.util.List;
 /**
  * Storage service for first-class low-code reports ({@code ab_report}, Phase 4 slice 1).
  *
- * <p>PURELY ADDITIVE: no controller/API wires this yet — that is a later slice. The report
- * designer continues to persist via {@code ab_page_schema} + {@code extension.reportDsl};
- * this service is the minimal CRUD spine for the eventual storage graduation.
- *
  * <p>Soft-delete uses the standard platform MyBatis-Plus logic-delete: the entity's
  * {@code @TableLogic deletedFlag} (BOOLEAN {@code deleted_flag}) is driven by the global
  * interceptor, so {@code deleteById} performs the soft delete and every finder
@@ -127,12 +123,6 @@ public class ReportStorageService {
      * Idempotent upsert keyed by the supplied {@code pid}: create a live row with the GIVEN
      * pid if none exists, else patch the existing live row's title/profile/dsl (+bump version).
      *
-     * <p>This is the REST-idempotent semantics for {@code PUT /{pid}} — a {@code PUT} to a not-yet
-     * existing resource id MAY create it, so a client that owns the id (here the page pid the report
-     * designer already minted) can sync a shadow without first knowing whether the row exists. The
-     * supplied {@code pid} is honored verbatim (never re-minted), which is what makes
-     * {@code ab_report.pid == page.pid} hold for the Phase 4 transition dual-write.
-     *
      * <p>{@code code} is required only on the create branch (it is tenant-unique and {@code NOT NULL});
      * it is ignored when the row already exists, since {@code code} is immutable on update.
      *
@@ -184,7 +174,7 @@ public class ReportStorageService {
      * {@code recordScheduleAudit}: the tenant comes from the persisted entity (which carries the
      * tenant-scoped {@code tenant_id}) and the actor from {@link MetaContext} (set on every
      * authenticated request by the tenant interceptor; all report writes run on the request thread
-     * via {@code ReportDefinitionController}, including the Phase 4 dual-write upsert).
+     * via {@code ReportDefinitionController}, including explicit updates).
      *
      * <p>ADDITIVE: this only records an audit event alongside a completed write; the persistence
      * itself is unchanged. {@code AuditTrailService.recordAudit} runs in its own

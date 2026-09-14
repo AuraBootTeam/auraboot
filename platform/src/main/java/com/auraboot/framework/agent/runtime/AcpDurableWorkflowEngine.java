@@ -29,6 +29,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore> analyticsTasks;
     private final AgentRunService agentRunService;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
@@ -45,12 +47,17 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
             if (!isAvailable()) {
                 return unavailableOutcome("start", null, null, sink);
             }
-            String taskPid = createConversationTaskRow(ctx, legacyRequest);
+            var stored = createConversationTaskRow(ctx, legacyRequest);
+            String taskPid = stored.taskPid();
             log.info("Durable conversation run dispatch: tenantId={}, turnId={}, taskPid={}",
                     ctx.tenantId(), ctx.turnId(), taskPid);
-            RunOutcome runOutcome = agentRunService.executeTaskSync(
-                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
+            RunOutcome runOutcome = legacyRequest != null && legacyRequest.getAnalyticsExecution() != null
+                    ? agentRunService.executeInitialAnalyticsTaskSync(ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT)
+                    : agentRunService.executeTaskSync(ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
             return mapRunToTurnOutcome(runOutcome, sink);
+        } catch (com.auraboot.framework.agent.service.AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
+            sink.onDone(admitted.getMessage(), null);
+            return new TurnOutcome.Success(admitted.getMessage(), Map.of("reused", true));
         } catch (Exception e) {
             log.error("Durable conversation run dispatch failed: {}", e.getMessage(), e);
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -87,7 +94,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         return new TurnOutcome.Failed(msg, null);
     }
 
-    private String createConversationTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
+    private com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Stored createConversationTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
         String taskPid = UniqueIdGenerator.generate();
         Map<String, Object> task = new HashMap<>();
         task.put("pid", taskPid);
@@ -124,6 +131,9 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         if (ctx.contextEnvelope() != null) {
             inputData.put("contextEnvelopeHash", ctx.contextEnvelope().envelopeHash());
         }
+        if (legacyRequest != null && legacyRequest.getAnalyticsExecution() != null) {
+            return analyticsTasks.getObject().create(ctx, legacyRequest.getAnalyticsExecution(), task, inputData);
+        }
         try {
             task.put("input_data", objectMapper.writeValueAsString(inputData));
         } catch (JsonProcessingException ex) {
@@ -131,7 +141,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         }
 
         dynamicDataMapper.insert("ab_agent_task", task);
-        return taskPid;
+        return new com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Stored(taskPid, true);
     }
 
     private static String buildTaskTitle(ChatRequest legacyRequest) {
@@ -176,10 +186,15 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
                         pa.message() != null ? pa.message() : "Approval required",
                         input,
                         approvalPid);
+                sink.onDone("", null);
                 yield new TurnOutcome.PendingConfirmation(
                         approvalPid,
                         pa.message() != null ? pa.message() : "Approval required",
                         approvalPid);
+            }
+            case RunOutcome.Cancelled c -> {
+                sink.onDone(c.reason(), null);
+                yield new TurnOutcome.Interrupted(c.reason(), "user_cancelled");
             }
             case RunOutcome.Failed f -> {
                 String msg = f.errorMessage() != null ? f.errorMessage() : "Agent run failed";

@@ -1,0 +1,36 @@
+[
+  {
+    "code": "core_dashboard_suggestion",
+    "displayName:zh-CN": "\u5206\u6790\u5efa\u8bae\u7248\u672c",
+    "displayName:en": "Analysis Suggestion Version",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "titleField": "core_dashboard_title",
+      "skipDetailPage": true,
+      "dataScope": {
+        "ownerField": "created_by",
+        "departmentField": null
+      }
+    }
+  },
+  {
+    "code": "core_dashboard_adoption",
+    "displayName:zh-CN": "\u5efa\u8bae\u91c7\u7eb3\u8bb0\u5f55",
+    "displayName:en": "Suggestion Adoption",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "titleField": "core_dashboard_title",
+      "skipDetailPage": true,
+      "dataScope": {
+        "ownerField": "created_by",
+        "departmentField": null
+      }
+    }
+  }
+]

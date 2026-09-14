@@ -88,6 +88,9 @@ export function adminRuntimeEngineRoutes() {
     }),
     route('/p/c/:pageKey', './routes/p.c.$pageKey.tsx'),
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
+    // Standalone saved-report view (opened from saved-report links); must be a
+    // registered route or the catch-all menu guard blocks the direct URL.
+    route('/reports/view/:pageKey', './routes/reports/view.$pageKey.tsx'),
     route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),
     route('/p/:pageKey/view/:recordId', './routes/p.$pageKey.view.tsx'),
     // Edit supports both /p/:pageKey/edit/:recordId (AGENTS.md convention) and

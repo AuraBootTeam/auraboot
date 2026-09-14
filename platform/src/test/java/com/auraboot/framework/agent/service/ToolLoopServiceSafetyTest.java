@@ -267,13 +267,31 @@ class ToolLoopServiceSafetyTest {
                 .build();
         when(approvalGate.checkAndRequestApproval(eq(1L), eq("run-3"), eq("task-3"), eq(tool.getName()),
                 eq(tool.getDescription()), anyMap(), eq(true)))
-                .thenReturn(null);
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Required tool approval has no matching policy"));
 
-        String result = service.executeToolCall(1L, "run-3", "task-3", "agent",
-                tool.getName(), Map.of("recordPid", "pc-1"), List.of(tool), null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.executeToolCall(1L, "run-3", "task-3", "agent",
+                tool.getName(), Map.of("recordPid", "pc-1"), List.of(tool), null))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
 
-        assertThat(result).contains("approval policy").contains("No data was changed");
         verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    @DisplayName("an exact consumed approval grant allows the required tool to execute")
+    void consumedGrantDispatchesRequiredTool() {
+        var tool = AgentToolDefinition.builder().name("platform.list_models").description("List models")
+                .toolType("platform").sourceCode("platform.list_models").riskLevel("L0")
+                .requiresApproval(true).build();
+        var input = Map.<String, Object>of("category", "test");
+        when(approvalGate.checkAndRequestApproval(eq(1L), eq("approved-run"), eq("task"),
+                eq(tool.getName()), eq(tool.getDescription()), eq(input), eq(true))).thenReturn(null);
+        when(toolProviderRegistry.execute(1L, tool.getName(), input)).thenReturn(
+                ProviderExecutionResult.builder().success(true).data(Map.of("models", List.of("verified"))).build());
+        String result = service.executeToolCall(1L, "approved-run", "task", "agent", tool.getName(), input, List.of(tool), null);
+        assertThat(result).contains("\"success\":true").contains("verified").doesNotContain("approvalRequired");
+        var order = inOrder(approvalGate, toolProviderRegistry);
+        order.verify(approvalGate).checkAndRequestApproval(1L, "approved-run", "task", tool.getName(), tool.getDescription(), input, true);
+        order.verify(toolProviderRegistry).execute(1L, tool.getName(), input);
     }
 
     @Test

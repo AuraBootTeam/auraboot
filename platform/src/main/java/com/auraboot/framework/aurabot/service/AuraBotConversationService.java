@@ -45,6 +45,7 @@ public class AuraBotConversationService {
     private final ImMessageService imMessageService;
     private final AgentDefinitionMapper agentDefinitionMapper;
     private final ObjectMapper objectMapper;
+    private final com.auraboot.framework.behavior.service.AnalyticsResultHistory analyticsHistory;
 
     public List<AuraBotConversationItem> listConversations(Long tenantId, Long memberId) {
         List<Long> conversationIds = memberMapper.findVisibleConversationIdsByMember(
@@ -70,10 +71,10 @@ public class AuraBotConversationService {
     }
 
     @Transactional
-    public AuraBotConversationItem ensureConversation(Long tenantId, Long memberId, String agentCode) {
+    public AuraBotConversationItem ensureConversation(Long tenantId, Long memberId, String agentCode, boolean newConversation) {
         String resolvedAgentCode = (agentCode == null || agentCode.isBlank()) ? "aurabot" : agentCode.trim();
 
-        List<Long> conversationIds = memberMapper.findConversationIdsByMember(
+        List<Long> conversationIds = newConversation ? List.of() : memberMapper.findConversationIdsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, memberId);
         for (Long conversationId : conversationIds) {
             ImConversation existing = conversationMapper.selectById(conversationId);
@@ -155,7 +156,7 @@ public class AuraBotConversationService {
 
     private void ensureMember(Long conversationId, Long tenantId, Long memberId) {
         if (!imConversationService.isMember(conversationId, ImConstants.MEMBER_TYPE_HUMAN, memberId, tenantId)) {
-            throw new IllegalArgumentException("Not a member of this conversation");
+            throw new org.springframework.security.access.AccessDeniedException("Not a member of this conversation");
         }
     }
 
@@ -205,6 +206,7 @@ public class AuraBotConversationService {
                 .thinkingContent(message.getThinkingContent())
                 .thinkingSignature(message.getThinkingSignature())
                 .retrievalEvidence(readRetrievalEvidence(metadata))
+                .resultContracts(analyticsHistory.restore(metadata.path("analyticsReferences")))
                 .createdAt(message.getCreatedAt())
                 .build();
     }

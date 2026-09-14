@@ -20,7 +20,6 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +52,9 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private final com.auraboot.framework.meta.service.MetaModelService metaModelService;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private NamedQueryFieldProtection fieldProtection;
 
     /**
      * Optional — when present and the request carries a {@code semanticModelCode},
@@ -120,11 +122,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(
-            value = "aggregateQuery",
-            key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getDataAccessContextSuffix() + ':' + #request.hashCode()",
-            unless = "#result == null || #result.getRows() == null || #result.getRows().isEmpty()"
-    )
+    // Authorization and data scopes are evaluated inside this method. A method-level
+    // result cache would bypass them on hits, including after permission revocation.
     public AggregateQueryResponse execute(AggregateQueryRequest request) {
         validateRequest(request);
 
@@ -133,8 +132,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         // semantic layer (PRD 16 §6 W4 D4). Bit-identical legacy behaviour
         // preserved when either is absent — existing widgets do not regress.
         if (request.getSemanticModelCode() != null
-                && !request.getSemanticModelCode().isBlank()
-                && semanticAggregateAdapter != null) {
+                && !request.getSemanticModelCode().isBlank()) {
+            if (semanticAggregateAdapter == null) {
+                throw new MetaServiceException("Semantic query service is unavailable");
+            }
             return semanticAggregateAdapter.execute(request);
         }
 
@@ -250,7 +251,34 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
-        // Use tenant-bypass method since tenant isolation is handled inside the NamedQuery's fromSql.
+        List<NamedQueryField> outputFields = new ArrayList<>();
+        if (request.getDimensions() != null) {
+            for (String dimension : request.getDimensions()) outputFields.add(fieldMap.get(dimension));
+        }
+        Set<String> metricAliases = new HashSet<>();
+        if (request.getMetrics() != null) {
+            for (MetricConfig metric : request.getMetrics()) {
+                String alias = metric.getAlias() != null ? metric.getAlias()
+                        : metric.getField() + "_" + metric.getAggregation().toLowerCase();
+                NamedQueryField projection = new NamedQueryField();
+                projection.setFieldCode(alias);
+                projection.setColumnExpr(fieldMap.get(metric.getField()).getColumnExpr());
+                outputFields.add(projection);
+                metricAliases.add(alias);
+            }
+        }
+        if (outputFields.isEmpty()) outputFields.addAll(fields);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, outputFields, "list");
+        for (var group : protection.protections()) {
+            if (group.aliases().keySet().stream().anyMatch(metricAliases::contains)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Protected field aggregation requires explicit output protection");
+            }
+        }
+
+        sql = fieldProtection.rewrite(protection, sql);
+
+        // The shared source rewrite already applies tenant and row scopes to each physical input.
         // This avoids JSqlParser failures on complex PostgreSQL-specific syntax.
         List<Map<String, Object>> rawRows = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
         // Filter out null entries that MyBatis can return for all-NULL aggregate rows
@@ -259,6 +287,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 : List.of();
 
         AggregateQueryResponse response = new AggregateQueryResponse();
+        rows = fieldProtection.apply(protection, rows);
         response.setRows(rows);
         response.setMeta(buildMetaForNamedQuery(request, query, fieldMap));
         response.setSummary(calculateSummary(rows, request.getMetrics()));
@@ -353,14 +382,15 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         if (selectClauses.isEmpty()) {
-            // Identity passthrough — return the named query's full output as-is
-            sql.append("*");
+            // Preserve the configured output whitelist and aliases in passthrough mode.
+            sql.append(fieldMap.values().stream().map(field -> field.getColumnExpr() + " AS " + field.getFieldCode())
+                    .collect(Collectors.joining(", ")));
         } else {
             sql.append(String.join(", ", selectClauses));
         }
 
         // FROM clause: use Named Query's fromSql as subquery
-        // Tenant isolation is handled by MyBatis tenant interceptor or fromSql definition
+        // The shared physical-source rewrite applies mandatory server tenant scopes.
         String fromSql = query.getFromSql().trim();
         if (fromSql.startsWith("(")) {
             // fromSql is already a subquery — use directly with alias to avoid double-wrapping
@@ -370,7 +400,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 fromSql = fromSql.substring(0, lastParen + 1);
             }
             sql.append(" FROM ").append(fromSql).append(" AS _nq");
-        } else if (fromSql.toUpperCase().startsWith("SELECT")) {
+        } else if (NamedQuerySqlSource.isQuery(fromSql)) {
             // fromSql is a full SELECT statement — wrap as subquery
             sql.append(" FROM (").append(fromSql).append(") AS _nq");
         } else {
@@ -751,7 +781,11 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             throw new MetaServiceException("Aggregate query request cannot be null");
         }
 
-        if ("namedQuery".equals(request.getType())) {
+        if (request.getSemanticModelCode() != null && !request.getSemanticModelCode().isBlank()) {
+            if (!IDENTIFIER_PATTERN.matcher(request.getSemanticModelCode()).matches()) {
+                throw new MetaServiceException("Invalid semantic model code format");
+            }
+        } else if ("namedQuery".equals(request.getType())) {
             if (request.getQueryCode() == null || request.getQueryCode().isBlank()) {
                 throw new MetaServiceException("Query code is required for named queries");
             }

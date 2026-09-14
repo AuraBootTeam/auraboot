@@ -39,12 +39,15 @@ class AgentTaskCompletedEventFlowTest {
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private ApplicationEventPublisher eventPublisher;
 
+    @Mock private AgentRunTerminalStore terminalStore;
     private RunLifecycleService service;
 
     @BeforeEach
     void setUp() {
         service = new RunLifecycleService(dynamicDataMapper, new ObjectMapper(),
-                memoryService, observationService, providerFactory, jdbcTemplate, eventPublisher);
+                memoryService, observationService, providerFactory, jdbcTemplate, eventPublisher, terminalStore);
+        lenient().when(terminalStore.complete(org.mockito.ArgumentMatchers.any(), anyString(), anyString(), anyMap(), anyMap(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> { ((Runnable) invocation.getArgument(5)).run(); return true; });
         // parent lookup for the published event
         lenient().when(dynamicDataMapper.selectByQuery(contains("SELECT parent_id"), anyMap()))
                 .thenReturn(List.of(Map.of("parent_id", "parent-123")));
@@ -75,7 +78,7 @@ class AgentTaskCompletedEventFlowTest {
         service.completeRunRecord(1L, "run-1", "task-1", LocalDateTime.now().minusSeconds(5), result, "m");
 
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper).update(org.mockito.Mockito.eq("ab_agent_run"), updateCaptor.capture(), anyMap());
+        verify(terminalStore).complete(org.mockito.Mockito.eq(1L), org.mockito.Mockito.eq("run-1"), org.mockito.Mockito.eq("task-1"), updateCaptor.capture(), anyMap(), org.mockito.ArgumentMatchers.any());
         assertThat(updateCaptor.getValue())
                 .containsEntry("run_status", "failed")
                 .containsEntry("error_message", "Plan execution did not reach success terminal state");

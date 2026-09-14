@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { DataTableBlock } from '../types';
 
 interface ReportTableBlockProps {
@@ -14,6 +15,7 @@ interface ReportTableBlockProps {
 const SAMPLE_ROWS = 3;
 
 export const ReportTableBlock: React.FC<ReportTableBlockProps> = ({ block, mode, data = [] }) => {
+  const text = useSmartText();
   const columns = block.columns;
   const hasColumns = columns.length > 0;
 
@@ -22,17 +24,25 @@ export const ReportTableBlock: React.FC<ReportTableBlockProps> = ({ block, mode,
     if (!hasColumns) {
       return (
         <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
-          <div className="mb-1 font-medium">{block.title || 'Data Table'}</div>
-          <div>Configure columns in the property panel</div>
+          <div className="mb-1 font-medium">
+            {block.title || text({ zh: '数据表格', en: 'Data Table' })}
+          </div>
+          <div>
+            {text({ zh: '请在属性面板中配置列', en: 'Configure columns in the property panel' })}
+          </div>
           {!block.dataSource && (
-            <div className="mt-1 text-xs text-amber-500">No data source selected</div>
+            <div className="mt-1 text-xs text-amber-500">
+              {text({ zh: '尚未选择数据源', en: 'No data source selected' })}
+            </div>
           )}
         </div>
       );
     }
 
     const sampleRows = Array.from({ length: SAMPLE_ROWS }, (_, i) =>
-      Object.fromEntries(columns.map((col) => [col.field, `Sample ${i + 1}`])),
+      Object.fromEntries(
+        columns.map((col) => [col.field, text({ zh: `示例 ${i + 1}`, en: `Sample ${i + 1}` })]),
+      ),
     );
 
     return (
@@ -83,7 +93,9 @@ export const ReportTableBlock: React.FC<ReportTableBlockProps> = ({ block, mode,
           </tbody>
         </table>
         {!block.dataSource && (
-          <div className="mt-1 text-xs text-amber-500">No data source selected</div>
+          <div className="mt-1 text-xs text-amber-500">
+            {text({ zh: '尚未选择数据源', en: 'No data source selected' })}
+          </div>
         )}
       </div>
     );
@@ -93,7 +105,9 @@ export const ReportTableBlock: React.FC<ReportTableBlockProps> = ({ block, mode,
   if (!hasColumns || data.length === 0) {
     return (
       <div className="py-4 text-center text-sm text-gray-500">
-        {!hasColumns ? 'No columns configured' : 'No data available'}
+        {!hasColumns
+          ? text({ zh: '尚未配置列', en: 'No columns configured' })
+          : text({ zh: '暂无数据', en: 'No data available' })}
       </div>
     );
   }
@@ -159,7 +173,7 @@ export const ReportTableBlock: React.FC<ReportTableBlockProps> = ({ block, mode,
                           sc.format || col.format,
                         )
                       : colIdx === 0
-                        ? block.summary!.label || 'Total'
+                        ? block.summary!.label || text({ zh: '合计', en: 'Total' })
                         : ''}
                   </td>
                 );

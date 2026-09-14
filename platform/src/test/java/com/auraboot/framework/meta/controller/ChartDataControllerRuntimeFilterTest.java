@@ -40,7 +40,7 @@ class ChartDataControllerRuntimeFilterTest {
     @Test
     void resolvesDepartmentOwnerPidsForAggregateAndNestedDrillFilters() {
         ChartDataController controller = new ChartDataController(
-                aggregateQueryService, organizationService, recordShareService);
+                aggregateQueryService, new com.auraboot.framework.meta.service.ChartRuntimeFilterResolver(organizationService, recordShareService));
         when(organizationService.getCurrentDepartmentUserPids(true))
                 .thenReturn(List.of("owner-a", "owner-b"));
 
@@ -69,7 +69,7 @@ class ChartDataControllerRuntimeFilterTest {
     void resolvesCurrentSharedRecordPidsForTheRequestedModel() {
         MetaContext.setContext(7L, 9L, "member-pid", "member");
         ChartDataController controller = new ChartDataController(
-                aggregateQueryService, organizationService, recordShareService);
+                aggregateQueryService, new com.auraboot.framework.meta.service.ChartRuntimeFilterResolver(organizationService, recordShareService));
         when(recordShareService.getSharedRecordPids(
                 7L, "crm_account_common", 9L, "member-pid", "read"))
                 .thenReturn(List.of("account-a", "account-b"));

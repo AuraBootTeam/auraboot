@@ -16,6 +16,9 @@ public class ReportExportRequest {
     @JsonProperty("reportPid")
     private String reportPid;
 
+    /** Idempotent identity for one explicit export action. */
+    private java.util.UUID usageId;
+
     @JsonProperty("parameters")
     private Map<String, Object> parameters;
 }

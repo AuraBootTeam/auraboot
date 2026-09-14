@@ -95,8 +95,7 @@ public class InterruptDispatcher {
         switch (classification.getSubPolicy()) {
             case InterruptClassifier.REPLACE_INTENT -> {
                 if (activeRunId != null) {
-                    cancelRun(activeRunId, tenantId);
-                    action = CANCELLED_RUN_ACTION;
+                    action = cancelRun(activeRunId, tenantId) ? CANCELLED_RUN_ACTION : NOOP_ACTION;
                 } else {
                     action = NOOP_ACTION;
                 }
@@ -156,30 +155,21 @@ public class InterruptDispatcher {
      * have a dedicated notes column; error_message is the audit field).
      * Idempotent — if the run has already completed / cancelled, no-op.
      *
-     * <p>On a successful flip (updated=1) also fires
+     * <p>On a committed cancellation also fires
      * {@link SessionEndedEvent} with {@link SessionEndedEvent.TerminalOutcome#CANCELLED}
      * so any L1 {@code category='session'} memories this run wrote before
      * cancellation still reach the memory L1->L2 promoter. Without this, the
      * rows persist as L1 until the hourly orphan cron rescues them — which
      * grows the {@code OrphanBacklogGrowing} metric and creates alert noise.
      */
-    private void cancelRun(String runPid, Long tenantId) {
-        // Tenant-scoped: ab_agent_run is NOT in the MyBatis TenantLineInnerInterceptor ignoreTable and
-        // this raw JdbcTemplate update bypasses the interceptor, so the caller's tenant_id MUST be in the
-        // WHERE clause — otherwise any authenticated user could cancel another tenant's running agent run
-        // by submitting its run pid (cross-tenant write / DoS).
-        int updated = jdbcTemplate.update(
-                "UPDATE ab_agent_run SET run_status = 'cancelled', " +
-                        "    completed_at = NOW(), updated_at = NOW(), " +
-                        "    error_message = COALESCE(error_message || E'\\n','') || 'cancelled by user interrupt' " +
-                        "WHERE pid = ? AND tenant_id = ? AND run_status = 'running'", runPid, tenantId);
-        if (updated != 1) {
-            log.debug("cancelRun: run {} no longer running (race with completion)", runPid);
-            return;
+    private boolean cancelRun(String runPid, Long tenantId) {
+        if (!runLifecycleService.cancelRun(tenantId, runPid)) {
+            log.debug("cancelRun: run {} no longer running or unavailable", runPid);
+            return false;
         }
 
         // Only publish SessionEndedEvent when THIS caller performed the cancel
-        // (updated == 1) — a race-losing call returns above, so the winner
+        // through the terminal store; a race-losing call returns above, so the winner
         // is the exclusive publisher.
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT tenant_id, agent_id FROM ab_agent_run WHERE pid = ? AND tenant_id = ?", runPid, tenantId);
@@ -187,27 +177,28 @@ public class InterruptDispatcher {
             // Row vanished between UPDATE and SELECT — should not happen for
             // a run we just flipped, but refuse to invent placeholder values.
             log.warn("cancelRun: run {} not found after cancel flip, skipping SessionEndedEvent", runPid);
-            return;
+            return true;
         }
         Map<String, Object> row = rows.get(0);
-        // tenant_id is the caller's tenantId (the UPDATE + SELECT above are tenant-scoped to it).
+        // Both cancellation and this lookup are scoped to the caller tenant.
         String agentCode = (String) row.get("agent_id");
         if (agentCode == null || agentCode.isBlank()) {
             log.warn("cancelRun: run {} missing agent ({}), skipping SessionEndedEvent",
                     runPid, agentCode);
-            return;
+            return true;
         }
 
         boolean claimed = runLifecycleService.markSessionEndedPublished(runPid);
         if (!claimed) {
             log.debug("cancelRun: SessionEndedEvent already published for run {}", runPid);
-            return;
+            return true;
         }
         Long uid = MetaContext.getCurrentUserId();
         String userId = uid == null ? null : uid.toString();
         eventPublisher.publishEvent(new SessionEndedEvent(
                 tenantId, runPid, agentCode, userId,
                 SessionEndedEvent.TerminalOutcome.CANCELLED));
+        return true;
     }
 
     private String truncate(String s, int max) {
