@@ -1,77 +1,125 @@
-/**
- * DslFormFillContext — exposes form mutation API to DSL block renderers.
- *
- * Block renderers normally only see {@code runtime} via their props; field
- * values live in a private hook (useDslForm). For blocks that need to mutate
- * field values (e.g. an AI fill banner that turns NL into a field map), this
- * Context provides a stable handle without coupling the block to useDslForm
- * internals.
- *
- * P1' minimum surface: applyFields(map). P2' may extend with getValue /
- * getValues / validate. Provider lives inside DslFormRenderer; consumers call
- * useDslFormFill() and tolerate a no-op when used outside a form.
- */
-import React, { createContext, useContext, useMemo } from 'react';
-import { partitionFieldsByLock } from './aiLockedFields';
+/** Shared draft mutation boundary for every AI form-fill entry. */
+import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
+import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
+import type { FormFillResult, FormFillTarget, FormFillReview } from './formFill';
 
 export interface DslFormFillApi {
-  /**
-   * Apply a partial map of field code → value to the form. Field codes marked
-   * AI-locked (see {@link DslFormFillApi.lockedFields}) are skipped — an AI fill
-   * must never overwrite a locked field.
-   */
-  applyFields: (fields: Record<string, unknown>) => void;
-  /**
-   * Field codes the form has marked AI-locked. Consumers (e.g. the ai-fill
-   * banner) forward these to the backend so the server skips them too.
-   */
+  applyFields: (fields: Record<string, unknown>) => FormFillResult;
+  extractFromText: (text: string) => Promise<void>;
   lockedFields: string[];
 }
 
-const NOOP_API: DslFormFillApi = {
-  applyFields: () => {
-    if (process.env.NODE_ENV === 'development') {
-      // eslint-disable-next-line no-console
-      console.warn('[DslFormFill] applyFields called outside a DslFormRenderer; noop.');
-    }
-  },
-  lockedFields: [],
-};
-
-const DslFormFillContext = createContext<DslFormFillApi>(NOOP_API);
-
-export interface DslFormFillProviderProps {
-  setFieldValue: ((field: string, value: unknown) => void) | undefined;
-  /** Field codes marked AI-locked; applyFields skips these. */
-  lockedFields?: string[];
-  children: React.ReactNode;
-}
+const DslFormFillContext = createContext<DslFormFillApi | null>(null);
 
 export function DslFormFillProvider({
-  setFieldValue,
-  lockedFields,
+  target,
   children,
-}: DslFormFillProviderProps) {
-  // Serialize the locked set so the memo only recomputes when its contents change.
-  const lockedKey = (lockedFields ?? []).join(' ');
-  const api = useMemo<DslFormFillApi>(() => {
-    const locked = lockedKey ? lockedKey.split(' ') : [];
-    if (!setFieldValue) return { ...NOOP_API, lockedFields: locked };
-    return {
-      lockedFields: locked,
-      applyFields: (fields) => {
-        const { applied } = partitionFieldsByLock(fields, locked);
-        Object.entries(applied).forEach(([fieldCode, value]) => {
-          setFieldValue(fieldCode, value);
-        });
-      },
+}: {
+  target: FormFillTarget;
+  children: React.ReactNode;
+}) {
+  const auraBot = useAuraBotSafe();
+  const register = auraBot?.registerFormFillTarget;
+  const active = useRef<FormFillTarget | null>(target);
+  const busy = useRef(false);
+  active.current = target;
+  useEffect(() => {
+    active.current = target;
+    const unregister = register?.(target);
+    return () => {
+      active.current = null;
+      unregister?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setFieldValue, lockedKey]);
-
+  }, [target, register]);
+  const api = useMemo<DslFormFillApi>(
+    () => ({
+      get lockedFields() {
+        return target
+          .snapshot()
+          .fields.filter((field) => field.locked)
+          .map((field) => field.code);
+      },
+      applyFields: (fields) => {
+        if (active.current !== target) throw new Error('ai.fill.target_changed');
+        return target.apply(fields);
+      },
+      extractFromText: async (text) => {
+        if (!text.trim()) throw new Error('ai.fill.nl_input_required');
+        if (busy.current) throw new Error('ai.fill.busy');
+        const formFill = target.snapshot();
+        formFill.fields = formFill.fields.filter((field) => !field.locked);
+        if (!formFill.fields.length) throw new Error('ai.fill.no_editable_fields');
+        busy.current = true;
+        let failure: string | undefined;
+        let received = false;
+        const proposals: Record<string, unknown> = Object.create(null);
+        const reviews: Record<string, FormFillReview> = Object.create(null);
+        const seen = new Set<string>();
+        try {
+          const conversation = await auraBotApi.ensureConversation('aurabot');
+          await auraBotApi.chatStream(
+            {
+              sessionId: crypto.randomUUID(),
+              message: text,
+              agentCode: 'aurabot',
+              conversationId: conversation.conversationId,
+              clientMsgId: crypto.randomUUID(),
+              formFill,
+              pageContext: { kind: 'form', modelCode: formFill.modelCode },
+            },
+            {
+              onChunk: () => {},
+              onDone: () => {},
+              onError: (error) => {
+                failure = error;
+              },
+              onConfirmRequired: () => {
+                failure = 'ai.fill.unexpected_action';
+              },
+              onToolResult: (id, result, success) => {
+                if (seen.has(id)) return;
+                seen.add(id);
+                // Platform provider tool results are the raw output map on this SSE event.
+                if (!success || result.action !== 'form_fill' || !result.fields) return;
+                if (active.current !== target) {
+                  failure = 'ai.fill.target_changed';
+                  return;
+                }
+                if (
+                  !result.reviews ||
+                  Object.values(result.reviews).some(
+                    (review: any) =>
+                      typeof review?.quote !== 'string' ||
+                      !review.quote.trim() ||
+                      !text.includes(review.quote),
+                  )
+                ) {
+                  failure = 'ai.fill.invalid_evidence';
+                  return;
+                }
+                Object.assign(proposals, result.fields);
+                Object.assign(reviews, result.reviews);
+                received = Object.keys(proposals).length > 0 || Object.keys(reviews).length > 0;
+              },
+            },
+          );
+          if (failure) throw new Error(failure);
+          if (!received) throw new Error('ai.fill.no_fields_extracted');
+          if (active.current !== target) throw new Error('ai.fill.target_changed');
+          target.apply(proposals, reviews);
+        } finally {
+          busy.current = false;
+        }
+      },
+    }),
+    [target],
+  );
   return <DslFormFillContext.Provider value={api}>{children}</DslFormFillContext.Provider>;
 }
 
 export function useDslFormFill(): DslFormFillApi {
-  return useContext(DslFormFillContext);
+  const context = useContext(DslFormFillContext);
+  if (!context) throw new Error('AI fill requires an active form');
+  return context;
 }

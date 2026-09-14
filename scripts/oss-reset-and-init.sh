@@ -706,6 +706,9 @@ WHERE u.email = 'admin@auraboot.com'
         --plugin-root="$PROJECT_ROOT/plugins"
     echo -e "${GREEN}   Plugin import complete${NC}"
 
+    # Install the versioned draft-only playbook through explicit initialization.
+    psql_run -v ON_ERROR_STOP=1 -f "$SCRIPT_DIR/seed-form-fill-skill.sql" -P pager=off
+
     # Step 7.6: Backfill model displayName for AuraBot Chinese search
     echo -e "${YELLOW}Step 7.6: Backfilling model displayNames...${NC}"
     psql_run -f "$SCRIPT_DIR/backfill-model-displayname.sql" -P pager=off 2>&1 | tail -1
