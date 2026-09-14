@@ -16,7 +16,7 @@ import { usePermission } from '~/contexts/AuthContext';
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReportStore } from './store/useReportStore';
-import { ReportDocumentProvider, useReportDocument } from './state/ReportDocumentProvider';
+import { ReportDocumentProvider, useReportDocument, ensurePageConfig } from './state/ReportDocumentProvider';
 import { ReportToolbar } from './components/ReportToolbar';
 import { BlockPalette } from './components/BlockPalette';
 import { ReportTableBlock } from './blocks/ReportTableBlock';
@@ -376,6 +376,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
 
   if (versioning.viewingVersionPid) {
     const historical = versioning.viewingSnapshot?.dsl as ReportDsl | undefined;
+    const normalizedHistorical = historical ? ensurePageConfig(historical) : undefined;
     return (
       <div className="flex h-screen flex-col bg-gray-50" data-testid="report-version-preview">
         <div className="border-b border-amber-200 bg-amber-50 p-4 pr-80">
@@ -396,7 +397,7 @@ const ReportDesignerInner: React.FC<ReportDesignerProps> = ({ reportId, initialT
         </div>
         <div className="flex-1 overflow-auto pr-80">
           {historical ? (
-            <PreviewContent key={versioning.viewingVersionPid} report={historical} />
+            <PreviewContent key={versioning.viewingVersionPid} report={normalizedHistorical as ReportDsl} />
           ) : (
             <p role="alert" className="p-6">
               {text({
