@@ -670,7 +670,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 .map(f -> {
                     SqlSafetyUtils.validateSqlFragment(f.getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(f.getFieldCode(), "NQ field code");
-                    return f.getColumnExpr() + " AS " + f.getFieldCode();
+                    return f.getColumnExpr() + " AS " + quotedIdentifier(f.getFieldCode());
                 })
                 .collect(Collectors.toList());
 
@@ -871,7 +871,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     .map(fc -> {
                         SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
                         SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
-                        return fieldMap.get(fc).getColumnExpr() + " AS " + fc;
+                        return fieldMap.get(fc).getColumnExpr() + " AS " + quotedIdentifier(fc);
                     })
                     .collect(Collectors.toList());
 
@@ -1376,6 +1376,18 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
             idx++;
         }
+    }
+
+    /**
+     * Quote a validated NQ field code as a SQL identifier so PostgreSQL keeps its
+     * declared case. An unquoted alias folds to lowercase, so camelCase output
+     * fields (e.g. "taskName") reached consumers as "taskname" and case-sensitive
+     * lookups (DSL sub-table columns, export headers) read them as missing.
+     * Callers must run {@link SqlSafetyUtils#validateIdentifier} first; the pattern
+     * forbids embedded quotes, so the quoting itself is injection-safe.
+     */
+    private String quotedIdentifier(String fieldCode) {
+        return "\"" + fieldCode + "\"";
     }
 
     private void parseUserConditions(JsonNode conditions, Map<String, NamedQueryField> fieldMap,
