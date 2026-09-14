@@ -319,6 +319,20 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
 });
 
+test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
+  const stack = read('scripts/oss-golden-stack.sh');
+
+  assert.match(stack, /--product-migration-root requires --fresh-db/);
+  assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
+  assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
+  assert.match(stack, /product-migrations\.tsv/);
+  assert.ok(
+    stack.indexOf('2.5/9 apply product-owned migrations')
+      < stack.indexOf('4/9 build bootJar'),
+    'product migrations must finish before backend startup and plugin import',
+  );
+});
+
 test('OSS golden stack rejects dependency capsules with dangling required-package links', () => {
   const golden = read('scripts/oss-golden-stack.sh');
   assert.match(golden, /web_admin_node_modules_usable\(\)/);
