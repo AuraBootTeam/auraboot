@@ -10,19 +10,18 @@ if (![grafanaUrl, traceId, artifacts, playwrightModule].every(Boolean)) {
 const playwright = await import(pathToFileURL(playwrightModule).href);
 const chromium = playwright.chromium ?? playwright.default?.chromium;
 if (!chromium) throw new Error(`Playwright module does not export chromium: ${playwrightModule}`);
+const grafanaUser = process.env.OBS_GRAFANA_USER;
+const grafanaPassword = process.env.OBS_GRAFANA_PASSWORD;
+if (!grafanaUser || !grafanaPassword) throw new Error('Grafana browser credentials are not set');
 fs.mkdirSync(artifacts, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 
 try {
-  await page.goto(`${grafanaUrl}/login`, { waitUntil: 'domcontentloaded' });
-  const username = page.locator('input[name="user"]');
-  if (await username.count()) {
-    await username.fill('admin');
-    await page.locator('input[name="password"]').fill('auraboot-observability-ci');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL(url => !url.pathname.endsWith('/login'));
-  }
+  const login = await page.request.post(`${grafanaUrl}/login`, {
+    data: { user: grafanaUser, password: grafanaPassword },
+  });
+  if (!login.ok()) throw new Error(`Grafana login failed with HTTP ${login.status()}`);
 
   const left = {
     datasource: 'loki',
