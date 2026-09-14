@@ -29,11 +29,12 @@ const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
 
 function parseArgs(argv) {
-  const options = { repoRoot: DEFAULT_REPO_ROOT };
+  const options = { repoRoot: DEFAULT_REPO_ROOT, skipOci: false };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--repo-root') options.repoRoot = resolve(argv[++index]);
     else if (argument === '--output') options.output = resolve(argv[++index]);
+    else if (argument === '--skip-oci') options.skipOci = true;
     else throw new Error(`unknown argument: ${argument}`);
   }
   if (!options.output) throw new Error('--output is required');
@@ -469,29 +470,37 @@ function main() {
     resolve(repoRoot, 'scripts/application/auraboot-core-env.sh'),
     resolve(output, 'bin/auraboot-core-env.sh'),
   );
-  const runtimeImage = resolve(output, 'oci/auraboot-runtime');
-  const runtimeRootfs = prepareRootfs([
-    { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
-    { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
-    { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
-    { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
-    { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
-    { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
-    { source: resolve(output, 'web'), destination: '/opt/auraboot/web' },
-    { source: deploymentScript, destination: '/opt/auraboot/bin/auraboot-core-env.sh' },
-    { source: resolve(output, 'app.yaml'), destination: '/opt/auraboot/app.yaml' },
-  ]);
-  const runtimeImageDigest = createOciImageLayout({
-    output: runtimeImage,
-    rootfs: runtimeRootfs,
-    entrypoint: ['java', '-jar', '/opt/auraboot/runtime/application.jar'],
-    labels: {
-      'org.opencontainers.image.title': 'auraboot-runtime',
-      'org.opencontainers.image.version': version,
-      'org.opencontainers.image.revision': commit,
-    },
-  });
-  rmSync(runtimeRootfs, { recursive: true, force: true });
+  // The OCI layout needs the linux/amd64 Docker builder (see oci-layout.mjs).
+  // `--skip-oci` stages the runnable artifact set (jar, migrations, config, web,
+  // npm, env script) without the image so non-Linux cold starts can build and
+  // run host-first; image-based flows (the release gate) must NOT pass it.
+  let runtimeImage = null;
+  let runtimeImageDigest = null;
+  if (!options.skipOci) {
+    runtimeImage = resolve(output, 'oci/auraboot-runtime');
+    const runtimeRootfs = prepareRootfs([
+      { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
+      { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
+      { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
+      { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
+      { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
+      { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
+      { source: resolve(output, 'web'), destination: '/opt/auraboot/web' },
+      { source: deploymentScript, destination: '/opt/auraboot/bin/auraboot-core-env.sh' },
+      { source: resolve(output, 'app.yaml'), destination: '/opt/auraboot/app.yaml' },
+    ]);
+    runtimeImageDigest = createOciImageLayout({
+      output: runtimeImage,
+      rootfs: runtimeRootfs,
+      entrypoint: ['java', '-jar', '/opt/auraboot/runtime/application.jar'],
+      labels: {
+        'org.opencontainers.image.title': 'auraboot-runtime',
+        'org.opencontainers.image.version': version,
+        'org.opencontainers.image.revision': commit,
+      },
+    });
+    rmSync(runtimeRootfs, { recursive: true, force: true });
+  }
 
   const artifactInputs = [
     { type: 'runtime', id: 'com.auraboot:runtime', version, path: runtime },
@@ -509,7 +518,7 @@ function main() {
     { type: 'config', id: 'platform-admin', version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
-    { type: 'oci', id: 'auraboot-runtime', version, path: runtimeImage },
+    ...(runtimeImage ? [{ type: 'oci', id: 'auraboot-runtime', version, path: runtimeImage }] : []),
   ];
   const catalog = {
     schemaVersion: 1,
@@ -520,7 +529,7 @@ function main() {
       commit,
     })),
   };
-  const lock = resolveApplication(manifest, catalog);
+  const lock = resolveApplication(manifest, catalog, { skipImage: options.skipOci });
   verifyArtifacts(lock, { artifactRoot: output });
   writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
   writeFileSync(resolve(output, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
