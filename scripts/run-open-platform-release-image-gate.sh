@@ -51,6 +51,11 @@ PYTHON_IMAGE="${AURA_CI_PYTHON_IMAGE:-python:3.13-alpine}"
 BUILD_JDK_IMAGE="eclipse-temurin:21-jdk"
 RUNTIME_JRE_IMAGE="eclipse-temurin:21-jre-alpine"
 PULL_TIMEOUT="${AURA_CI_RELEASE_PULL_TIMEOUT:-300}"
+GRADLE_VERSION="8.14.5"
+GRADLE_DISTRIBUTION_SHA256="6f74b601422d6d6fc4e1f9a1ab6522f642c2fdcbc15ae33ebd30ba3d7198e854"
+GRADLE_DISTRIBUTION_HASH="690y85m0j9nfaub7xoiayko8a"
+GRADLE_WRAPPER_HOME="${AURA_CI_GRADLE_WRAPPER_HOME:-${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper}"
+GRADLE_DISTRIBUTION_DIR="$GRADLE_WRAPPER_HOME/dists/gradle-${GRADLE_VERSION}-bin/$GRADLE_DISTRIBUTION_HASH"
 
 cleanup() {
   local status=$?
@@ -69,6 +74,30 @@ for base_image in pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_I
   timeout "$PULL_TIMEOUT" docker pull "$base_image" >/dev/null 2>&1 \
     || fatal "bounded pull failed for $base_image; mirror it by immutable digest in the controlled registry"
 done
+
+# The admitted host installer prewarms this distribution from the configured transport mirror and
+# verifies it against Gradle's fixed official SHA-256. Seed the BuildKit cache from that verified
+# host copy so a release build never depends on a best-effort services.gradle.org download from
+# inside the image build. The tracked wrapper URL and checksum policy remain unchanged.
+GRADLE_ZIP="$GRADLE_DISTRIBUTION_DIR/gradle-${GRADLE_VERSION}-bin.zip"
+GRADLE_MARKER="$GRADLE_DISTRIBUTION_DIR/.aura-distribution-sha256"
+[[ -f "$GRADLE_ZIP" && ! -L "$GRADLE_ZIP" ]] \
+  || fatal "verified host Gradle wrapper distribution is missing"
+[[ -f "$GRADLE_MARKER" && "$(<"$GRADLE_MARKER")" == "$GRADLE_DISTRIBUTION_SHA256" ]] \
+  || fatal "host Gradle wrapper checksum marker is missing or invalid"
+printf '%s  %s\n' "$GRADLE_DISTRIBUTION_SHA256" "$GRADLE_ZIP" | sha256sum --check --status \
+  || fatal "host Gradle wrapper distribution checksum mismatch"
+info "seeding BuildKit Gradle wrapper cache from verified host distribution"
+{
+  printf '# syntax=docker/dockerfile:1\n'
+  printf 'FROM %s\n' "$BUILD_JDK_IMAGE"
+  printf 'COPY dists/gradle-%s-bin/%s /tmp/gradle-dist\n' \
+    "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
+  printf 'RUN --mount=type=cache,target=/root/.gradle/wrapper mkdir -p /root/.gradle/wrapper/dists/gradle-%s-bin/%s && cp -a /tmp/gradle-dist/. /root/.gradle/wrapper/dists/gradle-%s-bin/%s/\n' \
+    "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH" "$GRADLE_VERSION" "$GRADLE_DISTRIBUTION_HASH"
+} | docker build -f - "$GRADLE_WRAPPER_HOME" \
+  > "$ARTIFACTS/logs/gradle-wrapper-cache-seed.log" 2>&1 \
+  || fatal "failed to seed BuildKit Gradle wrapper cache"
 
 STAGE="$WORK_ROOT/context"
 mkdir -p "$STAGE"
