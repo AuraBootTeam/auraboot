@@ -92,9 +92,12 @@ for plugin_root in "${plugin_roots[@]}"; do
     # Insert marketplace plugin. Marketplace catalog is G2 platform runtime data,
     # so it must live in the system tenant; the browse API reads it through
     # SystemTenantContextExecutor.
+    # summary is varchar(500) while description is TEXT: plugin.json descriptions
+    # (e.g. ent-qr-admin at 1090 chars) exceed 500, so truncate the summary copy
+    # in SQL — LEFT() is character-based and UTF-8 safe.
     "${PSQL[@]}" -q <<SQL
 INSERT INTO ab_marketplace_plugin (pid, tenant_id, plugin_id, namespace, display_name, display_name_zh, display_name_en, summary, description, author, plugin_type, category_code, status, visibility, featured, install_count, latest_version, total_versions, min_platform_version, license_mode, created_at, updated_at, published_at, deleted_flag)
-VALUES ('$plugin_pid', $SYSTEM_TENANT_ID, '$plugin_id', '$namespace', '$display_name_escaped', '$display_name_zh_escaped', '$display_name_en_escaped', '$description_escaped', '$description_escaped', '$author_escaped', '$plugin_type', '$category', 'published', 'public', false, 0, '$version', 1, $([ -n "$min_platform" ] && echo "'$min_platform'" || echo "NULL"), 'free', NOW(), NOW(), NOW(), false)
+VALUES ('$plugin_pid', $SYSTEM_TENANT_ID, '$plugin_id', '$namespace', '$display_name_escaped', '$display_name_zh_escaped', '$display_name_en_escaped', LEFT('$description_escaped', 500), '$description_escaped', '$author_escaped', '$plugin_type', '$category', 'published', 'public', false, 0, '$version', 1, $([ -n "$min_platform" ] && echo "'$min_platform'" || echo "NULL"), 'free', NOW(), NOW(), NOW(), false)
 ON CONFLICT (plugin_id) DO UPDATE SET pid = EXCLUDED.pid, tenant_id = $SYSTEM_TENANT_ID, latest_version = '$version', updated_at = NOW(), status = 'published', deleted_flag = false;
 SQL
 
