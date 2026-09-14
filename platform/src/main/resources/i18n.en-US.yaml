@@ -963,6 +963,9 @@ common:
   current_user: Current user
   current_department: Current department
   create: Create
+  save: Save
+  saved: Saved
+  copy: Copy
   new: New
   edit: Edit
   delete: Delete
@@ -1605,6 +1608,69 @@ notification_rule:
   saving: Saving...
   update_rule: Update rule
   create_rule: Create rule
+
+openPlatform:
+  title: Open Platform
+  badge: Machine-to-machine access
+  subtitle: Create tenant-scoped applications, grant minimum scopes, rotate credentials, and inspect the unified public API contract.
+  apiReference: API reference
+  newApplication: New application
+  connectionFlow: Connection flow
+  step1: Create an application and installation
+  step2: Grant explicit scopes and create a credential
+  step3: Exchange credentials for a short-lived access token
+  loadFailed: Unable to load Open Platform
+  emptyTitle: No external applications yet
+  emptyBody: Create the first application to issue tenant-bound credentials.
+  applicationCreated: Application created
+  createFailed: Unable to create application
+  createTitle: Create external application
+  name: Application name
+  description: Description
+  addInstallation: Add installation
+  noInstallations: No installations
+  installTitle: Install application
+  install: Install
+  installed: Application installed
+  installFailed: Unable to install application
+  environmentLabel: Environment
+  environment:
+    development: Development
+    staging: Staging
+    production: Production
+  rateLimit: Rate limit
+  rateLimitPerMinute: Requests per minute
+  scopes: Scopes
+  minimumScopes: Grant only the capabilities this installation needs.
+  viewCredentials: View credentials
+  newCredential: New credential
+  credentialsFailed: Unable to load credentials
+  credentialCreateFailed: Unable to create credential
+  noCredentials: No credentials
+  secretTitle: Save this credential now
+  secretWarning: The client secret is shown once. AuraBoot stores only its hash.
+  saved: I saved it
+  lastUsed: Last used
+  revoke: Revoke
+  revokeTitle: Revoke credential?
+  revokeWarning: Existing access tokens issued by this credential will stop working immediately.
+  credentialRevoked: Credential revoked
+  revokeFailed: Unable to revoke credential
+  editScopes: Edit scopes
+  scopeRevokeWarning: Saving a new scope set immediately revokes existing access tokens for this installation.
+  scopesUpdated: Scopes updated; existing access tokens were revoked
+  scopeUpdateFailed: Unable to update scopes
+  disable: Disable
+  disableInstallation: Disable installation
+  disableTitle: Disable access?
+  disableWarning: This immediately revokes active tokens. The action cannot be undone from this screen.
+  disabled: Access disabled and active tokens revoked
+  disableFailed: Unable to disable access
+  status:
+    active: Active
+    disabled: Disabled
+    revoked: Revoked
+    success: Success
 
 aurabot:
   error:

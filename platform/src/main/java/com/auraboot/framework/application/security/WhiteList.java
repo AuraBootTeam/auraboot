@@ -16,6 +16,10 @@ public class WhiteList {
             "/api/auth/reset-password",
             "/api/auth/verify-code/**",
 
+            // OAuth2 client_credentials entrypoint. Client authentication, installation status,
+            // scope subset and secret verification are enforced by OpenPlatformTokenService.
+            "/oauth2/token",
+
             "/api/bootstrap/**",
 
             "/api/health",

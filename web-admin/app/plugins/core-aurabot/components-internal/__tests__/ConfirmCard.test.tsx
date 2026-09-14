@@ -36,6 +36,31 @@ describe('ConfirmCard', () => {
     expect(card).not.toHaveTextContent('Execute');
   });
 
+  it('summarizesAnalyticsSuggestionWithoutExposingQueryOrIdentifiers', () => {
+    render(
+      <ConfirmCard
+        toolId="proposal"
+        toolName="cmd_core_dashboard_propose_suggestion"
+        description="Execute command"
+        input={{
+          title: '建议标题示例',
+          content: '核实订单',
+          analysisId: 'secret-analysis',
+          requestId: 'secret-request',
+          query: { modelCode: 'private_model' },
+        }}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const card = screen.getByTestId('aurabot-confirm-card');
+    expect(card).toHaveTextContent('保存建议版本');
+    expect(card).toHaveTextContent('核实订单');
+    expect(card).toHaveTextContent('保存不代表采纳');
+    expect(card).not.toHaveTextContent('secret-');
+    expect(card).not.toHaveTextContent('private_model');
+  });
+
   it('keepsConfirmationCallbacksAndLocalizedLabels', () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();

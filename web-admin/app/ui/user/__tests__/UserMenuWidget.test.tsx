@@ -19,6 +19,7 @@ vi.mock('~/contexts/I18nContext', () => ({
 
 const authedRootData = {
   user: { name: 'Admin User', email: 'admin@auraboot.com', tenantId: 't-1' },
+  permissions: { permissionCodes: [] },
   accessPolicy: { deploymentMode: 'multi', actorSwitchEnabled: false },
   branding: { productName: 'AuraBoot', logoUrl: '/logo.png' },
 };
@@ -65,6 +66,25 @@ describe('UserMenuWidget', () => {
     expect(dropdown.querySelector('a[href="/logout"]')).not.toBeNull();
     expect(screen.getByText('Admin User')).toBeInTheDocument();
     expect(screen.getByText('admin@auraboot.com')).toBeInTheDocument();
+    expect(screen.queryByTestId('open-platform-link')).toBeNull();
+  });
+
+  it('exposes Open Platform only to connector managers', () => {
+    rootLoaderData.value = {
+      ...authedRootData,
+      permissions: { permissionCodes: ['sys.connector.update'] },
+    };
+    render(
+      <MemoryRouter>
+        <UserMenuWidget />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'User avatar' }));
+    expect(screen.getByTestId('open-platform-link')).toHaveAttribute(
+      'href',
+      '/settings/api-docs',
+    );
   });
 
   it('renders nothing for anonymous visitors', () => {

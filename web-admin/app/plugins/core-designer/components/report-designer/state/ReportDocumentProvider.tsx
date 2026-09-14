@@ -29,12 +29,27 @@ import {
   type ReportBand,
   type ReportDataSource,
   type PageConfig,
+  DEFAULT_PAGE_CONFIG,
 } from '../types';
 import {
   useDesignerDocument,
   serializeDocument,
 } from '../../unified-designer/document/useDesignerDocument';
 import { useDesignerSelection } from '../../unified-designer/selection/useDesignerSelection';
+
+
+/** Fill missing page settings so stored DSL from any producer renders safely. */
+export function ensurePageConfig<T extends { page?: Partial<PageConfig> }>(dsl: T): T & { page: PageConfig } {
+  const page = (dsl.page ?? {}) as Partial<PageConfig>;
+  return {
+    ...dsl,
+    page: {
+      ...DEFAULT_PAGE_CONFIG,
+      ...page,
+      margin: { ...DEFAULT_PAGE_CONFIG.margin, ...(page.margin ?? {}) },
+    },
+  };
+}
 
 export interface ReportDocumentContextValue {
   report: ReportDsl | null;
@@ -251,7 +266,9 @@ export const ReportDocumentProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Lifecycle ───────────────────────────────────────────────────────────────
   const loadDocument = useCallback(
     (dsl: ReportDsl) => {
-      doc.reset(dsl);
+      // Programmatic/legacy definitions may omit page settings; the designer and its
+      // renderers assume a PageConfig, so fill defaults before the document resets.
+      doc.reset(ensurePageConfig(dsl));
       const snapshot = serializeDocument<ReportDsl>(dsl);
       setSavedSnapshot(snapshot);
       savedSnapshotRef.current = snapshot;

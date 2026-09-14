@@ -89,7 +89,7 @@ class AuraBotChatThinkingPersistenceIntegrationTest extends BaseIntegrationTest 
         MetaContext.setContext(tenantId, userId, userPid, username);
         MetaContext.setMemberId(humanMemberId);
 
-        AuraBotConversationItem conv = conversationService.ensureConversation(tenantId, humanMemberId, "aurabot");
+        AuraBotConversationItem conv = conversationService.ensureConversation(tenantId, humanMemberId, "aurabot", false);
         conversationId = conv.getConversationId();
     }
 

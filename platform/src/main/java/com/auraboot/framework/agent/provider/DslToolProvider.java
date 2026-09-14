@@ -115,17 +115,24 @@ public class DslToolProvider implements ToolProvider {
             // whatever the planner happened to return; policy/permission filtering
             // below and the read-only intent filter upstream are unchanged, so this
             // widens DISCOVERY only, never authorization.
+            String preferredType = ctx.getIntentHint();
+            boolean prioritizeOperation = preferredType != null
+                    && Set.of("create", "update", "delete").contains(preferredType);
             String sql = "SELECT code, display_name, description, agent_hint, input_schema, execution_config, cmd_risk_level, model_code " +
                     "FROM ab_command_definition " +
                     "WHERE tenant_id = #{params.tenantId} " +
                     (modelScopedHint ? "AND model_code = #{params.modelCode} " : "") +
                     "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
                     "AND (is_current = TRUE OR is_current IS NULL) " +
-                    "ORDER BY code " +
+                    (prioritizeOperation
+                            ? "ORDER BY CASE WHEN execution_config->>'type' = #{params.preferredType} THEN 0 ELSE 1 END, code "
+                            : "ORDER BY code ") +
                     "LIMIT #{params.limit}";
-            Map<String, Object> sqlParams = modelScopedHint
-                    ? Map.of("tenantId", ctx.getTenantId(), "modelCode", modelHint, "limit", maxResults)
-                    : Map.of("tenantId", ctx.getTenantId(), "limit", maxResults);
+            Map<String, Object> sqlParams = new LinkedHashMap<>();
+            sqlParams.put("tenantId", ctx.getTenantId());
+            sqlParams.put("limit", maxResults);
+            if (modelScopedHint) sqlParams.put("modelCode", modelHint);
+            if (prioritizeOperation) sqlParams.put("preferredType", preferredType);
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, sqlParams);
             for (Map<String, Object> row : rows) {
                 String code = (String) row.get("code");

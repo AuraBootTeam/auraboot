@@ -11,15 +11,15 @@ package com.auraboot.framework.conversation;
  * write empty strings — see {@code ab_im_message.thinking_content} schema
  * red line).
  *
- * <p>Future expansion: per-tool token usage, ResultContract aggregates,
- * etc. — when added, follow the same nullable-field discipline so legacy
- * call sites that pass {@link #EMPTY} keep compiling unchanged.
+ * <p>Result contracts are captured for persistence of authorized analytics query
+ * references. Result rows are not stored in the history metadata.
  */
 public record TurnArtifacts(
         String thinkingContent,
         String thinkingSignature,
         java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
-                retrievalEvidence) {
+                retrievalEvidence,
+        java.util.List<com.auraboot.framework.agent.dto.ResultContract> resultContracts) {
 
     /** Sentinel for turns that produced no artifacts. */
     public static final TurnArtifacts EMPTY = new TurnArtifacts(null, null, java.util.List.of());
@@ -28,7 +28,12 @@ public record TurnArtifacts(
         this(thinkingContent, thinkingSignature, java.util.List.of());
     }
 
+    public TurnArtifacts(String content, String signature, java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence) {
+        this(content, signature, evidence, java.util.List.of());
+    }
+
     public TurnArtifacts {
+        resultContracts = resultContracts == null ? java.util.List.of() : java.util.List.copyOf(resultContracts);
         retrievalEvidence = retrievalEvidence == null
                 ? java.util.List.of()
                 : java.util.List.copyOf(retrievalEvidence);
@@ -53,5 +58,10 @@ public record TurnArtifacts(
             return EMPTY;
         }
         return new TurnArtifacts(thinkingContent, thinkingSignature, retrievalEvidence);
+    }
+    public static TurnArtifacts of(String content, String signature,
+            java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence,
+            java.util.List<com.auraboot.framework.agent.dto.ResultContract> contracts) {
+        return new TurnArtifacts(content, signature, evidence, contracts);
     }
 }

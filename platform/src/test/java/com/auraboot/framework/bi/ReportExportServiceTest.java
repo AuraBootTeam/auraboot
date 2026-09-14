@@ -5,6 +5,7 @@ import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderException;
@@ -12,13 +13,10 @@ import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.branding.DeploymentBrandingProvider;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
-import com.auraboot.framework.meta.entity.PageSchema;
-import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
-import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
@@ -71,7 +69,7 @@ class ReportExportServiceTest {
     private Path tempDirectory;
 
     @Mock
-    private PageSchemaMapper pageSchemaMapper;
+    private UserPermissionService userPermissionService;
 
     @Mock
     private DynamicDataService dynamicDataService;
@@ -88,13 +86,20 @@ class ReportExportServiceTest {
     @Mock
     private ReportRenderClient reportRenderClient;
 
+    @Mock
+    private com.auraboot.framework.bi.service.ReportAggregateQueryService aggregateQueries;
+
+    @Mock
+    private com.auraboot.framework.behavior.service.AnalyticsReportUsageService analyticsReportUsage;
+
     private ReportExportServiceImpl reportExportService;
 
     @BeforeEach
     void setUp() {
-        reportExportService = new ReportExportServiceImpl(pageSchemaMapper, new ObjectMapper(),
+        org.mockito.Mockito.lenient().when(userPermissionService.hasPermission(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        reportExportService = new ReportExportServiceImpl(analyticsReportUsage, aggregateQueries, new ObjectMapper(),
                 dynamicDataService, namedQueryService, reportStorageService, auditTrailService,
-                reportRenderClient, BrandingIdentity::community);
+                reportRenderClient, BrandingIdentity::community, userPermissionService);
         // A successful export records an audit event sourced from MetaContext (set on every real
         // authenticated request, like the controller's MetaContext.getCurrentTenantId()); simulate it.
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
@@ -106,13 +111,34 @@ class ReportExportServiceTest {
     }
 
     @Test
-    void exportExcel_withStaticTableData_rendersWorkbookArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+    void unexpectedSourceErrorsDoNotLeakOrRecordSuccessfulExports() {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().valueToTree(Map.of("title", "Safe report",
+                "dataSources", Map.of("source", Map.of("type", "namedQuery", "queryCode", "private_query")),
+                "body", List.of())).toString());
+        when(reportStorageService.findByPid("broken-report")).thenReturn(report);
+        when(namedQueryService.executeQuery(eq("private_query"), any(NamedQueryTestRequest.class)))
+                .thenThrow(new IllegalStateException("SELECT secret FROM private_table; /srv/private/file"));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("broken-report");
+        for (java.util.function.Consumer<ReportExportRequest> export :
+                List.<java.util.function.Consumer<ReportExportRequest>>of(reportExportService::exportJson,
+                        reportExportService::exportExcel, reportExportService::exportPdf)) {
+            assertThatThrownBy(() -> export.accept(request))
+                    .isInstanceOf(com.auraboot.framework.exception.ValidationException.class)
+                    .hasMessage("Report data could not be loaded");
+        }
+        org.mockito.Mockito.verifyNoInteractions(auditTrailService, analyticsReportUsage, reportRenderClient);
+    }
 
-        when(pageSchemaMapper.selectByPid("rpt-001")).thenReturn(page);
+    @Test
+    void exportExcel_withStaticTableData_rendersWorkbookArtifact() throws Exception {
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
+
+        when(reportStorageService.findByPid("rpt-001")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-001");
@@ -142,11 +168,10 @@ class ReportExportServiceTest {
 
     @Test
     void exportArtifacts_useDeploymentBrandingProvider() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-branded")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-branded")).thenReturn(page);
 
         Path brandingConfig = tempDirectory.resolve("branding.json");
         Files.writeString(brandingConfig, """
@@ -174,15 +199,14 @@ class ReportExportServiceTest {
                         .withProperty("AURABOOT_BRANDING_CONFIG_PATH", brandingConfig.toString())
                         .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", "SO-2026-001"),
                 new ObjectMapper());
-        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(
-                pageSchemaMapper,
+        ReportExportServiceImpl brandedService = new ReportExportServiceImpl(analyticsReportUsage, aggregateQueries,
                 new ObjectMapper(),
                 dynamicDataService,
                 namedQueryService,
                 reportStorageService,
                 auditTrailService,
                 reportRenderClient,
-                customerBranding);
+                customerBranding, userPermissionService);
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-branded");
 
@@ -203,94 +227,28 @@ class ReportExportServiceTest {
         }
     }
 
-    // ---------- Phase 4 slice 2b-2: read ab_report first, fall back to page-schema ----------
-
     @Test
-    void loadReportDsl_readsAbReportFirst_whenShadowRowPresent() throws Exception {
-        // ab_report has the report (the dual-write shadow): the export must read it from there and
-        // must NOT touch the page-schema for the dsl.
-        ReportEntity shadow = new ReportEntity();
-        shadow.setPid("rpt-shadow");
-        shadow.setDsl(new ObjectMapper().writeValueAsString(reportDsl()));
-        when(reportStorageService.findByPid("rpt-shadow")).thenReturn(shadow);
-
+    void exportRejectsMissingOrOtherTenantReport() {
         ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-shadow");
-
-        ReportExportFile file = reportExportService.exportExcel(request);
-
-        // same export content as the page-schema path produces — proves the ab_report dsl shape
-        // is structurally identical to the page-schema reportDsl shape.
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
-            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
-            var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Region");
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
-            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
-        }
-
-        // the page-schema mapper was never consulted for the dsl (ab_report won)
-        verify(pageSchemaMapper, never()).selectByPid(any());
-    }
-
-    @Test
-    void loadReportDsl_fallsBackToPageSchema_whenNoShadowRow() throws Exception {
-        // ab_report has NO row for this pid (pre-dual-write report): export must fall back to the
-        // legacy page-schema extension.reportDsl, unchanged.
-        when(reportStorageService.findByPid("rpt-legacy")).thenReturn(null);
-
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-legacy")).thenReturn(page);
-
-        ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-legacy");
-
-        ReportExportFile file = reportExportService.exportExcel(request);
-
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file.getBytes()))) {
-            assertThat(workbook.getSheetName(0)).isEqualTo("Orders Export");
-            var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("North");
-            assertThat(sheet.getRow(2).getCell(1).getNumericCellValue()).isEqualTo(12.0);
-        }
-    }
-
-    @Test
-    void loadReportDsl_fallsBackToPageSchema_whenShadowRowHasBlankDsl() throws Exception {
-        // Defensive: a shadow row exists but its dsl is blank (never legitimately happens since the
-        // create() default is "{}", but guard the read path) → fall back to page-schema.
-        ReportEntity blankShadow = new ReportEntity();
-        blankShadow.setPid("rpt-blank");
-        blankShadow.setDsl("");
-        when(reportStorageService.findByPid("rpt-blank")).thenReturn(blankShadow);
-
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-blank")).thenReturn(page);
-
-        ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid("rpt-blank");
-
-        ReportExportFile file = reportExportService.exportJson(request);
-
-        Map<String, Object> payload = new ObjectMapper().readValue(file.getBytes(), new TypeReference<>() {});
-        Map<String, Object> exportedDsl = castMap(payload.get("reportDsl"));
-        assertThat(exportedDsl.get("title")).isEqualTo("Operations Export");
+        request.setReportPid("unavailable");
+        assertThatThrownBy(() -> reportExportService.exportJson(request))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+        ReportEntity other = new ReportEntity();
+        other.setTenantId(999L);
+        other.setDsl("{}");
+        when(reportStorageService.findByPid("unavailable")).thenReturn(other);
+        assertThatThrownBy(() -> reportExportService.exportJson(request))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("Report not found");
+        verify(auditTrailService, never()).recordAudit(any());
     }
 
     @Test
     void exportPdf_withStaticTableData_rendersPdfArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-pdf");
@@ -309,6 +267,38 @@ class ReportExportServiceTest {
             assertThat(text).contains("North | 12");
             assertThat(text).contains("South | 9");
             assertThat(text).contains("Generated by AuraBoot Platform");
+        }
+    }
+
+    @Test
+    void exportPdf_preservesChineseAndWrapsUsingEmbeddedFontWidths() throws Exception {
+        String rowText = "订单分析验证".repeat(60);
+        String json = new ObjectMapper().writeValueAsString(reportDsl())
+                .replace("Operations Export", "订单数量分析")
+                .replace("Orders Export", "订单明细")
+                .replace("Region", "订单标题")
+                .replace("Cases", "数量")
+                .replace("North", rowText);
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(json);
+        when(reportStorageService.findByPid("report-chinese")).thenReturn(report);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("report-chinese");
+        ReportExportFile file = reportExportService.exportPdf(request);
+        try (PDDocument document = PDDocument.load(file.getBytes())) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("订单数量分析", "订单明细", "订单标题 | 数量");
+            assertThat(text.replaceAll("\\R", "")).contains(rowText + " | 12");
+            PDFTextStripper bounds = new PDFTextStripper() {
+                @Override
+                protected void processTextPosition(TextPosition position) {
+                    assertThat(position.getXDirAdj() + position.getWidthDirAdj())
+                            .isLessThanOrEqualTo(PDRectangle.A4.getWidth() - 30f);
+                    super.processTextPosition(position);
+                }
+            };
+            bounds.getText(document);
         }
     }
 
@@ -356,12 +346,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportPdf_withPageSettings_preservesMediaBoxMarginsAndTextHierarchy() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", visualFidelityReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(visualFidelityReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-visual-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-visual-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-visual-pdf");
@@ -388,12 +377,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportJson_withReportDslAndResolvedRows_rendersRoundTripArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-json")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-json")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-json");
@@ -425,12 +413,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withStaticNonTableBlocks_rendersSemanticWorkbookSheets() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-table-xlsx")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-table-xlsx")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-non-table-xlsx");
@@ -490,11 +477,10 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_chartBlock_embedsNativeChart() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid("rpt-chart-native")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
+        when(reportStorageService.findByPid("rpt-chart-native")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-chart-native");
@@ -518,12 +504,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withModelNamedQueryAndApiDataSources_rendersResolvedRows() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonStaticDataSourceReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonStaticDataSourceReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-static")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-static")).thenReturn(page);
         when(dynamicDataService.list(eq("rpt_case_model"), any(DynamicQueryRequest.class)))
                 .thenReturn(PaginationResult.of(
                         List.of(Map.of("source", "Model", "cases", 31)),
@@ -568,6 +553,12 @@ class ReportExportServiceTest {
         verify(dynamicDataService).list(eq("rpt_case_model"), modelRequestCaptor.capture());
         DynamicQueryRequest modelRequest = modelRequestCaptor.getValue();
         assertThat(modelRequest.getConditions()).hasSize(1);
+        assertThat(modelRequest.getSortFields()).hasSize(2);
+        assertThat(modelRequest.getSortFields().get(0).getFieldName()).isEqualTo("e2et_order_type");
+        assertThat(modelRequest.getSortFields().get(0).getDirection().name()).isEqualTo("DESC");
+        assertThat(modelRequest.getSortFields().get(1).getFieldName()).isEqualTo("e2et_order_title");
+        assertThat(modelRequest.getSortFields().get(1).getDirection().name()).isEqualTo("ASC");
+        assertThat(modelRequest.getSortFields().get(1).getPriority()).isEqualTo(1);
         assertThat(modelRequest.getConditions().get(0).getFieldName()).isEqualTo("e2et_order_title");
         assertThat(modelRequest.getConditions().get(0).getOperator()).isEqualTo(QueryCondition.Operator.EQ);
         assertThat(modelRequest.getConditions().get(0).getValue()).isEqualTo("Model");
@@ -577,12 +568,11 @@ class ReportExportServiceTest {
 
     @Test
     void exportPdf_withStaticNonTableBlocks_rendersSemanticTextArtifact() throws Exception {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", nonTableReportDsl());
-        page.setExtension(extension);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(nonTableReportDsl()).toString());
 
-        when(pageSchemaMapper.selectByPid("rpt-non-table-pdf")).thenReturn(page);
+        when(reportStorageService.findByPid("rpt-non-table-pdf")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-non-table-pdf");
@@ -613,9 +603,9 @@ class ReportExportServiceTest {
 
     @Test
     void exportExcel_withoutReportDsl_throwsValidationException() {
-        PageSchema page = new PageSchema();
-        page.setExtension(new ExtensionBean());
-        when(pageSchemaMapper.selectByPid("rpt-missing")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        when(reportStorageService.findByPid("rpt-missing")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-missing");
@@ -681,9 +671,9 @@ class ReportExportServiceTest {
     @Test
     void export_withoutReportDsl_recordsNoAudit() {
         // A failed export (missing dsl) must NOT emit an audit event — audit only fires on success.
-        PageSchema page = new PageSchema();
-        page.setExtension(new ExtensionBean());
-        when(pageSchemaMapper.selectByPid("rpt-no-audit")).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        when(reportStorageService.findByPid("rpt-no-audit")).thenReturn(page);
 
         ReportExportRequest request = new ReportExportRequest();
         request.setReportPid("rpt-no-audit");
@@ -693,12 +683,35 @@ class ReportExportServiceTest {
         verify(auditTrailService, never()).recordAudit(any());
     }
 
+    @Test
+    void aggregateExportPreservesGovernedQueryAndCanonicalRows() throws Exception {
+        var query = Map.of("type", "aggregate", "semanticModelCode", "sales", "limit", 42);
+        var dsl = reportDsl();
+        dsl.put("dataSources", Map.of("orders", Map.of("type", "aggregate", "aggregateQuery", query)));
+        var page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().writeValueAsString(dsl));
+        when(reportStorageService.findByPid("aggregate-report")).thenReturn(page);
+        var response = new com.auraboot.framework.meta.dto.AggregateQueryResponse();
+        response.setRows(List.of(Map.of("region", "East", "cases", 120), Map.of("region", "West", "cases", 80)));
+        when(aggregateQueries.execute(any())).thenReturn(response);
+        var request = new ReportExportRequest(); request.setReportPid("aggregate-report");
+        var payload = new ObjectMapper().readTree(reportExportService.exportJson(request).getBytes());
+        assertThat(payload.path("dataSets").path("orders").get(0).path("cases").asInt()).isEqualTo(120);
+        assertThat(payload.path("dataSets").path("orders").get(1).path("cases").asInt()).isEqualTo(80);
+        var captured = ArgumentCaptor.forClass(com.auraboot.framework.meta.dto.AggregateQueryRequest.class);
+        verify(aggregateQueries).execute(captured.capture());
+        assertThat(captured.getValue().getSemanticModelCode()).isEqualTo("sales");
+        assertThat(captured.getValue().getLimit()).isEqualTo(42);
+        verify(aggregateQueries).validateAccess(captured.getValue());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService);
+    }
+
     private void stubReportDsl(String reportPid) {
-        PageSchema page = new PageSchema();
-        ExtensionBean extension = new ExtensionBean();
-        extension.setDynamicProperty("reportDsl", reportDsl());
-        page.setExtension(extension);
-        when(pageSchemaMapper.selectByPid(reportPid)).thenReturn(page);
+        ReportEntity page = new ReportEntity();
+        page.setTenantId(MetaContext.getCurrentTenantId());
+        page.setDsl(new ObjectMapper().valueToTree(reportDsl()).toString());
+        when(reportStorageService.findByPid(reportPid)).thenReturn(page);
     }
 
     private byte[] createPdf(String text) throws IOException {
@@ -937,13 +950,102 @@ class ReportExportServiceTest {
         return dsl;
     }
 
+    @Test
+    void exportJson_includesRowsBeyondTheFormerDefaultLimit() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "All rows", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders")), "body", List.of())));
+        when(reportStorageService.findByPid("full-rows")).thenReturn(report);
+        List<Map<String, Object>> rows = java.util.stream.IntStream.range(0, 201)
+                .mapToObj(index -> Map.<String, Object>of("title", "row-" + index)).toList();
+        when(dynamicDataService.list(eq("orders"), any())).thenReturn(PaginationResult.of(rows, 201L, 1, 1000));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("full-rows");
+        var payload = new ObjectMapper().readTree(reportExportService.exportJson(request).getBytes());
+        assertThat(payload.path("dataSets").path("rows").size()).isEqualTo(201);
+        assertThat(payload.path("dataSets").path("rows").get(200).path("title").asText()).isEqualTo("row-200");
+        ArgumentCaptor<DynamicQueryRequest> captured = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("orders"), captured.capture());
+        assertThat(captured.getValue().getPageSize()).isEqualTo(1000);
+    }
+
+    @Test
+    void exportsRejectTruncatedResultsInsteadOfProducingPartialFiles() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Limited", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders", "maxItems", 2)), "body", List.of())));
+        when(reportStorageService.findByPid("limited")).thenReturn(report);
+        when(dynamicDataService.list(eq("orders"), any())).thenReturn(PaginationResult.of(
+                List.of(Map.of("title", "first"), Map.of("title", "second")), 3L, 1, 2));
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("limited");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(ValidationException.class).hasMessageContaining("exceeds");
+    }
+
+    @Test
+    void modelPermissionDenialStopsEveryExportBeforeDataRead() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                Map.of("rows", Map.of("type", "model", "modelCode", "orders")), "body", List.of())));
+        when(reportStorageService.findByPid("denied")).thenReturn(report);
+        when(userPermissionService.hasPermission(99L, "model.orders.read")).thenReturn(false);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("denied");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService, analyticsReportUsage);
+    }
+
+    @Test
+    void namedQueryAndApiPermissionDenialStopsEveryExportBeforeDataRead() throws Exception {
+        when(userPermissionService.hasPermission(99L, "data.datasource.read")).thenReturn(false);
+        for (String type : List.of("namedQuery", "api")) {
+            ReportEntity report = new ReportEntity();
+            report.setTenantId(MetaContext.getCurrentTenantId());
+            report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                    Map.of("rows", Map.of("type", type, "queryCode", "protected_query")), "body", List.of())));
+            when(reportStorageService.findByPid(type)).thenReturn(report);
+            ReportExportRequest request = new ReportExportRequest();
+            request.setReportPid(type);
+            assertThatThrownBy(() -> reportExportService.exportJson(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+            assertThatThrownBy(() -> reportExportService.exportExcel(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+            assertThatThrownBy(() -> reportExportService.exportPdf(request)).isInstanceOf(com.auraboot.framework.exception.PermissionDeniedException.class);
+        }
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, namedQueryService, auditTrailService, analyticsReportUsage);
+    }
+
+    @Test
+    void declaredResourceDenialRemainsAccessDeniedForEveryExport() throws Exception {
+        ReportEntity report = new ReportEntity();
+        report.setTenantId(MetaContext.getCurrentTenantId());
+        report.setDsl(new ObjectMapper().writeValueAsString(Map.of("title", "Denied", "dataSources",
+                Map.of("rows", Map.of("type", "namedQuery", "queryCode", "protected_query")), "body", List.of())));
+        when(reportStorageService.findByPid("protected")).thenReturn(report);
+        var denial = new org.springframework.security.access.AccessDeniedException("Protected resource");
+        when(namedQueryService.executeQuery(eq("protected_query"), any())).thenThrow(denial);
+        ReportExportRequest request = new ReportExportRequest();
+        request.setReportPid("protected");
+        assertThatThrownBy(() -> reportExportService.exportJson(request)).isSameAs(denial);
+        assertThatThrownBy(() -> reportExportService.exportExcel(request)).isSameAs(denial);
+        assertThatThrownBy(() -> reportExportService.exportPdf(request)).isSameAs(denial);
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, auditTrailService, analyticsReportUsage);
+    }
+
     private Map<String, Object> nonStaticDataSourceReportDsl() {
         Map<String, Object> modelDataSource = new LinkedHashMap<>();
         modelDataSource.put("type", "model");
         modelDataSource.put("modelCode", "rpt_case_model");
         modelDataSource.put("maxItems", 20);
+        modelDataSource.put("sortBy", List.of(Map.of("field", "e2et_order_type", "order", "desc"),
+                Map.of("field", "e2et_order_title", "order", "asc")));
         modelDataSource.put("filters", List.of(Map.of(
-                "fieldName", "e2et_order_title",
+                "field", "e2et_order_title",
                 "operator", "EQ",
                 "value", "Model"
         )));

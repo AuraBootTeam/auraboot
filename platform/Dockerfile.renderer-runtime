@@ -1,0 +1,60 @@
+# Renderer-capable backend runtime image for report exports.
+#
+# CI-only packaging authority: built by scripts/run-renderer-release-image-gate.sh
+# on the admitted Linux CI host from a staged context of the exact ref. Stage 1
+# bundles the report renderer from web-admin sources and downloads the pinned
+# Playwright Chromium; stage 2 carries the JRE, Node, the browser, Chromium
+# system libraries, Noto CJK fonts and poppler for in-image PDF text checks.
+FROM node:22-bookworm-slim AS renderer-build
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+ENV PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
+# npm_config_registry is honored by npm AND pnpm and survives USER switches.
+ENV npm_config_registry=https://registry.npmmirror.com
+WORKDIR /build
+RUN npm install -g pnpm@9
+# Repo-root workspace (mirrors web-admin/Dockerfile): root lockfile resolves the
+# workspace:* links; only the manifests land before install for layer caching.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY web-admin/package.json ./web-admin/package.json
+COPY web-admin/packages ./web-admin/packages
+RUN HUSKY=0 pnpm install --frozen-lockfile --ignore-scripts
+COPY web-admin/app ./web-admin/app
+COPY web-admin/scripts ./web-admin/scripts
+COPY web-admin/report-renderer-runtime ./web-admin/report-renderer-runtime
+WORKDIR /build/web-admin
+RUN pnpm run build:report-renderer
+# The renderer runtime keeps its own frozen npm lock (validated against the
+# web-admin dependency versions by the packaging script).
+WORKDIR /build/web-admin/build/report-renderer
+RUN npm ci --ignore-scripts \
+    && npx playwright install chromium
+
+FROM eclipse-temurin:25-jre AS jre
+
+FROM node:22-bookworm-slim
+WORKDIR /app
+COPY --from=jre /opt/java/openjdk /opt/java/openjdk
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="/opt/java/openjdk/bin:${PATH}"
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+# Chromium runtime libraries, CJK fonts (rendering AND Java2D/PDFBox), fontconfig
+# for the JRE, and poppler-utils so the gate can extract PDF text in-image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        fontconfig fonts-noto-cjk libfreetype6 \
+        libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+        libcups2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+        libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+        poppler-utils wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts \
+    && chown -R node:node /app
+COPY --from=renderer-build /opt/playwright-browsers /opt/playwright-browsers
+COPY --from=renderer-build --chown=node:node /build/web-admin/build/report-renderer /app/report-renderer
+COPY --chown=node:node auraboot-boot.jar app.jar
+USER node
+EXPOSE 6443
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -q -O /dev/null http://localhost:6443/actuator/health || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

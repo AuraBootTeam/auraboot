@@ -1,123 +1,265 @@
-/**
- * B1 — chat-bi browser golden: AuraBot chat renders a chart via the `chat-bi` agent tool.
- *
- * Convergence endgame §7. This closes the S5 mis-classification ("ChatBI 即席图表浏览器
- * golden 不可做"): the correct form is an AuraBot-chat golden. The agent (stub-mode →
- * deterministic scripted tool_use) calls `aurabot:chat-bi` over the REAL `crm_lead_common` model;
- * the resulting {records, columns, chartType} flow through AuraBotChat → ChatBiResultCard,
- * which renders an ECharts chart inline in the chat panel.
- *
- * Backbone proven elsewhere: ChatBiSkillTest (mapping), ChatBiToolIntentLiveIT (live NL→
- * params with real DeepSeek), S5 dashboard golden (the raw aggregate path live). This spec
- * pins the last mile — the browser render of the chat-bi result card.
- *
- * Runs against the admin storageState whose tenant has the seeded crm_lead_common model + rows.
- */
-import { test, expect, type Page, type Locator } from '../../fixtures';
-import { openAuraBotPanel } from './_open-panel';
+/** Deterministic tool execution over a real model. This is not a real-LLM reasoning test. */
+import { test, expect } from '../../fixtures';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 
-test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+test.use({
+  storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+  locale: 'zh-CN',
+});
 
-const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
-const AURABOT_LAST_CONVERSATION_KEY = 'aurabot:last-conversation-id';
-
-function stubToolUse(name: string, input: Record<string, unknown>) {
-  return `${STUB_TOOL_USE_MARKER} ${JSON.stringify({ name, input })}`;
-}
-
-async function ensureFreshSession(page: Page, panel: Locator) {
-  // Start a clean conversation so the scripted tool_use turn is the only content.
-  const historyTrigger = panel.getByTestId('aurabot-history-trigger');
-  if (await historyTrigger.count()) {
-    await historyTrigger.click().catch(() => {});
-    const newSessionBtn = panel.getByTestId('aurabot-new-session');
-    if (await newSessionBtn.count()) {
-      await newSessionBtn.click().catch(() => {});
-    }
-  }
-  await page.evaluate((key) => window.localStorage.removeItem(key), AURABOT_LAST_CONVERSATION_KEY);
-  await expect(panel.locator('textarea').first()).toBeVisible({ timeout: 10000 });
-}
-
-async function sendAuraBotMessage(page: Page, panel: Locator, message: string) {
+test('AuraBot filtered analysis saves its complete query to a dashboard', async ({ page }) => {
+  test.setTimeout(120000);
+  page.on('pageerror', (error) => console.log('[analytics-page-error]', error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') console.log('[analytics-console-error]', message.text());
+  });
+  const funnelFrom = new Date().toISOString();
+  const title = `Analytics fixture ${Date.now()}`;
+  const fixture = await page.request.post('/api/dynamic/e2et_order/create', {
+    data: {
+      e2et_order_title: title,
+      e2et_order_type: 'normal',
+      e2et_order_urgent: false,
+      e2et_order_status: 'draft',
+    },
+  });
+  expect(fixture.status()).toBe(200);
+  expect(String((await fixture.json()).code)).toMatch(/^(0|200)$/);
+  await page.addInitScript(() => localStorage.removeItem('aurabot:last-conversation-id'));
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => {
+    const toggle = document.querySelector('[data-testid="ai-panel-toggle"]');
+    return toggle && Object.keys(toggle).some((key) => key.startsWith('__reactProps$'));
+  });
+  await page.getByTestId('ai-panel-toggle').click();
+  const panel = page.getByTestId('aurabot-panel');
+  await expect(panel).toBeVisible();
+  const query = {
+    modelCode: 'e2et_order',
+    dimensions: ['e2et_order_title'],
+    metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
+    filters: [{ field: 'e2et_order_title', operator: 'eq', value: title }],
+    orderBy: [{ field: 'cnt', direction: 'desc' }],
+    limit: 5,
+  };
   const input = panel.locator('textarea').first();
-  await expect(input).toBeEnabled({ timeout: 150000 });
-  const streamPromise = page.waitForResponse(
-    (r) => r.request().method() === 'POST' && r.url().includes('/api/ai/aurabot/chat/stream'),
-    { timeout: 150000 },
-  );
-  await input.fill(message);
-  await input.press('Enter');
-  const resp = await streamPromise;
-  expect(resp.status(), 'AuraBot chat stream should return 200').toBe(200);
-  await expect(input).toBeEnabled({ timeout: 150000 });
-}
-
-test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
-  test.describe.configure({ timeout: 180000 });
-
-  // chat-bi is now pinned as an always-on platform tool in ChatToolResolver
-  // (DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve): it's the safe structured
-  // sibling of the always-on platform_execute_sql, so the default chat always offers it.
-  // The stub emits the SANITIZED LLM name aurabot_chat-bi (provider code aurabot:chat-bi),
-  // which routes to the real ChatBiSkill over the real crm_lead_common model.
-  test('agent chat-bi tool over crm_lead_common renders a chart card inline', async ({ page }) => {
-    // Navigate to the concrete /home page, not '/': the '/' index route redirects
-    // to /home, and on client hydration react-router re-runs that loader and fires a
-    // LATE client-side navigation to /home that races with — and wipes — the chat
-    // panel content (the ChatBiResultCard vanishes mid-assertion). Landing directly
-    // on /home avoids the redirect race (same pattern as the other stable panel specs).
-    await page.goto('/home');
-    const panel = await openAuraBotPanel(page);
-    await ensureFreshSession(page, panel);
-
-    await sendAuraBotMessage(
-      page,
-      panel,
-      stubToolUse('aurabot_chat-bi', {
-        modelCode: 'crm_lead_common',
-        dimensions: ['crm_lead_status'],
-        metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
-        chartType: 'bar',
-        interpretation: 'Leads by status',
+  await expect(input).toBeEnabled();
+  await input.fill(
+    '@@AURABOOT_STUB_TOOL_USE@@ ' +
+      JSON.stringify({
+        name: 'aurabot_chat-bi',
+        input: { ...query, chartType: 'table', interpretation: 'Filtered orders' },
       }),
+  );
+  await input.press('Enter');
+  const card = panel.getByTestId('chatbi-result-card');
+  await expect(card).toBeVisible({ timeout: 45000 });
+  await expect(card).toHaveAttribute('data-row-count', '1');
+  await expect(card).toContainText(title);
+  const analysisId = await card.getAttribute('data-analysis-id');
+  expect(analysisId).toMatch(/^[0-9a-f-]{36}$/);
+  const db = new Client(PG_CONN);
+  await db.connect();
+  try {
+    await expect
+      .poll(async () => {
+        const rows = await db.query(
+          'SELECT event_name, props, user_id::text, tenant_id::text FROM ab_behavior_event WHERE interaction_id = $1 ORDER BY occurred_at, id',
+          [analysisId],
+        );
+        return rows.rows.map((row) => ({ name: row.event_name, props: row.props }));
+      })
+      .toEqual([
+        { name: 'analytics_requested', props: null },
+        {
+          name: 'analytics_query_succeeded',
+          props: { rowCount: 1, queryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        },
+        {
+          name: 'analytics_result_viewed',
+          props: {
+            queryHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+            signalSource: 'client_visible',
+          },
+        },
+      ]);
+  } finally {
+    await db.end();
+  }
+
+  const replayView = await page.request.post(`/api/analytics/results/${analysisId}/view`, {
+    data: {},
+  });
+  expect(replayView.status()).toBe(200);
+  const inventedView = await page.request.post(
+    `/api/analytics/results/00000000-0000-0000-0000-000000000000/view`,
+    { data: {} },
+  );
+  expect(inventedView.status()).toBe(400);
+
+  const createdResponse = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/dashboards',
+  );
+  await card.getByTestId('chatbi-save-dashboard').click();
+  const created = await createdResponse;
+  expect(created.status()).toBe(200);
+  const source = created.request().postDataJSON().widgets[0].config.dataSource;
+  expect(source).toMatchObject({ type: 'aggregate', ...query });
+  const saved = (await created.json()).data;
+  expect(saved.extension.analyticsOrigin.analysisId).toBe(analysisId);
+  const persisted = await page.request.get(`/api/dashboards/${saved.pid}`);
+  expect(persisted.status()).toBe(200);
+  expect((await persisted.json()).data.extension.analyticsOrigin).toEqual(
+    saved.extension.analyticsOrigin,
+  );
+  const tampered = created.request().postDataJSON();
+  tampered.widgets[0].config.dataSource.limit = 4;
+  const rejected = await page.request.post('/api/dashboards', { data: tampered });
+  expect(rejected.status()).toBe(400);
+  const rewrittenOrigin = await page.request.put(`/api/dashboards/${saved.pid}`, {
+    data: {
+      extension: { analyticsOrigin: { analysisId: 'forged-analysis', queryHash: 'forged' } },
+    },
+  });
+  expect(rewrittenOrigin.status()).toBe(422);
+  const unchanged = await page.request.get(`/api/dashboards/${saved.pid}`);
+  expect(unchanged.status()).toBe(200);
+  expect((await unchanged.json()).data.extension.analyticsOrigin).toEqual(
+    saved.extension.analyticsOrigin,
+  );
+
+  const proof = new Client(PG_CONN);
+  await proof.connect();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const result = await proof.query(
+            "SELECT status, target_key FROM ab_behavior_outcome_outbox WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_saved'",
+            [analysisId],
+          );
+          return result.rows;
+        },
+        { timeout: 15000 },
+      )
+      .toEqual([{ status: 'published', target_key: saved.pid }]);
+    await expect
+      .poll(async () => {
+        const result = await proof.query(
+          "SELECT props FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_saved'",
+          [analysisId],
+        );
+        return result.rows;
+      })
+      .toEqual([
+        {
+          props: {
+            targetType: 'dashboard',
+            targetKey: saved.pid,
+            queryHash: saved.extension.analyticsOrigin.queryHash,
+          },
+        },
+      ]);
+  } finally {
+    await proof.end();
+  }
+
+  await expect(card.getByTestId('chatbi-saved-dashboard')).toBeVisible();
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-saved.png`,
+    fullPage: true,
+  });
+  const queryPath = `/api/dashboards/${saved.pid}/widgets/${saved.widgets[0].id}/data`;
+  const requery = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === queryPath && response.request().method() === 'POST',
+  );
+  await card.getByTestId('chatbi-saved-dashboard').click();
+  await expect(page).toHaveURL(new RegExp(`/dashboards/view/${saved.code}$`));
+  const refreshed = await requery;
+  expect(refreshed.status()).toBe(200);
+  const usageRequest = refreshed.request().postDataJSON();
+  expect(usageRequest).toEqual({ usageId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+  expect((await refreshed.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
+  await expect(page.locator('main').getByText(title, { exact: true })).toBeVisible();
+  const duplicateUse = await page.request.post(queryPath, { data: usageRequest });
+  expect(duplicateUse.status()).toBe(200);
+  expect((await duplicateUse.json()).data.rows).toEqual([{ cnt: 1, e2et_order_title: title }]);
+  const missingWidget = await page.request.post(
+    `/api/dashboards/${saved.pid}/widgets/missing/data`,
+    { data: usageRequest },
+  );
+  expect(missingWidget.status()).toBe(404);
+  const usedProof = new Client(PG_CONN);
+  await usedProof.connect();
+  try {
+    await expect
+      .poll(
+        async () => {
+          const used = await usedProof.query(
+            "SELECT props FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_dashboard_used'",
+            [analysisId],
+          );
+          return used.rows;
+        },
+        { timeout: 15000 },
+      )
+      .toEqual([
+        {
+          props: {
+            targetType: 'dashboard',
+            targetKey: saved.pid,
+            widgetId: saved.widgets[0].id,
+            queryHash: saved.extension.analyticsOrigin.queryHash,
+            originalQuery: true,
+          },
+        },
+      ]);
+    const viewed = await usedProof.query(
+      "SELECT count(*)::int AS count FROM ab_behavior_event WHERE interaction_id = $1 AND event_name = 'analytics_result_viewed'",
+      [analysisId],
     );
-
-    // The chat-bi tool_result (records) renders as a ChatBiResultCard.
-    const card = panel.getByTestId('chatbi-result-card');
-    await expect(card, 'chat-bi result card should render in chat').toBeVisible({ timeout: 30000 });
-    await expect(card).toHaveAttribute('data-chart-type', 'bar');
-
-    // Real aggregate over the seeded crm_lead_common statuses → at least one grouped row.
-    const rowCount = Number(await card.getAttribute('data-row-count'));
-    expect(rowCount, 'chat-bi should return real grouped rows from crm_lead_common').toBeGreaterThan(0);
-
-    // The shared dashboard chart component (SharedChartFactory, via a synchronous static
-    // dataSource) renders an ECharts canvas inside the card's chart area.
-    await expect(
-      panel.getByTestId('chatbi-chart-area').locator('canvas').first(),
-      'ECharts canvas should render',
-    ).toBeVisible({ timeout: 30000 });
-
-    // Interpretation header text flows through.
-    await expect(card).toContainText('Leads by status');
-
-    // Slice E — ad-hoc → persisted bridge: persist this chart as a dashboard.
-    const saveBtn = card.getByTestId('chatbi-save-dashboard');
-    await expect(saveBtn, 'save-as-dashboard action should be available').toBeVisible({ timeout: 10000 });
-    const createResponse = page.waitForResponse(
-      (r) =>
-        r.request().method() === 'POST' &&
-        /\/api\/dashboards\/?($|\?)/.test(new URL(r.url()).pathname) &&
-        r.status() === 200,
-      { timeout: 30000 },
-    );
-    await saveBtn.click();
-    const created = await createResponse;
-    expect(created.status(), 'POST /api/dashboards should succeed').toBe(200);
-    await expect(
-      card.getByTestId('chatbi-saved-dashboard'),
-      'card should confirm the chart was saved as a dashboard',
-    ).toBeVisible({ timeout: 10000 });
+    expect(viewed.rows).toEqual([{ count: 1 }]);
+  } finally {
+    await usedProof.end();
+  }
+  const funnel = await page.request.get('/api/analytics/behavior/analysis-funnel', {
+    params: { from: funnelFrom, to: new Date().toISOString() },
+  });
+  expect(funnel.status()).toBe(200);
+  const funnelData = (await funnel.json()).data;
+  expect(funnelData.definitionVersion).toBe('analysis-task-funnel-v2');
+  expect(funnelData.records.map((stage: { tasks: number }) => stage.tasks)).toEqual([
+    1, 1, 1, 1, 1,
+  ]);
+  expect(funnelData.records.map((stage: { overallRate: number }) => stage.overallRate)).toEqual([
+    1, 1, 1, 1, 1,
+  ]);
+  expect(funnelData.quality).toMatchObject({
+    missingCorrelationEvents: 0,
+    withoutWindowEntryTasks: 0,
+    unmatchedStageEvents: 0,
+    sampledEvents: 0,
+  });
+  const retention = await page.request.get('/api/analytics/behavior/retention', {
+    params: { unit: 'artifact', from: funnelFrom, to: new Date().toISOString() },
+  });
+  expect(retention.status()).toBe(200);
+  const retentionData = (await retention.json()).data;
+  expect(retentionData.unit).toBe('artifact');
+  expect(retentionData.records).toHaveLength(3);
+  expect(retentionData.records.map((point: { dayOffset: number }) => point.dayOffset)).toEqual([
+    1, 7, 30,
+  ]);
+  for (const point of retentionData.records) {
+    expect(point.cohortSize).toBe(1);
+    expect(point.status).toBe('immature');
+    expect(point.retained ?? null).toBeNull();
+    expect(point.retentionRate ?? null).toBeNull();
+  }
+  await page.screenshot({
+    path: `${process.env.AURA_EVIDENCE_DIR}/dashboard-reopened.png`,
+    fullPage: true,
   });
 });

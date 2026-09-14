@@ -14,6 +14,8 @@ public class WebhookCreateRequest {
     @NotBlank
     private String name;
 
+    private String installationPid;
+
     @NotBlank
     private String targetUrl;
 

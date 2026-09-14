@@ -206,7 +206,13 @@ public class InboxController {
             return;
         }
         InboxItem item = inboxService.getItem(itemId, userId, tenantId);
-        if (item == null || !"bpm".equals(item.getSourceType()) || item.getSourceId() == null) {
+        // InboxEventListener creates BPM task items with sourceType "workflow"; older
+        // paths used "bpm". Both carry the engine task id in sourceId — gating on the
+        // literal "bpm" alone turned every listener-created approval into a silent
+        // no-op (item acted, engine task left pending).
+        boolean bpmSourced = item != null
+                && ("bpm".equals(item.getSourceType()) || "workflow".equals(item.getSourceType()));
+        if (!bpmSourced || item.getSourceId() == null) {
             return;
         }
         if (approval) {

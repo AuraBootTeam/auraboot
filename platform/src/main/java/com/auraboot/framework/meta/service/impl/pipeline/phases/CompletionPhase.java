@@ -38,6 +38,7 @@ public class CompletionPhase implements CommandPhase {
     private final ApiConnectorService apiConnectorService;
     private final WebhookDispatcher webhookDispatcher;
     private final ObjectMapper objectMapper;
+    private final com.auraboot.framework.behavior.outcome.AnalyticsCommandOutcomePublisher analyticsOutcomes;
 
     @Override public String name() { return "completion"; }
 
@@ -117,6 +118,9 @@ public class CompletionPhase implements CommandPhase {
                 ctx.getTenantId(), ctx.getCommand().getCode(), ctx.getCommand().getModelCode(),
                 ctx.getPayload(), ctx.getRequest() != null ? ctx.getRequest().getTargetRecordId() : null,
                 ctx.getTargetState());
+
+        // A failed outcome write must roll back the command mutation as well.
+        analyticsOutcomes.record(ctx);
 
         // Save idempotency record
         if (StringUtils.hasText(ctx.getRequest().getClientRequestId())) {

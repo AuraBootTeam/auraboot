@@ -2083,6 +2083,7 @@ CREATE TABLE public.ab_agent_run (
     context_envelope_hash character varying(64),
     deployment_pid character varying(26),
     context_envelope text,
+    final_response text,
     CONSTRAINT chk_agent_run_subtask_origin CHECK (((subtask_origin IS NULL) OR ((subtask_origin)::text = ANY ((ARRAY['interrupt_subtask'::character varying, 'delegate_task'::character varying, 'scheduled_split'::character varying])::text[]))))
 );
 
@@ -3085,6 +3086,48 @@ CREATE SEQUENCE public.ab_ai_trace_span_id_seq
 --
 
 ALTER SEQUENCE public.ab_ai_trace_span_id_seq OWNED BY public.ab_ai_trace_span.id;
+
+
+--
+-- Name: ab_analytics_deleted_record_basis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_analytics_deleted_record_basis (
+    tenant_id bigint NOT NULL,
+    event_id character varying(40) NOT NULL,
+    model_code character varying(64) NOT NULL,
+    target_key character varying(120) NOT NULL,
+    record_id bigint NOT NULL,
+    record_pid character varying(26) NOT NULL,
+    created_by bigint,
+    basis_version integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ab_analytics_deleted_record_basis_basis_version_check CHECK ((basis_version = 1))
+);
+
+
+--
+-- Name: TABLE ab_analytics_deleted_record_basis; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_analytics_deleted_record_basis IS 'Server-captured identity and owner basis from the same transaction as an analytics deletion outcome; not an authorization grant';
+
+
+--
+-- Name: ab_analytics_task_execution; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_analytics_task_execution (
+    tenant_id bigint NOT NULL,
+    task_pid character varying(26) NOT NULL,
+    actor_user_id bigint NOT NULL,
+    adoption_pid character varying(26) NOT NULL,
+    request_key uuid NOT NULL,
+    binding jsonb NOT NULL,
+    goal text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_analytics_task_execution_binding_check CHECK ((jsonb_typeof(binding) = 'object'::text)),
+    CONSTRAINT ab_analytics_task_execution_goal_check CHECK (((length(goal) >= 1) AND (length(goal) <= 4000)))
+);
 
 
 --
@@ -19478,6 +19521,38 @@ ALTER TABLE ONLY public.ab_ai_trace
 
 
 --
+-- Name: ab_analytics_deleted_record_basis ab_analytics_deleted_record_basis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_deleted_record_basis
+    ADD CONSTRAINT ab_analytics_deleted_record_basis_pkey PRIMARY KEY (tenant_id, event_id);
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_pkey PRIMARY KEY (tenant_id, task_pid);
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_actor_user_id_adoptio_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_actor_user_id_adoptio_key UNIQUE (tenant_id, actor_user_id, adoption_pid);
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_request_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_request_key_key UNIQUE (tenant_id, request_key);
+
+
+--
 -- Name: ab_announcement ab_announcement_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -23710,6 +23785,14 @@ ALTER TABLE ONLY public.ab_agent_release
 
 
 --
+-- Name: ab_agent_task uq_agent_task_tenant_pid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_task
+    ADD CONSTRAINT uq_agent_task_tenant_pid UNIQUE (tenant_id, pid);
+
+
+--
 -- Name: ab_async_task uq_async_task_code; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -25806,6 +25889,13 @@ CREATE INDEX idx_alarm_status ON public.ab_decision_alarm USING btree (tenant_id
 --
 
 CREATE INDEX idx_alarm_subject ON public.ab_decision_alarm USING btree (tenant_id, subject_type, subject_id, stage);
+
+
+--
+-- Name: idx_analytics_deleted_record_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_analytics_deleted_record_target ON public.ab_analytics_deleted_record_basis USING btree (tenant_id, model_code, target_key);
 
 
 --
@@ -30573,6 +30663,22 @@ CREATE TRIGGER trg_page_schema_ownership_default BEFORE INSERT OR UPDATE OF is_t
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_analytics_deleted_record_basis ab_analytics_deleted_record_basis_tenant_id_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_deleted_record_basis
+    ADD CONSTRAINT ab_analytics_deleted_record_basis_tenant_id_event_id_fkey FOREIGN KEY (tenant_id, event_id) REFERENCES public.ab_behavior_outcome_outbox(tenant_id, event_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: ab_analytics_task_execution ab_analytics_task_execution_tenant_id_task_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_analytics_task_execution
+    ADD CONSTRAINT ab_analytics_task_execution_tenant_id_task_pid_fkey FOREIGN KEY (tenant_id, task_pid) REFERENCES public.ab_agent_task(tenant_id, pid);
 
 
 --

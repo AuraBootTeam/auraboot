@@ -12,6 +12,7 @@ export interface VersionEntry {
   version: string;
   operation: string;
   operationBy: string;
+  operationByDisplayName?: string | null;
   operationAt: string;
   description?: string;
   parentVersionId?: string;

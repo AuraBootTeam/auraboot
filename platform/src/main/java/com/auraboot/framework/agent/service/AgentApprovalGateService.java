@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.event.AgentApprovalEvent;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.event.AuraEventBus;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -29,6 +30,10 @@ public class AgentApprovalGateService {
     private final AuraEventBus eventBus;
     private final AgentDispatchHandler dispatchHandler;
     private final ApprovalNotificationOutbox approvalNotificationOutbox;
+    @Autowired
+    private AgentRunTerminalStore terminalStore;
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Autowired
     public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
@@ -79,35 +84,13 @@ public class AgentApprovalGateService {
             return null;
         }
         if (toolRequiresApproval && matched == null) {
-            // Fail-secure：tool 要求审批但 tenant 未配置匹配的 policy → 拒绝创建 approval。
-            // 这会让调用方（CommandPipeline / SkillEngine）把 run 标失败，强制 tenant 补齐 policy。
-            // 理由：policy_id=null 的 approval 谁能批？之前的 fail-open 允许任意 tenant 用户批是严重漏洞。
-            log.error("Tool requires approval but no matching approval policy configured. " +
-                            "Refusing to create approval (fail-secure). tenant={}, tool={}, run={}. " +
-                            "Action: tenant admin must configure an ab_approval_policy with a tool_call " +
-                            "trigger_rule matching this tool.",
-                    tenantId, toolCode, runId);
-            return null;
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Required tool approval has no matching policy: " + toolCode);
         }
 
-        // F8 (execution-architecture review, 2026-07-20): an APPROVED approval for
-        // this task+tool GRANTS execution — do not gate again.
-        //
-        // Live-reproduced infinite approval loop: approving a pending request
-        // resumes the task as a NEW run, whose idempotency key ({newRunId}:{tool})
-        // misses the approved row, so the gate minted yet another pending approval —
-        // forever, and the approved action never executed. Human approval that does
-        // not actually authorize anything is worse than no gate: the user thinks
-        // they approved, nothing happens, and the audit trail fills with orphans.
-        //
-        // Scoped by task_id (stable across the resume hop, unlike run_id) + tool
-        // code, and consumed exactly once: the row is stamped consumed_at so a later
-        // run cannot replay the same grant (double-execution guard, mirroring
-        // approveAndExecute's already-APPROVED block).
-        String grantedPid = findConsumableGrant(tenantId, taskId, toolCode);
-        if (grantedPid != null) {
-            log.info("Approval grant consumed: pid={}, tool={}, task={} — proceeding with execution",
-                    grantedPid, toolCode, taskId);
+        // Both new tool calls and saved steps require the same exact grant.
+        if (consumeResumeGrant(tenantId, taskId, null, toolCode, requestData)) {
+            log.info("Exact approval grant consumed: tool={}, task={}", toolCode, taskId);
             return null;
         }
 
@@ -166,44 +149,37 @@ public class AgentApprovalGateService {
         }
     }
 
-    /**
-     * F8: find an APPROVED, not-yet-consumed approval for this task+tool and claim
-     * it. Returns the pid when this caller won the claim (execution may proceed),
-     * null otherwise.
-     *
-     * <p>The claim is a conditional UPDATE ({@code consumed_at IS NULL}) so two
-     * concurrent runs racing on the same grant cannot both execute — the loser
-     * sees 0 rows updated and falls through to the normal gate.
-     */
-    private String findConsumableGrant(Long tenantId, String taskId, String toolCode) {
-        if (taskId == null || taskId.isBlank()) {
-            return null;
+    /** Claims one exact approved payload before a tool call or saved step may bypass its approval gate. */
+    public boolean consumeResumeGrant(Long tenantId, String taskId, String approvalPid,
+                                      String toolCode, Map<String, Object> input) {
+        if (tenantId == null || taskId == null || toolCode == null || input == null) return false;
+        final String payload;
+        try { payload = objectMapper.writeValueAsString(input); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalArgumentException("Cannot serialize resumed approval input", invalid);
         }
-        // Claim in ONE statement: the WHERE carries the unconsumed predicate, so two
-        // concurrent runs racing on the same grant cannot both win (the loser updates
-        // 0 rows). A read-then-write pair would leave a TOCTOU window, and the
-        // map-based updater cannot express "consumed_at IS NULL" (null keys are
-        // rejected / would render as `= NULL`, which never matches).
-        String claimSql = "UPDATE ab_agent_approval SET consumed_at = NOW(), updated_at = NOW() "
-                + "WHERE pid = ( "
-                + "  SELECT pid FROM ab_agent_approval "
-                + "   WHERE tenant_id = #{params.tenantId} AND task_id = #{params.taskId} "
-                + "     AND approval_status = 'approved' AND consumed_at IS NULL "
-                + "     AND approval_description = #{params.toolDesc} "
-                + "   ORDER BY updated_at DESC LIMIT 1 "
-                + "  FOR UPDATE SKIP LOCKED )";
-        Map<String, Object> params = Map.of(
-                "tenantId", tenantId, "taskId", taskId, "toolDesc", "Tool: " + toolCode);
-        int claimed = dynamicDataMapper.updateByQuery(claimSql, params);
-        if (claimed <= 0) {
-            return null;
+        String hash = sha256Hex(canonicalizeJson(payload));
+        String claim = """
+                UPDATE ab_agent_approval SET consumed_at=NOW(), updated_at=NOW()
+                WHERE tenant_id=#{params.tenantId} AND consumed_at IS NULL AND pid=(
+                    SELECT pid FROM ab_agent_approval
+                    WHERE tenant_id=#{params.tenantId} AND task_id=#{params.taskId}
+                      AND approval_status='approved' AND consumed_at IS NULL
+                      AND (expires_at IS NULL OR expires_at > NOW())
+                      AND approval_description=#{params.toolDesc}
+                      AND plan_hash=#{params.planHash}
+                      AND request_data::jsonb=CAST(#{params.payload} AS jsonb)
+                      AND plan_snapshot::jsonb=CAST(#{params.payload} AS jsonb)
+                """;
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", tenantId); params.put("taskId", taskId);
+        params.put("toolDesc", "Tool: " + toolCode); params.put("planHash", hash); params.put("payload", payload);
+        if (approvalPid != null) {
+            claim += " AND pid=#{params.approvalPid}";
+            params.put("approvalPid", approvalPid);
         }
-        String pidSql = "SELECT pid FROM ab_agent_approval "
-                + "WHERE tenant_id = #{params.tenantId} AND task_id = #{params.taskId} "
-                + "AND approval_description = #{params.toolDesc} AND consumed_at IS NOT NULL "
-                + "ORDER BY consumed_at DESC LIMIT 1";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(pidSql, params);
-        return rows.isEmpty() ? null : (String) rows.get(0).get("pid");
+        claim += " ORDER BY updated_at DESC LIMIT 1 FOR UPDATE SKIP LOCKED)";
+        return dynamicDataMapper.updateByQuery(claim, params) == 1;
     }
 
     /** Immutable holder for a matched policy — used for both timeout and policy_id linkage. */
@@ -558,7 +534,14 @@ public class AgentApprovalGateService {
      */
     private Long toLong(Object value) {
         if (value instanceof Long) return (Long) value;
-        if (value instanceof Number) return ((Number) value).longValue();
+        if (value instanceof Integer || value instanceof Short || value instanceof Byte) return ((Number) value).longValue();
+        if (value instanceof String text && text.matches("[0-9]+")) {
+            try {
+                return Long.valueOf(text);
+            } catch (NumberFormatException outOfRange) {
+                return null;
+            }
+        }
         return null;
     }
 
@@ -626,17 +609,17 @@ public class AgentApprovalGateService {
                     "Approval " + approvalPid + " rejected: plan_hash mismatch (request_data modified after creation)");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> update = new HashMap<>();
-        update.put("approval_status", "approved");
-        update.put("approver_id", approverId);
-        update.put("approved_at", now);
-        update.put("updated_at", now);
-        int updated = dynamicDataMapper.update("ab_agent_approval", update,
-                Map.of("pid", approvalPid, "approval_status", "pending"));
-        if (updated == 0) {
-            log.warn("Approve race blocked: approval {} was no longer pending", approvalPid);
-            throw new IllegalStateException("Approval already processed: " + approvalPid);
+        int updated = dynamicDataMapper.updateByQuery("""
+                UPDATE ab_agent_approval
+                SET approval_status = 'approved', approver_id = #{params.approverId},
+                    approved_at = NOW(), updated_at = NOW()
+                WHERE pid = #{params.pid} AND tenant_id = #{params.tenantId}
+                  AND approval_status = 'pending'
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                """, Map.of("pid", approvalPid, "tenantId", tenantId, "approverId", approverId));
+        if (updated != 1) {
+            log.warn("Approve blocked: approval {} was processed or expired", approvalPid);
+            throw new IllegalStateException("Approval already processed or expired: " + approvalPid);
         }
         log.info("Approval approved: pid={}, approver={}, triggerAutoResume={}",
                 approvalPid, approverId, triggerAutoResume);
@@ -682,6 +665,7 @@ public class AgentApprovalGateService {
      *
      * @return the approval record, or null if not found / not in PENDING state
      */
+    @org.springframework.transaction.annotation.Transactional
     public Map<String, Object> reject(Long tenantId, String approvalPid, Long approverId, String reason) {
         Map<String, Object> approval = loadPendingApproval(tenantId, approvalPid);
         if (approval == null) {
@@ -695,7 +679,11 @@ public class AgentApprovalGateService {
         update.put("approved_at", now);
         update.put("rejection_reason", reason != null ? reason : "Rejected by user");
         update.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", approvalPid));
+        int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                Map.of("pid", approvalPid, "approval_status", "pending"));
+        if (updated != 1) {
+            throw new IllegalStateException("Approval already processed: " + approvalPid);
+        }
         log.info("Approval rejected: pid={}, approver={}, reason={}", approvalPid, approverId, reason);
 
         String runPid = (String) approval.get("run_id");
@@ -706,7 +694,7 @@ public class AgentApprovalGateService {
                 tenantId, approvalPid, runPid, agentCode, "rejected", approverId));
 
         // Fail the associated agent run
-        failRunOnRejection(runPid, "Approval rejected by user");
+        failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval rejected by user");
 
         approval.put("approval_status", "rejected");
         return approval;
@@ -731,31 +719,45 @@ public class AgentApprovalGateService {
 
         for (Map<String, Object> approval : expired) {
             String pid = (String) approval.get("pid");
+            MetaContext.Snapshot previousContext = MetaContext.snapshot();
             try {
-                Map<String, Object> update = new HashMap<>();
-                update.put("approval_status", "expired");
-                update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
-                update.put("updated_at", now);
-                dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", pid));
+                Long tenantId = ((Number) Objects.requireNonNull(approval.get("tenant_id"),
+                        "Expired approval must have a tenant")).longValue();
+                MetaContext.clear();
+                MetaContext.setSystemTenantContext(tenantId);
+                var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+                transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                transaction.executeWithoutResult(status -> {
+                    Map<String, Object> update = new HashMap<>();
+                    update.put("approval_status", "expired");
+                    update.put("rejection_reason", "Auto-expired: approval timeout exceeded");
+                    update.put("updated_at", now);
+                    int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                            Map.of("pid", pid, "approval_status", "pending"));
+                    if (updated != 1) {
+                        return;
+                    }
 
-                String runPid = (String) approval.get("run_id");
-                Long tenantId = approval.get("tenant_id") != null
-                        ? ((Number) approval.get("tenant_id")).longValue() : null;
-                String agentCode = resolveAgentCode(tenantId, runPid);
+                    String runPid = (String) approval.get("run_id");
+                    String agentCode = resolveAgentCode(tenantId, runPid);
 
-                // Publish domain event
-                if (tenantId != null) {
-                    eventBus.publishAfterCommit(new AgentApprovalEvent(
-                            tenantId, pid, runPid, agentCode, "expired", null));
-                }
+                    // Publish domain event
+                    if (tenantId != null) {
+                        eventBus.publishAfterCommit(new AgentApprovalEvent(
+                                tenantId, pid, runPid, agentCode, "expired", null));
+                    }
 
-                // Fail the associated agent run
-                failRunOnRejection(runPid, "Approval expired");
+                    // Fail the associated agent run
+                    failRunOnRejection(tenantId, runPid, (String) approval.get("task_id"), "Approval expired");
 
-                log.info("Approval expired: pid={}, run_id={}, task_id={}", pid,
-                        runPid, approval.get("task_id"));
+                    log.info("Approval expired: pid={}, run_id={}, task_id={}", pid,
+                            runPid, approval.get("task_id"));
+                });
             } catch (Exception e) {
                 log.error("Failed to expire approval {}: {}", pid, e.getMessage());
+            } finally {
+                MetaContext.clear();
+                MetaContext.restore(previousContext);
             }
         }
     }
@@ -834,27 +836,9 @@ public class AgentApprovalGateService {
     /**
      * Mark an agent run as FAILED due to rejection or expiry.
      */
-    private void failRunOnRejection(String runPid, String errorMessage) {
+    private void failRunOnRejection(Long tenantId, String runPid, String taskPid, String errorMessage) {
         if (runPid == null) return;
-
-        String sql = "SELECT run_status FROM ab_agent_run WHERE pid = #{params.pid}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of("pid", runPid));
-        if (rows.isEmpty()) return;
-
-        String status = (String) rows.get(0).get("run_status");
-        if (!"pending".equals(status)) {
-            log.info("Run {} is not PENDING (status={}), skipping fail-on-rejection", runPid, status);
-            return;
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> update = new HashMap<>();
-        update.put("run_status", "failed");
-        update.put("error_message", errorMessage);
-        update.put("completed_at", now);
-        update.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_run", update, Map.of("pid", runPid));
-        log.info("Run {} marked as FAILED: {}", runPid, errorMessage);
+        terminalStore.failPendingApproval(tenantId, runPid, taskPid, errorMessage);
     }
 
     /**

@@ -3,17 +3,19 @@
     "pageKey": "behavior_analytics",
     "name:zh-CN": "行为分析",
     "name:en": "Behavior Analytics",
-    "description": "UV/PV telemetry dashboard — KPI cards for page views, unique visitors, sessions, and total events; plus a top-events table. Backed by /api/analytics/behavior/* endpoints.",
+    "description": "Behavior traffic, ordered analysis conversion, and first-use retention from observed events.",
     "kind": "detail",
     "schemaVersion": 4,
     "layout": {
-      "type": "grid"
+      "type": "stack",
+      "gap": 16
     },
     "extension": {
       "showShare": false,
       "showReport": false,
       "showPrint": false,
-      "showEdit": false
+      "showEdit": false,
+      "showPdfExport": false
     },
     "dataSources": {
       "ds_behavior_overview": {
@@ -21,78 +23,661 @@
         "endpoint": "/api/analytics/behavior/overview",
         "url": "/api/analytics/behavior/overview",
         "method": "get",
-        "autoFetch": true
+        "autoFetch": false
       },
       "ds_top_events": {
         "type": "api",
         "endpoint": "/api/analytics/behavior/top-events",
         "url": "/api/analytics/behavior/top-events",
         "method": "get",
-        "autoFetch": true
+        "autoFetch": false
+      },
+      "ds_funnel": {
+        "type": "api",
+        "url": "/api/analytics/behavior/analysis-funnel",
+        "endpoint": "/api/analytics/behavior/analysis-funnel",
+        "method": "get",
+        "autoFetch": false
+      },
+      "ds_user_retention": {
+        "type": "api",
+        "url": "/api/analytics/behavior/retention",
+        "endpoint": "/api/analytics/behavior/retention",
+        "method": "get",
+        "autoFetch": false,
+        "params": {
+          "unit": "user"
+        }
+      },
+      "ds_artifact_retention": {
+        "type": "api",
+        "url": "/api/analytics/behavior/retention",
+        "endpoint": "/api/analytics/behavior/retention",
+        "method": "get",
+        "autoFetch": false,
+        "params": {
+          "unit": "artifact"
+        }
+      },
+      "ds_execution": {
+        "type": "api",
+        "url": "/api/analytics/behavior/executions",
+        "endpoint": "/api/analytics/behavior/executions",
+        "method": "get",
+        "autoFetch": false
       }
     },
     "blocks": [
       {
-        "id": "kpi_pv",
-        "blockType": "chart",
-        "chartType": "number-card",
-        "dataSource": "ds_behavior_overview",
-        "title": {
-          "zh-CN": "页面浏览量 (PV)",
-          "en": "Page Views (PV)"
-        },
-        "chartConfig": {
-          "metricField": "pageViews"
-        }
-      },
-      {
-        "id": "kpi_uv",
-        "blockType": "chart",
-        "chartType": "number-card",
-        "dataSource": "ds_behavior_overview",
-        "title": {
-          "zh-CN": "独立访客 (UV)",
-          "en": "Unique Visitors (UV)"
-        },
-        "chartConfig": {
-          "metricField": "uniqueVisitors"
-        }
-      },
-      {
-        "id": "kpi_sessions",
-        "blockType": "chart",
-        "chartType": "number-card",
-        "dataSource": "ds_behavior_overview",
-        "title": {
-          "zh-CN": "会话数",
-          "en": "Sessions"
-        },
-        "chartConfig": {
-          "metricField": "sessions"
-        }
-      },
-      {
-        "id": "kpi_total",
-        "blockType": "chart",
-        "chartType": "number-card",
-        "dataSource": "ds_behavior_overview",
-        "title": {
-          "zh-CN": "事件总数",
-          "en": "Total Events"
-        },
-        "chartConfig": {
-          "metricField": "totalEvents"
-        }
-      },
-      {
-        "id": "tbl_top_events",
-        "blockType": "chart",
-        "chartType": "table",
-        "dataSource": "ds_top_events",
-        "title": {
-          "zh-CN": "热门事件",
-          "en": "Top Events"
-        }
+        "id": "behavior_tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "analysis",
+            "label": {
+              "zh-CN": "使用与转化",
+              "en": "Usage and conversion"
+            },
+            "layout": {
+              "type": "grid",
+              "cols": 12,
+              "rowGap": 20
+            },
+            "blocks": [
+              {
+                "id": "behavior_scope",
+                "blockType": "rich-text",
+                "content": {
+                  "zh-CN": "<h2>分析使用与转化</h2><p>所有图表使用下方已应用的时间范围。漏斗按发起人的分析任务有序计数；留存按首次成功使用分析看板的 UTC 自然日分组，观察第 1、7、30 天是否再次使用。</p><p>“观察中”表示该观察日尚未结束，不计为零留存。这里只反映已收到的事件，不能据此认定投递完整、用户理解结果或产生业务收益。</p>",
+                  "en": "<h2>Analysis usage and conversion</h2><p>All charts use the applied time range below. The funnel follows ordered tasks per initiator. Retention groups first successful analytics dashboard use by UTC calendar day and checks use on days 1, 7, and 30.</p><p>Pending observation days are not zero retention. Received events do not prove complete delivery, comprehension, or business outcomes.</p>"
+                }
+              },
+              {
+                "id": "behavior_time_window",
+                "blockType": "filters",
+                "props": {
+                  "timeWindow": {
+                    "stateKey": "analysisWindow",
+                    "defaultDays": 30,
+                    "maxDays": 366
+                  }
+                }
+              },
+              {
+                "id": "kpi_pv",
+                "blockType": "chart",
+                "chartType": "number-card",
+                "dataSource": "ds_behavior_overview",
+                "title": {
+                  "zh-CN": "页面浏览量 (PV)",
+                  "en": "Page Views (PV)"
+                },
+                "chartConfig": {
+                  "metricField": "pageViews",
+                  "paramsStateKey": "analysisWindow"
+                },
+                "layout": {
+                  "col": 0,
+                  "colSpan": 3
+                }
+              },
+              {
+                "id": "kpi_uv",
+                "blockType": "chart",
+                "chartType": "number-card",
+                "dataSource": "ds_behavior_overview",
+                "title": {
+                  "zh-CN": "独立访客 (UV)",
+                  "en": "Unique Visitors (UV)"
+                },
+                "chartConfig": {
+                  "metricField": "uniqueVisitors",
+                  "paramsStateKey": "analysisWindow"
+                },
+                "layout": {
+                  "col": 3,
+                  "colSpan": 3
+                }
+              },
+              {
+                "id": "kpi_sessions",
+                "blockType": "chart",
+                "chartType": "number-card",
+                "dataSource": "ds_behavior_overview",
+                "title": {
+                  "zh-CN": "会话数",
+                  "en": "Sessions"
+                },
+                "chartConfig": {
+                  "metricField": "sessions",
+                  "paramsStateKey": "analysisWindow"
+                },
+                "layout": {
+                  "col": 6,
+                  "colSpan": 3
+                }
+              },
+              {
+                "id": "kpi_total",
+                "blockType": "chart",
+                "chartType": "number-card",
+                "dataSource": "ds_behavior_overview",
+                "title": {
+                  "zh-CN": "事件总数",
+                  "en": "Total Events"
+                },
+                "chartConfig": {
+                  "metricField": "totalEvents",
+                  "paramsStateKey": "analysisWindow"
+                },
+                "layout": {
+                  "col": 9,
+                  "colSpan": 3
+                }
+              },
+              {
+                "id": "analysis_funnel",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_funnel",
+                "title": {
+                  "zh-CN": "分析任务转化",
+                  "en": "Analysis task conversion"
+                },
+                "chartConfig": {
+                  "sortable": false,
+                  "showPagination": false,
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "code",
+                        "label": {
+                          "zh-CN": "分析阶段",
+                          "en": "Stage"
+                        },
+                        "valueLabels": {
+                          "requested": {
+                            "zh-CN": "请求分析",
+                            "en": "Analysis requested"
+                          },
+                          "query_succeeded": {
+                            "zh-CN": "查询成功",
+                            "en": "Query succeeded"
+                          },
+                          "result_viewed": {
+                            "zh-CN": "结果已呈现",
+                            "en": "Result presented"
+                          },
+                          "artifact_saved": {
+                            "zh-CN": "保存分析产物",
+                            "en": "Artifact saved"
+                          },
+                          "artifact_used": {
+                            "zh-CN": "再次使用产物",
+                            "en": "Artifact used"
+                          }
+                        }
+                      },
+                      {
+                        "field": "tasks",
+                        "label": {
+                          "zh-CN": "任务数",
+                          "en": "Tasks"
+                        }
+                      },
+                      {
+                        "field": "firstStageDenominator",
+                        "label": {
+                          "zh-CN": "首步任务数",
+                          "en": "First-stage tasks"
+                        }
+                      },
+                      {
+                        "field": "previousStageDenominator",
+                        "label": {
+                          "zh-CN": "上步任务数",
+                          "en": "Previous-stage tasks"
+                        }
+                      },
+                      {
+                        "field": "overallRate",
+                        "label": {
+                          "zh-CN": "总体转化率",
+                          "en": "Overall conversion"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "previousStageRate",
+                        "label": {
+                          "zh-CN": "上步转化率",
+                          "en": "Previous-stage conversion"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "status",
+                        "label": {
+                          "zh-CN": "样本状态",
+                          "en": "Sample status"
+                        },
+                        "valueLabels": {
+                          "observed": {
+                            "zh-CN": "已观测",
+                            "en": "Observed"
+                          },
+                          "no_sample": {
+                            "zh-CN": "无样本",
+                            "en": "No sample"
+                          },
+                          "immature": {
+                            "zh-CN": "观察中",
+                            "en": "Observation pending"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "paramsStateKey": "analysisWindow"
+                }
+              },
+              {
+                "id": "execution_scope",
+                "blockType": "rich-text",
+                "content": {
+                  "zh-CN": "<h2>执行结果</h2><p>按所选范围内首次开始的执行尝试统计，结果观察至查询截止时间。未观测终态可能包含等待批准或事件延迟，不等同正在运行。</p><p>总体成功率以全部开始为分母；完成者成功率仅以成功、失败和取消为分母。沙箱执行不进入正式分母，未知主体单独列出。执行成功不代表建议已采纳或产生业务收益。</p>",
+                  "en": "<h2>Execution outcomes</h2><p>Attempts first started in the selected range are observed through the query cutoff. Unresolved attempts can include pending approval or delayed events.</p><p>Overall success uses all starts; completed success uses success, failure and cancellation. Sandbox attempts are excluded and unknown principals are reported separately. Execution success does not prove adoption or business outcomes.</p>"
+                }
+              },
+              {
+                "id": "execution_counts",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_execution",
+                "title": {
+                  "zh-CN": "执行状态",
+                  "en": "Execution status"
+                },
+                "chartConfig": {
+                  "sortable": false,
+                  "showPagination": false,
+                  "paramsStateKey": "analysisWindow",
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "started",
+                        "label": {
+                          "zh-CN": "已开始",
+                          "en": "Started"
+                        }
+                      },
+                      {
+                        "field": "succeeded",
+                        "label": {
+                          "zh-CN": "成功",
+                          "en": "Succeeded"
+                        }
+                      },
+                      {
+                        "field": "failed",
+                        "label": {
+                          "zh-CN": "失败",
+                          "en": "Failed"
+                        }
+                      },
+                      {
+                        "field": "cancelled",
+                        "label": {
+                          "zh-CN": "取消",
+                          "en": "Cancelled"
+                        }
+                      },
+                      {
+                        "field": "unresolved",
+                        "label": {
+                          "zh-CN": "未观测终态",
+                          "en": "No observed outcome"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "layout": {
+                  "col": 0,
+                  "colSpan": 12
+                }
+              },
+              {
+                "id": "execution_rates",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_execution",
+                "title": {
+                  "zh-CN": "成功率与统计范围",
+                  "en": "Success rates and scope"
+                },
+                "chartConfig": {
+                  "sortable": false,
+                  "showPagination": false,
+                  "paramsStateKey": "analysisWindow",
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "successRate",
+                        "label": {
+                          "zh-CN": "总体成功率",
+                          "en": "Overall success"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "无样本",
+                          "en": "No sample"
+                        }
+                      },
+                      {
+                        "field": "completedSuccessRate",
+                        "label": {
+                          "zh-CN": "完成者成功率",
+                          "en": "Completed success"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "无样本",
+                          "en": "No sample"
+                        }
+                      },
+                      {
+                        "field": "excludedSandbox",
+                        "label": {
+                          "zh-CN": "已排除沙箱",
+                          "en": "Excluded sandbox"
+                        }
+                      },
+                      {
+                        "field": "unknownPrincipal",
+                        "label": {
+                          "zh-CN": "未知执行主体",
+                          "en": "Unknown principals"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "layout": {
+                  "col": 0,
+                  "colSpan": 12
+                }
+              },
+              {
+                "id": "user_retention",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_user_retention",
+                "title": {
+                  "zh-CN": "用户再次使用",
+                  "en": "User return use"
+                },
+                "chartConfig": {
+                  "pageSize": 9,
+                  "emptyMessage": {
+                    "zh-CN": "当前范围内尚无首次使用记录。在 AuraBot 保存分析看板并打开查询后，可在这里观察再次使用情况。",
+                    "en": "No first-use records in this range. Save an analysis dashboard in AuraBot and open it to query data, then track return use here."
+                  },
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "cohortDay",
+                        "label": {
+                          "zh-CN": "首次使用日（UTC）",
+                          "en": "First-use day (UTC)"
+                        }
+                      },
+                      {
+                        "field": "dayOffset",
+                        "label": {
+                          "zh-CN": "观察日",
+                          "en": "Observation day"
+                        },
+                        "valueLabels": {
+                          "1": "D1",
+                          "7": "D7",
+                          "30": "D30"
+                        }
+                      },
+                      {
+                        "field": "cohortSize",
+                        "label": {
+                          "zh-CN": "首次使用人数",
+                          "en": "First-use users"
+                        }
+                      },
+                      {
+                        "field": "retained",
+                        "label": {
+                          "zh-CN": "再次使用人数",
+                          "en": "Returning users"
+                        },
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "retentionRate",
+                        "label": {
+                          "zh-CN": "留存率",
+                          "en": "Retention"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "status",
+                        "label": {
+                          "zh-CN": "观察状态",
+                          "en": "Observation status"
+                        },
+                        "valueLabels": {
+                          "observed": {
+                            "zh-CN": "已观测",
+                            "en": "Observed"
+                          },
+                          "no_sample": {
+                            "zh-CN": "无样本",
+                            "en": "No sample"
+                          },
+                          "immature": {
+                            "zh-CN": "观察中",
+                            "en": "Observation pending"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "paramsStateKey": "analysisWindow"
+                }
+              },
+              {
+                "id": "artifact_retention",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_artifact_retention",
+                "title": {
+                  "zh-CN": "看板再次使用",
+                  "en": "Dashboard return use"
+                },
+                "chartConfig": {
+                  "pageSize": 9,
+                  "emptyMessage": {
+                    "zh-CN": "当前范围内尚无首次使用记录。在 AuraBot 保存分析看板并打开查询后，可在这里观察再次使用情况。",
+                    "en": "No first-use records in this range. Save an analysis dashboard in AuraBot and open it to query data, then track return use here."
+                  },
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "cohortDay",
+                        "label": {
+                          "zh-CN": "首次使用日（UTC）",
+                          "en": "First-use day (UTC)"
+                        }
+                      },
+                      {
+                        "field": "dayOffset",
+                        "label": {
+                          "zh-CN": "观察日",
+                          "en": "Observation day"
+                        },
+                        "valueLabels": {
+                          "1": "D1",
+                          "7": "D7",
+                          "30": "D30"
+                        }
+                      },
+                      {
+                        "field": "cohortSize",
+                        "label": {
+                          "zh-CN": "首次使用看板数",
+                          "en": "First-use dashboards"
+                        }
+                      },
+                      {
+                        "field": "retained",
+                        "label": {
+                          "zh-CN": "再次使用看板数",
+                          "en": "Returning dashboards"
+                        },
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "retentionRate",
+                        "label": {
+                          "zh-CN": "留存率",
+                          "en": "Retention"
+                        },
+                        "format": "percent",
+                        "precision": 1,
+                        "nullLabel": {
+                          "zh-CN": "尚未计算",
+                          "en": "Not calculated"
+                        }
+                      },
+                      {
+                        "field": "status",
+                        "label": {
+                          "zh-CN": "观察状态",
+                          "en": "Observation status"
+                        },
+                        "valueLabels": {
+                          "observed": {
+                            "zh-CN": "已观测",
+                            "en": "Observed"
+                          },
+                          "no_sample": {
+                            "zh-CN": "无样本",
+                            "en": "No sample"
+                          },
+                          "immature": {
+                            "zh-CN": "观察中",
+                            "en": "Observation pending"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "paramsStateKey": "analysisWindow"
+                }
+              },
+              {
+                "id": "tbl_top_events",
+                "blockType": "chart",
+                "chartType": "table",
+                "dataSource": "ds_top_events",
+                "title": {
+                  "zh-CN": "热门事件",
+                  "en": "Top Events"
+                },
+                "chartConfig": {
+                  "table": {
+                    "columns": [
+                      {
+                        "field": "eventName",
+                        "label": {
+                          "zh-CN": "事件",
+                          "en": "Event"
+                        },
+                        "valueLabels": {
+                          "analytics_requested": {
+                            "zh-CN": "请求分析",
+                            "en": "Analysis requested"
+                          },
+                          "analytics_query_succeeded": {
+                            "zh-CN": "分析查询成功",
+                            "en": "Analysis query succeeded"
+                          },
+                          "analytics_query_failed": {
+                            "zh-CN": "分析查询失败",
+                            "en": "Analysis query failed"
+                          },
+                          "analytics_result_viewed": {
+                            "zh-CN": "分析结果已呈现",
+                            "en": "Analysis result presented"
+                          },
+                          "analytics_dashboard_saved": {
+                            "zh-CN": "保存分析看板",
+                            "en": "Analysis dashboard saved"
+                          },
+                          "analytics_dashboard_used": {
+                            "zh-CN": "使用分析看板",
+                            "en": "Analysis dashboard used"
+                          },
+                          "page_view": {
+                            "zh-CN": "页面浏览",
+                            "en": "Page view"
+                          },
+                          "element_click": {
+                            "zh-CN": "界面点击",
+                            "en": "Element click"
+                          },
+                          "page_leave": {
+                            "zh-CN": "离开页面",
+                            "en": "Page leave"
+                          }
+                        }
+                      },
+                      {
+                        "field": "count",
+                        "label": {
+                          "zh-CN": "次数",
+                          "en": "Count"
+                        }
+                      }
+                    ]
+                  },
+                  "paramsStateKey": "analysisWindow"
+                }
+              }
+            ]
+          }
+        ]
       }
     ],
     "title": {
@@ -140,7 +725,9 @@
               "zh-CN": "隔离原因",
               "en-US": "Reason"
             },
-            "layout": { "colSpan": 4 }
+            "layout": {
+              "colSpan": 4
+            }
           },
           {
             "field": "replayStatus",
@@ -148,7 +735,9 @@
               "zh-CN": "回放状态",
               "en-US": "Replay Status"
             },
-            "layout": { "colSpan": 4 }
+            "layout": {
+              "colSpan": 4
+            }
           }
         ]
       },
@@ -251,7 +840,9 @@
                   },
                   {
                     "action": "dataSource.reload",
-                    "args": { "target": "list" }
+                    "args": {
+                      "target": "list"
+                    }
                   }
                 ]
               }

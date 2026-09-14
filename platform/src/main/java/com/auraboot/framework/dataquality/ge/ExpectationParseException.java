@@ -5,7 +5,7 @@ package com.auraboot.framework.dataquality.ge;
  * or references an unsupported {@code expectation_type}.
  *
  * <p>Modelled after
- * {@link com.auraboot.framework.chatbi.v2.compiler.TokenCompileException}:
+ * {@link com.auraboot.framework.semantic.compiler.MetricCompileException}:
  * a stable {@code code} string + human-readable {@code message}.
  *
  * <p>Example codes:

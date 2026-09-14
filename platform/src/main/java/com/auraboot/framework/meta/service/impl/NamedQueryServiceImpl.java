@@ -56,6 +56,9 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class NamedQueryServiceImpl extends BaseMetaService implements NamedQueryService {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private NamedQueryFieldProtection fieldProtection;
+
     private final NamedQueryMapper namedQueryMapper;
     private final NamedQueryFieldMapper namedQueryFieldMapper;
     private final NamedQueryVersionMapper namedQueryVersionMapper;
@@ -682,7 +685,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         String fromSql = query.getFromSql().trim();
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(String.join(", ", selectColumns));
-        if (fromSql.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(fromSql)) {
             sql.append(" FROM (").append(fromSql).append(") AS _nq");
         } else {
             sql.append(" FROM ").append(fromSql);
@@ -715,7 +718,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         authorizeRootRecord(query, policy, params);
 
-        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
 
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -741,8 +745,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
+        sql = new StringBuilder(fieldProtection.rewrite(protection, sql.toString()));
+
         // Count total
-        // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
+        // The shared source rewrite already applies tenant and row scopes before counting.
         // TenantLineInterceptor fails on deeply nested subqueries wrapped by the NQ engine.
         String countSql = "SELECT COUNT(*) FROM (" + sql + ") AS _count_query";
         Long total = dynamicDataMapper.countByQueryWithoutTenant(countSql, params);
@@ -753,6 +759,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
         List<Map<String, Object>> records = dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
 
+        records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
     }
 
@@ -825,6 +832,130 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 query.getCode(), modelCode, recordPid);
     }
 
+    /**
+     * Field whitelist, SELECT build, param binding, root-record ACL, resolved data scope,
+     * ordering, policy limit and projection execution shared by export rendering and download
+     * re-verification so both observe identical authorization semantics.
+     */
+    private ExportProjection executeAuthorizedProjection(NamedQuery query, String code,
+            NamedQueryDataExportRequest request) {
+        Long tenantId = getCurrentTenantId();
+        List<NamedQueryField> allFields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
+        validatePublicOutputAliases(allFields);
+        Map<String, NamedQueryField> fieldMap = allFields.stream()
+                .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
+
+        List<String> exportFieldCodes;
+        if (request.getFields() != null && !request.getFields().isEmpty()) {
+            for (String fc : request.getFields()) {
+                if (!fieldMap.containsKey(fc)) {
+                    throw new MetaServiceException("Field not in whitelist: " + fc);
+                }
+            }
+            exportFieldCodes = request.getFields();
+        } else {
+            exportFieldCodes = allFields.stream()
+                    .map(NamedQueryField::getFieldCode)
+                    .collect(Collectors.toList());
+        }
+
+        List<String> selectColumns = exportFieldCodes.stream()
+                .map(fc -> {
+                    SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
+                    SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
+                    return fieldMap.get(fc).getColumnExpr() + " AS " + fc;
+                })
+                .collect(Collectors.toList());
+
+        String exportFromSql = query.getFromSql().trim();
+        StringBuilder sql = new StringBuilder("SELECT ");
+        sql.append(String.join(", ", selectColumns));
+        if (NamedQuerySqlSource.isQuery(exportFromSql)) {
+            sql.append(" FROM (").append(exportFromSql).append(") AS _nq");
+        } else {
+            sql.append(" FROM ").append(exportFromSql);
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        if (request.getParameters() != null) params.putAll(request.getParameters());
+        List<String> whereClauses = new ArrayList<>();
+
+        if (query.hasBaseWhere()) {
+            parseBaseWhere(query.getBaseWhere(), whereClauses, params);
+        }
+
+        if (request.getWhereConditions() != null) {
+            parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
+        }
+
+        params.put("tenantId", tenantId);
+        Long userId = getCurrentUserId();
+        params.put("currentUserId", userId != null ? userId.toString() : null);
+        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+
+        List<String> exportScope = new ArrayList<>();
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
+                exportFieldCodes.stream().map(fieldMap::get).toList());
+        appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
+        whereClauses.addAll(exportScope);
+
+        if (!whereClauses.isEmpty()) {
+            sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
+        }
+
+        if (request.getOrderConditions() != null) {
+            String orderClause = parseOrderConditions(request.getOrderConditions(), fieldMap);
+            if (!orderClause.isEmpty()) {
+                sql.append(" ORDER BY ").append(orderClause);
+            }
+        } else if (query.hasDefaultOrder()) {
+            String defaultOrderClause = parseDefaultOrder(query.getDefaultOrder(), fieldMap);
+            if (!defaultOrderClause.isEmpty()) {
+                sql.append(" ORDER BY ").append(defaultOrderClause);
+            }
+        }
+
+        NamedQueryPolicy exportPolicy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
+        int policyExportMax = exportPolicy.getExportMaxRows() != null ? exportPolicy.getExportMaxRows() : 50000;
+        int limit = request.getLimit() != null ? Math.min(request.getLimit(), policyExportMax) : Math.min(10000, policyExportMax);
+        sql.append(" LIMIT ").append(limit);
+
+        // Physical source scopes already enforce tenant isolation, including CTE bodies.
+        List<Map<String, Object>> data = dynamicDataMapper.selectByQueryWithoutTenant(
+                fieldProtection.rewrite(protection, sql.toString()), params);
+        data = fieldProtection.apply(protection, data);
+        return new ExportProjection(allFields, exportFieldCodes, exportScope, protection, data);
+    }
+
+    @Override
+    public void authorizeExportDownload(String code, NamedQueryDataExportRequest request, JsonNode definitionSnapshot,
+            String rowSetDigest) {
+        NamedQuery query = namedQueryMapper.findByCode(code);
+        if (query == null || !query.isExecutable()) {
+            throw new AccessDeniedException("Export query is no longer available");
+        }
+        authorizeDeclaredResource(query);
+        // Re-executes the full authorized projection so the root-record ACL, the resolved data
+        // scope clause and the field protection all run under the caller's CURRENT permissions.
+        ExportProjection projection = executeAuthorizedProjection(query, code, request);
+        JsonNode currentDefinition = NamedQueryExportDefinition.capture(query, projection.allFields(),
+                projection.scopeClauses(), projection.protection().evidence());
+        if (definitionSnapshot == null || !definitionSnapshot.equals(currentDefinition)) {
+            throw new AccessDeniedException("Export query definition has changed; create a new export");
+        }
+        // Stored bytes are only streamable while the caller could produce the identical row set
+        // today; record ownership/department drift, revoked shares and protection changes fail
+        // closed here instead of streaming a stale artifact.
+        String currentDigest = NamedQueryRowSetDigest.digest(projection.data(), projection.exportFieldCodes());
+        if (rowSetDigest == null || !rowSetDigest.equals(currentDigest)) {
+            throw new AccessDeniedException("Export data no longer matches current permissions; create a new export");
+        }
+    }
+
+    private record ExportProjection(List<NamedQueryField> allFields, List<String> exportFieldCodes,
+            List<String> scopeClauses, NamedQueryFieldProtection.Plan protection,
+            List<Map<String, Object>> data) { }
+
     // ==================== Export ====================
 
     @Override
@@ -841,92 +972,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new MetaServiceException("Named query is not executable (status: " + query.getStatus() + "): " + code);
         }
 
-        Long tenantId = getCurrentTenantId();
+        authorizeDeclaredResource(query);
 
         try {
-            // 2. Get field whitelist
-            List<NamedQueryField> allFields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
-            validatePublicOutputAliases(allFields);
-            Map<String, NamedQueryField> fieldMap = allFields.stream()
-                    .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
-
-            // 3. Determine export fields
-            List<String> exportFieldCodes;
-            if (request.getFields() != null && !request.getFields().isEmpty()) {
-                // Validate requested fields are in whitelist
-                for (String fc : request.getFields()) {
-                    if (!fieldMap.containsKey(fc)) {
-                        throw new MetaServiceException("Field not in whitelist: " + fc);
-                    }
-                }
-                exportFieldCodes = request.getFields();
-            } else {
-                exportFieldCodes = allFields.stream()
-                        .map(NamedQueryField::getFieldCode)
-                        .collect(Collectors.toList());
-            }
-
-            // 4. Build SELECT columns (validate expressions for defense-in-depth)
-            List<String> selectColumns = exportFieldCodes.stream()
-                    .map(fc -> {
-                        SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
-                        SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
-                        return fieldMap.get(fc).getColumnExpr() + " AS " + quotedIdentifier(fc);
-                    })
-                    .collect(Collectors.toList());
-
-            // 5. Build SQL — wrap subquery fromSql in parentheses
-            String exportFromSql = query.getFromSql().trim();
-            StringBuilder sql = new StringBuilder("SELECT ");
-            sql.append(String.join(", ", selectColumns));
-            if (exportFromSql.toUpperCase().startsWith("SELECT ")) {
-                sql.append(" FROM (").append(exportFromSql).append(") AS _nq");
-            } else {
-                sql.append(" FROM ").append(exportFromSql);
-            }
-
-            Map<String, Object> params = new HashMap<>();
-            List<String> whereClauses = new ArrayList<>();
-
-            if (query.hasBaseWhere()) {
-                parseBaseWhere(query.getBaseWhere(), whereClauses, params);
-            }
-
-            if (request.getWhereConditions() != null) {
-                parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
-            }
-
-            params.put("tenantId", tenantId);
-            Long userId = getCurrentUserId();
-            params.put("currentUserId", userId != null ? userId.toString() : null);
-
-            appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
-
-            if (!whereClauses.isEmpty()) {
-                sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
-            }
-
-            // 6. ORDER BY
-            if (request.getOrderConditions() != null) {
-                String orderClause = parseOrderConditions(request.getOrderConditions(), fieldMap);
-                if (!orderClause.isEmpty()) {
-                    sql.append(" ORDER BY ").append(orderClause);
-                }
-            } else if (query.hasDefaultOrder()) {
-                String defaultOrderClause = parseDefaultOrder(query.getDefaultOrder(), fieldMap);
-                if (!defaultOrderClause.isEmpty()) {
-                    sql.append(" ORDER BY ").append(defaultOrderClause);
-                }
-            }
-
-            // 7. LIMIT — enforce policy exportMaxRows
-            NamedQueryPolicy exportPolicy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
-            int policyExportMax = exportPolicy.getExportMaxRows() != null ? exportPolicy.getExportMaxRows() : 50000;
-            int limit = request.getLimit() != null ? Math.min(request.getLimit(), policyExportMax) : Math.min(10000, policyExportMax);
-            sql.append(" LIMIT ").append(limit);
-
-            // 8. Execute query
-            List<Map<String, Object>> data = dynamicDataMapper.selectByQuery(sql.toString(), params);
+            ExportProjection projection = executeAuthorizedProjection(query, code, request);
+            List<NamedQueryField> allFields = projection.allFields();
+            List<String> exportFieldCodes = projection.exportFieldCodes();
+            List<Map<String, Object>> data = projection.data();
 
             // 9. Generate export file
             DataExportRequest.ExportFormat format = request.getFormat() != null
@@ -952,6 +1004,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             long fileSize = java.nio.file.Files.size(tempFile);
             return ExportResult.builder()
                     .success(true)
+                    .definitionSnapshot(NamedQueryExportDefinition.capture(query, allFields, projection.scopeClauses(), projection.protection().evidence()))
+                    .rowSetDigest(NamedQueryRowSetDigest.digest(data, exportFieldCodes))
                     .filePath(tempFile.toString())
                     .recordCount((long) data.size())
                     .fileSize(fileSize)
@@ -959,6 +1013,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                     .exportTime(startTime)
                     .build();
 
+        } catch (AccessDeniedException denied) {
+            throw denied;
         } catch (MetaServiceException e) {
             throw e;
         } catch (Exception e) {
@@ -1233,11 +1289,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
         }
 
-        if (sqlToValidate.toUpperCase().startsWith("SELECT ")) {
+        if (NamedQuerySqlSource.isQuery(sqlToValidate)) {
             // Full SELECT statement — validate for forbidden DML/DDL keywords
             // (allows nested subqueries, window functions, COALESCE, CASE, etc.)
             try {
-                SqlSafetyUtils.validateSelectOnlySql(sqlToValidate);
+                SqlSafetyUtils.validateSelectOnlySql("SELECT * FROM (" + sqlToValidate + ") _validation");
             } catch (IllegalArgumentException e) {
                 throw new MetaServiceException("FROM SQL contains dangerous patterns: " + e.getMessage());
             }
@@ -1263,8 +1319,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQuery query,
             Long tenantId,
             Long userId,
-            List<String> whereClauses) {
+            List<String> whereClauses,
+            NamedQueryFieldProtection.Plan protection) {
         String resourceCode = trimToNull(query.getResourceCode());
+        // Physical sources already apply this exact model/read scope before projection.
+        // Reapplying it outside the projection can reference columns that are not selected.
+        if (protection != null && resourceCode != null
+                && protection.coversDeclaredScope(resourceCode, trimToNull(query.getActionCode()))) return;
         String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             if (!permitFilter.isBlank()) {

@@ -11,6 +11,25 @@ import java.util.Map;
 
 public interface UserMapper extends BaseMapper<User> {
 
+    /** Resolve version actors without exposing unrelated users or directory fields. */
+    @Select("""
+            <script>
+            SELECT u.pid, COALESCE(NULLIF(u.nick_name, ''), NULLIF(u.user_name, '')) AS display_name
+            FROM ab_user u
+            WHERE u.deleted_flag = FALSE
+              AND EXISTS (SELECT 1 FROM ab_tenant_member tm
+                          WHERE tm.user_id = u.id AND tm.tenant_id = #{tenantId}
+                            AND tm.status = 'active' AND tm.deleted_flag = FALSE)
+              AND u.pid IN
+              <foreach collection="userPids" item="pid" open="(" separator="," close=")">
+                #{pid}
+              </foreach>
+            </script>
+            """)
+    List<Map<String, Object>> findDisplayNamesByPidsInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("userPids") java.util.Collection<String> userPids);
+
     /**
      * Explicitly clear the reset password token and sent-at timestamp for a user.
      * Required because updateById skips null fields by default.

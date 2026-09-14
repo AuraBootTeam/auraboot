@@ -109,6 +109,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
         when(sideEffects.auditWriter()).thenReturn(auditWriter);
         when(sideEffects.metricsRecorder()).thenReturn(metricsRecorder);
 
+        when(agentApprovalGateService.isAuthorizedApprover(anyLong(), anyString(), anyLong())).thenReturn(true);
         sink = mock(ResponseSink.class);
         when(sink.isClientConnected()).thenReturn(true);
         // PendingToolStore returns null for every lookup so the dispatcher

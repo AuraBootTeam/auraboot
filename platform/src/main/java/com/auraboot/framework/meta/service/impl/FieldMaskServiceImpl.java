@@ -167,36 +167,9 @@ public class FieldMaskServiceImpl implements FieldMaskService {
             return records;
         }
 
-        List<FieldMaskConfig> configs = getEnabledConfigs(modelCode);
-        if (configs.isEmpty()) {
-            return records;
-        }
-
-        // Filter configs applicable to the context (LIST, DETAIL, EXPORT)
-        List<FieldMaskConfig> applicable = configs.stream()
-                .filter(c -> isApplicableToContext(c, context))
-                .collect(Collectors.toList());
-
-        if (applicable.isEmpty()) {
-            return records;
-        }
-
-        // Check user role + permission exemptions. Permission codes are only fetched when at least
-        // one applicable config opts into permission-based exemption (avoids an extra permission
-        // lookup on the common masking path).
-        Set<String> userRoleCodes = getUserRoleCodes(userId);
-        boolean anyPermissionExempt = applicable.stream()
-                .anyMatch(c -> c.getExemptPermissionCodes() != null && !c.getExemptPermissionCodes().isBlank());
-        Set<String> userPermissionCodes = anyPermissionExempt
-                ? getUserPermissionCodes(userId)
-                : Collections.emptySet();
-
-        // Build field → config map, excluding exempt fields
         Map<String, FieldMaskConfig> fieldMasks = new HashMap<>();
-        for (FieldMaskConfig config : applicable) {
-            if (!isExempt(config, userRoleCodes, userPermissionCodes)) {
-                fieldMasks.put(config.getFieldCode(), config);
-            }
+        for (FieldMaskConfig config : getEffectiveConfigs(modelCode, userId, context)) {
+            fieldMasks.put(config.getFieldCode(), config);
         }
 
         if (fieldMasks.isEmpty()) {
@@ -224,6 +197,18 @@ public class FieldMaskServiceImpl implements FieldMaskService {
         }
 
         return masked;
+    }
+
+    @Override
+    public List<FieldMaskConfig> getEffectiveConfigs(String modelCode, Long userId, String context) {
+        List<FieldMaskConfig> applicable = getEnabledConfigs(modelCode).stream()
+                .filter(config -> isApplicableToContext(config, context)).toList();
+        if (applicable.isEmpty()) return List.of();
+        Set<String> roles = getUserRoleCodes(userId);
+        boolean permissionExempt = applicable.stream().anyMatch(config ->
+                config.getExemptPermissionCodes() != null && !config.getExemptPermissionCodes().isBlank());
+        Set<String> permissions = permissionExempt ? getUserPermissionCodes(userId) : Collections.emptySet();
+        return applicable.stream().filter(config -> !isExempt(config, roles, permissions)).toList();
     }
 
     /**

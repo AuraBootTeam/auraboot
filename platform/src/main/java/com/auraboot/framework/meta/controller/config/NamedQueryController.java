@@ -219,14 +219,13 @@ public class NamedQueryController {
             @Valid @RequestBody NamedQueryDataExportRequest request) {
         log.info("Export named query data: {}", code);
 
-        ExportResult result = namedQueryService.exportData(code, request);
+        ExportResult result = exportTaskService.exportSync(code, request);
 
         if (!result.getSuccess()) {
             return ApiResponse.error(result.getErrorMessage() != null ? result.getErrorMessage() : "Export failed");
         }
 
-        String downloadUrl = "/api/meta/named-queries/" + code + "/download?file=" +
-                java.net.URLEncoder.encode(result.getFilePath(), java.nio.charset.StandardCharsets.UTF_8);
+        String downloadUrl = result.getDownloadUrl();
 
         Map<String, Object> response = Map.of(
                 "success", true,
@@ -237,71 +236,6 @@ public class NamedQueryController {
         );
 
         return ApiResponse.success(response);
-    }
-
-    @GetMapping("/{code}/download")
-    @RequirePermission(MetaPermission.QUERY_READ)
-    public void downloadExport(
-            @PathVariable String code,
-            @RequestParam String file,
-            HttpServletResponse response) throws java.io.IOException {
-        log.info("Download named query export: code={}, file={}", code, file);
-
-        // Security: validate file path is within temp directory to prevent path traversal
-        java.nio.file.Path tempDir = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
-        java.nio.file.Path filePath = java.nio.file.Paths.get(file).normalize().toAbsolutePath();
-        if (!filePath.startsWith(tempDir.normalize().toAbsolutePath())) {
-            log.warn("Path traversal attempt blocked: {}", file);
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
-            return;
-        }
-        if (!java.nio.file.Files.exists(filePath)) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
-            return;
-        }
-
-        String extension = file.substring(file.lastIndexOf('.'));
-        String contentType;
-        switch (extension) {
-            case ".xlsx":
-                contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                break;
-            case ".csv":
-                contentType = "text/csv; charset=UTF-8";
-                break;
-            case ".json":
-                contentType = "application/json; charset=UTF-8";
-                break;
-            default:
-                contentType = "application/octet-stream";
-        }
-
-        String fileName = code + "_export" + extension;
-        String encodedFileName = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
-                .replace("+", "%20");
-
-        long fileSize = java.nio.file.Files.size(filePath);
-        response.setContentType(contentType);
-        response.setContentLengthLong(fileSize);
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedFileName);
-        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-
-        try (java.io.InputStream is = java.nio.file.Files.newInputStream(filePath);
-             java.io.OutputStream os = response.getOutputStream()) {
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = is.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-            os.flush();
-        }
-
-        // Delete temp file after download
-        try {
-            java.nio.file.Files.deleteIfExists(filePath);
-        } catch (Exception e) {
-            log.warn("Failed to delete temp export file: {}", file);
-        }
     }
 
     // ==================== Async Export ====================
@@ -356,6 +290,7 @@ public class NamedQueryController {
         };
 
         String fileName = task.getQueryCode() + "_export" + extension;
+        response.setHeader("Cache-Control", "no-store");
         response.setContentType(contentType);
         response.setContentLengthLong(java.nio.file.Files.size(filePath));
         response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");

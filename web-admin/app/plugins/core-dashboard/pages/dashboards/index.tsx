@@ -42,10 +42,7 @@ const PREF_KEY = 'dashboard_tab_order';
 const FAVORITE_KEY = 'dashboard_favorites';
 const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';
 const DASHBOARD_LIST_PAGE_SIZE = 200;
-const HIDDEN_DEFAULT_TAB_CODES = new Set([
-  'sc_workflow_dashboard',
-  'sc_arsenal_dashboard',
-]);
+const HIDDEN_DEFAULT_TAB_CODES = new Set(['sc_workflow_dashboard', 'sc_arsenal_dashboard']);
 const ACCESS_DENIED_PATTERN = /access forbidden|access denied|forbidden|permission denied|403/i;
 
 export function resolveDashboardErrorMessage(
@@ -79,9 +76,10 @@ function SortableTab({ dashboard, isActive, onClick }: SortableTabProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: dashboard.code!,
   });
-  const title = typeof dashboard.title === 'string' && dashboard.title.startsWith('$i18n:')
-    ? t(dashboard.title.slice(6))
-    : dashboard.title;
+  const title =
+    typeof dashboard.title === 'string' && dashboard.title.startsWith('$i18n:')
+      ? t(dashboard.title.slice(6))
+      : dashboard.title;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -381,10 +379,7 @@ export default function DashboardViewerPage() {
             />
           </svg>
           <p className="mb-2 text-lg font-medium text-gray-500">{t('dashboard.empty')}</p>
-          <Link
-            to="/p/dashboard-management"
-            className="text-sm text-blue-600 hover:underline"
-          >
+          <Link to="/p/dashboard-management" className="text-sm text-blue-600 hover:underline">
             {t('dashboard.goto_management')}
           </Link>
         </div>
@@ -425,14 +420,16 @@ export default function DashboardViewerPage() {
             onClick={() => setFavoritesOnly((value) => !value)}
             aria-pressed={favoritesOnly}
             data-testid="dashboard-favorites-filter"
-            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors disabled:opacity-50 ${
+            className={`inline-flex shrink-0 items-center rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors disabled:opacity-50 ${
               favoritesOnly
                 ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <StarIcon className={`mr-1.5 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`} />
-            {favoritesOnly ? t('dashboard.favorites.all', undefined, 'All dashboards') : t('dashboard.favorites.only', undefined, 'Favorites only')}
+            {favoritesOnly
+              ? t('dashboard.favorites.all', undefined, 'All dashboards')
+              : t('dashboard.favorites.only', undefined, 'Favorites only')}
           </button>
           {activeDashboard?.code && (
             <button
@@ -440,7 +437,7 @@ export default function DashboardViewerPage() {
               onClick={() => handleToggleFavorite(activeDashboard.code!)}
               aria-pressed={favoriteCodes.includes(activeDashboard.code!)}
               data-testid="dashboard-favorite-toggle"
-              className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`inline-flex shrink-0 items-center rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
                 favoriteCodes.includes(activeDashboard.code!)
                   ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -459,7 +456,7 @@ export default function DashboardViewerPage() {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center rounded-md bg-gray-100 px-3 py-1.5 text-sm whitespace-nowrap text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
           >
             <ArrowPathIcon className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {t('dashboard.refresh')}
@@ -495,6 +492,9 @@ export default function DashboardViewerPage() {
         {!loading && !error && activeDashboard && (
           <div ref={dashboardRef}>
             <DashboardViewer
+              dashboardPid={
+                activeDashboard.extension?.analyticsOrigin ? activeDashboard.pid : undefined
+              }
               widgets={runtimeWidgets}
               layoutConfig={activeDashboard.layoutConfig || { columns: 12, rowHeight: 80, gap: 16 }}
               className="min-h-[calc(100vh-140px)]"

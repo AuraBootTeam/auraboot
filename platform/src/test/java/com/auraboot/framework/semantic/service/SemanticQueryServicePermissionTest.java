@@ -137,4 +137,13 @@ class SemanticQueryServicePermissionTest {
                 .hasMessageContaining("does not resolve to a published MetaModel")
                 .hasMessageContaining("ab_role");
     }
+    @Test
+    void preservesSourcePermissionDenialBeforeCompilation() {
+        when(metaModelService.getTableName("ab_role"))
+                .thenThrow(new AccessDeniedException("private source"));
+        SemanticQueryRequest req = new SemanticQueryRequest();
+        req.setMetrics(List.of("g.open"));
+        assertThatThrownBy(() -> service.explainQuery(req, new UserContext(42L, 1L, null)))
+                .isInstanceOf(AccessDeniedException.class).hasMessage("private source");
+    }
 }

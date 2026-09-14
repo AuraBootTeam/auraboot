@@ -1,6 +1,8 @@
 package com.auraboot.framework.observability;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.observation.aop.ObservedAspect;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +26,12 @@ public class ObservabilityConfig implements WebMvcConfigurer {
         registry.addInterceptor(apiMetricsInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/actuator/**");
+    }
+
+    /** Activates Micrometer observations declared through {@code @Observed}. */
+    @Bean
+    public ObservedAspect observedAspect(ObservationRegistry observationRegistry) {
+        return new ObservedAspect(observationRegistry);
     }
 
     /**
