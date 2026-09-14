@@ -28,6 +28,7 @@ EXPECTED_REF="${AURA_CI_EXPECTED_REF:-$REF_SHA}"
 
 ARTIFACTS="$(cd "$AURA_REGRESSION_ARTIFACTS" && pwd)"
 mkdir -p "$ARTIFACTS/logs"
+CREDENTIAL_ARTIFACT="$ARTIFACTS/open-platform-credentials.json"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 LOCK_PARENT="${AURA_CI_RELEASE_LOCK_ROOT:-/opt/aura-ci/state/locks}"
 mkdir -p "$WORK_PARENT" "$LOCK_PARENT"
@@ -59,6 +60,7 @@ GRADLE_DISTRIBUTION_DIR="$GRADLE_WRAPPER_HOME/dists/gradle-${GRADLE_VERSION}-bin
 
 cleanup() {
   local status=$?
+  rm -f "$CREDENTIAL_ARTIFACT"
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
@@ -146,12 +148,17 @@ for attempt in $(seq 1 90); do
 done
 
 info "running two-domain HTTP protocol probe"
+# Create the secret handoff as the unprivileged host runner before the rootful helper container
+# writes it. Opening an existing file preserves host ownership; the EXIT trap removes it on every
+# success or failure path so a failed probe cannot leave client credentials in CI artifacts.
+: > "$CREDENTIAL_ARTIFACT"
+chmod 0600 "$CREDENTIAL_ARTIFACT"
 docker run --rm --network "$NET" -v "$STAGE/scripts/ci":/probe:ro -v "$ARTIFACTS":/artifacts \
   -e BASE_URL="http://$APP:6443" "$PYTHON_IMAGE" python /probe/open-platform-release-probe.py \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
-CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$ARTIFACTS/open-platform-credentials.json")"
-CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$ARTIFACTS/open-platform-credentials.json")"
+CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientId"])' "$CREDENTIAL_ARTIFACT")"
+CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
 info "running production-threshold k6 profile inside the CI network"
 docker run --rm --network "$NET" -v "$STAGE/tests/load/k6":/scripts:ro \
@@ -159,7 +166,7 @@ docker run --rm --network "$NET" -v "$STAGE/tests/load/k6":/scripts:ro \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" "$K6_IMAGE" run \
   --summary-export /artifacts/slo-summary.json /scripts/open-platform-slo.js \
   > "$ARTIFACTS/logs/k6.log" 2>&1 || fail "Open Platform production SLO thresholds failed"
-rm -f "$ARTIFACTS/open-platform-credentials.json"
+rm -f "$CREDENTIAL_ARTIFACT"
 
 info "waiting for Webhook queue drain"
 if [[ "$RELEASE_MUTATION" == "webhook-backlog" ]]; then
