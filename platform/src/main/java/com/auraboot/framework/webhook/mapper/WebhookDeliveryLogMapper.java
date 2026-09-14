@@ -89,4 +89,51 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
             """)
     int replay(@Param("tenantId") Long tenantId, @Param("pid") String pid,
                @Param("actorPid") String actorPid);
+
+    @Select("""
+            SELECT d.pid, d.subscription_pid, s.name AS subscription_name,
+                   d.event_id, d.delivery_status, d.retry_count, d.max_retries,
+                   d.response_status, d.next_retry_at, d.last_attempt_at, d.delivered_at,
+                   d.replay_count, d.last_replayed_at, d.created_at
+            FROM ab_webhook_delivery_log d
+            LEFT JOIN ab_webhook_subscription s
+              ON s.tenant_id = d.tenant_id AND s.pid = d.subscription_pid
+            WHERE d.tenant_id = #{tenantId} AND d.installation_pid = #{installationPid}
+              AND (CAST(#{status} AS varchar) IS NULL OR d.delivery_status = #{status})
+            ORDER BY d.created_at DESC, d.id DESC LIMIT #{limit}
+            """)
+    List<OperationsDelivery> findForOperations(@Param("tenantId") Long tenantId,
+                                                @Param("installationPid") String installationPid,
+                                                @Param("status") String status,
+                                                @Param("limit") int limit);
+
+    @Select("""
+            SELECT COUNT(*) FROM ab_webhook_delivery_log
+            WHERE tenant_id = #{tenantId} AND installation_pid = #{installationPid}
+              AND delivery_status = 'dead_letter' AND created_at >= #{since}
+            """)
+    long countDeadLetters(@Param("tenantId") Long tenantId,
+                          @Param("installationPid") String installationPid,
+                          @Param("since") Instant since);
+
+    @Update("""
+            UPDATE ab_webhook_delivery_log
+            SET delivery_status = 'pending', retry_count = 0, next_retry_at = NOW(),
+                response_status = NULL, response_body = NULL, error_message = NULL,
+                delivered_at = NULL, lease_owner = NULL, lease_token = NULL, lease_until = NULL,
+                replay_count = replay_count + 1, last_replayed_at = NOW(),
+                last_replayed_by_pid = #{actorPid}, updated_at = NOW()
+            WHERE tenant_id = #{tenantId} AND installation_pid = #{installationPid} AND pid = #{pid}
+              AND delivery_status IN ('dead_letter', 'failed')
+            """)
+    int replayForInstallation(@Param("tenantId") Long tenantId,
+                              @Param("installationPid") String installationPid,
+                              @Param("pid") String pid,
+                              @Param("actorPid") String actorPid);
+
+    record OperationsDelivery(String pid, String subscriptionPid, String subscriptionName,
+                              String eventId, String deliveryStatus, Integer retryCount,
+                              Integer maxRetries, Integer responseStatus, Instant nextRetryAt,
+                              Instant lastAttemptAt, Instant deliveredAt,
+                              Integer replayCount, Instant lastReplayedAt, Instant createdAt) { }
 }

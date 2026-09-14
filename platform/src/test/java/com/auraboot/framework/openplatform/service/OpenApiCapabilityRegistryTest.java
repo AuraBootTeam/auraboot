@@ -29,6 +29,12 @@ class OpenApiCapabilityRegistryTest {
                 registry.resolve("GET", "/api/open/v1/whoami").orElseThrow().requiredScope());
         assertTrue(registry.resolve("POST", "/api/open/v1/whoami").isEmpty());
         assertTrue(registry.resolve("GET", "/api/open/v1/internal/users").isEmpty());
+        assertEquals("assets.read", registry.resolve("GET", "/api/open/v1/resources/assets/asset-1")
+                .orElseThrow().requiredScope());
+        assertEquals("assets.manage", registry.resolve("POST", "/api/open/v1/commands/assets.assign:execute")
+                .orElseThrow().requiredScope());
+        assertTrue(registry.resolve("GET", "/api/open/v1/resources/tasset_asset/asset-1").isEmpty());
+        assertTrue(registry.resolve("POST", "/api/open/v1/commands/tasset:return_asset:execute").isEmpty());
     }
 
     @Test

@@ -1,0 +1,29 @@
+{
+  "name": "@auraboot/open-platform-sdk",
+  "version": "0.1.0",
+  "description": "Dependency-free TypeScript client for AuraBoot Open Platform",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "../../web-admin/node_modules/.bin/vitest run --root .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

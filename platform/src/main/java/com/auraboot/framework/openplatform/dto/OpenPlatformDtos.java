@@ -47,6 +47,25 @@ public final class OpenPlatformDtos {
                                  Instant createdAt, Instant expiresAt, Instant lastUsedAt) {
     }
 
+    public record RotateCredentialRequest(@Min(5) @Max(10080) Integer graceMinutes) { }
+
+    public record RotatedCredentialSecret(CredentialSecret credential, String replacedCredentialPid,
+                                          Instant replacedCredentialExpiresAt) { }
+
+    public record OperationsOverview(int windowHours, Instant since, long totalCalls,
+                                     long errorCalls, long throttledCalls, double errorRate,
+                                     double p95DurationMs, long deadLetterCount) { }
+
+    public record CallAuditView(String requestId, String method, String path, Integer status,
+                                Long durationMs, Instant occurredAt) { }
+
+    public record WebhookDeliveryView(String pid, String subscriptionName, String eventId,
+                                      String status, Integer retryCount, Integer maxRetries,
+                                      Integer responseStatus, String failureReason,
+                                      Instant nextRetryAt, Instant lastAttemptAt, Instant deliveredAt,
+                                      Integer replayCount, Instant lastReplayedAt, Instant createdAt,
+                                      boolean replayable) { }
+
     public record TokenResponse(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("token_type") String tokenType,

@@ -8,7 +8,12 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialSecret
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallationView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.OperationsOverview;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotatedCredentialSecret;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookDeliveryView;
 import com.auraboot.framework.openplatform.entity.ApplicationCredential;
 import com.auraboot.framework.openplatform.entity.ApplicationInstallation;
 import com.auraboot.framework.openplatform.entity.ExternalApplication;
@@ -17,12 +22,15 @@ import com.auraboot.framework.openplatform.mapper.ApplicationCredentialMapper;
 import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.openplatform.mapper.ApplicationScopeGrantMapper;
 import com.auraboot.framework.openplatform.mapper.ExternalApplicationMapper;
+import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
+import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 
@@ -37,6 +45,8 @@ public class OpenPlatformManagementService {
     private final OpenApiCapabilityRegistry capabilityRegistry;
     private final OpenPlatformSecretCodec secretCodec;
     private final PasswordEncoder passwordEncoder;
+    private final OpenApiCallAuditMapper auditMapper;
+    private final WebhookDeliveryLogMapper deliveryMapper;
 
     public List<ApplicationView> listApplications() {
         Long tenantId = requireTenant();
@@ -120,6 +130,81 @@ public class OpenPlatformManagementService {
                 .map(item -> new CredentialView(item.getPid(), item.getClientId(), item.getStatus(),
                         item.getCreatedAt(), item.getExpiresAt(), item.getLastUsedAt()))
                 .toList();
+    }
+
+    @Transactional
+    public RotatedCredentialSecret rotateCredential(String installationPid, String credentialPid,
+                                                     RotateCredentialRequest request) {
+        Long tenantId = requireTenant();
+        ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
+        ApplicationCredential previous = credentialMapper.findByInstallation(tenantId, installation.getId()).stream()
+                .filter(item -> credentialPid.equals(item.getPid()) && "active".equals(item.getStatus()))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Active credential not found"));
+        int graceMinutes = request.graceMinutes() == null ? 1440 : request.graceMinutes();
+        Instant expiresAt = Instant.now().plus(graceMinutes, ChronoUnit.MINUTES);
+        if (credentialMapper.scheduleExpiry(tenantId, previous.getPid(), expiresAt) != 1) {
+            throw new IllegalStateException("Credential could not be scheduled for expiry");
+        }
+        CredentialSecret replacement = createCredential(installationPid);
+        return new RotatedCredentialSecret(replacement, previous.getPid(), expiresAt);
+    }
+
+    public OperationsOverview getOperationsOverview(String installationPid, int windowHours) {
+        Long tenantId = requireTenant();
+        requireInstallation(tenantId, installationPid);
+        int boundedWindow = Math.max(1, Math.min(windowHours, 24 * 30));
+        Instant since = Instant.now().minus(boundedWindow, ChronoUnit.HOURS);
+        OpenApiCallAuditMapper.OperationsSummary summary = auditMapper.summarize(tenantId, installationPid, since);
+        long total = summary == null ? 0 : summary.totalCalls();
+        long errors = summary == null ? 0 : summary.errorCalls();
+        return new OperationsOverview(boundedWindow, since, total, errors,
+                summary == null ? 0 : summary.throttledCalls(), total == 0 ? 0 : (double) errors / total,
+                summary == null ? 0 : summary.p95DurationMs(),
+                deliveryMapper.countDeadLetters(tenantId, installationPid, since));
+    }
+
+    public List<CallAuditView> listCallAudits(String installationPid, String requestId,
+                                              Integer status, int limit) {
+        Long tenantId = requireTenant();
+        requireInstallation(tenantId, installationPid);
+        String normalizedRequestId = requestId == null || requestId.isBlank() ? null : requestId.trim();
+        return auditMapper.findForOperations(tenantId, installationPid, normalizedRequestId, status,
+                        Math.max(1, Math.min(limit, 200))).stream()
+                .map(item -> new CallAuditView(item.getRequestId(), item.getHttpMethod(), item.getRequestPath(),
+                        item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt()))
+                .toList();
+    }
+
+    public List<WebhookDeliveryView> listWebhookDeliveries(String installationPid, String status, int limit) {
+        Long tenantId = requireTenant();
+        requireInstallation(tenantId, installationPid);
+        String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toLowerCase();
+        return deliveryMapper.findForOperations(tenantId, installationPid, normalizedStatus,
+                        Math.max(1, Math.min(limit, 200))).stream()
+                .map(item -> new WebhookDeliveryView(item.pid(), item.subscriptionName(), item.eventId(),
+                        item.deliveryStatus(), item.retryCount(), item.maxRetries(), item.responseStatus(),
+                        safeFailureReason(item.deliveryStatus(), item.responseStatus()),
+                        item.nextRetryAt(), item.lastAttemptAt(), item.deliveredAt(),
+                        item.replayCount(), item.lastReplayedAt(), item.createdAt(),
+                        "dead_letter".equals(item.deliveryStatus()) || "failed".equals(item.deliveryStatus())))
+                .toList();
+    }
+
+    private String safeFailureReason(String status, Integer responseStatus) {
+        if (responseStatus != null && responseStatus >= 400) {
+            return "HTTP " + responseStatus;
+        }
+        return "dead_letter".equals(status) || "failed".equals(status) ? "Delivery failed" : null;
+    }
+
+    @Transactional
+    public void replayWebhookDelivery(String installationPid, String deliveryPid) {
+        Long tenantId = requireTenant();
+        requireInstallation(tenantId, installationPid);
+        if (deliveryMapper.replayForInstallation(tenantId, installationPid, deliveryPid,
+                MetaContext.getCurrentUserPid()) != 1) {
+            throw new IllegalStateException("Webhook delivery is not replayable");
+        }
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.auraboot.framework.openplatform.controller;
 
 import com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal;
 import com.auraboot.framework.openplatform.service.ExternalEventIngressService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/open/v1/event-sources")
+@AuthenticatedAccess
 @RequiredArgsConstructor
 public class ExternalEventIngressController {
     private final ExternalEventIngressService ingressService;
