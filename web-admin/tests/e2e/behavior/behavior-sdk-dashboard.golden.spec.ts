@@ -72,7 +72,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
 
   async function isolateRun(page: import('@playwright/test').Page): Promise<void> {
     await page.addInitScript(
-      ([id]) => sessionStorage.setItem('aura.behavior_run_id', id as string),
+      (id) => sessionStorage.setItem('aura.behavior_run_id', id),
       RUN_ID,
     );
   }
@@ -123,16 +123,13 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
     await page.waitForTimeout(500);
 
     // ── STEP 2: Click a DSL BlockRenderer-stamped element (deterministic) ────
-    await page.goto('/p/ab_user', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle').catch(() => null);
-
-    const auraElements = page.locator('[data-aura-element-id]');
-    const count = await auraElements.count();
-    // No fallback clicks: a list page without BlockRenderer-stamped elements is
-    // an environment-invalid condition, not a degradable golden.
-    expect(count, 'DSL page stamps data-aura-element-id elements (environment-valid)').toBeGreaterThan(0);
-
-    const target = auraElements.first();
+    // Target the behavior analytics dashboard itself: BSDK-03 proves its
+    // data-aura-element-id blocks (kpi_pv) render on every seeded stack. A list
+    // page target would depend on tenant row data; a missing element here is an
+    // environment-invalid condition, not a degradable golden.
+    await page.goto('/p/c/behavior_analytics', { waitUntil: 'domcontentloaded' });
+    const target = page.locator('[data-aura-element-id="kpi_pv"]');
+    await target.waitFor({ state: 'visible', timeout: 15_000 });
     await target.scrollIntoViewIfNeeded();
     await target.click();
     console.log(`Clicked element: ${await target.getAttribute('data-aura-element-id')}`);
