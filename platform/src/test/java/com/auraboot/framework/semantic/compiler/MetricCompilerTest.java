@@ -119,26 +119,100 @@ class MetricCompilerTest {
         assertThat(q.getSql()).contains("\"sales.avg_order_value\"");
     }
 
-    // ---- 6. conversion metric (simplified) -----------------------------------
+    // ---- 6. conversion metric (v0.2 cohort self-join) ------------------------
 
-    @Test
-    void conversion_simplified_ratio() {
-        // Add a conversion metric on the fly to the model
-        MetricDTO conv = new MetricDTO();
-        conv.setCode("paid_conv");
-        conv.setType("conversion");
-        conv.setTypeParams(Map.of(
+    private MetricDTO cohortConvMetric(Map<String, Object> overrides) {
+        Map<String, Object> params = new java.util.HashMap<>(Map.of(
                 "base_measure", "order_count",
                 "conversion_measure", "paid_order_count",
                 "entity", "customer_id",
-                "window", "30d"));
+                "window", "30d",
+                "base_filter", "status = 'trial'",
+                "conversion_filter", "status = 'paid'"));
+        params.putAll(overrides);
+        MetricDTO conv = new MetricDTO();
+        conv.setCode("paid_conv");
+        conv.setType("conversion");
+        conv.setTypeParams(params);
         salesModel.getMetrics().add(conv);
+        return conv;
+    }
 
+    @Test
+    void conversion_cohort_self_join_enforces_window() {
+        cohortConvMetric(Map.of());
         SemanticQueryRequest r = req();
         r.setMetrics(List.of("paid_conv"));
         r.setDimensions(List.of("region"));
         CompiledQuery q = compiler.compile(salesModel, r, user);
-        assertThat(q.getSql()).contains("NULLIF(COUNT(*), 0)");
+
+        // Cohort entry = first base event per (entity, dim); conversion = EXISTS in window.
+        assertThat(q.getSql()).contains("MIN(order_date) AS amos_et");
+        assertThat(q.getSql()).contains("GROUP BY customer_id, region_code");
+        assertThat(q.getSql()).contains("AND (status = 'paid')");
+        assertThat(q.getSql()).contains("AND (status = 'trial')");
+        assertThat(q.getSql()).contains("cv.order_date < b.amos_et + (? * INTERVAL '1 second')");
+        assertThat(q.getSql()).contains("COUNT(DISTINCT CASE WHEN t.amos_cv THEN t.amos_ce END)::numeric");
+        // Immature cohorts (window not closed) stay out of the denominator.
+        assertThat(q.getSql()).contains("b.amos_et + (? * INTERVAL '1 second') <= CURRENT_DATE");
+        // EXISTS params → maturity window → base side; region RLS fires on both sides.
+        assertThat(q.getParams()).containsExactly(
+                7L, 2592000L, "CN", "US",
+                2592000L,
+                7L, "CN", "US");
+    }
+
+    @Test
+    void conversion_cohort_uses_time_range_end_as_as_of() {
+        cohortConvMetric(Map.of());
+        SemanticQueryRequest r = req();
+        r.setMetrics(List.of("paid_conv"));
+        r.setDimensions(List.of("channel"));
+        SemanticQueryRequest.TimeRange tr = new SemanticQueryRequest.TimeRange();
+        tr.setField("order_date");
+        tr.setPreset("custom");
+        tr.setFrom("2026-01-01");
+        tr.setTo("2026-09-12");
+        r.setTimeRange(tr);
+        CompiledQuery q = compiler.compile(salesModel, r, user);
+
+        assertThat(q.getSql()).contains("order_date BETWEEN ? AND ?");
+        assertThat(q.getSql()).contains("b.amos_et + (? * INTERVAL '1 second') <= ?");
+        // RLS enforces conservatively even when the request does not touch a target dim.
+        assertThat(q.getParams()).containsExactly(
+                7L, 2592000L, "CN", "US",
+                2592000L, LocalDate.parse("2026-09-12"),
+                7L, LocalDate.parse("2026-01-01"), LocalDate.parse("2026-09-12"), "CN", "US");
+    }
+
+    @Test
+    void conversion_cannot_mix_with_other_metric_types() {
+        cohortConvMetric(Map.of());
+        SemanticQueryRequest r = req();
+        r.setMetrics(List.of("paid_conv", "total_sales"));
+        assertThatThrownBy(() -> compiler.compile(salesModel, r, user))
+                .isInstanceOf(MetricCompileException.class)
+                .extracting("errorCode").isEqualTo("UNSUPPORTED_METRIC_COMBINATION");
+    }
+
+    @Test
+    void conversion_without_cohort_filters_fails_closed() {
+        cohortConvMetric(Map.of("base_filter", "", "conversion_filter", ""));
+        SemanticQueryRequest r = req();
+        r.setMetrics(List.of("paid_conv"));
+        assertThatThrownBy(() -> compiler.compile(salesModel, r, user))
+                .isInstanceOf(MetricCompileException.class)
+                .extracting("errorCode").isEqualTo("COHORT_FILTER_MISSING");
+    }
+
+    @Test
+    void conversion_with_invalid_window_fails() {
+        cohortConvMetric(Map.of("window", "30x"));
+        SemanticQueryRequest r = req();
+        r.setMetrics(List.of("paid_conv"));
+        assertThatThrownBy(() -> compiler.compile(salesModel, r, user))
+                .isInstanceOf(MetricCompileException.class)
+                .extracting("errorCode").isEqualTo("TIMERANGE_INVALID");
     }
 
     // ---- 7. RLS injection ----------------------------------------------------
