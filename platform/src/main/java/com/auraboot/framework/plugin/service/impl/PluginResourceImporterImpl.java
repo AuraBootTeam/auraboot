@@ -1744,6 +1744,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             updateReq.setWidgets(widgetsNode);
             updateReq.setExtension(extensionNode);
             dashboardService.update(existing.getPid(), updateReq);
+            // Symmetry with the create path: update() only touches the working
+            // draft, so a re-imported dashboard would otherwise keep serving
+            // the stale published layout while the import reports success.
+            if (!"draft".equals(dto.getEffectiveStatus())) {
+                dashboardService.publish(existing.getPid());
+            }
             log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
                     logSafe(dto.getCode()), logSafe(existing.getPid()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
