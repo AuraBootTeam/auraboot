@@ -193,10 +193,14 @@ public class CommandStateCheckExecutor {
                     ? Map.of("recordId", idEntry.getValue())
                     : Map.of("tenantId", tenantId, "recordId", idEntry.getValue());
             List<Map<String, Object>> result = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
-            if (result == null || result.isEmpty()) {
+            // MyBatis can return a list containing a single all-null row — guard the
+            // element too, not just the list, or row.get() NPEs on every state check
+            // for records whose dynamic-table row has not been written yet.
+            Map<String, Object> row = (result == null || result.isEmpty()) ? null : result.get(0);
+            if (row == null) {
                 return null;
             }
-            Object value = result.get(0).get(stateField);
+            Object value = row.get(stateField);
             return value != null ? value.toString() : null;
         } catch (Exception e) {
             log.warn("Failed to read current state for model={}, recordId={}, stateField={}: {}",
