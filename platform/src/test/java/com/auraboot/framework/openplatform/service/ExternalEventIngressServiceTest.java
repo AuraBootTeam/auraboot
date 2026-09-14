@@ -1,6 +1,6 @@
 package com.auraboot.framework.openplatform.service;
 
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticator.ExternalApiKeyPrincipal;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal;
 import com.auraboot.framework.openplatform.entity.ApplicationInstallation;
 import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiIdempotencyMapper;
@@ -31,7 +31,7 @@ class ExternalEventIngressServiceTest {
     private final ReliableIntegrationAccessor accessor = mock(ReliableIntegrationAccessor.class);
     private final OpenPlatformSecretCodec codec = new OpenPlatformSecretCodec();
     private ExternalEventIngressService service;
-    private final ExternalApiKeyPrincipal principal = new ExternalApiKeyPrincipal(
+    private final MachinePrincipal principal = new MachinePrincipal(
             42L, "tok", "app", Set.of("automation.events.write"),
             "app", "inst", "production", "tok");
 

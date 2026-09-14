@@ -3,7 +3,7 @@ package com.auraboot.framework.application.security;
 import org.springframework.web.cors.CorsConfiguration;
 
 /**
- * Contributes a CORS rule for one public, key-authenticated endpoint.
+ * Contributes a CORS rule for one public, machine-authenticated endpoint.
  *
  * <p>The default {@code /api/**} rule only admits the admin origins and sends credentials — right
  * for the console, wrong for anything embedded in a customer's own site on an origin we have never

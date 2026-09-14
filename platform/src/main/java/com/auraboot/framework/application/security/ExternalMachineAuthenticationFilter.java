@@ -20,16 +20,16 @@ import java.util.Map;
 
 /** Establishes an authenticated tenant context for module-declared external API paths. */
 @Component
-public class ExternalApiKeyAuthenticationFilter extends OncePerRequestFilter {
+public class ExternalMachineAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String AUTHENTICATED_ATTRIBUTE =
-            ExternalApiKeyAuthenticationFilter.class.getName() + ".authenticated";
+            ExternalMachineAuthenticationFilter.class.getName() + ".authenticated";
 
-    private final List<ExternalApiKeyAuthenticator> authenticators;
+    private final List<ExternalMachineAuthenticator> authenticators;
     private final ObjectMapper objectMapper;
 
-    public ExternalApiKeyAuthenticationFilter(List<ExternalApiKeyAuthenticator> authenticators,
-                                              ObjectMapper objectMapper) {
+    public ExternalMachineAuthenticationFilter(List<ExternalMachineAuthenticator> authenticators,
+                                               ObjectMapper objectMapper) {
         this.authenticators = authenticators;
         this.objectMapper = objectMapper;
     }
@@ -37,7 +37,7 @@ public class ExternalApiKeyAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        ExternalApiKeyAuthenticator authenticator = authenticators.stream()
+        ExternalMachineAuthenticator authenticator = authenticators.stream()
                 .filter(candidate -> candidate.supports(request))
                 .findFirst()
                 .orElse(null);
@@ -47,19 +47,19 @@ public class ExternalApiKeyAuthenticationFilter extends OncePerRequestFilter {
         }
 
         long startedAt = System.nanoTime();
-        ExternalApiKeyAuthenticator.ExternalApiKeyPrincipal principal;
+        ExternalMachineAuthenticator.MachinePrincipal principal;
         try {
             principal = authenticator.authenticate(request);
-        } catch (ExternalApiKeyException exception) {
+        } catch (ExternalMachineAuthException exception) {
             writeError(response, exception.status(), exception.code());
             return;
         } catch (RuntimeException exception) {
-            writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "api_key_invalid");
+            writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
 
-        if (principal == null || principal.tenantId() == null || principal.keyPid() == null) {
-            writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "api_key_invalid");
+        if (principal == null || principal.tenantId() == null || principal.subjectPid() == null) {
+            writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "invalid_token");
             return;
         }
 
@@ -69,7 +69,7 @@ public class ExternalApiKeyAuthenticationFilter extends OncePerRequestFilter {
         var authentication = new UsernamePasswordAuthenticationToken(
                 principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        MetaContext.setContext(principal.tenantId(), null, principal.keyPid(), principal.keyName());
+        MetaContext.setContext(principal.tenantId(), null, principal.subjectPid(), principal.subjectName());
         request.setAttribute(AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
         MDC.put("tenantId", String.valueOf(principal.tenantId()));
 

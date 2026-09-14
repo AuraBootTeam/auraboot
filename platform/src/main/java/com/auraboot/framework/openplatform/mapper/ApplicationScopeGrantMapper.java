@@ -1,5 +1,6 @@
 package com.auraboot.framework.openplatform.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -9,6 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import java.util.Set;
 
 @Mapper
+@InterceptorIgnore(tenantLine = "true")
 public interface ApplicationScopeGrantMapper {
     @Select("""
             SELECT scope_code FROM ab_application_scope_grant

@@ -1,6 +1,6 @@
 package com.auraboot.framework.openplatform.security;
 
-import com.auraboot.framework.application.security.ExternalApiKeyException;
+import com.auraboot.framework.application.security.ExternalMachineAuthException;
 import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
 import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiRateLimitMapper;
@@ -54,7 +54,7 @@ class OpenPlatformBearerAuthenticatorTest {
         MockHttpServletRequest request = request("GET", "/api/open/v1/internal/users");
         request.addHeader("Authorization", "Bearer token");
 
-        ExternalApiKeyException error = assertThrows(ExternalApiKeyException.class,
+        ExternalMachineAuthException error = assertThrows(ExternalMachineAuthException.class,
                 () -> authenticator.authenticate(request));
         assertEquals(404, error.status());
     }
@@ -69,7 +69,7 @@ class OpenPlatformBearerAuthenticatorTest {
         MockHttpServletRequest request = request("GET", "/api/open/v1/whoami");
         request.addHeader("Authorization", "Bearer token");
 
-        ExternalApiKeyException error = assertThrows(ExternalApiKeyException.class,
+        ExternalMachineAuthException error = assertThrows(ExternalMachineAuthException.class,
                 () -> authenticator.authenticate(request));
         assertEquals(403, error.status());
     }
@@ -85,7 +85,7 @@ class OpenPlatformBearerAuthenticatorTest {
         MockHttpServletRequest request = request("GET", "/api/open/v1/whoami");
         request.addHeader("Authorization", "Bearer limited");
 
-        ExternalApiKeyException error = assertThrows(ExternalApiKeyException.class,
+        ExternalMachineAuthException error = assertThrows(ExternalMachineAuthException.class,
                 () -> authenticator.authenticate(request));
         assertEquals(429, error.status());
     }

@@ -1,7 +1,7 @@
 package com.auraboot.framework.openplatform.security;
 
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticator;
-import com.auraboot.framework.application.security.ExternalApiKeyException;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticator;
+import com.auraboot.framework.application.security.ExternalMachineAuthException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.openplatform.entity.OpenApiCallAudit;
 import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
-public class OpenPlatformBearerAuthenticator implements ExternalApiKeyAuthenticator {
+public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthenticator {
     private static final String PREFIX = "/api/open/v1/";
     private static final String BEARER = "Bearer ";
 
@@ -39,37 +39,37 @@ public class OpenPlatformBearerAuthenticator implements ExternalApiKeyAuthentica
     }
 
     @Override
-    public ExternalApiKeyPrincipal authenticate(HttpServletRequest request) {
+    public MachinePrincipal authenticate(HttpServletRequest request) {
         OpenApiCapabilityRegistry.Capability capability = capabilityRegistry
                 .resolve(request.getMethod(), request.getRequestURI())
-                .orElseThrow(() -> new ExternalApiKeyException(404, "open_api_capability_not_found"));
+                .orElseThrow(() -> new ExternalMachineAuthException(404, "open_api_capability_not_found"));
         String authorization = request.getHeader("Authorization");
         if (authorization == null || !authorization.startsWith(BEARER)
                 || authorization.length() <= BEARER.length()) {
-            throw new ExternalApiKeyException(401, "invalid_token");
+            throw new ExternalMachineAuthException(401, "invalid_token");
         }
         String rawToken = authorization.substring(BEARER.length()).trim();
         OpenPlatformAuthMapper.TokenAuthRecord token = authMapper.findToken(
                 secretCodec.sha256(rawToken), OpenPlatformTokenService.AUDIENCE, Instant.now());
         if (token == null || !"active".equals(token.installationStatus())
                 || !"active".equals(token.applicationStatus())) {
-            throw new ExternalApiKeyException(401, "invalid_token");
+            throw new ExternalMachineAuthException(401, "invalid_token");
         }
         Set<String> scopes = readScopes(token.scopes());
         if (!scopes.contains(capability.requiredScope())) {
-            throw new ExternalApiKeyException(403, "insufficient_scope");
+            throw new ExternalMachineAuthException(403, "insufficient_scope");
         }
         if (rateLimitMapper.consume(token.installationId(), Instant.now().truncatedTo(ChronoUnit.MINUTES),
                 token.rateLimitPerMinute()) == null) {
-            throw new ExternalApiKeyException(429, "rate_limit_exceeded");
+            throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
         }
         authMapper.touchToken(token.tokenPid(), Instant.now());
-        return new ExternalApiKeyPrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
+        return new MachinePrincipal(token.tenantId(), token.tokenPid(), token.applicationPid(), scopes,
                 token.applicationPid(), token.installationPid(), token.environment(), token.tokenPid());
     }
 
     @Override
-    public void recordCall(ExternalApiKeyPrincipal principal, HttpServletRequest request,
+    public void recordCall(MachinePrincipal principal, HttpServletRequest request,
                            int status, long durationMillis) {
         OpenApiCallAudit audit = new OpenApiCallAudit();
         audit.setPid(UniqueIdGenerator.generate());
@@ -91,7 +91,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalApiKeyAuthentica
         try {
             return objectMapper.readValue(json, new TypeReference<>() { });
         } catch (Exception exception) {
-            throw new ExternalApiKeyException(401, "invalid_token");
+            throw new ExternalMachineAuthException(401, "invalid_token");
         }
     }
 }

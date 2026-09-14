@@ -1,5 +1,7 @@
 package com.auraboot.framework.openplatform.service;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
@@ -49,7 +51,9 @@ public class OpenApiCapabilityRegistry {
         }
     }
 
-    public record Capability(String code, HttpMethod method, String pathPattern,
+    public record Capability(String code,
+                             @JsonSerialize(using = ToStringSerializer.class) HttpMethod method,
+                             String pathPattern,
                              String requiredScope, String dataPolicy, int schemaVersion) {
         public Capability {
             if (code == null || code.isBlank() || method == null || pathPattern == null

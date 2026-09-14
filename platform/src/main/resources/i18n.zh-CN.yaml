@@ -1939,6 +1939,7 @@ openPlatform:
   install: 安装
   installed: 应用已安装
   installFailed: 应用安装失败
+  environmentLabel: 环境
   environment:
     development: 开发环境
     staging: 预发布环境

@@ -1,5 +1,6 @@
 package com.auraboot.framework.openplatform.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 
@@ -10,6 +11,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenApiCapabilityRegistryTest {
+    @Test
+    void serializesHttpMethodAsStablePublicString() throws Exception {
+        OpenApiCapabilityRegistry registry = new OpenApiCapabilityRegistry(List.of());
+
+        String json = new ObjectMapper().writeValueAsString(registry.list());
+
+        assertTrue(json.contains("\"method\":\"GET\""));
+        assertTrue(json.contains("\"method\":\"POST\""));
+    }
+
     @Test
     void onlyResolvesExplicitMethodAndPathDeclarations() {
         OpenApiCapabilityRegistry registry = new OpenApiCapabilityRegistry(List.of());

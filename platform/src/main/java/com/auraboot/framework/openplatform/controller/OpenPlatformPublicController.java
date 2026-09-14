@@ -1,6 +1,6 @@
 package com.auraboot.framework.openplatform.controller;
 
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticator.ExternalApiKeyPrincipal;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,7 +12,7 @@ import java.util.Map;
 @RequestMapping("/api/open/v1")
 public class OpenPlatformPublicController {
     @GetMapping("/whoami")
-    public Map<String, Object> whoAmI(@AuthenticationPrincipal ExternalApiKeyPrincipal principal) {
+    public Map<String, Object> whoAmI(@AuthenticationPrincipal MachinePrincipal principal) {
         return Map.of(
                 "applicationPid", principal.applicationPid(),
                 "installationPid", principal.installationPid(),

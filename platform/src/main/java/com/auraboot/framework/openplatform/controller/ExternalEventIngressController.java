@@ -1,6 +1,6 @@
 package com.auraboot.framework.openplatform.controller;
 
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticator.ExternalApiKeyPrincipal;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal;
 import com.auraboot.framework.openplatform.service.ExternalEventIngressService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,7 +24,7 @@ public class ExternalEventIngressController {
 
     @PostMapping("/{sourceCode}/events")
     public ResponseEntity<ExternalEventIngressService.IngressResult> accept(
-            @AuthenticationPrincipal ExternalApiKeyPrincipal principal,
+            @AuthenticationPrincipal MachinePrincipal principal,
             @PathVariable String sourceCode,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody String rawBody) {

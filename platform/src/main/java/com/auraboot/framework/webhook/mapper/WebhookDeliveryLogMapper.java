@@ -22,8 +22,8 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLog>
     @Select("""
             WITH candidates AS (
                 SELECT id FROM ab_webhook_delivery_log
-                WHERE (delivery_status = 'pending' AND next_retry_at <= NOW())
-                   OR (delivery_status = 'processing' AND lease_until < NOW())
+                WHERE (delivery_status = 'pending' AND next_retry_at <= clock_timestamp())
+                   OR (delivery_status = 'processing' AND lease_until < clock_timestamp())
                 ORDER BY created_at, id
                 FOR UPDATE SKIP LOCKED
                 LIMIT #{limit}

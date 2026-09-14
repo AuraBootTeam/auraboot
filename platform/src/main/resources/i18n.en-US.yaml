@@ -1633,6 +1633,7 @@ openPlatform:
   install: Install
   installed: Application installed
   installFailed: Unable to install application
+  environmentLabel: Environment
   environment:
     development: Development
     staging: Staging

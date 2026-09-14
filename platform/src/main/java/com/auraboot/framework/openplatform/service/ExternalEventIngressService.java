@@ -1,6 +1,6 @@
 package com.auraboot.framework.openplatform.service;
 
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticator.ExternalApiKeyPrincipal;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal;
 import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiIdempotencyMapper;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
@@ -31,7 +31,7 @@ public class ExternalEventIngressService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public IngressResult accept(ExternalApiKeyPrincipal principal, String sourceCode,
+    public IngressResult accept(MachinePrincipal principal, String sourceCode,
                                 String idempotencyKey, String rawBody) {
         if (!SOURCE_CODE.matcher(sourceCode).matches()) {
             throw new InvalidExternalEventException("invalid_source_code");
