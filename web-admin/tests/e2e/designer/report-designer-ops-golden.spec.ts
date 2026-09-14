@@ -64,14 +64,7 @@ test('OPS-01 edit route renders the designer and version rollback flows from the
 
   // Produce a second version so a non-latest row exists for preview.
   await page.getByRole('button', { name: /Rich Text|富文本/ }).click();
-  await page.waitForTimeout(800);
-  const handles = await page.locator('[data-testid^="drag-handle-"]').count();
-  console.log('[diag] drag handles after add:', handles,
-    '| palette visible:', await page.getByTestId('block-palette').isVisible().catch(() => false),
-    '| dirty:', await page.locator('#report-export-status').isVisible().catch(() => false));
-  await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/diag-after-add.png`, fullPage: true });
-  const save = page.getByTestId('report-designer-toolbar-btn-save');
-  await save.click();
+  await page.getByTestId('report-designer-toolbar-btn-save').click();
   // After a successful save the document is clean: the export banner hides and a
   // new version appears in the history count.
   await expect(page.locator('#report-export-status')).toBeHidden();

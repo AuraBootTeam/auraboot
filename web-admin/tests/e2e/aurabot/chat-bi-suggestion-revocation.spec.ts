@@ -251,6 +251,8 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
     await dialog.getByRole('button', { name: '保存建议版本', exact: true }).click();
     const saved = await proposed;
     expect(saved.status(), await saved.text()).toBe(200);
+    // B112: the sonner channel is mounted at the app root; the success toast must be visible.
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: '建议版本已保存' })).toBeVisible();
     const version = (await saved.json()).data.data.record;
     let previousPid = version.pid;
     for (let index = 2; index <= 6; index++) {
