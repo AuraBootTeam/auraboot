@@ -15,13 +15,16 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
 #                   otherwise refuses to run on a database that predates the current
 #                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
 #                   TABLE, so it cannot back-fill columns into tables that already exist).
+#       --product-migration-root: repeatable directory of product-owned V*.sql migrations.
+#                   Requires --fresh-db and applies after the Core snapshot but before backend
+#                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
@@ -329,8 +332,8 @@ PY
 cmd_up() {
   local name="$1"; shift
   local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
-  local plugin_profile="" import_plugins=() extra_plugin_roots=()
-  local extra_root plugin_item
+  local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
+  local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
@@ -338,6 +341,17 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --product-migration-root)
+      [ -d "$2" ] || die "product migration root does not exist: $2"
+      product_migration_roots+=("$(cd "$2" && pwd)")
+      shift 2
+      ;;
+    --product-migration-root=*)
+      migration_root="${1#--product-migration-root=}"
+      [ -d "$migration_root" ] || die "product migration root does not exist: $migration_root"
+      product_migration_roots+=("$(cd "$migration_root" && pwd)")
+      shift
+      ;;
     --extra-plugin-root)
       [ -d "$2" ] || die "extra plugin root does not exist: $2"
       extra_plugin_roots+=("$(cd "$2" && pwd)")
@@ -361,6 +375,8 @@ cmd_up() {
     *) die "unknown arg: $1";;
   esac; done
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
+  [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] \
+    || die "--product-migration-root requires --fresh-db so product SQL is never replayed onto an unknown database"
   case "$runtime_mode" in
     development|verification|control|performance) ;;
     *) die "--runtime-mode must be development|verification|control|performance" ;;
@@ -456,6 +472,28 @@ cmd_up() {
     PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
       -q -f "$REPO_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" >"$sd/schema-apply.log" 2>&1 \
       || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
+  fi
+
+  if [ "${#product_migration_roots[@]}" -gt 0 ]; then
+    log "2.5/9 apply product-owned migrations"
+    : >"$sd/product-migrations.log"
+    printf 'root\tfile\tsha256\n' >"$sd/product-migrations.tsv"
+    local product_root migration_file migration_count=0 migration_hash
+    for product_root in "${product_migration_roots[@]}"; do
+      while IFS= read -r migration_file; do
+        [ -n "$migration_file" ] || continue
+        migration_count=$((migration_count + 1))
+        migration_hash="$(shasum -a 256 "$migration_file" | awk '{print $1}')"
+        printf '%s\t%s\t%s\n' "$product_root" "$migration_file" "$migration_hash" \
+          >>"$sd/product-migrations.tsv"
+        PGPASSWORD="$pg_pass" psql -v ON_ERROR_STOP=1 \
+          -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -f "$migration_file" \
+          >>"$sd/product-migrations.log" 2>&1 \
+          || { tail -20 "$sd/product-migrations.log" >&2; die "product migration failed: $migration_file"; }
+      done < <(find "$product_root" -maxdepth 1 -type f -name 'V*.sql' -print | LC_ALL=C sort)
+    done
+    [ "$migration_count" -gt 0 ] || die "product migration roots contain no V*.sql files"
+    log "    applied $migration_count product migration(s); receipt: $sd/product-migrations.tsv"
   fi
 
   log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
