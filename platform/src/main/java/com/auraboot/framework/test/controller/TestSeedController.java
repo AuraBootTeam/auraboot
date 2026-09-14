@@ -295,15 +295,17 @@ public class TestSeedController {
     private void installE2eTestPlugin(Tenant tenant, User user) {
         MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
         try {
+            boolean orgManagementImported = false;
+            boolean showcaseImported = false;
             try {
                 importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
-                importFirstAvailableTestPlugin(
+                orgManagementImported = importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "org-management",
                         "../plugins/org-management",
                         "../../auraboot/plugins/org-management"
                 );
-                importFirstAvailableTestPlugin(
+                showcaseImported = importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "showcase",
                         "../plugins/showcase",
@@ -313,8 +315,8 @@ public class TestSeedController {
                 // resolves to the Enterprise test-fixtures whose pages currently fail
                 // page validation; the OSS copy is the validation-clean canonical one
                 // (also what the docker mobile-e2e stack imports). Docker is unaffected:
-                // the "../../auraboot/..." path does not exist there, so it falls back to
-                // "../plugins/test-fixtures" (= the OSS mount).
+                // the "../../auraboot/plugins/test-fixtures" path does not exist there, so
+                // it falls back to "../plugins/test-fixtures" (= the OSS mount).
                 importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "test-fixtures",
@@ -327,15 +329,24 @@ public class TestSeedController {
             }
 
             ensureTestAdminCanUseImportedResources(tenant, user);
-            ensureShowcasePagesImportedForMobileE2e(tenant);
-            ensureOrgDepartmentSeedDataForMobileE2e(tenant, user);
-            ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user);
+            // Applications that do not ship the showcase/org-management plugins
+            // (e.g. the extracted standalone BPM/CRM apps) legitimately have no
+            // showcase pages or org_department table — the seed must not fail
+            // there; only enforce when the plugin was actually importable.
+            ensureShowcasePagesImportedForMobileE2e(tenant, showcaseImported);
+            ensureOrgDepartmentSeedDataForMobileE2e(tenant, user, orgManagementImported);
+            ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user, showcaseImported);
         } finally {
             MetaContext.clear();
         }
     }
 
-    private void ensureShowcasePagesImportedForMobileE2e(Tenant tenant) {
+    private void ensureShowcasePagesImportedForMobileE2e(Tenant tenant, boolean showcaseImported) {
+        if (!showcaseImported) {
+            log.warn("Showcase plugin not importable for tenant {} — skipping mobile showcase page assertion "
+                    + "(application does not ship the showcase plugin)", tenant.getId());
+            return;
+        }
         Integer pageCount = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM ab_page_schema
@@ -356,7 +367,12 @@ public class TestSeedController {
         }
     }
 
-    private void ensureOrgDepartmentSeedDataForMobileE2e(Tenant tenant, User user) {
+    private void ensureOrgDepartmentSeedDataForMobileE2e(Tenant tenant, User user, boolean orgManagementImported) {
+        if (!orgManagementImported) {
+            log.warn("Org-management plugin not importable for tenant {} — skipping mobile org_department seed "
+                    + "(application does not ship the org-management plugin)", tenant.getId());
+            return;
+        }
         Boolean tableExists = jdbcTemplate.queryForObject(
                 "SELECT to_regclass(?) IS NOT NULL",
                 Boolean.class,
@@ -394,8 +410,13 @@ public class TestSeedController {
         log.info("Inserted mobile showcase organization seed rows: tenantId={}, rows=1", tenant.getId());
     }
 
-    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user) {
-            Integer existing = jdbcTemplate.queryForObject("""
+    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user, boolean showcaseImported) {
+        if (!showcaseImported) {
+            log.warn("Showcase plugin not importable for tenant {} — skipping mobile showcase_all_fields seed "
+                    + "(application does not ship the showcase plugin)", tenant.getId());
+            return;
+        }
+        Integer existing = jdbcTemplate.queryForObject("""
                     SELECT COUNT(*)
                     FROM mt_showcase_all_fields
                     WHERE tenant_id = ?
@@ -881,17 +902,18 @@ public class TestSeedController {
         }
     }
 
-    private void importFirstAvailableTestPlugin(Long tenantId, String pluginName, String... relativePaths) {
+    private boolean importFirstAvailableTestPlugin(Long tenantId, String pluginName, String... relativePaths) {
         Path workingDir = Path.of(System.getProperty("user.dir"));
         for (String relativePath : relativePaths) {
             Path pluginDir = workingDir.resolve(relativePath).normalize();
             if (pluginDir.toFile().isDirectory()) {
                 importTestPlugin(relativePath, pluginName, tenantId);
-                return;
+                return true;
             }
         }
         log.warn("{} plugin directory not found in any candidate path {}, skipping plugin install",
                 pluginName, List.of(relativePaths));
+        return false;
     }
 
     /**
