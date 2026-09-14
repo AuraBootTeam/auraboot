@@ -7,8 +7,8 @@
 | category | count | what it is |
 |---|--:|---|
 | **gate** | 43 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
-| **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
-| **entrypoint** | 27 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
+| **generator** | 5 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
+| **entrypoint** | 31 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
 | **tooling** | 67 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
 | **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
@@ -70,7 +70,7 @@
 | `validate-public-record-id-contracts.mjs` | 2 | 2026-06-24 | Public dynamic-record id contract inventory and regression gate. |
 | `validate-workflows.sh` | 0 | 2026-03-26 | Validate GitHub Actions workflow YAML files. |
 
-## generator (4)
+## generator (5)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -78,8 +78,9 @@
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 | `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
+| `application/create-release-screenshot-manifest.mjs` | 1 | 2026-09-14 | Create the checksum-bound screenshot manifest consumed by product release image gates. |
 
-## entrypoint (27)
+## entrypoint (31)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -90,6 +91,7 @@
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/enterprise-env-export.sh` | 0 | 2026-05-09 | enterprise-env-export.sh — env contract for the enterprise overlay |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
+| `dev/rebuild-ent-backend.sh` | 1 | 2026-09-14 | Rebuild the Enterprise backend against an explicit OSS checkout. |
 | `dev/rotate-license-keypair.sh` | 0 | 2026-05-09 | Rotate the AuraBoot commercial-license signing keypair. |
 | `dev/run-agent-runtime-backend-gate.sh` | 0 | 2026-07-23 | Focused backend gate for the generic agent runtime architecture. |
 | `dev/xxl-job-true-stack-smoke.sh` | 0 | 2026-06-07 |  |
@@ -108,6 +110,9 @@
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
 | `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
+| `run-bpm-release-image-gate.sh` | 1 | 2026-09-14 | Build and verify the immutable BPM release image. |
+| `run-open-platform-slo-gate.sh` | 1 | 2026-09-14 | Run smoke or production-threshold k6 checks for the Open Platform. |
+| `run-renderer-release-image-gate.sh` | 1 | 2026-09-14 | Build and verify the immutable renderer release image. |
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
 | `application/application-cli.mjs` | 1 | 2026-09-12 | Validate application manifests, resolve immutable locks, and verify staged artifact checksums. |

@@ -7,7 +7,12 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialSecret
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallationView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.OperationsOverview;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotatedCredentialSecret;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookDeliveryView;
 import com.auraboot.framework.openplatform.service.OpenPlatformManagementService;
 import com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -21,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -62,6 +68,41 @@ public class OpenPlatformManagementController {
     @GetMapping("/installations/{installationPid}/credentials")
     public ApiResponse<List<CredentialView>> listCredentials(@PathVariable String installationPid) {
         return ApiResponse.success(managementService.listCredentials(installationPid));
+    }
+
+    @PostMapping("/installations/{installationPid}/credentials/{credentialPid}/rotate")
+    public ApiResponse<RotatedCredentialSecret> rotateCredential(
+            @PathVariable String installationPid, @PathVariable String credentialPid,
+            @Valid @RequestBody RotateCredentialRequest request) {
+        return ApiResponse.success(managementService.rotateCredential(installationPid, credentialPid, request));
+    }
+
+    @GetMapping("/installations/{installationPid}/overview")
+    public ApiResponse<OperationsOverview> getOverview(@PathVariable String installationPid,
+                                                       @RequestParam(defaultValue = "24") int windowHours) {
+        return ApiResponse.success(managementService.getOperationsOverview(installationPid, windowHours));
+    }
+
+    @GetMapping("/installations/{installationPid}/audits")
+    public ApiResponse<List<CallAuditView>> listAudits(@PathVariable String installationPid,
+                                                       @RequestParam(required = false) String requestId,
+                                                       @RequestParam(required = false) Integer status,
+                                                       @RequestParam(defaultValue = "50") int limit) {
+        return ApiResponse.success(managementService.listCallAudits(installationPid, requestId, status, limit));
+    }
+
+    @GetMapping("/installations/{installationPid}/webhook-deliveries")
+    public ApiResponse<List<WebhookDeliveryView>> listWebhookDeliveries(
+            @PathVariable String installationPid, @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "50") int limit) {
+        return ApiResponse.success(managementService.listWebhookDeliveries(installationPid, status, limit));
+    }
+
+    @PostMapping("/installations/{installationPid}/webhook-deliveries/{deliveryPid}/replay")
+    public ApiResponse<Void> replayWebhookDelivery(@PathVariable String installationPid,
+                                                    @PathVariable String deliveryPid) {
+        managementService.replayWebhookDelivery(installationPid, deliveryPid);
+        return ApiResponse.success();
     }
 
     @DeleteMapping("/installations/{installationPid}/credentials/{credentialPid}")

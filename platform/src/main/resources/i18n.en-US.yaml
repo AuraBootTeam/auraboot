@@ -1646,6 +1646,12 @@ openPlatform:
   newCredential: New credential
   credentialsFailed: Unable to load credentials
   credentialCreateFailed: Unable to create credential
+  credentialRotated: Credential rotated; the previous credential remains valid during the grace period
+  rotateFailed: Unable to rotate credential
+  rotateTitle: Rotate credential
+  rotateWarning: A new secret is created now. The previous credential can issue tokens until its grace period ends; issued tokens expire at their normal short TTL.
+  graceMinutes: Grace period (minutes)
+  rotate: Rotate
   noCredentials: No credentials
   secretTitle: Save this credential now
   secretWarning: The client secret is shown once. AuraBoot stores only its hash.
@@ -1666,6 +1672,28 @@ openPlatform:
   disableWarning: This immediately revokes active tokens. The action cannot be undone from this screen.
   disabled: Access disabled and active tokens revoked
   disableFailed: Unable to disable access
+  operations: Operations
+  operationsTitle: Operations
+  operationsSubtitle: Last 24 hours of API traffic and outbound delivery health.
+  refresh: Refresh
+  retry: Retry
+  operationsLoadFailed: Unable to load operations data
+  totalCalls: Calls
+  errorRate: Error rate
+  errorCalls: Errors
+  deadLetters: Dead letters
+  callAudit: Call audit
+  noCalls: No calls match this filter
+  deliveryStatus: Delivery status
+  webhookDeliveries: Webhook deliveries
+  noDeliveries: No deliveries match this filter
+  deletedSubscription: Deleted subscription
+  replay: Replay
+  replayQueued: Webhook replay queued
+  replayFailed: Unable to replay webhook
+  replayConfirmTitle: Replay this delivery?
+  replayConfirmBody: The original signed payload will be delivered again and may repeat downstream side effects.
+  confirmReplay: Confirm replay
   status:
     active: Active
     disabled: Disabled
