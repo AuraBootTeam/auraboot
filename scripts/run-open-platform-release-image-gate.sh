@@ -59,6 +59,9 @@ GRADLE_DISTRIBUTION_DIR="$GRADLE_WRAPPER_HOME/dists/gradle-${GRADLE_VERSION}-bin
 
 cleanup() {
   local status=$?
+  if docker inspect "$APP" >/dev/null 2>&1; then
+    docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
+  fi
   docker rm -f "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   if [[ -d "$LOCK_DIR" && "$(cat "$LOCK_DIR/owner" 2>/dev/null || true)" == "$LOCK_TOKEN" ]]; then
@@ -124,6 +127,7 @@ docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migra
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
 docker run -d --name "$APP" --network "$NET" \
+  -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=test \
   -e DATABASE_URL="jdbc:postgresql://$PG:5432/open_platform_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \

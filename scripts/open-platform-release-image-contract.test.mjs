@@ -16,6 +16,8 @@ assert.match(gate, /sha256sum --check --status/);
 assert.match(gate, /seeding BuildKit Gradle wrapper cache from verified host distribution/);
 assert.match(gate, /--mount=type=cache,target=\/root\/\.gradle\/wrapper/);
 assert.match(dockerfile, /COPY VERSION \/VERSION/);
+assert.match(gate, /docker logs "\$APP" > "\$ARTIFACTS\/logs\/app\.log"/);
+assert.match(gate, /-v "\$STAGE\/plugins":\/plugins:ro/);
 assert.match(gate, /PROFILE=production/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);
