@@ -450,7 +450,6 @@ interface AuraBotContextValue {
     attachments?: ChatImageAttachment[],
     analyticsExecution?: { adoptionPid: string; requestId: string },
   ) => void;
-  sendMessage: (content: string, attachments?: ChatImageAttachment[]) => void;
   registerFormFillTarget: (target: FormFillTarget) => () => void;
   confirmTool: (toolId: string) => void;
   cancelTool: (toolId: string) => void;
