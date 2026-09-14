@@ -51,6 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chown -R node:node /app
 COPY --from=renderer-build /opt/playwright-browsers /opt/playwright-browsers
 COPY --from=renderer-build --chown=node:node /build/web-admin/build/report-renderer /app/report-renderer
+# FALSIFY (deliberate defect, CI evidence only): renderer binary exits before producing PDF.
+RUN sed -i '1i process.exit(1);' /app/report-renderer/cli.js
 COPY --chown=node:node auraboot-boot.jar app.jar
 USER node
 EXPOSE 6443
