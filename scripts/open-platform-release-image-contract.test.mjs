@@ -18,6 +18,7 @@ assert.match(gate, /--mount=type=cache,target=\/root\/\.gradle\/wrapper/);
 assert.match(dockerfile, /COPY VERSION \/VERSION/);
 assert.match(gate, /docker logs "\$APP" > "\$ARTIFACTS\/logs\/app\.log"/);
 assert.match(gate, /-v "\$STAGE\/plugins":\/plugins:ro/);
+assert.match(gate, /chmod -R a\+rX "\$STAGE\/plugins"/);
 assert.match(gate, /PROFILE=production/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);

@@ -105,6 +105,10 @@ info "seeding BuildKit Gradle wrapper cache from verified host distribution"
 STAGE="$WORK_ROOT/context"
 mkdir -p "$STAGE"
 git -C "$REPO_ROOT" archive --format=tar HEAD | tar -x -C "$STAGE"
+# The CI service uses umask 077 while the image runs as appuser (UID 1000). Grant read/traverse on
+# the immutable public plugin staging copy so the test-profile app can consume the read-only bind
+# mount without running as root or changing permissions in the source checkout.
+chmod -R a+rX "$STAGE/plugins"
 info "building exact-ref image $IMAGE"
 docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
