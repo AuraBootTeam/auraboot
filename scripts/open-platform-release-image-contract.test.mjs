@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const gate = fs.readFileSync(new URL('./run-open-platform-release-image-gate.sh', import.meta.url), 'utf8');
 const probe = fs.readFileSync(new URL('./ci/open-platform-release-probe.py', import.meta.url), 'utf8');
 const slo = fs.readFileSync(new URL('../tests/load/k6/open-platform-slo.js', import.meta.url), 'utf8');
+const dockerfile = fs.readFileSync(new URL('../platform/Dockerfile', import.meta.url), 'utf8');
 
 assert.match(gate, /AURA_CI_EXPECTED_REF/);
 assert.match(gate, /uname -s.*Linux/);
@@ -14,6 +15,7 @@ assert.match(gate, /GRADLE_DISTRIBUTION_SHA256="6f74b601422d6d6fc4e1f9a1ab6522f6
 assert.match(gate, /sha256sum --check --status/);
 assert.match(gate, /seeding BuildKit Gradle wrapper cache from verified host distribution/);
 assert.match(gate, /--mount=type=cache,target=\/root\/\.gradle\/wrapper/);
+assert.match(dockerfile, /COPY VERSION \/VERSION/);
 assert.match(gate, /PROFILE=production/);
 assert.match(slo, /open_api_errors/);
 assert.match(slo, /p\(95\)<250/);
