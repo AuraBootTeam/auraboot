@@ -151,15 +151,15 @@ class MetricCompilerTest {
         assertThat(q.getSql()).contains("GROUP BY customer_id, region_code");
         assertThat(q.getSql()).contains("AND (status = 'paid')");
         assertThat(q.getSql()).contains("AND (status = 'trial')");
-        assertThat(q.getSql()).contains("cv.order_date < b.amos_et + (? * INTERVAL '1 second')");
+        assertThat(q.getSql()).contains("cv.order_date < b.amos_et + (?::bigint * INTERVAL '1 second')");
         assertThat(q.getSql()).contains("COUNT(DISTINCT CASE WHEN t.amos_cv THEN t.amos_ce END)::numeric");
         // Immature cohorts (window not closed) stay out of the denominator.
-        assertThat(q.getSql()).contains("b.amos_et + (? * INTERVAL '1 second') <= CURRENT_DATE");
+        assertThat(q.getSql()).contains("b.amos_et + (?::bigint * INTERVAL '1 second') <= CURRENT_DATE");
         // EXISTS params → maturity window → base side; region RLS fires on both sides.
         assertThat(q.getParams()).containsExactly(
                 7L, 2592000L, "CN", "US",
-                2592000L,
-                7L, "CN", "US");
+                7L, "CN", "US",
+                2592000L);
     }
 
     @Test
@@ -176,13 +176,13 @@ class MetricCompilerTest {
         r.setTimeRange(tr);
         CompiledQuery q = compiler.compile(salesModel, r, user);
 
-        assertThat(q.getSql()).contains("order_date BETWEEN ? AND ?");
-        assertThat(q.getSql()).contains("b.amos_et + (? * INTERVAL '1 second') <= ?");
+        assertThat(q.getSql()).contains("order_date BETWEEN ?::date AND ?::date");
+        assertThat(q.getSql()).contains("b.amos_et + (?::bigint * INTERVAL '1 second') <= ?::date");
         // RLS enforces conservatively even when the request does not touch a target dim.
         assertThat(q.getParams()).containsExactly(
                 7L, 2592000L, "CN", "US",
-                2592000L, LocalDate.parse("2026-09-12"),
-                7L, LocalDate.parse("2026-01-01"), LocalDate.parse("2026-09-12"), "CN", "US");
+                7L, LocalDate.parse("2026-01-01"), LocalDate.parse("2026-09-12"), "CN", "US",
+                2592000L, LocalDate.parse("2026-09-12"));
     }
 
     @Test

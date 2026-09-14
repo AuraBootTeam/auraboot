@@ -56,8 +56,10 @@ import java.util.regex.Pattern;
 public class MetricCompiler {
 
     private static final Pattern IDENT = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
-    /** Internal cohort subquery aliases; model columns must never collide with them. */
-    private static final String COHORT_ALIAS_PREFIX = "amos_";
+    /** Internal cohort subquery alias names (exact-match collision guard). */
+    private static final String COHORT_ENTITY_ALIAS = "amos_ce";
+    private static final String COHORT_ENTRY_TIME_ALIAS = "amos_et";
+    private static final String COHORT_CONV_ALIAS = "amos_cv";
     /**
      * Mirrors the SemanticYamlValidator / AccessPolicyCompiler denylist. Keep in
      * sync — cohort filters are interpolated into subquery WHERE fragments, so
@@ -445,11 +447,15 @@ public class MetricCompiler {
             referencedColumns.add(rd.dim.getFieldRef());
         }
         CohortSpec spec = cohortSpec(metric, model, measureMap, referencedColumns);
+        // Ambiguity guard: a model column EXACTLY named like an internal cohort
+        // alias would make the outer references ambiguous. Prefix matches are
+        // harmless — platform field codes routinely carry arbitrary product
+        // prefixes (e.g. amos_cf_*), so only the exact names are rejected.
         for (String col : referencedColumns) {
-            if (col.startsWith(COHORT_ALIAS_PREFIX)) {
+            if (COHORT_ENTITY_ALIAS.equals(col) || COHORT_ENTRY_TIME_ALIAS.equals(col)
+                    || COHORT_CONV_ALIAS.equals(col)) {
                 throw new MetricCompileException("UNKNOWN_DIMENSION",
-                        "column '" + col + "' collides with the internal cohort alias prefix "
-                                + COHORT_ALIAS_PREFIX + "*");
+                        "column '" + col + "' collides with an internal cohort alias name");
             }
         }
 
@@ -490,14 +496,14 @@ public class MetricCompiler {
                 .append("\n               AND (").append(spec.convFilter()).append(')')
                 .append("\n               AND cv.").append(ptRef).append(" >= b.amos_et")
                 .append("\n               AND cv.").append(ptRef)
-                .append(" < b.amos_et + (? * INTERVAL '1 second')");
+                .append(" < b.amos_et + (?::bigint * INTERVAL '1 second')");
         params.add(spec.windowSeconds());
         StringBuilder convRls = new StringBuilder();
         params.addAll(accessPolicyCompiler.injectRls(convRls, model.getAccessPolicies(), requestedDimCodes, user));
         existsSql.append(convRls).append("\n           )");
 
         List<Object> matureParams = new ArrayList<>();
-        StringBuilder matureSql = new StringBuilder("WHERE b.amos_et + (? * INTERVAL '1 second') <= ");
+        StringBuilder matureSql = new StringBuilder("WHERE b.amos_et + (?::bigint * INTERVAL '1 second') <= ");
         matureParams.add(spec.windowSeconds());
         List<LocalDate> range = List.of();
         if (req.getTimeRange() != null) {
@@ -509,7 +515,7 @@ public class MetricCompiler {
             range = TimeRangeResolver.resolve(req.getTimeRange());
         }
         if (!range.isEmpty()) {
-            matureSql.append('?');
+            matureSql.append("?::date");
             matureParams.add(range.get(1));
         } else {
             matureSql.append("CURRENT_DATE");
@@ -520,7 +526,7 @@ public class MetricCompiler {
                 .append(spec.baseFilter()).append(')');
         baseParams.add(user.tenantId());
         if (!range.isEmpty()) {
-            baseWhere.append(" AND ").append(ptRef).append(" BETWEEN ? AND ?");
+            baseWhere.append(" AND ").append(ptRef).append(" BETWEEN ?::date AND ?::date");
             baseParams.add(range.get(0));
             baseParams.add(range.get(1));
         }
@@ -587,8 +593,11 @@ public class MetricCompiler {
             tailParams.add(req.getOffset());
         }
 
-        params.addAll(matureParams);
+        // Textual order: EXISTS → base (entry) side → maturity → tail. The base
+        // subquery appears in FROM, before the maturity WHERE, so its params must
+        // bind first — an order slip here silently mismatches every parameter.
         params.addAll(baseParams);
+        params.addAll(matureParams);
         params.addAll(tailParams);
         String finalSql = sql.toString();
         return new CompiledQuery(finalSql, params, referencedColumns, fingerprint(finalSql));
