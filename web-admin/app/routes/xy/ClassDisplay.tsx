@@ -72,7 +72,7 @@ export default function ClassDisplay() {
     if (!isAuthenticated) return;
     const classPid = String(params.classPid || '');
     load(classPid);
-    const timer = setInterval(() => load(classPid), 15000);
+    const timer = setInterval(() => load(classPid), 3000); // 3s 短轮询:SSE 管线落地前的时延兜底(验收口径见 FR-036)
     return () => clearInterval(timer);
   }, [isAuthenticated, params.classPid, load]);
 
