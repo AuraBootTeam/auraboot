@@ -19,6 +19,7 @@ test('real-stack runner proves every observability acceptance surface', () => {
   }
   for (const token of ['observability-postgres:', 'app:']) assert.match(compose, new RegExp(token));
   assert.match(compose, /observability-postgres:[\s\S]*image: pgvector\/pgvector:pg16/);
+  assert.match(compose, /app:[\s\S]*\.\/plugins:\/app\/plugins:ro/);
   assert.match(compose, /GF_AUTH_ANONYMOUS_ENABLED: "true"/);
   for (const port of ['APP', 'POSTGRES', 'PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
     assert.match(compose, new RegExp(`127\\.0\\.0\\.1:\\$\\{AURA_OBS_${port}_PORT`));
@@ -49,10 +50,13 @@ test('real-stack runner proves every observability acceptance surface', () => {
   assert.match(runner, /run_flyway validate/);
   assert.match(runner, /ab_flyway_schema_history/);
   assert.match(runner, /up -d --wait observability-postgres/);
-  assert.match(runner, /api\/tenant-selection\/my-spaces/);
-  assert.match(runner, /spaceType === "platform"/);
-  assert.match(runner, /api\/tenant-selection\/process/);
-  assert.match(runner, /platform tenant selection returned no JWT/);
+  assert.match(runner, /scripts\/import-plugins\.sh/);
+  assert.match(runner, /--plugin-root=\/app\/plugins/);
+  assert.match(runner, /platform-admin/);
+  assert.match(runner, /String\(value\?\.code\) !== '0'/);
+  assert.match(runner, /unset JWT/);
+  assert.doesNotMatch(runner, /spaceType === "platform"/);
+  assert.doesNotMatch(runner, /platform tenant selection returned no JWT/);
   assert.doesNotMatch(runner, /docker compose[^\n]*down|down --volumes/);
 });
 

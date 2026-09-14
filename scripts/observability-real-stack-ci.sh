@@ -69,6 +69,8 @@ command -v docker >/dev/null 2>&1 || invalid 'docker is unavailable'
 command -v curl >/dev/null 2>&1 || invalid 'curl is unavailable'
 command -v node >/dev/null 2>&1 || invalid 'node is unavailable'
 command -v java >/dev/null 2>&1 || invalid 'java is unavailable'
+command -v python3 >/dev/null 2>&1 || invalid 'python3 is unavailable'
+command -v psql >/dev/null 2>&1 || invalid 'psql is unavailable'
 command -v timeout >/dev/null 2>&1 || invalid 'timeout is unavailable'
 docker compose version >/dev/null 2>&1 || invalid 'docker compose v2 is unavailable'
 docker info >/dev/null 2>&1 || invalid 'Docker daemon is unavailable'
@@ -152,6 +154,26 @@ then
     --data '{"companyName":"Observability Acceptance","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Acceptance Admin","systemMode":"single"}' \
     > "$ARTIFACTS/bootstrap.json"
 fi
+
+# Bootstrap deliberately creates only the tenant/role baseline; product permissions are
+# owned by plugins. Import the platform-admin contract before probing its
+# system_management-gated runtime page. The app sees the same immutable checkout at
+# /app/plugins, while import verification reads the acceptance PostgreSQL instance.
+PGHOST=127.0.0.1 \
+PGPORT="$AURA_OBS_POSTGRES_PORT" \
+PGUSER=auraboot \
+PGDATABASE=aura_boot \
+PGPASSWORD=auraboot-observability-ci \
+BACKEND_URL="http://127.0.0.1:$AURA_OBS_APP_PORT" \
+PLUGIN_ROOT=/app/plugins \
+  "$PROJECT_ROOT/scripts/import-plugins.sh" \
+    --edition=oss \
+    --backend-url="http://127.0.0.1:$AURA_OBS_APP_PORT" \
+    --plugin-root=/app/plugins \
+    platform-admin \
+    > "$ARTIFACTS/platform-admin-import.log" 2>&1 \
+  || { printf '[observability-real-stack] product-failure: platform-admin permission contract import failed\n' >&2; exit 1; }
+
 LOGIN_RESPONSE="$(curl --fail --silent --show-error -X POST \
   "http://127.0.0.1:$AURA_OBS_APP_PORT/api/auth/login" \
   -H 'Content-Type: application/json' \
@@ -166,39 +188,17 @@ process.stdin.on("end", () => {
   process.stdout.write(value);
 });')" || { printf '[observability-real-stack] product-failure: login returned no JWT\n' >&2; exit 1; }
 unset LOGIN_RESPONSE
-SPACES_RESPONSE="$(curl --fail --silent --show-error \
-  -H "Authorization: Bearer $JWT" \
-  "http://127.0.0.1:$AURA_OBS_APP_PORT/api/tenant-selection/my-spaces")"
-PLATFORM_TENANT_ID="$(printf '%s' "$SPACES_RESPONSE" | node -e '
-let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", chunk => input += chunk);
-process.stdin.on("end", () => {
-  const spaces = JSON.parse(input)?.data ?? [];
-  const value = spaces.find(space => space?.spaceType === "platform")?.tenantId;
-  if (!value) process.exit(1);
-  process.stdout.write(String(value));
-});')" || { printf '[observability-real-stack] product-failure: bootstrap admin has no platform tenant\n' >&2; exit 1; }
-unset SPACES_RESPONSE
-SELECT_RESPONSE="$(curl --fail --silent --show-error -X POST \
-  -H "Authorization: Bearer $JWT" \
-  -H 'Content-Type: application/json' \
-  --data "{\"action\":\"select\",\"tenantId\":\"$PLATFORM_TENANT_ID\"}" \
-  "http://127.0.0.1:$AURA_OBS_APP_PORT/api/tenant-selection/process")"
-JWT="$(printf '%s' "$SELECT_RESPONSE" | node -e '
-let input = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", chunk => input += chunk);
-process.stdin.on("end", () => {
-  const value = JSON.parse(input)?.data?.jwt;
-  if (!value) process.exit(1);
-  process.stdout.write(value);
-});')" || { printf '[observability-real-stack] product-failure: platform tenant selection returned no JWT\n' >&2; exit 1; }
-unset SELECT_RESPONSE PLATFORM_TENANT_ID
 curl --fail --silent --show-error -D "$ARTIFACTS/application-response.headers" \
   -H "Authorization: Bearer $JWT" \
   "http://127.0.0.1:$AURA_OBS_APP_PORT/api/observability/snapshot" \
   > "$ARTIFACTS/application-response.json"
+unset JWT
+node - "$ARTIFACTS/application-response.json" <<'NODE' \
+  || { printf '[observability-real-stack] product-failure: observability snapshot authorization or response contract failed\n' >&2; exit 1; }
+const fs = require('node:fs');
+const value = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (String(value?.code) !== '0' || !value?.data?.jvm || !value?.data?.http) process.exit(1);
+NODE
 TRACE_ID="$(awk 'BEGIN{IGNORECASE=1} /^X-Trace-Id:/ {gsub("\\r", "", $2); print $2}' \
   "$ARTIFACTS/application-response.headers" | tail -1)"
 [[ "$TRACE_ID" =~ ^[0-9a-f]{32}$ ]] \

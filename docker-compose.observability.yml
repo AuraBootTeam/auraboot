@@ -40,6 +40,8 @@ services:
         condition: service_healthy
       tempo:
         condition: service_started
+    volumes:
+      - ./plugins:/app/plugins:ro
     restart: unless-stopped
 
   prometheus:
