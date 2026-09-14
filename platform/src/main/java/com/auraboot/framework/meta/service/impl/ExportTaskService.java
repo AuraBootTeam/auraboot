@@ -152,9 +152,15 @@ public class ExportTaskService {
 
             List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(tenantId, task.getQueryCode());
 
-            // Build SELECT
+            // Build SELECT — quote field codes so PostgreSQL preserves camelCase
+            // aliases (unquoted identifiers fold to lowercase and the exported
+            // headers stop matching the declared NQ output fields).
             List<String> selectColumns = fields.stream()
-                    .map(f -> f.getColumnExpr() + " AS " + f.getFieldCode())
+                    .map(f -> {
+                        com.auraboot.framework.meta.security.SqlSafetyUtils.validateIdentifier(
+                                f.getFieldCode(), "NQ export field code");
+                        return f.getColumnExpr() + " AS \"" + f.getFieldCode() + "\"";
+                    })
                     .toList();
             if (selectColumns.isEmpty()) {
                 selectColumns = List.of("*");
@@ -190,7 +196,10 @@ public class ExportTaskService {
             String fileName = task.getQueryCode() + "_export_" + task.getPid();
 
             java.nio.file.Path tempFile;
-            String format = task.getFormat() != null ? task.getFormat() : "excel";
+            // submitExport stores the enum name ("CSV"/"JSON"), so normalize here or
+            // every csv/json request silently falls into the excel branch.
+            String format = task.getFormat() != null
+                    ? task.getFormat().toLowerCase(java.util.Locale.ROOT) : "excel";
             switch (format) {
                 case "csv":
                     tempFile = exportAsCsv(data, fieldCodes, fileName);

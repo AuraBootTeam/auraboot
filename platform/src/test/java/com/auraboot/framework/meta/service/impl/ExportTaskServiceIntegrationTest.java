@@ -283,6 +283,38 @@ class ExportTaskServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("CSV export fills camelCase field values (declared case survives SQL aliasing)")
+    void submitExport_csv_preservesCamelCaseFieldValues() throws Exception {
+        String code = uniqueCode("camelcsv");
+        insertNamedQuery(code);
+        NamedQueryField f1 = new NamedQueryField(testTenant.getId(), code, "rowCode", "code", "string");
+        f1.setSortable(true);
+        namedQueryFieldMapper.insert(f1);
+        NamedQueryField f2 = new NamedQueryField(testTenant.getId(), code, "rowTitle", "title", "string");
+        f2.setSortable(false);
+        namedQueryFieldMapper.insert(f2);
+
+        ExportTaskDTO initial = exportTaskService.submitExport(
+                code, exportRequest(DataExportRequest.ExportFormat.CSV),
+                testTenant.getId(), testUser.getId());
+        ExportTaskDTO dto = awaitTerminal(initial.getPid(), 10_000);
+        assertEquals(ExportTask.STATUS_COMPLETED, dto.getStatus());
+
+        String fileKey = exportTaskService.getFileKey(dto.getPid());
+        assertNotNull(fileKey, "completed export must have a file");
+        // exportAsCsv writes with the platform default charset — read symmetrically
+        String csv = new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(fileKey)));
+        String[] lines = csv.lines().toArray(String[]::new);
+        assertTrue(lines.length >= 2, "header plus at least one data row expected: " + csv);
+        assertEquals("rowCode,rowTitle", lines[0], "header must use declared field codes");
+        // The exported query is the row just created above, so its own code must
+        // appear as a VALUE — folded lowercase keys would make every cell empty.
+        String dataRow = lines[1];
+        assertTrue(dataRow.contains(code),
+                "camelCase field lookup must resolve values, got: " + dataRow);
+    }
+
+    @Test
     @DisplayName("submitExport creates and processes a JSON export (waits for async completion)")
     void submitExport_json_happyPath() throws InterruptedException {
         String code = uniqueCode("json");
