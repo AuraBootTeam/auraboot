@@ -1,6 +1,6 @@
 package com.auraboot.framework.notification.listener;
 
-import com.auraboot.framework.bpm.event.BpmEvent;
+import com.auraboot.framework.plugin.extension.WorkflowEvent;
 import com.auraboot.framework.notification.channel.NotificationMessage;
 import com.auraboot.framework.notification.channel.NotificationResult;
 import com.auraboot.framework.notification.channel.PushNotificationChannel;
@@ -18,7 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.util.*;
 
 /**
- * Listens to BPM task events and sends push notifications to assignees.
+ * Listens to workflow task events and sends push notifications to assignees.
  * Handles task_assigned and task_transferred events.
  *
  * @since 6.4.0
@@ -39,22 +39,22 @@ public class TaskPushNotificationListener {
 
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onBpmEvent(BpmEvent event) {
-        String bpmType = event.getBpmEventType();
-        if (!"task_assigned".equals(bpmType) && !"task_transferred".equals(bpmType)) {
+    public void onWorkflowEvent(WorkflowEvent event) {
+        String workflowType = event.getWorkflowEventType();
+        if (!"task_assigned".equals(workflowType) && !"task_transferred".equals(workflowType)) {
             return;
         }
 
         try {
             Map<String, Object> payload = event.getPayload();
             if (payload == null) {
-                log.debug("BpmEvent payload is null, skipping push notification");
+                log.debug("WorkflowEvent payload is null, skipping push notification");
                 return;
             }
 
             List<Long> assigneeUserIds = resolveAssigneeUserIds(payload);
             if (assigneeUserIds.isEmpty()) {
-                log.debug("No assignee user IDs resolved for BPM event type={}, skipping push", bpmType);
+                log.debug("No assignee user IDs resolved for workflow event type={}, skipping push", workflowType);
                 return;
             }
 
@@ -78,16 +78,16 @@ public class TaskPushNotificationListener {
             }
 
             if (recipientsWithTokens.isEmpty()) {
-                log.debug("No recipients with valid push tokens for event type={}", bpmType);
+                log.debug("No recipients with valid push tokens for event type={}", workflowType);
                 return;
             }
 
             // Build push notification
             String taskId = payload.getOrDefault("taskId", "").toString();
             String processName = payload.getOrDefault("processName", "").toString();
-            String title = buildTitle(bpmType, processName);
-            String body = buildBody(bpmType, payload);
-            String deepLink = "auraboot://bpm/task/" + taskId;
+            String title = buildTitle(workflowType, processName);
+            String body = buildBody(workflowType, payload);
+            String deepLink = String.valueOf(payload.getOrDefault("deepLink", ""));
 
             NotificationMessage message = NotificationMessage.builder()
                     .tenantId(event.getTenantId())
@@ -95,23 +95,23 @@ public class TaskPushNotificationListener {
                     .subject(title)
                     .body(body)
                     .category(CATEGORY)
-                    .sourceType("bpm_task")
+                    .sourceType("workflow_task")
                     .sourceId(taskId)
                     .extras(Map.of(
                             "deep_link", deepLink,
                             "badge", 1,
-                            "bpm_event_type", bpmType
+                            "workflow_event_type", workflowType
                     ))
                     .build();
 
             NotificationResult result = pushNotificationChannel.send(message);
             if (!result.isSuccess()) {
-                log.warn("Push notification failed for BPM event type={}: {}", bpmType, result.getErrorMessage());
+                log.warn("Push notification failed for workflow event type={}: {}", workflowType, result.getErrorMessage());
             } else {
-                log.info("Push notification sent for BPM event type={} to {} recipients", bpmType, recipientsWithTokens.size());
+                log.info("Push notification sent for workflow event type={} to {} recipients", workflowType, recipientsWithTokens.size());
             }
         } catch (Exception e) {
-            log.error("Failed to process push notification for BPM event type={}: {}", bpmType, e.getMessage(), e);
+            log.error("Failed to process push notification for workflow event type={}: {}", workflowType, e.getMessage(), e);
         }
     }
 

@@ -384,7 +384,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             String agentCode = request.agentCode();
             TurnExecutionPlanner.InitialExecutionMode initialMode;
             TurnExecutionPlanner.TurnExecutionPlan turnPlan = null;
-            if (TurnExecutionPlanner.isRagOnlyChannel(request.channel())) {
+            if (legacyRequest != null && legacyRequest.getFormFill() != null) {
+                if (!"web".equals(request.channel())
+                        || (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode))) {
+                    throw new IllegalArgumentException("Form extraction requires the web AuraBot draft entry");
+                }
+                // Source text must never promote a draft extraction into a
+                // durable workflow or a named agent with business write tools.
+                initialMode = TurnExecutionPlanner.InitialExecutionMode.SYNC_AGENT_TURN;
+                route = new TurnRoute(initialMode.name(), "FORM_FILL_DRAFT_ONLY", java.util.List.of("FORM_FILL"));
+            } else if (TurnExecutionPlanner.isRagOnlyChannel(request.channel())) {
                 // RAG-only channel (embeddable CS widget): pure knowledge Q&A. Never route to the
                 // durable/planner path regardless of triage bucket — otherwise a "cancel account /
                 // export data" question is classified as a task and runs execute_sql, looping on tool

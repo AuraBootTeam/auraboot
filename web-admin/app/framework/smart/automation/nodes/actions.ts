@@ -245,7 +245,7 @@ export const actionNodes: FlowNodeDefinition[] = [
       {
         key: 'processKey',
         label: '$i18n:automation.field.processKey',
-        type: 'process-select',
+        type: 'workflow-select',
         required: true,
         group: 'process',
       },

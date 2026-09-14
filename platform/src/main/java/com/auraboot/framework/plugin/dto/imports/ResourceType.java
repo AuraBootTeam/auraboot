@@ -14,7 +14,6 @@ public enum ResourceType {
     ROLE("ab_role", "角色", OwnershipType.SHARED),
     ROLE_PERMISSION("ab_role_permission", "角色权限", OwnershipType.SHARED),
     MENU("ab_menu", "菜单", OwnershipType.SHARED),
-    PROCESS("ab_bpm_process_definition", "流程", OwnershipType.SHARED),
     PAGE("ab_page_schema", "页面", OwnershipType.SHARED),
     DICT("ab_dict", "字典", OwnershipType.SHARED),
     NAMED_QUERY("ab_named_query", "命名查询", OwnershipType.SHARED),
@@ -60,10 +59,7 @@ public enum ResourceType {
             case AGENT_DEFINITION -> 76;
             case PAGE -> 80;
             case SAVED_VIEW -> 82;
-            // Templates are looked up by code at process runtime (no FK), but importing them
-            // before PROCESS keeps the delivery channel ready by the time processes deploy.
             case NOTIFICATION_TEMPLATE -> 85;
-            case PROCESS -> 90;
             case I18N -> 95;
         };
     }

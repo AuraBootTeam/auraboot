@@ -2,6 +2,7 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver.ActiveRelease;
+import com.auraboot.framework.environment.service.EnvironmentService;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.PageSchemaRuntimeDTO;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -24,12 +25,15 @@ public class AuthoringRuntimePageMaterializer {
     private static final TypeReference<List<Object>> OBJECT_LIST = new TypeReference<>() { };
 
     private final AuthoringActiveReleaseResolver activeReleaseResolver;
+    private final EnvironmentService environmentService;
     private final ObjectMapper objectMapper;
 
     public AuthoringRuntimePageMaterializer(
             AuthoringActiveReleaseResolver activeReleaseResolver,
+            EnvironmentService environmentService,
             ObjectMapper objectMapper) {
         this.activeReleaseResolver = activeReleaseResolver;
+        this.environmentService = environmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -38,7 +42,7 @@ public class AuthoringRuntimePageMaterializer {
             return null;
         }
         long tenantId = requiredTenantId();
-        long envId = requiredEnvironmentId();
+        long envId = requiredEnvironmentId(tenantId);
         ActiveRelease active = activeReleaseResolver.findByResource(
                 tenantId, envId, "PAGE_SCHEMA", baseline.getPid());
         if (active == null) {
@@ -129,8 +133,14 @@ public class AuthoringRuntimePageMaterializer {
         return context.getTenantId();
     }
 
-    private long requiredEnvironmentId() {
+    private long requiredEnvironmentId(long tenantId) {
         Long envId = MetaContext.getCurrentEnvironmentId();
+        if (envId == null) {
+            envId = environmentService.findOrCreateDefaultId(tenantId);
+            if (envId != null) {
+                MetaContext.setEnvironmentId(envId);
+            }
+        }
         if (envId == null) {
             throw new ResponseStatusException(FORBIDDEN, "authoring.context.incomplete");
         }

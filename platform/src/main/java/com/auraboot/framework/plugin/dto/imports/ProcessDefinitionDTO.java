@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DTO for importing BPM process definitions from plugin manifest.
+ * DTO for importing workflow definitions from plugin manifest.
  */
 @Data
 @Builder

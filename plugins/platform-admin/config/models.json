@@ -1,41 +1,5 @@
 [
   {
-    "code": "sla_config",
-    "displayName:zh-CN": "SLA 配置",
-    "displayName:en": "SLA Configuration",
-    "description": "SLA deadline and warning configuration for BPM processes",
-    "modelType": "entity",
-    "modelCategory": "master",
-    "extension": {
-      "titleField": "name",
-      "subtitleField": "target_type",
-      "tableName": "ab_sla_config",
-      "softDelete": true
-    },
-    "semantic_description": "Service Level Agreement configuration defining deadline and warning rules for BPM process targets. Answers: what SLA milestones apply to which process types, and when should warnings trigger?",
-    "domain_category": "platform",
-    "data_sensitivity": "internal",
-    "lifecycle_description": "No status lifecycle — master configuration reference."
-  },
-  {
-    "code": "bpm_domain_config",
-    "displayName:zh-CN": "BPM 域配置",
-    "displayName:en": "BPM Domain Configuration",
-    "description": "BPM domain configuration for process grouping and field display",
-    "modelType": "entity",
-    "modelCategory": "master",
-    "extension": {
-      "titleField": "domain_name",
-      "subtitleField": "domain_code",
-      "tableName": "ab_bpm_domain_config",
-      "softDelete": true
-    },
-    "semantic_description": "BPM domain configuration specifying which process keys belong to a domain, and which fields are visible in list / filter / sort. Answers: which fields should be displayed for which business domain's processes?",
-    "domain_category": "platform",
-    "data_sensitivity": "internal",
-    "lifecycle_description": "No status lifecycle — master configuration reference."
-  },
-  {
     "code": "data_permission",
     "displayName:zh-CN": "数据权限策略",
     "displayName:en": "Data Permission Policy",
@@ -136,29 +100,14 @@
       "subtitleField": "task_type",
       "tableName": "ab_scheduled_task",
       "softDelete": false,
-      "uniqueFields": ["name"]
+      "uniqueFields": [
+        "name"
+      ]
     },
     "semantic_description": "Configurable background task definition specifying trigger (cron / interval), target handler bean/method, retry policy, and execution timeout. Answers: which recurring or delayed operations should execute automatically, with what frequency and constraints?",
     "domain_category": "platform",
     "data_sensitivity": "internal",
     "lifecycle_description": "No status lifecycle — task definition reference (enabled/disabled via enabled field, not state transition)."
-  },
-  {
-    "code": "bpm_process_management",
-    "displayName:zh-CN": "BPM 流程定义",
-    "displayName:en": "BPM Process Definition",
-    "description": "BPM process definition management (data from dedicated BPM API)",
-    "modelType": "entity",
-    "modelCategory": "master",
-    "extension": {
-      "titleField": "process_name",
-      "subtitleField": "process_key",
-      "skipTableCreation": true
-    },
-    "semantic_description": "BPM process definition metadata retrieved from dedicated BPM engine API (not persisted to relational table). Answers: which workflow templates exist in the system, with what name and process key?",
-    "domain_category": "platform",
-    "data_sensitivity": "internal",
-    "lifecycle_description": "No status lifecycle — read-only metadata from BPM engine (skipTableCreation: true)."
   },
   {
     "code": "dashboard_management",

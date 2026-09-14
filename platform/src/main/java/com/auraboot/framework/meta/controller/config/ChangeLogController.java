@@ -8,10 +8,16 @@ import com.auraboot.framework.meta.entity.DataChangeLog;
 import com.auraboot.framework.meta.service.ChangeLogService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * REST controller for querying data change history.
@@ -25,6 +31,7 @@ import java.util.List;
 public class ChangeLogController {
 
     private final ChangeLogService changeLogService;
+    private final UserService userService;
 
     /**
      * Get change history for a specific record.
@@ -35,7 +42,46 @@ public class ChangeLogController {
             @RequestParam String modelCode,
             @RequestParam String recordPid) {
         List<DataChangeLog> history = changeLogService.getHistory(modelCode, recordPid);
+        resolveActorNames(history);
         return ApiResponse.success(history);
+    }
+
+    /**
+     * Populate {@code changedByName} so clients render a readable actor instead
+     * of the raw user id. Resolution is best-effort: deleted or foreign users
+     * simply leave the name null.
+     */
+    private void resolveActorNames(List<DataChangeLog> history) {
+        if (history == null || history.isEmpty()) {
+            return;
+        }
+        Set<Long> userIds = history.stream()
+                .map(DataChangeLog::getChangedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<Long, String> names = userService.findByUserIds(userIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        ChangeLogController::displayNameOf,
+                        (a, b) -> a));
+        for (DataChangeLog log : history) {
+            if (log.getChangedBy() != null) {
+                log.setChangedByName(names.get(log.getChangedBy()));
+            }
+        }
+    }
+
+    private static String displayNameOf(User user) {
+        if (user.getNickName() != null && !user.getNickName().isBlank()) {
+            return user.getNickName();
+        }
+        if (user.getUserName() != null && !user.getUserName().isBlank()) {
+            return user.getUserName();
+        }
+        return user.getEmail();
     }
 
     /**

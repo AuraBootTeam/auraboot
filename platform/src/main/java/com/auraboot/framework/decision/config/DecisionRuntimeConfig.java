@@ -41,14 +41,15 @@ public class DecisionRuntimeConfig {
     }
 
     @Bean
-    public com.auraboot.framework.decision.adapter.DroolsDrlAdapter droolsDrlAdapter(
-            com.auraboot.framework.bpm.rule.DroolsEngineService droolsEngineService) {
-        return new com.auraboot.framework.decision.adapter.DroolsDrlAdapter(droolsEngineService);
+    public com.auraboot.framework.decision.adapter.WorkflowDrlAdapter workflowDrlAdapter(
+            com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry workflowCapabilities) {
+        return new com.auraboot.framework.decision.adapter.WorkflowDrlAdapter(workflowCapabilities);
     }
 
     @Bean
-    public com.auraboot.framework.decision.adapter.DroolsDmnAdapter droolsDmnAdapter() {
-        return new com.auraboot.framework.decision.adapter.DroolsDmnAdapter();
+    public com.auraboot.framework.decision.adapter.WorkflowDmnAdapter workflowDmnAdapter(
+            com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry workflowCapabilities) {
+        return new com.auraboot.framework.decision.adapter.WorkflowDmnAdapter(workflowCapabilities);
     }
 
     /**

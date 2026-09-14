@@ -104,23 +104,23 @@ class AutomationFlowTriggerDeriverTest {
     // ==================== BPM event trigger ====================
 
     /**
-     * Designer saves a trigger-bpm-event node.
-     * Verifies triggerType=on_bpm_event, modelCode (= processKey), and
+     * Designer saves a trigger-workflow-event node.
+     * Verifies triggerType=on_workflow_event, modelCode (= processKey), and
      * triggerConfig.eventTypes are all correctly derived.
      */
     @Test
-    void derive_bpmEventTrigger_extractsAllFields() {
+    void derive_workflowEventTrigger_extractsAllFields() {
         Map<String, Object> cfg = Map.of(
-                "triggerType", "on_bpm_event",
+                "triggerType", "on_workflow_event",
                 "modelCode", "leave_approval",
                 "eventTypes", List.of("process_started", "task_completed"));
         Map<String, Object> fc = flowConfig(List.of(
-                triggerNode("trigger-bpm-event", cfg)));
+                triggerNode("trigger-workflow-event", cfg)));
 
         DerivedTrigger result = deriver.derive(fc);
 
         assertThat(result.isEmpty()).isFalse();
-        assertThat(result.triggerType()).isEqualTo("on_bpm_event");
+        assertThat(result.triggerType()).isEqualTo("on_workflow_event");
         assertThat(result.modelCode()).isEqualTo("leave_approval");
         assertThat(result.triggerConfig()).isNotNull();
         assertThat(result.triggerConfig().getEventTypes())

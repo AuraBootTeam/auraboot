@@ -21,7 +21,7 @@ interface PipeRunOptions {
  *
  * Examples:
  *   aura pipe run ./my-workflow.yaml
- *   aura pipe run daily-sales-report --template
+ *   aura pipe run overdue-tasks-alert --template
  *   aura pipe run ./report.yaml --dry-run --verbose
  */
 export async function pipeRunCommand(fileOrName: string, options: PipeRunOptions): Promise<void> {

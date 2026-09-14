@@ -53,13 +53,6 @@ public class WhiteList {
             // signature/token validation and fails closed when none is configured)
             "/api/automations/webhooks/**",
 
-            // CRM public inbound endpoint (no auth — adapters perform their own verification)
-            "/api/crm/inbound/**",
-            "/api/crm/forms/**",
-
-            // CRM Calendar OAuth callback (no auth — state token carries identity)
-            "/api/crm/calendar/callback/**",
-
             // Public shared views (GAP-121)
             "/api/views/shared/**",
 

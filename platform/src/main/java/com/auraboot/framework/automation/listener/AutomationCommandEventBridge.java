@@ -23,7 +23,7 @@ import java.util.Map;
  *
  * <p>Uses {@code @TransactionalEventListener(AFTER_COMMIT)} so automations only
  * run after the command transaction has fully committed — consistent with how
- * the BPM event bridge and the field-change audit listener work.
+ * the workflow event bridge and the field-change audit listener work.
  *
  * <p>Uses {@code @Async("eventTaskExecutor")} so automation execution is
  * non-blocking and cannot slow down the HTTP response.

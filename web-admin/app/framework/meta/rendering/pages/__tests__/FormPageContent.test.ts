@@ -660,7 +660,7 @@ describe('resolveEditRecordEndpoint', () => {
         {
           extension: {
             recordSource: {
-              endpoint: '/api/bpm/process-definitions/{pid}',
+              endpoint: '/api/extensions/workflow/process-definitions/{pid}',
               method: 'get',
             },
           },
@@ -668,7 +668,7 @@ describe('resolveEditRecordEndpoint', () => {
         'bpm_process_management',
         'process-1',
       ),
-    ).toBe('/api/bpm/process-definitions/process-1');
+    ).toBe('/api/extensions/workflow/process-definitions/process-1');
   });
 });
 

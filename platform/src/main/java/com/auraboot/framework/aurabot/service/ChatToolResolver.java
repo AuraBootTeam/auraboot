@@ -247,6 +247,17 @@ public class ChatToolResolver {
                             "required", List.of("fields")))
                     .build();
 
+    /** This mode deliberately has no business, SQL, delegation or approval tools. */
+    public ResolvedTools resolveFormFill(com.auraboot.framework.agent.dto.FormFillRequest request) {
+        cacheSyntheticPlatformTool(PLATFORM_FILL_FORM_TOOL, "platform.fill_form", true, "L1");
+        LlmChatRequest.Tool tool = LlmChatRequest.Tool.builder()
+                .name(FormFillContract.TOOL_NAME)
+                .description("Extract only facts explicitly supported by the pasted text into the declared form fields. "
+                        + "Omit unknown or ambiguous values. This prepares a draft, never submits it.")
+                .inputSchema(FormFillContract.schema(request)).build();
+        return new ResolvedTools(List.of(tool), "form_fill", request.modelCode(), true);
+    }
+
     /** SQL remains a fallback only when no domain read tool is available. */
     private static final LlmChatRequest.Tool PLATFORM_EXECUTE_SQL_TOOL =
             LlmChatRequest.Tool.builder()

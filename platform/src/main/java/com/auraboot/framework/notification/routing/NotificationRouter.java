@@ -1,6 +1,6 @@
 package com.auraboot.framework.notification.routing;
 
-import com.auraboot.framework.bpm.event.BpmEvent;
+import com.auraboot.framework.plugin.extension.WorkflowEvent;
 import com.auraboot.framework.event.AuraEvent;
 import com.auraboot.framework.notification.channel.NotificationChannel;
 import com.auraboot.framework.notification.channel.NotificationMessage;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 /**
  * Event-driven notification router.
  *
- * Listens to {@link CommandCompletedEvent} and {@link BpmEvent}, matches templates
+ * Listens to {@link CommandCompletedEvent} and {@link WorkflowEvent}, matches templates
  * by code, resolves recipients via {@link RecipientResolver}, renders templates,
  * and dispatches to all configured channels.
  *
@@ -79,8 +79,11 @@ public class NotificationRouter {
     // ASYNC: avoid blocking BPM command chain (BE-5 P0 fix 2026-04-30)
     @Async("eventTaskExecutor")
     @EventListener
-    public void onBpmEvent(BpmEvent event) {
-        route(event, event.getEventType());
+    public void onBpmEvent(WorkflowEvent event) {
+        AuraEvent adapter = new AuraEvent(
+                event.getTenantId(), event.getEventType(), event.getSourceType(),
+                event.getInstanceId(), event.getPayload()) {};
+        route(adapter, event.getWorkflowEventType());
     }
 
     void route(AuraEvent event, String templateCode) {

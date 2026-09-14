@@ -1,6 +1,5 @@
 package com.auraboot.framework.meta.controller;
 
-import com.auraboot.smart.framework.engine.common.util.CollectionUtil;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
@@ -109,7 +108,7 @@ public class DataSourceController {
         
         try {
             // 首先尝试从items字段获取数据（迁移后的主要数据源）
-             if (!CollectionUtil.isEmpty(dictDTO.getItems())) {
+             if (dictDTO.getItems() != null && !dictDTO.getItems().isEmpty()) {
                  items = dictDTO.getItems();
             } else {
                 // 降级方案：从字典项中获取数据

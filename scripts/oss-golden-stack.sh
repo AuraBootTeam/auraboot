@@ -33,7 +33,7 @@
 #
 # Then run golden specs (the `up` banner prints this, `env` re-prints it):
 #   cd web-admin && eval "$(../scripts/oss-golden-stack.sh env <name>)" \
-#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/<spec>.spec.ts
+#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/<spec>.spec.ts
 #
 set -euo pipefail
 
@@ -67,6 +67,43 @@ ADMIN_PASSWORD="Test2026x"
 
 log() { printf '\033[36m[golden-stack]\033[0m %s\n' "$*"; }
 die() { printf '\033[31m[golden-stack] FATAL:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# ---- per-checkout stack lock -----------------------------------------------------------
+# Gradle outputs are not safe to write concurrently on one checkout: a second build
+# rewriting platform/build/libs while our backend boots replaces the jar inode under the
+# running JVM, which then dies with ServiceLoader NoSuchFileException (observed
+# 2026-09-14: a CI release suite built the same checkout during 'up'). 'up' holds this
+# lock across build → backend health so golden-stack runs serialize per checkout. CI
+# suites that don't take the lock are covered separately by spawning from a copied jar.
+GOLDEN_STACK_LOCK_DIR=""
+
+golden_stack_lock_dir() {
+  local key; key="$(printf '%s' "$REPO_ROOT" | cksum | cut -d' ' -f1)"
+  printf '%s/aura-golden-stack-%s.lock' "${TMPDIR:-/tmp}" "$key"
+}
+
+release_stack_lock() {
+  [ -n "$GOLDEN_STACK_LOCK_DIR" ] || return 0
+  rm -rf "$GOLDEN_STACK_LOCK_DIR"
+  GOLDEN_STACK_LOCK_DIR=""
+}
+
+acquire_stack_lock() {
+  local lock_dir; lock_dir="$(golden_stack_lock_dir)"
+  if ! mkdir "$lock_dir" 2>/dev/null; then
+    local holder; holder="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+      log "taking over stale golden-stack lock (holder pid $holder is gone)"
+      rm -rf "$lock_dir"
+      mkdir "$lock_dir" || die "cannot take over stale golden-stack lock $lock_dir"
+    else
+      die "another golden-stack operation is running on $REPO_ROOT (holder pid ${holder:-?}, lock $lock_dir)"
+    fi
+  fi
+  printf '%s\n' "$$" >"$lock_dir/pid"
+  GOLDEN_STACK_LOCK_DIR="$lock_dir"
+  trap release_stack_lock EXIT
+}
 
 state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
 
@@ -322,6 +359,8 @@ cmd_up() {
 
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
+  acquire_stack_lock
+
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
   # `runtime ensure` is the idempotent allocation contract: the same stable name + slot +
   # source worktree is reused, while a different slot/worktree/branch is rejected. Keep a
@@ -428,6 +467,12 @@ cmd_up() {
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
+  # Run from a copy, not the build output: the JVM lazily re-opens nested jars from this
+  # path for its whole lifetime, and a build that rewrites build/libs mid-boot (CI suite,
+  # second 'up' that lost the lock race on an older checkout) kills the process. The
+  # golden-stack lock above only covers cooperating golden-stack runs.
+  local run_jar="$sd/boot-run.jar"
+  cp "$jar" "$run_jar"
 
   local staging_args=(--profile "${plugin_profile:-none}")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
@@ -459,7 +504,7 @@ cmd_up() {
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
-      java -jar "$jar"
+      java -jar "$run_jar"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
@@ -760,7 +805,7 @@ export PG_PORT=${pg_port:-5432}
 export PG_USER=${pg_user:-auraboot}
 export PG_DB=${pg_db:-aura_boot}
 # example: cd web-admin && eval "\$(../scripts/oss-golden-stack.sh env $name)" \\
-#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/designer-property-edit.spec.ts
+#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/designer-lifecycle.spec.ts
 # NOTE: 'up' runs an internal warm step (full setup → auth storageState → pre-warm
 #       /report-designer + /dashboard), and web-admin/vite.config.ts pre-bundles the
 #       heavy lazy-route deps (optimizeDeps.include, #947). The FIRST golden run after

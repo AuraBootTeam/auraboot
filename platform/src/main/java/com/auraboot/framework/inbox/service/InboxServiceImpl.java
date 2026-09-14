@@ -103,7 +103,10 @@ public class InboxServiceImpl implements InboxService {
             wrapper.eq(InboxItem::getItemType, itemType);
         }
         if (status != null && !status.isBlank()) {
-            wrapper.eq(InboxItem::getStatus, status);
+            // Status is stored lowercase ("pending"/"acted"/"dismissed"); callers
+            // historically passed the Javadoc's uppercase form and silently
+            // matched 0 rows (see TestFixtureController inbox_empty incident).
+            wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
         }
 
         wrapper.orderByDesc(InboxItem::getCreatedAt);
@@ -122,7 +125,10 @@ public class InboxServiceImpl implements InboxService {
             wrapper.in(InboxItem::getItemType, itemTypes);
         }
         if (status != null && !status.isBlank()) {
-            wrapper.eq(InboxItem::getStatus, status);
+            // Status is stored lowercase ("pending"/"acted"/"dismissed"); callers
+            // historically passed the Javadoc's uppercase form and silently
+            // matched 0 rows (see TestFixtureController inbox_empty incident).
+            wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
         }
 
         wrapper.orderByDesc(InboxItem::getCreatedAt);

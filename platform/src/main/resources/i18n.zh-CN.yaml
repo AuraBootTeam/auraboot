@@ -549,24 +549,6 @@ notification:
     load_failed: 加载通知偏好失败
     update_failed: 更新通知偏好失败
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 您有新的待办任务
-    task_completed:
-      title: 任务已完成
-    process_started:
-      title: 流程已发起
-    process_ended:
-      title: 流程已结束
-    sla_warning:
-      title: SLA 预警提醒
-    sla_escalated:
-      title: SLA 已升级
-    default:
-      title: 流程通知
-
 # Flow Designer SDK
 flow:
   palette:
@@ -626,8 +608,8 @@ automation:
     scheduled.desc: 按照 Cron 表达式定时触发
     webhook: Webhook 触发
     webhook.desc: 当收到外部 Webhook 请求时触发
-    bpmEvent: 流程事件触发
-    bpmEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
+    workflowEvent: 流程事件触发
+    workflowEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
     inactivity: 记录闲置时
     inactivity.desc: 当记录在指定时长内没有活动（未更新）时触发，由定时巡检驱动
 
@@ -724,7 +706,7 @@ automation:
     collection.desc: 要遍历的数组或列表
     itemVariable: 元素变量名
     itemVariable.desc: 当前元素的变量名，默认为 item
-    bpmProcess: BPM 流程
+    workflowProcess: BPM 流程
     eventTypes: 事件类型
     eventTypes.desc: 留空表示监听所有事件类型
     eventTypes.process_started: 流程启动
@@ -1281,10 +1263,6 @@ workbench:
     title: 统计概览
     inbox_pending: 待办事项
     inbox_urgent: 紧急待办
-    crm_opportunity_amount: 活跃商机
-    crm_account_active: 活跃客户
-    bpm_running: 运行中流程
-    bpm_completed_week: 本周完成
     this_week: 本周
     this_month: 本月
   inbox:
@@ -1394,11 +1372,6 @@ workbench:
     done: 完成
     customize: 点击编辑自定义快捷操作
     customize_hint: 点击编辑自定义
-    newLead: 新建线索
-    newAccount: 新建客户
-    newOpportunity: 新建商机
-    startProcess: 发起流程
-    newContract: 新建合同
     reports: 报表
   recent:
     title: 最近访问
@@ -1406,8 +1379,6 @@ workbench:
   category:
     stats: 统计指标
     tasks: 待办与任务
-    crm: CRM 销售
-    bpm: 流程管理
     general: 通用组件
   widget:
     stats_row: 指标行
@@ -1418,16 +1389,6 @@ workbench:
     inbox_desc: 审批/任务/提醒列表
     calendar: 日程视图
     calendar_desc: 月历视图标记待办日期
-    pipeline: 商机漏斗
-    pipeline_desc: 各阶段商机数量与金额
-    leads: 最新线索
-    leads_desc: 最新线索列表
-    activities: 活动记录
-    activities_desc: 近期跟进活动时间线
-    my_process: 我的流程
-    my_process_desc: 我发起的流程状态
-    process_stats: 流程统计
-    process_stats_desc: 完成率/平均耗时
     shortcuts: 快捷操作
     shortcuts_desc: 常用操作快捷入口
     recent: 最近访问
@@ -1436,50 +1397,11 @@ workbench:
     announcement_desc: 系统公告和团队通知
     quick_note: 快速备忘
     quick_note_desc: 个人备忘录
-  activities:
-    title: 近期活动
-    empty: 暂无活动记录
-    justNow: 刚刚
-    minutesAgo: "{minutes}分钟前"
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
   announcement:
     title: 公告通知
     empty: 暂无公告
     pinned: 置顶
     urgent: 紧急
-  pipeline:
-    title: 商机漏斗
-    empty: 暂无商机数据
-    goToCrm: 前往 CRM
-    total: 合计
-  leads:
-    title: 最新线索
-    empty: 暂无线索
-    viewAll: 查看全部
-    unnamed: 未命名线索
-    justNow: 刚刚
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
-  processStats:
-    title: 流程统计
-    noData: 暂无数据
-    completionRate: 完成率
-    hours: 小时
-    avgDuration: 平均耗时
-    processes: 个流程
-    running: 运行中
-    completedThisWeek: 本周完成
-  process:
-    title: 我的流程
-    empty: 暂无发起的流程
-    viewAll: 查看全部
-    filterAll: 全部
-    filterRunning: 运行中
-    filterCompleted: 已完成
-    justNow: 刚刚
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
   quickNote:
     title: 快速备忘
     placeholder: 写下备忘内容…

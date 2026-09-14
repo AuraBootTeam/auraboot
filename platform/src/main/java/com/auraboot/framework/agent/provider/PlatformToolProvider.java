@@ -349,7 +349,7 @@ public class PlatformToolProvider implements ToolProvider {
         output.put("success", true);
         output.put("total", models.size());
         output.put("models", models);
-        output.put("hint", "IMPORTANT: Table names use mt_ prefix. For example, model 'crm_lead_common' → table 'mt_crm_lead_common'. "
+        output.put("hint", "IMPORTANT: Table names use mt_ prefix. For example, model 'sales_lead' → table 'mt_sales_lead'. "
                 + "All mt_* tables have: id, pid, tenant_id, created_at, updated_at, created_by, updated_by. "
                 + "ALWAYS include 'WHERE tenant_id = #{params.tenantId}' for data isolation.");
         output.put("instruction", "Schema loaded. Now use platform.execute_sql to query the data. Do NOT call platform.list_models again.");
@@ -471,7 +471,8 @@ public class PlatformToolProvider implements ToolProvider {
     @SuppressWarnings("unchecked")
     private Map<String, Object> fillForm(Map<String, Object> params) {
         Object fieldsObj = params.get("fields");
-        if (fieldsObj == null || (fieldsObj instanceof Map && ((Map<?, ?>) fieldsObj).isEmpty())) {
+        if (fieldsObj == null || (fieldsObj instanceof Map && ((Map<?, ?>) fieldsObj).isEmpty()
+                && (!(params.get("reviews") instanceof Map<?, ?> reviews) || reviews.isEmpty()))) {
             return errorResult("fields is required for platform.fill_form");
         }
 
@@ -487,6 +488,7 @@ public class PlatformToolProvider implements ToolProvider {
         output.put("action", "form_fill");
         output.put("fields", fields);
         output.put("fieldCount", fields.size());
+        if (params.get("reviews") instanceof Map<?, ?> reviews) output.put("reviews", reviews);
         output.put("source", getStringParam(params, "source"));
         output.put("confidence", params.get("confidence"));
         output.put("instruction", "Form fill data ready. The frontend will populate the form. "

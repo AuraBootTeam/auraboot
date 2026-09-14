@@ -32,10 +32,6 @@ import { toolListCommand, toolTestCommand } from './commands/ops/tools.js';
 import { approvalListCommand, approvalApproveCommand, approvalRejectCommand } from './commands/ops/approvals.js';
 
 // ── Business domain commands ────────────────────────────────────────────────
-import { crmLeadsCommand } from './commands/crm/leads.js';
-import { crmOpportunitiesCommand } from './commands/crm/opportunities.js';
-import { crmAccountsCommand } from './commands/crm/accounts.js';
-import { crmDashboardCommand } from './commands/crm/dashboard.js';
 import { projectListCommand } from './commands/project/list.js';
 import { projectTasksCommand } from './commands/project/tasks.js';
 import { projectDashboardCommand } from './commands/project/dashboard.js';
@@ -295,51 +291,6 @@ opsApprovals
   .requiredOption('-r, --reason <text>', 'Reason for rejection')
   .action(async (pid: string, cmdOpts: any) => {
     await approvalRejectCommand(pid, cmdOpts.reason, { ...program.opts(), ...cmdOpts });
-  });
-
-// ── crm ─────────────────────────────────────────────────────────────────────
-
-const crm = program
-  .command('crm')
-  .description('CRM: leads, opportunities, accounts, dashboard');
-
-crm
-  .command('leads')
-  .description('List and filter CRM leads')
-  .option('--status <status>', 'Filter by status (NEW, CONTACTED, QUALIFIED, CONVERTED, LOST)')
-  .option('--source <source>', 'Filter by source (WEBSITE, REFERRAL, EXHIBITION, ...)')
-  .option('-k, --keyword <text>', 'Search keyword')
-  .option('-n, --limit <n>', 'Max results', '50')
-  .action(async (cmdOpts: any) => {
-    await crmLeadsCommand({ ...program.opts(), ...cmdOpts });
-  });
-
-crm
-  .command('opportunities')
-  .alias('opps')
-  .description('List and filter sales opportunities')
-  .option('--stage <stage>', 'Filter by stage (DISCOVERY, QUALIFICATION, PROPOSAL, NEGOTIATION, CLOSED_WON, CLOSED_LOST)')
-  .option('-k, --keyword <text>', 'Search keyword')
-  .option('-n, --limit <n>', 'Max results', '50')
-  .action(async (cmdOpts: any) => {
-    await crmOpportunitiesCommand({ ...program.opts(), ...cmdOpts });
-  });
-
-crm
-  .command('accounts')
-  .description('List and filter customer accounts')
-  .option('--status <status>', 'Filter by status')
-  .option('-k, --keyword <text>', 'Search keyword')
-  .option('-n, --limit <n>', 'Max results', '50')
-  .action(async (cmdOpts: any) => {
-    await crmAccountsCommand({ ...program.opts(), ...cmdOpts });
-  });
-
-crm
-  .command('dashboard')
-  .description('CRM KPI summary and pipeline overview')
-  .action(async () => {
-    await crmDashboardCommand(program.opts());
   });
 
 // ── project ─────────────────────────────────────────────────────────────────

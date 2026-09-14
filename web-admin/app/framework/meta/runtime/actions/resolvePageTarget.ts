@@ -6,7 +6,8 @@
  * or an absolute path (`/p/c/quote_console`) — and every consumer must turn it
  * into the same route. Keeping the rules in one place is what stops the
  * `navigate` action and the form back link from drifting apart.
- */
+*/
+import { getKernel } from '~/framework/bootstrap';
 
 /**
  * Resolve a DSL navigation target to a route path.
@@ -59,26 +60,18 @@ export function resolvePageTargetPath(
     return `/dashboards/view/${code}`;
   }
 
-  // Cross-designer navigation: bpmn-status:{processKey}
-  if (target.startsWith('bpmn-status:')) {
-    const processKey = target.substring('bpmn-status:'.length);
-    const params = new URLSearchParams({ processKey });
-    if (recordPid) {
-      params.set('businessKey', String(recordPid));
-    }
-    return `/bpm/process-status?${params.toString()}`;
-  }
+  const navigationProvider = getKernel().contributionRegistry.getPrimaryService(
+    'aura.navigation.target',
+  )?.provider as
+    | { resolveTarget?: (target: string, recordPid?: string | null) => string | undefined }
+    | undefined;
+  const contributedTarget = navigationProvider?.resolveTarget?.(target, recordPid);
+  if (contributedTarget) return contributedTarget;
 
   // Cross-designer navigation: automation:{pid}
   if (target.startsWith('automation:')) {
     const pid = target.substring('automation:'.length);
     return `/automation/${pid}`;
-  }
-
-  // Cross-designer navigation: bpmn-designer:{pid}
-  if (target.startsWith('bpmn-designer:')) {
-    const pid = target.substring('bpmn-designer:'.length);
-    return pid ? `/bpmn-designer?pid=${pid}` : '/bpmn-designer';
   }
 
   // Legacy format: "{modelCode}_{pageType}"

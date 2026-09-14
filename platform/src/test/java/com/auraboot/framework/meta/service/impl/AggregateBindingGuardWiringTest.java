@@ -14,6 +14,7 @@ import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -79,6 +80,7 @@ class AggregateBindingGuardWiringTest {
     @Mock private ExecutorRegistry executorRegistry;
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
+    @Mock private WorkflowCapabilityRegistry workflowCapabilityRegistry;
 
     @InjectMocks
     private DynamicDataServiceImpl service;
@@ -123,6 +125,8 @@ class AggregateBindingGuardWiringTest {
                 .thenReturn(List.of(Map.of("pid", RECORD_ID, "quote_pid", AUTHORIZED_AGGREGATE, "amount", 10)));
 
         lenient().when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        lenient().when(applicationContext.getBean(WorkflowCapabilityRegistry.class))
+                .thenReturn(workflowCapabilityRegistry);
         allowRead();
     }
 

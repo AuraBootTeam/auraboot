@@ -13,7 +13,6 @@
 import { getKernel, resetKernel } from './bootstrap.js'
 
 import coreDemoPlugin from '~/plugins/core-demo'
-import coreBpmPlugin from '~/plugins/core-bpm'
 import coreDesignerPlugin from '~/plugins/core-designer'
 import coreAutomationPlugin from '~/plugins/core-automation'
 import coreOrganizationPlugin from '~/plugins/core-organization'
@@ -37,7 +36,6 @@ import { ENTERPRISE_PLUGINS } from 'virtual:auraboot-web-contributions'
 
 const CORE_PLUGINS = [
   coreDemoPlugin,
-  coreBpmPlugin,
   coreDesignerPlugin,
   coreAutomationPlugin,
   coreOrganizationPlugin,

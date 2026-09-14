@@ -378,26 +378,6 @@
       "blocking": true
     },
     {
-      "id": "OSS-REL-OEE-DASHBOARD",
-      "domain": "oss",
-      "name": "PCBA OEE dashboard golden (requires an already-running host stack)",
-      "command": "./scripts/host-oee-dashboard-golden.sh",
-      "tier": "release",
-      "coversPaths": [
-        "web-admin/tests/e2e/pcba/**",
-        "scripts/host-oee-dashboard-golden.sh"
-      ],
-      "axes": {
-        "surface": "ui",
-        "dependencies": "real-stack",
-        "verdict": "exact-pin",
-        "driver": "browser"
-      },
-      "goldenSet": false,
-      "blocking": false,
-      "reason": "not self-contained — it deliberately does not start or reset services, so it needs a host stack brought up outside the runner. RECORDED until it is either wrapped or documented as on-demand."
-    },
-    {
       "id": "OSS-REL-COLLAB-TRIO",
       "domain": "oss",
       "name": "Collaboration trio browser golden (Inbox queue, notification centre, IM/agent mentions)",

@@ -1,6 +1,7 @@
 package com.auraboot.framework.inbox.mapper;
 
 import com.auraboot.framework.inbox.model.InboxItem;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -149,8 +150,13 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
                             @Param("endTime") java.time.Instant endTime);
 
     /**
-     * Mark expired items: PENDING items with expires_at in the past → EXPIRED.
+     * Mark expired items for every tenant: PENDING items with expires_at in the past → EXPIRED.
+     *
+     * <p>This is invoked by a platform scheduler without a request tenant. It is
+     * deliberately the only cross-tenant inbox update path; ordinary inbox
+     * operations above remain protected by the tenant interceptor.</p>
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Update("""
         UPDATE ab_inbox_item SET status = 'expired'
         WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < NOW()
@@ -158,8 +164,9 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
     int markExpiredItems();
 
     /**
-     * Delete old acted/dismissed/expired items older than N days.
+     * Delete old acted/dismissed/expired items for every tenant older than N days.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @org.apache.ibatis.annotations.Delete("""
         DELETE FROM ab_inbox_item
         WHERE status IN ('acted', 'dismissed', 'expired')

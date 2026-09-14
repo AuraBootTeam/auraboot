@@ -8,7 +8,7 @@
  *   4. Publish/Deploy/Enable + API Verify
  *   5. Backend Data Verify
  *
- * BPMN lifecycle coverage moved to tests/e2e/bpm-designer, where the specs
+ * BPMN lifecycle coverage is product-owned by aura-bpm/e2e/bpm, where the specs
  * assert designerJson, BPMN XML, and selected SmartEngine runtime behavior
  * without permission-gated skip wrappers.
  * Automation coverage moved to tests/e2e/automation/automation-designer-golden.spec.ts,

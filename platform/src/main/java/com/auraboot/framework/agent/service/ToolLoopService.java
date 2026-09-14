@@ -1019,6 +1019,11 @@ public class ToolLoopService {
             return Set.of(EffectClass.WRITE_PLATFORM_STATE);
         }
         if ("platform".equals(type)) {
+            if ("platform.fill_form".equals(source)) {
+                // Returns a proposed patch; neither a persisted draft nor a
+                // business record is written by the provider.
+                return Set.of(EffectClass.READ_CONTEXT);
+            }
             if ("platform.list_models".equals(source)
                     || "platform.execute_sql".equals(source)
                     || "platform.model_suggest".equals(source)) {

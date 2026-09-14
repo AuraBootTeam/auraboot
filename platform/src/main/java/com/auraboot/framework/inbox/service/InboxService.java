@@ -30,7 +30,7 @@ public interface InboxService {
      * @param userId   target user
      * @param tenantId tenant
      * @param itemType optional filter (APPROVAL, TASK, MENTION, etc.)
-     * @param status   optional filter (PENDING, ACTED, DISMISSED)
+     * @param status   optional filter, case-insensitive; stored lowercase ("pending", "acted", "dismissed")
      * @param pageNum  page number (1-based)
      * @param pageSize page size
      */
@@ -44,7 +44,7 @@ public interface InboxService {
      * @param userId    target user
      * @param tenantId  tenant
      * @param itemTypes optional filter — list of item types (null = all)
-     * @param status    optional filter (PENDING, ACTED, DISMISSED)
+     * @param status    optional filter, case-insensitive; stored lowercase ("pending", "acted", "dismissed")
      * @param pageNum   page number (1-based)
      * @param pageSize  page size
      */

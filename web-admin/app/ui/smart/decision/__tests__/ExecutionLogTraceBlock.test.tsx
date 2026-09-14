@@ -12,6 +12,7 @@ const http = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 const scrollIntoViewMock = vi.hoisted(() => vi.fn());
+const traceNavigation = vi.hoisted(() => ({ resolveLink: vi.fn() }));
 
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();
@@ -23,6 +24,14 @@ vi.mock('react-router', async (importOriginal) => {
 
 vi.mock('~/shared/services/ApiService', () => ({
   getApiService: () => http,
+}));
+
+vi.mock('~/framework/bootstrap', () => ({
+  getKernel: () => ({
+    contributionRegistry: {
+      getPrimaryService: () => ({ provider: traceNavigation }),
+    },
+  }),
 }));
 
 const recentLog = {
@@ -189,6 +198,8 @@ describe('ExecutionLogTraceBlock', () => {
     http.post.mockReset();
     http.delete.mockReset();
     scrollIntoViewMock.mockReset();
+    traceNavigation.resolveLink.mockReset();
+    traceNavigation.resolveLink.mockReturnValue(undefined);
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoViewMock,
@@ -290,6 +301,10 @@ describe('ExecutionLogTraceBlock', () => {
       callerType: 'SLA',
       callerRef: '01SLA_CONFIG',
     };
+    traceNavigation.resolveLink.mockReturnValue({
+      href: '/p/sla_config/view/01SLA_CONFIG',
+      label: '打开 SLA 配置',
+    });
     http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
       if (endpoint === '/decision/logs/recent') {
         return Promise.resolve({
@@ -320,7 +335,7 @@ describe('ExecutionLogTraceBlock', () => {
     await screen.findByTestId('elta-row-sla-log-1');
     fireEvent.click(screen.getByTestId('elta-open-trace-sla-log-1'));
 
-    const link = await screen.findByTestId('elta-open-sla-config');
+    const link = await screen.findByTestId('elta-open-product-trace');
     expect(link).toHaveAttribute('href', '/p/sla_config/view/01SLA_CONFIG');
     expect(await screen.findByTestId('elta-chain-caller-sla-log-1')).toHaveTextContent(
       'SLA / 01SLA_CONFIG',
@@ -425,6 +440,10 @@ describe('ExecutionLogTraceBlock', () => {
   });
 
   it('links BPM execution logs back to the process status viewer', async () => {
+    traceNavigation.resolveLink.mockReturnValue({
+      href: '/extensions/workflow/instances/01INSTANCE',
+      label: '打开流程状态',
+    });
     http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
       if (endpoint === '/decision/logs/recent') {
         return Promise.resolve({
@@ -455,8 +474,8 @@ describe('ExecutionLogTraceBlock', () => {
     await screen.findByTestId('elta-row-bpm-log-1');
     fireEvent.click(screen.getByTestId('elta-open-trace-bpm-log-1'));
 
-    const link = await screen.findByTestId('elta-open-bpm-process-status');
-    expect(link).toHaveAttribute('href', '/bpm/process-status?processInstanceId=01BPMINSTANCE');
+    const link = await screen.findByTestId('elta-open-product-trace');
+    expect(link).toHaveAttribute('href', '/extensions/workflow/instances/01INSTANCE');
     expect(await screen.findByTestId('elta-chain-caller-bpm-log-1')).toHaveTextContent(
       'BPM / wd_leave_approval',
     );

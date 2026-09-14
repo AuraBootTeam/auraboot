@@ -40,7 +40,7 @@ const SHARED_DETAIL_BLOCKS = [
 
 const SHARED_LAYOUT_BLOCKS = ['tabs', 'tab', 'columns'] as const;
 const SHARED_ACTION_BLOCKS = ['action-bar', 'action'] as const;
-const SHARED_WORKFLOW_BLOCKS = ['bpm-panel', 'activity-timeline', 'field-history'] as const;
+const SHARED_WORKFLOW_BLOCKS = ['workflow-panel', 'activity-timeline', 'field-history'] as const;
 // Workbench blocks (KPI metric strip + status banner + the batch-2 family:
 // workbench action bar, review drawer, evidence panel, record inspector,
 // candidate list, artifact timeline). Surfaced on detail and dashboard kinds —

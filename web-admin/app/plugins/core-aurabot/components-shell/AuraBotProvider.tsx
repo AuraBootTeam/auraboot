@@ -17,6 +17,7 @@ import React, {
 } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
+import type { FormFillTarget } from '~/framework/meta/rendering/formFill';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -422,7 +423,6 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
 // Context
 // ============================================================================
 
-export type FormFillHandler = (fields: Record<string, any>) => void;
 
 /**
  * P1: image attachment carried alongside a user message. Each entry is the
@@ -450,6 +450,8 @@ interface AuraBotContextValue {
     attachments?: ChatImageAttachment[],
     analyticsExecution?: { adoptionPid: string; requestId: string },
   ) => void;
+  sendMessage: (content: string, attachments?: ChatImageAttachment[]) => void;
+  registerFormFillTarget: (target: FormFillTarget) => () => void;
   confirmTool: (toolId: string) => void;
   cancelTool: (toolId: string) => void;
   clearMessages: () => void;
@@ -460,8 +462,6 @@ interface AuraBotContextValue {
   setPageContext: (ctx: Partial<PageContext>) => void;
   setSelectedAgent: (agentCode: string) => void;
   toggleKnowledgeBase: (kbPid: string) => void;
-  registerFormFillHandler: (handler: FormFillHandler) => void;
-  unregisterFormFillHandler: () => void;
 }
 
 export const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
@@ -566,7 +566,8 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
   const location = useLocation();
   const params = useParams();
-  const formFillHandlerRef = useRef<FormFillHandler | null>(null);
+  const formFillTargetRef = useRef<FormFillTarget | null>(null);
+  const formFillTargetsRef = useRef<FormFillTarget[]>([]);
 
   // Live mirror of currentConversationId. refreshConversations is recreated as
   // its deps change, so a captured copy can go stale: a refreshConversations
@@ -788,6 +789,8 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       if (!hasAttachments && !content.trim()) return;
       if (state.isLoading) return;
 
+      const fillTarget = formFillTargetRef.current;
+      const fillTargetId = fillTarget?.snapshot().targetId;
       const { conversationId } = await ensureConversation();
 
       // userMsgId doubles as the server-side dedup key (clientMsgId on
@@ -891,8 +894,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               });
               // Handle form_fill action — populate the current page's form
               const data = result?.data || result;
-              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
-                formFillHandlerRef.current(data.fields);
+              if (_success && data?.action === 'form_fill' && data?.fields
+                  && fillTarget && formFillTargetRef.current === fillTarget
+                  && fillTarget.snapshot().targetId === fillTargetId) {
+                fillTarget.apply(data.fields);
               }
             },
             onResultContract: (contract) => {
@@ -1092,9 +1097,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 },
               });
               const data = result?.data || result;
-              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
-                formFillHandlerRef.current(data.fields);
-              }
+              // Form filling is draft-only and never resumes through business approval.
             },
             onConfirmRequired: (
               tid: string,
@@ -1229,12 +1232,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePanel, closePanel, state.panelState]);
 
-  const registerFormFillHandler = useCallback((handler: FormFillHandler) => {
-    formFillHandlerRef.current = handler;
-  }, []);
-
-  const unregisterFormFillHandler = useCallback(() => {
-    formFillHandlerRef.current = null;
+  const registerFormFillTarget = useCallback((target: FormFillTarget) => {
+    formFillTargetsRef.current = [...formFillTargetsRef.current.filter((item) => item !== target), target];
+    formFillTargetRef.current = target;
+    return () => {
+      formFillTargetsRef.current = formFillTargetsRef.current.filter((item) => item !== target);
+      formFillTargetRef.current = formFillTargetsRef.current.at(-1) ?? null;
+    };
   }, []);
 
   const value: AuraBotContextValue = {
@@ -1254,8 +1258,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     setPageContext,
     setSelectedAgent,
     toggleKnowledgeBase,
-    registerFormFillHandler,
-    unregisterFormFillHandler,
+    registerFormFillTarget,
   };
 
   return <AuraBotCtx.Provider value={value}>{children}</AuraBotCtx.Provider>;

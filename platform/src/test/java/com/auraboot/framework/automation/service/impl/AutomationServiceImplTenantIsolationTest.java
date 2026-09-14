@@ -57,7 +57,7 @@ class AutomationServiceImplTenantIsolationTest {
     @Mock
     private AutomationTriggerService automationTriggerService;
     @Mock
-    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+    private com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime automationProcessRuntime;
     @Mock
     private DecisionUsageIndexService usageIndexService;
 
@@ -66,8 +66,12 @@ class AutomationServiceImplTenantIsolationTest {
     @BeforeEach
     void setUp() {
         AutomationFlowTriggerDeriver deriver = new AutomationFlowTriggerDeriver(new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime>
+                runtimeProvider = org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        org.mockito.Mockito.lenient().when(runtimeProvider.getIfAvailable()).thenReturn(automationProcessRuntime);
         service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
-                automationProcessRuntime, deriver, usageIndexService);
+                runtimeProvider, deriver, usageIndexService);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 

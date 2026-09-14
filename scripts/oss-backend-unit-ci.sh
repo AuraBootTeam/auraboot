@@ -61,7 +61,16 @@ cleanup() {
   status=$?
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
   docker compose "${COMPOSE_ARGS[@]}" logs --no-color > "$ARTIFACTS/compose.log" 2>&1 || true
-  printf '[oss-backend-unit-ci] runtime retained: compose_project=%s artifacts=%s\n' \
+  docker compose "${COMPOSE_ARGS[@]}" stop >/dev/null 2>&1 || true
+  # Retain containers and volumes for evidence, but release the finite Docker
+  # address-pool allocation. Stopped containers can be reattached by Compose if
+  # an owner later restarts this exact retained project.
+  while IFS= read -r container_id; do
+    [[ -n "$container_id" ]] || continue
+    docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
+  done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
+  docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
+  printf '[oss-backend-unit-ci] runtime retained and stopped; network released: compose_project=%s artifacts=%s\n' \
     "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
 }

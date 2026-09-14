@@ -13,7 +13,7 @@ import type { Browser, Locator } from '@playwright/test';
 import { basename } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { ErrorCodes } from '~/shared/services/http-client/types';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   acceptConfirmDialog,
   clickRowActionByLocator,

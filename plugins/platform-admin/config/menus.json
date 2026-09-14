@@ -1,43 +1,5 @@
 [
   {
-    "code": "admin_sla_config",
-    "parentCode": "bpm_management",
-    "name:zh-CN": "SLA 配置",
-    "name:en": "SLA Configuration",
-    "path": "/p/sla_config",
-    "pageKey": "sla_config_list",
-    "component": null,
-    "icon": "IconClock",
-    "type": 1,
-    "permissionCode": "admin_sla_config",
-    "orderNo": 30,
-    "visible": true,
-    "extension": {
-      "platforms": [
-        "web"
-      ]
-    }
-  },
-  {
-    "code": "admin_bpm_domain_config",
-    "parentCode": "bpm_management",
-    "name:zh-CN": "域配置",
-    "name:en": "Domain Configuration",
-    "path": "/p/bpm_domain_config",
-    "pageKey": "bpm_domain_config_list",
-    "component": null,
-    "icon": "IconSettings",
-    "type": 1,
-    "permissionCode": "admin_bpm_domain_config",
-    "orderNo": 40,
-    "visible": true,
-    "extension": {
-      "platforms": [
-        "web"
-      ]
-    }
-  },
-  {
     "code": "admin_data_permission",
     "parentCode": "system_management",
     "name:zh-CN": "数据权限",

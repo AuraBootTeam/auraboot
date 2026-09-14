@@ -48,6 +48,9 @@ public class ChatRequest {
      */
     private PageContext pageContext;
 
+    /** Explicit draft-only extraction mode. */
+    private FormFillRequest formFill;
+
     /**
      * Agent code to route the chat to a specific ACP agent.
      * Default "aurabot" routes to the built-in AuraBot assistant.

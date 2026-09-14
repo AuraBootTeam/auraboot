@@ -282,7 +282,7 @@ public final class DslRegistry {
         ACTIVITY_TIMELINE("activity-timeline", "Activity timeline block", "1.3"),
         RECORD_COMMENTS("record-comments", "Record comments block", "1.3"),
         FIELD_HISTORY("field-history", "Field history block", "1.3"),
-        BPM_PANEL("bpm-panel", "BPM panel block", "1.3"),
+        WORKFLOW_PANEL("workflow-panel", "Workflow panel block", "1.3"),
         METRIC_STRIP("metric-strip", "Metric strip block", "1.4"),
         STAGE_RAIL("stage-rail", "Ordered business stage rail block", "1.8"),
         RECORD_INSPECTOR("record-inspector", "Record inspector block", "1.4"),
@@ -404,7 +404,7 @@ public final class DslRegistry {
         ON_STATE_CHANGE("on_state_change", "On state change", "1.0"),
         SCHEDULED("scheduled", "Scheduled trigger", "1.0"),
         WEBHOOK("webhook", "Webhook trigger", "1.0"),
-        ON_BPM_EVENT("on_bpm_event", "On BPM event", "1.1"),
+        ON_WORKFLOW_EVENT("on_workflow_event", "On workflow event", "1.1"),
         ON_INACTIVITY("on_inactivity", "On inactivity timeout", "1.1");
 
         private final String code, label, since;

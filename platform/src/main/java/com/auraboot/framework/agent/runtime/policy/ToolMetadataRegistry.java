@@ -86,6 +86,12 @@ public class ToolMetadataRegistry {
     private ToolEffectType inferEffectType(String toolName, String toolType) {
         String name = lower(toolName);
         String type = lower(toolType);
+        // This platform primitive only returns proposed fields. Business writes
+        // remain behind the form's ordinary, user-initiated command submission.
+        if ("platform".equals(type) && ("platform_fill_form".equals(name)
+                || "platform.fill_form".equals(name))) {
+            return ToolEffectType.NONE;
+        }
         if ("llm_native".equals(type)) {
             return ToolEffectType.NONE;
         }

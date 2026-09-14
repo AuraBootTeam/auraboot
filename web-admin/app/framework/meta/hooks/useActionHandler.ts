@@ -644,7 +644,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Supported formats:
    * - Cross-designer prefixes:
    *   - "dashboard:{code}" -> /dashboards/view/{code}
-   *   - "bpmn-status:{processKey}" -> /bpm/process-status?processKey={processKey}&businessKey={recordPid}
+   *   - product navigation prefixes are resolved by a typed contribution provider
    *   - "automation:{pid}" -> /automation/{pid}
    * - Legacy "{modelCode}_{pageType}" e.g. "qo_daily_report_form"
    */
@@ -1140,12 +1140,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             return;
           }
 
-          case 'bpm': {
+          case 'workflow': {
             if (confirmKey) {
               const confirmed = await showConfirmDialog(confirmKey);
               if (!confirmed) return;
             }
-            const { processDefinitionKey, businessKeyField, variables: varMap } = actionDef;
+            const { workflowKey, businessKeyField, variables: varMap } = actionDef;
             const src: Record<string, any> = record || context.data || {};
             const businessKeyRaw = src[businessKeyField];
             if (
@@ -1154,7 +1154,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               String(businessKeyRaw).trim() === ''
             ) {
               throw new Error(
-                `action.type=bpm: record missing or blank businessKeyField "${businessKeyField}"`,
+                `action.type=workflow: record missing or blank businessKeyField "${businessKeyField}"`,
               );
             }
             const resolvedVars: Record<string, unknown> = {};
@@ -1167,7 +1167,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 }
                 if (expr.includes('[')) {
                   throw new Error(
-                    `action.type=bpm: JSONPath bracket syntax not supported: "${expr}"`,
+                    `action.type=workflow: JSONPath bracket syntax not supported: "${expr}"`,
                   );
                 }
                 const stripped = expr.startsWith('$.') ? expr.slice(2) : expr.slice(1);
@@ -1185,20 +1185,15 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 if (resolved) resolvedVars[k] = cursor;
               }
             }
-            const { startProcessFromAction } =
-              await import('~/plugins/core-bpm/services/bpmWorkbenchService');
-            const result = await startProcessFromAction({
-              processDefinitionKey,
+            const { getKernel } = await import('~/framework/bootstrap');
+            const result = await getKernel().pluginLoader.invoke('workflow.start', {
+              workflowKey,
               businessKey: String(businessKeyRaw),
               variables: Object.keys(resolvedVars).length > 0 ? resolvedVars : undefined,
-            });
-            // i18n keys `bpm.action.start.success` / `bpm.action.start.deduped` are
-            // pending registration in the central i18n dictionary; t() accepts a
-            // fallback string that surfaces when the key is missing so the UX
-            // never shows the raw key.
+            }) as { deduped?: boolean };
             const toastMessage = result.deduped
-              ? t('bpm.action.start.deduped', undefined, '该记录已有审批流程在运行')
-              : t('bpm.action.start.success', undefined, '审批流程已启动');
+              ? t('workflow.action.start.deduped', undefined, '该记录已有工作流在运行')
+              : t('workflow.action.start.success', undefined, '工作流已启动');
             notifyToast(toastMessage, 'success');
             if (context.loadData) await context.loadData();
             return;

@@ -1,3 +1,4 @@
+import type { FormFillSnapshot } from '~/framework/meta/rendering/formFill';
 /**
  * AuraBot API Service
  *
@@ -461,6 +462,7 @@ export const auraBotApi = {
       message: string;
       agentCode?: string;
       pageContext?: any;
+      formFill?: FormFillSnapshot;
       knowledgeBaseIds?: string[];
       history?: Array<{ role: string; content: string }>;
       conversationId?: number;

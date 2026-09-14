@@ -1,7 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
-import com.auraboot.framework.bpm.rule.DroolsEngineService;
-import com.auraboot.framework.bpm.rule.RuleReasonMessages;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -79,7 +80,7 @@ public class PreActionsPhase implements CommandPhase {
     private static final String RULE_RESULT_KEY_REASON = "reason";
     private static final String FALLBACK_REASON_KEY = "bpm.rule.execution_failed";
 
-    private final DroolsEngineService droolsEngineService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
     private final DynamicDataService dynamicDataService;
     private final RecordSnapshotReader snapshotReader;
 
@@ -144,7 +145,7 @@ public class PreActionsPhase implements CommandPhase {
                                 Map<String, Object> currentRecord) {
         String ruleCode = asString(action.get("ruleCode"));
         if (ruleCode == null) {
-            throw new BusinessException(RuleReasonMessages.i18nKey("bpm.rule.rule_code_required"));
+            throw new BusinessException("bpm.rule.rule_code_required");
         }
 
         // Resolve contextLookup first, building scope map for placeholders.
@@ -195,19 +196,21 @@ public class PreActionsPhase implements CommandPhase {
 
         Map<String, Object> ruleResult;
         try {
-            ruleResult = droolsEngineService.evaluate(ruleCode, facts);
+            ruleResult = workflowCapabilities.execute("rule.evaluate",
+                    new WorkflowCapability.WorkflowRequest(null, null,
+                            Map.of("ruleCode", ruleCode, "facts", facts))).payload();
         } catch (BusinessException be) {
             throw be;
         } catch (Exception e) {
             log.error("preAction bpm:run-rule failed: ruleCode={}, error={}",
                     ruleCode, e.getMessage(), e);
-            throw new BusinessException(RuleReasonMessages.i18nKey(FALLBACK_REASON_KEY));
+            throw new BusinessException(FALLBACK_REASON_KEY);
         }
 
         if (ruleResult != null && Boolean.FALSE.equals(ruleResult.get(RULE_RESULT_KEY_VALID))) {
             Object reason = ruleResult.get(RULE_RESULT_KEY_REASON);
             throw new BusinessException(
-                    RuleReasonMessages.reasonKey(ruleCode, reason, FALLBACK_REASON_KEY));
+                    reason == null ? FALLBACK_REASON_KEY : String.valueOf(reason));
         }
     }
 

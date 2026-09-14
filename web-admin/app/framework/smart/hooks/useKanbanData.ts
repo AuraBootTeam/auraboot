@@ -387,10 +387,13 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       const authoritativeCount = Number(authoritative?.kanban_total_count);
       const count = Number.isFinite(authoritativeCount) ? authoritativeCount : cards.length;
       const columnAggregations: Record<string, number> = {};
+      const columnAggregationLabels: Record<string, string | Record<string, string>> = {};
       if (aggregations) {
         let serverAggregationIndex = 0;
         for (const agg of aggregations) {
-          const key = agg.label || agg.field;
+          // Stable key independent of the label: labels may be localized maps
+          // rendered via getLocalizedText (WMS-UX-02).
+          const key = `${agg.function}_${agg.field}`;
           if (agg.function === 'count') {
             columnAggregations[key] = count;
           } else {
@@ -400,6 +403,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
               : calculateAggregation(cards, agg);
             serverAggregationIndex += 1;
           }
+          if (agg.label !== undefined) columnAggregationLabels[key] = agg.label;
         }
       }
 
@@ -416,6 +420,8 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
         loadedCount: cards.length,
         hasMore: count > cards.length,
         aggregations: Object.keys(columnAggregations).length > 0 ? columnAggregations : undefined,
+        aggregationLabels:
+          Object.keys(columnAggregationLabels).length > 0 ? columnAggregationLabels : undefined,
       });
     }
 

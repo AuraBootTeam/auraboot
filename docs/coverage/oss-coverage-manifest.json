@@ -273,8 +273,7 @@
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
-            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -634,8 +633,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
-            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -788,8 +786,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
-            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -7521,7 +7518,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
             "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -7535,7 +7531,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
             "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -7555,8 +7550,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-parr1-permission-matrix.spec.ts",
             "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
             "web-admin/tests/e2e/organization/org-department.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
@@ -7587,8 +7580,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-saved-view-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-parr1-permission-matrix.spec.ts",
             "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
@@ -7788,8 +7779,7 @@
           "evidence": [
             "web-admin/tests/e2e/organization/member-detail.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -7824,8 +7814,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -7976,7 +7965,6 @@
             "web-admin/tests/e2e/showcase/list-configpanel-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/page-creation-dispatch-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-choice-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-misc-e2e.spec.ts",
@@ -8012,18 +8000,6 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "admin:create_bpm_domain_config",
-          "action": "admin:create_bpm_domain_config",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
             "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -8066,18 +8042,6 @@
           "verdict": "pass"
         },
         {
-          "id": "admin:create_sla_config",
-          "action": "admin:create_sla_config",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
           "id": "admin:create_webhook",
           "action": "admin:create_webhook",
           "surface": "ui",
@@ -8093,16 +8057,6 @@
         {
           "id": "admin:delete_api_connector",
           "action": "admin:delete_api_connector",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "admin:delete_bpm_domain_config",
-          "action": "admin:delete_bpm_domain_config",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -8141,16 +8095,6 @@
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
-        },
-        {
-          "id": "admin:delete_sla_config",
-          "action": "admin:delete_sla_config",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
         },
         {
           "id": "admin:delete_webhook",
@@ -8238,18 +8182,6 @@
           "verdict": "pass"
         },
         {
-          "id": "admin:update_bpm_domain_config",
-          "action": "admin:update_bpm_domain_config",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
           "id": "admin:update_data_permission",
           "action": "admin:update_data_permission",
           "surface": "ui",
@@ -8270,18 +8202,6 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "admin:update_sla_config",
-          "action": "admin:update_sla_config",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -8337,76 +8257,6 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=api_connector"
-        },
-        {
-          "id": "page:bpm_domain_config_form",
-          "action": "bpm_domain_config_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=bpm_domain_config"
-        },
-        {
-          "id": "page:bpm_domain_config_list",
-          "action": "bpm_domain_config_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=list model=bpm_domain_config"
-        },
-        {
-          "id": "page:bpm_process_management_form",
-          "action": "bpm_process_management_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/designer-roundtrip.spec.ts",
-            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=form model=bpm_process_management"
-        },
-        {
-          "id": "page:bpm_process_management_list",
-          "action": "bpm_process_management_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm-designer/designer-gateway-condition.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-ruletask-drools.spec.ts",
-            "web-admin/tests/e2e/bpm/aura-policy-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-definition-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-designer-interaction.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-callactivity.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-gateway-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-http.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-hooks.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-multiinstance.spec.ts",
-            "web-admin/tests/e2e/bpm/plugin-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/rule-binding-designer-host.spec.ts",
-            "web-admin/tests/e2e/bpm/tenant-isolation-ui.spec.ts",
-            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
-            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=list model=bpm_process_management"
         },
         {
           "id": "page:dashboard_management_list",
@@ -8517,46 +8367,6 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=scheduled_task"
-        },
-        {
-          "id": "page:sla_config_detail",
-          "action": "sla_config_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
-            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=detail model=sla_config"
-        },
-        {
-          "id": "page:sla_config_form",
-          "action": "sla_config_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=sla_config"
-        },
-        {
-          "id": "page:sla_config_list",
-          "action": "sla_config_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
-            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
-            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=list model=sla_config"
         },
         {
           "id": "page:system_preferences_form",
@@ -9068,11 +8878,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "sc:detail_showcase",
@@ -9128,8 +8936,7 @@
           "evidence": [
             "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
             "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
-            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -9142,7 +8949,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts",
             "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts",
             "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
@@ -9168,7 +8974,6 @@
             "web-admin/tests/e2e/showcase/list-ux-features.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts"
@@ -9864,6 +9669,27 @@
           "verdict": "untested"
         },
         {
+          "id": "e2et_stage_record.create",
+          "action": "e2et_stage_record.create",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et_stage_record.update",
+          "action": "e2et_stage_record.update",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "e2eto:create_e2et_order",
           "action": "e2eto:create_e2et_order",
           "surface": "ui",
@@ -10124,173 +9950,39 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=e2et_record"
-        }
-      ]
-    },
-    {
-      "id": "workflow-demo",
-      "title": "workflow-demo",
-      "rows": [
-        {
-          "id": "wd:cancel_leave_request",
-          "action": "wd:cancel_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
         },
         {
-          "id": "wd:create_and_submit_leave_request",
-          "action": "wd:create_and_submit_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "wd:create_leave_balance",
-          "action": "wd:create_leave_balance",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "wd:create_leave_request",
-          "action": "wd:create_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "wd:delete_leave_request",
-          "action": "wd:delete_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "wd:submit_leave_request",
-          "action": "wd:submit_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-node-property-matrix.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-servicetask-command.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "wd:update_leave_balance",
-          "action": "wd:update_leave_balance",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "wd:update_leave_request",
-          "action": "wd:update_leave_request",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "page:wd_leave_balance_list",
-          "action": "wd_leave_balance_list",
+          "id": "page:e2et_stage_record_detail",
+          "action": "e2et_stage_record_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=wd_leave_balance"
+          "note": "kind=detail model=e2et_stage_record"
         },
         {
-          "id": "page:wd_leave_request_detail",
-          "action": "wd_leave_request_detail",
+          "id": "page:e2et_stage_record_form",
+          "action": "e2et_stage_record_form",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm-designer/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/bpm-smoke/wf-end-to-end-smoke.spec.ts",
-            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-cancel.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-long-hr.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-reject.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-short-manager.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-sla-escalation.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=detail model=wd_leave_request"
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=e2et_stage_record"
         },
         {
-          "id": "page:wd_leave_request_form",
-          "action": "wd_leave_request_form",
+          "id": "page:e2et_stage_record_list",
+          "action": "e2et_stage_record_list",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-no-balance-error.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=form model=wd_leave_request"
-        },
-        {
-          "id": "page:wd_leave_request_list",
-          "action": "wd_leave_request_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
-            "web-admin/tests/e2e/p1demo/wd-leave-request-ai-lifecycle.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
-          "note": "kind=list model=wd_leave_request"
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=e2et_stage_record"
         }
       ]
     },
@@ -10391,14 +10083,12 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-permission-negative.spec.ts",
             "web-admin/tests/e2e/enterprise/permission-matrix-smoke.spec.ts",
             "web-admin/tests/e2e/model/model-publish-governance.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-badfile-permissions.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts",
             "web-admin/tests/e2e/permission/capability-save-ui-golden.spec.ts",
-            "web-admin/tests/e2e/permission/permission-abac-rule-center.spec.ts",
             "web-admin/tests/e2e/permission/permission-management.spec.ts",
             "web-admin/tests/e2e/permission/permission-v2-golden.spec.ts",
             "web-admin/tests/e2e/permission/role-default-scope-golden.spec.ts",
@@ -10660,66 +10350,11 @@
             "web-admin/tests/e2e/automation/automation-golden.spec.ts",
             "web-admin/tests/e2e/automation/automation-management.spec.ts",
             "web-admin/tests/e2e/automation/llm-call-node.spec.ts",
-            "web-admin/tests/e2e/automation/rule-binding-designer-host.spec.ts",
-            "web-admin/tests/e2e/formula/formula-editor.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+            "web-admin/tests/e2e/formula/formula-editor.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
           "verdict": "pass",
           "note": "plugin=core-automation file=./plugins/core-automation/pages/automations.tsx"
-        },
-        {
-          "id": "platform-page:bpm.process-status",
-          "action": "/bpm/process-status",
-          "surface": "platform-page",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/bpm-publish-run-detail.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-rule-binding-fail-closed.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-workflow.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-status-viewer.spec.ts",
-            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
-            "web-admin/tests/e2e/bpm-showcase/s5-s6-gateways-rules.spec.ts"
-          ],
-          "assertion": "a browser spec navigates to this route",
-          "verdict": "pass",
-          "note": "plugin=core-bpm file=./plugins/core-bpm/pages/ProcessStatus.tsx"
-        },
-        {
-          "id": "platform-page:bpm.sla-monitor",
-          "action": "/bpm/sla-monitor",
-          "surface": "platform-page",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/bpm-frontend-mgmt.spec.ts",
-            "web-admin/tests/e2e/bpm/sla-monitor-drill.spec.ts",
-            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
-            "web-admin/tests/e2e/bpm-showcase/s7-sla-deadline.spec.ts",
-            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
-          ],
-          "assertion": "a browser spec navigates to this route",
-          "verdict": "pass",
-          "note": "plugin=core-bpm file=./plugins/core-bpm/pages/SlaMonitor.tsx"
-        },
-        {
-          "id": "platform-page:bpm.task-center",
-          "action": "/bpm/task-center",
-          "surface": "platform-page",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-deep.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-workflow.spec.ts",
-            "web-admin/tests/e2e/bpm/task-center.spec.ts"
-          ],
-          "assertion": "a browser spec navigates to this route",
-          "verdict": "pass",
-          "note": "plugin=core-bpm file=./plugins/core-bpm/pages/TaskCenter.tsx"
         },
         {
           "id": "platform-page:dashboard.designer.create",
@@ -10731,7 +10366,6 @@
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
-            "web-admin/tests/e2e/dashboard/designer-datasource-config-golden.spec.ts",
             "web-admin/tests/e2e/designer/dashboard-designer-deep.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts"
           ],
@@ -10765,35 +10399,8 @@
             "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
             "web-admin/tests/e2e/asset-management/asset-lifecycle.spec.ts",
             "web-admin/tests/e2e/asset-management/asset-management.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-quality-agent-entry.spec.ts",
-            "web-admin/tests/e2e/aurabot/pcba-quality-agent-write.spec.ts",
             "web-admin/tests/e2e/auth/auth-complete.spec.ts",
             "web-admin/tests/e2e/automation/llm-call-node.spec.ts",
-            "web-admin/tests/e2e/bpm/aura-policy-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-definition-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-designer-interaction.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-publish-run-detail.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-callactivity.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-gateway-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-http.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-status-viewer.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-hooks.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-multiinstance.spec.ts",
-            "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/plugin-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/tenant-isolation-ui.spec.ts",
-            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-gateway-condition.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-ruletask-drools.spec.ts",
             "web-admin/tests/e2e/community/community-smoke.spec.ts",
             "web-admin/tests/e2e/construction-process/cp-construction-log-crud.spec.ts",
             "web-admin/tests/e2e/construction-process/cp-lifecycle.spec.ts",
@@ -10805,33 +10412,7 @@
             "web-admin/tests/e2e/contract-cost/cc-payment-plan-crud.spec.ts",
             "web-admin/tests/e2e/contract-cost/executive-dashboard-smoke.spec.ts",
             "web-admin/tests/e2e/contract-cost/pm-workspace-tabs.spec.ts",
-            "web-admin/tests/e2e/crm/crm-account-management-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
-            "web-admin/tests/e2e/crm/crm-calendar-sync.spec.ts",
-            "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts",
-            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
-            "web-admin/tests/e2e/crm/crm-contact-management-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-contact-par07-visual-signoff.spec.ts",
-            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
-            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
-            "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
-            "web-admin/tests/e2e/crm/crm-email-features.spec.ts",
-            "web-admin/tests/e2e/crm/crm-follow-record-full-lifecycle-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-inbound-channel.spec.ts",
-            "web-admin/tests/e2e/crm/crm-inbound-lifecycle.spec.ts",
-            "web-admin/tests/e2e/crm/crm-inbound-smoke.spec.ts",
-            "web-admin/tests/e2e/crm/crm-lead-management-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-merge-queue.spec.ts",
-            "web-admin/tests/e2e/crm/crm-multimodel-import-cordys-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
-            "web-admin/tests/e2e/crm/crm-opportunity-lifecycle-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
-            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
-            "web-admin/tests/e2e/crm/crm-web-form.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "web-admin/tests/e2e/dashboard/aggregate-grain-orderby-golden.spec.ts",
-            "web-admin/tests/e2e/dashboard/arsenal-live-datasource-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-favorites.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
@@ -10849,7 +10430,6 @@
             "web-admin/tests/e2e/e2et-order/e2et-order-dashboard-lifecycle.spec.ts",
             "web-admin/tests/e2e/email/email-account-setup.spec.ts",
             "web-admin/tests/e2e/email/email-compose.spec.ts",
-            "web-admin/tests/e2e/email/email-crm-timeline.spec.ts",
             "web-admin/tests/e2e/email/email-inbox.spec.ts",
             "web-admin/tests/e2e/email/email-sequence.spec.ts",
             "web-admin/tests/e2e/email/email-shared-mailbox.spec.ts",
@@ -10928,8 +10508,6 @@
             "web-admin/tests/e2e/quality/quality-pqc-fqc-crud.spec.ts",
             "web-admin/tests/e2e/realtime-data-push.spec.ts",
             "web-admin/tests/e2e/report-template/report-template-crud.spec.ts",
-            "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
             "web-admin/tests/e2e/sales/sales-dashboard.spec.ts",
             "web-admin/tests/e2e/sales/sales-order-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/sales-pricing.spec.ts",
@@ -10951,7 +10529,6 @@
             "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/widgets-choice-e2e.spec.ts",
@@ -10963,8 +10540,7 @@
             "web-admin/tests/e2e/templates/acp-showcase-lifecycle.spec.ts",
             "web-admin/tests/e2e/templates/template-center-golden.spec.ts",
             "web-admin/tests/e2e/templates/templates-smoke.spec.ts",
-            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts",
-            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
           "verdict": "pass",
@@ -10992,52 +10568,11 @@
           "evidence": [
             "web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
-            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
-            "web-admin/tests/e2e/decisionops/strategy-studio-dmn-value-labels.spec.ts"
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
           "verdict": "pass",
           "note": "plugin=core-decisionops file=./plugins/core-decisionops/pages/DecisionOpsConsolePage.tsx"
-        },
-        {
-          "id": "platform-page:designer.bpmn",
-          "action": "/bpmn-designer",
-          "surface": "platform-page",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/bpm/aura-policy-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-designer-interaction.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-designer-ui.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/bpm-process-definition.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-callactivity.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-gateway-lifecycle.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-http.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-hooks.spec.ts",
-            "web-admin/tests/e2e/bpm/designer-usertask-multiinstance.spec.ts",
-            "web-admin/tests/e2e/bpm/plugin-roundtrip.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-export.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-gateway-condition.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-palette-drag.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-property-edit-extra.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-property-edit.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-ruletask-drools.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-server-validate.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-undo-import.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-validation-highlight.spec.ts",
-            "web-admin/tests/e2e/bpm-designer/designer-validation-locate.spec.ts",
-            "web-admin/tests/e2e/designer/designers.spec.ts",
-            "web-admin/tests/e2e/designer-ux-improvements.spec.ts"
-          ],
-          "assertion": "a browser spec navigates to this route",
-          "verdict": "pass",
-          "note": "plugin=core-designer file=./plugins/core-designer/pages/bpmn-designer.tsx"
         },
         {
           "id": "platform-page:designer.flow",
@@ -11308,12 +10843,9 @@
             "web-admin/tests/e2e/aurabot/chat-bi-suggestions.spec.ts",
             "web-admin/tests/e2e/automation/rule-binding-designer-host.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts",
-            "web-admin/tests/e2e/bpm/rule-binding-designer-host.spec.ts",
-            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-business-write-guard-golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-personalization-promotion-golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-release-golden.spec.ts",
-            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-field-impact-preflight.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
@@ -11324,7 +10856,6 @@
             "web-admin/tests/e2e/decisionops/dmn-table-editor-deep.spec.ts",
             "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts",
             "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
-            "web-admin/tests/e2e/decisionops/strategy-studio-dmn-value-labels.spec.ts",
             "web-admin/tests/e2e/home/oss-workbench.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-operations-dashboard.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
@@ -11448,7 +10979,6 @@
             "web-admin/tests/e2e/showcase/model-field-change-page-sync-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-fields-page-impact-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/model-page-workbench-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -11587,7 +11117,6 @@
             "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
             "web-admin/tests/e2e/collab-review/notification-actions.spec.ts",
             "web-admin/tests/e2e/collab-review/notification-i18n.spec.ts",
-            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
             "web-admin/tests/e2e/header/header-features.spec.ts",
             "web-admin/tests/e2e/notification/notification-system.spec.ts"
           ],
@@ -11798,8 +11327,6 @@
             "web-admin/tests/e2e/plugin/plugin-deep.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",

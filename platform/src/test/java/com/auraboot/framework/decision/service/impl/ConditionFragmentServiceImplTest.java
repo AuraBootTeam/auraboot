@@ -58,7 +58,7 @@ class ConditionFragmentServiceImplTest {
         fragment.setDecisionRefsJson(objectMapper.valueToTree(List.of("approval_routing")));
 
         DecisionUsageRefEntity bpmRef = usageRef(
-                "BPM_PROCESS",
+                "WORKFLOW_PROCESS",
                 "wd_leave_approval",
                 "DECISION",
                 "approval_routing",
@@ -82,7 +82,7 @@ class ConditionFragmentServiceImplTest {
         assertThat(impact.getIncomingCount()).isEqualTo(1);
         assertThat(impact.getIncoming()).singleElement()
                 .satisfies(ref -> {
-                    assertThat(ref.getSourceType()).isEqualTo("BPM_PROCESS");
+                    assertThat(ref.getSourceType()).isEqualTo("WORKFLOW_PROCESS");
                     assertThat(ref.getSourceCode()).isEqualTo("wd_leave_approval");
                     assertThat(ref.getSourceName()).isEqualTo("请假审批流程");
                     assertThat(ref.getTargetType()).isEqualTo("DECISION");
@@ -99,7 +99,7 @@ class ConditionFragmentServiceImplTest {
         List<DecisionUsageRefEntity> directRefs = List.of(
                 usageRef("SLA_RULE", "wd_manager_approve_sla", "CONDITION_FRAGMENT",
                         "shared_leave_approval_guard", Map.of("sourceName", "主管审批 SLA")),
-                usageRef("BPM_PROCESS", "wd_leave_approval", "CONDITION_FRAGMENT",
+                usageRef("WORKFLOW_PROCESS", "wd_leave_approval", "CONDITION_FRAGMENT",
                         "shared_leave_approval_guard", Map.of("sourceName", "请假审批流程")),
                 usageRef("AUTOMATION", "leave_request_automation", "CONDITION_FRAGMENT",
                         "shared_leave_approval_guard", Map.of("sourceName", "长假自动提醒")),
@@ -122,7 +122,7 @@ class ConditionFragmentServiceImplTest {
                         org.assertj.core.groups.Tuple.tuple(
                                 "SLA_RULE", "CONDITION_FRAGMENT", "shared_leave_approval_guard"),
                         org.assertj.core.groups.Tuple.tuple(
-                                "BPM_PROCESS", "CONDITION_FRAGMENT", "shared_leave_approval_guard"),
+                                "WORKFLOW_PROCESS", "CONDITION_FRAGMENT", "shared_leave_approval_guard"),
                         org.assertj.core.groups.Tuple.tuple(
                                 "AUTOMATION", "CONDITION_FRAGMENT", "shared_leave_approval_guard"),
                         org.assertj.core.groups.Tuple.tuple(

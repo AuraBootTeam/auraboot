@@ -3,27 +3,15 @@ import { listTemplates, loadTemplate } from '../../src/pipe/templates.js';
 
 describe('workflow templates', () => {
   describe('listTemplates', () => {
-    it('should return at least 4 built-in templates', () => {
+    it('should return at least 2 platform templates', () => {
       const templates = listTemplates();
-      expect(templates.length).toBeGreaterThanOrEqual(4);
-    });
-
-    it('should include daily-sales-report template', () => {
-      const templates = listTemplates();
-      const names = templates.map(t => t.name);
-      expect(names).toContain('daily-sales-report');
+      expect(templates.length).toBeGreaterThanOrEqual(2);
     });
 
     it('should include overdue-tasks-alert template', () => {
       const templates = listTemplates();
       const names = templates.map(t => t.name);
       expect(names).toContain('overdue-tasks-alert');
-    });
-
-    it('should include new-leads-digest template', () => {
-      const templates = listTemplates();
-      const names = templates.map(t => t.name);
-      expect(names).toContain('new-leads-digest');
     });
 
     it('should include inventory-restock-check template', () => {
@@ -42,24 +30,10 @@ describe('workflow templates', () => {
   });
 
   describe('loadTemplate', () => {
-    it('should load daily-sales-report template', () => {
-      const wf = loadTemplate('daily-sales-report');
-      expect(wf).not.toBeNull();
-      expect(wf!.name).toBe('daily-sales-report');
-      expect(wf!.steps.length).toBeGreaterThanOrEqual(2);
-      expect(wf!.steps[0]).toMatchObject({ type: 'query', source: 'crm_opportunity_common' });
-    });
-
     it('should load overdue-tasks-alert template', () => {
       const wf = loadTemplate('overdue-tasks-alert');
       expect(wf).not.toBeNull();
       expect(wf!.steps.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should query the canonical CRM lead model in new-leads-digest', () => {
-      const wf = loadTemplate('new-leads-digest');
-      expect(wf).not.toBeNull();
-      expect(wf!.steps[0]).toMatchObject({ type: 'query', source: 'crm_lead_common' });
     });
 
     it('should return null for unknown template', () => {
@@ -68,7 +42,7 @@ describe('workflow templates', () => {
     });
 
     it('should return valid workflow with all required fields', () => {
-      const wf = loadTemplate('daily-sales-report');
+      const wf = loadTemplate('overdue-tasks-alert');
       expect(wf!.name).toBeTruthy();
       expect(wf!.steps).toBeInstanceOf(Array);
       for (const step of wf!.steps) {
