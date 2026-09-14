@@ -38,6 +38,8 @@ test('real-stack runner proves every observability acceptance surface', () => {
     assert.ok(reliableMetrics.includes(metric), metric);
   }
   assert.match(runner, /find \\\n[\s\S]*docker\/prometheus[\s\S]*docker\/grafana\/dashboards[\s\S]*-exec chmod a\+r/);
+  assert.match(runner, /plugins\/platform-admin" -type d -exec chmod a\+rx/);
+  assert.match(runner, /plugins\/platform-admin" -type f -exec chmod a\+r/);
   for (const port of ['PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
     assert.match(runner, new RegExp(`AURA_OBS_${port}_PORT`));
     assert.match(compose, new RegExp(`AURA_OBS_${port}_PORT`));

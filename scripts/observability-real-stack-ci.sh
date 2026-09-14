@@ -93,6 +93,8 @@ find \
   "$PROJECT_ROOT/docker/grafana/provisioning" \
   "$PROJECT_ROOT/docker/grafana/dashboards" \
   -type f -exec chmod a+r {} +
+find "$PROJECT_ROOT/plugins/platform-admin" -type d -exec chmod a+rx {} +
+find "$PROJECT_ROOT/plugins/platform-admin" -type f -exec chmod a+r {} +
 
 "${COMPOSE[@]}" config --quiet
 "$PROJECT_ROOT/platform/gradlew" -p "$PROJECT_ROOT/platform" bootJar --no-daemon -x test \
