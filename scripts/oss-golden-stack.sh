@@ -209,7 +209,7 @@ stage_requested_backend_jars() {
   # platform SNAPSHOT and require the immutable API jar produced by this exact Core checkout.
   # Passing the property to every plugin build is harmless for in-repo plugins and keeps one
   # build path for both repository layouts.
-  local platform_plugin_api_jar="$REPO_ROOT/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0-SNAPSHOT.jar"
+  local platform_plugin_api_jar="$REPO_ROOT/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar"
   [ -f "$platform_plugin_api_jar" ] \
     || die "platform-plugin-api jar missing after publication build: $platform_plugin_api_jar"
 

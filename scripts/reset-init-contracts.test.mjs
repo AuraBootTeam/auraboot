@@ -284,7 +284,7 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /"\$DEV" gradle "\$runtime_name" --project "\$REPO_ROOT\/platform"/);
   assert.match(golden, /--project "\$backend_dir"/);
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
-  assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0-SNAPSHOT\.jar/);
+  assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
   assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
   assert.ok(
     golden.indexOf('platform_plugin_api_jar=') <
