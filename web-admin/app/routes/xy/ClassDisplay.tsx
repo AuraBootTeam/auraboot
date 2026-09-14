@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
+import { useTenantTheme } from '~/contexts/TenantThemeContext';
 import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
 import { PetAvatar, usePetVisual } from './PetAvatar';
 
@@ -15,7 +16,8 @@ import { PetAvatar, usePetVisual } from './PetAvatar';
  * Auto-refresh every 15s keeps the screen current without interaction.
  */
 export default function ClassDisplay() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const tenantTheme = useTenantTheme();
   const params = useParams();
   const navigate = useNavigate();
   const [classroom, setClassroom] = useState<XyRow | null>(null);
@@ -90,10 +92,18 @@ export default function ClassDisplay() {
               {loaded ? name || '班级大屏' : '加载中…'}
             </h1>
             {classroom && <p className="mt-1 text-sm" style={{ color: '#8C9B79' }}>{String(classroom.xy_cls_slogan || '')}</p>}
+            {tenantTheme?.brandName && (
+              <p className="mt-1 text-xs font-semibold tracking-wide" style={{ color: '#7C9271' }} data-testid="display-brand">{tenantTheme.brandName}</p>
+            )}
           </div>
-          <button className="rounded-pill px-3 py-1.5 text-xs" style={{ background: '#FFFFFF66', color: '#426B3E' }} onClick={() => navigate('/')}>
-            退出大屏
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="rounded-pill px-3 py-1.5 text-xs" style={{ background: '#FFFFFF99', color: '#426B3E' }} data-testid="display-identity">
+              大屏账号:{user?.name || '未登录'}
+            </span>
+            <button className="rounded-pill px-3 py-1.5 text-xs" style={{ background: '#FFFFFF66', color: '#426B3E' }} onClick={() => navigate('/')}>
+              退出大屏
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 grid items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
