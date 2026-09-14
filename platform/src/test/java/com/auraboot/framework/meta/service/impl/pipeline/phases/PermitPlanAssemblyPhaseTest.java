@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.permission.service.RecordShareService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.PhaseDecision;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -181,6 +182,30 @@ class PermitPlanAssemblyPhaseTest {
     }
 
     @Test
+    @DisplayName("an exact external machine grant resolves to ALL without a human row-scope subject")
+    void resolvesAllScopeForExactExternalMachineGrant() {
+        CommandPipelineContext ctx = ctxWithModelAndUser("asset-1", "tasset_asset", null);
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("tasset.asset.manage"));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+
+        MetaContext.runWithExternalCommandPermission("tasset.asset.manage", () -> phase.execute(ctx));
+
+        assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.ALL);
+    }
+
+    @Test
+    @DisplayName("a mismatched external permission never manufactures machine ALL scope")
+    void leavesScopeUnresolvedForMismatchedExternalMachineGrant() {
+        CommandPipelineContext ctx = ctxWithModelAndUser("asset-1", "tasset_asset", null);
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("tasset.asset.read"));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+
+        MetaContext.runWithExternalCommandPermission("tasset.asset.manage", () -> phase.execute(ctx));
+
+        assertThat(ctx.getPermitPlan().scope()).isNull();
+    }
+
+    @Test
     @DisplayName("a command with no model leaves scope unresolved")
     void leavesScopeUnresolvedWhenTheCommandHasNoModel() {
         DataPermissionEngine engine = Mockito.mock(DataPermissionEngine.class);
@@ -285,6 +310,10 @@ class PermitPlanAssemblyPhaseTest {
     }
 
     private CommandPipelineContext ctxWithModel(String targetRecordId, String modelCode) {
+        return ctxWithModelAndUser(targetRecordId, modelCode, 10L);
+    }
+
+    private CommandPipelineContext ctxWithModelAndUser(String targetRecordId, String modelCode, Long userId) {
         CommandExecuteRequest request = new CommandExecuteRequest();
         if (targetRecordId != null) {
             request.setTargetRecordId(targetRecordId);
@@ -293,7 +322,7 @@ class PermitPlanAssemblyPhaseTest {
                 .commandCode("mkt:approve_purchase")
                 .request(request)
                 .tenantId(99L)
-                .userId(10L)
+                .userId(userId)
                 .startTime(System.currentTimeMillis())
                 .build();
         if (modelCode != null) {

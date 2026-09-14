@@ -1952,6 +1952,12 @@ openPlatform:
   newCredential: 新建凭据
   credentialsFailed: 凭据加载失败
   credentialCreateFailed: 凭据创建失败
+  credentialRotated: 凭据已轮换；旧凭据在宽限期内仍有效
+  rotateFailed: 凭据轮换失败
+  rotateTitle: 轮换凭据
+  rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
+  graceMinutes: 宽限期（分钟）
+  rotate: 轮换
   noCredentials: 暂无凭据
   secretTitle: 立即保存此凭据
   secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
@@ -1972,6 +1978,28 @@ openPlatform:
   disableWarning: 此操作会立即吊销有效 Token，且无法在本页面恢复。
   disabled: 访问已停用，有效 Token 已吊销
   disableFailed: 停用失败
+  operations: 运维
+  operationsTitle: 运维
+  operationsSubtitle: 最近 24 小时 API 流量与出站投递健康状况。
+  refresh: 刷新
+  retry: 重试
+  operationsLoadFailed: 运维数据加载失败
+  totalCalls: 调用数
+  errorRate: 错误率
+  errorCalls: 错误调用
+  deadLetters: 死信
+  callAudit: 调用审计
+  noCalls: 没有符合筛选条件的调用
+  deliveryStatus: 投递状态
+  webhookDeliveries: Webhook 投递
+  noDeliveries: 没有符合筛选条件的投递
+  deletedSubscription: 已删除的订阅
+  replay: 重放
+  replayQueued: Webhook 重放已入队
+  replayFailed: Webhook 重放失败
+  replayConfirmTitle: 重放此投递？
+  replayConfirmBody: 原始签名载荷将再次投递，可能重复触发下游副作用。
+  confirmReplay: 确认重放
   status:
     active: 已启用
     disabled: 已停用

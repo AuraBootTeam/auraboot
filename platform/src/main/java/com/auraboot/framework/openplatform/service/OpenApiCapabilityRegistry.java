@@ -24,6 +24,10 @@ public class OpenApiCapabilityRegistry {
         published.add(new Capability("automation.external-event.publish", HttpMethod.POST,
                 "/api/open/v1/event-sources/{sourceCode}/events", "automation.events.write",
                 "tenant-wide", 1));
+        published.add(new Capability("assets.get", HttpMethod.GET,
+                "/api/open/v1/resources/assets/{recordPid}", "assets.read", "tenant-wide", 1));
+        published.add(new Capability("assets.assign", HttpMethod.POST,
+                "/api/open/v1/commands/assets.assign:execute", "assets.manage", "tenant-wide", 1));
         contributors.forEach(contributor -> published.addAll(contributor.capabilities()));
         this.capabilities = published.stream()
                 .sorted(Comparator.comparing(Capability::code))

@@ -35,4 +35,12 @@ public interface ApplicationCredentialMapper extends BaseMapper<ApplicationCrede
             WHERE tenant_id = #{tenantId} AND pid = #{pid} AND status = 'active'
             """)
     int revoke(@Param("tenantId") Long tenantId, @Param("pid") String pid, @Param("now") Instant now);
+
+    @Update("""
+            UPDATE ab_application_credential SET expires_at = #{expiresAt}
+            WHERE tenant_id = #{tenantId} AND pid = #{pid} AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > #{expiresAt})
+            """)
+    int scheduleExpiry(@Param("tenantId") Long tenantId, @Param("pid") String pid,
+                       @Param("expiresAt") Instant expiresAt);
 }
