@@ -471,7 +471,8 @@ public class PlatformToolProvider implements ToolProvider {
     @SuppressWarnings("unchecked")
     private Map<String, Object> fillForm(Map<String, Object> params) {
         Object fieldsObj = params.get("fields");
-        if (fieldsObj == null || (fieldsObj instanceof Map && ((Map<?, ?>) fieldsObj).isEmpty())) {
+        if (fieldsObj == null || (fieldsObj instanceof Map && ((Map<?, ?>) fieldsObj).isEmpty()
+                && (!(params.get("reviews") instanceof Map<?, ?> reviews) || reviews.isEmpty()))) {
             return errorResult("fields is required for platform.fill_form");
         }
 
@@ -487,6 +488,7 @@ public class PlatformToolProvider implements ToolProvider {
         output.put("action", "form_fill");
         output.put("fields", fields);
         output.put("fieldCount", fields.size());
+        if (params.get("reviews") instanceof Map<?, ?> reviews) output.put("reviews", reviews);
         output.put("source", getStringParam(params, "source"));
         output.put("confidence", params.get("confidence"));
         output.put("instruction", "Form fill data ready. The frontend will populate the form. "

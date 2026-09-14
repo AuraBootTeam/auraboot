@@ -100,14 +100,14 @@ class AuraBotChatToolRuntimeAdapter {
                         null,
                         null,
                         objectMapper),
-                callbacks(ctx, modelCode, sessionId, contextBundle, envelope));
+                callbacks(ctx, modelCode, sessionId, contextBundle, envelope, userMessage));
     }
 
     private ChatTurnRuntime.ChatToolLoopCallbacks callbacks(TurnContext ctx,
                                                             String modelCode,
                                                             String sessionId,
                                                             AgentContextBundle contextBundle,
-                                                            ExecutionEnvelope envelope) {
+                                                            ExecutionEnvelope envelope, String sourceText) {
         return new ChatTurnRuntime.ChatToolLoopCallbacks() {
             @Override
             public AgentExecutionState buildRoundState(ChatTurnRuntime.ChatToolLoopRound round) {
@@ -134,6 +134,12 @@ class AuraBotChatToolRuntimeAdapter {
                 if (!isToolAvailable(call.toolDefinitions(), call.toolName())) {
                     log.warn("LLM requested unavailable AuraBot tool {}; rejecting without execution", call.toolName());
                     return unavailableToolResult(call.toolName());
+                }
+                if (FormFillContract.TOOL_NAME.equals(call.toolName())) {
+                    var definition = call.toolDefinitions().stream()
+                            .filter(tool -> call.toolName().equals(tool.getToolName()))
+                            .findFirst().orElseThrow();
+                    FormFillContract.validate(definition.getParameterSchema(), call.input() != null ? call.input() : Map.of(), sourceText);
                 }
                 return chatToolExecutor.execute(
                         call.toolName(),
@@ -248,9 +254,7 @@ class AuraBotChatToolRuntimeAdapter {
                         readOnly ? "none" : "user_confirmation"))
                 .requiresApproval(definition.isRequiresApproval())
                 .requiresConfirmation(requiresConfirmation)
-                .parameterSchema(definition.getInputSchema() != null
-                        ? definition.getInputSchema()
-                        : llmTool.getInputSchema())
+                .parameterSchema(llmTool.getInputSchema())
                 .build();
     }
 

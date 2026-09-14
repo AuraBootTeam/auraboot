@@ -471,6 +471,24 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    void formFillRequestsOnlyContextCapabilityAndDoesNotExecuteACommand() {
+        Map<String, Object> fields = Map.of("name", "Customer");
+        Map<String, Object> input = Map.of("fields", fields);
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("platform.fill_form").toolType("platform")
+                .sourceCode("platform.fill_form").riskLevel("L1").build();
+        when(toolProviderRegistry.execute(1L, "platform.fill_form", input))
+                .thenReturn(ProviderExecutionResult.builder().success(true)
+                        .data(Map.of("action", "form_fill", "fields", fields)).build());
+        String result = service.executeToolCall(1L, "run-fill", null, "aurabot",
+                tool.getName(), input, List.of(tool), null);
+        assertThat(result).contains("\"success\":true", "form_fill", "Customer");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent ->
+                intent.requiredEffects().equals(Set.of(EffectClass.READ_CONTEXT))));
+        verifyNoInteractions(commandExecutor, namedQueryService);
+    }
+
+    @Test
     @DisplayName("low-risk AuraBot skill tools route through SkillToolExecutor")
     void lowRiskAurabotSkillToolsRouteThroughSkillExecutor() {
         ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
