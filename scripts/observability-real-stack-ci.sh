@@ -251,7 +251,7 @@ const requiredNames = [
   'auraboot_reliable_delivery_unhealthy',
 ];
 for (const required of requiredNames) if (!metrics.includes(required)) throw new Error(`application metric missing: ${required}`);
-if (!metrics.includes('auraboot_integration_events_total{outcome="retry_scheduled"}')) {
+if (!/^auraboot_integration_events_total\{[^}\n]*outcome="retry_scheduled"[^}\n]*\}\s/m.test(metrics)) {
   throw new Error('bounded retry counter missing from application exporter');
 }
 const scraped = JSON.parse(fs.readFileSync(process.argv[3], 'utf8')).data?.result ?? [];

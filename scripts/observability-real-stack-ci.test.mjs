@@ -60,6 +60,7 @@ test('real-stack runner proves every observability acceptance surface', () => {
   assert.match(runner, /--plugin-root=\/app\/plugins/);
   assert.match(runner, /platform-admin/);
   assert.match(runner, /String\(value\?\.code\) !== '0'/);
+  assert.match(runner, /integration_events_total\\\{\[\^}\\n\]\*outcome="retry_scheduled"/);
   assert.match(runner, /unset JWT/);
   assert.doesNotMatch(runner, /spaceType === "platform"/);
   assert.doesNotMatch(runner, /platform tenant selection returned no JWT/);
