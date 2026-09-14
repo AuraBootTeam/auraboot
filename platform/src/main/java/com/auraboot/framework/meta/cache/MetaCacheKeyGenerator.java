@@ -114,8 +114,11 @@ public class MetaCacheKeyGenerator implements KeyGenerator {
 
     /**
      * Cache suffix for results whose visibility depends on the current subject's
-     * data scope. Includes tenant, user, member, and permit-plan grade so row-scoped
-     * query results cannot be reused across subjects in the same tenant.
+     * data scope. Includes tenant, user, member, permit-plan grade, and the
+     * {@link DataAccessCacheEpoch} so row-scoped query results cannot be reused
+     * across subjects in the same tenant, and permission changes (role binding,
+     * role-permission, permission definition) immediately orphan every cached
+     * entry — a revoked subject cannot read pre-revocation results until TTL.
      */
     public static String getDataAccessContextSuffix() {
         if (MetaContext.exists()) {
@@ -123,11 +126,12 @@ public class MetaCacheKeyGenerator implements KeyGenerator {
             Long userId = MetaContext.getCurrentUserId();
             Long memberId = MetaContext.getCurrentMemberId();
             String permitScope = MetaContext.getCommandPermitScope();
-            return String.format("%s:%s:%s:%s",
+            return String.format("%s:%s:%s:%s:e%s",
                     tenantId != null ? tenantId : DEFAULT_VALUE,
                     userId != null ? userId : DEFAULT_VALUE,
                     memberId != null ? memberId : DEFAULT_VALUE,
-                    permitScope != null ? "permit-" + permitScope : "scoped");
+                    permitScope != null ? "permit-" + permitScope : "scoped",
+                    DataAccessCacheEpoch.current());
         }
         return NO_CONTEXT;
     }
