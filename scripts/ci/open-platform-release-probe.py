@@ -95,9 +95,14 @@ dynamic_create("tasset_asset", {
     "tasset_as_code": "REL-ASSET-002", "tasset_as_name": "Release Probe Asset 2",
     "tasset_as_status": "available",
 })
-product = dynamic_create("tinv_product", {"tinv_pd_name": "Release Probe Product"})
-warehouse = dynamic_create("tinv_warehouse", {"tinv_wh_name": "Release Probe Warehouse"})
+product = dynamic_create("tinv_product", {
+    "tinv_pd_code": "REL-PRODUCT-001", "tinv_pd_name": "Release Probe Product",
+})
+warehouse = dynamic_create("tinv_warehouse", {
+    "tinv_wh_code": "REL-WAREHOUSE-001", "tinv_wh_name": "Release Probe Warehouse",
+})
 stock_in = dynamic_create("tinv_stock_in", {
+    "tinv_si_code": "REL-STOCK-IN-001",
     "tinv_si_product_id": product["pid"], "tinv_si_warehouse_id": warehouse["pid"],
     "tinv_si_quantity": 3, "tinv_si_unit_cost": 12.5, "tinv_si_supplier": "CI fixture",
 })
