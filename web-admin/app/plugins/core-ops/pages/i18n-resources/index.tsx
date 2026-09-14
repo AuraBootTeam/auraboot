@@ -59,7 +59,7 @@ export default function I18nResourcesPage() {
   const [newKey, setNewKey] = useState('');
   const [newLang, setNewLang] = useState('zh-CN');
   const [newValue, setNewValue] = useState('');
-  const [translatingKey, setTranslatingKey] = useState<string | null>(null);
+  const [batchTranslating, setBatchTranslating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,17 +127,19 @@ export default function I18nResourcesPage() {
     load();
   }, [newKey, newLang, newValue, load]);
 
-  const aiTranslate = useCallback(
-    async (sourceKey: string) => {
-      setTranslatingKey(sourceKey);
+  // Batch: the backend finds keys missing in targetLocale (up to maxKeys)
+  // and fills them from the source locale — one call per prefix space.
+  const aiTranslateBatch = useCallback(
+    async (targetLocale: string) => {
+      setBatchTranslating(true);
       try {
         await fetchResult('/api/admin/i18n/ai-translate', {
           method: 'post',
-          params: { key: sourceKey, sourceLocale: 'zh-CN', targetLocale: 'en-US' },
+          params: { targetLocale, sourceLocale: 'zh-CN', maxKeys: 200 },
         });
         load();
       } finally {
-        setTranslatingKey(null);
+        setBatchTranslating(false);
       }
     },
     [load],
@@ -182,6 +184,14 @@ export default function I18nResourcesPage() {
         <button onClick={load} className="border rounded px-2 py-1 text-sm flex items-center gap-1">
           <MagnifyingGlassIcon className="h-4 w-4" /> {l('查询', 'Search')}
         </button>
+        <button
+          onClick={() => aiTranslateBatch('en-US')}
+          disabled={batchTranslating}
+          className="border rounded px-2 py-1 text-sm flex items-center gap-1 disabled:opacity-50"
+          title={l('为 en-US 补齐缺失翻译(≤200 条)', 'Fill missing en-US translations (≤200)')}
+        >
+          <SparklesIcon className="h-4 w-4" /> {l('AI 批量翻译 → en-US', 'AI batch translate → en-US')}
+        </button>
         <span className="text-sm text-text-3">{total}</span>
       </div>
 
@@ -208,6 +218,7 @@ export default function I18nResourcesPage() {
               <th className="p-2">key</th>
               <th className="p-2">lang</th>
               <th className="p-2">{l('文案', 'value')}</th>
+              <th className="p-2">status</th>
               <th className="p-2">{l('操作', 'actions')}</th>
             </tr>
           </thead>
@@ -223,6 +234,7 @@ export default function I18nResourcesPage() {
                     r.value
                   )}
                 </td>
+                <td className="p-2 whitespace-nowrap">{r.status}</td>
                 <td className="p-2 whitespace-nowrap">
                   {editingPid === r.pid ? (
                     <button onClick={() => saveEdit(r.pid)} className="text-blue-600 px-1">
@@ -237,15 +249,6 @@ export default function I18nResourcesPage() {
                       <PencilSquareIcon className="h-4 w-4 inline" />
                     </button>
                   )}
-                  <button
-                    onClick={() => aiTranslate(r.i18nKey)}
-                    disabled={translatingKey === r.i18nKey}
-                    className="text-purple-600 px-1 disabled:opacity-50"
-                    aria-label={`translate-${r.i18nKey}`}
-                    title={l('AI 翻译', 'AI translate')}
-                  >
-                    <SparklesIcon className="h-4 w-4 inline" />
-                  </button>
                   <button onClick={() => remove(r.pid)} className="text-red-600 px-1" aria-label={`delete-${r.i18nKey}`}>
                     <TrashIcon className="h-4 w-4 inline" />
                   </button>
@@ -253,7 +256,7 @@ export default function I18nResourcesPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="p-4 text-center text-text-3">{l('无数据', 'No data')}</td></tr>
+              <tr><td colSpan={5} className="p-4 text-center text-text-3">{l('无数据', 'No data')}</td></tr>
             )}
           </tbody>
         </table>
