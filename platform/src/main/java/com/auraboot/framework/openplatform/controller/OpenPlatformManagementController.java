@@ -13,6 +13,8 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredential
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotatedCredentialSecret;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookDeliveryView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookSubscriptionHealthView;
+import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.auraboot.framework.openplatform.service.OpenPlatformManagementService;
 import com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -38,10 +40,16 @@ import java.util.List;
 public class OpenPlatformManagementController {
     private final OpenPlatformManagementService managementService;
     private final OpenApiCapabilityRegistry capabilityRegistry;
+    private final OpenApiEventCatalog eventCatalog;
 
     @GetMapping("/capabilities")
     public ApiResponse<List<OpenApiCapabilityRegistry.Capability>> listCapabilities() {
         return ApiResponse.success(capabilityRegistry.list());
+    }
+
+    @GetMapping("/event-catalog")
+    public ApiResponse<List<OpenApiEventCatalog.EventDescriptor>> listEventCatalog() {
+        return ApiResponse.success(eventCatalog.externallyPublished());
     }
 
     @GetMapping("/applications")
@@ -96,6 +104,12 @@ public class OpenPlatformManagementController {
             @PathVariable String installationPid, @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "50") int limit) {
         return ApiResponse.success(managementService.listWebhookDeliveries(installationPid, status, limit));
+    }
+
+    @GetMapping("/installations/{installationPid}/webhook-health")
+    public ApiResponse<List<WebhookSubscriptionHealthView>> listWebhookHealth(
+            @PathVariable String installationPid) {
+        return ApiResponse.success(managementService.listWebhookHealth(installationPid));
     }
 
     @PostMapping("/installations/{installationPid}/webhook-deliveries/{deliveryPid}/replay")

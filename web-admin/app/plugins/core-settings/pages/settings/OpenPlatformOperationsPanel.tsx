@@ -33,6 +33,24 @@ interface Delivery {
   createdAt: string;
   replayable: boolean;
 }
+interface EventDescriptor {
+  type: string;
+  currentVersion: number;
+  supportedVersions: number[];
+  classification: string;
+  subjectResourceCode: string;
+}
+interface WebhookHealth {
+  pid: string;
+  name: string;
+  eventType: string;
+  eventVersion: number;
+  catalogCurrentVersion?: number;
+  compatible: boolean;
+  rotationStatus: 'healthy' | 'due' | 'overdue' | 'missing';
+  rotationDueAt?: string;
+  enabled: boolean;
+}
 
 export default function OpenPlatformOperationsPanel({
   installationPid,
@@ -44,6 +62,8 @@ export default function OpenPlatformOperationsPanel({
   const [overview, setOverview] = useState<Overview | null>(null);
   const [audits, setAudits] = useState<Audit[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [eventCatalog, setEventCatalog] = useState<EventDescriptor[]>([]);
+  const [webhookHealth, setWebhookHealth] = useState<WebhookHealth[]>([]);
   const [requestId, setRequestId] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -58,7 +78,7 @@ export default function OpenPlatformOperationsPanel({
         ? `?requestId=${encodeURIComponent(requestId.trim())}`
         : '';
       const deliveryQuery = deliveryStatus ? `?status=${encodeURIComponent(deliveryStatus)}` : '';
-      const [overviewData, auditData, deliveryData] = await Promise.all([
+      const [overviewData, auditData, deliveryData, catalogData, healthData] = await Promise.all([
         apiFetch<Overview>(
           `/api/open-platform/installations/${installationPid}/overview?windowHours=24`,
         ),
@@ -68,10 +88,16 @@ export default function OpenPlatformOperationsPanel({
         apiFetch<Delivery[]>(
           `/api/open-platform/installations/${installationPid}/webhook-deliveries${deliveryQuery}`,
         ),
+        apiFetch<EventDescriptor[]>('/api/open-platform/event-catalog'),
+        apiFetch<WebhookHealth[]>(
+          `/api/open-platform/installations/${installationPid}/webhook-health`,
+        ),
       ]);
       setOverview(overviewData);
       setAudits(auditData ?? []);
       setDeliveries(deliveryData ?? []);
+      setEventCatalog(catalogData ?? []);
+      setWebhookHealth(healthData ?? []);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -168,7 +194,10 @@ export default function OpenPlatformOperationsPanel({
             ))}
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-            <div className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <div
+              data-testid="open-platform-call-audit"
+              className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+            >
               <div className="mb-3 flex items-end gap-2">
                 <label className="min-w-0 flex-1 text-xs font-medium text-gray-500">
                   request_id
@@ -280,6 +309,91 @@ export default function OpenPlatformOperationsPanel({
               )}
             </div>
           </div>
+          <div
+            data-testid="open-platform-contract-health-grid"
+            className="grid min-w-0 items-start gap-4 lg:grid-cols-2"
+          >
+            <div
+              className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+              data-testid="open-platform-event-catalog"
+            >
+              <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                {t('openPlatform.eventCatalog', undefined, 'Event catalog')}
+              </h4>
+              <p className="mt-1 text-xs text-gray-400">
+                {t(
+                  'openPlatform.eventCatalogHint',
+                  undefined,
+                  'Only explicitly published partner events can be selected by installed applications.',
+                )}
+              </p>
+              {eventCatalog.length === 0 ? (
+                <div className="mt-3">
+                  <Empty
+                    label={t(
+                      'openPlatform.noPublishedEvents',
+                      undefined,
+                      'No partner events published',
+                    )}
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {eventCatalog.map((event) => (
+                    <div
+                      key={event.type}
+                      className="min-w-0 rounded-md bg-slate-50 p-2 dark:bg-slate-950"
+                    >
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                        <code className="min-w-0 text-xs break-all text-gray-800 dark:text-gray-100">
+                          {event.type}
+                        </code>
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] text-indigo-700">
+                          {event.classification} · v{event.currentVersion}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {event.subjectResourceCode} · compatible v
+                        {event.supportedVersions.join(', v')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div
+              className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+              data-testid="open-platform-webhook-health"
+            >
+              <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                {t('openPlatform.webhookHealth', undefined, 'Webhook compatibility & signing')}
+              </h4>
+              <p className="mt-1 text-xs text-gray-400">
+                {t(
+                  'openPlatform.webhookHealthHint',
+                  undefined,
+                  'Rotate signing secrets every 90 days and keep subscriptions on a supported schema.',
+                )}
+              </p>
+              {webhookHealth.length === 0 ? (
+                <div className="mt-3">
+                  <Empty
+                    label={t(
+                      'openPlatform.noInstalledWebhooks',
+                      undefined,
+                      'No webhooks for this installation',
+                    )}
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {webhookHealth.map((item) => (
+                    <WebhookHealthCard key={item.pid} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
       {pendingReplay && (
@@ -321,6 +435,44 @@ export default function OpenPlatformOperationsPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function WebhookHealthCard({ item }: { item: WebhookHealth }) {
+  const warning =
+    !item.compatible || item.rotationStatus === 'overdue' || item.rotationStatus === 'missing';
+  return (
+    <div
+      className={`min-w-0 rounded-md border p-2 text-xs ${
+        warning
+          ? 'border-amber-300 bg-amber-50 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100'
+          : 'border-transparent bg-slate-50 text-gray-700 dark:bg-slate-950 dark:text-gray-200'
+      }`}
+      data-rotation-status={item.rotationStatus}
+      data-compatible={String(item.compatible)}
+    >
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 font-medium break-words">{item.name}</span>
+        <span className="font-semibold">{item.compatible ? 'Compatible' : 'Action required'}</span>
+      </div>
+      <code className="mt-1 block text-[11px] break-all">{item.eventType}</code>
+      <p className="mt-1">
+        schema v{item.eventVersion}
+        {item.catalogCurrentVersion ? ` · catalog v${item.catalogCurrentVersion}` : ''}
+        {' · '}
+        signing {item.rotationStatus}
+      </p>
+      {item.rotationDueAt && (
+        <p className="mt-1 text-[11px] opacity-75">Rotate by {formatTime(item.rotationDueAt)}</p>
+      )}
+      {!item.compatible && <p className="mt-1 font-medium">Choose a supported event version.</p>}
+      {item.rotationStatus === 'overdue' && (
+        <p className="mt-1 font-medium">Rotate the signing secret now.</p>
+      )}
+      {item.rotationStatus === 'missing' && (
+        <p className="mt-1 font-medium">Add a signing secret before enabling delivery.</p>
+      )}
+    </div>
   );
 }
 

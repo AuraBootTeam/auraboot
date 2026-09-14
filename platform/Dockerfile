@@ -25,6 +25,9 @@ WORKDIR /app
 COPY platform/gradlew gradlew
 COPY platform/gradle gradle
 COPY platform/build.gradle platform/settings.gradle platform/gradle.properties ./
+# platform/build.gradle intentionally reads ../VERSION so the platform and repository release
+# stay on one canonical version. WORKDIR is /app in this stage, therefore that file is /VERSION.
+COPY VERSION /VERSION
 
 # Copy subproject build files for dependency resolution
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle

@@ -22,7 +22,7 @@ import java.util.Map;
  * Re-checks and transaction-holds the version of the client-named command target.
  *
  * <p>This phase deliberately runs after every authorization gate and the atomic idempotency claim,
- * but before any mutation or plugin handler. The {@code FOR SHARE} row lock remains held by the
+ * but before any mutation or plugin handler. The {@code FOR UPDATE} row lock remains held by the
  * caller's command transaction until commit/rollback, closing the gap between the earlier boundary
  * observation and the write phases.</p>
  */
@@ -87,17 +87,13 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(
                 primaryKeyColumn, "command target version primary key");
 
-        // SECURITY: selectByQueryWithoutTenant bypasses the tenant interceptor. This query carries
-        // an explicit tenant_id predicate and binds both tenant and pid; identifiers are resolved
-        // from MetaModelService and independently validated above.
-        String sql = "SELECT row_version FROM " + tableName
-                + " WHERE tenant_id = #{params.tenantId}"
-                + " AND " + primaryKeyColumn + " = #{params.targetRecordPid}"
-                + " FOR SHARE";
-        Map<String, Object> params = Map.of(
-                "tenantId", ctx.getTenantId(),
-                "targetRecordPid", ctx.getRequest().getTargetRecordId());
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
+        // SECURITY: the typed mapper seam carries an explicit tenant predicate, binds values,
+        // and revalidates both metadata-derived identifiers before adding FOR UPDATE.
+        List<Map<String, Object>> rows = dynamicDataMapper.selectRowVersionForUpdate(
+                tableName,
+                primaryKeyColumn,
+                ctx.getTenantId(),
+                ctx.getRequest().getTargetRecordId());
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
         if (authoritative == null || requested.longValue() != authoritative) {

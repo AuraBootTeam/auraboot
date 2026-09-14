@@ -124,6 +124,23 @@ public interface DynamicDataMapper {
             @Param("currentUserId") Long currentUserId);
 
     /**
+     * Lock one tenant-scoped dynamic record and return its authoritative row version.
+     *
+     * <p>This is deliberately a typed seam instead of raw SELECT SQL: table and primary-key
+     * identifiers are revalidated by {@link DynamicSqlProvider}, values stay bound, and the
+     * explicit tenant predicate permits the interceptor bypass required by PostgreSQL
+     * {@code FOR UPDATE}. The caller must run inside the mutation transaction so the lock is held
+     * until commit or rollback.</p>
+     */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectRowVersionForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> selectRowVersionForUpdate(
+            @Param("tableName") String tableName,
+            @Param("pkColumn") String pkColumn,
+            @Param("tenantId") long tenantId,
+            @Param("recordId") String recordId);
+
+    /**
      * 删除数据
      * @param tableName 表名
      * @param conditions 删除条件

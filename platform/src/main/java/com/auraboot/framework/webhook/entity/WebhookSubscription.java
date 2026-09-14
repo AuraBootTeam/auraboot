@@ -35,6 +35,9 @@ public class WebhookSubscription {
     @TableField("event_type")
     private String eventType;
 
+    @TableField("event_version")
+    private Integer eventVersion;
+
     @TableField("model_code")
     private String modelCode;
 
@@ -43,6 +46,9 @@ public class WebhookSubscription {
 
     @TableField("secret")
     private String secret;
+
+    @TableField("secret_rotated_at")
+    private Instant secretRotatedAt;
 
     @TableField("headers")
     private String headers;
