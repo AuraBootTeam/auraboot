@@ -418,14 +418,17 @@ public class InboxEventListener {
      * Priority: processName > humanized processKey > fallback.
      */
     private String buildApprovalTitle(String taskName, String processName, String processKey) {
+        // CJK process names (the product's primary audience) read naturally without
+        // an English "Approval:" prefix — "请假审批" alone is clearer than
+        // "Approval: 请假审批".
         if (processName != null && !processName.isBlank()) {
-            return "Approval: " + processName;
+            return processName;
         }
         if (taskName != null && !taskName.isBlank() && isHumanReadable(taskName)) {
-            return "Approval: " + taskName;
+            return taskName;
         }
         if (processKey != null) {
-            return "Approval: " + humanize(processKey);
+            return humanize(processKey);
         }
         return "New Approval Task";
     }
