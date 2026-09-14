@@ -8,7 +8,7 @@
 |---|--:|---|
 | **gate** | 43 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
-| **entrypoint** | 27 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
+| **entrypoint** | 29 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
 | **tooling** | 67 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
 | **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
@@ -79,7 +79,7 @@
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 | `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
 
-## entrypoint (27)
+## entrypoint (29)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -90,6 +90,7 @@
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/enterprise-env-export.sh` | 0 | 2026-05-09 | enterprise-env-export.sh — env contract for the enterprise overlay |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
+| `dev/rebuild-ent-backend.sh` | 0 | 2026-09-14 | One-command Enterprise backend rebuild: publish OSS artifacts to ~/.m2, build the Enterprise bootJar, restart the test backend, seed smoke. |
 | `dev/rotate-license-keypair.sh` | 0 | 2026-05-09 | Rotate the AuraBoot commercial-license signing keypair. |
 | `dev/run-agent-runtime-backend-gate.sh` | 0 | 2026-07-23 | Focused backend gate for the generic agent runtime architecture. |
 | `dev/xxl-job-true-stack-smoke.sh` | 0 | 2026-06-07 |  |
@@ -113,6 +114,7 @@
 | `application/application-cli.mjs` | 1 | 2026-09-12 | Validate application manifests, resolve immutable locks, and verify staged artifact checksums. |
 | `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
 | `application/audit-core-only-schema.sh` | 1 | 2026-09-12 | Fail closed when a migrated core-only database contains BPM/CRM tables or persisted product literals. |
+| `application/create-release-screenshot-manifest.mjs` | 2 | 2026-09-13 | Build the immutable release screenshot manifest: stable IDs, image facts, and SHA-256 checksums for every captured screenshot. |
 | `application/migration-ownership.mjs` | 1 | 2026-09-12 | Split legacy core migrations into deterministic core, CRM, and BPM ownership sets without Flyway version collisions. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
