@@ -234,7 +234,7 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
     <div
       ref={containerRef}
       data-testid="designer-canvas"
-      className={`relative flex-1 overflow-auto bg-gray-100 p-4 transition-colors ${
+      className={`relative flex-1 overflow-auto bg-gray-100 p-4 transition-colors [background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1px)] [background-size:20px_20px] ${
         isDragOver ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : ''
       } ${className}`}
       onDrop={handleDrop}
