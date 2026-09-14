@@ -3,6 +3,7 @@ package com.auraboot.framework.webhook.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
@@ -31,6 +32,7 @@ public class WebhookServiceImpl implements WebhookService {
     private final WebhookSubscriptionMapper subscriptionMapper;
     private final WebhookDispatcher webhookDispatcher;
     private final FieldEncryptionService fieldEncryptionService;
+    private final ApplicationInstallationMapper installationMapper;
 
     @Override
     @Transactional
@@ -41,6 +43,7 @@ public class WebhookServiceImpl implements WebhookService {
         WebhookSubscription entity = new WebhookSubscription();
         entity.setTenantId(tenantId);
         entity.setPid(UniqueIdGenerator.generate());
+        entity.setInstallationPid(validateInstallation(tenantId, request.getInstallationPid()));
         entity.setName(request.getName());
         entity.setTargetUrl(request.getTargetUrl());
         entity.setEventType(request.getEventType());
@@ -88,6 +91,7 @@ public class WebhookServiceImpl implements WebhookService {
         }
 
         existing.setName(request.getName());
+        existing.setInstallationPid(validateInstallation(tenantId, request.getInstallationPid()));
         existing.setTargetUrl(request.getTargetUrl());
         existing.setEventType(request.getEventType());
         existing.setModelCode(request.getModelCode());
@@ -140,5 +144,15 @@ public class WebhookServiceImpl implements WebhookService {
         }
         webhookDispatcher.dispatch(subscription.getEventType(), testPayload,
                 MetaContext.getCurrentTenantId());
+    }
+
+    private String validateInstallation(Long tenantId, String installationPid) {
+        if (installationPid == null || installationPid.isBlank()) {
+            return null;
+        }
+        if (installationMapper.findByTenantAndPid(tenantId, installationPid) == null) {
+            throw new IllegalArgumentException("Open Platform installation not found: " + installationPid);
+        }
+        return installationPid;
     }
 }

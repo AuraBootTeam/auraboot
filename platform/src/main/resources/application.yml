@@ -159,7 +159,6 @@ springdoc:
     try-it-out-enabled: true
     filter: true
   packages-to-scan: com.auraboot.framework
-  paths-to-match: /api/**
   group-configs:
     - group: meta
       paths-to-match: /api/meta/**

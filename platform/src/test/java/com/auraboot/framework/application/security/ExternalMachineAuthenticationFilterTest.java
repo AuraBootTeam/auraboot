@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ExternalApiKeyAuthenticationFilterTest {
+class ExternalMachineAuthenticationFilterTest {
 
     @AfterEach
     void clearContext() {
@@ -26,26 +26,26 @@ class ExternalApiKeyAuthenticationFilterTest {
     @Test
     void supportedRequestEstablishesTenantAuthenticationAndAlwaysClearsIt() throws Exception {
         AtomicBoolean audited = new AtomicBoolean();
-        ExternalApiKeyAuthenticator authenticator = new ExternalApiKeyAuthenticator() {
+        ExternalMachineAuthenticator authenticator = new ExternalMachineAuthenticator() {
             public boolean supports(jakarta.servlet.http.HttpServletRequest request) { return true; }
-            public ExternalApiKeyPrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
-                return new ExternalApiKeyPrincipal(42L, "key-pid", "ERP", Set.of("qr:read"));
+            public MachinePrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
+                return new MachinePrincipal(42L, "token-pid", "ERP application", Set.of("openapi.profile.read"));
             }
-            public void recordCall(ExternalApiKeyPrincipal principal,
+            public void recordCall(MachinePrincipal principal,
                                    jakarta.servlet.http.HttpServletRequest request,
                                    int status, long durationMillis) {
                 audited.set(status == 200 && principal.tenantId() == 42L);
             }
         };
-        var filter = new ExternalApiKeyAuthenticationFilter(List.of(authenticator), new ObjectMapper());
-        var request = new MockHttpServletRequest("GET", "/api/open/qr/v1/codes");
-        request.setServletPath("/api/open/qr/v1/codes");
+        var filter = new ExternalMachineAuthenticationFilter(List.of(authenticator), new ObjectMapper());
+        var request = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
+        request.setServletPath("/api/open/v1/whoami");
         var response = new MockHttpServletResponse();
         FilterChain chain = (req, res) -> {
             assertEquals(42L, MetaContext.getCurrentTenantId());
             assertTrue(SecurityContextHolder.getContext().getAuthentication().isAuthenticated());
             assertTrue(Boolean.TRUE.equals(request.getAttribute(
-                    ExternalApiKeyAuthenticationFilter.AUTHENTICATED_ATTRIBUTE)));
+                    ExternalMachineAuthenticationFilter.AUTHENTICATED_ATTRIBUTE)));
         };
 
         filter.doFilter(request, response, chain);
@@ -57,22 +57,22 @@ class ExternalApiKeyAuthenticationFilterTest {
 
     @Test
     void policyRejectionDoesNotReachController() throws Exception {
-        ExternalApiKeyAuthenticator authenticator = new ExternalApiKeyAuthenticator() {
+        ExternalMachineAuthenticator authenticator = new ExternalMachineAuthenticator() {
             public boolean supports(jakarta.servlet.http.HttpServletRequest request) { return true; }
-            public ExternalApiKeyPrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
-                throw new ExternalApiKeyException(429, "api_rate_limited");
+            public MachinePrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
+                throw new ExternalMachineAuthException(429, "rate_limit_exceeded");
             }
         };
-        var filter = new ExternalApiKeyAuthenticationFilter(List.of(authenticator), new ObjectMapper());
-        var request = new MockHttpServletRequest("GET", "/api/open/qr/v1/codes");
-        request.setServletPath("/api/open/qr/v1/codes");
+        var filter = new ExternalMachineAuthenticationFilter(List.of(authenticator), new ObjectMapper());
+        var request = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
+        request.setServletPath("/api/open/v1/whoami");
         var response = new MockHttpServletResponse();
         AtomicBoolean chained = new AtomicBoolean();
 
         filter.doFilter(request, response, (req, res) -> chained.set(true));
 
         assertEquals(429, response.getStatus());
-        assertTrue(response.getContentAsString().contains("api_rate_limited"));
+        assertTrue(response.getContentAsString().contains("rate_limit_exceeded"));
         assertFalse(chained.get());
     }
 }

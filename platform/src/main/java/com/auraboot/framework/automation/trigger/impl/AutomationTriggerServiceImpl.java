@@ -299,6 +299,31 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     }
 
     @Override
+    public void onExternalEvent(String sourceCode, String eventType, String eventId,
+                                String subject, Map<String, Object> payload) {
+        List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
+                sourceCode, "external_event");
+        for (Automation automation : automations) {
+            TriggerConfig config = automation.getTriggerConfig();
+            if (config != null && config.getEventTypes() != null && !config.getEventTypes().isEmpty()
+                    && !config.getEventTypes().contains(eventType)) {
+                continue;
+            }
+            Map<String, Object> triggerPayload = new LinkedHashMap<>();
+            triggerPayload.put("event", "external_event");
+            triggerPayload.put("eventType", eventType);
+            triggerPayload.put("eventId", eventId);
+            triggerPayload.put("sourceCode", sourceCode);
+            triggerPayload.put("subject", subject);
+            triggerPayload.put("data", payload);
+            Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, triggerPayload);
+            if (matchedPayload != null) {
+                executeAutomationAsync(automation, eventId, matchedPayload);
+            }
+        }
+    }
+
+    @Override
     @Transactional
     public AutomationLog executeAutomation(Automation automation, String recordPid,
                                            Map<String, Object> triggerPayload) {
