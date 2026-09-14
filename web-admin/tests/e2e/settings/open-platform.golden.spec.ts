@@ -53,6 +53,15 @@ async function dismissToasts(page: import('@playwright/test').Page) {
   await expect(page.getByRole('alert')).toHaveCount(0);
 }
 
+async function openAccountMenu(page: import('@playwright/test').Page) {
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 15_000,
+  });
+  const userMenu = page.getByTestId('user-menu');
+  await userMenu.getByRole('button', { name: /User avatar/ }).click();
+  await expect(userMenu.getByTestId('user-dropdown')).toBeVisible();
+}
+
 test.describe('Open Platform golden journey', () => {
   test.setTimeout(120_000);
   test.use({
@@ -68,7 +77,7 @@ test.describe('Open Platform golden journey', () => {
     await authenticate(page);
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
-    await page.getByRole('button', { name: /User avatar/ }).click();
+    await openAccountMenu(page);
     const menuEntry = page.getByTestId('open-platform-link');
     await expect(menuEntry).toBeVisible();
     await capture(page, 'OP-OPS-01');
@@ -89,7 +98,7 @@ test.describe('Open Platform golden journey', () => {
       });
     });
     await page.goto('/');
-    await page.getByRole('button', { name: /User avatar/ }).click();
+    await openAccountMenu(page);
     await page.getByTestId('open-platform-link').click();
     await expect(page.getByTestId('open-platform-page')).toContainText('受控加载失败');
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
