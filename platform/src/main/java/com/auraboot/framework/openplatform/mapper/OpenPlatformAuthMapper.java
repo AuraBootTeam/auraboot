@@ -15,7 +15,7 @@ public interface OpenPlatformAuthMapper {
             SELECT c.id AS credential_id, c.pid AS credential_pid, c.tenant_id,
                    c.installation_id, c.secret_hash, c.status AS credential_status,
                    c.expires_at AS credential_expires_at,
-                   i.pid AS installation_pid, i.environment, i.rate_limit_per_minute,
+                   i.pid AS installation_pid, i.environment,
                    i.status AS installation_status,
                    a.pid AS application_pid, a.status AS application_status
             FROM ab_application_credential c
@@ -29,7 +29,8 @@ public interface OpenPlatformAuthMapper {
     @Select("""
             SELECT t.pid AS token_pid, t.tenant_id, t.installation_id, t.scopes,
                    t.expires_at AS token_expires_at,
-                   i.pid AS installation_pid, i.environment, i.status AS installation_status,
+                   i.pid AS installation_pid, i.environment, i.rate_limit_per_minute,
+                   i.status AS installation_status,
                    a.pid AS application_pid, a.status AS application_status
             FROM ab_application_access_token t
             JOIN ab_application_installation i ON i.id = t.installation_id

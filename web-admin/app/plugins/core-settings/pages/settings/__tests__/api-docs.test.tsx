@@ -68,6 +68,8 @@ describe('OpenPlatformPage', () => {
     render(<OpenPlatformPage />);
     expect(await screen.findByText('ERP Bridge')).toBeVisible();
     expect(screen.getByText('Rate limit: 600/min')).toBeVisible();
+    expect(screen.queryByText('app-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('inst-1')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'New credential' }));
     expect(await screen.findByText('Save this credential now')).toBeVisible();
@@ -80,5 +82,37 @@ describe('OpenPlatformPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Disable installation' }));
     expect(screen.getByText(/immediately revokes active tokens/)).toBeVisible();
+  });
+
+  it('configures the installation rate limit and explicit scopes', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/capabilities')) return response([capability]);
+      if (url.endsWith('/applications') && !init?.method) return response([{
+        pid: 'app-2', name: 'Warehouse Connector', status: 'active',
+        createdAt: '2026-09-14T00:00:00Z', installations: [],
+      }]);
+      return response({});
+    }));
+    const user = userEvent.setup();
+    render(<OpenPlatformPage />);
+    expect(await screen.findByText('Warehouse Connector')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Add installation' }));
+    const rateLimit = screen.getByTestId('open-platform-rate-limit');
+    await user.clear(rateLimit);
+    await user.type(rateLimit, '1200');
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      '/api/open-platform/applications/app-2/installations',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          environment: 'development',
+          scopes: ['openapi.profile.read'],
+          rateLimitPerMinute: 1200,
+        }),
+      }),
+    ));
   });
 });
