@@ -4,9 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/observability-real-stack}"
-COMPOSE=(docker compose -f "$PROJECT_ROOT/docker-compose.observability.yml" -p aura-ci-observability --profile acceptance)
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 RUN_ID="obs-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+COMPOSE_PROJECT="aura-ci-observability-${RUN_ID,,}"
+COMPOSE=(docker compose -f "$PROJECT_ROOT/docker-compose.observability.yml" -p "$COMPOSE_PROJECT" --profile acceptance)
 TRACE_ID=""
 RUNTIME_STARTED=0
 export AURA_OBS_PROMETHEUS_PORT="${AURA_OBS_PROMETHEUS_PORT:-29090}"
@@ -39,12 +40,13 @@ close_runtime() {
     printf '%s\n' "$running" >> "$ARTIFACTS/compose-stop.log"
     close_rc=1
   fi
-  node - "$ARTIFACTS/runtime-closure.json" "$RUN_ID" "$close_rc" <<'NODE'
+  node - "$ARTIFACTS/runtime-closure.json" "$RUN_ID" "$COMPOSE_PROJECT" "$close_rc" <<'NODE'
 const fs = require('node:fs');
-const [file, runId, closeCode] = process.argv.slice(2);
+const [file, runId, composeProject, closeCode] = process.argv.slice(2);
 fs.writeFileSync(file, JSON.stringify({
   contractVersion: 1,
   runId,
+  composeProject,
   status: closeCode === '0' ? 'closed' : 'close-failed',
   processesAndPortsReleased: closeCode === '0',
   evidenceVolumesRetained: true,

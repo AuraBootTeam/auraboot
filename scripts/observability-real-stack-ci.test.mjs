@@ -43,6 +43,10 @@ test('real-stack runner proves every observability acceptance surface', () => {
     assert.match(compose, new RegExp(`AURA_OBS_${port}_PORT`));
   }
   assert.match(runner, /trap on_exit EXIT/);
+  assert.match(runner, /COMPOSE_PROJECT="aura-ci-observability-\$\{RUN_ID,,\}"/);
+  assert.match(runner, /-p "\$COMPOSE_PROJECT"/);
+  assert.doesNotMatch(runner, /-p aura-ci-observability /);
+  assert.match(runner, /composeProject/);
   assert.match(runner, /compose-ps-after-close\.txt/);
   assert.match(runner, /runtime-closure\.json/);
   assert.match(runner, /stop --timeout 30/);
