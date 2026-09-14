@@ -205,12 +205,21 @@ stage_requested_backend_jars() {
       >"$sd/platform-publications.log" 2>&1 \
     || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
+  # External hybrid plugins use artifact mode: they deliberately cannot resolve a moving
+  # platform SNAPSHOT and require the immutable API jar produced by this exact Core checkout.
+  # Passing the property to every plugin build is harmless for in-repo plugins and keeps one
+  # build path for both repository layouts.
+  local platform_plugin_api_jar="$REPO_ROOT/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar"
+  [ -f "$platform_plugin_api_jar" ] \
+    || die "platform-plugin-api jar missing after publication build: $platform_plugin_api_jar"
+
   local spec staged_path jar_hash jar_entry_class entry_class_path
   for spec in "${backend_specs[@]}"; do
     IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class <<< "$spec"
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
-      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar --console=plain \
+      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar \
+      "-PplatformPluginApiJar=$platform_plugin_api_jar" --console=plain \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
