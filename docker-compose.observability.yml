@@ -115,10 +115,9 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-auraboot-observability-ci}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # The acceptance stack is loopback-only and disposable. Anonymous Admin keeps a derived
-      # Explore link in the same browser flow instead of redirecting it through a second login.
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      # The acceptance stack is loopback-only. Keep anonymous access disabled so the browser
+      # proves one deterministic authenticated session across the Loki -> Tempo navigation.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning

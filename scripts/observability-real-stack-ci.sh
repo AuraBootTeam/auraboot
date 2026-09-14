@@ -372,6 +372,7 @@ const requireFromBin = createRequire(path.resolve(process.argv[2]));
 process.stdout.write(requireFromBin.resolve('@playwright/test'));
 NODE
 )"
+OBS_GRAFANA_USER="$OBS_GRAFANA_USER" OBS_GRAFANA_PASSWORD="$OBS_GRAFANA_PASSWORD" \
 node "$PROJECT_ROOT/scripts/observability-grafana-browser.mjs" \
   "http://127.0.0.1:$AURA_OBS_GRAFANA_PORT" "$TRACE_ID" "$ARTIFACTS" "$PLAYWRIGHT_MODULE"
 node - "$ARTIFACTS/summary.json" <<'NODE'

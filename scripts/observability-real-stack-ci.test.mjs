@@ -20,7 +20,7 @@ test('real-stack runner proves every observability acceptance surface', () => {
   for (const token of ['observability-postgres:', 'app:']) assert.match(compose, new RegExp(token));
   assert.match(compose, /observability-postgres:[\s\S]*image: pgvector\/pgvector:pg16/);
   assert.match(compose, /app:[\s\S]*\.\/plugins:\/app\/plugins:ro/);
-  assert.match(compose, /GF_AUTH_ANONYMOUS_ENABLED: "true"/);
+  assert.match(compose, /GF_AUTH_ANONYMOUS_ENABLED: "false"/);
   for (const port of ['APP', 'POSTGRES', 'PROMETHEUS', 'ALERTMANAGER', 'CANARY', 'PUSHGATEWAY', 'LOKI', 'TEMPO', 'ZIPKIN', 'GRAFANA']) {
     assert.match(compose, new RegExp(`127\\.0\\.0\\.1:\\$\\{AURA_OBS_${port}_PORT`));
   }
@@ -32,6 +32,9 @@ test('real-stack runner proves every observability acceptance surface', () => {
     assert.ok(runner.includes(proof), proof);
   }
   assert.match(browser, /a\[href\*="\$\{traceId\}"\]/);
+  assert.match(browser, /page\.request\.post\(`\$\{grafanaUrl\}\/login`/);
+  assert.match(browser, /OBS_GRAFANA_USER/);
+  assert.match(browser, /OBS_GRAFANA_PASSWORD/);
   assert.match(browser, /grafana-tempo-trace\.png/);
   assert.match(jwtFilter, /HTTP request completed method=\{\} path=\{\} status=\{\}/);
   for (const metric of ['auraboot_reliable_delivery_pending', 'auraboot_reliable_delivery_dlq', 'auraboot_reliable_delivery_oldest_pending_age_seconds', 'auraboot_reliable_delivery_unhealthy']) {
