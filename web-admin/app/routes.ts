@@ -43,6 +43,7 @@ export default [
 
   // Xiaoya (edu) consumer surfaces — standalone shells without admin chrome.
   // Authenticated via the same session; see app/routes/xy/ for details.
+  route('/xy/import/:classPid?', './routes/xy/RosterImport.tsx'),
   route('/xy/child/:studentPid?', './routes/xy/ChildSpace.tsx'),
   route('/xy/display/:classPid?', './routes/xy/ClassDisplay.tsx'),
 
