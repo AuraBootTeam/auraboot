@@ -451,7 +451,9 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
       const adoptionPid = (await adopted.json()).data.data.record.pid;
       await expect(latest).toContainText('已采纳');
       await latest.getByRole('button', { name: '发起执行', exact: true }).click();
-      await expect(dialog).toContainText(executionGoal);
+      // The UI renders only the human-readable goal; the internal stub directive is masked.
+      await expect(dialog).toContainText('Delete e2et_customer follow-up records using the existing customer command.');
+      await expect(dialog).not.toContainText('@@AURABOOT_STUB_TOOL_USE@@');
       await grant('model.e2et_order.read', false);
       const deniedExecution = page.waitForResponse(
         (response) =>

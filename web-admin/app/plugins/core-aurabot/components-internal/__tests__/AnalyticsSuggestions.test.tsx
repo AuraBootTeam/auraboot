@@ -54,6 +54,27 @@ beforeEach(() => {
   fixture.row.executionGoal = 'Review the order';
   fixture.row.execution = null;
 });
+describe('Analytics suggestion execution goal display', () => {
+  it('renders only the human-readable goal when an internal directive follows', async () => {
+    fixture.row.executionGoal =
+      'Delete follow-up records using the existing customer command.\n@@AURABOOT_STUB_TOOL_USE@@ {"calls":[{"id":"customer-0"}]}';
+    await show();
+    const goal = screen.getByText(/执行目标/).closest('p');
+    expect(goal).toHaveTextContent(/Delete follow-up records/);
+    expect(goal?.textContent).not.toContain('@@AURABOOT_STUB_TOOL_USE@@');
+    expect(goal?.textContent).not.toContain('"calls"');
+  });
+
+  it('hides a directive-only goal behind an explicit placeholder', async () => {
+    fixture.row.executionGoal = '@@AURABOOT_STUB_TOOL_USE@@ {"calls":[]}';
+    await show();
+    const goal = screen.getByText(/执行目标/).closest('p');
+    expect(goal).toHaveTextContent('内部执行指令已隐藏');
+    expect(goal?.textContent).not.toContain('@@"AURABOOT_STUB_TOOL_USE@@');
+    expect(goal?.textContent).not.toContain('calls');
+  });
+});
+
 describe('Analytics suggestion execution eligibility', () => {
   it.each(['success', 'failed', 'pending', 'queued', 'running', 'cancelled', 'unknown'])(
     'shows persisted %s without another first-run action',

@@ -34,6 +34,19 @@ type Suggestion = {
 type SuggestionPage = { records: Suggestion[]; total: number; page: number; pageSize: number };
 type CommandResult = { data: { record: { pid: string } } };
 
+/**
+ * Execution goals carry an internal tool directive for the automation runtime; that
+ * protocol payload is never user-facing, so only the human-readable prefix renders and
+ * a directive-only goal collapses to an explicit placeholder.
+ */
+const STUB_DIRECTIVE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
+function displayExecutionGoal(goal: string, hide: (zh: string, en: string) => string): string {
+  const markerIndex = goal.indexOf(STUB_DIRECTIVE_MARKER);
+  if (markerIndex < 0) return goal;
+  const human = goal.slice(0, markerIndex).trim();
+  return human || hide('内部执行指令已隐藏', 'Internal execution directive hidden');
+}
+
 /** Inline actions backed by immutable DSL commands; the query never becomes a form input. */
 export function AnalyticsSuggestions({
   analysisId,
@@ -293,7 +306,7 @@ export function AnalyticsSuggestions({
           </p>
           {row.executionGoal && (
             <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
-              {l('执行目标', 'Execution goal')}: {row.executionGoal}
+              {l('执行目标', 'Execution goal')}: {displayExecutionGoal(row.executionGoal, l)}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -465,7 +478,8 @@ export function AnalyticsSuggestions({
           </p>
           {confirmation?.executionGoal && (
             <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
-              {l('执行目标', 'Execution goal')}: {confirmation.executionGoal}
+              {l('执行目标', 'Execution goal')}: {' '}
+            {displayExecutionGoal(confirmation.executionGoal, l)}
             </p>
           )}
           {actionError && (
@@ -501,7 +515,9 @@ export function AnalyticsSuggestions({
           </DialogHeader>
           <p className="text-sm font-medium break-words">{executionConfirmation?.title}</p>
           <p className="max-h-48 overflow-y-auto text-sm break-words whitespace-pre-wrap">
-            {executionConfirmation?.executionGoal}
+            {executionConfirmation?.executionGoal
+              ? displayExecutionGoal(executionConfirmation.executionGoal, l)
+              : executionConfirmation?.executionGoal}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setExecutionConfirmation(null)}>
