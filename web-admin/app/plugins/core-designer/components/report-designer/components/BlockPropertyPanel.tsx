@@ -254,7 +254,7 @@ export const BlockPropertyPanel: React.FC = () => {
     <PanelShell title="Report Properties">
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Description</label>
           <textarea
             value={report.description || ''}
             onChange={(e) => updateDescription(e.target.value)}
@@ -265,21 +265,21 @@ export const BlockPropertyPanel: React.FC = () => {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '页面大小', en: 'Page Size' })}</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '页面大小', en: 'Page Size' })}</label>
           <p className="text-sm text-gray-600">
             {report.page.size} — {report.page.orientation}
           </p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">{text({ zh: '数据源', en: 'Data Sources' })}</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '数据源', en: 'Data Sources' })}</label>
           <p className="text-sm text-gray-600">
             {Object.keys(report.dataSources).length} configured
           </p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Blocks</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Blocks</label>
           <p className="text-sm text-gray-600">{report.body.length} block(s)</p>
         </div>
 

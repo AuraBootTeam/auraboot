@@ -101,7 +101,7 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
     <div className="mx-auto max-w-4xl p-8">
       {/* Toolbar */}
       <div className="mb-6 flex items-center justify-between print:hidden">
-        <h1 className="text-xl font-semibold text-gray-900">{report.title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">{report.title}</h1>
         <div className="flex gap-2">
           <button
             onClick={handleExportPdf}
@@ -125,14 +125,14 @@ export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey })
 
       <ReportQueryControls report={report} query={query} />
 
-      <p className="mb-4 text-sm text-gray-500 print:hidden">
+      <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs text-blue-700 print:hidden">
         {text({
           zh: '模型和命名查询预览最多 500 行，同步导出最多 1000 行；超过时请缩小筛选范围。',
           en: 'Model and named-query sources preview up to 500 rows and export up to 1000 rows. Narrow filters for larger results.',
         })}
       </p>
       {/* Report content */}
-      <div className="rounded-lg bg-white p-8 shadow-sm print:p-0 print:shadow-none">
+      <div className="rounded-xl bg-white p-8 shadow-md ring-1 ring-black/5 print:p-0 print:shadow-none">
         {/* Header */}
         {report.header && (
           <>

@@ -186,7 +186,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         <p
           id="report-export-status"
           role="status"
-          className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-900"
+          className="mx-4 mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
         >
           {text({
             zh: '请先保存当前修改，再导出报表。导出使用已保存的报表定义。',
