@@ -40,6 +40,7 @@ NAME="rbac-golden-nightly"
 SLOT="71"
 KEEP=0
 REPEAT=1
+RUNTIME_MODE="development"
 
 die() { echo "[rbac-golden-run] ERROR: $*" >&2; exit 2; }
 
@@ -49,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     --name)   [[ $# -ge 2 ]] || die "--name requires a value"; NAME="$2"; shift 2;;
     --repeat) [[ $# -ge 2 ]] || die "--repeat requires a value"; REPEAT="$2"; shift 2;;
     --keep)   KEEP=1; shift;;
+    --runtime-mode) [[ $# -ge 2 ]] || die "--runtime-mode requires a value"; RUNTIME_MODE="$2"; shift 2;;
     -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0;;
     *) die "unknown arg: $1";;
   esac
@@ -68,7 +70,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$SLOT repeat=$REPEAT ==="
+echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$SLOT mode=$RUNTIME_MODE repeat=$REPEAT ==="
 
 # 1. Fresh isolated stack (destroy any prior instance of this name first so the DB is
 #    always freshly bootstrapped — guards against a stale-slot role model).
@@ -76,7 +78,7 @@ echo "[rbac-golden-run] 1/4 fresh stack (destroy prior + up + import)"
 "$GS" destroy "$NAME" >/dev/null 2>&1 || true
 # --no-warm: the rbac golden self-provisions its member and runs with --no-deps, so it does
 # NOT need the setup/auth/pre-warm step (which runs the full generic setup project).
-"$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm || die "stack bring-up failed"
+"$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE" || die "stack bring-up failed"
 "$GS" import "$NAME" || die "plugin import failed"
 
 # 2. Export the Playwright env (PW_SKIP_WEBSERVER + base URL + backend + PG*).
@@ -97,7 +99,7 @@ set -e 2>/dev/null || true
 echo "[rbac-golden-run] 4/4 result"
 if [[ "$GOLDEN_RC" == 0 ]]; then
   echo "[rbac-golden-run] ============================================"
-  echo "[rbac-golden-run]   RBAC GOLDEN: PASS  (name=$NAME slot=$SLOT)"
+  echo "[rbac-golden-run]   RBAC GOLDEN: PASS  (name=$NAME slot=$SLOT mode=$RUNTIME_MODE)"
   echo "[rbac-golden-run] ============================================"
 else
   echo "[rbac-golden-run] ############################################"
