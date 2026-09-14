@@ -67,7 +67,7 @@ public class ExternalApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
                 .toList();
         var authentication = new UsernamePasswordAuthenticationToken(
-                "api-key:" + principal.keyPid(), null, authorities);
+                principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         MetaContext.setContext(principal.tenantId(), null, principal.keyPid(), principal.keyName());
         request.setAttribute(AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);

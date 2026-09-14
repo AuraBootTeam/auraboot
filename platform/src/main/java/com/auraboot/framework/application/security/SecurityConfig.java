@@ -172,6 +172,8 @@ public class SecurityConfig {
             "Content-Type",
             "X-Requested-With",
             "X-Aura-API-Key",
+            "Idempotency-Key",
+            "X-Request-Id",
             "Accept",
             "Origin",
             "X-Tenant-Id",
@@ -180,7 +182,8 @@ public class SecurityConfig {
         configuration.setExposedHeaders(Arrays.asList(
             "X-Total-Count",
             "X-Page-Size",
-            "X-Current-Page"
+            "X-Current-Page",
+            "X-Request-Id"
         ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

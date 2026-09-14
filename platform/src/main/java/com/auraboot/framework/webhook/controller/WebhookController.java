@@ -103,6 +103,20 @@ public class WebhookController {
         return ApiResponse.success(logs);
     }
 
+    @PostMapping("/{pid}/deliveries/{deliveryPid}/replay")
+    public ApiResponse<Void> replay(@PathVariable String pid, @PathVariable String deliveryPid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        WebhookSubscription subscription = webhookService.getByPid(pid);
+        if (subscription == null) {
+            return ApiResponse.error("Webhook not found: " + pid);
+        }
+        int replayed = deliveryLogMapper.replay(tenantId, deliveryPid, MetaContext.getCurrentUserPid());
+        if (replayed != 1) {
+            return ApiResponse.error("Delivery is not replayable: " + deliveryPid);
+        }
+        return ApiResponse.success();
+    }
+
     private WebhookSubscription maskWebhook(WebhookSubscription sub) {
         if (sub != null && sub.getSecret() != null) {
             sub.setSecret(fieldEncryptionService.mask(sub.getSecret()));

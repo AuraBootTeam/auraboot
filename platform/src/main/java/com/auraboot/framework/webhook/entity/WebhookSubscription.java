@@ -23,6 +23,9 @@ public class WebhookSubscription {
     @TableField("pid")
     private String pid;
 
+    @TableField("installation_pid")
+    private String installationPid;
+
     @TableField("name")
     private String name;
 

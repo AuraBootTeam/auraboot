@@ -20,9 +20,15 @@ public interface ExternalApiKeyAuthenticator {
                             int status, long durationMillis) {
     }
 
-    record ExternalApiKeyPrincipal(Long tenantId, String keyPid, String keyName, Set<String> scopes) {
+    record ExternalApiKeyPrincipal(Long tenantId, String keyPid, String keyName, Set<String> scopes,
+                                   String applicationPid, String installationPid,
+                                   String environment, String tokenPid) {
         public ExternalApiKeyPrincipal {
             scopes = scopes == null ? Set.of() : Set.copyOf(scopes);
+        }
+
+        public ExternalApiKeyPrincipal(Long tenantId, String keyPid, String keyName, Set<String> scopes) {
+            this(tenantId, keyPid, keyName, scopes, null, null, null, null);
         }
     }
 }
