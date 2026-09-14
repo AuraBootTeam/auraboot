@@ -20,6 +20,8 @@ RELEASE_MUTATION="${AURA_OPEN_PLATFORM_RELEASE_MUTATION:-}"
 [[ "$(uname -s)" == "Linux" ]] || fatal "release images must be verified on the admitted Linux CI host"
 [[ "$(uname -m)" == "x86_64" ]] || fatal "release image builder must be x86_64"
 for command_name in docker git openssl python3 timeout; do need "$command_name"; done
+RUNNER_UID="$(id -u)"
+RUNNER_GID="$(id -g)"
 [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all)" ]] || fatal "CI checkout is dirty"
 REF_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 EXPECTED_REF="${AURA_CI_EXPECTED_REF:-$REF_SHA}"
@@ -153,7 +155,8 @@ info "running two-domain HTTP protocol probe"
 # success or failure path so a failed probe cannot leave client credentials in CI artifacts.
 : > "$CREDENTIAL_ARTIFACT"
 chmod 0600 "$CREDENTIAL_ARTIFACT"
-docker run --rm --network "$NET" -v "$STAGE/scripts/ci":/probe:ro -v "$ARTIFACTS":/artifacts \
+docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
+  -v "$STAGE/scripts/ci":/probe:ro -v "$ARTIFACTS":/artifacts \
   -e BASE_URL="http://$APP:6443" "$PYTHON_IMAGE" python /probe/open-platform-release-probe.py \
   > "$ARTIFACTS/protocol-probe.json" 2> "$ARTIFACTS/logs/protocol-probe.log" \
   || fail "two-domain HTTP protocol probe failed"
@@ -161,7 +164,8 @@ CLIENT_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["cl
 CLIENT_SECRET="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["clientSecret"])' "$CREDENTIAL_ARTIFACT")"
 
 info "running production-threshold k6 profile inside the CI network"
-docker run --rm --network "$NET" -v "$STAGE/tests/load/k6":/scripts:ro \
+docker run --rm --user "$RUNNER_UID:$RUNNER_GID" --network "$NET" \
+  -v "$STAGE/tests/load/k6":/scripts:ro \
   -v "$ARTIFACTS":/artifacts -e PROFILE=production -e BASE_URL="http://$APP:6443" \
   -e CLIENT_ID="$CLIENT_ID" -e CLIENT_SECRET="$CLIENT_SECRET" "$K6_IMAGE" run \
   --summary-export /artifacts/slo-summary.json /scripts/open-platform-slo.js \
