@@ -216,7 +216,13 @@ public class PostExecutionPhase implements CommandPhase {
                     sideEffectExecutor.executeSideEffectCreate(targetModel, fieldMapping, currentRecord, tenantId, userId);
                 }
                 case com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants.POST_TYPE_START_PROCESS -> {
-                    executePostActionStartProcess(postAction, parentRecordId, payload, command);
+                    // Resolve start_process templates against payload ∪ current record:
+                    // the pipeline may rebuild the payload (normalize/field-map), dropping
+                    // business fields the process variable mapping references, so fall
+                    // back to the submitted record for ${payload.*} keys it lacks.
+                    Map<String, Object> templateContext = sideEffectExecutor.buildCurrentRecordContext(
+                            payload, tenantId, command, request);
+                    executePostActionStartProcess(postAction, parentRecordId, templateContext, command);
                 }
                 case com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants.POST_TYPE_WITHDRAW_PROCESS -> {
                     executePostActionWithdrawProcess(postAction, parentRecordId, payload, command, tenantId);
