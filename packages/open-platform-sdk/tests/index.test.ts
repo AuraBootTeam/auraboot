@@ -16,10 +16,18 @@ describe("OpenPlatformClient", () => {
         json(200, { access_token: "token-1", expires_in: 300 }),
       )
       .mockResolvedValueOnce(
-        json(200, { pid: "asset-1", assetCode: "A-1", name: "Laptop" }),
+        json(
+          200,
+          { pid: "asset-1", assetCode: "A-1", name: "Laptop" },
+          { ETag: '"asset-v1"' },
+        ),
       )
       .mockResolvedValueOnce(
-        json(200, { pid: "asset-2", assetCode: "A-2", name: "Phone" }),
+        json(
+          200,
+          { pid: "asset-2", assetCode: "A-2", name: "Phone" },
+          { ETag: '"asset-v1"' },
+        ),
       );
     const client = new OpenPlatformClient({
       baseUrl: "https://tenant.example/",
@@ -71,15 +79,54 @@ describe("OpenPlatformClient", () => {
       fetch: fetcher,
     });
 
-    await client.assignAsset("asset-1", "alice", "assign-asset-0001");
+    await client.assignAsset(
+      "asset-1",
+      "alice",
+      "assign-asset-0001",
+      '"asset-v1"',
+    );
 
     expect(fetcher).toHaveBeenCalledTimes(4);
     expect(fetcher.mock.calls[1][1]?.headers).toMatchObject({
       "Idempotency-Key": "assign-asset-0001",
+      "If-Match": '"asset-v1"',
     });
     expect(fetcher.mock.calls[3][1]?.headers).toMatchObject({
       Authorization: "Bearer fresh",
       "Idempotency-Key": "assign-asset-0001",
+      "If-Match": '"asset-v1"',
+    });
+  });
+
+  it("supports baseUrl plus accessToken, opaque pages, and no 412 retry", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [{ pid: "receipt-1" }],
+          hasMore: true,
+          nextCursor: "opaque",
+        }),
+      )
+      .mockResolvedValueOnce(
+        json(412, { code: "precondition_failed", message: "stale" }),
+      );
+    const client = new OpenPlatformClient({
+      baseUrl: "https://tenant.example",
+      accessToken: "provided-token",
+      fetch: fetcher,
+    });
+
+    await expect(client.listStockIns(25)).resolves.toMatchObject({
+      nextCursor: "opaque",
+    });
+    await expect(
+      client.confirmStockIn("receipt-1", "confirm-0001", '"receipt-v1"'),
+    ).rejects.toMatchObject({ status: 412, code: "precondition_failed" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0][0]).toContain("limit=25");
+    expect(fetcher.mock.calls[0][1]?.headers).toMatchObject({
+      Authorization: "Bearer provided-token",
     });
   });
 

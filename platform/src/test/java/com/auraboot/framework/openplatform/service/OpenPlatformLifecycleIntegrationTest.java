@@ -7,11 +7,15 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicati
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
 import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
+import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
+import com.auraboot.framework.webhook.service.WebhookDispatcher;
+import com.auraboot.framework.webhook.service.WebhookService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +31,8 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired private OpenPlatformAuthMapper authMapper;
     @Autowired private OpenPlatformSecretCodec secretCodec;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private WebhookService webhookService;
+    @Autowired private WebhookDispatcher webhookDispatcher;
 
     @Test
     void credentialScopeAndInstallationLifecycleRevokeTokensImmediately() {
@@ -180,5 +186,81 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         assertTrue(managementService.listWebhookDeliveries(installation.pid(), "dead_letter", 50).isEmpty());
         assertEquals("pending", managementService.listWebhookDeliveries(installation.pid(), null, 50)
                 .getFirst().status());
+    }
+
+    @Test
+    void installationWebhookCatalogCompatibilityAndRotationHealthUseRealPostgres() {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Versioned webhook fixture", null));
+        var installation = managementService.install(application.pid(),
+                new InstallApplicationRequest("production", Set.of("openapi.events.read"), 600));
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        WebhookCreateRequest valid = new WebhookCreateRequest();
+        valid.setName("Asset partner hook");
+        valid.setInstallationPid(installation.pid());
+        valid.setTargetUrl("https://example.invalid/assets");
+        valid.setEventType("assets.assignment.changed");
+        valid.setEventVersion(1);
+        valid.setSecret("rotated-secret");
+        var created = webhookService.create(valid);
+        assertEquals(1, created.getEventVersion());
+        assertTrue(created.getSecretRotatedAt().isAfter(Instant.now().minusSeconds(10)));
+
+        WebhookCreateRequest incompatible = new WebhookCreateRequest();
+        incompatible.setName("Unsupported hook");
+        incompatible.setInstallationPid(installation.pid());
+        incompatible.setTargetUrl("https://example.invalid/unsupported");
+        incompatible.setEventType("assets.assignment.changed");
+        incompatible.setEventVersion(2);
+        incompatible.setSecret("secret");
+        assertThrows(IllegalArgumentException.class, () -> webhookService.create(incompatible));
+
+        Instant now = Instant.now();
+        insertWebhookHealthRow(tenantId, installation.pid(), "hook-due", "Due hook",
+                "assets.assignment.changed", 1, "secret", now.minus(80, java.time.temporal.ChronoUnit.DAYS));
+        insertWebhookHealthRow(tenantId, installation.pid(), "hook-overdue", "Overdue hook",
+                "inventory.stock-in.confirmed", 1, "secret", now.minus(91, java.time.temporal.ChronoUnit.DAYS));
+        insertWebhookHealthRow(tenantId, installation.pid(), "hook-missing", "Unsigned hook",
+                "assets.assignment.changed", 1, null, null);
+        insertWebhookHealthRow(tenantId, installation.pid(), "hook-incompatible", "Removed event hook",
+                "removed.partner.event", 1, "secret", now);
+
+        var health = managementService.listWebhookHealth(installation.pid());
+        assertEquals(5, health.size());
+        assertTrue(health.stream().anyMatch(item -> item.pid().equals(created.getPid())
+                && item.compatible() && item.rotationStatus().equals("healthy")));
+        assertTrue(health.stream().anyMatch(item -> item.pid().equals("hook-due")
+                && item.rotationStatus().equals("due")));
+        assertTrue(health.stream().anyMatch(item -> item.pid().equals("hook-overdue")
+                && item.rotationStatus().equals("overdue")));
+        assertTrue(health.stream().anyMatch(item -> item.pid().equals("hook-missing")
+                && item.rotationStatus().equals("missing")));
+        assertTrue(health.stream().anyMatch(item -> item.pid().equals("hook-incompatible")
+                && !item.compatible()));
+        assertFalse(health.toString().contains("rotated-secret"));
+        assertFalse(health.toString().contains("example.invalid"));
+
+        var rejected = webhookDispatcher.dispatchTracked("assets.assignment.changed", Map.of(
+                "id", "evt_invalid",
+                "type", "assets.assignment.changed",
+                "schemaVersion", 1,
+                "occurredAt", Instant.now().toString(),
+                "subject", Map.of("type", "assets", "pid", "asset-1"),
+                "data", Map.of("pid", "asset-1", "secret", "must-not-leave-boundary")), tenantId);
+        assertTrue(rejected.receipts().isEmpty());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE event_id = 'evt_invalid'", Integer.class));
+    }
+
+    private void insertWebhookHealthRow(Long tenantId, String installationPid, String pid, String name,
+                                        String eventType, int eventVersion, String secret, Instant rotatedAt) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_webhook_subscription
+                  (tenant_id, pid, name, target_url, event_type, event_version, secret,
+                   secret_rotated_at, installation_pid, created_at, updated_at)
+                VALUES (?, ?, ?, 'https://must-not-leak.invalid/hook', ?, ?, ?, ?, ?, NOW(), NOW())
+                """, tenantId, pid, name, eventType, eventVersion, secret,
+                rotatedAt == null ? null : java.sql.Timestamp.from(rotatedAt), installationPid);
     }
 }

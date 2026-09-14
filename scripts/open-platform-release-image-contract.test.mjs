@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const gate = fs.readFileSync(new URL('./run-open-platform-release-image-gate.sh', import.meta.url), 'utf8');
+const probe = fs.readFileSync(new URL('./ci/open-platform-release-probe.py', import.meta.url), 'utf8');
+const slo = fs.readFileSync(new URL('../tests/load/k6/open-platform-slo.js', import.meta.url), 'utf8');
+
+assert.match(gate, /AURA_CI_EXPECTED_REF/);
+assert.match(gate, /uname -s.*Linux/);
+assert.match(gate, /uname -m.*x86_64/);
+assert.match(gate, /status --porcelain --untracked-files=all/);
+assert.match(gate, /registry publication requires a separate owner-authorized job/);
+assert.match(gate, /PROFILE=production/);
+assert.match(slo, /open_api_errors/);
+assert.match(slo, /p\(95\)<250/);
+assert.match(gate, /delivery_status IN \('pending','processing','failed','dead_letter'\)/);
+assert.match(gate, /webhookDrainBacklog/);
+assert.match(gate, /AURA_OPEN_PLATFORM_RELEASE_MUTATION/);
+assert.match(gate, /EXPECTED_RED: Webhook backlog mutation was rejected/);
+assert.match(gate, /releaseReceiptCreated.*False/);
+assert.match(probe, /inventory\.stock-ins\.confirm/);
+assert.match(probe, /expected=\(412,/);
+assert.match(probe, /cursor \+ 'x'/);
+console.log('open-platform release-image contract: PASS');

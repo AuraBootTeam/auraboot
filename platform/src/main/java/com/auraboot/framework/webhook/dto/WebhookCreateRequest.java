@@ -22,6 +22,8 @@ public class WebhookCreateRequest {
     @NotBlank
     private String eventType;
 
+    private Integer eventVersion = 1;
+
     private String modelCode;
     private String filterExpression;
     private String secret;
