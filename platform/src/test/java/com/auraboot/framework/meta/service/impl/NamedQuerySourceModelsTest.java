@@ -98,4 +98,16 @@ class NamedQuerySourceModelsTest {
         Map<String, String> resolved = resolve("public.ab_user");
         assertTrue(resolved.containsKey("\"public\".\"ab_user\""));
     }
+    @Test void bpmProductTablesResolveAsSystemSources() {
+        // ab_bpm_* product tables (audit, process definition) sit under the
+        // tenant-bypass prefixes alongside se_* engine tables.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        for (String table : List.of("public.ab_bpm_audit_record", "public.ab_bpm_process_definition")) {
+            Map<String, String> resolved = resolve(table);
+            assertTrue(resolved.get("\"public\".\"" + table.substring("public.".length()) + "\"")
+                    .startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
+        }
+    }
 }
