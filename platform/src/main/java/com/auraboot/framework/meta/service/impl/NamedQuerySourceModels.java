@@ -40,7 +40,13 @@ public class NamedQuerySourceModels {
 
     /** True when the quoted identity's bare table name starts with an engine (bypass) prefix. */
     static boolean isBypassEngineSource(String key) {
-        return engineSourceMarker(key).startsWith(ENGINE_SOURCE_MARKER_PREFIX);
+        String bare = key.trim().toLowerCase();
+        int lastDot = bare.lastIndexOf('.');
+        if (lastDot >= 0) bare = bare.substring(lastDot + 1);
+        bare = bare.replace("\"", "");
+        // se_ is the SmartEngine table prefix configured via
+        // aura.persistence.tenant-bypass-table-prefixes on standalone applications.
+        return bare.startsWith("se_");
     }
 
     record Sources(Map<String, String> models, Map<String, String> views) {
