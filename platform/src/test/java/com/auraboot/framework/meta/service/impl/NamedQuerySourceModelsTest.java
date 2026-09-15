@@ -74,4 +74,28 @@ class NamedQuerySourceModelsTest {
         }
     }
     private static String identity(String table) { return NamedQuerySourceModels.identity(table); }
+
+
+    @Test void engineBypassTableWithoutModelResolvesAsSystemSource() {
+        // E10: engine tables (se_*) under the tenant-bypass prefixes have no meta
+        // model but carry their own tenant_id column — resolve as SYSTEM sources
+        // instead of failing approval-history style named queries.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        Map<String, String> resolved = resolve("public.se_task_instance");
+        assertTrue(resolved.containsKey("\"public\".\"se_task_instance\""));
+        assertTrue(resolved.get("\"public\".\"se_task_instance\"")
+                .startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
+    }
+
+    @Test void nonBypassUnknownTableIsStillDenied() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        assertThrows(AccessDeniedException.class, () -> resolve("public.some_business_table"));
+    }
+        @Test void platformSharedUserTableResolvesAsSystemSource() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("users", "ab_user")));
+        Map<String, String> resolved = resolve("public.ab_user");
+        assertTrue(resolved.containsKey("\"public\".\"ab_user\""));
+    }
 }
