@@ -179,7 +179,7 @@ export function ContextualAuthoringSurface({
   const permissionLossObservedRef = useRef(false);
   const recoveryActorId = user?.id == null ? null : String(user.id);
 
-  const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
+  const rootNode = useMemo(() => buildAuthoringTree(workingSchema, t), [workingSchema, t]);
   const runtimeSchema = useMemo(() => schemaForRuntimePreview(workingSchema), [workingSchema]);
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
   const selectedNode = nodeIndex.byId.get(selectedId) ?? rootNode;
@@ -352,7 +352,7 @@ export function ContextualAuthoringSurface({
         if (cancelled) return;
         const sourceSchema = latestSchemaRef.current;
         const restoredSchema = schemaFromSnapshot(sourceSchema, restored.snapshot);
-        const restoredTree = buildAuthoringTree(restoredSchema);
+        const restoredTree = buildAuthoringTree(restoredSchema, t);
         const restoredIndex = indexTree(restoredTree);
         const contextSelection = contextSelectionId(restored.interactionContext);
         const selected = [resume.focusBlockId, contextSelection, schema.id].find(
@@ -2571,13 +2571,16 @@ function finiteNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-function buildAuthoringTree(schema: ContextualAuthoringSurfaceProps['schema']): AuthoringNode {
+function buildAuthoringTree(
+  schema: ContextualAuthoringSurfaceProps['schema'],
+  translate?: (key: string) => string,
+): AuthoringNode {
   const page: AuthoringNode = {
     id: schema.id,
     sourceId: schema.id,
     kind: 'page',
     blockType: 'page',
-    label: localizedLabel(schema.title, schema.pageKey || '页面'),
+    label: localizedLabel(schema.title, schema.pageKey || '页面', translate),
     parentId: null,
     depth: 0,
     source: schema as unknown as Record<string, unknown>,
@@ -2602,7 +2605,7 @@ function buildBlockNode(
     sourceId,
     kind: 'block',
     blockType,
-    label: localizedLabel(block.title, blockTypeLabel(blockType)),
+    label: localizedLabel(block.title, blockTypeLabel(blockType), translate),
     parentId,
     depth,
     source: block,
@@ -2643,6 +2646,7 @@ function addLeafNodes(
   parent: AuthoringNode,
   kind: 'field' | 'action',
   values: Record<string, unknown>[],
+  translate?: (key: string) => string,
 ) {
   values.forEach((value, index) => {
     const identity = String(value.id || value.field || value.code || `${kind}-${index}`);
@@ -2651,7 +2655,7 @@ function addLeafNodes(
       sourceId: String(value.id || identity),
       kind,
       blockType: kind === 'field' ? 'field' : 'action',
-      label: localizedLabel(value.label, String(value.field || value.code || identity)),
+      label: localizedLabel(value.label, String(value.field || value.code || identity), translate),
       parentId: parent.id,
       depth: parent.depth + 1,
       source: value,
@@ -2692,8 +2696,20 @@ function ancestorChain(node: AuthoringNode, index: Map<string, AuthoringNode>): 
   return chain;
 }
 
-function localizedLabel(value: unknown, fallback: string): string {
-  if (typeof value === 'string' && value.trim()) return value;
+function localizedLabel(value: unknown, fallback: string, translate?: (key: string) => string): string {
+  if (typeof value === 'string' && value.trim()) {
+    // `$i18n:<key>` labels must resolve (or degrade to a readable key segment),
+    // never leak the raw token into the structure tree.
+    if (value.startsWith('$i18n:')) {
+      const key = value.slice(6);
+      if (translate) {
+        const resolved = translate(key);
+        if (resolved && resolved !== value) return resolved;
+      }
+      return key.split('.').pop() || key;
+    }
+    return value;
+  }
   if (value && typeof value === 'object') {
     try {
       return getLocalizedText(value as Record<string, string>, 'zh-CN', (key) => key) || fallback;
