@@ -137,14 +137,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (request.getSemanticModelCode() != null
                 && !request.getSemanticModelCode().isBlank()) {
             if (semanticAggregateAdapter == null) {
-<<<<<<< HEAD
                 throw new MetaServiceException(
-                        "SEMANTIC_ADAPTER_UNAVAILABLE: semanticModelCode="
+                        "SEMANTIC_ADAPTER_UNAVAILABLE: Semantic query service is unavailable (semanticModelCode="
                                 + request.getSemanticModelCode()
-                                + " requires the semantic layer, which is not wired in this runtime");
-=======
-                throw new MetaServiceException("Semantic query service is unavailable");
->>>>>>> origin/main
+                                + "; the semantic layer is not wired in this runtime)");
             }
             return semanticAggregateAdapter.execute(request);
         }
