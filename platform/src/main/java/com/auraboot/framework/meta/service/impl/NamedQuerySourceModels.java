@@ -18,6 +18,15 @@ public class NamedQuerySourceModels {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
+    /** Platform reference sources resolvable without a tenant model, as qualified identities. */
+    private static final Set<String> PLATFORM_REFERENCE_SOURCES = Set.of("\"public\".\"ab_user\"");
+    /** Marker model code for a platform reference source; protection must skip model checks. */
+    public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
+
+    static String platformReferenceMarker(String key) {
+        return PLATFORM_REFERENCE_MARKER;
+    }
+
     record Sources(Map<String, String> models, Map<String, String> views) {
         Sources { models = Map.copyOf(models); views = Map.copyOf(views); }
     }
@@ -49,6 +58,15 @@ public class NamedQuerySourceModels {
         if (visiting.contains(key)) throw new AccessDeniedException("Recursive view source is unsupported");
         if (result.containsKey(key)) return;
         if (visiting.size() >= 32) throw new AccessDeniedException("View source nesting exceeds the supported depth");
+        if (PLATFORM_REFERENCE_SOURCES.contains(key)) {
+            // Platform reference tables (identity and similar global registries) have no tenant
+            // column and no tenant model, so they cannot take row scopes or field protections.
+            // They are only ever joined on their unique pid against an already tenant-scoped
+            // anchor (e.g. ab_user.pid = activity owner), which exposes no rows beyond that
+            // anchor's scope. Mapping them to a reserved marker lets protection skip them.
+            result.put(key, platformReferenceMarker(key));
+            return;
+        }
         Set<String> candidates = catalog.getOrDefault(key, Set.of());
         if (candidates.size() != 1) throw new AccessDeniedException("Export source model is unknown or ambiguous");
         Map<String, Object> relation = jdbc.queryForMap("""
