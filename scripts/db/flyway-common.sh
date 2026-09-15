@@ -41,6 +41,9 @@ _require_db() {
 # Build the comma-separated Flyway locations for an edition.
 # oss        -> core
 # enterprise -> core + enterprise (layered into the same database/history)
+# AURA_FLYWAY_EXTRA_LOCATIONS (colon-separated filesystem paths) is appended
+# when set — extracted product applications (e.g. aura-bpm/migrations/bpm)
+# layer their migrations into the same database/history this way.
 _build_locations() {
   local edition="$1" ent_root="${2:-}"
   if [[ ! -d "$CORE_MIGRATION_DIR" ]]; then
@@ -59,6 +62,14 @@ _build_locations() {
       exit 2
     fi
     locs="$locs,filesystem:$ent_dir"
+  fi
+  if [[ -n "${AURA_FLYWAY_EXTRA_LOCATIONS:-}" ]]; then
+    local extra="" part
+    while IFS= read -r part; do
+      [[ -n "$part" ]] || continue
+      extra="${extra:+$extra,}filesystem:$part"
+    done < <(printf '%s\n' "$AURA_FLYWAY_EXTRA_LOCATIONS" | tr ':' '\n')
+    locs="$locs,$extra"
   fi
   printf '%s' "$locs"
 }
