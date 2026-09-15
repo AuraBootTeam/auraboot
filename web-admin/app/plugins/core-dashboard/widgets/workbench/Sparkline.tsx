@@ -39,6 +39,11 @@ export function Sparkline({
   if (!points || points.length < 2) {
     return null;
   }
+  // An all-zero series draws a flat accent line that reads as a stray
+  // underline under the stat value — there is no trend to show.
+  if (points.every((p) => p === 0)) {
+    return null;
+  }
 
   const min = Math.min(...points);
   const max = Math.max(...points);

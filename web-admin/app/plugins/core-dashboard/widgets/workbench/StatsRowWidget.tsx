@@ -57,7 +57,10 @@ export function StatsRowWidget({ stats: statConfigs, className = '' }: StatsRowW
 
   return (
     <div
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 ${className}`}
+      className={`grid gap-4 ${className}`}
+      style={{
+        gridTemplateColumns: `repeat(${Math.min(Math.max(configs.length, 1), 4)}, minmax(0, 1fr))`,
+      }}
       data-testid="stats-row"
     >
       {configs.map((cfg) => {

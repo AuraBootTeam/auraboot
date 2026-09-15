@@ -37,8 +37,8 @@ public class WorkbenchTemplateProvider {
           {
             "id": "wb-shortcuts",
             "type": "ShortcutsWidget",
-            "x": 7, "y": 1, "w": 5, "h": 2,
-            "minW": 3, "minH": 2, "maxW": 12, "maxH": 3,
+            "x": 7, "y": 1, "w": 5, "h": 3,
+            "minW": 3, "minH": 2, "maxW": 12, "maxH": 4,
             "config": {
               "title": "workbench.shortcuts.title",
               "dataSource": { "type": "static" },
@@ -48,7 +48,7 @@ public class WorkbenchTemplateProvider {
           {
             "id": "wb-recent",
             "type": "RecentWidget",
-            "x": 7, "y": 3, "w": 5, "h": 3,
+            "x": 7, "y": 4, "w": 5, "h": 3,
             "minW": 3, "minH": 2, "maxW": 6, "maxH": 6,
             "config": {
               "title": "workbench.recent.title",
