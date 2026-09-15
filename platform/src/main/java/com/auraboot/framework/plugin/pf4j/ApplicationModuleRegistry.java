@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.ApplicationModuleExtension;
+import org.springframework.context.ApplicationContext;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -77,6 +78,21 @@ public class ApplicationModuleRegistry {
     public synchronized List<String> registeredModuleIds(String pluginId) {
         return modulesByPlugin.getOrDefault(pluginId, List.of()).stream()
                 .map(LoadedModule::moduleId).toList();
+    }
+
+    /**
+     * Live child contexts of every registered application module, for
+     * host-side event forwarding (Spring does not propagate parent-published
+     * events down to child contexts).
+     */
+    public synchronized List<ApplicationContext> childContexts() {
+        List<ApplicationContext> contexts = new ArrayList<>();
+        for (List<LoadedModule> modules : modulesByPlugin.values()) {
+            for (LoadedModule module : modules) {
+                contexts.add(module.context());
+            }
+        }
+        return contexts;
     }
 
     private void closeReverse(List<LoadedModule> loaded) {
