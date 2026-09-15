@@ -41,6 +41,12 @@ export default [
     route('/tenant-selection', './tenant/TenantSelection.tsx'),
   ]),
 
+  // Xiaoya (edu) consumer surfaces — standalone shells without admin chrome.
+  // Authenticated via the same session; see app/routes/xy/ for details.
+  route('/xy/import/:classPid?', './routes/xy/RosterImport.tsx'),
+  route('/xy/child/:studentPid?', './routes/xy/ChildSpace.tsx'),
+  route('/xy/display/:classPid?', './routes/xy/ClassDisplay.tsx'),
+
   // Explicit admin namespace. During the compatibility window it redirects
   // /admin/* to the existing admin paths while the shell remains admin-scoped.
   layout('./routes/AdminLayout.tsx', [
