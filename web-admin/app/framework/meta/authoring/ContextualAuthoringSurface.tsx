@@ -2587,7 +2587,7 @@ function buildAuthoringTree(
     children: [],
   };
   page.children = (schema.blocks || []).map((block, index) =>
-    buildBlockNode(block as Record<string, unknown>, page.id, 1, `block-${index}`),
+    buildBlockNode(block as Record<string, unknown>, page.id, 1, `block-${index}`, translate),
   );
   return page;
 }
@@ -2597,6 +2597,7 @@ function buildBlockNode(
   parentId: string,
   depth: number,
   fallback: string,
+  translate?: (key: string) => string,
 ): AuthoringNode {
   const sourceId = String(block.id || `${parentId}/${fallback}`);
   const blockType = String(block.blockType || 'block');
@@ -2615,7 +2616,7 @@ function buildBlockNode(
   nestedBlocks.forEach((child, index) => {
     if (child && typeof child === 'object') {
       node.children.push(
-        buildBlockNode(child as Record<string, unknown>, node.id, depth + 1, `block-${index}`),
+        buildBlockNode(child as Record<string, unknown>, node.id, depth + 1, `block-${index}`, translate),
       );
     }
   });
@@ -2635,7 +2636,7 @@ function buildBlockNode(
   listValues(block.tabs).forEach((tab, tabIndex) => {
     listValues(tab.blocks).forEach((child, childIndex) => {
       node.children.push(
-        buildBlockNode(child, node.id, depth + 1, `tab-${tabIndex}-${childIndex}`),
+        buildBlockNode(child, node.id, depth + 1, `tab-${tabIndex}-${childIndex}`, translate),
       );
     });
   });
