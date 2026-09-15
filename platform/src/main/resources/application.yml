@@ -183,6 +183,14 @@ springdoc:
 spring:
   application:
     name: auraboot-platform
+  task:
+    scheduling:
+      # Multiple @Scheduled jobs share this pool (SLA scan, webhook delivery
+      # worker, export cleanup, ...). The default single thread starves the
+      # webhook delivery worker whenever the SLA scan runs long, leaving
+      # deliveries stuck in 'pending'.
+      pool:
+        size: 4
   config:
     import: optional:classpath:aurabot/synonyms.yml
   profiles:
