@@ -244,7 +244,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
       .first()
       .click();
 
-    const reportTitleInput = page.locator('input[placeholder="Report Title"]').first();
+    const reportTitleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/).first();
     if (await reportTitleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await reportTitleInput.fill(uniqueId('dl_rpt'));
     }
@@ -287,7 +287,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
         .first()
         .click();
 
-      const reportTitleInput = page.locator('input[placeholder="Report Title"]').first();
+      const reportTitleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/).first();
       if (await reportTitleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await reportTitleInput.fill(uniqueId('dl_rpt'));
       }

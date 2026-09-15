@@ -332,7 +332,9 @@ public class StepLoopService {
         // loop. Forward the matching skill row when available so the H.3 wiring
         // also covers single-step plans (e.g. report_analysis when the planner
         // collapses to one direct-execution step).
-        if (plan.size() == 1 && "Execute task directly".equals(plan.get(0).getDescription())) {
+        if (plan.size() == 1 && !plan.get(0).isRequiresApproval()
+                && plan.get(0).getStatus() != AgentPlanStep.StepStatus.AWAITING_APPROVAL
+                && "Execute task directly".equals(plan.get(0).getDescription())) {
             plan.get(0).setStatus(AgentPlanStep.StepStatus.RUNNING);
             Map<String, Object> singleStepSkill = lookupSkillForStep(plan.get(0), skillByCode);
             AgentRunService.AgentLoopResult result = executeAgentLoop(tenantId, runPid, taskPid, agentCode,
@@ -351,6 +353,24 @@ public class StepLoopService {
             AgentPlanStep step = plan.get(i);
             if (step.isTerminal()) {
                 continue;
+            }
+            if (skipApprovalForResumedStep && i == startStep
+                    && step.getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL) {
+                Map<String, Object> pending = step.getOutput() != null ? step.getOutput() : Map.of();
+                String approvalPid = pending.get("approvalPid") instanceof String pid ? pid : null;
+                if (pending.containsKey("approvalToolName") && (approvalPid == null || approvalPid.isBlank()
+                        || !(pending.get("approvalInput") instanceof Map<?, ?>))) {
+                    throw new org.springframework.security.access.AccessDeniedException("Saved tool approval input is incomplete");
+                }
+                String toolName = pending.get("approvalToolName") instanceof String name ? name
+                        : step.getToolCode() != null ? step.getToolCode() : "step_" + i;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> approvedInput = pending.get("approvalInput") instanceof Map<?, ?> input
+                        ? (Map<String, Object>) input : Map.of("stepIndex", i);
+                if (!approvalGate.consumeResumeGrant(tenantId, taskPid, approvalPid, toolName, approvedInput)) {
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "Resumed step requires an unconsumed approval for its exact input");
+                }
             }
             if (skipApprovalForResumedStep && i == startStep
                     && step.getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL
@@ -1125,6 +1145,20 @@ public class StepLoopService {
         String result = toolLoopService.executeToolCall(
                 tenantId, runPid, taskPid, agentCode, toolName, approvedInput, approvedTools, traceCtx);
         throwIfApprovalRequiredToolResult(result, toolName, approvedInput);
+        if (!ToolResultOutcome.isSuccess(result, objectMapper)) {
+            String failure = "Approved tool execution failed: " + toolName;
+            step.setStatus(AgentPlanStep.StepStatus.FAILED);
+            step.setError(failure);
+            step.setResult(truncate(result, 200));
+            step.setFinishedAt(LocalDateTime.now());
+            step.setDurationMs(System.currentTimeMillis() - started);
+            Map<String, Object> failed = new LinkedHashMap<>(output);
+            failed.put("status", "failed");
+            failed.put("result", truncate(result, 200));
+            step.setOutput(failed);
+            persistPlan(tenantId, runPid, plan, stepIndex, "approval_tool_failed");
+            throw new IllegalStateException(failure);
+        }
 
         step.setStatus(AgentPlanStep.StepStatus.COMPLETED);
         step.setError(null);
@@ -1144,31 +1178,7 @@ public class StepLoopService {
                 "output", result,
                 "step", stepIndex,
                 "resumedApproval", true));
-        markFutureDuplicateToolStepsCompleted(plan, stepIndex, toolName);
         return true;
-    }
-
-    private void markFutureDuplicateToolStepsCompleted(List<AgentPlanStep> plan, int approvedStepIndex, String toolName) {
-        if (plan == null || toolName == null || toolName.isBlank()) {
-            return;
-        }
-        for (int j = approvedStepIndex + 1; j < plan.size(); j++) {
-            AgentPlanStep future = plan.get(j);
-            if (future == null || future.isTerminal() || !toolName.equals(future.getToolCode())) {
-                continue;
-            }
-            future.setStatus(AgentPlanStep.StepStatus.COMPLETED);
-            future.setError(null);
-            future.setStartedAt(LocalDateTime.now());
-            future.setFinishedAt(LocalDateTime.now());
-            future.setDurationMs(0);
-            future.setResult("Tool already executed after approval on step " + approvedStepIndex);
-            Map<String, Object> reused = new LinkedHashMap<>();
-            reused.put("status", "success");
-            reused.put("approvalToolName", toolName);
-            reused.put("reusedFromStep", approvedStepIndex);
-            future.setOutput(reused);
-        }
     }
 
     private List<AgentToolDefinition> markToolApproved(List<AgentToolDefinition> tools, String approvedToolName) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import {
   BuildingOffice2Icon,
+  CommandLineIcon,
   Cog6ToothIcon,
   InformationCircleIcon,
   IdentificationIcon,
@@ -70,6 +71,10 @@ export function UserMenuWidget({
     { productName: branding.productName },
     locale === 'zh-CN' ? `关于 ${branding.productName}` : `About ${branding.productName}`,
   );
+  const permissionCodes = rootData?.permissions?.permissionCodes;
+  const canManageOpenPlatform =
+    Array.isArray(permissionCodes) && permissionCodes.includes('sys.connector.update');
+  const openPlatformLabel = locale === 'zh-CN' ? '开放平台' : 'Open Platform';
 
   // Lazy-load spaces for tenant switching in the account menu
   useEffect(() => {
@@ -310,6 +315,20 @@ export function UserMenuWidget({
                 <Cog6ToothIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
                 <span>{platformConsoleLabel}</span>
               </button>
+            </div>
+          )}
+
+          {canManageOpenPlatform && (
+            <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+              <Link
+                to="/settings/api-docs"
+                data-testid="open-platform-link"
+                className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                onClick={() => setShowUserDropdown(false)}
+              >
+                <CommandLineIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                <span>{openPlatformLabel}</span>
+              </Link>
             </div>
           )}
 

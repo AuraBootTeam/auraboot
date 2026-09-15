@@ -159,13 +159,13 @@ function assertWebGraphIntegrity(contributions) {
   for (const code of byCode.keys()) visit(code);
 }
 
-export function buildApplicationGraph(manifestInput, webContributionInputs = [], { requireContributions = false } = {}) {
+export function buildApplicationGraph(manifestInput, webContributionInputs = [], { requireContributions = false, skipImage = false } = {}) {
   const manifest = validateManifest(manifestInput);
   const webContributions = orderedWebContributions(manifest, webContributionInputs, requireContributions);
   assertWebGraphIntegrity(webContributions);
   const nodes = [
     { kind: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
-    { kind: 'image', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version },
+    ...(skipImage ? [] : [{ kind: 'image', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { kind: 'api', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { kind: 'web', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { kind: 'web', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
@@ -262,10 +262,10 @@ export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {
   }
 }
 
-function requirements(manifest) {
+function requirements(manifest, { skipImage = false } = {}) {
   return [
     { type: 'runtime', id: 'com.auraboot:runtime', version: manifest.platform.runtime },
-    { type: 'oci', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version },
+    ...(skipImage ? [] : [{ type: 'oci', id: manifest.platform.baseImage.id, version: manifest.platform.baseImage.version }]),
     { type: 'maven', id: 'com.auraboot:platform-plugin-api', version: manifest.platform.pluginApi },
     { type: 'npm', id: '@auraboot/web-shell', version: manifest.platform.webShell },
     { type: 'npm', id: '@auraboot/plugin-sdk', version: manifest.platform.pluginSdk },
@@ -295,10 +295,10 @@ function resolveRequirement(requirement, catalog) {
   return matches[0];
 }
 
-export function resolveApplication(manifestInput, catalog, { webContributions = [] } = {}) {
+export function resolveApplication(manifestInput, catalog, { webContributions = [], skipImage = false } = {}) {
   const manifest = validateManifest(manifestInput);
   if (!catalog || !Array.isArray(catalog.artifacts)) throw new Error('artifact catalog must contain artifacts[]');
-  const artifacts = requirements(manifest)
+  const artifacts = requirements(manifest, { skipImage })
     .map((requirement) => resolveRequirement(requirement, catalog))
     .sort((left, right) => `${left.type}:${left.id}`.localeCompare(`${right.type}:${right.id}`));
 
@@ -318,7 +318,7 @@ export function resolveApplication(manifestInput, catalog, { webContributions = 
     schemaVersion: 1,
     application: { id: manifest.app.id, version: manifest.app.version },
     manifestDigest: sha256(canonicalJson(manifest)),
-    composition: buildApplicationGraph(manifest, webContributions, { requireContributions: true }),
+    composition: buildApplicationGraph(manifest, webContributions, { requireContributions: true, skipImage }),
     artifacts,
   };
   const lock = {

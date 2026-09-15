@@ -1263,7 +1263,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (executorOpt.isPresent()) {
             Map<String, Object> record = executorOpt.get().get(modelCode, recordId);
             if (record == null) {
-                throw new MetaServiceException("Record not found: " + recordId + " in model: " + modelCode);
+                throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
             }
             return record;
         }
@@ -1291,7 +1291,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
 
         if (records.isEmpty()) {
-            throw new MetaServiceException("Record not found: " + recordId + " in model: " + modelCode);
+            throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
         }
 
         Map<String, Object> record = records.get(0);
@@ -1401,20 +1401,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private void enforceRuleCenterRecordPermission(String modelCode, String recordId, Map<String, Object> record) {
-        Long subjectId = currentMemberIdForRuleCenterPermission();
-        if (subjectId == null) {
-            throw new MetaServiceException("Permission context missing for model: " + modelCode);
-        }
-
-        PermissionFacade facade = getPermissionFacade();
-        if (facade == null) {
-            throw new MetaServiceException("Permission facade unavailable for model: " + modelCode);
-        }
-
-        PermissionResult result = facade.canOperate(subjectId, modelCode, "read", record);
-        if (!result.granted()) {
-            throw new AccessDeniedException("Access denied: you do not have permission to view this record");
-        }
+        RuleCenterRecordReadAuthorization.requireReadable(modelCode, record,
+                this::currentMemberIdForRuleCenterPermission, this::getPermissionFacade);
     }
 
     private Long currentMemberIdForRuleCenterPermission() {

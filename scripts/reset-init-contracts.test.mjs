@@ -284,6 +284,13 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /"\$DEV" gradle "\$runtime_name" --project "\$REPO_ROOT\/platform"/);
   assert.match(golden, /--project "\$backend_dir"/);
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
+  assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
+  assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
+  assert.ok(
+    golden.indexOf('platform_plugin_api_jar=') <
+      golden.indexOf('"-PplatformPluginApiJar=$platform_plugin_api_jar"'),
+    'artifact-mode API jar must be resolved before external plugin builds',
+  );
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
   assert.match(golden, /seeds the runtime's shared wrapper distribution/);
@@ -310,6 +317,20 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
     'backend jars must be staged before the PF4J host starts',
   );
   assert.match(read('scripts/import-plugins.sh'), /verify_reference_integrity/);
+});
+
+test('OSS golden stack applies explicit product migrations only to a fresh database before backend startup', () => {
+  const stack = read('scripts/oss-golden-stack.sh');
+
+  assert.match(stack, /--product-migration-root requires --fresh-db/);
+  assert.match(stack, /find "\$product_root" -maxdepth 1 -type f -name 'V\*\.sql'/);
+  assert.match(stack, /psql -v ON_ERROR_STOP=1[\s\S]{0,240}-f "\$migration_file"/);
+  assert.match(stack, /product-migrations\.tsv/);
+  assert.ok(
+    stack.indexOf('2.5/9 apply product-owned migrations')
+      < stack.indexOf('4/9 build bootJar'),
+    'product migrations must finish before backend startup and plugin import',
+  );
 });
 
 test('OSS golden stack rejects dependency capsules with dangling required-package links', () => {

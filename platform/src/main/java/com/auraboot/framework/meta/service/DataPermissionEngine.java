@@ -84,6 +84,12 @@ public interface DataPermissionEngine {
     boolean canAccessRecord(Long tenantId, String modelCode, Long userId,
                             Map<String, Object> record);
 
+    /** Historical bases require explicit member context and cannot use legacy scope approximations. */
+    default boolean canAccessHistoricalRecord(Long tenantId, String modelCode, Long userId, Long memberId,
+                                              Map<String, Object> record) {
+        return false;
+    }
+
     /**
      * Check if a single record is accessible for an explicit action.
      * Dynamic CRUD callers use {@link #canAccessRecord(Long, String, Long, Map)}

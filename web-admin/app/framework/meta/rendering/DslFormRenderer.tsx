@@ -19,14 +19,11 @@
  * rather than wiring into internal rendering hooks directly.
  */
 
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { profileRegistry, ProfileProvider } from '@auraboot/runtime-kernel';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';
-import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
-import { DslFormFillProvider } from './DslFormFillContext';
-import { collectAiLockedFieldCodes, partitionFieldsByLock } from './aiLockedFields';
 
 // Ensure built-in profiles are registered before resolution
 import '~/framework/meta/profiles/admin';
@@ -78,24 +75,6 @@ export function DslFormRenderer({
   onCancel,
 }: DslFormRendererProps) {
   const { loading, error, schema, rendererProps } = form;
-
-  // Field codes the author marked AI-locked (D5). Both AI-fill apply seams
-  // below must skip them so an AI fill never overwrites a locked field.
-  const lockedFields = React.useMemo(() => collectAiLockedFieldCodes(schema), [schema]);
-
-  // Register form fill handler with AuraBot so AI can populate fields
-  const auraBot = useAuraBotSafe();
-  useEffect(() => {
-    if (!auraBot || !form.setFieldValue) return;
-    const handler = (fields: Record<string, any>) => {
-      const { applied } = partitionFieldsByLock(fields, lockedFields);
-      Object.entries(applied).forEach(([fieldCode, value]) => {
-        form.setFieldValue(fieldCode, value);
-      });
-    };
-    auraBot.registerFormFillHandler(handler);
-    return () => auraBot.unregisterFormFillHandler();
-  }, [auraBot, form.setFieldValue, lockedFields]);
 
   // --- 1. Loading state ---
   if (loading) {
@@ -175,16 +154,14 @@ export function DslFormRenderer({
   // --- 7. Render ---
   return (
     <ProfileProvider value={profile}>
-      <DslFormFillProvider setFieldValue={form.setFieldValue} lockedFields={lockedFields}>
-        <div className={className} data-testid="dsl-form-renderer">
-          <Suspense fallback={suspenseFallback}>
-            <PageContent
-              {...rendererProps}
-              onCancelOverride={onCancel ?? rendererProps.onCancelOverride}
-            />
-          </Suspense>
-        </div>
-      </DslFormFillProvider>
+      <div className={className} data-testid="dsl-form-renderer">
+        <Suspense fallback={suspenseFallback}>
+          <PageContent
+            {...rendererProps}
+            onCancelOverride={onCancel ?? rendererProps.onCancelOverride}
+          />
+        </Suspense>
+      </div>
     </ProfileProvider>
   );
 }

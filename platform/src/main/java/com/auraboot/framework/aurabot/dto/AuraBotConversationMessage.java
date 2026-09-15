@@ -26,5 +26,6 @@ public class AuraBotConversationMessage {
     private String thinkingSignature;
     private java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
             retrievalEvidence;
+    private java.util.List<com.auraboot.framework.agent.dto.ResultContract> resultContracts;
     private Instant createdAt;
 }

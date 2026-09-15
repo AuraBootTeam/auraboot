@@ -35,14 +35,50 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     private SkillAutoGenerator skillAutoGenerator;
 
     @BeforeEach
-    void ensureSeeded() {
+    void ensureSeeded() throws java.io.IOException {
         agentTemplateSeeder.seed();
+        jdbcTemplate.execute(java.nio.file.Files.readString(
+                java.nio.file.Path.of("../scripts/seed-form-fill-skill.sql")));
         try {
             MetaContext.setSystemTenantContext(SYSTEM_TENANT_ID);
             skillAutoGenerator.syncSkills(SYSTEM_TENANT_ID);
         } finally {
             MetaContext.clear();
         }
+    }
+
+    @Autowired
+    private com.auraboot.framework.aurabot.service.FormFillSkillService formFillSkills;
+
+    @Autowired
+    private org.mybatis.spring.SqlSessionTemplate sqlSession;
+
+    @Test
+    void formFillSkillLoadsPlatformSeedAndAnIsolatedTenantOverrideFromPostgres() {
+        var provider = new com.auraboot.framework.agent.provider.OpenAiCompatibleLlmProvider(
+                null, new com.fasterxml.jackson.databind.ObjectMapper());
+        Long tenantId = testTenant.getId();
+        var builtin = formFillSkills.resolve(tenantId, provider, "fixture-model");
+        assertThat(builtin.version()).isEqualTo("1.1.0");
+        assertThat(builtin.prompt()).contains("Read the platform_fill_form input schema");
+        jdbcTemplate.update("""
+                INSERT INTO ab_agent_skill
+                (pid, tenant_id, skill_code, skill_name, skill_version, skill_tools, prompt_template, actionability)
+                VALUES (?, ?, 'form_draft_fill', 'Tenant form playbook', '2.0.0',
+                        '["platform.fill_form"]'::jsonb, 'Use the tenant vocabulary.', 'read_only')
+                ON CONFLICT (tenant_id, skill_code) DO UPDATE SET
+                    skill_version = EXCLUDED.skill_version, skill_tools = EXCLUDED.skill_tools,
+                    prompt_template = EXCLUDED.prompt_template, actionability = EXCLUDED.actionability,
+                    skill_status = 'active', deleted_flag = FALSE
+                """, com.auraboot.framework.common.util.UniqueIdGenerator.generate(), tenantId);
+        // The fixture uses JDBC inside one test transaction. Begin the equivalent of a
+        // fresh request read instead of reusing MyBatis' first-level SELECT cache.
+        sqlSession.clearCache();
+        var tenant = formFillSkills.resolve(tenantId, provider, "fixture-model");
+        assertThat(tenant.version()).isEqualTo("2.0.0");
+        assertThat(tenant.prompt()).isEqualTo("Use the tenant vocabulary.");
+        assertThat(formFillSkills.resolve(SYSTEM_TENANT_ID, provider, "fixture-model").prompt())
+                .isEqualTo(builtin.prompt());
     }
 
     // =========================================================================
@@ -56,7 +92,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        assertThat(count).isEqualTo(5);
+        assertThat(count).isEqualTo(6);
     }
 
     @Test
@@ -66,7 +102,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT * FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(skills).hasSize(5);
+        assertThat(skills).hasSize(6);
         for (Map<String, Object> skill : skills) {
             assertThat(skill.get("skill_code")).isNotNull();
             assertThat(skill.get("skill_name")).isNotNull();
@@ -96,7 +132,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "report_analysis",
                 "ops_inspector",
                 "dsl.command",
-                "dsl.query"
+                "dsl.query",
+                "form_draft_fill"
         );
     }
 

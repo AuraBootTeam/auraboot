@@ -94,7 +94,7 @@ export const ReportCanvas: React.FC = () => {
   return (
     <div
       data-testid="report-canvas"
-      className="flex-1 overflow-auto bg-gray-100 p-8"
+      className="flex-1 overflow-auto bg-gray-100 p-8 [background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1px)] [background-size:18px_18px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) selectBlock(null);
       }}

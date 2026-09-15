@@ -21,12 +21,24 @@ public interface DataScopeService {
      */
     DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode);
 
+    /** Resolve current historical scope without legacy ownership approximations. */
+    default DataScopeCondition resolveHistoricalScope(Long memberId, String resourceCode, String actionCode) {
+        return DataScopeCondition.none();
+    }
+
+
     /**
      * Resolve whether an owner user PID currently belongs to one of the permitted departments.
      * This supports records such as CRM opportunities whose department is derived from their owner
      * instead of copied into a stale business-record snapshot.
      */
     boolean isOwnerInDepartments(String ownerUserPid, List<String> departmentPids);
+
+    /** Resolve a standard numeric creator identity within the current tenant. */
+    default boolean isCreatorInDepartments(Long userId, List<String> departmentPids) {
+        return false;
+    }
+
 
     /**
      * Set a data scope for a specific role/resource/action combination (upsert).

@@ -52,6 +52,9 @@ import java.util.concurrent.Executor;
 @Service
 public class AuraBotChatService {
 
+    @Autowired
+    private FormFillSkillService formFillSkillService;
+
     private final LlmProviderFactory llmProviderFactory;
     private final PromptTemplateService promptTemplateService;
     private final ChatToolResolver chatToolResolver;
@@ -416,11 +419,21 @@ public class AuraBotChatService {
         // Use the resolved provider code (may differ from input when auto-discovered)
         providerCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
 
+        String model = options.getModel();
+        if (model == null || model.isBlank()) {
+            model = config.getDefaultModel();
+        }
+        FormFillSkillService.ResolvedSkill formSkill = request.getFormFill() == null ? null
+                : formFillSkillService.resolve(tenantId, llmProviderFactory.getProvider(providerCode), model);
+
         // --- Trace: create trace ---
         Map<String, Object> traceMetadata = new HashMap<>();
         traceMetadata.put("provider_code", providerCode);
         traceMetadata.put("turn_id", ctx.turnId());
         traceMetadata.put("turn_phase", "initial");
+        if (formSkill != null) {
+            traceMetadata.put("runtime_skill", formSkill.traceMetadata());
+        }
         if (request.getPageContext() != null) {
             traceMetadata.put("page_context", Map.of(
                     "kind", Objects.toString(request.getPageContext().getKind(), ""),
@@ -436,11 +449,7 @@ public class AuraBotChatService {
             }
         }
 
-        // 2. Resolve model and options
-        String model = options.getModel();
-        if (model == null || model.isBlank()) {
-            model = config.getDefaultModel();
-        }
+        // 2. Resolve options
         int maxTokens = options.getMaxTokens() != null ? options.getMaxTokens() : config.getMaxTokens();
 
         // 3. Resolve tools from model context
@@ -455,7 +464,7 @@ public class AuraBotChatService {
         // --- D1 Grounding: compile user message → BIF, constrain tools, persist ---
         com.auraboot.framework.agent.dto.BusinessIntentFrame bif = null;
         String qualityIssue = null;
-        if (groundingService != null) {
+        if (groundingService != null && request.getFormFill() == null) {
             SpanContext groundingSpan = aiTraceService.startSpan(
                     trace, null, "span", "d1_grounding",
                     buildGroundingSpanInput(request.getMessage(), modelCode, recordPid, request.getSessionId()));
@@ -500,7 +509,9 @@ public class AuraBotChatService {
         SpanContext resolveSpan = aiTraceService.startSpan(
                 trace, null, "span", "resolve_tools",
                 buildResolveToolsSpanInput(request.getMessage(), modelCode, recordPid));
-        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid, ctx.channel());
+        var resolved = request.getFormFill() != null
+                ? chatToolResolver.resolveFormFill(request.getFormFill())
+                : chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid, ctx.channel());
         List<LlmChatRequest.Tool> tools = resolved.tools();
         if (bif != null) {
             tools = applyCandidateSkillsMode(tools, bif);
@@ -531,6 +542,9 @@ public class AuraBotChatService {
             sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
         }
         String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
+        if (formSkill != null) {
+            systemPrompt += formSkill.instructions(request.getFormFill());
+        }
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
             if (qualityIssue != null) {

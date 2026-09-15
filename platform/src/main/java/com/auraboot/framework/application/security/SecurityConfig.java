@@ -44,9 +44,9 @@ public class SecurityConfig {
     private ScopeRestrictionFilter scopeRestrictionFilter;
 
     @Autowired
-    private ExternalApiKeyAuthenticationFilter externalApiKeyAuthenticationFilter;
+    private ExternalMachineAuthenticationFilter externalMachineAuthenticationFilter;
 
-    /** CORS rules for public key-authenticated endpoints owned by other modules. */
+    /** CORS rules for public machine-authenticated endpoints owned by other modules. */
     @Autowired(required = false)
     private List<PublicCorsContributor> publicCorsContributors;
 
@@ -114,7 +114,7 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(scopeRestrictionFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(externalApiKeyAuthenticationFilter, ScopeRestrictionFilter.class);
+                .addFilterBefore(externalMachineAuthenticationFilter, ScopeRestrictionFilter.class);
 
         // Test-only: honor X-Test-Spoof-User-Id AFTER JwtAuthenticationFilter
         // populates MetaContext. Bean is only present when the "test" profile
@@ -172,6 +172,8 @@ public class SecurityConfig {
             "Content-Type",
             "X-Requested-With",
             "X-Aura-API-Key",
+            "Idempotency-Key",
+            "X-Request-Id",
             "Accept",
             "Origin",
             "X-Tenant-Id",
@@ -180,7 +182,8 @@ public class SecurityConfig {
         configuration.setExposedHeaders(Arrays.asList(
             "X-Total-Count",
             "X-Page-Size",
-            "X-Current-Page"
+            "X-Current-Page",
+            "X-Request-Id"
         ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
@@ -202,7 +205,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/collect/keyed", keyedCollect);
 
-        // Rules contributed by modules that own their own public key-authenticated endpoint (the
+        // Rules contributed by modules that own their own public machine-authenticated endpoint (the
         // embeddable CS widget, for one). Registered before "/api/**" so the specific pattern wins.
         if (publicCorsContributors != null) {
             for (PublicCorsContributor contributor : publicCorsContributors) {

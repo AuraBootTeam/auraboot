@@ -53,6 +53,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final CurrentUserTeamResolver currentUserTeamResolver;
     private final MenuService menuService;
     private final PermissionMapper permissionMapper;
+    private final com.auraboot.framework.behavior.service.AnalyticsArtifactService analyticsArtifacts;
 
     // Default layout configuration
     private static final String DEFAULT_LAYOUT_CONFIG = """
@@ -65,6 +66,15 @@ public class DashboardServiceImpl implements DashboardService {
         log.info("Creating dashboard: title={}", request.getTitle());
 
         validateCreateRequest(request);
+        if (request.getExtension() != null && request.getExtension().has("analyticsOrigin")) {
+            throw new ValidationException(ResponseCode.BadParam, "Analytics origin is managed by the server");
+        }
+        if (StringUtils.hasText(request.getSourceAnalysisId()) && request.getExtension() != null
+                && !request.getExtension().isObject()) {
+            throw new ValidationException(ResponseCode.BadParam, "Dashboard extension must be an object");
+        }
+        String queryHash = StringUtils.hasText(request.getSourceAnalysisId())
+                ? analyticsArtifacts.verifyQuery(request.getSourceAnalysisId(), request.getWidgets()) : null;
         if ("team".equals(request.getScope())) {
             validateCurrentUserInTeam(request.getTeamId());
         }
@@ -104,6 +114,13 @@ public class DashboardServiceImpl implements DashboardService {
             dashboard.setModuleId(resolveModuleId(tenantId, request.getModulePid()));
         }
         dashboard.setExtension(request.getExtension());
+        if (queryHash != null) {
+            ObjectNode extension = dashboard.getExtension() != null && dashboard.getExtension().isObject()
+                    ? ((ObjectNode) dashboard.getExtension()).deepCopy() : objectMapper.createObjectNode();
+            extension.putObject("analyticsOrigin").put("analysisId", request.getSourceAnalysisId())
+                    .put("queryHash", queryHash);
+            dashboard.setExtension(extension);
+        }
         dashboard.setDeletedFlag(false);
         dashboard.setCreatedAt(Instant.now());
         dashboard.setUpdatedAt(Instant.now());
@@ -120,6 +137,9 @@ public class DashboardServiceImpl implements DashboardService {
         // Record initial version
         versionHistoryService.recordVersion("dashboard", dashboard.getPid(), "create", null);
 
+        if (queryHash != null) {
+            analyticsArtifacts.dashboardSaved(request.getSourceAnalysisId(), dashboard.getPid(), queryHash);
+        }
         log.info("Dashboard created: pid={}", dashboard.getPid());
         return toDTO(dashboard);
     }
@@ -194,7 +214,21 @@ public class DashboardServiceImpl implements DashboardService {
             dashboard.setModuleId(resolveModuleId(tenantId, request.getModulePid()));
         }
         if (request.getExtension() != null) {
-            dashboard.setExtension(request.getExtension());
+            JsonNode origin = dashboard.getExtension() == null ? null : dashboard.getExtension().get("analyticsOrigin");
+            JsonNode incoming = request.getExtension().get("analyticsOrigin");
+            if (incoming != null && !incoming.equals(origin)) {
+                throw new ValidationException(ResponseCode.BadParam, "Analytics origin cannot be changed");
+            }
+            if (origin != null) {
+                if (!request.getExtension().isObject()) {
+                    throw new ValidationException(ResponseCode.BadParam, "Dashboard extension must be an object");
+                }
+                ObjectNode extension = ((ObjectNode) request.getExtension()).deepCopy();
+                extension.set("analyticsOrigin", origin);
+                dashboard.setExtension(extension);
+            } else {
+                dashboard.setExtension(request.getExtension());
+            }
         }
         if (dashboard.isTeam()) {
             validateCurrentUserInTeam(dashboard.getTeamId());
@@ -390,7 +424,14 @@ public class DashboardServiceImpl implements DashboardService {
         request.setWidgets(sourceDashboard.getWidgets());
         request.setIsDefault(false);
         request.setSortOrder(sourceDashboard.getSortOrder());
-        request.setExtension(sourceDashboard.getExtension());
+        JsonNode sourceExtension = sourceDashboard.getExtension();
+        if (sourceExtension != null && sourceExtension.isObject()) {
+            ObjectNode copied = ((ObjectNode) sourceExtension).deepCopy();
+            copied.remove("analyticsOrigin");
+            request.setExtension(copied);
+        } else {
+            request.setExtension(sourceExtension);
+        }
 
         return create(request);
     }

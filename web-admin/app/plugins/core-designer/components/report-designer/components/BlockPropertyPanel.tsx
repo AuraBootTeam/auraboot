@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useReportDocument } from '../state/ReportDocumentProvider';
 import { DataTableBlockEditor } from './DataTableBlockEditor';
 import { GroupedTableBlockEditor } from './GroupedTableBlockEditor';
@@ -98,6 +99,7 @@ const PanelShell: React.FC<{
 );
 
 export const BlockPropertyPanel: React.FC = () => {
+  const text = useSmartText();
   const {
     report,
     selectedBlockId,
@@ -252,32 +254,32 @@ export const BlockPropertyPanel: React.FC = () => {
     <PanelShell title="Report Properties">
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Description</label>
           <textarea
             value={report.description || ''}
             onChange={(e) => updateDescription(e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             rows={3}
-            placeholder="Report description..."
+            placeholder={text({ zh: '报表描述...', en: 'Report description...' })}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Page Size</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '页面大小', en: 'Page Size' })}</label>
           <p className="text-sm text-gray-600">
             {report.page.size} — {report.page.orientation}
           </p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Data Sources</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '数据源', en: 'Data Sources' })}</label>
           <p className="text-sm text-gray-600">
             {Object.keys(report.dataSources).length} configured
           </p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Blocks</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Blocks</label>
           <p className="text-sm text-gray-600">{report.body.length} block(s)</p>
         </div>
 
@@ -296,7 +298,7 @@ export const BlockPropertyPanel: React.FC = () => {
         </div>
 
         <div className="pt-4 text-xs text-gray-400">
-          Select a block on the canvas to edit its properties.
+          {text({ zh: '在画布中选择块以编辑其属性。', en: 'Select a block on the canvas to edit its properties.' })}
         </div>
       </div>
     </PanelShell>

@@ -249,6 +249,29 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         return dataScopeAllows(memberId, modelCode, actionCode, record);
     }
 
+    @Override
+    public boolean canAccessHistoricalRecord(Long tenantId, String modelCode, Long userId, Long memberId,
+                                             Map<String, Object> record) {
+        if (tenantId == null || userId == null || memberId == null || record == null) return false;
+        var policies = getEffectivePolicies(tenantId, modelCode, memberId).stream()
+                .filter(policy -> "row".equals(policy.getPolicyType())).toList();
+        if (!policies.isEmpty() && policies.stream().noneMatch(policy -> {
+            String type = policy.getScopeType();
+            if ("all".equals(type)) return true;
+            if ("self".equals(type)) return matchesSelf(userId, record);
+            if ("custom".equals(type) && policy.getConditionAst() != null) return matchesCustom(policy, userId, record);
+            // Legacy SQL, department and project approximations are not historical authorization.
+            return false;
+        })) return false;
+        var condition = dataScopeEvaluator.getHistoricalCondition(memberId, modelCode, "read");
+        if (condition == null || !Set.of("all", "not_configured", "none", "self", "dept", "dept_and_sub")
+                .contains(condition.scopeType())) return false;
+        var share = recordShareEvaluator.evaluate(memberId, modelCode, "read", record);
+        if (share != null && share.verdict() == EvaluationVerdict.ALLOW) return true;
+        var step = dataScopeEvaluator.evaluateHistorical(memberId, modelCode, "read", record);
+        return step != null && step.verdict() != EvaluationVerdict.DENY;
+    }
+
     // ==================== Column-Level Masking ====================
 
     @Override
@@ -438,7 +461,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                     log.warn("Owner-derived DEPT data scope has no tenant context; failing secure");
                     return "1 = 0";
                 }
-                return condition.deptOwnerField()
+                // org_emp_user_id is varchar while owner-derived fields may be numeric
+                // (created_by) or varchar (pid columns); compare as text so both work.
+                return "CAST(" + condition.deptOwnerField() + " AS VARCHAR)"
                         + " IN (SELECT org_emp_user_id FROM mt_org_employee"
                         + " WHERE tenant_id = " + tenantId
                         + " AND deleted_flag = FALSE"

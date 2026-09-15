@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "99a559934",
+    "commit": "089acef61",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -1633,12 +1633,37 @@
       "title": "core-dashboard",
       "rows": [
         {
+          "id": "core_dashboard:adopt_suggestion",
+          "action": "core_dashboard:adopt_suggestion",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "core_dashboard:propose_suggestion",
+          "action": "core_dashboard:propose_suggestion",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "page:behavior_analytics",
           "action": "behavior_analytics",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
             "web-admin/tests/e2e/behavior/anonymous-keyed-collect.golden.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts"
           ],
@@ -2014,6 +2039,20 @@
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
           "note": "kind=list model=meta_models"
+        },
+        {
+          "id": "page:report_management",
+          "action": "report_management",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=report_definition"
         }
       ]
     },
@@ -4585,9 +4624,11 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
-            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts"
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
+            "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -5466,6 +5507,7 @@
             "web-admin/tests/e2e/contract-cost/pm-workspace-tabs.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-designer-ops-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-favorites.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
@@ -5723,10 +5765,12 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/_golden-stack-warm.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-save-report.spec.ts",
             "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts",
             "web-admin/tests/e2e/designer/designer-lifecycle.spec.ts",
             "web-admin/tests/e2e/designer/designer-unified-architecture.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
+            "web-admin/tests/e2e/designer/report-designer-ops-golden.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-history-golden.spec.ts",
@@ -5886,7 +5930,12 @@
           "evidence": [
             "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
             "web-admin/tests/e2e/aurabot/admin-agent-runs.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts",
             "web-admin/tests/e2e/aurabot/chat-bi-render-golden.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-save-report.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-suggestions.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-business-write-guard-golden.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-personalization-promotion-golden.spec.ts",
@@ -5903,6 +5952,7 @@
             "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
             "web-admin/tests/e2e/home/oss-workbench.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-operations-dashboard.spec.ts",
+            "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/workbench/workbench-redesign.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -5996,6 +6046,7 @@
             "web-admin/tests/e2e/aurabot/ai-modeling-entry.spec.ts",
             "web-admin/tests/e2e/aurabot/ai-panel.spec.ts",
             "web-admin/tests/e2e/aurabot/ai-result-contract.spec.ts",
+            "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
             "web-admin/tests/e2e/auth/logout.spec.ts",
             "web-admin/tests/e2e/command/command-management.spec.ts",
             "web-admin/tests/e2e/formula/formula-editor.spec.ts",
@@ -6135,6 +6186,17 @@
           "assertion": "no browser spec navigates to this route",
           "verdict": "untested",
           "note": "plugin=core-ops file=./plugins/core-ops/pages/errors/index.tsx"
+        },
+        {
+          "id": "platform-page:ops.i18n-resources",
+          "action": "/i18n-resources",
+          "surface": "platform-page",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec navigates to this route",
+          "verdict": "untested",
+          "note": "plugin=core-ops file=./plugins/core-ops/pages/i18n-resources/index.tsx"
         },
         {
           "id": "platform-page:ops.notification-rules",
@@ -6376,19 +6438,6 @@
           "note": "plugin=core-platform file=./plugins/core-platform/pages/plugins/index.tsx"
         },
         {
-          "id": "platform-page:semantic.chatbi",
-          "action": "/semantic/ask",
-          "surface": "platform-page",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/semantic/chatbi-console-golden.spec.ts"
-          ],
-          "assertion": "a browser spec navigates to this route",
-          "verdict": "pass",
-          "note": "plugin=core-semantic file=./routes/chatbi/index.tsx"
-        },
-        {
           "id": "platform-page:semantic.lineage",
           "action": "/semantic/lineage",
           "surface": "platform-page",
@@ -6545,11 +6594,11 @@
     }
   ],
   "stats": {
-    "commands": 253,
-    "untested": 177,
-    "pages": 166,
+    "commands": 255,
+    "untested": 179,
+    "pages": 167,
     "pagesUntested": 103,
     "platformPages": 95,
-    "platformPagesUntested": 41
+    "platformPagesUntested": 42
   }
 }

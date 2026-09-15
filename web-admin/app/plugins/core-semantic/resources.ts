@@ -10,14 +10,6 @@ export const RESOURCES: PluginResource[] = [
     file: './routes/semantic-models/index.tsx',
   },
   {
-    key: 'semantic.chatbi',
-    path: '/semantic/ask',
-    title: { en: 'Conversational Analytics', zh: '对话式分析' },
-    icon: 'message-circle',
-    menu: { order: 59, group: 'semantic' },
-    file: './routes/chatbi/index.tsx',
-  },
-  {
     key: 'semantic.lineage',
     path: '/semantic/lineage',
     title: { en: 'Data Lineage', zh: '数据血缘' },

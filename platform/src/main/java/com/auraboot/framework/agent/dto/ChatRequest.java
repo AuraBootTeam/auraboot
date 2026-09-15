@@ -13,6 +13,9 @@ import java.util.Map;
 @Data
 public class ChatRequest {
 
+    /** Reference only; execution goals and provenance are always loaded server-side. */
+    private com.auraboot.framework.behavior.service.AnalyticsConversationTaskStore.Request analyticsExecution;
+
     /**
      * Session ID for conversation continuity.
      */
@@ -44,6 +47,9 @@ public class ChatRequest {
      * Structured page context from the frontend copilot panel.
      */
     private PageContext pageContext;
+
+    /** Explicit draft-only extraction mode. */
+    private FormFillRequest formFill;
 
     /**
      * Agent code to route the chat to a specific ACP agent.
@@ -121,5 +127,12 @@ public class ChatRequest {
         private Double temperature = 0.7;
         private Integer maxTokens = 4096;
         private Boolean stream = true;
+        /** Explicit execution policy flags consumed by the canonical turn planner. */
+        private Boolean explicitDurableRequest;
+        private Boolean durableWorkflow;
+        private Boolean durable;
+        private Boolean requiresApproval;
+        private Boolean externalSideEffect;
+        private Boolean batch;
     }
 }

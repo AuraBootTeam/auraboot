@@ -65,6 +65,10 @@ public interface AutomationTriggerService {
      */
     void onBpmEvent(String eventType, String processKey, String instanceId, Map<String, Object> payload);
 
+    /** Consume an authenticated external event from the reliable integration worker. */
+    void onExternalEvent(String sourceCode, String eventType, String eventId,
+                         String subject, Map<String, Object> payload);
+
     /**
      * Execute an automation
      *

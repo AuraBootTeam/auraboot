@@ -51,9 +51,11 @@ function formatParamName(key: string, isZh: boolean): string {
 }
 
 function hasTechnicalDescription(value: string): boolean {
-  return /\b(?:cmd|nq|builtin)_[a-z0-9_]+\b/i.test(value)
-    || /\b[a-z][a-z0-9]*:[a-z][a-z0-9_]*\b/i.test(value)
-    || /\b[a-z][a-z0-9]*_[a-z][a-z0-9_]*\b/i.test(value);
+  return (
+    /\b(?:cmd|nq|builtin)_[a-z0-9_]+\b/i.test(value) ||
+    /\b[a-z][a-z0-9]*:[a-z][a-z0-9_]*\b/i.test(value) ||
+    /\b[a-z][a-z0-9]*_[a-z][a-z0-9_]*\b/i.test(value)
+  );
 }
 
 /** Keys to exclude from the displayed parameters */
@@ -74,15 +76,31 @@ export function ConfirmCard({
 }: ConfirmCardProps) {
   const { t, locale } = useI18n();
   const isZh = locale.toLowerCase().startsWith('zh');
-  const displayName = formatToolDisplayName(toolName, isZh);
+  const isAnalyticsSuggestion = [
+    'cmd_core_dashboard_propose_suggestion',
+    'cmd:core_dashboard:propose_suggestion',
+  ].includes(toolName);
+  const displayName = isAnalyticsSuggestion
+    ? isZh
+      ? '保存建议版本'
+      : 'Save suggestion version'
+    : formatToolDisplayName(toolName, isZh);
 
   // Filter input params for display
-  const visibleParams = Object.entries(input).filter(([key]) => !EXCLUDED_KEYS.has(key));
-  const safeDescription = description && !hasTechnicalDescription(description)
-    ? description
-    : isZh
-      ? `执行前请核对 ${visibleParams.length} 项参数。`
-      : `Review ${visibleParams.length} parameter${visibleParams.length === 1 ? '' : 's'} before execution.`;
+  const visibleParams = Object.entries(input).filter(([key]) =>
+    isAnalyticsSuggestion
+      ? ['title', 'content', 'executionIntent'].includes(key)
+      : !EXCLUDED_KEYS.has(key),
+  );
+  const safeDescription = isAnalyticsSuggestion
+    ? isZh
+      ? '将以下建议关联到本次分析并保存。保存不代表采纳，也不会执行后续业务操作。'
+      : 'Save this suggestion with the current analysis. Saving does not adopt it or execute business actions.'
+    : description && !hasTechnicalDescription(description)
+      ? description
+      : isZh
+        ? `执行前请核对 ${visibleParams.length} 项参数。`
+        : `Review ${visibleParams.length} parameter${visibleParams.length === 1 ? '' : 's'} before execution.`;
 
   return (
     <div className="mb-3 flex justify-start" data-testid="aurabot-confirm-card">
@@ -106,10 +124,23 @@ export function ConfirmCard({
               {visibleParams.map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-xs">
                   <span className="min-w-[60px] font-medium text-amber-600 dark:text-amber-400">
-                    {formatParamName(key, isZh)}:
+                    {isAnalyticsSuggestion && key === 'executionIntent'
+                      ? isZh
+                        ? '执行目标'
+                        : 'Execution goal'
+                      : isAnalyticsSuggestion && key === 'content'
+                        ? isZh
+                          ? '建议内容'
+                          : 'Suggestion'
+                        : formatParamName(key, isZh)}
+                    :
                   </span>
                   <span className="break-all text-amber-700 dark:text-amber-300/70">
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    {isAnalyticsSuggestion && key === 'executionIntent'
+                      ? String((value as { goal?: string })?.goal ?? '')
+                      : typeof value === 'object'
+                        ? JSON.stringify(value)
+                        : String(value)}
                   </span>
                 </div>
               ))}

@@ -32,6 +32,9 @@ common:
   new: 新建
   add: 添加
   create: 新建
+  save: 保存
+  saved: 已保存
+  copy: 复制
   detail: 详情
   submit: 提交
   export: 导出
@@ -1911,6 +1914,97 @@ notification_rule:
   saving: 保存中...
   update_rule: 更新规则
   create_rule: 创建规则
+
+openPlatform:
+  title: 开放平台
+  badge: 系统对系统访问
+  subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
+  apiReference: API 参考
+  newApplication: 新建应用
+  connectionFlow: 接入流程
+  step1: 创建应用并建立环境安装
+  step2: 授予明确的 Scope 并创建凭据
+  step3: 用凭据换取短期 Access Token
+  loadFailed: 开放平台加载失败
+  emptyTitle: 暂无外部应用
+  emptyBody: 创建第一个应用，开始签发租户绑定的访问凭据。
+  applicationCreated: 应用已创建
+  createFailed: 应用创建失败
+  createTitle: 创建外部应用
+  name: 应用名称
+  description: 描述
+  addInstallation: 添加安装
+  noInstallations: 暂无安装
+  installTitle: 安装应用
+  install: 安装
+  installed: 应用已安装
+  installFailed: 应用安装失败
+  environmentLabel: 环境
+  environment:
+    development: 开发环境
+    staging: 预发布环境
+    production: 生产环境
+  rateLimit: 限流
+  rateLimitPerMinute: 每分钟请求数
+  scopes: 权限范围
+  minimumScopes: 仅授予此安装实际需要的能力。
+  viewCredentials: 查看凭据
+  newCredential: 新建凭据
+  credentialsFailed: 凭据加载失败
+  credentialCreateFailed: 凭据创建失败
+  credentialRotated: 凭据已轮换；旧凭据在宽限期内仍有效
+  rotateFailed: 凭据轮换失败
+  rotateTitle: 轮换凭据
+  rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
+  graceMinutes: 宽限期（分钟）
+  rotate: 轮换
+  noCredentials: 暂无凭据
+  secretTitle: 立即保存此凭据
+  secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
+  saved: 我已保存
+  lastUsed: 最近使用
+  revoke: 吊销
+  revokeTitle: 确认吊销凭据？
+  revokeWarning: 此凭据签发的现有 Access Token 将立即失效。
+  credentialRevoked: 凭据已吊销
+  revokeFailed: 凭据吊销失败
+  editScopes: 编辑 Scope
+  scopeRevokeWarning: 保存新的 Scope 集合会立即吊销此安装的现有 Access Token。
+  scopesUpdated: Scope 已更新，现有 Access Token 已吊销
+  scopeUpdateFailed: Scope 更新失败
+  disable: 停用
+  disableInstallation: 停用安装
+  disableTitle: 确认停用访问？
+  disableWarning: 此操作会立即吊销有效 Token，且无法在本页面恢复。
+  disabled: 访问已停用，有效 Token 已吊销
+  disableFailed: 停用失败
+  operations: 运维
+  operationsTitle: 运维
+  operationsSubtitle: 最近 24 小时 API 流量与出站投递健康状况。
+  refresh: 刷新
+  retry: 重试
+  operationsLoadFailed: 运维数据加载失败
+  totalCalls: 调用数
+  errorRate: 错误率
+  errorCalls: 错误调用
+  deadLetters: 死信
+  callAudit: 调用审计
+  noCalls: 没有符合筛选条件的调用
+  deliveryStatus: 投递状态
+  webhookDeliveries: Webhook 投递
+  noDeliveries: 没有符合筛选条件的投递
+  deletedSubscription: 已删除的订阅
+  replay: 重放
+  replayQueued: Webhook 重放已入队
+  replayFailed: Webhook 重放失败
+  replayConfirmTitle: 重放此投递？
+  replayConfirmBody: 原始签名载荷将再次投递，可能重复触发下游副作用。
+  confirmReplay: 确认重放
+  status:
+    active: 已启用
+    disabled: 已停用
+    revoked: 已吊销
+    success: 成功
 
 aurabot:
   error:

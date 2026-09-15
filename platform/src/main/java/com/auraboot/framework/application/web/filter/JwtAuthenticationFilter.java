@@ -1,7 +1,7 @@
 package com.auraboot.framework.application.web.filter;
 
 import com.auraboot.framework.application.security.WhiteList;
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticationFilter;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticationFilter;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
@@ -321,7 +321,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         if (Boolean.TRUE.equals(request.getAttribute(
-                ExternalApiKeyAuthenticationFilter.AUTHENTICATED_ATTRIBUTE))) {
+                ExternalMachineAuthenticationFilter.AUTHENTICATED_ATTRIBUTE))) {
             return true;
         }
         if ("options".equals(request.getMethod())) {

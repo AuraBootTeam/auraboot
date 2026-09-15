@@ -27,6 +27,7 @@ function parseArgs(argv) {
     else if (argument === '--lock') options.lock = resolve(rest[++index]);
     else if (argument === '--output') options.output = resolve(rest[++index]);
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
+    else if (argument === '--skip-image') options.skipImage = true;
     else if (argument === '--source-map') options.sourceMap = resolve(rest[++index]);
     else if (argument === '--source-graph') options.sourceGraph = resolve(rest[++index]);
     else if (argument === '--artifact-graph') options.artifactGraph = resolve(rest[++index]);
@@ -54,7 +55,10 @@ function main() {
     const catalog = readStructuredFile(required(options, 'catalog'));
     const output = required(options, 'output');
     const webContributions = loadCatalogWebContributions(manifest, catalog, options.artifactRoot);
-    const lock = resolveApplication(manifest, catalog, { webContributions });
+    const lock = resolveApplication(manifest, catalog, {
+      webContributions,
+      skipImage: options.skipImage === true,
+    });
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, `${JSON.stringify(lock, null, 2)}\n`);
     process.stdout.write(`resolved application lock: ${lock.identity}\n`);

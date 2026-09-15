@@ -459,7 +459,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook", "on_workflow_event");
+                    "on_state_change", "scheduled", "webhook", "on_workflow_event", "external_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 errors.add("Invalid trigger type: " + request.getTriggerType());
             }
@@ -510,7 +510,7 @@ public class AutomationServiceImpl implements AutomationService {
         if (StringUtils.hasText(request.getTriggerType())) {
             List<String> validTriggerTypes = List.of(
                     "on_record_create", "on_record_update", "on_field_change",
-                    "on_state_change", "scheduled", "webhook", "on_workflow_event");
+                    "on_state_change", "scheduled", "webhook", "on_workflow_event", "external_event");
             if (!validTriggerTypes.contains(request.getTriggerType())) {
                 throw new ValidationException(ResponseCode.CommonValidationFailed,
                         "Invalid trigger type: " + request.getTriggerType());

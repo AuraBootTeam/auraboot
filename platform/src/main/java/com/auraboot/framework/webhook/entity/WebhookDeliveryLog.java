@@ -27,6 +27,9 @@ public class WebhookDeliveryLog {
     @TableField("subscription_pid")
     private String subscriptionPid;
 
+    @TableField("installation_pid")
+    private String installationPid;
+
     @TableField("event_id")
     private String eventId;
 
@@ -50,6 +53,33 @@ public class WebhookDeliveryLog {
 
     @TableField("retry_count")
     private Integer retryCount;
+
+    @TableField("max_retries")
+    private Integer maxRetries;
+
+    @TableField("next_retry_at")
+    private Instant nextRetryAt;
+
+    @TableField("lease_owner")
+    private String leaseOwner;
+
+    @TableField("lease_token")
+    private String leaseToken;
+
+    @TableField("lease_until")
+    private Instant leaseUntil;
+
+    @TableField("last_attempt_at")
+    private Instant lastAttemptAt;
+
+    @TableField("replay_count")
+    private Integer replayCount;
+
+    @TableField("last_replayed_at")
+    private Instant lastReplayedAt;
+
+    @TableField("last_replayed_by_pid")
+    private String lastReplayedByPid;
 
     @TableField("error_message")
     private String errorMessage;

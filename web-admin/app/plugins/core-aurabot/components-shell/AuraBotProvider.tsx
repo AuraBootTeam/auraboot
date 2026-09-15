@@ -16,6 +16,8 @@ import React, {
   useRef,
 } from 'react';
 import { useLocation, useParams } from 'react-router';
+import { useI18n } from '~/contexts/I18nContext';
+import type { FormFillTarget } from '~/framework/meta/rendering/formFill';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -230,11 +232,7 @@ const initialState: AuraBotState = {
  */
 export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMessage[] {
   const sender: SimpleMessage['sender'] =
-    message.sender === 'user'
-      ? 'user'
-      : message.sender === 'system'
-        ? 'system'
-        : 'bot';
+    message.sender === 'user' ? 'user' : message.sender === 'system' ? 'system' : 'bot';
 
   const normalizedType: SimpleMessage['type'] =
     message.type === 'system'
@@ -251,9 +249,9 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
   // check here prevents an empty-string column drift from ever rendering an
   // empty reasoning pane in the UI.
   if (
-    sender === 'bot'
-    && typeof message.thinkingContent === 'string'
-    && message.thinkingContent.length > 0
+    sender === 'bot' &&
+    typeof message.thinkingContent === 'string' &&
+    message.thinkingContent.length > 0
   ) {
     out.push({
       id: `db-${message.id}-thinking`,
@@ -275,6 +273,16 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
     traceId: message.traceId || undefined,
     retrievalEvidence: message.retrievalEvidence,
   });
+  for (const [index, contract] of (message.resultContracts ?? []).entries()) {
+    out.push({
+      id: `db-${message.id}-result-${index}`,
+      type: 'result_contract',
+      sender,
+      timestamp: baseTimestamp,
+      content: '',
+      resultContract: contract,
+    });
+  }
   return out;
 }
 
@@ -415,7 +423,6 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
 // Context
 // ============================================================================
 
-export type FormFillHandler = (fields: Record<string, any>) => void;
 
 /**
  * P1: image attachment carried alongside a user message. Each entry is the
@@ -438,7 +445,12 @@ interface AuraBotContextValue {
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
-  sendMessage: (content: string, attachments?: ChatImageAttachment[]) => void;
+  sendMessage: (
+    content: string,
+    attachments?: ChatImageAttachment[],
+    analyticsExecution?: { adoptionPid: string; requestId: string },
+  ) => void;
+  registerFormFillTarget: (target: FormFillTarget) => () => void;
   confirmTool: (toolId: string) => void;
   cancelTool: (toolId: string) => void;
   clearMessages: () => void;
@@ -449,8 +461,6 @@ interface AuraBotContextValue {
   setPageContext: (ctx: Partial<PageContext>) => void;
   setSelectedAgent: (agentCode: string) => void;
   toggleKnowledgeBase: (kbPid: string) => void;
-  registerFormFillHandler: (handler: FormFillHandler) => void;
-  unregisterFormFillHandler: () => void;
 }
 
 export const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
@@ -550,11 +560,13 @@ export interface AuraBotProviderProps {
 }
 
 export function AuraBotProvider({ children }: AuraBotProviderProps) {
+  const { locale } = useI18n();
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
   const location = useLocation();
   const params = useParams();
-  const formFillHandlerRef = useRef<FormFillHandler | null>(null);
+  const formFillTargetRef = useRef<FormFillTarget | null>(null);
+  const formFillTargetsRef = useRef<FormFillTarget[]>([]);
 
   // Live mirror of currentConversationId. refreshConversations is recreated as
   // its deps change, so a captured copy can go stale: a refreshConversations
@@ -574,7 +586,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       const items = await auraBotApi.listConversations();
       const summaries = items.map(toSessionSummary);
       setSessions(summaries);
-      if (!currentConversationIdRef.current && summaries.length > 0 && state.messages.length === 0) {
+      if (
+        !currentConversationIdRef.current &&
+        summaries.length > 0 &&
+        state.messages.length === 0
+      ) {
         // Only auto-restore when we have an explicit remembered conversation id
         // that still exists on the server. Avoid arbitrarily resuming a random
         // historical conversation (breaks welcome-state UX and E2E tests that
@@ -612,7 +628,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   }, [state.panelState, refreshConversations]);
 
   useEffect(() => {
-    rememberConversationId(state.currentConversationId);
+    if (state.currentConversationId !== null) rememberConversationId(state.currentConversationId);
   }, [state.currentConversationId]);
 
   // Sync pageContext from route changes
@@ -733,13 +749,14 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       };
     }
 
-    const conversation = await auraBotApi.ensureConversation(state.selectedAgentCode);
+    const conversation = await auraBotApi.ensureConversation(state.selectedAgentCode, true);
     const summary = toSessionSummary(conversation);
     setSessions((prev) => {
       const filtered = prev.filter((item) => item.conversationId !== summary.conversationId);
       return [summary, ...filtered];
     });
     rememberConversationId(summary.conversationId);
+    currentConversationIdRef.current = summary.conversationId;
     dispatch({ type: 'set_current_conversation', payload: summary.conversationId });
     return {
       conversationId: summary.conversationId,
@@ -755,7 +772,15 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Send message — wired to SSE streaming
   const sendMessage = useCallback(
-    async (content: string, attachments?: ChatImageAttachment[]) => {
+    async (
+      content: string,
+      attachments?: ChatImageAttachment[],
+      analyticsExecution?: { adoptionPid: string; requestId: string },
+    ) => {
+      const analyticsError =
+        locale === 'zh-CN'
+          ? '执行未完成。请刷新建议并检查权限后重试；已有任务的状态以服务器记录为准。'
+          : 'Execution did not complete. Refresh suggestions and check permissions before retrying; server records determine the state of an existing task.';
       const hasAttachments = !!attachments && attachments.length > 0;
       // Allow empty text when image attachments are present — the model can
       // still answer the implicit "what is this?". Without attachments, we
@@ -763,6 +788,8 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       if (!hasAttachments && !content.trim()) return;
       if (state.isLoading) return;
 
+      const fillTarget = formFillTargetRef.current;
+      const fillTargetId = fillTarget?.snapshot().targetId;
       const { conversationId } = await ensureConversation();
 
       // userMsgId doubles as the server-side dedup key (clientMsgId on
@@ -792,6 +819,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             // Phase B.1: server-side persistence wiring.
             conversationId,
             clientMsgId: userMsgId,
+            analyticsExecution,
             knowledgeBaseIds:
               state.selectedKnowledgeBaseIds.length > 0
                 ? state.selectedKnowledgeBaseIds
@@ -830,7 +858,12 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             onError: (error: string, traceId?: string) => {
               dispatch({
                 type: 'update_message',
-                payload: { id: botMsgId, type: 'error', content: error, traceId },
+                payload: {
+                  id: botMsgId,
+                  type: 'error',
+                  content: analyticsExecution ? analyticsError : error,
+                  traceId,
+                },
               });
               dispatch({ type: 'set_loading', payload: false });
               refreshConversations().catch(() => {});
@@ -860,8 +893,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               });
               // Handle form_fill action — populate the current page's form
               const data = result?.data || result;
-              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
-                formFillHandlerRef.current(data.fields);
+              if (_success && data?.action === 'form_fill' && data?.fields
+                  && fillTarget && formFillTargetRef.current === fillTarget
+                  && fillTarget.snapshot().targetId === fillTargetId) {
+                fillTarget.apply(data.fields);
               }
             },
             onResultContract: (contract) => {
@@ -931,14 +966,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                     toolName,
                     toolInput: input,
                     pendingTurnId,
-                    skillName:
-                      (extension?.skillName as string | undefined) ?? toolName,
-                    skillPreview:
-                      (extension?.preview as Record<string, any> | undefined) ?? {},
-                    previewToken:
-                      (extension?.previewToken as string | undefined) ?? '',
-                    riskLevel:
-                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                    skillName: (extension?.skillName as string | undefined) ?? toolName,
+                    skillPreview: (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken: (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel: (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
                   },
                 });
                 dispatch({ type: 'set_loading', payload: false });
@@ -967,7 +998,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       } catch (e: any) {
         dispatch({
           type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: e.message || 'Chat failed' },
+          payload: {
+            id: botMsgId,
+            type: 'error',
+            content: analyticsExecution ? analyticsError : e.message || 'Chat failed',
+          },
         });
         dispatch({ type: 'set_loading', payload: false });
         // Phase B.1: server already attempted to persist; on transport failure
@@ -979,6 +1014,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     [
       ensureConversation,
       refreshConversations,
+      locale,
       state.isLoading,
       state.sessionId,
       state.selectedAgentCode,
@@ -1011,8 +1047,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // C-5 T7: skill_preview_card carries the same pendingTurnId field.
       const confirmCard = state.messages.find(
         (m) =>
-          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
-          m.toolId === toolId,
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
@@ -1020,7 +1055,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         // by the SSE handler that set pendingTurnId.
         dispatch({
           type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: 'Missing pendingTurnId for confirmTool' },
+          payload: {
+            id: botMsgId,
+            type: 'error',
+            content: 'Missing pendingTurnId for confirmTool',
+          },
         });
         dispatch({ type: 'set_loading', payload: false });
         return;
@@ -1057,9 +1096,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 },
               });
               const data = result?.data || result;
-              if (data?.action === 'form_fill' && data?.fields && formFillHandlerRef.current) {
-                formFillHandlerRef.current(data.fields);
-              }
+              // Form filling is draft-only and never resumes through business approval.
             },
             onConfirmRequired: (
               tid: string,
@@ -1086,14 +1123,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                     toolName: tname,
                     toolInput: input,
                     pendingTurnId,
-                    skillName:
-                      (extension?.skillName as string | undefined) ?? tname,
-                    skillPreview:
-                      (extension?.preview as Record<string, any> | undefined) ?? {},
-                    previewToken:
-                      (extension?.previewToken as string | undefined) ?? '',
-                    riskLevel:
-                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                    skillName: (extension?.skillName as string | undefined) ?? tname,
+                    skillPreview: (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken: (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel: (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
                   },
                 });
                 dispatch({ type: 'set_loading', payload: false });
@@ -1163,8 +1196,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // C-5 T7: include skill_preview_card so skill cancels echo back too.
       const confirmCard = state.messages.find(
         (m) =>
-          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
-          m.toolId === toolId,
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
@@ -1199,12 +1231,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePanel, closePanel, state.panelState]);
 
-  const registerFormFillHandler = useCallback((handler: FormFillHandler) => {
-    formFillHandlerRef.current = handler;
-  }, []);
-
-  const unregisterFormFillHandler = useCallback(() => {
-    formFillHandlerRef.current = null;
+  const registerFormFillTarget = useCallback((target: FormFillTarget) => {
+    formFillTargetsRef.current = [...formFillTargetsRef.current.filter((item) => item !== target), target];
+    formFillTargetRef.current = target;
+    return () => {
+      formFillTargetsRef.current = formFillTargetsRef.current.filter((item) => item !== target);
+      formFillTargetRef.current = formFillTargetsRef.current.at(-1) ?? null;
+    };
   }, []);
 
   const value: AuraBotContextValue = {
@@ -1224,8 +1257,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     setPageContext,
     setSelectedAgent,
     toggleKnowledgeBase,
-    registerFormFillHandler,
-    unregisterFormFillHandler,
+    registerFormFillTarget,
   };
 
   return <AuraBotCtx.Provider value={value}>{children}</AuraBotCtx.Provider>;

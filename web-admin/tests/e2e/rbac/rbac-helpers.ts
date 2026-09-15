@@ -87,8 +87,9 @@ export async function openAsRole(
   browser: Browser,
   email: string,
   password: string,
+  locale?: string,
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, locale });
   const page = await context.newPage();
   await loginViaUI(page, email, password);
   return { context, page };
