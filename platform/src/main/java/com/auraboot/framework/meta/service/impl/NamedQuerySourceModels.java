@@ -22,9 +22,25 @@ public class NamedQuerySourceModels {
     private static final Set<String> PLATFORM_REFERENCE_SOURCES = Set.of("\"public\".\"ab_user\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
+    /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
+    public static final String ENGINE_SOURCE_MARKER_PREFIX = "engine.";
 
     static String platformReferenceMarker(String key) {
         return PLATFORM_REFERENCE_MARKER;
+    }
+
+    /** Marker for an engine-table source under the tenant-bypass prefixes (own tenant_id column). */
+    static String engineSourceMarker(String key) {
+        String bare = key.trim().toLowerCase();
+        int lastDot = bare.lastIndexOf('.');
+        if (lastDot >= 0) bare = bare.substring(lastDot + 1);
+        bare = bare.replace("\"", "");
+        return ENGINE_SOURCE_MARKER_PREFIX + bare;
+    }
+
+    /** True when the quoted identity's bare table name starts with an engine (bypass) prefix. */
+    static boolean isBypassEngineSource(String key) {
+        return engineSourceMarker(key).startsWith(ENGINE_SOURCE_MARKER_PREFIX);
     }
 
     record Sources(Map<String, String> models, Map<String, String> views) {
@@ -65,6 +81,13 @@ public class NamedQuerySourceModels {
             // anchor (e.g. ab_user.pid = activity owner), which exposes no rows beyond that
             // anchor's scope. Mapping them to a reserved marker lets protection skip them.
             result.put(key, platformReferenceMarker(key));
+            return;
+        }
+        if (isBypassEngineSource(key)) {
+            // Engine tables (se_*) sit under the configured tenant-bypass prefixes: the
+            // runtime maintains their tenant_id column and NQ SQL on them carries explicit
+            // tenant filters, so they cannot back meta-model source resolution.
+            result.put(key, engineSourceMarker(key));
             return;
         }
         Set<String> candidates = catalog.getOrDefault(key, Set.of());
