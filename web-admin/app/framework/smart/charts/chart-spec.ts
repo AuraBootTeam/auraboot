@@ -51,6 +51,7 @@ export type ChartSpecType =
   | 'spc'
   | 'pareto'
   | 'gantt'
+  | 'waterfall'
   | 'combo'
   | 'nps'
   | 'wordcloud'
@@ -58,7 +59,7 @@ export type ChartSpecType =
 
 export const CHART_SPEC_TYPES: readonly ChartSpecType[] = [
   'bar', 'line', 'area', 'pie', 'scatter', 'radar', 'funnel', 'gauge', 'heatmap',
-  'treemap', 'map', 'spc', 'pareto', 'gantt', 'combo', 'nps', 'wordcloud', 'table',
+  'treemap', 'map', 'spc', 'pareto', 'gantt', 'waterfall', 'combo', 'nps', 'wordcloud', 'table',
 ];
 
 export function isChartSpecType(t: string): t is ChartSpecType {
@@ -159,6 +160,20 @@ export interface ChartScatterOptions {
 }
 
 /**
+ * Waterfall-family options (AMOS cockpit gap G05): rows are deltas that stack
+ * into a running total, except rows whose `totalField` value is listed in
+ * `totalValues` — those render as ABSOLUTE bars restarting the running sum
+ * (e.g. quote baseline / subtotal / total rows in a profit bridge). When
+ * `totalField` is unset every row is a delta.
+ */
+export interface ChartWaterfallOptions {
+  /** Row column classifying absolute-total rows (e.g. `bridge_kind`). */
+  totalField?: string;
+  /** Values of `totalField` that mark absolute bars (default `['total','subtotal','合计','小计']`). */
+  totalValues?: string[];
+}
+
+/**
  * Interaction intent. ALL of these are screen-affordances that print targets must
  * degrade explicitly (see CAPABILITY_MATRIX / validateChartSpecForTarget).
  */
@@ -194,6 +209,8 @@ export interface ChartSpec {
   visual?: ChartVisualOptions;
   /** Scatter/bubble-family declarative options (axis labels, bubble sizing). */
   scatter?: ChartScatterOptions;
+  /** Waterfall-family declarative options (absolute-total row classification). */
+  waterfall?: ChartWaterfallOptions;
 }
 
 // --- render targets ----------------------------------------------------------

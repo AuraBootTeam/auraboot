@@ -142,10 +142,16 @@ class SemanticPublishServiceTest {
         when(modelMapper.findByCode(eq(1L), eq("sales"), eq("sales"), eq("0.1")))
                 .thenReturn(stale);
         // Existing dims/metrics to be soft-deleted
+        com.auraboot.framework.semantic.entity.AbSemanticDimension staleDim =
+                new com.auraboot.framework.semantic.entity.AbSemanticDimension();
+        staleDim.setId(11L);
+        com.auraboot.framework.semantic.entity.AbSemanticMetric staleMetric =
+                new com.auraboot.framework.semantic.entity.AbSemanticMetric();
+        staleMetric.setId(12L);
         when(dimensionMapper.listByModel(1L, "OLDPID0000000000000000000A"))
-                .thenReturn(new ArrayList<>(Collections.singletonList(new com.auraboot.framework.semantic.entity.AbSemanticDimension())));
+                .thenReturn(new ArrayList<>(Collections.singletonList(staleDim)));
         when(metricMapper.listActiveByModel(1L, "OLDPID0000000000000000000A"))
-                .thenReturn(new ArrayList<>(Collections.singletonList(new com.auraboot.framework.semantic.entity.AbSemanticMetric())));
+                .thenReturn(new ArrayList<>(Collections.singletonList(staleMetric)));
 
         String pid = service.publishFromYaml(yaml, "sales", 1L, 100L);
 
@@ -154,6 +160,14 @@ class SemanticPublishServiceTest {
         verify(modelMapper, times(1)).updateById(any(AbSemanticModel.class));
         verify(lineageMapper, times(1))
                 .softDeleteAllFrom(1L, "OLDPID0000000000000000000A");
+        // Regression (live-stack defect): the previous rows must be logically
+        // deleted via deleteById — updateById cannot write the @TableLogic
+        // deleted_flag, which left stale rows holding uk_semantic_*_code and
+        // made every republish fail with DuplicateKeyException.
+        verify(dimensionMapper, times(1)).deleteById(11L);
+        verify(metricMapper, times(1)).deleteById(12L);
+        verify(dimensionMapper, never()).updateById(any(com.auraboot.framework.semantic.entity.AbSemanticDimension.class));
+        verify(metricMapper, never()).updateById(any(com.auraboot.framework.semantic.entity.AbSemanticMetric.class));
     }
 
     @Test

@@ -385,6 +385,137 @@ function scatterOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChart
   };
 }
 
+/**
+ * WATERFALL branch (AMOS cockpit gap G05). Rows stack deltas into a running
+ * total via a transparent helper series; rows classified as totals by
+ * `spec.waterfall.totalField`/`totalValues` render as ABSOLUTE bars that
+ * restart the running sum (quote baseline / subtotal / total rows of a profit
+ * bridge). Per-bar semantic colors follow the SmartParetoChart convention:
+ * overridable hex props on the component, ECharts-palette defaults here.
+ */
+function waterfallOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOption {
+  const title = titleText(spec);
+  const valueField = spec.measures[0]?.field;
+  const labelField = dimField(spec, 'category');
+  const categories = labelField ? categoryLabels(spec, rows, labelField) : rows.map(() => '');
+  const totalField = spec.waterfall?.totalField;
+  const totalValues = (spec.waterfall?.totalValues ?? ['total', 'subtotal', '合计', '小计']).map(
+    (v) => String(v).toLowerCase(),
+  );
+
+  // Empty data → same degenerate shape as the bar branch.
+  if (!rows.length || !valueField) {
+    return {
+      title: title ? { text: title, left: 'center', textStyle: { fontSize: 14 } } : undefined,
+      xAxis: { type: 'category', data: [] },
+      yAxis: { type: 'value', data: [] },
+      series: [],
+    };
+  }
+
+  type Bar = {
+    /** Signed delta (absolute value for total rows). */
+    delta: number;
+    /** Bar magnitude (≥0) drawn from the anchor. */
+    magnitude: number;
+    /** Helper-series anchor (running base; 0 for totals). */
+    base: number;
+    kind: 'total' | 'increase' | 'decrease';
+  };
+  const bars: Bar[] = [];
+  let running = 0;
+  for (const row of rows) {
+    const raw = Number(row[valueField] ?? 0) || 0;
+    const isTotal =
+      totalField != null &&
+      totalValues.includes(String(row[totalField] ?? '').trim().toLowerCase());
+    if (isTotal) {
+      bars.push({ delta: raw, magnitude: Math.abs(raw), base: 0, kind: 'total' });
+      running = raw;
+      continue;
+    }
+    const from = running;
+    running += raw;
+    bars.push({
+      delta: raw,
+      magnitude: Math.abs(raw),
+      base: Math.min(from, running),
+      kind: raw >= 0 ? 'increase' : 'decrease',
+    });
+  }
+
+  const showLabel = spec.visual?.dataLabels ?? false;
+  return {
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          textStyle: { fontSize: 14, fontWeight: 500 },
+        }
+      : undefined,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: unknown) => {
+        const list = (Array.isArray(params) ? params : [params]) as Array<{ dataIndex?: number }>;
+        const idx = Number(list[0]?.dataIndex ?? 0);
+        const bar = bars[idx];
+        if (!bar) return '';
+        const label = categories[idx] ?? '';
+        return `${label}<br/>${bar.kind === 'total' ? '合计' : bar.delta >= 0 ? '增加' : '减少'}: ${
+          bar.kind === 'total' ? bar.delta : Math.abs(bar.delta)
+        }`;
+      },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: title ? '15%' : '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: categories,
+      axisLabel: {
+        rotate: categories.length > 10 ? 45 : 0,
+        hideOverlap: true,
+      },
+    },
+    yAxis: { type: 'value' },
+    series: [
+      {
+        type: 'bar',
+        stack: 'waterfall',
+        itemStyle: { color: 'transparent' },
+        data: bars.map((bar) => bar.base),
+        silent: true,
+      },
+      {
+        type: 'bar',
+        stack: 'waterfall',
+        data: bars.map((bar) => ({
+          value: bar.magnitude,
+          itemStyle: {
+            color:
+              bar.kind === 'total' ? '#5470c6' : bar.kind === 'increase' ? '#91cc75' : '#ee6666',
+          },
+        })),
+        label: {
+          show: showLabel,
+          position: 'top',
+          formatter: (p: unknown) => {
+            const bar = bars[Number((p as { dataIndex?: number }).dataIndex ?? 0)];
+            if (!bar) return '';
+            return String(bar.kind === 'total' ? bar.delta : Math.abs(bar.delta));
+          },
+        },
+        emphasis: { focus: 'series' as const },
+      },
+    ],
+  };
+}
+
 export function chartSpecToEChartsOption(
   spec: ChartSpec,
   rows: Record<string, unknown>[],
@@ -402,6 +533,11 @@ export function chartSpecToEChartsOption(
   // SCATTER is the canonical SmartScatterChart builder (B2d): legacy-equivalent base.
   if (spec.type === 'scatter') {
     return scatterOption(spec, rows);
+  }
+
+  // WATERFALL (gap G05): running-total bridge with absolute-total rows.
+  if (spec.type === 'waterfall') {
+    return waterfallOption(spec, rows);
   }
 
   const labelField = dimField(spec, spec.type === 'pie' ? 'name' : 'category');

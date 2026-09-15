@@ -96,4 +96,45 @@ describe('chartSpecToEChartsOption', () => {
     const opt = chartSpecToEChartsOption(spec({ title: 'Sales' }), rows) as any;
     expect(opt.title.text).toBe('Sales');
   });
+
+  it('builds a waterfall running total with an absolute-total anchor row', () => {
+    // Quote-baseline bridge (gap G05): total row restarts the running sum,
+    // deltas stack as floating bars anchored by the transparent helper series.
+    const bridgeRows = [
+      { stage: '报价基线', amount: 100, kind: 'total' },
+      { stage: '材料涨价', amount: -20, kind: 'delta' },
+      { stage: '工艺降本', amount: 15, kind: 'delta' },
+      { stage: '当前成本', amount: 95, kind: 'total' },
+    ];
+    const opt = chartSpecToEChartsOption(
+      spec({
+        type: 'waterfall',
+        dimensions: [{ field: 'stage', role: 'category' }],
+        waterfall: { totalField: 'kind', totalValues: ['total'] },
+      }),
+      bridgeRows,
+    ) as any;
+
+    const [helper, visual] = opt.series;
+    expect(helper.stack).toBe('waterfall');
+    expect(helper.itemStyle.color).toBe('transparent');
+    // Anchors: total→0, -20 from 100→80, +15 from 80→80, total→0.
+    expect(helper.data).toEqual([0, 80, 80, 0]);
+    // Magnitudes: total 100, |−20|, 15, total 95.
+    expect(visual.data.map((d: any) => d.value)).toEqual([100, 20, 15, 95]);
+    expect(visual.data[0].itemStyle.color).toBe('#5470c6');
+    expect(visual.data[1].itemStyle.color).toBe('#ee6666');
+    expect(visual.data[2].itemStyle.color).toBe('#91cc75');
+    expect(opt.xAxis.data).toEqual(['报价基线', '材料涨价', '工艺降本', '当前成本']);
+  });
+
+  it('treats every row as a delta when no totalField is configured', () => {
+    const opt = chartSpecToEChartsOption(
+      spec({ type: 'waterfall' }),
+      rows,
+    ) as any;
+    const [helper, visual] = opt.series;
+    expect(helper.data).toEqual([0, 10]);
+    expect(visual.data.map((d: any) => d.value)).toEqual([10, 30]);
+  });
 });

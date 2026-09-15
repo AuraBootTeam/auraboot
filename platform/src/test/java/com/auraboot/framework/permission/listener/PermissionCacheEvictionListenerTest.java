@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.listener;
 
+import com.auraboot.framework.meta.cache.DataAccessCacheEpoch;
 import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 /** Verifies that transaction listeners preserve explicit tenant isolation during eviction. */
@@ -57,5 +59,17 @@ class PermissionCacheEvictionListenerTest {
 
         verify(userPermissionService).evictUserPermissions(1L);
         verify(userPermissionService).evictRoleUsers(7L);
+    }
+
+    @Test
+    void permissionEventsBumpTheDataAccessCacheEpoch() {
+        long before = DataAccessCacheEpoch.current();
+
+        listener.onUserRoleChanged(new UserRoleChangedEvent(this, 100L, 1L, 7L, "CREATE"));
+        listener.onRolePermissionChanged(new RolePermissionChangedEvent(this, 100L, 7L, 50L, "DELETE"));
+        listener.onPermissionDefinitionChanged(new PermissionDefinitionChangedEvent(
+                this, 100L, "model.user.read", "CREATE"));
+
+        assertThat(DataAccessCacheEpoch.current()).isGreaterThan(before + 1);
     }
 }

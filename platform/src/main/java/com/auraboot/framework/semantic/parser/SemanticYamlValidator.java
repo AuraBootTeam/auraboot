@@ -184,6 +184,20 @@ public class SemanticYamlValidator {
                                 "metric[" + mt.getCode() + "] conversion.entity '" + entity
                                         + "' not declared in entities[]");
                     }
+                    // v0.2 cohort conversion: the self-join selects event rows via
+                    // explicit row predicates — without them the window cannot be
+                    // enforced, so blank/absent filters fail at publish time.
+                    for (String key : new String[] {"base_filter", "conversion_filter"}) {
+                        Object filter = params.get(key);
+                        if (filter == null || String.valueOf(filter).isBlank()) {
+                            throw new SemanticValidationException(
+                                    "MISSING_PARAM",
+                                    "metric[" + mt.getCode() + "].type_params." + key
+                                            + " missing (required for cohort window enforcement)");
+                        }
+                        assertNoSqlInjection(String.valueOf(filter),
+                                "metric[" + mt.getCode() + "].type_params." + key);
+                    }
                 }
                 default -> {
                     // JSON Schema enum should already block; defensive only

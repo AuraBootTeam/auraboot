@@ -98,6 +98,11 @@ reg('pareto', () =>
 reg('gantt', () =>
   import('~/framework/smart/components/charts/SmartGanttChart').then((m) => ({ default: m.SmartGanttChart })),
 );
+reg('waterfall', () =>
+  import('~/framework/smart/components/charts/SmartWaterfallChart').then((m) => ({
+    default: m.SmartWaterfallChart,
+  })),
+);
 reg('table', () =>
   import('~/framework/smart/components/charts/SmartTableChart').then((m) => ({ default: m.SmartTableChart })),
 );

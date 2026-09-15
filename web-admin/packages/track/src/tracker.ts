@@ -24,6 +24,12 @@ export function createTracker(opts: {
    * and the server enriches identity from the JWT (authenticated mode — unchanged).
    */
   getAnonId?: () => string;
+  /**
+   * Optional run-scoped isolation identity. When present, every event carries
+   * `runId` (→ ab_behavior_event.run_id) so one execution's rows can be asserted
+   * and cleaned up without touching shared data (AMOS cockpit gap G10).
+   */
+  getRunId?: () => string | undefined;
   endpoint?: string;
   batchSize?: number;
 }): Tracker {
@@ -59,6 +65,7 @@ export function createTracker(opts: {
           eventCategory: 'navigation',
           clientSessionId: opts.getSessionId(),
           anonId: opts.getAnonId?.(),
+          runId: opts.getRunId?.(),
           props: { routeTemplate: path },
         }),
       );
@@ -72,6 +79,7 @@ export function createTracker(opts: {
           eventCategory: 'ui_interaction',
           clientSessionId: opts.getSessionId(),
           anonId: opts.getAnonId?.(),
+          runId: opts.getRunId?.(),
           ui,
           props: {},
         }),

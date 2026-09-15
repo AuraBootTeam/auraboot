@@ -298,7 +298,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
     return (
       <div
         className={cn(
-          'flex h-full flex-col items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-white/90 p-4 text-center shadow-sm',
+          'flex h-full flex-col items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-white/90 dark:border-slate-600 dark:bg-gray-900/90 p-4 text-center shadow-sm',
           className,
         )}
         style={style}
@@ -327,8 +327,8 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           const cardClickable = Boolean(cardDrillDown?.enabled && onDrillDown);
           const cardContent = (
             <>
-              <div className="text-xs font-medium text-slate-500">{resolveCardLabel(card)}</div>
-              <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{resolveCardLabel(card)}</div>
+              <div className="mt-3 text-2xl font-semibold text-slate-950 dark:text-slate-50 tabular-nums">
                 {loading
                   ? '...'
                   : error
@@ -343,7 +343,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </>
           );
           const cardClassName = cn(
-            'h-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition',
+            'h-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition dark:border-gray-700 dark:bg-gray-900',
             cardClickable && 'cursor-pointer hover:border-sky-300 hover:shadow-md',
           );
           return cardClickable ? (
@@ -392,7 +392,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
       <div className="flex h-full flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+            <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 dark:text-slate-400 uppercase">
               {cardLabel}
             </span>
             <span
@@ -419,23 +419,23 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : isEmpty ? (
             <div className="space-y-3">
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem]">
+              <div className="text-4xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 tabular-nums md:text-[2.65rem]">
                 {prefix || ''}0{suffix || ''}
               </div>
               <div className="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
                 Waiting for first record
               </div>
-              <div className="text-xs leading-5 text-slate-500">
+              <div className="text-xs leading-5 text-slate-500 dark:text-slate-400">
                 This KPI is ready. It will update automatically once matching business data is
                 created.
               </div>
             </div>
           ) : (
             <>
-              <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem]">
+              <div className="text-4xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 tabular-nums md:text-[2.65rem]">
                 {formattedValue}
               </div>
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ backgroundColor: color }}
@@ -448,7 +448,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
         </div>
 
         {trend?.enabled && (
-          <div className="mt-4 inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500">
+          <div className="mt-4 inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-slate-400 dark:text-slate-400">
             {trend.compareType === 'lastDay' && 'vs yesterday'}
             {trend.compareType === 'lastWeek' && 'vs last week'}
             {trend.compareType === 'lastMonth' && 'vs last month'}

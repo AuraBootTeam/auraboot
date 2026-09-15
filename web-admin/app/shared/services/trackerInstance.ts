@@ -4,6 +4,17 @@ import { post } from '~/shared/services/http-client';
 const CLIENT_SESSION_KEY = 'aura.client_session_id';
 
 /**
+ * Run-scoped isolation identity (ab_behavior_event.run_id). Hosts/tests set this
+ * sessionStorage key so one execution's events can be asserted and cleaned up
+ * without touching shared data (AMOS cockpit gap G10).
+ */
+const BEHAVIOR_RUN_ID_KEY = 'aura.behavior_run_id';
+
+export function getBehaviorRunId(): string | undefined {
+  return sessionStorage.getItem(BEHAVIOR_RUN_ID_KEY) ?? undefined;
+}
+
+/**
  * Returns a stable browser-tab-scoped session id stored in sessionStorage.
  * Generates a new one (via crypto.randomUUID or generateEventId fallback) if
  * none is present yet.
@@ -30,6 +41,7 @@ export function getTracker(): Tracker {
     instance = createTracker({
       post: (url, body, opts) => post(url, body, { keepalive: opts.keepalive }),
       getSessionId: getClientSessionId,
+      getRunId: getBehaviorRunId,
     });
   }
   return instance;

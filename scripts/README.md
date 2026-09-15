@@ -118,6 +118,7 @@
 | `application/application-cli.mjs` | 1 | 2026-09-12 | Validate application manifests, resolve immutable locks, and verify staged artifact checksums. |
 | `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
 | `application/audit-core-only-schema.sh` | 1 | 2026-09-12 | Fail closed when a migrated core-only database contains BPM/CRM tables or persisted product literals. |
+| `application/create-release-screenshot-manifest.mjs` | 2 | 2026-09-13 | Build the immutable release screenshot manifest: stable IDs, image facts, and SHA-256 checksums for every captured screenshot. |
 | `application/migration-ownership.mjs` | 1 | 2026-09-12 | Split legacy core migrations into deterministic core, CRM, and BPM ownership sets without Flyway version collisions. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |

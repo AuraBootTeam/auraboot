@@ -122,6 +122,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (request.getPolicy() != null) {
             entity.setPolicy(request.getPolicy());
         }
+        validateRowScopeContract(entity);
         entity.setStatus(request.getStatus() != null
                 ? NamedQueryStatus.fromString(request.getStatus()).name().toLowerCase(Locale.ROOT)
                 : StatusConstants.DRAFT);
@@ -222,6 +223,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (request.getPolicy() != null) {
             entity.setPolicy(request.getPolicy());
         }
+        validateRowScopeContract(entity);
 
         entity.setUpdatedAt(Instant.now());
         namedQueryMapper.updateById(entity);
@@ -1264,6 +1266,31 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             log.error("Connector query failed: connectorPid={}, endpoint={}, error={}",
                     query.getConnectorPid(), query.getConnectorEndpointCode(), e.getMessage());
             throw new MetaServiceException("Connector query failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Save-time half of the row-scope contract: a query declaring
+     * {@code policy.rowScope = require_row_filter} must carry resource_code and
+     * action_code, otherwise every execution would fail closed with no rows
+     * scoping possible. Unknown scope values are rejected outright.
+     */
+    private void validateRowScopeContract(NamedQuery entity) {
+        NamedQueryPolicy policy = entity.getPolicy();
+        if (policy == null || policy.getRowScope() == null || policy.getRowScope().isBlank()) {
+            return;
+        }
+        String scope = policy.getRowScope();
+        if (!NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(scope)
+                && !NamedQueryPolicy.ROW_SCOPE_TENANT.equals(scope)) {
+            throw new MetaServiceException("Unknown named query policy.rowScope: " + scope);
+        }
+        if (NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(scope)
+                && (trimToNull(entity.getResourceCode()) == null
+                        || trimToNull(entity.getActionCode()) == null)) {
+            throw new MetaServiceException(
+                    "named query policy.rowScope=require_row_filter requires resourceCode and actionCode: "
+                            + entity.getCode());
         }
     }
 
