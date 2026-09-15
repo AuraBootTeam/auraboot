@@ -4,6 +4,8 @@ import com.auraboot.framework.application.security.AdminRoleInterceptor;
 import com.auraboot.framework.authoring.workspace.AuthoringBusinessWriteInterceptor;
 import com.auraboot.framework.environment.web.EnvironmentResolverInterceptor;
 import com.auraboot.framework.permission.interceptor.PermissionInterceptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -21,6 +23,8 @@ import java.util.Map;
 /** Runtime request mapping owned by dynamically activated application modules. */
 @Component
 public final class PluginRequestMappingHandlerMapping extends RequestMappingHandlerMapping {
+
+    private static final Logger log = LoggerFactory.getLogger(PluginRequestMappingHandlerMapping.class);
 
     private static final String[] API_PATHS = {"/api/**"};
     private static final String[] PUBLIC_API_PATHS = {
@@ -55,12 +59,48 @@ public final class PluginRequestMappingHandlerMapping extends RequestMappingHand
         Method[] methods = controllerType.getMethods();
         for (Method method : methods) {
             RequestMappingInfo mapping = getMappingForMethod(method, controllerType);
-            if (mapping != null) {
-                registerMapping(mapping, controller, method);
-                mappings.add(mapping);
+            if (mapping == null) {
+                continue;
             }
+            // Composition policy: the host owns canonical routes. When a plugin
+            // facet re-declares a path the host already maps (e.g. the BPM
+            // application's standalone-only mobile endpoints under an enterprise
+            // host), the plugin method is skipped with a warning instead of
+            // failing the whole module registration. Plugin-vs-plugin duplicates
+            // still fail closed through registerMapping's ambiguity check.
+            if (isHostOwned(mapping)) {
+                log.warn("Plugin controller {} duplicates host mapping(s) {} — host wins, skipping",
+                        controllerType.getName(), mapping.getDirectPaths());
+                continue;
+            }
+            registerMapping(mapping, controller, method);
+            mappings.add(mapping);
         }
         registrations.put(controller, List.copyOf(mappings));
+    }
+
+    /** True when an identical direct path is already mapped by a non-plugin handler. */
+    private boolean isHostOwned(RequestMappingInfo candidate) {
+        for (RequestMappingInfo existing : getHandlerMethods().keySet()) {
+            if (isPluginRegistered(existing)) {
+                continue;
+            }
+            for (String path : candidate.getDirectPaths()) {
+                if (existing.getDirectPaths().contains(path)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isPluginRegistered(RequestMappingInfo info) {
+        for (List<RequestMappingInfo> owned : registrations.values()) {
+            if (owned.contains(info)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public synchronized void unregisterController(Object controller) {
