@@ -46,7 +46,9 @@ public class NamedQuerySourceModels {
         bare = bare.replace("\"", "");
         // se_ is the SmartEngine table prefix configured via
         // aura.persistence.tenant-bypass-table-prefixes on standalone applications.
-        return bare.startsWith("se_");
+        // se_* = SmartEngine tables; ab_bpm_* = BPM product tables. Both live under
+        // the tenant-bypass prefixes on standalone applications.
+        return bare.startsWith("se_") || bare.startsWith("ab_bpm_");
     }
 
     record Sources(Map<String, String> models, Map<String, String> views) {
