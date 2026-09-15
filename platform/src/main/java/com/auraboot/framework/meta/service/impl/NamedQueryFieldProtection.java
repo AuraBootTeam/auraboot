@@ -52,7 +52,8 @@ public class NamedQueryFieldProtection {
         for (String model : new TreeSet<>(sourceModels.values())) {
             // Platform reference sources carry no model-level permission or scope; see
             // NamedQuerySourceModels.PLATFORM_REFERENCE_SOURCES.
-            if (model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)) continue;
+            if (model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)
+                    || model.startsWith(com.auraboot.framework.meta.service.impl.NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) continue;
             if (memberId == null || !permissionEvaluator.canAction(memberId, model, "read")) {
                 throw new AccessDeniedException("Access denied for named query source: " + model);
             }
@@ -71,6 +72,11 @@ public class NamedQueryFieldProtection {
                 // Global reference table joined by unique pid against a tenant-scoped anchor:
                 // no tenant column to filter and no model policies to apply.
                 scope = "true";
+            } else if (source.getValue().startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) {
+                // Engine tables (se_*) keep their own tenant_id column (varchar in the BPM
+                // store). Filter on the text form so the literal cannot collide with a
+                // bigint-typed sibling column in another source.
+                scope = "tenant_id::text = '" + MetaContext.getCurrentTenantId() + "'";
             } else {
                 scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
                     String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
