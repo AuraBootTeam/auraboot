@@ -189,6 +189,12 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
     return renderSettingsCard();
   }
 
+  // Block-level readOnly: a detail-section/form block may declare itself
+  // read-only as a whole (e.g. system-generated content that is never
+  // hand-edited). Every field renders through FieldRenderer with readOnly
+  // forced on so inputs cannot masquerade as editable.
+  const isBlockReadOnly = Boolean((block as any).readOnly);
+
   return (
     <div className="form-section mb-6">
       {renderTitle()}
@@ -207,7 +213,10 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
                 gridRow: rowSpan > 1 ? `span ${rowSpan}` : undefined,
               }}
             >
-              <FieldRenderer field={field} runtime={runtime} />
+              <FieldRenderer
+                field={isBlockReadOnly ? { ...field, readOnly: true } : field}
+                runtime={runtime}
+              />
             </div>
           );
         })}
