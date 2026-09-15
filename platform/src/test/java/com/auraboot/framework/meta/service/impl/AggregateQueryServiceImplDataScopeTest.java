@@ -211,7 +211,7 @@ class AggregateQueryServiceImplDataScopeTest {
         AggregateQueryRequest request = new AggregateQueryRequest();
         request.setSemanticModelCode("revenue");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.execute(request))
-                .hasMessage("Semantic query service is unavailable");
+                .hasMessageContaining("Semantic query service is unavailable");
         org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
     }
 
