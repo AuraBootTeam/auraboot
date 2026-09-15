@@ -81,7 +81,7 @@ public final class PluginRequestMappingHandlerMapping extends RequestMappingHand
 
     /** True when an identical direct path is already mapped by a non-plugin handler. */
     private boolean isHostOwned(RequestMappingInfo candidate) {
-        for (RequestMappingInfo existing : getMappingRegistry().getMappings().keySet()) {
+        for (RequestMappingInfo existing : getHandlerMethods().keySet()) {
             if (isPluginRegistered(existing)) {
                 continue;
             }
