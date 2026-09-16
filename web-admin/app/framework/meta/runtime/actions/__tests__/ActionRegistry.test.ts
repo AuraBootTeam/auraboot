@@ -7,7 +7,7 @@ import { createExpressionContext } from '~/framework/meta/runtime/expression/con
 
 describe('ActionRegistry command failure feedback', () => {
   it('carries the current page language through a flow to its command handler', async () => {
-    const context = createExpressionContext({global:{locale:'zh-CN'}});
+    const context = createExpressionContext({global:{locale:'zh-CN',theme:'light'}});
     const fetchResult = vi.fn().mockResolvedValue({code:'35000',message:'Bad parameter',
       context:{detail:'Record not found: SECRET-PID in model: internal_model'}});
     const flow = new FlowRunner({

@@ -91,6 +91,7 @@ const quoteOpsCurrentSpecNames = [
   // array made the quoteops project silently select none of them.
   'bom-format-review-ui',
   'bom-workbench-lines',
+  'bom-workbench-line-detail-golden',
   'quote-actions',
   'quote-bom-badfile-permissions',
   'quote-bom-convert-export',
@@ -207,7 +208,7 @@ export default defineConfig({
   timeout: process.env.E2E_COVERAGE === '1' ? 60000 : 15000,
 
   // Reporter configuration
-  reporter: process.env.CI
+  reporter: process.env.CI || process.env.PW_RESULTS_JSON
     ? [
         ['list'],
         ['html', { open: 'never', outputFolder: reportDir }],

@@ -2206,8 +2206,9 @@ export async function seedFixedCountQuote(page: Page): Promise<CreatedRows> {
 
 
 /** Drive the product list search, never the shell command palette. */
-export async function searchBusinessList(page: Page, listPath: string, keyword: string): Promise<number> {
-  const modelCode = listPath.split('/').filter(Boolean).pop();
+export async function searchBusinessList(page: Page, listPath: string, keyword: string, sourceModelCode?: string): Promise<number> {
+  // DSL page keys may be aliases; callers must declare the actual source model.
+  const modelCode = sourceModelCode ?? listPath.split('/').filter(Boolean).pop();
   const isListResponse = (response: import('@playwright/test').Response) =>
     response.url().includes(`/api/dynamic/${modelCode}/list`) && response.request().method() === 'GET';
   const initial = page.waitForResponse(isListResponse);

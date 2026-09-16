@@ -35,6 +35,7 @@ const users: Record<string, QuoteRoleUser> = {};
 let taskId = '';
 let taskNo = '';
 let customerName = '';
+let customerId = '';
 let created: BomWorkbenchSeed | undefined;
 
 async function listLines(page: Page): Promise<any[]> {
@@ -84,7 +85,11 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       taskId = created.taskId;
       const task = await readDynamicRecord(adminPage, 'bom_conversion_task_pcba', taskId);
       taskNo = String(task?.bom_task_no || '');
-      customerName = `WBLD Cust ${uid}`;
+      customerId = String(task?.bom_task_customer_id || '');
+      expect(customerId, 'fixture task has a customer').toBeTruthy();
+      const customer = await readDynamicRecord(adminPage, 'crm_account_common', customerId);
+      customerName = String(customer?.crm_acc_name || '');
+      expect(customerName, 'fixture customer has a searchable name').toBeTruthy();
     } finally {
       await adminContext.close();
     }
@@ -112,7 +117,7 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
 
       // 后台集合：该客户名下的任务（含本任务）与 UI 集合一致
       const apiTasks = await queryDynamicRecords(adminPage, 'bom_conversion_task_pcba', [
-        { fieldName: 'bom_task_customer_id', operator: 'EQ', value: created!.projectId },
+        { fieldName: 'bom_task_customer_id', operator: 'EQ', value: customerId },
       ]);
       expect(
         apiTasks.some((t) => String(t.bom_task_no) === taskNo),
@@ -120,7 +125,7 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       ).toBe(true);
 
       // 客户筛选：列表按客户名过滤后仅见该客户的任务行
-      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, customerName);
+      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, customerName, 'bom_conversion_task_pcba');
       const bodyText = await adminPage.locator('main').innerText();
       expect(bodyText, 'filtered workbench list still shows the seeded task').toContain(taskNo.slice(0, 12));
       expect(filteredCount, 'filtered list returns at least the seeded task row').toBeGreaterThan(0);
@@ -132,7 +137,9 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       expect(restored, 'clearing the filter restores the unfiltered first page').toBeGreaterThanOrEqual(
         filteredCount,
       );
-      await adminPage.screenshot({ path: 'test-results/b1301-filter-restore.png', fullPage: true });
+      await test.info().attach('B13-01-filter-restore', {
+        body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
     } finally {
       await adminContext.close();
     }
@@ -152,6 +159,10 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       await clickRowActionByLocator(page, workbenchRow, 'open_workbench', '打开');
       await waitForDynamicPageLoad(page, 20_000);
       await expect(page).toHaveURL(new RegExp(`${WORKBENCH}/view/${taskId}$`));
+      // The shared helper can observe the preceding list during SPA navigation.
+      // Wait for this detail route's actual business content before inspecting it.
+      await expect(page.getByRole('columnheader', { name: /物料名称|Material Name/i }).first())
+        .toBeVisible({ timeout: 20_000 });
 
       // B09-04: 行表表头（行号/物料名称/位号）可见；有效行计数与后台 active 行数一致
       const lines = await listLines(page);
@@ -173,8 +184,11 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       );
 
       // B09-04: 首行位号/数量与后台记录一致（行级文本包含，不依赖具体列序）
-      const firstBackend = active[0];
-      const firstLine = standardLineTable.getByRole('row').nth(1);
+      // API ordering and table ordering differ; compare the same persisted PID.
+      const firstBackend = active.find(line => String(line.pid) === created!.standardLineId);
+      expect(firstBackend, 'the controlled standard line exists in the active API set').toBeDefined();
+      expect(String(firstBackend.bom_std_refdes || ''), 'reference designators are non-empty').not.toBe('');
+      const firstLine = standardLineTable.getByTestId(`table-row-${created!.standardLineId}`);
       await expect(firstLine).toBeVisible();
       await expect(firstLine, '首行位号与后台一致').toContainText(
         String(firstBackend.bom_std_refdes ?? '').split(',')[0] ?? '',
@@ -190,11 +204,9 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       await expect(
         page.getByRole('heading', { name: /候选物料|Candidate Materials/i }),
       ).toBeVisible();
-      const drawerText = await page
-        .locator('[data-testid^="review-drawer"], [role="dialog"]')
-        .first()
-        .innerText()
-        .catch(() => page.locator('main').innerText());
+      const drawer = page.getByTestId('review-drawer');
+      await expect(drawer).toBeVisible();
+      const drawerText = await drawer.innerText();
       expect(drawerText, '浮层明细包含该行位号').toContain(
         String(firstBackend.bom_std_refdes ?? '').split(',')[0] ?? '',
       );
@@ -209,6 +221,14 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       await expect(exportHistory.locator('summary')).toContainText(
         /决策历史与导出影响|导出影响与历史|Decision History.*Export|Export.*History/i,
       );
+      await exportHistory.locator('summary').click();
+      const revision = await readDynamicRecord(page, 'bom_export_revision', created!.exportRevisionId);
+      expect(revision.bom_er_filename, 'controlled export revision has a filename').toBeTruthy();
+      await expect(exportHistory).toContainText(String(revision.bom_er_filename));
+      await expect(page.getByTestId(`review-drawer-candidate-${created!.primaryEvidenceId}`))
+        .toContainText(created!.candidateCode);
+      await expect(page.getByTestId(`review-drawer-candidate-${created!.secondaryEvidenceId}`))
+        .toContainText(created!.secondaryCandidateCode);
       await test.info().attach('line-detail-golden', {
         body: await page.screenshot({ fullPage: true }),
         contentType: 'image/png',

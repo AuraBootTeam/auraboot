@@ -785,6 +785,7 @@ test('E15 upload UI isolates exactly three unsafe rows and completes fourteen wi
   await info.attach('e15-isolation-persistence', { body: JSON.stringify({ sourceSha256, task, rows, isolated, matches }), contentType: 'application/json' });
   const editedLine=rows.find(r=>!isolatedIds.has(r.pid))!;
   expect(editedLine).toBeTruthy();
+  if (typeof editedLine.pid !== 'string' || !editedLine.pid) throw new Error('Edited standard line must have a persisted PID');
   const changedQty=Number(editedLine.bom_std_qty)+1;
   expect(Number.isFinite(changedQty)).toBe(true);
   await executeCommand(page,'bom:update_standard_item',{pid:editedLine.pid,bom_std_qty:changedQty},editedLine.pid,'update');
