@@ -95,7 +95,7 @@ export const sessionStorage = createCookieSessionStorage({
 });
 
 /** Renew once the access token has at most this much time left. */
-const RENEW_BEFORE_MS = 12 * 60 * 60 * 1000;
+const RENEW_BEFORE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Reads the `exp` claim from a JWT payload without verifying the signature.
@@ -131,22 +131,20 @@ export async function createUserSession({
   remember: boolean;
   redirectTo: string;
 }) {
+  return redirect(redirectTo, {
+    headers: { 'Set-Cookie': await commitUserSession(request, token, remember) },
+  });
+}
+
+export async function commitUserSession(request: Request, token: string, remember: boolean) {
   const session = await getSessionFromRequest(request);
   session.set(JWT_TOKEN_KEY, token);
-  const tokenExp = readJwtExp(token);
-  if (tokenExp != null) {
-    session.set(TOKEN_EXPIRY_KEY, String(tokenExp));
-  }
+  const exp = readJwtExp(token);
+  if (exp == null) throw new Error('Authentication response has no token expiry');
+  session.set(TOKEN_EXPIRY_KEY, String(exp));
   session.set(REMEMBER_KEY, remember ? '1' : '0');
-
-  return redirect(redirectTo, {
-    headers: {
-      'Set-Cookie': await sessionStorage.commitSession(session, {
-        maxAge: remember
-          ? 60 * 60 * 24 * 7 // 7 days
-          : undefined,
-      }),
-    },
+  return sessionStorage.commitSession(session, {
+    maxAge: remember ? Math.max(0, exp - Math.floor(Date.now() / 1000)) : undefined,
   });
 }
 
@@ -157,7 +155,7 @@ export interface SessionRenewalResult {
 
 /**
  * Whether a session is close enough to its token deadline that a renewal should
- * be attempted. Pure and unit-tested; the default threshold is 12 hours.
+ * be attempted. Pure and unit-tested; the default threshold is 24 hours.
  */
 export function shouldAttemptRenewal(
   expiryEpochSeconds: number | null,
@@ -166,7 +164,7 @@ export function shouldAttemptRenewal(
 ): boolean {
   if (expiryEpochSeconds == null || !Number.isFinite(expiryEpochSeconds)) return false;
   const expiryMs = expiryEpochSeconds * 1000;
-  return expiryMs - nowMs <= thresholdMs;
+  return expiryMs > nowMs && expiryMs - nowMs <= thresholdMs;
 }
 
 /**
@@ -185,7 +183,7 @@ export async function maybeRenewSession(request: Request): Promise<SessionRenewa
   if (!token) return { renewed: false };
 
   const expiryRaw = session.get(TOKEN_EXPIRY_KEY);
-  const expiry = expiryRaw == null ? null : Number(expiryRaw);
+  const expiry = expiryRaw == null ? readJwtExp(token) : Number(expiryRaw);
   if (!shouldAttemptRenewal(expiry, Date.now(), RENEW_BEFORE_MS)) {
     return { renewed: false };
   }
@@ -209,7 +207,7 @@ export async function maybeRenewSession(request: Request): Promise<SessionRenewa
   }
   const remember = session.get(REMEMBER_KEY) === '1';
   const setCookie = await sessionStorage.commitSession(session, {
-    maxAge: remember ? 60 * 60 * 24 * 7 : undefined,
+    maxAge: remember && renewedExp != null ? Math.max(0, renewedExp - Math.floor(Date.now() / 1000)) : undefined,
   });
   return { renewed: true, setCookie };
 }

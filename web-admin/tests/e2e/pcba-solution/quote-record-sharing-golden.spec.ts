@@ -16,6 +16,18 @@ test('quote sharing release gate: multiple members, role access and revocation t
   for (const user of recipients) viewers.push(await openQuoteRolePage(browser, user));
   const root = `/api/dynamic/qo_quote_common/${quote.quoteId}`;
   const shareParams = `resourceCode=qo_quote_common&recordPid=${quote.quoteId}`;
+  const refreshRevokedViewer = async (index: number) => {
+    const client = viewers[index].page;
+    const recordResponse = client.waitForResponse(response => new URL(response.url()).pathname === root && response.request().method() === 'GET');
+    await client.reload();
+    expect((await recordResponse).status()).toBe(403);
+    const denied = client.getByTestId('ab:detail:qo_quote_common:container');
+    await expect(denied.getByRole('heading', { level: 2 })).toBeVisible();
+    await expect(denied.getByRole('heading', { level: 2 })).toHaveText('无法访问此记录');
+    await expect(denied.locator('p')).toHaveText('当前账号没有访问权限，请联系记录负责人。');
+    await expect(client.getByTestId(`table-row-${quote.lineId}`)).toHaveCount(0);
+    await testInfo.attach(`revoked-viewer-${index}`, { body: await client.screenshot(), contentType: 'image/png' });
+  };
   const probe = async (index: number, allowed: boolean) => {
     const client = viewers[index].page;
     expect((await client.request.get(root)).status()).toBe(allowed ? 200 : 403);
@@ -81,6 +93,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   };
   await revokeAll();
   for(let i=0;i<3;i++) await probe(i,false);
+  await refreshRevokedViewer(0);
   await dialog.getByRole('button',{name:'指定角色',exact:true}).click();
   const options = await page.request.get(`/api/record-share/roles?${shareParams}`);
   expect(options.ok()).toBe(true);
@@ -124,5 +137,6 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await dialog.locator('[data-testid^="record-share-remove-"]').click();
   await expect(dialog.getByTestId('record-share-empty')).toBeVisible();
   await probe(2,false);
+  await refreshRevokedViewer(2);
   for(const viewer of viewers) await viewer.context.close();
 });

@@ -10,6 +10,8 @@ import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
   openQuoteRolePage,
+  readDynamicRecord,
+  writeMiniBoardZip,
   type QuoteRoleUser,
 } from './quote-e2e-helpers';
 
@@ -87,6 +89,8 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
     data: { payload: { bom_project_name: `W2B ${suffix}`, bom_pcba_code: `W2B-${suffix}`, bom_project_remark: 'qo-iso' }, operationType: 'create' },
   });
   const projBody = await proj.json();
+  expect(proj.status()).toBe(200);
+  expect(String(projBody.code)).toBe('0');
   const projId = projBody?.data?.recordPid || projBody?.data?.data?.recordPid || projBody?.data?.recordId;
   expect(projId, `project created for ${code}`).toBeTruthy();
 
@@ -95,21 +99,41 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
     multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
   });
   const upBody = await up.json();
+  expect(up.status()).toBe(200);
+  expect(String(upBody.code)).toBe('0');
   const fileId = upBody?.data?.fileId || upBody?.data?.id;
   expect(fileId, `BOM uploaded for ${code}`).toBeTruthy();
 
   const corrected = JSON.stringify([{ name: 'bom.xlsx', url: `/api/file/download/${fileId}`, size: buf.length, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileId }]);
-  // CreateQuoteHandler enforces the mandatory-materials contract on every write
-  // path (#1777): gerber/cpl slots are required alongside the corrected BOM.
-  // The slots only need id+filename with a valid extension — the parse itself
-  // is offloaded to the background task queue and this spec asserts record
-  // visibility, not parse outcomes.
+  // Use actual uploaded board/coordinate files. This test proves record scope,
+  // not parser geometry or coordinate association; those have separate gates.
   const gerberName = `e2e-gerber-${suffix}.zip`;
   const cplName = `e2e-cpl-${suffix}.csv`;
+  const boardPath = writeMiniBoardZip(test.info().outputPath(gerberName));
+  async function uploadFixture(name: string, mimeType: string, buffer: Buffer): Promise<string> {
+    const response = await page.context().request.post('/api/file/upload', {
+      multipart: { file: { name, mimeType, buffer } },
+    });
+    const body = await response.json();
+    expect(response.status()).toBe(200);
+    expect(String(body.code)).toBe('0');
+    expect(body.data?.fileId).toBeTruthy();
+    return String(body.data.fileId);
+  }
+  const gerberId = await uploadFixture(gerberName, 'application/zip', fs.readFileSync(boardPath));
+  const cplId = await uploadFixture(cplName, 'text/csv', Buffer.from('Designator,Mid X,Mid Y,Layer\nR1,0,0,Top\n'));
   const cr = await page.context().request.post('/api/meta/commands/execute/qo_quote_common:create', {
-    data: { payload: { qo_quote_code: code, qo_quote_customer: `W2B ${suffix}`, qo_quote_project_id: projId, corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx', gerber_source_file_id: gerberName, gerber_source_filename: gerberName, cpl_source_file_id: cplName, cpl_source_filename: cplName }, operationType: 'create' },
+    data: { payload: { qo_quote_code: code, qo_quote_customer: `W2B ${suffix}`, qo_quote_project_id: projId, corrected_bom_file: corrected, corrected_bom_file_id: fileId, corrected_bom_filename: 'bom.xlsx', gerber_source_file_id: gerberId, gerber_source_filename: gerberName, cpl_source_file_id: cplId, cpl_source_filename: cplName }, operationType: 'create' },
   });
   expect(cr.status(), `quote created for ${code}`).toBe(200);
+  const created = await cr.json();
+  expect(String(created.code)).toBe('0');
+  const result = created.data?.data ?? created.data;
+  const quoteId = String(result?.recordPid ?? result?.recordId ?? result?.quote?.pid ?? '');
+  expect(quoteId, 'scope assertions require the exact newly created quote').toBeTruthy();
+  const saved = await readDynamicRecord(page, 'qo_quote_common', quoteId);
+  expect(saved.qo_quote_code).toBe(code);
+  expect(saved.qo_quote_project_id).toBe(projId);
 }
 
 test.describe('Quote data-scope isolation self/all @smoke', () => {

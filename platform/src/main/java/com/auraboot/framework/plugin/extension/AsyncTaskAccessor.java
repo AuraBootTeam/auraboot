@@ -32,4 +32,9 @@ public interface AsyncTaskAccessor {
      * @return the submitted task code, or {@code null} when submission is unavailable
      */
     String submitCommandTask(String commandCode, String modelCode, String recordPid, Map<String, Object> payload);
+    /** Opt in only when the handler persists idempotent checkpoints for replay. */
+    default String submitResumableCommandTask(String commandCode, String modelCode, String recordPid,
+                                               Map<String, Object> payload) {
+        throw new UnsupportedOperationException("Host does not support resumable command tasks");
+    }
 }

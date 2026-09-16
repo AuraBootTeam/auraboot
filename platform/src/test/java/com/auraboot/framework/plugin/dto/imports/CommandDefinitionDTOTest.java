@@ -23,6 +23,22 @@ class CommandDefinitionDTOTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void currentStatePolicySurvivesDslImportWithItsStateBoundaries() throws Exception {
+        var dto = mapper.readValue("""
+                {"code":"bom:cancel_task","type":"state_transition",
+                 "stateField":"bom_task_status","fromStates":["pending","parsing"],
+                 "toState":"cancelled","executionConfig":{"options":{
+                   "targetVersionPolicy":"current_state"}}}
+                """, CommandDefinitionDTO.class);
+        var config = dto.getConsolidatedExecutionConfig();
+        assertEquals("current_state", ((Map<?, ?>) config.get("options")).get("targetVersionPolicy"));
+        assertEquals("state_transition", config.get("type"));
+        assertEquals(java.util.List.of("pending", "parsing"), config.get("fromStates"));
+        assertEquals("cancelled", config.get("toState"));
+    }
+
+
+    @Test
     void concurrencyFields_parseIntoDeclaredFields_notUnknownFields() throws Exception {
         String json = """
             {

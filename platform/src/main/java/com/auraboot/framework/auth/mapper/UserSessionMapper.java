@@ -28,7 +28,7 @@ public interface UserSessionMapper extends BaseMapper<UserSession> {
                 #{session.deviceInfo}, #{session.ipAddress}, #{session.userAgent},
                 #{session.createdAt}, #{session.lastActiveAt}, #{session.revoked}
             )
-            ON CONFLICT (token_hash) DO NOTHING
+            ON CONFLICT DO NOTHING
             """)
     @Options(useGeneratedKeys = true, keyProperty = "session.id")
     int insertIfAbsent(@Param("session") UserSession session);
@@ -38,6 +38,9 @@ public interface UserSessionMapper extends BaseMapper<UserSession> {
 
     @Select("SELECT * FROM ab_user_session WHERE token_hash = #{tokenHash} AND revoked = false LIMIT 1")
     UserSession findByTokenHash(@Param("tokenHash") String tokenHash);
+
+    @Select("SELECT * FROM ab_user_session WHERE pid = #{pid} LIMIT 1")
+    UserSession findByPid(@Param("pid") String pid);
 
     @Update("UPDATE ab_user_session SET revoked = true, revoked_at = NOW() WHERE id = #{id}")
     int revokeSession(@Param("id") Long id);

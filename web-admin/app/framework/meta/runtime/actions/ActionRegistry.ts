@@ -1,3 +1,4 @@
+import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -1176,7 +1177,7 @@ export function downloadBase64CommandArtifact(value: any): boolean {
  */
 actionRegistry.register(
   'command.execute',
-  async ({ args, fetchResult, token, expressionEvaluator, expressionContext }) => {
+  async ({ args, fetchResult, token, expressionEvaluator, expressionContext, t, locale }) => {
     if (!fetchResult) {
       console.error('[ActionRegistry] command.execute: fetchResult not provided');
       return;
@@ -1241,7 +1242,7 @@ actionRegistry.register(
     });
 
     if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || result.message || `Command ${command} failed`);
+      throw new Error(resolveCommandErrorMessage(result, command, t, locale));
     }
 
     downloadBase64CommandArtifact(result.data);

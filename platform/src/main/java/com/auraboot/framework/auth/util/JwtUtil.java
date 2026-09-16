@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.util;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.dto.SessionTokenContext;
 import io.jsonwebtoken.Claims;
+import com.auraboot.framework.common.util.UlidGenerator;
 import io.jsonwebtoken.Header;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -15,6 +16,7 @@ import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
@@ -52,12 +54,16 @@ public class JwtUtil {
     @Value("${security.jwt.expiration}")
     private Long expiration;
 
+    @Value("${security.session.renew-window-seconds:15552000}")
+    private long sessionLifetimeSeconds = 15552000L;
+
     @Value("${security.jwt.previous-secret:}")
     private String previousSecret;
 
     @Value("${security.jwt.previous-kid:}")
     private String previousKid;
 
+    private Clock clock = Clock.systemUTC();
     private SecretKey currentKey;
     private SecretKey previousKey; // null when not in rotation
 
@@ -76,11 +82,12 @@ public class JwtUtil {
             log.warn("Using default dev JWT secret — DO NOT use in production.");
         }
         validateKeyLength(secret, "security.jwt.secret");
-        if (expiration != null && expiration > MAX_EXPIRATION_SECONDS) {
+        if (expiration == null || expiration <= 0 || expiration > MAX_EXPIRATION_SECONDS) {
             throw new IllegalStateException(
                 String.format("JWT expiration %d seconds exceeds maximum allowed %d seconds (7 days).", expiration, MAX_EXPIRATION_SECONDS));
         }
 
+        if (sessionLifetimeSeconds <= 0) throw new IllegalStateException("Session lifetime must be positive");
         currentKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
 
         if (previousSecret != null && !previousSecret.isBlank()) {
@@ -162,6 +169,7 @@ public class JwtUtil {
     private Claims extractAllClaims(String token) {
         SecretKey key = resolveSigningKey(token);
         return Jwts.parser()
+                .clock(() -> Date.from(clock.instant()))
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
@@ -252,17 +260,60 @@ public class JwtUtil {
         });
     }
 
+    public String extractSessionId(String token) {
+        return extractStringClaim(token, "sid");
+    }
+
+    /** Preserve the authenticated login deadline when changing execution context. */
+    public String inheritSessionLifetime(String newToken, String previousToken) {
+        Claims previous = extractAllClaims(previousToken);
+        Map<String, Object> next = new HashMap<>(extractAllClaims(newToken));
+        if (!previous.getSubject().equals(next.get("sub"))) {
+            throw new IllegalArgumentException("Session subject mismatch");
+        }
+        copyLifetime(previous, next);
+        return createToken(next, previous.getSubject());
+    }
+
+    /** Verification rejects expired tokens; renewal never revives one. */
+    public String renewSessionToken(String token, String sessionPid) {
+        Claims previous = extractAllClaims(token);
+        if (!previous.getExpiration().toInstant().isAfter(clock.instant())) throw new IllegalArgumentException("Token expired");
+        if (previous.get("scope") != null) throw new IllegalArgumentException("Scoped tokens cannot renew login sessions");
+        Map<String, Object> claims = new HashMap<>(previous);
+        copyLifetime(previous, claims);
+        claims.put("sid", sessionPid);
+        return createToken(claims, previous.getSubject());
+    }
+
+    private void copyLifetime(Claims previous, Map<String, Object> next) {
+        Object started = previous.get("auth_time");
+        long origin = started == null ? previous.getIssuedAt().toInstant().getEpochSecond()
+                : Long.parseLong(started.toString());
+        Object deadline = previous.get("session_exp");
+        next.put("auth_time", origin);
+        next.put("session_exp", deadline == null ? origin + sessionLifetimeSeconds
+                : Long.parseLong(deadline.toString()));
+    }
+
     private String createToken(Map<String, Object> claims, String subjectByUserPid) {
+        Instant now = clock.instant();
+        claims.putIfAbsent("sid", UlidGenerator.generate());
+        claims.putIfAbsent("auth_time", now.getEpochSecond());
+        claims.putIfAbsent("session_exp", now.plusSeconds(sessionLifetimeSeconds).getEpochSecond());
+        Instant deadline = Instant.ofEpochSecond(Long.parseLong(claims.get("session_exp").toString()));
+        if (!deadline.isAfter(now)) throw new IllegalArgumentException("Absolute session deadline reached");
+        Instant tokenExpiry = now.plusSeconds(expiration);
+        if (tokenExpiry.isAfter(deadline)) tokenExpiry = deadline;
         return Jwts.builder()
                 .header().keyId(kid).and()
                 .claims(claims)
                 .subject(subjectByUserPid)
                 // Unique per issuance so two tokens minted in the same second
-                // still differ — session rotation (renewal) must be able to
-                // invalidate the old token without touching the new one.
+                // still differ while sharing a revocable server-side session.
                 .id(java.util.UUID.randomUUID().toString())
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plusSeconds(expiration)))
+                .issuedAt(Date.from(clock.instant()))
+                .expiration(Date.from(tokenExpiry))
                 .signWith(currentKey)
                 .compact();
     }
@@ -303,7 +354,7 @@ public class JwtUtil {
                 .header().keyId(kid).and()
                 .claims(claims)
                 .subject(subject)
-                .issuedAt(Date.from(Instant.now()))
+                .issuedAt(Date.from(clock.instant()))
                 .expiration(Date.from(Instant.now().plusSeconds(ttlSeconds)))
                 .signWith(currentKey)
                 .compact();

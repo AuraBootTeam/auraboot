@@ -66,6 +66,13 @@ public class AsyncTaskServiceImpl {
         log.info("Async task framework initialized with {} executor(s)", executorRegistry.size());
     }
 
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000, initialDelay = 30000)
+    public void recoverResumablePendingTasks() {
+        for (AsyncTask task : asyncTaskMapper.findResumablePendingTasks(100)) {
+            self.executeTaskAsync(task.getId(), task.getTenantId());
+        }
+    }
+
     // ==================== Public API ====================
 
     /**
@@ -234,10 +241,10 @@ public class AsyncTaskServiceImpl {
             return;
         }
 
-        // Mark as running
+        // Claim once even if after-commit dispatch and recovery race.
+        if (asyncTaskMapper.claimPending(task.getId(), tenantId, Instant.now()) != 1) return;
         task.setStatus(AsyncTask.STATUS_RUNNING);
         task.setStartedAt(Instant.now());
-        asyncTaskMapper.updateById(task);
 
         // Register thread for cancellation support
         runningTaskThreads.put(task.getTaskCode(), Thread.currentThread());

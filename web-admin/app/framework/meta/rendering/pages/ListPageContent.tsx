@@ -1061,8 +1061,11 @@ function ListPageContentInner(props: PageContentProps) {
   const miscBlocksPosition = resolveListMiscBlocksPosition(schema);
 
   // Read initial sorts, keyword, and view from URL search params
-  const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
-  const urlChipFilters = useMemo(() => decodeFilters(searchParams.get('filters')), [searchParams]);
+  // Keyword/pagination updates must not reset a saved view's sorts or filters.
+  const urlSortEncoding = searchParams.get('sort');
+  const urlFilterEncoding = searchParams.get('filters');
+  const urlSorts = useMemo(() => decodeSorts(urlSortEncoding), [urlSortEncoding]);
+  const urlChipFilters = useMemo(() => decodeFilters(urlFilterEncoding), [urlFilterEncoding]);
   const urlKeyword = useMemo(() => searchParams.get('keyword') || '', [searchParams]);
   const urlViewPid = useMemo(() => searchParams.get('view') || null, [searchParams]);
   // Active preset view (?preset=created_today) — persists across reload.
@@ -1329,7 +1332,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
-    const currentUrlEncoding = searchParams.get('filters');
+    const currentUrlEncoding = urlFilterEncoding;
     const syncAction = resolveUrlStateSyncAction(
       pendingChipFilterUrlSyncRef.current,
       currentUrlEncoding,
@@ -1340,11 +1343,11 @@ function ListPageContentInner(props: PageContentProps) {
       return;
     }
     setChipFilters((prev) => (areFiltersEqual(prev, urlChipFilters) ? prev : urlChipFilters));
-  }, [searchParams, urlChipFilters]);
+  }, [urlFilterEncoding, urlChipFilters]);
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
-    const currentUrlEncoding = searchParams.get('sort');
+    const currentUrlEncoding = urlSortEncoding;
     const syncAction = resolveUrlStateSyncAction(pendingSortUrlSyncRef.current, currentUrlEncoding);
     if (syncAction === 'wait-for-local') return;
     if (syncAction === 'ack-local') {
@@ -1352,7 +1355,7 @@ function ListPageContentInner(props: PageContentProps) {
       return;
     }
     setActiveSorts((prev) => (areSortsEqual(prev, urlSorts) ? prev : urlSorts));
-  }, [searchParams, urlSorts]);
+  }, [urlSortEncoding, urlSorts]);
 
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {

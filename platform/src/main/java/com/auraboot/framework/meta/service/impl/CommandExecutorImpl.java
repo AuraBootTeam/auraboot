@@ -210,6 +210,7 @@ public class CommandExecutorImpl implements CommandExecutor {
 
             if (e instanceof BusinessException || e instanceof ValidationException
                     || e instanceof com.auraboot.framework.exception.ConflictException
+                    || e instanceof org.springframework.dao.DataAccessException
                     || e instanceof AccessDeniedException) {
                 throw e;
             }

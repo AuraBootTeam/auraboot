@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useEffect } from 'react';
+import { startActiveSessionRenewal } from '~/shared/services/active-session';
 import { useLoaderData } from 'react-router';
 import type { User, UserPermissions, Preferences } from '~/utils/type';
 
@@ -66,6 +67,13 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // SSR-safe: get initial data from loader
   const data = useLoaderData() as AuthLoaderData | undefined;
+
+  useEffect(() => {
+    if (!data?.user) return;
+    return startActiveSessionRenewal(window, document, () => fetch('/api/auth/session-renew', {
+      method: 'POST', credentials: 'same-origin',
+    }));
+  }, [Boolean(data?.user)]);
 
   // Permission check functions
   // Supports two formats:

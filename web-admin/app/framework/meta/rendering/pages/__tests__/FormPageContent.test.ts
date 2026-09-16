@@ -339,6 +339,15 @@ describe('datetime form values', () => {
 });
 
 describe('resolveAsyncCommandDispatch', () => {
+  it('lets a configured detail page poll an admitted task, but waits for incomplete acknowledgements', () => {
+    const admitted = { data: { async: true, queued: true, taskCode: 'A1', taskId: 'B1' } };
+    expect(resolveAsyncCommandDispatch(admitted, 'redirect')).toBeNull();
+    expect(resolveAsyncCommandDispatch(admitted)).toEqual({ taskCode: 'A1' });
+    expect(resolveAsyncCommandDispatch({ data: { ...admitted.data, taskId: '' } }, 'redirect'))
+      .toEqual({ taskCode: 'A1' });
+    expect(resolveAsyncCommandDispatch({ data: { ...admitted.data, queued: false } }, 'redirect'))
+      .toEqual({ taskCode: 'A1' });
+  });
   it('detects command-engine async dispatch payloads nested under data', () => {
     expect(
       resolveAsyncCommandDispatch({

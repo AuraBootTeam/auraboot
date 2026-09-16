@@ -84,6 +84,7 @@ const quoteOpsCurrentSpecNames = [
   // heavily guarded; this one had no UI coverage at all until now.
   'bom-import-gateway-manual-path',
   'bom-material-library-golden',
+  'bom-rule-center-crud',
   // Current breadth/depth suites. These cover bad input, required-empty forms,
   // self/all data scopes, BOM review/export, quote actions, dropdowns, org
   // administration, and parsed Excel artifacts. Keeping them outside this

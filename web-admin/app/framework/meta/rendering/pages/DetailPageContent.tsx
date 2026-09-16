@@ -96,6 +96,10 @@ interface DetailListResult {
   records?: RecordData[];
 }
 
+export function isDetailRecordAccessDenied(result: { httpStatus?: unknown; code?: unknown }): boolean {
+  return Number(result.httpStatus ?? result.code) === 403;
+}
+
 export function resolveDetailReturnTarget(search: string): string | null {
   const routeContext = decodeRouteContextFromSearch(search);
   const returnTo = String(routeContext?.returnTo || '').trim();
@@ -794,6 +798,7 @@ function DetailPageContentInner(props: PageContentProps) {
   const [rawData, setRawData] = useState<any>(null);
   const [recordLoading, setRecordLoading] = useState(true);
   const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordAccessDenied, setRecordAccessDenied] = useState(false);
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   const hasApiSingletonRecordSource = Boolean(
@@ -859,9 +864,11 @@ function DetailPageContentInner(props: PageContentProps) {
             setRecordData(unwrappedRecord);
           }
           setRecordError(null);
+          setRecordAccessDenied(false);
         } else {
           setRawData(null);
           setRecordData({});
+          setRecordAccessDenied(isDetailRecordAccessDenied(result));
           setRecordError(
             (result as any)?.desc ||
               (result as any)?.message ||
@@ -872,6 +879,7 @@ function DetailPageContentInner(props: PageContentProps) {
         if (cancelled) return;
         setRawData(null);
         setRecordData({});
+        setRecordAccessDenied(false);
         setRecordError(
           error instanceof Error ? error.message : 'The requested record could not be loaded.',
         );
@@ -1256,9 +1264,13 @@ function DetailPageContentInner(props: PageContentProps) {
         <div className="rounded-card bg-panel p-8 shadow-sm">
           <div className="mx-auto grid max-w-lg gap-3 text-center">
             <h2 className="text-text text-lg font-semibold">
-              {resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
+              {recordAccessDenied
+                ? getLocalizedText({ 'zh-CN': '无法访问此记录', en: 'Cannot access this record' }, locale, t)
+                : resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
             </h2>
-            <p className="text-text-2 text-sm">{recordError}</p>
+            <p className="text-text-2 text-sm">{recordAccessDenied
+              ? getLocalizedText({ 'zh-CN': '当前账号没有访问权限，请联系记录负责人。', en: 'Your account does not have access. Contact the record owner.' }, locale, t)
+              : recordError}</p>
             <Link
               to={`/p/${tableName}`}
               className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"

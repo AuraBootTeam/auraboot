@@ -2540,6 +2540,37 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(flat).not.toHaveTextContent('阶梯价');
   });
 
+  it('distinguishes pending, failed and genuinely empty candidates without showing stale cards', () => {
+    const runtime = makeReviewDrawerRuntime();
+    const manager = runtime.getDataSourceManager();
+    let state: any = { loading: true, error: null };
+    runtime.getDataSourceManager = () => ({ ...manager, getState: () => state });
+    const { rerender } = render(
+      <ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />,
+    );
+    expect(screen.getByTestId('review-drawer-candidates-loading')).toBeVisible();
+    expect(screen.queryByTestId('review-drawer-candidates-empty')).toBeNull();
+    expect(screen.queryByTestId('review-drawer-candidate-ME-1')).toBeNull();
+    state = { loading: false, error: new Error('internal transport detail') };
+    rerender(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+    expect(screen.getByTestId('review-drawer-candidates-error')).toBeVisible();
+    expect(screen.queryByTestId('review-drawer-candidates-empty')).toBeNull();
+    expect(screen.queryByTestId('review-drawer-candidate-ME-1')).toBeNull();
+    expect(screen.queryByText('internal transport detail')).toBeNull();
+    state = { loading: false, error: null };
+    runtime.getDataSourceManager = () => ({
+      ...manager,
+      getState: () => state,
+      getData: (id: string) => (id === 'candidates' ? [] : manager.getData(id)),
+    });
+    rerender(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+    expect(screen.getByTestId('review-drawer-candidates-empty')).toBeVisible();
+    runtime.getDataSourceManager = () => ({ ...manager, getState: () => state });
+    rerender(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+    expect(screen.getByTestId('review-drawer-candidate-ME-1')).toBeVisible();
+    expect(screen.queryByTestId('review-drawer-candidates-empty')).toBeNull();
+  });
+
   it('keeps long BOM refdes titles constrained so drawer actions remain visible', () => {
     const longRefdes = Array.from({ length: 48 }, (_, index) => `C${1000 + index}`).join(',');
     const runtime = makeReviewDrawerRuntime({

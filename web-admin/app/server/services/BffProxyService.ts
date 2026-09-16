@@ -210,7 +210,7 @@ export class BffProxyService {
           contentLength: req.headers['content-length'],
         };
 
-        logger.info(`🚀 API Request Started [${requestId}] [${backendUrl}]`, requestStartDetails);
+        logger.info(requestStartDetails, `🚀 API Request Started [${requestId}] [${backendUrl}]`);
       }
 
       // Check if this is an SSE request using unified detection
@@ -291,13 +291,13 @@ export class BffProxyService {
             500,
             String(response.headers?.['content-type'] ?? ''),
           );
-          logger.info(`✅ API Proxy Success [${requestId}]`, {
-            ...successDetails,
-            responsePreview,
-          });
+          logger.info(
+            { ...successDetails, responsePreview },
+            `✅ API Proxy Success [${requestId}]`,
+          );
         } else {
           // 简洁日志模式
-          logger.info(`✅ API Proxy Success [${requestId}]`, successDetails);
+          logger.info(successDetails, `✅ API Proxy Success [${requestId}]`);
         }
       }
     } catch (error) {
@@ -315,7 +315,7 @@ export class BffProxyService {
         error: errorMessage,
       };
 
-      logger.error(`🚨 API Proxy Error [${requestId}]`, requestDetails);
+      logger.error(requestDetails, `🚨 API Proxy Error [${requestId}]`);
       this.handleProxyError(error, res);
     }
   }
@@ -850,7 +850,8 @@ export class BffProxyService {
         contentType === '' ||
         /(?:json|text|javascript|xml|html|x-www-form-urlencoded)/i.test(contentType);
       if (!isTextual) return `[opaque response: ${buffer.byteLength} bytes]`;
-      preview = buffer.toString('utf8');
+      // Decode only enough bytes for the preview, leaving the forwarded body untouched.
+      preview = buffer.subarray(0, (maxLength + 1) * 4).toString('utf8');
     } else if (typeof data === 'string') {
       preview = data;
     } else if (typeof data === 'object') {
@@ -903,8 +904,7 @@ export class BffProxyService {
       // 记录响应转发日志
       if (!skipLogging) {
         if (this.isVerboseLogging()) {
-          //todo 这里的1000000是一个临时值，需要根据实际情况调整
-          const responsePreview = this.formatResponsePreview(response.data, 1000000, upstreamType);
+          const responsePreview = this.formatResponsePreview(response.data, 500, upstreamType);
           logger.info(
             `Proxy response forwarded - Status: ${response.status}, Response: ${responsePreview}`,
           );

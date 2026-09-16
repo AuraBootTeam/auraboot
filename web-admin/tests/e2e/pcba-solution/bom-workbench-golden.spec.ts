@@ -1,3 +1,4 @@
+import { saveWorkbookDownload } from './workbook-download-evidence';
 import { test, expect } from '../../fixtures';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -222,11 +223,105 @@ async function clickSidebarPage(
 test.describe('BOM standardization workbench golden', () => {
   test.describe.configure({ timeout: 210_000 });
 
+  test('candidate transport wait and failure remain distinct from an empty list and recover on reopen', async ({
+    page,
+  }, testInfo) => {
+    const created = await seedBomWorkbench(page, {
+      candidateCodes: ['D410000000100', 'D41HT00000100'],
+    });
+    const readDecisionState = async () => ({
+      row: await readDynamicRecord(page, 'bom_standard_line_pcba', created.standardLineId),
+      task: await readDynamicRecord(page, 'bom_conversion_task_pcba', created.taskId),
+      decisions: await queryDynamicRecords(page, 'bom_review_decision', [
+        { fieldName: 'bom_rd_task_id', operator: 'EQ', value: created.taskId },
+      ]),
+    });
+    const beforeTransport = await readDecisionState();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pattern = '**/api/dynamic/bom_match_evidence/list**';
+    // Fault injection only at the transport boundary. The recovered candidates
+    // must come from the real seeded backend, not a mocked successful response.
+    await page.route(pattern, async (route) => {
+      await pending;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '503', message: 'Injected upstream unavailable' }),
+      });
+    });
+    try {
+      await page.goto(`/p/bom_conversion_task_pcba_workbench/view/${created.taskId}`);
+      await page.locator('tbody tr').filter({ hasText: 'R1,R2' }).first().click();
+      await expect(page.getByTestId('review-drawer-candidates-loading')).toBeVisible();
+      await expect(page.getByTestId('review-drawer-candidates-empty')).toHaveCount(0);
+      await page.screenshot({ path: testInfo.outputPath('candidate-loading.png') });
+      release();
+      await expect(page.getByTestId('review-drawer-candidates-error')).toBeVisible();
+      await expect(page.getByTestId('review-drawer-candidates-empty')).toHaveCount(0);
+      await expect(
+        page.getByTestId('review-drawer-candidate-action-confirm_candidate'),
+      ).toBeDisabled();
+      const afterFailure = await readDecisionState();
+      expect(afterFailure, 'candidate transport failure must not change decisions or counters').toEqual(beforeTransport);
+      await testInfo.attach('candidate-error-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach('candidate-error-persistence', { body: JSON.stringify({ beforeTransport, afterFailure, injectedStatus: 503 }), contentType: 'application/json' });
+      await page.unrouteAll({ behavior: 'wait' });
+      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/i }).click();
+      await page.locator('tbody tr').filter({ hasText: 'R1,R2' }).first().click();
+      await expect(
+        page.getByTestId(`review-drawer-candidate-${created.primaryEvidenceId}`),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('review-drawer-candidates-error')).toHaveCount(0);
+      const afterRecovery = await readDecisionState();
+      expect(afterRecovery, 'reopening candidates without confirming must not write a decision').toEqual(beforeTransport);
+      await testInfo.attach('candidate-recovery-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach('candidate-recovery-persistence', { body: JSON.stringify({ beforeTransport, afterRecovery, primaryEvidenceId: created.primaryEvidenceId }), contentType: 'application/json' });
+    } finally {
+      release();
+      await page.unrouteAll({ behavior: 'wait' });
+      await cleanupRows(page, created);
+    }
+  });
+
   test('persists D410 confirm and undo, then validates both unconfirmed and confirmed Excel revisions', async ({
     page,
   }, testInfo) => {
     const created: BomWorkbenchSeed = await seedBomWorkbench(page, {
       candidateCodes: ['D410000000100', 'D41HT00000100'],
+    });
+    async function attachDecisionStage(name: string, expectedCode: string) {
+      const row = await readDynamicRecord(page, 'bom_standard_line_pcba', created.standardLineId);
+      const task = await readDynamicRecord(page, 'bom_conversion_task_pcba', created.taskId);
+      const decisions = await queryDynamicRecords(page, 'bom_review_decision', [
+        { fieldName: 'bom_rd_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      const revisions = await queryDynamicRecords(page, 'bom_export_revision', [
+        { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      expect(String(row.bom_std_material_code ?? '')).toBe(expectedCode);
+      await testInfo.attach(`${name}-browser`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach(`${name}-persistence`, { body: JSON.stringify({ taskId: created.taskId, row, task, decisions, revisions }), contentType: 'application/json' });
+    }
+    const candidateRequests: Array<Promise<Record<string, unknown>>> = [];
+    page.on('response', (response) => {
+      if (!response.url().includes('/api/dynamic/bom_match_evidence/list')) return;
+      candidateRequests.push(
+        response
+          .json()
+          .then((body) => ({
+            url: response.url(),
+            status: response.status(),
+            body,
+          }))
+          .catch((error) => ({
+            url: response.url(),
+            status: response.status(),
+            readError: String(error),
+          })),
+      );
     });
     const consoleIssues: string[] = [];
     page.on('console', (message) => {
@@ -386,6 +481,7 @@ test.describe('BOM standardization workbench golden', () => {
       await expect(page.getByTestId('review-drawer-candidate-action-undo_decision')).toBeEnabled({
         timeout: 20_000,
       });
+      await attachDecisionStage('workbench-confirmed', created.candidateCode);
       const undoResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/bom:undo_decision') &&
@@ -446,6 +542,8 @@ test.describe('BOM standardization workbench golden', () => {
         created.standardLineId,
       );
 
+      await attachDecisionStage('workbench-undone', '');
+
       // Close the review drawer before exercising the toolbar-level regenerate action: the
       // floating drawer (fixed z-50) overlays the workbench toolbar and would intercept the
       // click on workbench-action-download_new_bom. Close fully dismisses the drawer (clears the
@@ -480,7 +578,7 @@ test.describe('BOM standardization workbench golden', () => {
       expect(download.suggestedFilename()).toMatch(/standard-bom-.*\.xlsx$/);
       expect(download.suggestedFilename()).toBe(`standard-bom-${created.taskId}.xlsx`);
       const exportPath = path.join(testInfo.outputDir, 'standard-bom-unconfirmed.xlsx');
-      await download.saveAs(exportPath);
+      await saveWorkbookDownload(download, exportPath, testInfo, 'bom-unconfirmed');
       validateStandardBomWorkbook(exportPath, created, 'unconfirmed', unconfirmedExportRow);
 
       await expect
@@ -503,6 +601,8 @@ test.describe('BOM standardization workbench golden', () => {
           exportFileId: String(regenerateData.exportFileId),
           revisionCount: 2,
         });
+
+      await attachDecisionStage('workbench-unconfirmed-export', '');
 
       // Reconfirm the exact D410 candidate after proving that the undo export contained no stale
       // selection. This produces a second independently parsed artifact for the final state.
@@ -589,7 +689,7 @@ test.describe('BOM standardization workbench golden', () => {
       const finalDownload = await finalDownloadPromise;
       expect(finalDownload.suggestedFilename()).toBe(`standard-bom-${created.taskId}.xlsx`);
       const finalExportPath = path.join(testInfo.outputDir, 'standard-bom-confirmed.xlsx');
-      await finalDownload.saveAs(finalExportPath);
+      await saveWorkbookDownload(finalDownload, finalExportPath, testInfo, 'bom-confirmed');
       validateStandardBomWorkbook(finalExportPath, created, 'confirmed', confirmedExportRow);
 
       await expect
@@ -622,10 +722,28 @@ test.describe('BOM standardization workbench golden', () => {
         `standard-bom-${created.taskId}.xlsx`,
       );
 
+      await page.getByTestId('artifact-timeline').scrollIntoViewIfNeeded();
+      await attachDecisionStage('workbench-confirmed-export', created.candidateCode);
+
       await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
       await expect(page.locator('a[href="/p/bom_review_queue"]')).toHaveCount(0);
       await expect(consoleIssues).toEqual([]);
     } finally {
+      await testInfo.attach('candidate-request-evidence', {
+        body: Buffer.from(
+          JSON.stringify(
+            {
+              taskId: created.taskId,
+              standardLineId: created.standardLineId,
+              primaryEvidenceId: created.primaryEvidenceId,
+              requests: await Promise.all(candidateRequests),
+            },
+            null,
+            2,
+          ),
+        ),
+        contentType: 'application/json',
+      });
       await cleanupRows(page, created);
     }
   });

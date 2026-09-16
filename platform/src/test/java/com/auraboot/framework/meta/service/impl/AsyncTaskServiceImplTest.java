@@ -45,6 +45,7 @@ class AsyncTaskServiceImplTest {
     @BeforeEach
     void setUp() {
         asyncTaskMapper = mock(AsyncTaskMapper.class);
+        when(asyncTaskMapper.claimPending(any(), any(), any())).thenReturn(1);
         executor = mock(AsyncTaskExecutor.class);
         when(executor.getTaskType()).thenReturn("command-handler");
 
@@ -76,6 +77,31 @@ class AsyncTaskServiceImplTest {
         req.setTaskType("command-handler");
         req.setTaskName("bom:import_material_library");
         return req;
+    }
+
+    @Test
+    void duplicate_dispatch_cannot_execute_a_task_after_another_worker_claims_it() throws Exception {
+        AsyncTask task = new AsyncTask();
+        task.setId(11L);
+        task.setTenantId(10L);
+        task.setTaskCode("dedupe");
+        task.setTaskType("command-handler");
+        task.setStatus(AsyncTask.STATUS_PENDING);
+        when(asyncTaskMapper.selectById(11L)).thenReturn(task);
+        when(asyncTaskMapper.claimPending(eq(11L), eq(10L), any())).thenReturn(0);
+        service.executeTaskAsync(11L, 10L);
+        verify(executor, org.mockito.Mockito.never()).execute(any(), any());
+        verify(asyncTaskMapper, org.mockito.Mockito.never()).updateById(any(AsyncTask.class));
+    }
+
+    @Test
+    void recovery_dispatches_only_opted_in_pending_tasks_using_persisted_tenant() {
+        AsyncTask task = new AsyncTask();
+        task.setId(11L);
+        task.setTenantId(10L);
+        when(asyncTaskMapper.findResumablePendingTasks(100)).thenReturn(List.of(task));
+        service.recoverResumablePendingTasks();
+        verify(selfProxy).executeTaskAsync(11L, 10L);
     }
 
     @Test

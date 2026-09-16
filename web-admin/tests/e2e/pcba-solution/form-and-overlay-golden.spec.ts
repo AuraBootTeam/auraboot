@@ -9,6 +9,7 @@ import {
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
   seedQuoteForCorrectedBomUpload,
+  seedFixedCountQuote,
   type CreatedRows,
 } from './quote-e2e-helpers';
 
@@ -218,12 +219,12 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
   });
 
   test('loading overlay appears while a slow toolbar command is in flight', async ({ page }) => {
-    const created = await seedQuoteForCorrectedBomUpload(page);
+    const created = await seedFixedCountQuote(page);
 
     try {
       await openQuoteDetailFromList(page, created);
       await page.getByRole('tab', { name: /加工点数|Process/i }).click();
-      await expect(page.getByTestId('toolbar-btn-recompute_process_fee')).toBeVisible({
+      await expect(page.getByTestId('toolbar-btn-count_process')).toBeVisible({
         timeout: 20_000,
       });
 
@@ -244,7 +245,11 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
           response.request().method() === 'POST',
         { timeout: 30_000 },
       );
-      await page.getByTestId('toolbar-btn-recompute_process_fee').click();
+      await page.getByTestId('toolbar-btn-count_process').click();
+      const dialog = page.getByTestId('form-dialog');
+      await expect(dialog).toBeVisible();
+      await dialog.getByTestId('form-dialog-field-count_hole_mode').selectOption('none');
+      await dialog.getByTestId('form-dialog-submit').click();
 
       await expect(page.getByTestId('loading-overlay')).toBeVisible({ timeout: 5_000 });
 
@@ -254,6 +259,16 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
         `compute_process_fee HTTP ${commandResponse.status()}`,
       ).toBe(true);
 
+      const body = await commandResponse.json();
+      expect(String(body.code), JSON.stringify(body)).toBe('0');
+      const receipt = body.data?.data ?? body.data;
+      expect(receipt.taskCode, 'accepted command must return a tracked task').toBeTruthy();
+      await expect.poll(async () => {
+        const taskResponse = await page.request.get(`/api/async-tasks/${receipt.taskCode}`);
+        expect(taskResponse.ok()).toBe(true);
+        const task = (await taskResponse.json()).data;
+        return task.status;
+      }, { timeout: 60_000 }).toBe('completed');
       await expect(page.getByTestId('loading-overlay')).toBeHidden({ timeout: 20_000 });
     } finally {
       await cleanupRows(page, created);

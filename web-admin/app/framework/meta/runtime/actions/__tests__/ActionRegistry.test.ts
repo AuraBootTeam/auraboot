@@ -2,6 +2,42 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
+import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+
+describe('ActionRegistry command failure feedback', () => {
+  it('carries the current page language through a flow to its command handler', async () => {
+    const context = createExpressionContext({global:{locale:'zh-CN'}});
+    const fetchResult = vi.fn().mockResolvedValue({code:'35000',message:'Bad parameter',
+      context:{detail:'Record not found: SECRET-PID in model: internal_model'}});
+    const flow = new FlowRunner({
+      evaluator:{evaluateCondition:()=>true, evaluateObject:(value:unknown)=>value} as any, actionRegistry,
+      stateManager:{getContext:()=>context} as any, scopeId:'feedback-test',
+      dataSourceManager:{} as any, schema:{} as any, getAllFormFields:()=>[],
+    });
+    await expect(flow.run([{action:'command.execute',args:{command:'quote:create_version'}}],
+      {...context,fetchResult} as any)).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
+  });
+  it('preserves the actionable reason from a failed flow command', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '35000', message: 'Bad parameter',
+      context: { detail: 'Plugin handler execution failed: Approval requires a decision note' },
+    });
+    await expect(actionRegistry.execute('command.execute', {
+      fetchResult, args: { command: 'quote:approve' },
+    })).rejects.toThrow('Approval requires a decision note');
+  });
+
+  it('explains unavailable referenced records without exposing internal identifiers', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '35000', message: 'Bad parameter',
+      context: { detail: 'Plugin handler execution failed: Record not found: SECRET-PID in model: internal_model' },
+    });
+    await expect(actionRegistry.execute('command.execute', {
+      fetchResult, locale: 'zh-CN', args: { command: 'quote:create_version' },
+    })).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
+  });
+});
 
 describe('ActionRegistry delete translations', () => {
   it('does not leak unresolved i18n keys into confirmation and success toasts', async () => {

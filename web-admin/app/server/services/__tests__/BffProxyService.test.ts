@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
+import logger from '~/server/utils/logger';
+import pino from 'pino';
 import {
   BffProxyService,
   isLongRunningProxyPath,
@@ -70,6 +72,85 @@ describe('isLongRunningProxyPath', () => {
 });
 
 describe('BffProxyService', () => {
+  it('bounds diagnostic previews without truncating the actual response bytes', () => {
+    vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const { response } = createResponseRecorder();
+    const payload = Buffer.from('x'.repeat(2_000_000));
+    const lines: string[] = [];
+    const sink = pino(
+      {},
+      {
+        write(line: string) {
+          lines.push(line);
+        },
+      },
+    );
+    const spy = vi
+      .spyOn(logger, 'info')
+      .mockImplementation((...args: any[]) => (sink.info as any)(...args));
+    try {
+      (service as any).forwardResponse(
+        { status: 200, headers: { 'content-type': 'application/json' }, data: payload },
+        response,
+        false,
+      );
+      expect(response.body).toEqual(payload);
+      const forwarded = lines
+        .map((line) => JSON.parse(line))
+        .find((row) => row.msg?.startsWith('Proxy response forwarded'));
+      expect(forwarded).toBeDefined();
+      expect(forwarded.msg.length).toBeLessThan(700);
+      expect(forwarded.msg).toContain('...');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('retains timeout request identity and duration in actual structured logger output', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const { response } = createResponseRecorder();
+    const lines: string[] = [];
+    const sink = pino(
+      {},
+      {
+        write(line: string) {
+          lines.push(line);
+        },
+      },
+    );
+    const spy = vi
+      .spyOn(logger, 'error')
+      .mockImplementation((...args: any[]) => (sink.error as any)(...args));
+    vi.mocked(axios).mockRejectedValueOnce(
+      Object.assign(new Error('upstream deadline'), { code: 'ECONNABORTED' }),
+    );
+    try {
+      await service.handleApiRequest(
+        {
+          method: 'GET',
+          url: '/api/dynamic/bom_match_evidence/list',
+          headers: { host: 'localhost', authorization: 'Bearer fixture-token' },
+          connection: {},
+        } as any,
+        response as any,
+      );
+      const failure = lines
+        .map((line) => JSON.parse(line))
+        .find((row) => row.msg?.includes('API Proxy Error'));
+      expect(failure).toMatchObject({
+        method: 'GET',
+        url: '/api/dynamic/bom_match_evidence/list',
+        error: 'upstream deadline',
+      });
+      expect(failure.requestId).toBeTruthy();
+      expect(failure.duration).toMatch(/^\d+ms$/);
+      expect(JSON.stringify(failure)).not.toContain('fixture-token');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();

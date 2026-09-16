@@ -1,3 +1,4 @@
+import { saveWorkbookDownload } from './workbook-download-evidence';
 import fs from 'node:fs';
 import type { Locator } from '@playwright/test';
 import os from 'node:os';
@@ -80,7 +81,7 @@ async function tableTexts(locator: Locator): Promise<string[]> {
  * side effects; there is deliberately no direct batch_source_prices or compute_process_fee call.
  *
  * The workbook is a non-standard customer BOM. Its first data row has a blank package but contains
- * a standalone 0201 token in the description, reproducing the reported process-fee match case.
+ * a standalone 0201 token in the description, covering non-standard material descriptions.
  */
 test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
   test.describe.configure({ timeout: 150_000 });
@@ -91,7 +92,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     created = await seedQuoteForCorrectedBomUpload(page);
   });
 
-  test('uploads non-standard BOM and automatically runs Yunhan pricing + process-fee matching', async ({
+  test('uploads non-standard BOM, automatically prices and leaves unselected board counts uncalculated', async ({
     page,
   }, testInfo) => {
     const mpnSuffix = `-E2E-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -134,10 +135,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await selectReferenceOption(page, 'qo_quote_crm_account_id', accountId!);
     await selectReferenceOption(page, 'qo_quote_project_id', projectId!);
 
-    // Gerber-only caliber: the zip must be a real parseable board so the
-    // auto-parse + auto-recompute chain yields matched detail hits. R1 (SMD,
-    // 3 pads of 0.283mm2 -> 1 point each) covers the resistor line; D1 (THT,
-    // 2 holes of 0.8mm -> 1 point each) covers the diode line.
+    // Real source files are uploaded, but counting requires an explicit drill scope.
     const gerberFixture = writeMiniBoardZip(
       path.join(os.tmpdir(), `nonstd-gerber-${Date.now()}.zip`),
       { pads: 3, holes: 2 },
@@ -343,65 +341,11 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         mockUploadRequestObserved: true,
       });
 
-    // The same UI upload must also have triggered Gerber parse + process-point
-    // recalculation (gerber-only caliber). The fixture attributes 3 paste pads
-    // (0.283mm2 each, first SMT bucket = 1 point) to R1 and 2 drill holes
-    // (0.8mm, first DIP bucket = 1 point) to D1, so the resistor line carries a
-    // matched SMT detail hit and the diode line a matched DIP detail hit. The
-    // exported quote template owns the point-unit-price multiplication.
-    let processHits: Record<string, unknown>[] = [];
-    await expect
-      .poll(
-        async () => {
-          processHits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
-            { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: created.quoteId },
-          ]);
-          const resistorHit = processHits.find((row) => {
-            const lineId = String(row.qo_pfrh_quote_line_id);
-            return (
-              lineId === String(resistorLine?.pid) &&
-              String(row.qo_pfrh_process_stage) === 'SMT'
-            );
-          });
-          return resistorHit
-            ? {
-                status: resistorHit.qo_pfrh_match_status,
-                stage: resistorHit.qo_pfrh_process_stage,
-                basis: resistorHit.qo_pfrh_point_basis,
-                unitPoints: Number(resistorHit.qo_pfrh_unit_points),
-                totalPoints: Number(resistorHit.qo_pfrh_total_points),
-                amount: Number(resistorHit.qo_pfrh_amount),
-              }
-            : null;
-        },
-        { timeout: 30_000, intervals: [500, 1_000, 2_000] },
-      )
-      .toEqual({
-        status: 'matched',
-        stage: 'SMT',
-        basis: 'gerber_histogram',
-        unitPoints: 3,
-        totalPoints: 3,
-        amount: 0,
-      });
-    expect(processHits).toHaveLength(2);
-
-    const resistorHit = processHits.find(
-      (row) => String(row.qo_pfrh_quote_line_id) === String(resistorLine?.pid),
-    );
-    expect(String(resistorHit?.qo_pfrh_point_formula)).toBe('1 × 3 = 3');
-    expect(resistorHit?.qo_pfrh_point_source).toBe('gerber-smt-detail');
-    expect(String(resistorHit?.qo_pfrh_trace)).toContain('BOARD_SCOPE refdes=R1');
-
-    const diodeHit = processHits.find((row) => {
-      const lineId = String(row.qo_pfrh_quote_line_id);
-      return lineId === String(diodeLine?.pid) && String(row.qo_pfrh_process_stage) === 'DIP';
-    });
-    expect(diodeHit, 'diode line must carry the matched DIP detail hit').toBeTruthy();
-    expect(Number(diodeHit?.qo_pfrh_unit_points)).toBe(2);
-    expect(Number(diodeHit?.qo_pfrh_total_points)).toBe(2);
-    expect(String(diodeHit?.qo_pfrh_point_source)).toBe('gerber-dip-detail');
-    expect(String(diodeHit?.qo_pfrh_trace)).toContain('BOARD_SCOPE refdes=D1');
+    // BOM upload must not silently select billable holes or manufacture per-line points.
+    const processHits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
+      { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: created.quoteId },
+    ]);
+    expect(processHits).toHaveLength(0);
 
     await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
     await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({
@@ -439,32 +383,10 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(page.getByTestId('metric-strip-qo_quote_header_summary')).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByTestId('metric-strip-item-total_points')).toContainText('5');
-
-    const resistorHitRow = page
-      .locator('[data-testid^="table-row-"]')
-      .filter({ hasText: 'WMF2400TEE' });
-    await expect(resistorHitRow).toHaveCount(1, { timeout: 20_000 });
-    // Only R1 has Gerber facts; R2/R3 remain unresolved and require review.
-    await expect(resistorHitRow).toContainText(/需人工复核|Manual Review/i);
-    // The separate placement column and grouped facts retain the three real R1 pads.
-    await expect(resistorHitRow).toContainText('(0.283 mm² × 3) × 1 位号');
-
-    // The review drawer is retired; the flat seven-column table carries the facts
-    // (qty/unit points/total points live only in the combined 数量/点数 column).
-    await expect(page.getByTestId('review-drawer')).toHaveCount(0);
-    const processHeaders2 = await tableTexts(
-      resistorHitRow.locator('xpath=ancestor::table[1]').locator('thead th, thead [role="columnheader"]'),
-    );
-    const processCells2 = await tableTexts(resistorHitRow.locator('td, [role="cell"]'));
-    expect(
-      processHeaders2.some((header) => /说明\/处理|Note \/ Action/i.test(header)),
-      '说明/处理 column retired with the v2 tab',
-    ).toBe(false);
-    const pointsColumn2 = processHeaders2.findIndex((header) => /数量\/点数|Qty \/ Points/i.test(header));
-    expect(String(processCells2[pointsColumn2] ?? '')).toMatch(/共 3 点/);
-
-    await testInfo.attach('nonstd-process-fee-0201-match.png', {
+    await expect(page.getByText('尚未按新口径计算', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: '计算／重新计算', exact: true })).toBeVisible();
+    await expect(page.getByText('待人工确认', { exact: true })).toHaveCount(0);
+    await testInfo.attach('nonstd-process-count-unselected.png', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
@@ -488,7 +410,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     ).toBe('0');
     const download = await downloadPromise;
     const quoteWorkbookPath = path.join(testInfo.outputDir, 'nonstd-customer-bom-quote.xlsx');
-    await download.saveAs(quoteWorkbookPath);
+    await saveWorkbookDownload(download, quoteWorkbookPath, testInfo, 'quote-nonstandard');
     validateQuickCustomerBomWorkbook(quoteWorkbookPath, mpnSuffix);
     await testInfo.attach('nonstd-customer-bom-quote.xlsx', {
       path: quoteWorkbookPath,

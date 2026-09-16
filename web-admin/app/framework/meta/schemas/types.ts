@@ -322,7 +322,11 @@ export interface CommandInputFormConfig {
 
 // Action definition — unified button behavior
 export type ActionDef =
-  | ({ type: 'command'; command: string } & CommandInputFormConfig)
+  | ({
+      type: 'command';
+      command: string;
+      download?: { fileIdField: string };
+    } & CommandInputFormConfig)
   | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
   | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
   | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
