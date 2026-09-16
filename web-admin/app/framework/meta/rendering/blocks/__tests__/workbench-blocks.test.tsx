@@ -2540,7 +2540,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(flat).not.toHaveTextContent('阶梯价');
   });
 
-  it('distinguishes pending, failed and genuinely empty candidates without showing stale cards', () => {
+  it('keeps a successful candidate snapshot stable while a polling refresh is pending', () => {
     const runtime = makeReviewDrawerRuntime();
     const manager = runtime.getDataSourceManager();
     let state: any = { loading: true, error: null };
@@ -2551,6 +2551,17 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer-candidates-loading')).toBeVisible();
     expect(screen.queryByTestId('review-drawer-candidates-empty')).toBeNull();
     expect(screen.queryByTestId('review-drawer-candidate-ME-1')).toBeNull();
+
+    state = { loading: true, error: null, data: manager.getData('candidates') };
+    rerender(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+    expect(screen.queryByTestId('review-drawer-candidates-loading')).toBeNull();
+    expect(screen.getByTestId('review-drawer-candidates-refreshing')).toBeVisible();
+    expect(screen.getByTestId('review-drawer-candidate-ME-1')).toBeVisible();
+    expect(screen.getByTestId('review-drawer-candidate-list')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('review-drawer-candidate-list')).toHaveClass(
+      '[scrollbar-gutter:stable]',
+    );
+
     state = { loading: false, error: new Error('internal transport detail') };
     rerender(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
     expect(screen.getByTestId('review-drawer-candidates-error')).toBeVisible();
