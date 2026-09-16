@@ -61,6 +61,7 @@ class RecordShareControllerAuthzTest {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, CALLER_ID, CALLER_PID, "caller");
+        MetaContext.setMemberId(CALLER_ID);
     }
 
     @AfterEach
@@ -80,6 +81,23 @@ class RecordShareControllerAuthzTest {
         verify(recordShareService).shareRecordByPid(TENANT_ID, RESOURCE, RECORD_PID,
                 "role", 23L, "role-pid", "read", null);
         org.mockito.Mockito.verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void rolePickerReturnsStableCodesForPageOwnedBusinessFiltering() {
+        stubBusinessOwner(CALLER_PID);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        role.setPid("role-pid");
+        role.setCode("qo_sales");
+        role.setName("销售");
+        role.setTenantId(TENANT_ID);
+        role.setStatus("ACTIVE");
+        when(roleService.findByTenantId(TENANT_ID)).thenReturn(List.of(role));
+
+        var response = controller.listShareRoles(RESOURCE, RECORD_PID);
+
+        assertThat(response.getData()).containsExactly(
+                new RecordShareController.ShareRoleOption("role-pid", "qo_sales", "销售"));
     }
 
     @Test
@@ -217,6 +235,37 @@ class RecordShareControllerAuthzTest {
 
         assertThat(controller.getManageCapability(RESOURCE, RECORD_PID).getData().canManage())
                 .isFalse();
+    }
+
+    @Test
+    void accessCapabilityReportsOnlyTheCallersExplicitRecordShare() {
+        when(recordShareService.isSharedByPid(
+                TENANT_ID, RESOURCE, RECORD_PID, CALLER_ID, CALLER_PID, "read"))
+                .thenReturn(true);
+        when(recordShareService.isSharedByPid(
+                TENANT_ID, RESOURCE, RECORD_PID, CALLER_ID, CALLER_PID, "update"))
+                .thenReturn(true);
+
+        var capability = controller.getAccessCapability(RESOURCE, RECORD_PID).getData();
+
+        assertThat(capability.canRead()).isTrue();
+        assertThat(capability.canUpdate()).isTrue();
+        verify(recordShareService).isSharedByPid(
+                TENANT_ID, RESOURCE, RECORD_PID, CALLER_ID, CALLER_PID, "read");
+        verify(recordShareService).isSharedByPid(
+                TENANT_ID, RESOURCE, RECORD_PID, CALLER_ID, CALLER_PID, "update");
+        verify(userPermissionService, never()).hasPermission(any(Long.class), any(String.class));
+        verify(dynamicDataService, never()).getById(any(), any());
+    }
+
+    @Test
+    void accessCapabilityDoesNotProjectOwnerOrRolePermissionsIntoARecordShare() {
+        var capability = controller.getAccessCapability(RESOURCE, RECORD_PID).getData();
+
+        assertThat(capability.canRead()).isFalse();
+        assertThat(capability.canUpdate()).isFalse();
+        verify(userPermissionService, never()).hasPermission(any(Long.class), any(String.class));
+        verify(dynamicDataService, never()).getById(any(), any());
     }
 
     @Test

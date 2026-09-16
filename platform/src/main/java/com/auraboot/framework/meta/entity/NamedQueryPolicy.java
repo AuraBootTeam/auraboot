@@ -60,6 +60,9 @@ public class NamedQueryPolicy {
 
         /** Root action to evaluate; defaults to {@code read}. */
         private String actionCode = "read";
+
+        /** Allow an active update-level record share to satisfy this query's surface permission. */
+        private Boolean allowCollaborator = false;
     }
 
     /**

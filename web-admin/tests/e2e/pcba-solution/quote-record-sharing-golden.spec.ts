@@ -26,6 +26,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     await expect(denied.getByRole('heading', { level: 2 })).toHaveText('无法访问此记录');
     await expect(denied.locator('p')).toHaveText('当前账号没有访问权限，请联系记录负责人。');
     await expect(client.getByTestId(`table-row-${quote.lineId}`)).toHaveCount(0);
+    await client.screenshot({path:testInfo.outputPath(`quote-revoked-viewer-${index}.png`), fullPage:true});
     await testInfo.attach(`revoked-viewer-${index}`, { body: await client.screenshot(), contentType: 'image/png' });
   };
   const probe = async (index: number, allowed: boolean) => {
@@ -35,10 +36,8 @@ test('quote sharing release gate: multiple members, role access and revocation t
       const response = await client.request.post(`/api/meta/named-queries/${query}/execute`, {
         data: { parameters: { quoteId: quote.quoteId } },
       });
-      // Record sharing does not grant the process-fee capability missing from sales roles.
-      const canReadQuery = allowed && (query !== 'qo_quote_process_fee_unassigned_facts'
-        || recipients[index].roleCodes.includes('qo_procurement'));
-      expect(response.status()).toBe(canReadQuery ? 200 : 403);
+      // Quote collaboration grants every quote tab for this exact shared root only.
+      expect(response.status()).toBe(allowed ? 200 : 403);
     }
     const capability = await client.request.get(`/api/record-share/manage-capability?${shareParams}`);
     expect(capability.status()).toBe(allowed ? 200 : 403);
@@ -64,12 +63,18 @@ test('quote sharing release gate: multiple members, role access and revocation t
   expect(memberPayload.recordPid).toBe(quote.quoteId);
   expect(memberPayload.subjectType).toBe('member');
   expect(memberPayload.subjectPids).toHaveLength(2);
-  expect(memberPayload.permissionMask).toBe('read');
+  expect(memberPayload.permissionMask).toBe('read,update');
   await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(2);
+  await page.screenshot({path:testInfo.outputPath('quote-member-sharing.png'), fullPage:true});
   for(let i=0;i<2;i++) await probe(i,true);
   await probe(2,false);
+  await viewers[0].page.goto('/p/qo_quote_common');
+  await expect(viewers[0].page.getByText(quote.quoteCode, {exact:false}).first()).toBeVisible();
   await viewers[0].page.goto(`/p/qo_quote_common/view/${quote.quoteId}#bom_price`);
-  await expect(viewers[0].page.getByRole('tab',{name:'BOM价格计算',exact:true})).toBeVisible();
+  for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
+    await expect(viewers[0].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
+  }
+  await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   await expect(viewers[0].page.getByTestId('ab:detail:qo_quote_common:share-btn')).toHaveCount(0);
   await viewers[0].page.getByRole('tab',{name:'BOM价格计算',exact:true}).click();
   await expect(viewers[0].page.getByTestId(`table-row-${quote.lineId}`)).toContainText(quote.mpn);
@@ -78,10 +83,11 @@ test('quote sharing release gate: multiple members, role access and revocation t
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();
   await reader.getByTestId('form-dialog-field-qo_quote_set_count').fill('2');
-  const deniedEdit = reader.waitForResponse(response => response.url().includes('/api/meta/commands/execute/qo_quote_common:recompute_quantities') && response.request().method()==='POST');
+  const sharedEdit = reader.waitForResponse(response => response.url().includes('/api/meta/commands/execute/qo_quote_common:recompute_quantities') && response.request().method()==='POST');
   await reader.getByTestId('form-dialog-submit').click();
-  expect((await deniedEdit).status()).toBe(403);
-  expect((await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(1);
+  const sharedEditResponse = await sharedEdit;
+  expect(sharedEditResponse.ok(), await sharedEditResponse.text()).toBe(true);
+  await expect.poll(async () => (await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(2);
 
   const forbidden = await viewers[0].page.request.post('/api/record-share', {data: memberPayload});
   expect(forbidden.status()).toBe(403);
@@ -97,10 +103,14 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await dialog.getByRole('button',{name:'指定角色',exact:true}).click();
   const options = await page.request.get(`/api/record-share/roles?${shareParams}`);
   expect(options.ok()).toBe(true);
-  const available = (await options.json()).data as Array<{pid:string;name:string}>;
-  // Match the visible business role; no technical role codes are shown in the picker.
-  const procurement = available.find(role => /采购/.test(role.name));
+  const available = (await options.json()).data as Array<{pid:string;code:string;name:string}>;
+  const procurement = available.find(role => role.code === 'qo_procurement');
   expect(procurement).toBeTruthy();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(4);
+  for (const businessRole of ['销售', '采购', '工程', '商业审批人']) {
+    await expect(dialog.getByRole('checkbox',{name:businessRole,exact:true})).toBeVisible();
+  }
+  await expect(dialog.getByText(/pe_qdp_release_manager|E2E No Business/)).toHaveCount(0);
   await dialog.getByRole('checkbox',{name:procurement!.name,exact:true}).check();
   await dialog.getByTestId('record-share-permission-read-update').click();
   await dialog.getByTestId('record-share-expiry-7d').click();
@@ -117,7 +127,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   const collaborator = viewers[2].page;
   await collaborator.goto(`/p/qo_quote_common/view/${quote.quoteId}#bom_price`);
   await collaborator.getByRole('button',{name:/修改套数/}).click();
-  await collaborator.getByTestId('form-dialog-field-qo_quote_set_count').fill('2');
+  await collaborator.getByTestId('form-dialog-field-qo_quote_set_count').fill('3');
   const edited = collaborator.waitForResponse(response => response.url().includes('/api/meta/commands/execute/qo_quote_common:recompute_quantities') && response.request().method()==='POST');
   await collaborator.getByTestId('form-dialog-submit').click();
   const editResponse = await edited;
@@ -126,7 +136,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   const completion = collaborator.locator('div.fixed.inset-0').filter({hasText:/修改套数\/价格系数已完成/}).first();
   await expect(completion).toBeVisible({timeout:60_000});
   await completion.getByRole('button',{name:'关闭',exact:true}).last().click();
-  await expect.poll(async () => (await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(2);
+  await expect.poll(async () => (await (await page.request.get(root)).json()).data.qo_quote_set_count).toBe(3);
   await probe(0,false);
   await dialog.getByRole('heading',{name:'添加协作成员',exact:true}).scrollIntoViewIfNeeded();
   await page.screenshot({path:testInfo.outputPath('quote-role-sharing.png'), fullPage:true});

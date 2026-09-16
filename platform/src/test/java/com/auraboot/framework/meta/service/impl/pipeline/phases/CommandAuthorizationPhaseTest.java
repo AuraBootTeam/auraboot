@@ -3,10 +3,15 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,9 +35,20 @@ class CommandAuthorizationPhaseTest {
     @Mock
     private UserPermissionService userPermissionService;
 
+    @Mock
+    private RecordShareService recordShareService;
+
+    @Mock
+    private ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
+
+    private CommandAuthorizationPhase phase() {
+        return new CommandAuthorizationPhase(
+                userPermissionService, recordShareService, dynamicDataServiceProvider);
+    }
+
     @Test
     void executeSkipsPermissionServiceWhenCommandDeclaresNoPermissions() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
 
         phase.execute(contextWithPermissions(null, 42L));
 
@@ -41,7 +57,7 @@ class CommandAuthorizationPhaseTest {
 
     @Test
     void executeRecordsWhichPermissionAuthorizedTheCaller() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
 
@@ -58,7 +74,7 @@ class CommandAuthorizationPhaseTest {
      */
     @Test
     void executeRecordsThatNoDecisionWasMadeWhenNothingIsDeclared() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         CommandPipelineContext ctx = contextWithPermissions(null, 42L);
 
         phase.execute(ctx);
@@ -70,7 +86,7 @@ class CommandAuthorizationPhaseTest {
 
     @Test
     void executeRecordsThatNoDecisionWasMadeWithoutAUserInContext() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), null);
 
         phase.execute(ctx);
@@ -83,7 +99,7 @@ class CommandAuthorizationPhaseTest {
 
     @Test
     void executeAllowsCommandWhenUserHasAnyDeclaredPermission() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
 
         phase.execute(contextWithPermissions(List.of("dashboard.manage", "dashboard.admin"), 42L));
@@ -94,7 +110,7 @@ class CommandAuthorizationPhaseTest {
 
     @Test
     void executeDeniesCommandWhenUserHasNoneOfTheDeclaredPermissions() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
         when(userPermissionService.hasPermission(42L, "dashboard.admin")).thenReturn(false);
 
@@ -113,6 +129,46 @@ class CommandAuthorizationPhaseTest {
         verify(userPermissionService).hasPermission(42L, "dashboard.admin");
     }
 
+    @Test
+    void executeAllowsOnlyTheExplicitlySharedTargetForADeclaredCollaboratorCommand() {
+        MetaContext.setContext(1L, 42L, "member-public-pid", "member");
+        MetaContext.setMemberId(84L);
+        try {
+            when(userPermissionService.hasPermission(42L, "qo.price.manage")).thenReturn(false);
+            when(recordShareService.isSharedByPid(
+                    1L, "qo_quote_common", "quote-pid", 84L,
+                    "member-public-pid", "update")).thenReturn(true);
+
+            CommandExecuteRequest request = new CommandExecuteRequest();
+            request.setTargetRecordId("quote-pid");
+            CommandDefinition command = new CommandDefinition();
+            command.setModelCode("qo_quote_common");
+            Map<String, Object> execConfig = new HashMap<>();
+            execConfig.put("permissions", List.of("qo.price.manage"));
+            execConfig.put("handlerParams", Map.of(
+                    "recordShareGrant", Map.of(
+                            "resourceCode", "qo_quote_common",
+                            "action", "update")));
+            CommandPipelineContext ctx = CommandPipelineContext.builder()
+                    .commandCode("qo_quote_common:price")
+                    .command(command)
+                    .request(request)
+                    .tenantId(1L)
+                    .userId(42L)
+                    .startTime(System.currentTimeMillis())
+                    .execConfig(execConfig)
+                    .build();
+
+            phase().execute(ctx);
+
+            assertThat(ctx.getAuthorizationVerdict().permissionCode())
+                    .isEqualTo("record-share:qo_quote_common:update");
+        } finally {
+            MetaContext.clearMemberId();
+            MetaContext.clear();
+        }
+    }
+
     /**
      * A denial is now a recorded decision, not only a thrown exception. The pipeline still aborts,
      * but the verdict on the context says the caller was DENIED and which permissions it lacked —
@@ -122,7 +178,7 @@ class CommandAuthorizationPhaseTest {
      */
     @Test
     void executeRecordsADeniedVerdictBeforeThrowing() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
 
@@ -139,7 +195,7 @@ class CommandAuthorizationPhaseTest {
 
     @Test
     void executeIgnoresBlankPermissionEntriesBeforeCheckingAccess() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
 
         phase.execute(contextWithPermissions(List.of("", "  ", "dashboard.manage"), 42L));
@@ -154,7 +210,7 @@ class CommandAuthorizationPhaseTest {
     @Test
     @DisplayName("authorizing records a PERMIT phase-decision onto the plan accumulator")
     void recordsAPermitDecisionForThePlan() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
 
@@ -169,7 +225,7 @@ class CommandAuthorizationPhaseTest {
     @Test
     @DisplayName("denying records a DENY phase-decision (with reason) onto the plan accumulator before throwing")
     void recordsADenyDecisionForThePlan() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
 
@@ -185,7 +241,7 @@ class CommandAuthorizationPhaseTest {
     @Test
     @DisplayName("an undeclared command records an ABSTAIN phase-decision, never a permit")
     void recordsAnAbstainDecisionWhenNothingIsDeclared() {
-        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandAuthorizationPhase phase = phase();
         CommandPipelineContext ctx = contextWithPermissions(null, 42L);
 
         phase.execute(ctx);

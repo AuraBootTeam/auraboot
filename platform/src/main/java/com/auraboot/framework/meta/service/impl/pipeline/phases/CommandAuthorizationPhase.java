@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
@@ -7,10 +8,14 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CommandAuthorizationPhase implements CommandPhase {
 
     private final UserPermissionService userPermissionService;
+    private final RecordShareService recordShareService;
+    private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
 
     /**
      * Command codes already reported as undeclared. Bounded by the number of distinct commands, and
@@ -71,6 +78,12 @@ public class CommandAuthorizationPhase implements CommandPhase {
             }
         }
 
+        String recordSharePermission = authorizeDeclaredRecordShare(ctx);
+        if (recordSharePermission != null) {
+            applyVerdict(ctx, CommandAuthorizationVerdict.authorized(recordSharePermission));
+            return;
+        }
+
         // Record the refusal as a decision before throwing: a denial that only ever surfaced as a
         // thrown exception left no trace on the context for an audit trail (or a future decision plan)
         // to read. The throw still aborts the pipeline exactly as before — this changes nothing about
@@ -78,6 +91,54 @@ public class CommandAuthorizationPhase implements CommandPhase {
         applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Command permission denied: required one of " + String.join(", ", requiredPermissions));
+    }
+
+    /**
+     * An explicit command policy may let an update collaborator execute this command for one
+     * shared aggregate. The command must name the target record, and child-record commands must
+     * declare the field that points back to the shared root. Missing or malformed metadata denies.
+     */
+    private String authorizeDeclaredRecordShare(CommandPipelineContext ctx) {
+        Object rawParams = ctx.getExecConfig().get("handlerParams");
+        if (!(rawParams instanceof java.util.Map<?, ?> handlerParams)) return null;
+        Object rawGrant = handlerParams.get("recordShareGrant");
+        if (!(rawGrant instanceof java.util.Map<?, ?> grant)) return null;
+
+        String resourceCode = text(grant.get("resourceCode"));
+        String action = text(grant.get("action"));
+        String targetRecordId = ctx.getRequest().getTargetRecordId();
+        if (!StringUtils.hasText(resourceCode)
+                || !java.util.Set.of("read", "update").contains(action)
+                || !StringUtils.hasText(targetRecordId)
+                || ctx.getTenantId() == null) {
+            return null;
+        }
+
+        String rootRecordPid = targetRecordId;
+        String targetReferenceField = text(grant.get("targetReferenceField"));
+        if (StringUtils.hasText(targetReferenceField)) {
+            if (ctx.getCommand() == null || !StringUtils.hasText(ctx.getCommand().getModelCode())) {
+                return null;
+            }
+            java.util.Map<String, Object> target = MetaContext.runWithCommandPermitScope(
+                    "ALL",
+                    () -> dynamicDataServiceProvider.getObject().getById(
+                            ctx.getCommand().getModelCode(), targetRecordId));
+            if (target == null) return null;
+            Object reference = target.get(targetReferenceField);
+            rootRecordPid = reference == null ? null : String.valueOf(reference).trim();
+        }
+        if (!StringUtils.hasText(rootRecordPid)) return null;
+
+        Long memberId = MetaContext.getCurrentMemberId();
+        String memberPid = MetaContext.getCurrentUserPid();
+        boolean shared = recordShareService.isSharedByPid(
+                ctx.getTenantId(), resourceCode, rootRecordPid, memberId, memberPid, action);
+        return shared ? "record-share:" + resourceCode + ":" + action : null;
+    }
+
+    private String text(Object value) {
+        return value == null ? null : String.valueOf(value).trim();
     }
 
     /**

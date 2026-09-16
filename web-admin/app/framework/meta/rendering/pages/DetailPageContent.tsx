@@ -78,7 +78,7 @@ import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/der
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
 import { useTimezone } from '~/contexts/TimezoneContext';
-import { useAuth } from '~/contexts/AuthContext';
+import { AdditionalPermissionsProvider, useAuth } from '~/contexts/AuthContext';
 import {
   formatInTimezone,
   resolveTemporalFormat,
@@ -1772,6 +1772,16 @@ function DetailPageContentInner(props: PageContentProps) {
           onClose={() => setShareDialogOpen(false)}
           resourceCode={schema?.modelCode || tableName}
           recordPid={recordPid}
+          permissionMode={
+            schema?.extension?.recordShare?.mode === 'collaborate-only'
+              ? 'collaborate-only'
+              : 'standard'
+          }
+          allowedRoleCodes={
+            Array.isArray(schema?.extension?.recordShare?.allowedRoleCodes)
+              ? schema.extension.recordShare.allowedRoleCodes
+              : undefined
+          }
         />
       )}
 
@@ -1797,10 +1807,67 @@ export function resolveDetailPdfFileName(
 }
 
 export function DetailPageContent(props: PageContentProps) {
+  const { schema, tableName, recordPid, token } = props;
+  const resourceCode = schema?.modelCode || tableName;
+  const sharePolicy = schema?.extension?.recordShare;
+  const collaborationPermissions = useMemo(
+    () =>
+      Array.isArray(sharePolicy?.collaborationPermissions)
+        ? sharePolicy.collaborationPermissions
+            .map((code: unknown) => String(code || '').trim())
+            .filter(Boolean)
+        : [],
+    [sharePolicy?.collaborationPermissions],
+  );
+  const [sharedPermissions, setSharedPermissions] = useState<string[]>([]);
+  const [shareAccessResolved, setShareAccessResolved] = useState(
+    sharePolicy?.mode !== 'collaborate-only' || collaborationPermissions.length === 0,
+  );
+
+  useEffect(() => {
+    if (
+      sharePolicy?.mode !== 'collaborate-only' ||
+      collaborationPermissions.length === 0 ||
+      !resourceCode ||
+      !recordPid
+    ) {
+      setSharedPermissions([]);
+      setShareAccessResolved(true);
+      return;
+    }
+    let cancelled = false;
+    setShareAccessResolved(false);
+    const params = new URLSearchParams({ resourceCode, recordPid });
+    fetchResult<{ canUpdate?: boolean }>(
+      `/api/record-share/access-capability?${params.toString()}`,
+      { method: 'get', token: token || undefined },
+    )
+      .then((result) => {
+        if (cancelled) return;
+        setSharedPermissions(
+          ResultHelper.isSuccess(result) && result.data?.canUpdate === true
+            ? collaborationPermissions
+            : [],
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSharedPermissions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setShareAccessResolved(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [collaborationPermissions, recordPid, resourceCode, sharePolicy?.mode, token]);
+
+  if (!shareAccessResolved) return <LoadingSpinner />;
   return (
-    <AsyncTaskModalProvider>
-      <DetailPageContentInner {...props} />
-    </AsyncTaskModalProvider>
+    <AdditionalPermissionsProvider permissions={sharedPermissions}>
+      <AsyncTaskModalProvider>
+        <DetailPageContentInner {...props} />
+      </AsyncTaskModalProvider>
+    </AdditionalPermissionsProvider>
   );
 }
 
