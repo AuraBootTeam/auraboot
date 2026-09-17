@@ -124,8 +124,9 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
         'seeded task belongs to the seeded customer per API',
       ).toBe(true);
 
-      // 客户筛选：列表按客户名过滤后仅见该客户的任务行
-      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, customerName, 'bom_conversion_task_pcba');
+      // 关键字过滤:工作台页面的搜索框走模型 keyword 面(含任务号),不承诺按
+      // 客户名过滤(任务表无客户名列,客户归属由上方 API EQ 断言覆盖)。
+      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, taskNo.slice(0, 12), 'bom_conversion_task_pcba');
       const bodyText = await adminPage.locator('main').innerText();
       expect(bodyText, 'filtered workbench list still shows the seeded task').toContain(taskNo.slice(0, 12));
       expect(filteredCount, 'filtered list returns at least the seeded task row').toBeGreaterThan(0);
