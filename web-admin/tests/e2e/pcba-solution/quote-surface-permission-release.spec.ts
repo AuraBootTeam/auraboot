@@ -561,4 +561,25 @@ test('formal invalid predecessor: missing quote is rejected without creating a f
   await expect(page.locator('main')).not.toContainText('Bad parameter');
   await info.attach('missing-previous-rejection',{body:JSON.stringify({status:response.status(),body}),contentType:'application/json'});
   await info.attach('missing-previous-browser',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
+
+  // 非法前驱:真实存在但非正式版本的报价同样拒绝,且不误创建首版
+  const illegalSeed = await seedQuoteForCorrectedBomUpload(page);
+  try {
+    await page.reload();
+    await expect(page.getByText('已冻结', {exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'创建正式报价版本',exact:true}).click();
+    await page.getByTestId('form-dialog-field-previous_quote_id').fill(illegalSeed.quoteId);
+    const illegalResponsePromise=page.waitForResponse(r=>r.url().includes('qo_quote_common:create_version_from_scenario')&&r.request().method()==='POST');
+    await page.getByTestId('form-dialog-submit').click();
+    const illegalResponse=await illegalResponsePromise;
+    const illegalBody=await illegalResponse.json();
+    expect(illegalResponse.status()).toBe(400);
+    expect(String(illegalBody.code)).not.toBe('0');
+    expect(JSON.stringify(illegalBody)).toContain('previous_quote_id must reference a formal Quote Version');
+    expect(await queryDynamicRecords(page,'qo_quote_common',[{fieldName:'qo_quote_cost_scenario_id',operator:'EQ',value:scenarioId}])).toHaveLength(0);
+    await info.attach('illegal-previous-rejection',{body:JSON.stringify({status:illegalResponse.status(),body:illegalBody}),contentType:'application/json'});
+    await info.attach('illegal-previous-browser',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
+  } finally {
+    await cleanupRows(page, illegalSeed);
+  }
 });
