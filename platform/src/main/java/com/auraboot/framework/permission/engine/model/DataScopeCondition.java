@@ -18,6 +18,8 @@ import java.util.List;
  * @param deptPids        list of department PIDs within scope (string-based, from dynamic tables)
  * @param sharedRecordIds record IDs explicitly shared via ReBAC
  * @param sharedRecordPids public record PIDs explicitly shared via ReBAC
+ * @param sharedRootReferences declared child→aggregate-root edges whose shared root pids extend
+ *                        this resource's row surface (see {@link SharedRootReference})
  */
 public record DataScopeCondition(
         String scopeType,
@@ -27,13 +29,15 @@ public record DataScopeCondition(
         String deptOwnerField,
         List<String> deptPids,
         List<Long> sharedRecordIds,
-        List<String> sharedRecordPids
+        List<String> sharedRecordPids,
+        List<SharedRootReference> sharedRootReferences
 ) {
 
     public DataScopeCondition {
         deptPids = immutableList(deptPids);
         sharedRecordIds = immutableList(sharedRecordIds);
         sharedRecordPids = immutableList(sharedRecordPids);
+        sharedRootReferences = immutableList(sharedRootReferences);
     }
 
     /**
@@ -47,7 +51,7 @@ public record DataScopeCondition(
             List<String> deptPids,
             List<Long> sharedRecordIds) {
         this(scopeType, ownerField, ownerValue, deptField, null,
-                deptPids, sharedRecordIds, Collections.emptyList());
+                deptPids, sharedRecordIds, Collections.emptyList(), Collections.emptyList());
     }
 
     /**
@@ -62,7 +66,23 @@ public record DataScopeCondition(
             List<Long> sharedRecordIds,
             List<String> sharedRecordPids) {
         this(scopeType, ownerField, ownerValue, deptField, null,
-                deptPids, sharedRecordIds, sharedRecordPids);
+                deptPids, sharedRecordIds, sharedRecordPids, Collections.emptyList());
+    }
+
+    /**
+     * Backward-compatible constructor for conditions without declared root references.
+     */
+    public DataScopeCondition(
+            String scopeType,
+            String ownerField,
+            Object ownerValue,
+            String deptField,
+            String deptOwnerField,
+            List<String> deptPids,
+            List<Long> sharedRecordIds,
+            List<String> sharedRecordPids) {
+        this(scopeType, ownerField, ownerValue, deptField, deptOwnerField,
+                deptPids, sharedRecordIds, sharedRecordPids, Collections.emptyList());
     }
 
     public DataScopeCondition withSharedRecords(List<Long> recordIds, List<String> recordPids) {
@@ -74,7 +94,21 @@ public record DataScopeCondition(
                 deptOwnerField,
                 deptPids,
                 recordIds,
-                recordPids);
+                recordPids,
+                sharedRootReferences);
+    }
+
+    public DataScopeCondition withSharedRootReferences(List<SharedRootReference> references) {
+        return new DataScopeCondition(
+                scopeType,
+                ownerField,
+                ownerValue,
+                deptField,
+                deptOwnerField,
+                deptPids,
+                sharedRecordIds,
+                sharedRecordPids,
+                references);
     }
 
     /**
@@ -83,7 +117,8 @@ public record DataScopeCondition(
     public static DataScopeCondition all() {
         return new DataScopeCondition(
                 "all", null, null, null, null,
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyList());
     }
 
     /**
@@ -92,7 +127,8 @@ public record DataScopeCondition(
     public static DataScopeCondition none() {
         return new DataScopeCondition(
                 "none", null, null, null, null,
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyList());
     }
 
     /**
@@ -107,7 +143,8 @@ public record DataScopeCondition(
     public static DataScopeCondition notConfigured() {
         return new DataScopeCondition(
                 "not_configured", null, null, null, null,
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyList());
     }
 
     private static <T> List<T> immutableList(List<T> values) {

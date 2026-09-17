@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
+import com.auraboot.framework.permission.engine.model.SharedRootReference;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.RecordShareService;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +26,7 @@ class DataScopeEvaluatorTest {
 
     @Mock private DataScopeService dataScopeService;
     @Mock private RecordShareService recordShareService;
+    @Mock private RecordShareRowSurfaceResolver rowSurfaceResolver;
     @InjectMocks private DataScopeEvaluator evaluator;
 
     @AfterEach
@@ -216,5 +219,80 @@ class DataScopeEvaluatorTest {
                 .thenReturn(new DataScopeCondition("self", "owner_id", null, null, List.of(), List.of()));
         EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("owner_id", 1L));
         assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    // ---- Declared shared-aggregate row surface (record share on the root covers child rows) ----
+
+    @Test
+    void getCondition_unionsDeclaredSharedRootReferences() {
+        MetaContext.setContext(99L, 7L, "user_pid_7", "user");
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "created_by", 7L, null, List.of(), List.of());
+        when(dataScopeService.resolveScope(1L, "qo_quote_line_common", "read")).thenReturn(self);
+        when(recordShareService.getSharedRecordIds(99L, "qo_quote_line_common", 1L, "read"))
+                .thenReturn(List.of());
+        when(recordShareService.getSharedRecordPids(99L, "qo_quote_line_common", 1L, "user_pid_7", "read"))
+                .thenReturn(List.of());
+        when(rowSurfaceResolver.resolveSharedRootReferences(99L, 1L, "qo_quote_line_common", "read"))
+                .thenReturn(List.of(new SharedRootReference("qo_ql_quote_id", List.of("root_1"))));
+
+        DataScopeCondition condition = evaluator.getCondition(1L, "qo_quote_line_common", "read");
+
+        assertEquals(1, condition.sharedRootReferences().size());
+        assertEquals("qo_ql_quote_id", condition.sharedRootReferences().get(0).referenceField());
+        assertEquals(List.of("root_1"), condition.sharedRootReferences().get(0).rootRecordPids());
+    }
+
+    @Test
+    void evaluate_allowsChildRowReferencingSharedRootDespiteSelfDeny() {
+        MetaContext.setContext(99L, 7L, "user_pid_7", "user");
+        when(dataScopeService.resolveScope(1L, "qo_quote_line_common", "read"))
+                .thenReturn(new DataScopeCondition("self", "created_by", 7L, null, List.of(), List.of()));
+        when(rowSurfaceResolver.resolveSharedRootReferences(99L, 1L, "qo_quote_line_common", "read"))
+                .thenReturn(List.of(new SharedRootReference("qo_ql_quote_id", List.of("root_1"))));
+
+        EvaluationStep s = evaluator.evaluate(1L, "qo_quote_line_common", "read",
+                Map.of("created_by", 42L, "qo_ql_quote_id", "root_1"));
+
+        assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+    }
+
+    @Test
+    void evaluate_stillDeniesChildRowWhenRootNotShared() {
+        MetaContext.setContext(99L, 7L, "user_pid_7", "user");
+        when(dataScopeService.resolveScope(1L, "qo_quote_line_common", "read"))
+                .thenReturn(new DataScopeCondition("self", "created_by", 7L, null, List.of(), List.of()));
+        when(rowSurfaceResolver.resolveSharedRootReferences(99L, 1L, "qo_quote_line_common", "read"))
+                .thenReturn(List.of(new SharedRootReference("qo_ql_quote_id", List.of("root_1"))));
+
+        EvaluationStep s = evaluator.evaluate(1L, "qo_quote_line_common", "read",
+                Map.of("created_by", 42L, "qo_ql_quote_id", "someone-elses-root"));
+
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    @Test
+    void evaluate_noneScopeStillAllowsChildRowReferencingSharedRoot() {
+        MetaContext.setContext(99L, 7L, "user_pid_7", "user");
+        when(dataScopeService.resolveScope(1L, "qo_quote_line_common", "read"))
+                .thenReturn(DataScopeCondition.none());
+        when(rowSurfaceResolver.resolveSharedRootReferences(99L, 1L, "qo_quote_line_common", "read"))
+                .thenReturn(List.of(new SharedRootReference("qo_ql_quote_id", List.of("root_1"))));
+
+        EvaluationStep s = evaluator.evaluate(1L, "qo_quote_line_common", "read",
+                Map.of("qo_ql_quote_id", "root_1"));
+
+        assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+    }
+
+    @Test
+    void getCondition_withoutMetaContextSkipsSurfaceResolution() {
+        DataScopeCondition self = new DataScopeCondition("self", "owner_id", 1L, null, List.of(), List.of());
+        when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(self);
+        assertSame(self, evaluator.getCondition(1L, "M", "view"));
+        verify(recordShareService, org.mockito.Mockito.never())
+                .getSharedRecordPids(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
     }
 }
