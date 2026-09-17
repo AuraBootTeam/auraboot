@@ -7,42 +7,12 @@ import {
   cleanupRows,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
-  prepareReviewedCorrectedBomUpload,
+  createQuoteFromReviewedBom,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
   type CreatedRows,
 } from './quote-e2e-helpers';
-
-function extractTaskCode(commandBody: any): string | undefined {
-  const candidates = [
-    commandBody?.data?.data?.taskCode,
-    commandBody?.data?.handlerResults?.[0]?.taskCode,
-    commandBody?.data?.handlerResults?.[0]?.data?.taskCode,
-    commandBody?.data?.taskCode,
-  ];
-  return candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
-}
-
-async function waitForAsyncTaskTerminal(page: Page, taskCode: string): Promise<any> {
-  const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
-  let latestTask: any;
-  await expect
-    .poll(
-      async () => {
-        const taskBody = await page.evaluate(async (code: string) => {
-          const response = await fetch(`/api/async-tasks/${encodeURIComponent(code)}`);
-          return response.json();
-        }, taskCode);
-        latestTask = taskBody?.data ?? taskBody;
-        const status = String(latestTask?.status ?? '').toLowerCase();
-        return terminalStatuses.has(status) ? status : '';
-      },
-      { timeout: 60_000, intervals: [1500] },
-    )
-    .toMatch(/^(completed|failed|cancelled)$/);
-  return latestTask;
-}
 
 function createInvalidCorrectedBomWorkbook(filePath: string): string {
   const workbook = XLSXUtils.book_new();
@@ -57,10 +27,6 @@ function createInvalidCorrectedBomWorkbook(filePath: string): string {
 }
 
 test.describe('QuoteOps visual feedback golden', () => {
-    // FIXME(#429 A1): the detail-page corrected-BOM upload button was removed;
-    // materials upload now happens only at quote creation. Rewrite this journey
-    // against the create-time upload-review once that slice lands.
-    test.fixme(true, 'detail-page corrected-BOM upload removed; pending create-time review rewrite');
 
   test.describe.configure({ timeout: 120_000 });
 
@@ -110,46 +76,17 @@ test.describe('QuoteOps visual feedback golden', () => {
     );
 
     try {
+      const receipt = await createQuoteFromReviewedBom(page, created, invalidWorkbookPath);
+      await testInfo.attach('create-command-response.json', {
+        body: JSON.stringify(receipt.body, null, 2), contentType: 'application/json',
+      });
       await openQuoteDetailFromList(page, created);
-      await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible({
-        timeout: 20_000,
-      });
-
-      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, invalidWorkbookPath);
-      const commandResponsePromise = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'POST' &&
-          response
-            .url()
-            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom'),
-        { timeout: 60_000 },
-      );
-      await uploadDialog.getByTestId('form-dialog-submit').click();
-
-      const commandResponse = await commandResponsePromise;
-      const commandBody = await commandResponse.json();
-      await testInfo.attach('import-command-response.json', {
-        body: JSON.stringify(commandBody, null, 2),
-        contentType: 'application/json',
-      });
-      const taskCode = extractTaskCode(commandBody);
-      expect(taskCode, JSON.stringify(commandBody)).toBeTruthy();
-
-      await expect(page.getByText(/导入进行中|后台处理中|running/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
-      const task = await waitForAsyncTaskTerminal(page, taskCode!);
-      expect(task.status).toBe('completed');
-
-      // The corrected-BOM upload uses panel feedback (promptUpload.feedbackMode='panel'):
-      // an unreadable customer layout is preserved for the Yunhan quick lane instead of being
-      // discarded. The task completes, while the import record and row visibly stay partial/pending.
-      await expect(page.getByText(/已完成|Completed/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
+      await expect.poll(async () => {
+        const rows = await queryDynamicRecords(page, 'qo_bom_import_common', [
+          { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
+        ]);
+        return rows[0]?.qo_bi_status;
+      }).toBe('partial');
 
       const imports = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
@@ -184,8 +121,15 @@ test.describe('QuoteOps visual feedback golden', () => {
 
       const main = page.locator('main');
       await expect(main).toContainText('invalid-corrected-bom.xlsx', { timeout: 20_000 });
-      await expect(main).toContainText(/部分导入|partial/i);
-      await expect(main).toContainText(/待云汉识别/i);
+      await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      const pendingRow = page.getByTestId(`table-row-${quoteLines[0].pid}`);
+      await expect(pendingRow).toContainText('opaque-row-value');
+      const pendingStatus = pendingRow.getByText('待云汉识别', { exact: true });
+      await pendingStatus.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'center' }));
+      await expect(pendingStatus).toBeInViewport();
+      await testInfo.attach('pending-recognition-price-row.png', {
+        body: await page.screenshot(), contentType: 'image/png',
+      });
     } finally {
       await cleanupRows(page, created);
       await setYunhanMockScenario(page, 'release-default');

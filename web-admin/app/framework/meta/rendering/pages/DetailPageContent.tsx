@@ -78,7 +78,7 @@ import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/der
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
 import { useTimezone } from '~/contexts/TimezoneContext';
-import { useAuth } from '~/contexts/AuthContext';
+import { AdditionalPermissionsProvider, useAuth } from '~/contexts/AuthContext';
 import {
   formatInTimezone,
   resolveTemporalFormat,
@@ -94,6 +94,10 @@ interface RecordData {
 
 interface DetailListResult {
   records?: RecordData[];
+}
+
+export function isDetailRecordAccessDenied(result: { httpStatus?: unknown; code?: unknown }): boolean {
+  return Number(result.httpStatus ?? result.code) === 403;
 }
 
 export function resolveDetailReturnTarget(search: string): string | null {
@@ -794,6 +798,7 @@ function DetailPageContentInner(props: PageContentProps) {
   const [rawData, setRawData] = useState<any>(null);
   const [recordLoading, setRecordLoading] = useState(true);
   const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordAccessDenied, setRecordAccessDenied] = useState(false);
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   const hasApiSingletonRecordSource = Boolean(
@@ -859,9 +864,11 @@ function DetailPageContentInner(props: PageContentProps) {
             setRecordData(unwrappedRecord);
           }
           setRecordError(null);
+          setRecordAccessDenied(false);
         } else {
           setRawData(null);
           setRecordData({});
+          setRecordAccessDenied(isDetailRecordAccessDenied(result));
           setRecordError(
             (result as any)?.desc ||
               (result as any)?.message ||
@@ -872,6 +879,7 @@ function DetailPageContentInner(props: PageContentProps) {
         if (cancelled) return;
         setRawData(null);
         setRecordData({});
+        setRecordAccessDenied(false);
         setRecordError(
           error instanceof Error ? error.message : 'The requested record could not be loaded.',
         );
@@ -1256,9 +1264,13 @@ function DetailPageContentInner(props: PageContentProps) {
         <div className="rounded-card bg-panel p-8 shadow-sm">
           <div className="mx-auto grid max-w-lg gap-3 text-center">
             <h2 className="text-text text-lg font-semibold">
-              {resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
+              {recordAccessDenied
+                ? getLocalizedText({ 'zh-CN': '无法访问此记录', en: 'Cannot access this record' }, locale, t)
+                : resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
             </h2>
-            <p className="text-text-2 text-sm">{recordError}</p>
+            <p className="text-text-2 text-sm">{recordAccessDenied
+              ? getLocalizedText({ 'zh-CN': '当前账号没有访问权限，请联系记录负责人。', en: 'Your account does not have access. Contact the record owner.' }, locale, t)
+              : recordError}</p>
             <Link
               to={`/p/${tableName}`}
               className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
@@ -1760,6 +1772,16 @@ function DetailPageContentInner(props: PageContentProps) {
           onClose={() => setShareDialogOpen(false)}
           resourceCode={schema?.modelCode || tableName}
           recordPid={recordPid}
+          permissionMode={
+            schema?.extension?.recordShare?.mode === 'collaborate-only'
+              ? 'collaborate-only'
+              : 'standard'
+          }
+          allowedRoleCodes={
+            Array.isArray(schema?.extension?.recordShare?.allowedRoleCodes)
+              ? schema.extension.recordShare.allowedRoleCodes
+              : undefined
+          }
         />
       )}
 
@@ -1784,10 +1806,67 @@ export function resolveDetailPdfFileName(
 }
 
 export function DetailPageContent(props: PageContentProps) {
+  const { schema, tableName, recordPid, token } = props;
+  const resourceCode = schema?.modelCode || tableName;
+  const sharePolicy = schema?.extension?.recordShare;
+  const collaborationPermissions = useMemo(
+    () =>
+      Array.isArray(sharePolicy?.collaborationPermissions)
+        ? sharePolicy.collaborationPermissions
+            .map((code: unknown) => String(code || '').trim())
+            .filter(Boolean)
+        : [],
+    [sharePolicy?.collaborationPermissions],
+  );
+  const [sharedPermissions, setSharedPermissions] = useState<string[]>([]);
+  const [shareAccessResolved, setShareAccessResolved] = useState(
+    sharePolicy?.mode !== 'collaborate-only' || collaborationPermissions.length === 0,
+  );
+
+  useEffect(() => {
+    if (
+      sharePolicy?.mode !== 'collaborate-only' ||
+      collaborationPermissions.length === 0 ||
+      !resourceCode ||
+      !recordPid
+    ) {
+      setSharedPermissions([]);
+      setShareAccessResolved(true);
+      return;
+    }
+    let cancelled = false;
+    setShareAccessResolved(false);
+    const params = new URLSearchParams({ resourceCode, recordPid });
+    fetchResult<{ canUpdate?: boolean }>(
+      `/api/record-share/access-capability?${params.toString()}`,
+      { method: 'get', token: token || undefined },
+    )
+      .then((result) => {
+        if (cancelled) return;
+        setSharedPermissions(
+          ResultHelper.isSuccess(result) && result.data?.canUpdate === true
+            ? collaborationPermissions
+            : [],
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSharedPermissions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setShareAccessResolved(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [collaborationPermissions, recordPid, resourceCode, sharePolicy?.mode, token]);
+
+  if (!shareAccessResolved) return <LoadingSpinner />;
   return (
-    <AsyncTaskModalProvider>
-      <DetailPageContentInner {...props} />
-    </AsyncTaskModalProvider>
+    <AdditionalPermissionsProvider permissions={sharedPermissions}>
+      <AsyncTaskModalProvider>
+        <DetailPageContentInner {...props} />
+      </AsyncTaskModalProvider>
+    </AdditionalPermissionsProvider>
   );
 }
 

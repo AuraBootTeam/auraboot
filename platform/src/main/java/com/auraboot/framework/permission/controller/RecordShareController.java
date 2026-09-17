@@ -107,6 +107,28 @@ public class RecordShareController {
                 canManageRecordShares(resourceCode, recordPid)));
     }
 
+    /**
+     * Return the current caller's active record-share access.
+     *
+     * <p>This endpoint reports only explicit ReBAC grants. Ordinary owner/RBAC access is not
+     * projected into the response, so a page can safely use it to enable record-scoped
+     * collaboration affordances without turning a role permission into a share.</p>
+     */
+    @GetMapping("/access-capability")
+    @Operation(summary = "Get the caller's record-share access")
+    public ApiResponse<RecordShareAccessResponse> getAccessCapability(
+            @RequestParam @NotBlank String resourceCode,
+            @RequestParam @NotBlank String recordPid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long memberId = MetaContext.getCurrentMemberId();
+        String memberPid = MetaContext.getCurrentUserPid();
+        boolean canRead = recordShareService.isSharedByPid(
+                tenantId, resourceCode, recordPid, memberId, memberPid, "read");
+        boolean canUpdate = recordShareService.isSharedByPid(
+                tenantId, resourceCode, recordPid, memberId, memberPid, "update");
+        return ApiResponse.success(new RecordShareAccessResponse(canRead, canUpdate));
+    }
+
     /** Only owners/admins may discover tenant roles for this record's share picker. */
     @GetMapping("/roles")
     public ApiResponse<List<ShareRoleOption>> listShareRoles(
@@ -116,7 +138,7 @@ public class RecordShareController {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(roleService.findByTenantId(tenantId).stream()
                 .filter(role -> isActiveTenantRole(role, tenantId))
-                .map(role -> new ShareRoleOption(role.getPid(), role.getName())).toList());
+                .map(role -> new ShareRoleOption(role.getPid(), role.getCode(), role.getName())).toList());
     }
 
     private static boolean isActiveTenantRole(com.auraboot.framework.rbac.entity.Role role, Long tenantId) {
@@ -124,7 +146,12 @@ public class RecordShareController {
                 && !Boolean.TRUE.equals(role.getDeletedFlag()) && "ACTIVE".equalsIgnoreCase(role.getStatus());
     }
 
-    public record ShareRoleOption(String pid, String name) {}
+    /**
+     * Public role option for a record-share picker. The stable role code lets a
+     * business page select its own shareable business roles without depending on
+     * localized display names or environment-specific public IDs.
+     */
+    public record ShareRoleOption(String pid, String code, String name) {}
 
     /** Validate every recipient before writing any grant; a batch is atomic. */
     @PostMapping
@@ -525,5 +552,8 @@ public class RecordShareController {
     }
 
     public record RecordShareCapabilityResponse(boolean canManage) {
+    }
+
+    public record RecordShareAccessResponse(boolean canRead, boolean canUpdate) {
     }
 }

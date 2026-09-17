@@ -76,7 +76,10 @@ const I18N = {
   },
 };
 
-function renderDialog() {
+function renderDialog(
+  permissionMode: 'standard' | 'collaborate-only' = 'standard',
+  allowedRoleCodes?: string[],
+) {
   return render(
     <I18nProvider initialLocale="zh-CN" initialData={I18N}>
       <RecordShareDialog
@@ -84,6 +87,8 @@ function renderDialog() {
         onClose={vi.fn()}
         resourceCode="crm_account_common"
         recordPid="account-pid"
+        permissionMode={permissionMode}
+        allowedRoleCodes={allowedRoleCodes}
       />
     </I18nProvider>,
   );
@@ -92,6 +97,48 @@ function renderDialog() {
 describe('RecordShareDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('offers only collaboration and submits update access in collaborate-only mode', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: null }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderDialog('collaborate-only');
+    await screen.findByText('暂无协作成员');
+    expect(screen.queryByTestId('record-share-permission-read')).not.toBeInTheDocument();
+    expect(screen.getByTestId('record-share-permission-read-update')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('选择销售二组'));
+    fireEvent.click(screen.getByText('保存协作成员'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({ permissionMask: 'read,update' });
+  });
+
+  it('shows only the business roles allowed by the current page', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', data: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          data: [
+            { pid: 'sales-role-pid', code: 'qo_sales', name: '销售' },
+            { pid: 'internal-role-pid', code: 'pe_qdp_release_manager', name: '发布经理' },
+          ],
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderDialog('collaborate-only', ['qo_sales', 'qo_procurement']);
+    await screen.findByText('暂无协作成员');
+    fireEvent.click(screen.getByRole('button', { name: '指定角色' }));
+
+    expect(await screen.findByText('销售')).toBeInTheDocument();
+    expect(screen.queryByText('发布经理')).not.toBeInTheDocument();
   });
 
   it('shows readable member names and never renders internal or subject PIDs', async () => {

@@ -222,6 +222,54 @@ export async function prepareReviewedCorrectedBomUpload(
   return uploadDialog;
 }
 
+/** Current public upload journey: quote create form, explicit column review, real files. */
+export async function createQuoteFromReviewedBom(page: Page, created: CreatedRows, filePath: string) {
+  await openQuoteCreateFormFromList(page);
+  for (const [field, model] of [
+    ['qo_quote_crm_account_id', 'crm_account_common'],
+    ['qo_quote_project_id', 'req_requirement_set_pcba_bom'],
+  ]) {
+    const id = created.rows.find((row) => row.model === model)?.pid;
+    expect(id, `fixture ${model}`).toBeTruthy();
+    const trigger = page.getByTestId(`select-trigger-${field}`);
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    await page.locator(`[role="option"][data-value="${id}"]`).first().click();
+  }
+  const paste = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nM02*\n';
+  for (const [field, file] of [
+    ['gerber_source_file', { name: 'review-board.zip', mimeType: 'application/zip',
+      buffer: miniZip([{ name: 'board.gtp', content: paste }]) }],
+    ['cpl_source_file', { name: 'review-cpl.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('Designator,Mid X,Mid Y,Layer\nR1,0,0,Top\n') }],
+  ] as const) {
+    const pending = page.waitForResponse((r) => r.url().includes('/api/file/upload') && r.request().method() === 'POST');
+    await page.getByTestId(`form-field-${field}`).locator('input[type="file"]').first().setInputFiles(file);
+    const response = await pending;
+    expect(response.ok()).toBe(true);
+    expect(String((await response.json()).code)).toBe('0');
+  }
+  await page.getByTestId('bom-upload-review-file-corrected_bom_file').setInputFiles(filePath);
+  await expect(page.getByTestId('bom-upload-review-grid')).toBeVisible();
+  await expect(page.getByTestId('form-btn-save')).toBeEnabled();
+  const pending = page.waitForResponse((r) => r.url().includes('/api/meta/commands/execute/qo_quote_common:create') && r.request().method() === 'POST');
+  await page.getByTestId('form-btn-save').click();
+  const response = await pending;
+  const request = response.request().postDataJSON();
+  const payload = request.payload ?? request.params?.payload;
+  expect(payload.bom_selected_columns.length, 'reviewed column roles travel with the create command').toBeGreaterThan(0);
+  const body = await response.json();
+  expect(response.ok(), JSON.stringify(body)).toBe(true);
+  expect(String(body.code), JSON.stringify(body)).toBe('0');
+  const id = String(body.data?.data?.recordId ?? body.data?.data?.quoteId ?? '');
+  expect(id, 'create command returns persisted quote').toBeTruthy();
+  created.quoteId = id;
+  const record = await readDynamicRecord(page, 'qo_quote_common', id);
+  created.quoteCode = String(record.qo_quote_code ?? '');
+  expect(created.quoteCode).toBeTruthy();
+  return { body, request };
+}
+
 const BOM_INTERNAL_FIXTURE_MODELS = [
   'req_requirement_set_pcba_bom',
   'bom_conversion_task_pcba',
@@ -437,7 +485,7 @@ export async function expectCommandNotDenied(
   return result;
 }
 
-async function pollAsyncTaskResult(page: Page, taskCode: string): Promise<Record<string, unknown>> {
+export async function pollAsyncTaskResult(page: Page, taskCode: string): Promise<Record<string, unknown>> {
   const terminal = new Set(['completed', 'failed', 'cancelled']);
   let resultData: Record<string, unknown> = {};
 
@@ -1069,7 +1117,7 @@ export async function seedQuoteForCorrectedBomUpload(page: Page): Promise<Create
   return seedQuoteScaffold(page, 'CBOM', [], 'consumer');
 }
 
-async function openPgClient(): Promise<{ client: import('pg').Client; database: string }> {
+export async function openPgClient(): Promise<{ client: import('pg').Client; database: string }> {
   const { Client } = await import('pg');
   // The Quote/BOM golden stack DB is exposed via POSTGRES_* (runtime env file, sourced by
   // the gate runner); fall back to the standard libpq PG* vars. The PG_HOST/PG_PORT/PG_USER/
@@ -1479,13 +1527,20 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
     },
   ]);
   try {
-    await executeCommand(
-      page,
-      'qo_quote_common:compute_process_fee',
-      {},
-      created.quoteId,
-      'update',
-    );
+    // This export fixture supplies persisted board counts, independently of BOM line quantities.
+    // Parser geometry is exercised by the fixed-count sidecar suite.
+    for (const [stage, quantity, pointsEach] of [['SMT', 3, 0.5], ['DIP', 2, 1]] as const) {
+      await dynamicCreate(page, 'qo_process_fee_rule_hit_common', {
+        qo_pfrh_quote_id: created.quoteId,
+        qo_pfrh_process_stage: stage,
+        qo_pfrh_match_status: 'matched',
+        qo_pfrh_point_source: 'SIMPLE_COUNT_V1',
+        qo_pfrh_metering_qty: quantity,
+        qo_pfrh_unit_points: pointsEach,
+        qo_pfrh_total_points: quantity * pointsEach,
+        qo_pfrh_point_basis: 'SIMPLE_COUNT_V1',
+      }, created.rows);
+    }
     await executeCommand(
       page,
       'qo_quote_common:override_process_fee',
@@ -2124,4 +2179,52 @@ export async function seedProcessFeeGeometryQuote(page: Page): Promise<CreatedRo
       refdes: 'P5', mpn: 'GEOMETRY-MISSING', packageName: 'CUSTOM', qty: 1,
       unitCost: 1, lineCost: 1, linePrice: 1, smtPoints: 0, thtPoints: 0 },
   ]);
+}
+
+/** Current fixed-count fixture: real uploaded Paste geometry, no seeded calculation result. */
+export async function seedFixedCountQuote(page: Page): Promise<CreatedRows> {
+  const created = await seedQuoteScaffold(page, 'FIXEDCOUNT', []);
+  const rfq = created.rows.find((row) => row.model === 'crm_customer_request_pcba_rfq');
+  expect(rfq, 'quote scaffold must retain its RFQ').toBeTruthy();
+  const geometry = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nX020000Y000000D03*\nX040000Y000000D03*\nM02*\n';
+  const upload = await page.request.post('/api/file/upload', { multipart: {
+    file: { name: 'fixed-count.gbr.zip', mimeType: 'application/zip',
+      buffer: miniZip([{ name: 'board.gtp', content: geometry }]) },
+  } });
+  const body = await upload.json();
+  expect(upload.ok(), JSON.stringify(body)).toBe(true);
+  expect(body.code).toBe('0');
+  expect(body.data.fileId).toBeTruthy();
+  await dynamicCreate(page, 'qo_rfq_source_attachment_common', {
+    qo_rsa_rfq_id: rfq!.pid, qo_rsa_type: 'gerber_package',
+    qo_rsa_filename: 'fixed-count.gbr.zip', qo_rsa_file_id: body.data.fileId,
+    qo_rsa_version_no: 2, qo_rsa_uploaded_at: new Date().toISOString(),
+    qo_rsa_parse_status: 'uploaded', qo_rsa_validation_status: 'pending',
+  }, created.rows);
+  return created;
+}
+
+
+/** Drive the product list search, never the shell command palette. */
+export async function searchBusinessList(page: Page, listPath: string, keyword: string, sourceModelCode?: string): Promise<number> {
+  // DSL page keys may be aliases; callers must declare the actual source model.
+  const modelCode = sourceModelCode ?? listPath.split('/').filter(Boolean).pop();
+  const isListResponse = (response: import('@playwright/test').Response) =>
+    response.url().includes(`/api/dynamic/${modelCode}/list`) && response.request().method() === 'GET';
+  const initial = page.waitForResponse(isListResponse);
+  await page.goto(listPath, { waitUntil: 'domcontentloaded' });
+  expect((await initial).ok(), 'initial list request must succeed').toBe(true);
+  const search = page.getByTestId('list-search-input');
+  await expect(search).toBeVisible();
+  if (await search.inputValue() !== keyword) {
+    await search.fill(keyword);
+    const pending = page.waitForResponse(isListResponse);
+    await search.press('Enter');
+    const response = await pending;
+    expect(response.status(), 'filtered list request must succeed').toBe(200);
+    const body = await response.json();
+    expect(String(body.code), 'filtered list must return a successful business result').toBe('0');
+  }
+  await expect(page.locator('main').getByText('加载中...', { exact: true })).toHaveCount(0);
+  return page.locator('table tbody tr').count();
 }

@@ -1,7 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { uniqueId } from '../helpers';
+import { uniqueId, clickRowActionByLocator } from '../helpers';
 import {
+  searchBusinessList,
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
   openQuoteRolePage,
@@ -32,54 +33,20 @@ async function fillSeq(page: Page, name: string, value: string) {
   await loc.pressSequentially(value, { delay: 12 });
 }
 
-function modelCodeFromListPath(listPath: string): string {
-  return listPath.split('/').filter(Boolean).pop() || '';
-}
-
-async function waitForListReady(page: Page): Promise<void> {
-  await expect.poll(async () => {
-    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]').first().count();
-    const tableReady = await page.locator('table, [role="table"]').first().count();
-    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
-    return (searchReady > 0 || tableReady > 0) && loading === 0;
-  }).toBe(true);
-}
-
-async function listSearch(page: Page, listPath: string, keyword: string): Promise<number> {
-  await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  await waitForListReady(page);
-  const q = page.locator(
-    '[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]'
-  ).first();
-  if (await q.count() > 0) {
-    await q.click();
-    await q.fill('');
-    await q.pressSequentially(keyword, { delay: 12 });
-    // DSL/standard list filter applies on a 搜索 button click (not onChange/Enter alone)
-    const searchBtn = page.locator(
-      '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索")'
-    ).first();
-    const modelCode = modelCodeFromListPath(listPath);
-    const response = page.waitForResponse((r) => (
-      r.url().includes(`/api/dynamic/${modelCode}/list`) && r.request().method() === 'GET'
-    ), { timeout: 5000 }).catch(() => null);
-    if (await searchBtn.count() > 0) {
-      await searchBtn.click();
-    } else {
-      await page.keyboard.press('Enter');
-    }
-    await response;
-    await waitForListReady(page);
-  }
-  return page.locator('table tbody tr').count();
-}
+const listSearch = searchBusinessList;
 
 async function saveForm(page: Page): Promise<void> {
-  const response = page.waitForResponse((r) => (
+  const pending = page.waitForResponse((r) => (
     r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
-  ), { timeout: 5000 }).catch(() => null);
-  await page.getByRole('button', { name: '保存' }).first().click({ timeout: 5000 });
-  await response;
+  ), { timeout: 15_000 });
+  await page.getByRole('button', { name: '保存' }).first().click();
+  const response = await pending;
+  expect(response.status(), 'save must reach the command handler').toBe(200);
+  const body = await response.json();
+  expect(String(body.code), 'save must succeed, not merely return HTTP 200').toBe('0');
+  // The response arrives before the form's onSuccess closes/navigates and
+  // invalidates list data. Do not race that lifecycle with a new list search.
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
 }
 
 async function clickSaveForValidation(page: Page): Promise<void> {
@@ -117,22 +84,24 @@ async function createProject(page: Page, name: string): Promise<void> {
   await saveForm(page);
 }
 
-async function openRowForEdit(page: Page, row: Locator): Promise<boolean> {
-  const rowEdit = row.getByTestId('row-action-edit');
-  const rowLink = row.locator('a').first();
-  if (await rowEdit.count() > 0 && await rowEdit.click({ timeout: 5000 }).then(() => true).catch(() => false)) return true;
-  if (await rowLink.count() > 0 && await rowLink.click({ timeout: 5000 }).then(() => true).catch(() => false)) return true;
-  const more = row.getByRole('button', { name: 'More actions' });
-  if (await more.count() > 0) {
-    await more.click({ timeout: 5000 }).catch(() => null);
-    const edit = page.getByText('编辑', { exact: false }).first();
-    return edit.click({ timeout: 5000 }).then(() => true).catch(() => false);
+async function openRowForEdit(page: Page, row: Locator): Promise<void> {
+  await expect(row).toBeVisible();
+  try {
+    // CRM lists expose View directly and Edit in the row menu. Locator actions
+    // auto-wait through the search refresh; an isVisible probe does not wait.
+    await row.getByTestId('row-action-more').click();
+    await page.getByTestId('row-action-dropdown').getByTestId('row-action-edit').click();
+  } catch (error) {
+    await test.info().attach('customer-edit-failure-browser', { body: await page.screenshot(), contentType: 'image/png' });
+    await test.info().attach('customer-edit-failure-state', {
+      body: JSON.stringify({ url: page.url(), row: await row.innerText().catch(() => 'detached'),
+        actions: await page.locator('[data-testid^="row-action-"]').evaluateAll(nodes => nodes.map(n => ({
+          testId: n.getAttribute('data-testid'), text: n.textContent, html: n.outerHTML,
+        }))) }), contentType: 'application/json',
+    });
+    throw error;
   }
-  return false;
-}
-
-async function waitForMainText(page: Page, expected: string): Promise<void> {
-  await expect.poll(async () => page.locator('main').innerText().catch(() => '')).toContain(expected);
+  await expect(page.locator("textarea[name='crm_acc_remark'], input[name='crm_acc_remark']")).toBeVisible();
 }
 
 test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scope @smoke', () => {
@@ -181,6 +150,12 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
   // ── CUST-03: 编辑客户 → 回显新值 ──
   test('CUST-03 edit customer persists + reopens with new value', async ({ browser }) => {
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
+    const listRequests: Array<{ at: number; url: string }> = [];
+    page.on('request', request => {
+      if (request.url().includes('/api/dynamic/crm_account_common/list')) {
+        listRequests.push({ at: Date.now(), url: request.url() });
+      }
+    });
     try {
       const marker = `W1CUST${uid}`.slice(0, 26);
       await createCustomer(page, marker);
@@ -191,18 +166,21 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
       // open detail/edit via the row's edit action or its first link (not clicking the whole row)
       await openRowForEdit(page, row);
       const newRemark = `edited-${uid}`;
-      if (await page.locator("textarea[name='crm_acc_remark'], input[name='crm_acc_remark']").count() > 0) {
-        await fillSeq(page, 'crm_acc_remark', newRemark);
-        await saveForm(page);
-        await listSearch(page, CUST_LIST, marker);
-        const row2 = page.locator(`table tbody tr:has-text("${marker}")`).first();
-        await openRowForEdit(page, row2);
-        await waitForMainText(page, newRemark);
-        expect(await page.locator('main').innerText(), 'edited remark回显').toContain(newRemark);
-      } else {
-        test.info().annotations.push({ type: 'note', description: 'CUST-03: no editable remark entry found via testid/link — needs selector confirm' });
-      }
+      await fillSeq(page, 'crm_acc_remark', newRemark);
+      await saveForm(page);
+      await listSearch(page, CUST_LIST, marker);
+      const row2 = page.locator(`table tbody tr:has-text("${marker}")`).first();
+      await openRowForEdit(page, row2);
+      await expect(page.locator("textarea[name='crm_acc_remark'], input[name='crm_acc_remark']")).toHaveValue(newRemark);
+      const searched = listRequests.map(request => new URL(request.url)).filter(url => url.searchParams.get('keyword') === marker);
+      expect(searched.length).toBeGreaterThan(0);
+      const firstSort = searched[0].searchParams.get('sortField');
+      expect(firstSort).toBeTruthy();
+      expect([...new Set(searched.map(url => url.searchParams.get('sortField')))], 'keyword updates preserve the active sort').toEqual([firstSort]);
+
+
     } finally {
+      await test.info().attach('customer-edit-list-requests', { body: JSON.stringify(listRequests), contentType: 'application/json' });
       await context.close();
     }
   });
@@ -212,20 +190,24 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
     try {
       const marker = `W1SRCH${uid}`.slice(0, 26);
+      const other = `W1OTHER${uid}`.slice(0, 26);
       await createCustomer(page, marker);
-      // baseline: unfiltered row count (stack has many customers → >1)
-      await page.goto(CUST_LIST, { waitUntil: 'domcontentloaded' });
-      await waitForListReady(page);
-      const initial = await page.locator('table tbody tr').count();
-      // CUST-07: search by the marker → narrows (fewer rows) AND the marker row is present
-      const hit = await listSearch(page, CUST_LIST, marker);
-      expect(await page.locator(`table tbody tr:has-text("${marker}")`).count(), 'CUST-07: search hit shows the row').toBeGreaterThan(0);
-      expect(hit, 'CUST-07: search narrows the list (filter applied)').toBeLessThan(initial);
-      // CUST-08: no-match keyword → no marker-style data row remains (empty state)
+      await createCustomer(page, other);
+      // Self-scoped fresh users need their own positive and negative controls.
+      // Never depend on the runtime's historical customer count.
+      await listSearch(page, CUST_LIST, '');
+      const markerRow = page.locator('table tbody tr').filter({ hasText: marker });
+      const otherRow = page.locator('table tbody tr').filter({ hasText: other });
+      await expect(markerRow).toHaveCount(1);
+      await expect(otherRow).toHaveCount(1);
+      await listSearch(page, CUST_LIST, marker);
+      await expect(markerRow).toHaveCount(1);
+      await expect(otherRow).toHaveCount(0);
       await listSearch(page, CUST_LIST, `NOMATCH${uid}ZZZ`);
-      const stillMatched = await page.locator(`table tbody tr:has-text("W1SRCH")`).count();
-      const emptyState = await page.getByText(/暂无数据|无数据|No data|empty/i).count();
-      expect(stillMatched === 0 || emptyState > 0, 'CUST-08: no-match → empty/filtered (no W1SRCH row)').toBeTruthy();
+      await expect(markerRow).toHaveCount(0);
+      await expect(otherRow).toHaveCount(0);
+      await expect(page.locator('main').getByText(/暂无符合条件的客户|暂无数据|无数据|No data|empty/i).first()).toBeVisible();
+
     } finally {
       await context.close();
     }
@@ -237,15 +219,29 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     try {
       await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
       await expect(page.locator("input[name='crm_acc_name']")).toBeVisible();
-      expect(page.locator('main').innerText, 'no forbidden').toBeTruthy();
-      const combos = page.getByRole('combobox');
-      const n = await combos.count();
-      expect(n, 'form has dict dropdowns').toBeGreaterThan(0);
-      await combos.first().click();
-      await expect.poll(async () => page.getByRole('option').count()).toBeGreaterThan(0);
-      const optCount = await page.getByRole('option').count();
-      expect(optCount, 'dict dropdown loads options (DD-01)').toBeGreaterThan(0);
-      await page.keyboard.press('Escape');
+      await expect(page.locator('main')).not.toContainText(/无权访问|权限不足|Forbidden/i);
+      for (const field of ['crm_acc_industry', 'crm_acc_rating', 'crm_acc_status']) {
+        const trigger = page.getByTestId(`select-trigger-${field}`);
+        await expect(trigger).toBeVisible();
+        await trigger.click();
+        const options = page.getByRole('option');
+        await expect(options.first()).toBeVisible();
+        const labels = await options.allTextContents();
+        expect(labels.length, `${field} needs positive and negative search options`).toBeGreaterThan(1);
+        const target = labels[0].trim();
+        const search = page.getByTestId(`select-search-${field}`);
+        await search.fill(target);
+        await expect(options).toHaveCount(labels.filter((label) => label.toLowerCase().includes(target.toLowerCase())).length);
+        await expect(page.getByRole('option', { name: target, exact: true })).toBeVisible();
+        await search.fill(`NO-MATCH-${uid}`);
+        await expect(options).toHaveCount(0);
+        await expect(page.getByText(/无匹配结果|暂无匹配|No results|未找到结果/i).first()).toBeVisible();
+        await search.fill(target);
+        await page.getByRole('option', { name: target, exact: true }).click();
+        await expect(trigger).toContainText(target);
+        await expect(page.locator(`input[type="hidden"][name="${field}"]`)).not.toHaveValue('');
+      }
+
     } finally {
       await context.close();
     }

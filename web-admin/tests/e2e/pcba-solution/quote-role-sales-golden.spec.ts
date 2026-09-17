@@ -1,3 +1,4 @@
+import { saveWorkbookDownload } from './workbook-download-evidence';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -314,6 +315,7 @@ async function generateAndValidateWorkbook(
   expectedSetCount: number,
   testInfo: TestInfo,
   expectedLine?: { mpn: string; unitCost: number },
+  fixedCounts?: { apertures: number; holes: number },
 ): Promise<string> {
   await settleReviewDrawer(page);
   await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
@@ -336,10 +338,11 @@ async function generateAndValidateWorkbook(
   ).toBe('0');
   const download = await downloadPromise;
   const exportPath = path.join(testInfo.outputDir, `role-sales-${label}-${quoteId}.xlsx`);
-  await download.saveAs(exportPath);
+  await saveWorkbookDownload(download, exportPath, testInfo, `sales-${label}`);
   validateQuoteWorkbook(exportPath, {
     expectedSetCount,
     expectedBomLine: expectedLine,
+    fixedCounts,
   });
   return exportPath;
 }
@@ -1267,12 +1270,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const processHits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
         { fieldName: 'qo_pfrh_quote_line_id', operator: 'EQ', value: lineId },
       ]);
-      const matchedProcessHit = processHits.find(
-        (row) =>
-          String(row.qo_pfrh_match_status ?? '') === 'matched' &&
-          Number(row.qo_pfrh_unit_points ?? 0) > 0,
-      );
-      expect(matchedProcessHit, JSON.stringify(processHits).slice(0, 1200)).toBeTruthy();
+      expect(processHits, 'material repricing must not allocate whole-board points to a BOM line').toHaveLength(0);
 
       const refreshedLine = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
       expect(String(refreshedLine.qo_ql_mpn ?? '')).toBe(REPRICE_MPN);
@@ -1304,6 +1302,23 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       // path: an ALL-scope export legitimately refreshes derived cost rows as the administrator,
       // which would no longer be an honest fixture for a SELF-owner isolation assertion.
       step = 'cross-employee SELF isolation';
+      // Ownership probes need non-empty protected resources. Current material repricing
+      // creates neither process money nor per-line point hits, so seed explicit ACL
+      // fixtures through admin setup after pricing/export assertions, then assign the sales owner.
+      if (!exporterPage) throw new Error('ACL fixture requires the admin setup page');
+      const aclFixtures: CreatedRows['rows'] = [];
+      await dynamicCreate(exporterPage, 'qo_cost_item_common', {
+        qo_ci_quote_id: quoteId, qo_ci_cost_type: 'packaging', qo_ci_amount: 1,
+        qo_ci_source: 'manual_override', qo_ci_override: true,
+      }, aclFixtures);
+      const boardScopeHitId = await dynamicCreate(exporterPage, 'qo_process_fee_rule_hit_common', {
+        qo_pfrh_quote_id: quoteId, qo_pfrh_process_stage: 'SMT',
+        qo_pfrh_match_status: 'matched', qo_pfrh_point_source: 'SIMPLE_COUNT_V1',
+        qo_pfrh_point_basis: 'SIMPLE_COUNT_V1', qo_pfrh_metering_qty: 3,
+        qo_pfrh_unit_points: 0.5, qo_pfrh_total_points: 1.5,
+      }, aclFixtures);
+      await reassignRecordOwnerByEmail(aclFixtures, SALES_USER.email);
+
       const ownedRepricePreviews = await queryDynamicRecords(page, 'qo_reprice_preview_common', [
         { fieldName: 'qo_rp_quote_line_id', operator: 'EQ', value: lineId },
       ]);
@@ -1335,7 +1350,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
             { fieldName: 'qo_qd_quote_id', operator: 'EQ', value: quoteId },
           ]),
         },
-        { model: 'qo_process_fee_rule_hit_common', records: processHits },
+        { model: 'qo_process_fee_rule_hit_common', records: [{ pid: boardScopeHitId }] },
       ];
       for (const group of ownedRecordGroups) {
         expect(group.records.length, `${group.model} should have owner records`).toBeGreaterThan(0);
@@ -1470,6 +1485,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
             mpn: REPRICE_MPN,
             unitCost: Number(adminLine.qo_ql_unit_cost),
           },
+          { apertures: 3, holes: 0 },
         );
         await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
         await expect(adminPage.getByTestId(`table-row-${lineId}`)).toBeVisible({

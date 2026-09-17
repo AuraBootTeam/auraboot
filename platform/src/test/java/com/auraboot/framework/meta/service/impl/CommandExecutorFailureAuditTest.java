@@ -231,6 +231,18 @@ class CommandExecutorFailureAuditTest {
     }
 
     @Test
+    void persistenceFailureReachesSafeGlobalHandlerWithoutBecomingUserBusinessText() {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(new LinkedHashMap<>(Map.of("name", "mapping")));
+        var failure = new org.springframework.dao.DuplicateKeyException(
+                "SQL INSERT mt_private_table; duplicate key private_constraint");
+        org.mockito.Mockito.doThrow(failure).when(commandPipeline)
+                .executePreGuardPhases(any(CommandPipelineContext.class));
+        assertThatThrownBy(() -> commandExecutor.execute("test.create", request)).isSameAs(failure);
+    }
+
+    @Test
     void executePreservesConflictExceptionForHttp409Mapping() {
         MetaContext.setContext(77L, 42L, "user_42", "Operator");
         CommandExecuteRequest request = new CommandExecuteRequest();

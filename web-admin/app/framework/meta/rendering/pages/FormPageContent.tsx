@@ -371,9 +371,13 @@ export function buildFormCommandPayload(
   );
 }
 
-export function resolveAsyncCommandDispatch(responseData: any): { taskCode: string } | null {
+export function resolveAsyncCommandDispatch(responseData: any, submitMode?: unknown): { taskCode: string } | null {
   const dispatch =
     responseData?.data && typeof responseData.data === 'object' ? responseData.data : responseData;
+  // A configured task-detail page owns progress polling after durable admission.
+  // A generic async acknowledgement without a task record must still be awaited.
+  if (submitMode === 'redirect' && dispatch?.queued === true &&
+      typeof dispatch?.taskId === 'string' && dispatch.taskId.trim()) return null;
   const taskCode = dispatch?.taskCode;
   if (dispatch?.async === true && typeof taskCode === 'string' && taskCode.trim()) {
     return { taskCode: taskCode.trim() };
@@ -2015,7 +2019,7 @@ export function FormPageContent(props: PageContentProps) {
               // The reason a command refused the submit lives in context.detail.
               throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode, t));
             }
-            const asyncDispatch = resolveAsyncCommandDispatch(result.data);
+            const asyncDispatch = resolveAsyncCommandDispatch(result.data, schema?.extension?.asyncSubmitMode);
             const responseData = asyncDispatch
               ? await (async () => {
                   const message = t('common.asyncProcessing');

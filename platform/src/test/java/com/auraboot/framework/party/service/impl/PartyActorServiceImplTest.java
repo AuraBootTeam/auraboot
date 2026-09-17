@@ -146,12 +146,14 @@ class PartyActorServiceImplTest {
                 .thenReturn(10L);
         when(jwtUtil.generateTokenWithContext(any(), eq("user-pid"), any(SessionTokenContext.class)))
                 .thenReturn("new-token");
+        when(jwtUtil.inheritSessionLifetime("new-token", "old-token")).thenReturn("new-token");
 
         ActorSwitchResponse response = service.switchActor(
                 303L, "old-token", "127.0.0.1", "test-agent");
 
         assertThat(response.executionScope()).isEqualTo("party");
         assertThat(response.contextVersion()).isEqualTo(10L);
+        verify(jwtUtil).inheritSessionLifetime("new-token", "old-token");
         ArgumentCaptor<SessionTokenContext> tokenContext = ArgumentCaptor.forClass(SessionTokenContext.class);
         verify(jwtUtil).generateTokenWithContext(any(), eq("user-pid"), tokenContext.capture());
         assertThat(tokenContext.getValue().actorPartyId()).isEqualTo(303L);

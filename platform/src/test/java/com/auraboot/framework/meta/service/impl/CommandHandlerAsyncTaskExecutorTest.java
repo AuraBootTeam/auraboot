@@ -37,6 +37,17 @@ class CommandHandlerAsyncTaskExecutorTest {
         extensionRegistry = mock(ExtensionRegistry.class);
         DynamicDataService dynamicDataService = mock(DynamicDataService.class);
         executor = new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+        var members = mock(com.auraboot.framework.tenant.service.TenantMemberService.class);
+        var roles = mock(com.auraboot.framework.rbac.service.UserRoleService.class);
+        var member = new com.auraboot.framework.tenant.dao.entity.TenantMember();
+        member.setId(67L);
+        member.setTenantId(123L);
+        member.setUserId(45L);
+        member.setStatus("active");
+        when(members.findByTenantIdAndUserId(123L, 45L)).thenReturn(member);
+        when(roles.getRoleIdsByMemberIdAndTenantId(67L, 123L)).thenReturn(java.util.List.of(89L));
+        ReflectionTestUtils.setField(executor, "tenantMemberService", members);
+        ReflectionTestUtils.setField(executor, "userRoleService", roles);
     }
 
     @AfterEach
@@ -57,6 +68,75 @@ class CommandHandlerAsyncTaskExecutorTest {
         ObjectNode payload = in.putObject("payload");
         payload.put("source_file_id", "01KFILE");
         return in;
+    }
+
+    @Test
+    void resumable_handler_receives_real_checkpoint_transaction_bridge() throws Exception {
+        var manager = mock(org.springframework.transaction.PlatformTransactionManager.class);
+        var status = mock(org.springframework.transaction.TransactionStatus.class);
+        when(manager.getTransaction(org.mockito.ArgumentMatchers.any())).thenReturn(status);
+        ReflectionTestUtils.setField(executor, "platformTransactionManager", manager);
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            CommandHandlerExtension.CommandContext context = inv.getArgument(0);
+            assertThat(context.independentTransactionAccessor()).isNotNull();
+            context.independentTransactionAccessor().requiresNew(db -> {
+                throw new IllegalStateException("controlled batch failure");
+            });
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+        var input = params("bom:import_material_library");
+        input.put("resumeOnRestart", true);
+        assertThat(executor.execute(input, noop).isSuccess()).isFalse();
+        org.mockito.Mockito.verify(manager).rollback(status);
+        org.mockito.Mockito.verify(manager, org.mockito.Mockito.never()).commit(status);
+    }
+
+    @Test
+    void resumable_handler_cannot_silently_run_without_checkpoint_transactions() throws Exception {
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+        var input = params("bom:import_material_library");
+        input.put("resumeOnRestart", true);
+        assertThat(executor.execute(input, noop).isSuccess()).isFalse();
+        org.mockito.Mockito.verify(handler, org.mockito.Mockito.never())
+                .execute(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void recovery_restores_persisted_tenant_and_clears_scheduler_thread_identity() throws Exception {
+        MetaContext.clear();
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(123L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(45L);
+            assertThat(MetaContext.snapshot().memberId()).isEqualTo(67L);
+            assertThat(MetaContext.snapshot().roleIds()).containsExactly(89L);
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+        assertThat(executor.execute(params("bom:import_material_library"), noop).isSuccess()).isTrue();
+        assertThat(MetaContext.exists()).isFalse();
+        MetaContext.setContext(999L, 777L, "other", "other");
+        assertThat(executor.execute(params("bom:import_material_library"), noop).isSuccess()).isTrue();
+        assertThat(MetaContext.getCurrentTenantId()).isEqualTo(999L);
+        assertThat(MetaContext.getCurrentUserId()).isEqualTo(777L);
+    }
+
+    @Test
+    void removed_membership_cannot_execute_recovered_task() throws Exception {
+        var members = mock(com.auraboot.framework.tenant.service.TenantMemberService.class);
+        ReflectionTestUtils.setField(executor, "tenantMemberService", members);
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+        assertThat(executor.execute(params("bom:import_material_library"), noop).isSuccess()).isFalse();
+        org.mockito.Mockito.verify(handler, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
     }
 
     @Test

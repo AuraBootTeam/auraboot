@@ -142,6 +142,74 @@ class CommandTargetVersionLockPhaseTest {
         assertThat(phase.shouldSkip(ctx)).isTrue();
     }
 
+    @Test
+    void currentStateIntentLocksExclusivelyAndUsesTheLatestVersion() {
+        givenPhysicalModel();
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenReturn(List.of(Map.of("row_version", 12L)));
+        CommandPipelineContext ctx = currentStateContext(7);
+
+        assertThat(phase.shouldSkip(ctx)).isFalse();
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(12L);
+        verify(dynamicDataMapper).selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1");
+    }
+
+    @Test
+    void currentStateIntentStillLocksWhenTheClientOmitsItsVersion() {
+        givenPhysicalModel();
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenReturn(List.of(Map.of("row_version", 12L)));
+        CommandPipelineContext ctx = currentStateContext(null);
+        assertThat(phase.shouldSkip(ctx)).isFalse();
+        phase.execute(ctx);
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(12L);
+    }
+
+    @Test
+    void currentStateIntentFailsClosedWhenTheTargetDisappears() {
+        givenPhysicalModel();
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenReturn(List.of());
+        assertThatThrownBy(() -> phase.execute(currentStateContext(null)))
+                .isInstanceOf(CasVersionConflictException.class);
+    }
+
+    @Test
+    void currentStatePolicyCannotBypassVersionChecksOnAnOrdinaryEdit() {
+        CommandPipelineContext ctx = context(7);
+        ctx.getCommand().setExecutionConfig("""
+                {"type":"update","options":{"targetVersionPolicy":"current_state"}}
+                """);
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("state_transition");
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void currentStatePolicyRequiresExplicitStateBoundaries() {
+        CommandPipelineContext ctx = context(7);
+        ctx.getCommand().setExecutionConfig("""
+                {"type":"state_transition","options":{"targetVersionPolicy":"current_state"}}
+                """);
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fromStates");
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    private CommandPipelineContext currentStateContext(Integer expectedVersion) {
+        CommandPipelineContext ctx = context(expectedVersion);
+        ctx.getCommand().setExecutionConfig("""
+                {"type":"state_transition","stateField":"status",
+                 "fromStates":["pending","running"],"toState":"cancelled",
+                 "options":{"targetVersionPolicy":"current_state"}}
+                """);
+        return ctx;
+    }
+
     private void givenPhysicalModel() {
         when(metaModelService.getTableName("dq_quote_request")).thenReturn("dq_quote_request");
         when(metaModelService.getPrimaryKeyField("dq_quote_request")).thenReturn(

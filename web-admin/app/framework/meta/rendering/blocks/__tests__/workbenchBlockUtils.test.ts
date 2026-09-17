@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
 const { fetchResultMock } = vi.hoisted(() => ({
@@ -56,6 +57,19 @@ describe('workbenchBlockUtils action runner', () => {
     fetchResultMock.mockReset();
     fetchResultMock.mockResolvedValue({ code: '0', data: {} });
     vi.unstubAllGlobals();
+  });
+
+  it('evaluates numeric pagination actions and notifies dependent data sources', async () => {
+    const runtime = makeRuntime({ getEvaluator: () => new ExpressionEvaluator() }) as any;
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'state.set', args: { bomPage: '${(state.bomPage || 1) + 1}' },
+    });
+    expect(runtime.getContext().state.bomPage).toBe(2);
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'state.set', args: { bomPage: '${state.bomPage - 1}' },
+    });
+    expect(runtime.getContext().state.bomPage).toBe(1);
+    expect(runtime.__notifyStateChanged).toHaveBeenCalledWith('bomPage');
   });
 
   it('reloads one or more data sources', async () => {

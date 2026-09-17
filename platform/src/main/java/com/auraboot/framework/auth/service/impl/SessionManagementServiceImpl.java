@@ -41,7 +41,8 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Transactional
     public UserSession createSession(Long userId, String token, String ipAddress, String userAgent) {
         UserSession session = new UserSession();
-        session.setPid(UlidGenerator.generate());
+        String sid = jwtUtil == null ? null : jwtUtil.extractSessionId(token);
+        session.setPid(sid == null ? UlidGenerator.generate() : sid);
         session.setUserId(userId);
         session.setTokenHash(hashToken(token));
         populateExecutionContext(session, token);
@@ -52,7 +53,8 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         session.setLastActiveAt(Instant.now());
         session.setRevoked(false);
         if (userSessionMapper.insertIfAbsent(session) == 0) {
-            UserSession existing = userSessionMapper.findByTokenHash(session.getTokenHash());
+            UserSession existing = sid == null ? userSessionMapper.findByTokenHash(session.getTokenHash())
+                    : userSessionMapper.findByPid(sid);
             if (existing == null) {
                 throw new IllegalStateException("Session idempotency conflict did not expose the existing row");
             }
@@ -81,8 +83,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 
     @Override
     public boolean isSessionValid(String token) {
-        String hash = hashToken(token);
-        UserSession session = userSessionMapper.findByTokenHash(hash);
+        UserSession session = findByToken(token);
         return session != null && !Boolean.TRUE.equals(session.getRevoked());
     }
 
@@ -91,7 +92,8 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         if (token == null || token.isBlank()) {
             return null;
         }
-        return userSessionMapper.findByTokenHash(hashToken(token));
+        String sid = jwtUtil == null ? null : jwtUtil.extractSessionId(token);
+        return sid == null ? userSessionMapper.findByTokenHash(hashToken(token)) : userSessionMapper.findByPid(sid);
     }
 
     @Override
@@ -112,7 +114,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         if (token == null || token.isBlank()) {
             return;
         }
-        UserSession session = userSessionMapper.findByTokenHash(hashToken(token));
+        UserSession session = findByToken(token);
         if (session == null || Boolean.TRUE.equals(session.getRevoked())) {
             return;
         }
@@ -144,7 +146,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
             return;
         }
 
-        UserSession session = userSessionMapper.findByTokenHash(hash);
+        UserSession session = findByToken(token);
         if (session != null) {
             userSessionMapper.updateLastActive(session.getId());
             lastActiveThrottle.put(hash, now);

@@ -2,11 +2,11 @@ import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
   dynamicCreate,
-  executeCommand,
   isTransientViteDynamicImportIssue,
   openQuoteDetailFromList,
-  prepareReviewedCorrectedBomUpload,
+  createQuoteFromReviewedBom,
   queryDynamicRecords,
+  pollAsyncTaskResult,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
   yunhanMockControlUrl,
@@ -66,11 +66,6 @@ function parseSnapshot(value: unknown): Record<string, unknown> {
 }
 
 test.describe('QuoteOps bulk import + current sourcing golden', () => {
-    // FIXME(#429 A1): the detail-page corrected-BOM upload button was removed;
-    // materials upload now happens only at quote creation. Rewrite this journey
-    // against the create-time upload-review once that slice lands.
-    test.fixme(true, 'detail-page corrected-BOM upload removed; pending create-time review rewrite');
-
   test.describe.configure({ timeout: 300_000 });
 
   test('imports correlated rows in bulk and ignores historical recent-cache evidence', async ({
@@ -99,45 +94,8 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
       const workbookPath = createSyntheticBomWorkbook(
         testInfo.outputPath('bulk-cache-golden-bom.xlsx'),
       );
+      await createQuoteFromReviewedBom(page, created, workbookPath);
       await openQuoteDetailFromList(page, created);
-      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible({
-        timeout: 20_000,
-      });
-
-      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, workbookPath);
-      const importResponsePromise = page.waitForResponse(
-        (response) =>
-          response
-            .url()
-            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
-          response.request().method() === 'POST',
-        { timeout: 60_000 },
-      );
-      await uploadDialog.getByTestId('form-dialog-submit').click();
-
-      const importResponse = await importResponsePromise;
-      const importBody = (await importResponse.json().catch(() => ({}))) as Record<string, any>;
-      expect(
-        String(importBody?.code),
-        `import_corrected_bom response: ${JSON.stringify(importBody).slice(0, 600)}`,
-      ).toBe('0');
-
-      // Import (and its auto-recompute) runs as a background task — wait for it to finish so the
-      // pricing step below starts from a settled state.
-      const taskCode = String(importBody?.data?.data?.taskCode ?? importBody?.data?.taskCode ?? '');
-      if (taskCode) {
-        await expect
-          .poll(
-            async () => {
-              const r = await page.request.get(`/api/async-tasks/${encodeURIComponent(taskCode)}`);
-              return String(
-                ((await r.json().catch(() => ({}))) as any)?.data?.status ?? '',
-              ).toLowerCase();
-            },
-            { timeout: 240_000, intervals: [1000, 2000, 3000] },
-          )
-          .toMatch(/completed|failed|cancelled/);
-      }
 
       // ── 2. bulk import correctness: rows materialized AND correlated ───────
       await expect
@@ -216,13 +174,36 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
       }
 
       await setYunhanMockScenario(page, 'release-default');
-      await executeCommand(
-        page,
-        'qo_quote_common:batch_source_prices',
-        {},
-        created.quoteId,
-        'execute',
+      await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      const sourcingResponse = page.waitForResponse(
+        (response) =>
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_common:batch_source_prices') &&
+          response.request().method() === 'POST',
       );
+      await page.getByTestId('workbench-action-run_sourcing').click();
+      const response = await sourcingResponse;
+      expect(response.ok()).toBe(true);
+      const commandBody = await response.json();
+      expect(String(commandBody.code)).toBe('0');
+      const submitted = commandBody.data?.data;
+      expect(submitted?.async, 'UI sourcing must return its async task').toBe(true);
+      expect(submitted.taskCode).toBeTruthy();
+      // Import already wrote terminal not-found evidence. It cannot prove that
+      // this new sourcing action finished or crossed the connector boundary.
+      const terminalResult = await pollAsyncTaskResult(page, submitted.taskCode);
+      expect(terminalResult.quoteId).toBe(created.quoteId);
+      expect(Number(terminalResult.processedCount)).toBe(SYNTHETIC_MPNS.length);
+      expect(Number(terminalResult.failedCount)).toBe(0);
+      expect(Number(terminalResult.exceptionCount)).toBe(0);
+      testInfo.annotations.push({
+        type: 'async-terminal',
+        description: JSON.stringify({
+          taskCode: submitted.taskCode,
+          result: terminalResult,
+        }),
+      });
 
       // Every current line must get terminal connector evidence without the retired cache marker.
       for (const line of lines) {

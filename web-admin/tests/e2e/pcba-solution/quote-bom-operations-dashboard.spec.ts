@@ -3,6 +3,8 @@ import { test, expect } from '../../fixtures';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import {
   ensureQuoteRoleUser,
+  seedDownloadableQuote,
+  dynamicCreate,
   makeQuoteRoleUser,
   openQuoteRolePage,
   type QuoteRoleUser,
@@ -173,6 +175,16 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
     try {
       await createOrdinaryRole(page, roleCode);
       await ensureQuoteRoleUser(page, ordinaryUser);
+      // Current-week charts must not depend on leftovers from a previous gate/week.
+      await seedDownloadableQuote(page);
+      await dynamicCreate(page, 'bom_conversion_task_pcba', {
+        bom_task_no: `OPS-${uid}`,
+        bom_task_source_package: 'operations-dashboard-fixture',
+        bom_task_status: 'pending',
+        bom_task_raw_filename: `OPS-${uid}.xlsx`,
+        bom_task_total_rows: 0,
+      }, []);
+
     } finally {
       await context.close();
     }

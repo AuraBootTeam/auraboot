@@ -6,6 +6,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import {
   executeSimpleWorkbenchAction,
   readDataSourceRows,
+  readDataSourceState,
   readPath,
   resolveRuntimeValue,
   useDataSourceSubscription,
@@ -2536,7 +2537,15 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         ) || contextRecord
       : contextRecord;
   const selectedRecordKey = record ? String(record.pid ?? record.bom_std_row_no ?? '') : '';
-  const candidates = readDataSourceRows(runtime, candidateDataSource);
+  const candidateState = readDataSourceState(runtime, candidateDataSource);
+  const hasCandidateSnapshot = candidateState?.data !== undefined && candidateState?.data !== null;
+  const isInitialCandidateLoading = Boolean(candidateState?.loading && !hasCandidateSnapshot);
+  const isRefreshingCandidates = Boolean(candidateState?.loading && hasCandidateSnapshot);
+  // Polling reloads the selected row's evidence after every committed BOM batch. DataSourceManager
+  // deliberately keeps the previous successful payload while that request is in flight. Keep
+  // rendering the same snapshot here as well: replacing a full candidate list with a loading line
+  // every 1.5 seconds makes the fixed review surface visibly reflow and shake.
+  const candidates = candidateState?.error ? [] : readDataSourceRows(runtime, candidateDataSource);
   const exportRows = readDataSourceRows(runtime, exportDataSource);
   const selectedCandidate = candidates.find((row: any, index: number) => {
     const key = candidateTableConfig.keyField
@@ -2942,8 +2951,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         triggerHost={editTriggerHost}
         isRecordSelected={() => {
           const current = resolveRuntimeValue(runtime, contextExpression);
-          return current != null && Object.keys(current).length > 0
-            && String(readPath(current, contextKeyField)) === String(contextRecordKey);
+          return (
+            current != null &&
+            Object.keys(current).length > 0 &&
+            String(readPath(current, contextKeyField)) === String(contextRecordKey)
+          );
         }}
       />
 
@@ -3339,11 +3351,48 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               </header>
               <div
                 data-testid="review-drawer-candidate-list"
-                className={`min-h-0 flex-1 overflow-auto ${
+                aria-busy={candidateState?.loading ? true : undefined}
+                className={`relative min-h-0 flex-1 [scrollbar-gutter:stable] overflow-auto ${
                   usesCandidateComparisonTable ? 'p-0' : 'space-y-1.5 p-2'
                 }`}
               >
-                {candidates.length === 0 ? (
+                {isRefreshingCandidates && (
+                  <div
+                    role="status"
+                    data-testid="review-drawer-candidates-refreshing"
+                    className="rounded-pill bg-panel/90 text-text-2 pointer-events-none absolute top-2 right-2 z-10 border px-2 py-1 text-xs shadow-sm"
+                  >
+                    {getLocalizedText({ 'zh-CN': '正在刷新…', en: 'Refreshing…' }, locale, t)}
+                  </div>
+                )}
+                {isInitialCandidateLoading ? (
+                  <div
+                    role="status"
+                    data-testid="review-drawer-candidates-loading"
+                    className="text-text-2 p-3 text-sm"
+                  >
+                    {getLocalizedText(
+                      { 'zh-CN': '正在加载候选物料…', en: 'Loading candidates…' },
+                      locale,
+                      t,
+                    )}
+                  </div>
+                ) : candidateState?.error ? (
+                  <div
+                    role="alert"
+                    data-testid="review-drawer-candidates-error"
+                    className="text-text-2 p-3 text-sm"
+                  >
+                    {getLocalizedText(
+                      {
+                        'zh-CN': '候选物料加载失败，请重新打开复核面板。',
+                        en: 'Could not load candidates. Close and reopen the review panel to try again.',
+                      },
+                      locale,
+                      t,
+                    )}
+                  </div>
+                ) : candidates.length === 0 ? (
                   <div
                     data-testid="review-drawer-candidates-empty"
                     className="rounded-control border-border-strong text-text-2 border border-dashed p-3 text-sm"

@@ -133,6 +133,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Verify security version — invalidate token if password changed
                 int tokenSv = jwtUtil.extractSecurityVersion(jwt);
                 User user = userService.findByPid(userPid);
+                if (user == null || !user.isEnabled()) {
+                    reject(request, response, ApiResponse.errorWithContext(ResponseCode.Unauthorized, request.getRequestURI()));
+                    return;
+                }
                 if (user != null) {
                     int dbSv = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
                     if (tokenSv < dbSv) {

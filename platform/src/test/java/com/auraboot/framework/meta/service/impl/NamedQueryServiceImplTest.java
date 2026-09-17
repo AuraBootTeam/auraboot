@@ -18,6 +18,7 @@ import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import com.auraboot.framework.permission.service.RecordShareService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +50,7 @@ class NamedQueryServiceImplTest {
     private final DecisionUsageIndexService usageIndexService = mock(DecisionUsageIndexService.class);
     private final DataPermissionEngine dataPermissionEngine = mock(DataPermissionEngine.class);
     private final PermissionEvaluator permissionEvaluator = mock(PermissionEvaluator.class);
+    private final RecordShareService recordShareService = mock(RecordShareService.class);
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider =
             mock(ObjectProvider.class);
@@ -63,6 +65,7 @@ class NamedQueryServiceImplTest {
             usageIndexService,
             dataPermissionEngine,
             permissionEvaluator,
+            recordShareService,
             dynamicDataServiceProvider);
 
     @org.junit.jupiter.api.BeforeEach
@@ -164,6 +167,37 @@ class NamedQueryServiceImplTest {
 
         verify(namedQueryFieldMapper, never()).findByQueryCode(any(), anyString());
         verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
+    @Test
+    void executeQueryAllowsAnExplicitUpdateCollaboratorForTheExactRootQuote() {
+        MetaContext.setContext(10L, 20L, "member-pid", "Tester");
+        MetaContext.setMemberId(30L);
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("qo.quote.bom_price");
+        query.setActionCode("read");
+        NamedQueryPolicy policy = new NamedQueryPolicy();
+        NamedQueryPolicy.RootAccess root = new NamedQueryPolicy.RootAccess();
+        root.setModelCode("qo_quote_common");
+        root.setPidParam("quoteId");
+        root.setAllowCollaborator(true);
+        policy.setRootAccess(root);
+        query.setPolicy(policy);
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "qo.quote.bom_price", "read")).thenReturn(false);
+        when(recordShareService.isSharedByPid(
+                10L, "qo_quote_common", "quote-pid", 30L, "member-pid", "update"))
+                .thenReturn(true);
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(0L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(List.of());
+        var request = new com.auraboot.framework.meta.dto.NamedQueryTestRequest();
+        request.setParameters(Map.of("quoteId", "quote-pid"));
+
+        service.executeQuery("order_summary", request);
+
+        verify(dataPermissionEngine, never()).buildRowFilter(any(), anyString(), anyString(), any());
     }
 
     @Test

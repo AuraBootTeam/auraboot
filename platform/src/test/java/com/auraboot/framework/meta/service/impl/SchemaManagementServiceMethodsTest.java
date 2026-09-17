@@ -237,6 +237,39 @@ class SchemaManagementServiceMethodsTest {
     // ==================== addFieldToModel 测试 ====================
 
     @Test
+    void syncRemovesOnlyGeneratedSingleColumnUniquenessWhenModelDisablesIt() {
+        when(metaModelService.getModelDefinitionFromDb("test_model")).thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists(anyString(), anyString())).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column")).thenReturn("VARCHAR(255)");
+        when(tableMetadataService.isColumnNullable(anyString(), anyString())).thenReturn(true);
+        when(ddlDialect.getName()).thenReturn("PostgreSQL");
+        when(tableMetadataService.hasGeneratedSingleColumnUniqueConstraint("tb_test", "test_column"))
+                .thenReturn(true);
+        when(tableMetadataService.hasGeneratedTenantUniqueIndex("tb_test", "test_column")).thenReturn(true);
+        SchemaSyncOptions dryRun = SchemaSyncOptions.builder().syncMode(SchemaSyncOptions.SyncMode.DRY_RUN).build();
+
+        var relaxed = schemaManagementService.syncModelToTable("test_model", dryRun);
+        assertTrue(relaxed.getSuccess());
+        assertTrue(relaxed.getExecutedDDL().contains(
+                "ALTER TABLE tb_test DROP CONSTRAINT IF EXISTS tb_test_test_column_key"));
+        assertTrue(relaxed.getExecutedDDL().contains(
+                "DROP INDEX IF EXISTS idx_tb_test_test_column_tenant_unique"));
+        verify(dynamicDataMapper, never()).alterTable(anyString());
+
+        testField.setUnique(true);
+        var retained = schemaManagementService.syncModelToTable("test_model", dryRun);
+        assertTrue(retained.getExecutedDDL().stream().noneMatch(sql -> sql.contains("DROP ")));
+
+        testField.setUnique(false);
+        when(tableMetadataService.hasGeneratedSingleColumnUniqueConstraint("tb_test", "test_column"))
+                .thenReturn(false);
+        when(tableMetadataService.hasGeneratedTenantUniqueIndex("tb_test", "test_column")).thenReturn(false);
+        var unmanaged = schemaManagementService.syncModelToTable("test_model", dryRun);
+        assertTrue(unmanaged.getExecutedDDL().stream().noneMatch(sql -> sql.contains("DROP ")));
+    }
+
+    @Test
     @DisplayName("addFieldToModel - 成功添加字段")
     void testAddFieldToModel_Success() {
         // Given — addFieldToModel uses getModelDefinitionFromDb (bypasses cache)

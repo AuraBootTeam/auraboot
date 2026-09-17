@@ -1,3 +1,4 @@
+import { saveWorkbookDownload } from './workbook-download-evidence';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as XLSX from 'xlsx';
@@ -71,8 +72,18 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
   });
   expect(workbook.SheetNames).toEqual(['BOM', '变更记录', '转换明细']);
 
+  for (const sheetName of workbook.SheetNames) {
+    for (const [address, entry] of Object.entries(workbook.Sheets[sheetName])) {
+      if (address.startsWith('!') || !entry || typeof entry !== 'object') continue;
+      const cellValue = entry as XLSX.CellObject;
+      expect(cellValue.t, `${sheetName}!${address} must not be an Excel error`).not.toBe('e');
+      expect(`${cellValue.v ?? ''} ${cellValue.f ?? ''}`).not.toMatch(/#(?:REF!|VALUE!|DIV\/0!|NAME\?|NUM!|N\/A|NULL!|GETTING_DATA)/i);
+    }
+  }
   const bomRows = sheetRows(workbook, 'BOM');
   expect(bomRows.length).toBeGreaterThanOrEqual(6);
+  expect(cell(bomRows[1], 0), 'export must belong to this exact task fixture').toContain(created.marker);
+  expect(bomRows.slice(7).filter(row => row.some(value => String(value ?? '').trim() !== ''))).toHaveLength(2);
   expect(bomRows[3]).toEqual([
     '序号',
     '层级',
@@ -166,6 +177,19 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
 
   test('eng: workbench candidate confirm → undo → export download, zero forbidden', async ({ browser }, testInfo) => {
     const { context, page } = await openQuoteRolePage(browser, ENG_USER);
+    async function attachRoleStage(name: string, expectedCode: string) {
+      const row = await readDynamicRecord(page, 'bom_standard_line_pcba', created.standardLineId);
+      const task = await readDynamicRecord(page, 'bom_conversion_task_pcba', created.taskId);
+      const decisions = await queryDynamicRecords(adminPage, 'bom_review_decision', [
+        { fieldName: 'bom_rd_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      const revisions = await queryDynamicRecords(adminPage, 'bom_export_revision', [
+        { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      expect(String(row.bom_std_material_code ?? '')).toBe(expectedCode);
+      await testInfo.attach(`${name}-browser`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach(`${name}-persistence`, { body: JSON.stringify({ role: 'bom_engineering', row, task, decisions, revisions }), contentType: 'application/json' });
+    }
     const forbidden: ForbiddenHit[] = [];
     let step = 'login';
     page.on('response', (resp: Response) => {
@@ -265,6 +289,9 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       await expect(page.getByTestId('review-drawer-candidate-action-undo_decision')).toBeEnabled({
         timeout: 20_000,
       });
+      await expect(page.getByTestId('metric-strip-item-green')).toContainText('2');
+      await expect(page.getByTestId('metric-strip-item-yellow')).toContainText('0');
+      await attachRoleStage('engineering-confirmed', created.candidateCode);
       const undoResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/bom:undo_decision') &&
@@ -294,6 +321,14 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       ]);
       expect(decisions.map((d) => d.bom_rd_decision_type).sort()).toEqual(['manual_confirm', 'undo']);
 
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForDynamicPageLoad(page, 20_000);
+      await expect(page.getByTestId('metric-strip-item-green')).toContainText('1');
+      await expect(page.getByTestId('metric-strip-item-yellow')).toContainText('1');
+      await page.locator('tbody tr').filter({ hasText: 'R1,R2' }).first().click();
+      await expect(page.getByTestId('review-drawer')).toBeVisible();
+      await attachRoleStage('engineering-undone', '');
+
       // 5. regenerate + download the standard BOM as the role; parse the workbook.
       // The drawer is still open (modal) — use its own regenerate-and-download action,
       // which drives the same bom:regenerate_export command.
@@ -313,9 +348,16 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       const regenBody = await (await regeneratePromise).json().catch(() => ({}));
       expect(String((regenBody as { code?: unknown }).code)).toBe('0');
       const download = await downloadPromise;
+      expect(download.suggestedFilename()).toBe(`standard-bom-${created.taskId}.xlsx`);
       const exportPath = path.join(testInfo.outputDir, `role-eng-standard-bom-${created.taskId}.xlsx`);
-      await download.saveAs(exportPath);
+      await saveWorkbookDownload(download, exportPath, testInfo, 'bom-engineering');
       validateStandardBomWorkbook(exportPath, created);
+      const exportFileId = String(regenBody?.data?.data?.exportFileId ?? regenBody?.data?.exportFileId ?? '');
+      expect(exportFileId).toBeTruthy();
+      const exportedTask = await readDynamicRecord(page, 'bom_conversion_task_pcba', created.taskId);
+      expect(exportedTask.bom_task_export_file_id).toBe(exportFileId);
+      expect(String(exportedTask.bom_task_edited_after_completion)).toBe('false');
+      await attachRoleStage('engineering-exported', '');
 
       // 6. hard gates: no console runtime errors, no forbidden API responses as the role
       expect(consoleIssues, `console issues:\n${consoleIssues.join('\n')}`).toEqual([]);

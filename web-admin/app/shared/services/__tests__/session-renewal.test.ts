@@ -59,6 +59,8 @@ describe('session sliding renewal', () => {
     const now = 1_000_000;
     expect(shouldAttemptRenewal(now / 1000 + 3600, now, 12 * 3600 * 1000)).toBe(true);
     expect(shouldAttemptRenewal(now / 1000 + 13 * 3600, now, 12 * 3600 * 1000)).toBe(false);
+    expect(shouldAttemptRenewal(now / 1000, now, 86400000)).toBe(false);
+    expect(shouldAttemptRenewal(now / 1000 - 1, now, 86400000)).toBe(false);
     expect(shouldAttemptRenewal(null, now, 12 * 3600 * 1000)).toBe(false);
     expect(shouldAttemptRenewal(Number.NaN, now, 12 * 3600 * 1000)).toBe(false);
   });
@@ -75,7 +77,7 @@ describe('session sliding renewal', () => {
   });
 
   it('skips renewal when the token is not inside the window', async () => {
-    const exp = Math.floor(Date.now() / 1000) + 20 * 3600;
+    const exp = Math.floor(Date.now() / 1000) + 48 * 3600;
     const session = fakeSession({ jwtToken: makeJwt(exp), tokenExpiry: String(exp) });
     getSessionMock.mockResolvedValue(session);
     const { maybeRenewSession } = await import('~/shared/services/session');
@@ -115,7 +117,8 @@ describe('session sliding renewal', () => {
       expect.any(Request),
     );
     expect(session.set).toHaveBeenCalledWith('jwtToken', newJwt);
-    expect(commitSessionMock).toHaveBeenCalledWith(session, { maxAge: 7 * 24 * 3600 });
+    expect(commitSessionMock.mock.calls[0][1].maxAge).toBeGreaterThanOrEqual(89999);
+    expect(commitSessionMock.mock.calls[0][1].maxAge).toBeLessThanOrEqual(90000);
   });
 
   it('keeps the current token when the renew call fails', async () => {
@@ -139,4 +142,22 @@ describe('session sliding renewal', () => {
     });
     expect(session.set).not.toHaveBeenCalledWith('jwtToken', expect.anything());
   });
+  it('cookie writer records expiry and remember preference and bounds cookie TTL', async () => {
+    const session = fakeSession({}); getSessionMock.mockResolvedValue(session);
+    const { commitUserSession } = await import('~/shared/services/session');
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    await commitUserSession(new Request('http://localhost/'), makeJwt(exp), true);
+    expect(session.set).toHaveBeenCalledWith('tokenExpiry', String(exp));
+    expect(session.set).toHaveBeenCalledWith('remember', '1');
+    expect(commitSessionMock.mock.calls[0][1].maxAge).toBeLessThanOrEqual(3600);
+    await commitUserSession(new Request('http://localhost/'), makeJwt(exp), false);
+    expect(commitSessionMock.mock.calls[1][1].maxAge).toBeUndefined();
+  });
+  it('expired token never calls renewal', async () => {
+    getSessionMock.mockResolvedValue(fakeSession({ jwtToken: makeJwt(Math.floor(Date.now()/1000)-1) }));
+    const { maybeRenewSession } = await import('~/shared/services/session');
+    expect(await maybeRenewSession(new Request('http://localhost/'))).toEqual({renewed:false});
+    expect(post).not.toHaveBeenCalled();
+  });
+
 });

@@ -16,6 +16,14 @@ import java.util.Set;
 @Mapper
 public interface DynamicDataMapper {
 
+    /** Fixed tenant-scoped lock query for current-state command intents; never accepts raw SQL. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectTargetVersionForUpdate")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> selectTargetVersionForUpdate(
+            @Param("tableName") String tableName, @Param("primaryKeyColumn") String primaryKeyColumn,
+            @Param("tenantId") Long tenantId, @Param("targetRecordPid") String targetRecordPid);
+
+
     /**
      * 根据SQL查询数据
      * @param sql SQL语句

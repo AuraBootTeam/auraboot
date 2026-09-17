@@ -1,3 +1,4 @@
+import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
  *
@@ -50,6 +51,10 @@
  */
 
 import { useState, useCallback } from 'react';
+import {
+  downloadWithAuth,
+  resolveCommandFileDownload,
+} from '~/framework/meta/utils/commandDownload';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
@@ -87,14 +92,6 @@ import {
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
 type NavigateFunction = RouterNavigateFunction;
 
-function firstNonBlankString(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value !== 'string') continue;
-    const trimmed = value.trim();
-    if (trimmed.length > 0) return trimmed;
-  }
-  return undefined;
-}
 
 function toNonBlankString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -305,62 +302,7 @@ function notifyActionToast(
   }
 }
 
-/**
- * Pull the user-facing reason out of a failed command response. The backend puts it in
- * `context.detail` (localized); `message` / `desc` are the generic envelope text
- * ("Business error"), so they must stay last. Shared with the DSL form page so both
- * command execution paths surface the same reason.
- */
-export function resolveCommandErrorMessage(
-  result: unknown,
-  commandCode: string,
-  translate?: (key: string) => string,
-): string {
-  const body = (result || {}) as Record<string, any>;
-  const stableI18nKey =
-    String(body.code || '').toUpperCase() === 'BACKEND_REQUEST_TIMEOUT'
-      ? 'common.error.backendRequestTimeout'
-      : undefined;
-  if (stableI18nKey && translate) {
-    const localized = translate(stableI18nKey);
-    if (localized && localized !== stableI18nKey) {
-      return localized;
-    }
-  }
-  const conflictCode = String(body.context?.errorCode || '').toUpperCase();
-  if (conflictCode === 'CAS_VERSION_CONFLICT') {
-    return 'This record was updated by someone else. Refresh to review the latest data before saving.';
-  }
-  if (conflictCode === 'REQUEST_INTENT_CONFLICT') {
-    return 'This request does not match the original request. Refresh and start the operation again.';
-  }
-  if (conflictCode === 'CAS_VERSION_REQUIRED') {
-    return 'This form is stale and cannot prove the record is unchanged. Refresh and try again.';
-  }
-  const resolved =
-    firstNonBlankString(
-      body.context?.detail,
-      body.context?.error,
-      body.context?.exception,
-      body.data?.context?.detail,
-      body.data?.context?.error,
-      body.data?.detail,
-      body.data?.error,
-      body.data?.message,
-      body.message,
-      body.desc,
-    ) || `Command ${commandCode} failed`;
-
-  // PF4J/platform wrappers are implementation details, not business feedback. Keep
-  // the handler's actionable reason while removing the transport prefix from every
-  // DSL command surface (detail, form, workbench and list actions).
-  return resolved
-    .replace(
-      /^(?:plugin (?:extension )?handler execution failed|command handler execution failed)\s*:\s*/i,
-      '',
-    )
-    .trim();
-}
+export { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 
 export interface UseActionHandlerOptions {
   // SchemaRuntime (可选 - 用于 ActionFlow 支持)
@@ -604,7 +546,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(resolveCommandErrorMessage(result, commandCode, t));
+        throw new Error(resolveCommandErrorMessage(result, commandCode, t, locale));
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -983,7 +925,15 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               },
             );
             surfaceTemporaryPassword(commandResult);
-            downloadBase64CommandArtifact(commandResult);
+            const downloadedInline = downloadBase64CommandArtifact(commandResult);
+            if (!downloadedInline && !(commandResult as any)?.__asyncFailed && actionDef.download) {
+              const downloadUrl = resolveCommandFileDownload(commandResult, actionDef.download);
+              if (!downloadUrl)
+                throw new Error(
+                  'Command download result is missing the configured file identifier',
+                );
+              await downloadWithAuth(downloadUrl);
+            }
             if ((commandResult as any)?.__asyncFailed) {
               if (context.loadData) {
                 await context.loadData();

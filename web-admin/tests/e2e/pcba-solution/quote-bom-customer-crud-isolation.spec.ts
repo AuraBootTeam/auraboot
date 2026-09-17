@@ -2,6 +2,8 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import {
+  queryDynamicRecords,
+  searchBusinessList,
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
   openQuoteRolePage,
@@ -27,47 +29,18 @@ async function fillSeq(page: Page, name: string, value: string) {
   await loc.pressSequentially(value, { delay: 12 });
 }
 
-async function waitForListReady(page: Page): Promise<void> {
-  await expect.poll(async () => {
-    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]').first().count();
-    const tableReady = await page.locator('table, [role="table"]').first().count();
-    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
-    return (searchReady > 0 || tableReady > 0) && loading === 0;
-  }).toBe(true);
-}
-
-async function listSearch(page: Page, listPath: string, keyword: string): Promise<number> {
-  await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  await waitForListReady(page);
-  const q = page.locator(
-    '[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]'
-  ).first();
-  if (await q.count() > 0) {
-    await q.click();
-    await q.fill('');
-    await q.pressSequentially(keyword, { delay: 12 });
-    const searchBtn = page.locator(
-      '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索")'
-    ).first();
-    const response = page.waitForResponse((r) => (
-      r.url().includes('/api/dynamic/crm_account_common/list') && r.request().method() === 'GET'
-    ), { timeout: 5000 }).catch(() => null);
-    if (await searchBtn.count() > 0) await searchBtn.click();
-    else await page.keyboard.press('Enter');
-    await response;
-    await waitForListReady(page);
-  }
-  return page.locator('table tbody tr').count();
-}
+const listSearch = searchBusinessList;
 
 async function createCustomer(page: Page, name: string) {
   await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
   await fillSeq(page, 'crm_acc_name', name);
   const saveResponse = page.waitForResponse((r) => (
     r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
-  ), { timeout: 5000 }).catch(() => null);
+  ), { timeout: 15_000 });
   await page.getByRole('button', { name: '保存' }).first().click();
-  await saveResponse;
+  const saved = await saveResponse;
+  expect(saved.status()).toBe(200);
+  expect(String((await saved.json()).code)).toBe('0');
 }
 
 test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
@@ -144,10 +117,16 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
   // ── CUST-05: 客户数据隔离 self(销售A建 → 销售B看不到)+ admin all ──
   test('CUST-05 customer self isolation + admin all-scope', async ({ browser }) => {
     const marker = `W2ISO${uid}`.slice(0, 24);
+    let customerId = '';
     const a = await openQuoteRolePage(browser, users['sales_a']);
     try {
       await createCustomer(a.page, marker);
       expect(await listSearch(a.page, CUST_LIST, marker), 'sales A sees own customer').toBeGreaterThan(0);
+      const ownRows = await queryDynamicRecords(a.page, 'crm_account_common', [
+        { fieldName: 'crm_acc_name', operator: 'EQ', value: marker },
+      ]);
+      customerId = String(ownRows[0]?.pid ?? '');
+      expect(customerId, 'sales A customer pid resolvable').toBeTruthy();
     } finally {
       await a.context.close();
     }
@@ -156,6 +135,22 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
       await listSearch(b.page, CUST_LIST, marker);
       expect(await b.page.locator(`table tbody tr:has-text("${marker}")`).count(),
         'CUST-05: sales B must NOT see sales A customer (self)').toBe(0);
+      // B01-02: list filtering is not enough — detail read and write APIs must
+      // enforce the same self scope for another sales user.
+      const detail = await b.page.request.get(`/api/dynamic/crm_account_common/${customerId}`);
+      const detailBody = await detail.json().catch(() => ({}));
+      const detailRejected = [403, 404].includes(detail.status())
+        || String((detailBody as { code?: unknown }).code ?? '0') !== '0'
+        || !(detailBody as { data?: unknown })?.data;
+      expect(detailRejected, 'B01-02: foreign customer detail read must be refused (same self scope)').toBe(true);
+      const write = await b.page.request.put(`/api/dynamic/crm_account_common/${customerId}`, {
+        data: { crm_acc_name: `${marker}-HACKED` },
+        timeout: 15_000,
+      });
+      const writeBody = await write.json().catch(() => ({}));
+      const writeRejected = ![200, 201].includes(write.status())
+        || String((writeBody as { code?: unknown }).code ?? '0') !== '0';
+      expect(writeRejected, 'B01-02: foreign customer write must be refused (same self scope)').toBe(true);
     } finally {
       await b.context.close();
     }
@@ -165,10 +160,16 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
     try {
       const ap = await adminCtx.newPage();
       await listSearch(ap, CUST_LIST, marker);
-      expect(await ap.locator(`table tbody tr:has-text("${marker}")`).count(),
-        'CUST-05: admin sees the customer (all)').toBeGreaterThan(0);
+      await expect(ap.locator(`table tbody tr:has-text("${marker}")`).first(),
+        'CUST-05: admin sees the customer (all)').toBeVisible();
+      const afterRows = await queryDynamicRecords(ap, 'crm_account_common', [
+        { fieldName: 'crm_acc_name', operator: 'EQ', value: marker },
+      ]);
+      expect(afterRows.length, 'customer still present exactly once for admin').toBe(1);
+      expect(String(afterRows[0]?.crm_acc_name ?? ''), 'denied foreign write must not rename the customer').toBe(marker);
     } finally {
       await adminCtx.close();
     }
   });
+
 });

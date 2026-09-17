@@ -1,146 +1,64 @@
 package com.auraboot.framework.auth.service.impl;
 
-import com.auraboot.framework.auth.dto.AuthenticationResponse;
-import com.auraboot.framework.auth.dto.TokenRenewResponse;
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.service.SessionManagementService;
-import com.auraboot.framework.auth.strategy.LoginCompletionHelper;
 import com.auraboot.framework.auth.util.JwtUtil;
-import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
-import org.junit.jupiter.api.BeforeEach;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import java.time.Instant;
 import java.util.Date;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
 class SessionRenewalServiceImplTest {
+    private final SessionManagementService sessions = mock(SessionManagementService.class);
+    private final JwtUtil jwt = mock(JwtUtil.class);
+    private final UserService users = mock(UserService.class);
+    private final TenantService tenants = mock(TenantService.class);
+    private final TenantMemberService members = mock(TenantMemberService.class);
+    private final SessionRenewalServiceImpl service = new SessionRenewalServiceImpl(sessions, jwt, users, tenants, members);
 
-    private static final long RENEW_WINDOW_SECONDS = 7 * 24 * 3600L;
-    private static final String OLD_TOKEN = "old.token.value";
-    private static final String NEW_TOKEN = "new.token.value";
-    private static final String USER_PID = "user-pid-1";
-
-    @Mock
-    private SessionManagementService sessionManagementService;
-    @Mock
-    private LoginCompletionHelper loginCompletionHelper;
-    @Mock
-    private JwtUtil jwtUtil;
-    @Mock
-    private UserService userService;
-
-    private SessionRenewalServiceImpl service;
-
-    @BeforeEach
-    void setUp() {
-        service = new SessionRenewalServiceImpl(
-                sessionManagementService, loginCompletionHelper, jwtUtil, userService);
-        ReflectionTestUtils.setField(service, "renewWindowSeconds", RENEW_WINDOW_SECONDS);
+    private void active() {
+        UserSession row = new UserSession(); row.setPid("session-1");
+        when(sessions.findByToken("old")).thenReturn(row);
+        when(jwt.extractTenantId("old")).thenReturn(null);
+        when(jwt.extractIdentifier("old")).thenReturn("user");
+        User user = new User(); user.setPid("user"); user.setId(1L);
+        when(users.findByPid("user")).thenReturn(user);
     }
-
-    private UserSession activeSession(Instant createdAt) {
-        UserSession session = new UserSession();
-        session.setCreatedAt(createdAt);
-        session.setRevoked(false);
-        return session;
+    @Test void missing_session_rejects() {
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("no longer valid");
+        verifyNoInteractions(jwt);
     }
-
-    private User enabledUser() {
-        User user = new User();
-        user.setPid(USER_PID);
-        return user;
+    @Test void revoked_session_rejects() {
+        UserSession row = new UserSession(); row.setRevoked(true);
+        when(sessions.findByToken("old")).thenReturn(row);
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("no longer valid");
     }
-
-    @Test
-    void renew_withoutSessionRecord_throws() {
-        when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(null);
-
-        assertThatThrownBy(() -> service.renew(OLD_TOKEN, "127.0.0.1", "UA"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("no longer valid");
+    @Test void renewal_preserves_session_and_never_creates_another_login() {
+        active(); when(jwt.renewSessionToken("old", "session-1")).thenReturn("new");
+        when(jwt.extractExpiration("new")).thenReturn(Date.from(Instant.parse("2026-10-01T00:00:00Z")));
+        assertThat(service.renew("old", null, null).getJwt()).isEqualTo("new");
+        verify(sessions, never()).createSession(any(), any(), any(), any());
+        verify(sessions, never()).revokeSessionByToken(any());
     }
-
-    @Test
-    void renew_withRevokedSession_throws() {
-        UserSession session = activeSession(Instant.now().minusSeconds(60));
-        session.setRevoked(true);
-        when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(session);
-
-        assertThatThrownBy(() -> service.renew(OLD_TOKEN, "127.0.0.1", "UA"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("no longer valid");
+    @Test void deadline_rejection_never_returns_a_cookie_token() {
+        active(); when(jwt.renewSessionToken("old", "session-1")).thenThrow(new IllegalArgumentException());
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("expired");
     }
-
-    @Test
-    void renew_outsideRenewWindow_throws() {
-        UserSession session = activeSession(Instant.now().minusSeconds(RENEW_WINDOW_SECONDS + 1));
-        when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(session);
-
-        assertThatThrownBy(() -> service.renew(OLD_TOKEN, "127.0.0.1", "UA"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("expired");
-
-        verify(loginCompletionHelper, never()).completeLogin(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString());
+    @Test void security_version_change_rejects() {
+        active(); when(jwt.extractSecurityVersion("old")).thenReturn(2);
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("security version");
     }
-
-    @Test
-    void renew_insideWindow_issuesRenewedTokenAndKeepsOldSessionUsable() {
-        UserSession session = activeSession(Instant.now().minusSeconds(60));
-        when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(session);
-        when(jwtUtil.extractIdentifier(OLD_TOKEN)).thenReturn(USER_PID);
-        when(userService.findByPid(USER_PID)).thenReturn(enabledUser());
-
-        AuthenticationResponse auth = new AuthenticationResponse(
-                NEW_TOKEN, 42L, USER_PID, "admin", 7L, "member");
-        when(loginCompletionHelper.completeLogin(
-                org.mockito.ArgumentMatchers.any(User.class), org.mockito.ArgumentMatchers.eq("127.0.0.1"),
-                org.mockito.ArgumentMatchers.eq("UA"))).thenReturn(auth);
-        when(sessionManagementService.isSessionValid(NEW_TOKEN)).thenReturn(true);
-        when(jwtUtil.extractExpiration(NEW_TOKEN))
-                .thenReturn(Date.from(Instant.now().plusSeconds(86400)));
-
-        TokenRenewResponse response = service.renew(OLD_TOKEN, "127.0.0.1", "UA");
-
-        assertThat(response.getJwt()).isEqualTo(NEW_TOKEN);
-        assertThat(response.getExpiresAt()).isNotNull();
-        // The old session must stay usable until its natural JWT expiry so a
-        // dropped Set-Cookie (e.g. on a redirect) cannot strand the browser.
-        verify(sessionManagementService, never()).revokeSessionByToken(OLD_TOKEN);
+    @Test void removed_user_rejects() {
+        active(); when(users.findByPid("user")).thenReturn(null);
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("no longer active");
     }
-
-    @Test
-    void renew_whenNewTokenHasNoSessionRecord_throws() {
-        UserSession session = activeSession(Instant.now().minusSeconds(60));
-        when(sessionManagementService.findByToken(OLD_TOKEN)).thenReturn(session);
-        when(jwtUtil.extractIdentifier(OLD_TOKEN)).thenReturn(USER_PID);
-        when(userService.findByPid(USER_PID)).thenReturn(enabledUser());
-
-        AuthenticationResponse auth = new AuthenticationResponse(
-                NEW_TOKEN, 42L, USER_PID, "admin", 7L, "member");
-        when(loginCompletionHelper.completeLogin(
-                org.mockito.ArgumentMatchers.any(User.class), org.mockito.ArgumentMatchers.eq("127.0.0.1"),
-                org.mockito.ArgumentMatchers.eq("UA"))).thenReturn(auth);
-        when(sessionManagementService.isSessionValid(NEW_TOKEN)).thenReturn(false);
-
-        assertThatThrownBy(() -> service.renew(OLD_TOKEN, "127.0.0.1", "UA"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("failed");
-
-        verify(sessionManagementService, never()).revokeSessionByToken(OLD_TOKEN);
+    @Test void removed_tenant_rejects() {
+        active(); when(jwt.extractTenantId("old")).thenReturn(10L);
+        assertThatThrownBy(() -> service.renew("old", null, null)).hasMessageContaining("membership");
     }
 }

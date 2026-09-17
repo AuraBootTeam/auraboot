@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useEffect } from 'react';
+import { startActiveSessionRenewal } from '~/shared/services/active-session';
 import { useLoaderData } from 'react-router';
 import type { User, UserPermissions, Preferences } from '~/utils/type';
 
@@ -55,6 +56,24 @@ const AuthContext = createContext<AuthContextType>({
   hasAllPermissions: () => false,
 });
 
+const AdditionalPermissionContext = createContext<ReadonlySet<string>>(new Set());
+
+/** Adds server-authorized, record-scoped permissions below a detail-page boundary. */
+export function AdditionalPermissionsProvider({
+  permissions,
+  children,
+}: {
+  permissions: Iterable<string>;
+  children: React.ReactNode;
+}) {
+  const values = useMemo(() => new Set(permissions), [permissions]);
+  return (
+    <AdditionalPermissionContext.Provider value={values}>
+      {children}
+    </AdditionalPermissionContext.Provider>
+  );
+}
+
 /**
  * AuthProvider - SSR-safe authentication context
  *
@@ -66,6 +85,13 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // SSR-safe: get initial data from loader
   const data = useLoaderData() as AuthLoaderData | undefined;
+
+  useEffect(() => {
+    if (!data?.user) return;
+    return startActiveSessionRenewal(window, document, () => fetch('/api/auth/session-renew', {
+      method: 'POST', credentials: 'same-origin',
+    }));
+  }, [Boolean(data?.user)]);
 
   // Permission check functions
   // Supports two formats:
@@ -143,10 +169,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+  const additionalPermissions = useContext(AdditionalPermissionContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context;
+  return useMemo(() => {
+    if (additionalPermissions.size === 0) return context;
+    const hasPermission = (permissionCode: string) =>
+      additionalPermissions.has(permissionCode) || context.hasPermission(permissionCode);
+    return {
+      ...context,
+      hasPermission,
+      hasAnyPermission: (permissionCodes: string[]) => permissionCodes.some(hasPermission),
+      hasAllPermissions: (permissionCodes: string[]) => permissionCodes.every(hasPermission),
+    };
+  }, [additionalPermissions, context]);
 }
 
 /**

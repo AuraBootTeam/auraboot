@@ -54,8 +54,8 @@ class CommandBoundaryVerdictIT extends BaseIntegrationTest {
     @Autowired private TenantBootstrapService tenantBootstrapService;
     @Autowired private UserPermissionService userPermissionService;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private CommandAuthorizationPhase phase;
 
-    private CommandAuthorizationPhase phase;
     private Long tenantId;
     private Long adminUserId;
     private Long adminMemberId;
@@ -93,7 +93,6 @@ class CommandBoundaryVerdictIT extends BaseIntegrationTest {
         userPermissionService.evictUserPermissions(adminUserId);
         userPermissionService.evictUserPermissions(memberUserId);
 
-        phase = new CommandAuthorizationPhase(userPermissionService);
     }
 
     private Long insertMember(Long userId) {

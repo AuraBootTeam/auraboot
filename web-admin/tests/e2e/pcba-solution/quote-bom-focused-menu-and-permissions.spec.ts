@@ -10,6 +10,7 @@ import {
   openQuoteRolePage,
   type QuoteRoleUser,
   type RoleSnapshot,
+  openPgClient,
 } from './quote-e2e-helpers';
 
 /**
@@ -366,6 +367,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-${label}`));
         await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
         await expectCommandDenied(page, 'bom:create_material', { bom_mm_material_code: `X-${uid}` });
+        await expectCommandDenied(page, 'org:create_department', { org_dept_name: `X-${uid}-${label}` });
       });
     }
 
@@ -388,6 +390,55 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.noBusinessRole, async (page) => {
       await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
       await expectCommandDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-norole`));
+      await expectCommandDenied(page, 'org:create_department', { org_dept_name: `X-${uid}-norole` });
+
+      // X02-01: dynamic role assignment through the platform admin API must
+      // flip authorization on the next request without a new login. Grant
+      // qo_sales to the no-role member, the previously denied quote create is
+      // accepted, and revoking the role returns it to denied.
+      const { client } = await openPgClient();
+      let memberPid = '';
+      try {
+        const row = await client.query(
+          `select tm.pid from ab_tenant_member tm
+           join ab_user u on u.id = tm.user_id
+           where u.email = $1 order by tm.created_at desc limit 1`,
+          [users.noBusinessRole.email],
+        );
+        memberPid = String(row.rows[0]?.pid ?? '');
+      } finally {
+        await client.end();
+      }
+      expect(memberPid, 'no-role member has a pid').toBeTruthy();
+
+      const adminContext = await browser.newContext({
+        storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+      });
+      const grant = await adminContext.request.post('/api/user-roles/assign-by-code', {
+        data: { memberPid, roleCodes: ['qo_sales'] },
+      });
+      expect(grant.status(), 'role grant via admin API succeeds').toBe(200);
+      await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
+
+      // assign-by-code treats an empty roleCodes list as a no-op, so the
+      // revoke uses the platform remove-by-pid endpoint (service-layer change
+      // publishes the member permission-cache eviction after commit).
+      const { client: revokeClient } = await openPgClient();
+      let qoSalesRolePid = '';
+      try {
+        qoSalesRolePid = String(await revokeClient.query(
+          `select pid from ab_role where code = 'qo_sales' limit 1`,
+        ).then((r) => r.rows[0]?.pid ?? ''));
+      } finally {
+        await revokeClient.end();
+      }
+      expect(qoSalesRolePid, 'qo_sales role pid resolvable').toBeTruthy();
+      const revoke = await adminContext.request.delete('/api/user-roles/remove-by-pid', {
+        data: { memberPid, rolePids: [qoSalesRolePid] },
+      });
+      expect(revoke.status(), 'role revoke via admin API succeeds').toBe(200);
+      await adminContext.close();
+      await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
     });
   });
 });

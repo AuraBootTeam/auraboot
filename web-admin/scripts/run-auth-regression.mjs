@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const targetSpecs = [
   'tests/e2e/auth/login.spec.ts',
+  'tests/e2e/auth/session-lifetime.spec.ts',
   'tests/e2e/auth/auth-complete.spec.ts',
   'tests/e2e/auth/auth-recovery-and-signup.spec.ts',
   'tests/e2e/auth/login-multichannel.spec.ts',
@@ -44,6 +45,17 @@ for (const dir of [
   dirname(env.PW_RESULTS_JSON),
 ]) {
   mkdirSync(dir, { recursive: true });
+}
+
+// Session lifetime invariants must pass before browser auth journeys.
+const renewalUnit = spawnSync('vitest', ['run',
+  'app/shared/services/__tests__/session-renewal.test.ts',
+  'app/shared/services/__tests__/active-session.test.ts', '--retry=0'], {
+  stdio: 'inherit', env, shell: process.platform === 'win32',
+});
+if (renewalUnit.error || renewalUnit.status !== 0) {
+  console.error(renewalUnit.error || 'Session renewal unit gate failed');
+  process.exit(renewalUnit.status || 1);
 }
 
 runPlaywright([
