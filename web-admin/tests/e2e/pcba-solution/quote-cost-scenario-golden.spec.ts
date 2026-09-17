@@ -158,4 +158,69 @@ test.describe('PCBA quote cost scenario golden', () => {
     // 冻结后档位值保持最后一次 ready 保存的 200,未被后续尝试改动
     expect(Number((await tierRows())[0].qo_cst_quantity)).toBe(200);
   });
+
+  // Q18-03: 含成本缺口与假设的方案详情——缺口与假设人类可读展示(豁免原因/批准原因/
+  // 描述),无 raw JSON 或内部编码泄漏。走真实生命周期:假设创建→批准→缺口豁免→冻结。
+  test('Q18-03 scenario with assumptions and gaps renders human-readable waiver/approval evidence without raw internals', async ({
+    page,
+  }, info) => {
+    const marker = `CSGAP-${Date.now()}`;
+    const payload: Record<string, unknown> = {
+      qo_cs_name: marker, qo_cs_customer: marker, qo_cs_commitment_level: 'estimate', qo_cs_currency: 'CNY',
+      qo_cs_valid_until: '2030-12-31', idempotency_key: marker,
+      tiers: [{ qo_cst_quantity: 100, qo_cst_currency: 'CNY', qo_cst_material_unit_cost: 10,
+        qo_cst_process_unit_cost: 2, qo_cst_nre_total: 100, qo_cst_other_unit_cost: 1,
+        qo_cst_risk_pct: 5, qo_cst_target_margin_pct: 20 }],
+      assumptions: [], gaps: [],
+    };
+    for (const field of ['mdp_id', 'mdp_version', 'mdp_hash', 'structure_ref', 'process_ref', 'pack_set_version',
+      'price_snapshot_version', 'rate_card_version', 'fx_rate_version', 'rule_set_version', 'risk_version',
+      'assumption_set_version'])
+      payload[`qo_cs_${field}`] = `${marker}-${field}`;
+    const created = await executeCommand(page, 'qo_cost_scenario_common:create_from_mdp', payload, undefined, 'create');
+    const scenarioId = String(created.recordId);
+
+    // 假设经授权命令创建(默认 proposed)→ 授权命令批准
+    const assumptionCreated = await executeCommand(page, 'qo_cost_assumption_common:create', {
+      qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
+      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: 'cost', qo_ca_version: 'v1',
+    });
+    const assumptionId = String(assumptionCreated.recordId);
+    await executeCommand(page, 'qo_cost_assumption_common:approve', {
+      approved_by: 'Local E2E', approval_reason: '汇率口径经财务复核',
+    }, assumptionId, 'update');
+
+    // 缺口经授权命令创建(默认 open)→ 授权命令豁免(挂假设)
+    const gapCreated = await executeCommand(page, 'qo_cost_gap_common:create', {
+      qo_cg_code: 'GAP-TEST', qo_cg_scenario_id: scenarioId,
+      qo_cg_severity: 'critical', qo_cg_description: '缺少测试报告成本项',
+      qo_cg_assumption_id: assumptionId,
+    });
+    const gapId = String(gapCreated.recordId);
+    await executeCommand(page, 'qo_cost_gap_common:close', {
+      mode: 'waived', waiver_reason: '由历史测试报告覆盖,无需另行收费',
+      waived_by: 'Local E2E',
+    }, gapId, 'update');
+
+    // 重算刷新门状态(GT-Q02),再冻结定版
+    await executeCommand(page, 'qo_cost_scenario_common:calculate', {}, scenarioId, 'update');
+    await executeCommand(page, 'qo_cost_scenario_common:freeze', { frozen_by: 'Local E2E' }, scenarioId, 'update');
+
+    await page.goto(`/p/qo_cost_scenario_common/view/${scenarioId}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /成本方案|Cost/i })).toBeVisible({ timeout: 20_000 });
+    const bodyText = await page.locator('main').innerText();
+    // 人类可读:假设描述/批准原因、缺口描述/豁免原因全部可见
+    expect(bodyText).toContain('汇率假设 7.0 CNY/USD');
+    expect(bodyText).toContain('汇率口径经财务复核');
+    expect(bodyText).toContain('缺少测试报告成本项');
+    expect(bodyText).toContain('由历史测试报告覆盖,无需另行收费');
+    // 无 raw JSON 或内部编码泄漏
+    expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
+    expect(bodyText).not.toMatch(/\{"qo_ca_/);
+    expect(bodyText).not.toMatch(/UNAPPROVED_ASSUMPTION|INVALID_WAIVER/);
+    await info.attach('q18-03-scenario-evidence', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  });
 });
