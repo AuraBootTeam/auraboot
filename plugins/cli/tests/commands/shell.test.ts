@@ -4,10 +4,6 @@ describe('shell command', () => {
   describe('command registry', () => {
     const COMMANDS: Record<string, string> = {
       'help':       'Show available commands',
-      'crm leads':  'List CRM leads',
-      'crm opps':   'List opportunities',
-      'crm accounts': 'List accounts',
-      'crm dashboard': 'CRM KPI summary',
       'project list': 'List projects',
       'project tasks': 'List tasks',
       'project dashboard': 'PM KPI summary',
@@ -19,9 +15,7 @@ describe('shell command', () => {
       'quit':        'Exit shell',
     };
 
-    it('should have all domain commands', () => {
-      expect(COMMANDS['crm leads']).toBeDefined();
-      expect(COMMANDS['crm opps']).toBeDefined();
+    it('should have platform and installed domain commands', () => {
       expect(COMMANDS['project list']).toBeDefined();
       expect(COMMANDS['ops agents']).toBeDefined();
     });
@@ -38,14 +32,14 @@ describe('shell command', () => {
 
   describe('tab completion', () => {
     it('should match prefix', () => {
-      const commands = ['crm leads', 'crm opps', 'crm accounts', 'project list', 'ops agents'];
-      const line = 'crm';
+      const commands = ['project list', 'project tasks', 'project dashboard', 'ops agents'];
+      const line = 'project';
       const hits = commands.filter(c => c.startsWith(line));
-      expect(hits).toEqual(['crm leads', 'crm opps', 'crm accounts']);
+      expect(hits).toEqual(['project list', 'project tasks', 'project dashboard']);
     });
 
     it('should return all on empty input', () => {
-      const commands = ['crm leads', 'project list', 'ops agents'];
+      const commands = ['project list', 'ops agents'];
       const line = '';
       const hits = commands.filter(c => c.startsWith(line));
       expect(hits).toEqual(commands);

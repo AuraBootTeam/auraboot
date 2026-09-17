@@ -907,6 +907,35 @@ class NamedQueryServiceImplIntegrationTest {
         assertTrue(result.getTotal() >= 0);
     }
 
+    @Test
+    @DisplayName("executeQuery preserves camelCase output field codes (no lowercase folding)")
+    void executeQueryPreservesCamelCaseFieldCodes() {
+        String code = uniqueCode("camel");
+        NamedQueryCreateRequest createReq = newRequest(code, "Camel Case Output");
+        createReq.setFromSql("SELECT id, code, status FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
+        namedQueryService.create(createReq);
+
+        namedQueryService.addField(code, newFieldRequest("queryRef", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("rowCode", "code", "string"));
+
+        NamedQueryTestRequest req = new NamedQueryTestRequest();
+        req.setPage(1);
+        req.setSize(10);
+
+        PaginationResult<java.util.Map<String, Object>> result = namedQueryService.executeQuery(code, req);
+        assertNotNull(result.getRecords());
+        assertFalse(result.getRecords().isEmpty(), "the query created above must return its own row");
+        java.util.Map<String, Object> row = result.getRecords().get(0);
+        assertTrue(row.containsKey("queryRef"),
+                "camelCase alias queryRef must keep its declared case, keys=" + row.keySet());
+        assertTrue(row.containsKey("rowCode"),
+                "camelCase alias rowCode must keep its declared case, keys=" + row.keySet());
+        assertFalse(row.containsKey("queryref"),
+                "lowercase-folded keys leak when aliases are emitted unquoted");
+        assertFalse(row.containsKey("rowcode"),
+                "lowercase-folded keys leak when aliases are emitted unquoted");
+    }
+
     // ==================== findByPid returns fields when includeFields implied ====================
 
     @Test

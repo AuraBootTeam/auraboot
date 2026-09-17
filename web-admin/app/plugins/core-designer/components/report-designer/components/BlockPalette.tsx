@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useReportDocument } from '../state/ReportDocumentProvider';
 import type { BlockDefinition, ReportBand } from '../types';
 import { DesignerPalette } from '~/shared/designer';
@@ -199,6 +200,7 @@ const BlockIcon: React.FC<{ type: string; className?: string }> = ({
 // ==================== Component ====================
 
 export const BlockPalette: React.FC = () => {
+  const text = useSmartText();
   const { addBlock, updateHeader, updateFooter, report } = useReportDocument();
 
   const handleAddBlock = (def: BlockDefinition) => {
@@ -334,7 +336,7 @@ export const BlockPalette: React.FC = () => {
     <DesignerPalette
       items={items}
       title="Blocks"
-      subtitle="Click to add to report"
+      subtitle={text({ zh: '点击添加到报表', en: 'Click to add to report' })}
       onItemClick={(item) => handleAddBlock(item.data as BlockDefinition)}
       className="w-56 bg-gray-50"
       testId="block-palette"

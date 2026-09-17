@@ -12,6 +12,20 @@ class ToolMetadataRegistryTest {
     private final ToolMetadataRegistry registry = new ToolMetadataRegistry();
 
     @Test
+    void formDraftHasNoBusinessSideEffectsButOtherPlatformToolsRemainWrites() {
+        for (String name : java.util.List.of("platform.fill_form", "platform_fill_form")) {
+            ToolMetadata metadata = registry.from(ToolDefinition.builder()
+                    .toolCode(name).toolName(name).toolType("platform").riskLevel("L1")
+                    .requiresConfirmation(false).build(), ToolMetadataTrustLevel.VERIFIED);
+            assertThat(metadata.getEffectType()).isEqualTo(ToolEffectType.NONE);
+            assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.NONE);
+        }
+        assertThat(registry.from(ToolDefinition.builder().toolCode("platform.update_record")
+                .toolType("platform").build(), ToolMetadataTrustLevel.VERIFIED).getEffectType())
+                .isEqualTo(ToolEffectType.INTERNAL_WRITE);
+    }
+
+    @Test
     @DisplayName("maps platform-owned query tools to verified read metadata")
     void mapsVerifiedReadToolMetadata() {
         ToolDefinition query = ToolDefinition.builder()

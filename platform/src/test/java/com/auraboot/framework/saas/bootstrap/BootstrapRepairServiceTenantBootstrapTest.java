@@ -97,6 +97,8 @@ class BootstrapRepairServiceTenantBootstrapTest {
     void orderedStepsRunTenantBootstrapBeforeBuiltinPluginImport() {
         assertThat(BootstrapRepairService.ORDERED_STEPS)
             .containsSubsequence(
+                BootstrapRepairService.STEP_BUSINESS_TENANT,
+                BootstrapRepairService.STEP_ADMIN_MEMBERSHIP,
                 BootstrapRepairService.STEP_BUSINESS_TENANT_BOOTSTRAP,
                 BootstrapRepairService.STEP_BUILTIN_PLUGINS
             );

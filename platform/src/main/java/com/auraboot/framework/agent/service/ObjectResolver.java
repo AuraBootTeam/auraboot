@@ -84,8 +84,8 @@ public class ObjectResolver {
 
         // Layer 2: Load model display names from ab_meta_model.extension->>'displayName'
         try {
-            String sql = "SELECT code, extension->>'displayName' as display_name FROM ab_meta_model " +
-                    "WHERE status = 'published' AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
+            String sql = "SELECT code, COALESCE(extension->>'displayName', extension->'extension'->>'displayName') as display_name FROM ab_meta_model " +
+                    "WHERE tenant_id IN (-1, 0) AND status = 'published' AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
             for (Map<String, Object> row : rows) {
                 String code = (String) row.get("code");
@@ -130,6 +130,9 @@ public class ObjectResolver {
         }
 
         // Phase 1: Find all exact/alias matches in the message (longest match wins)
+        int firstLineEnd = lower.indexOf('\n');
+        if (firstLineEnd < 0) firstLineEnd = lower.length();
+        boolean bestInOpening = false;
         String bestAlias = null;
         String bestModelCode = null;
         double bestConfidence = 0.0;
@@ -143,7 +146,11 @@ public class ObjectResolver {
                 // Exact model_code match gets highest confidence
                 if (alias.equals(entry.getValue())) confidence = 0.99;
 
-                if (bestAlias == null || alias.length() > bestAlias.length()) {
+                // The opening names the target; appended data may mention other models.
+                boolean inOpening = lower.indexOf(alias) + alias.length() <= firstLineEnd;
+                if (bestAlias == null || (inOpening && !bestInOpening)
+                        || (inOpening == bestInOpening && alias.length() > bestAlias.length())) {
+                    bestInOpening = inOpening;
                     bestAlias = alias;
                     bestModelCode = entry.getValue();
                     bestConfidence = confidence;
@@ -355,14 +362,16 @@ public class ObjectResolver {
             }
 
             // Load tenant-specific model display names
-            String modelSql = "SELECT code, extension->>'displayName' as display_name FROM ab_meta_model " +
-                    "WHERE status = 'published' AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
-            List<Map<String, Object>> modelRows = dynamicDataMapper.selectByQuery(modelSql, Map.of());
+            String modelSql = "SELECT code, COALESCE(extension->>'displayName', extension->'extension'->>'displayName') as display_name FROM ab_meta_model " +
+                    "WHERE tenant_id = #{params.tenantId} AND status = 'published' AND (deleted_flag = FALSE OR deleted_flag IS NULL)";
+            List<Map<String, Object>> modelRows = dynamicDataMapper.selectByQuery(modelSql, Map.of("tenantId", tenantId));
             for (Map<String, Object> row : modelRows) {
                 String code = (String) row.get("code");
                 String displayName = (String) row.get("display_name");
+                if (code != null) tenantInverted.putIfAbsent(code.toLowerCase(), code);
                 if (code != null && displayName != null && !displayName.isBlank()) {
                     tenantDisplayNames.put(code, displayName.toLowerCase());
+                    tenantInverted.putIfAbsent(displayName.toLowerCase(), code);
                 }
             }
 

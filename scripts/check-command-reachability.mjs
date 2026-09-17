@@ -114,8 +114,8 @@ export function conventionReferencedCommands(pluginDir) {
 export function referencedCommands(pluginDir) {
   const found = new Set();
   // Scan the raw text of every page/menu file, single-file or sharded — the
-  // directory form is easy to miss (workflow-demo keeps one JSON per page under
-  // config/pages/, and the first version of this gate only opened pages.json,
+  // directory form is easy to miss (a plugin may keep one JSON per page under
+  // config/pages/, and a gate that only opens pages.json would miss them,
   // producing 19 false positives). Substring over raw JSON on purpose: the DSL
   // reaches commands through several unrelated shapes, and a structured matcher
   // that knows four of five reports reachable commands as unreachable.

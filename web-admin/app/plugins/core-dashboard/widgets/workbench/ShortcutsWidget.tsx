@@ -248,7 +248,7 @@ export function ShortcutsWidget({
       </div>
 
       {/* Vertical list */}
-      <ul data-testid="shortcuts-list" className="flex-1 px-2 pb-2">
+      <ul data-testid="shortcuts-list" className="flex-1 overflow-y-auto px-2 pb-2">
         {items.map((item, index) => {
           const isDragging = dragIndex === index;
           const isDropTarget =

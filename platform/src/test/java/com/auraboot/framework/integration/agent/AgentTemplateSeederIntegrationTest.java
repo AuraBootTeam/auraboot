@@ -35,14 +35,50 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     private SkillAutoGenerator skillAutoGenerator;
 
     @BeforeEach
-    void ensureSeeded() {
+    void ensureSeeded() throws java.io.IOException {
         agentTemplateSeeder.seed();
+        jdbcTemplate.execute(java.nio.file.Files.readString(
+                java.nio.file.Path.of("../scripts/seed-form-fill-skill.sql")));
         try {
             MetaContext.setSystemTenantContext(SYSTEM_TENANT_ID);
             skillAutoGenerator.syncSkills(SYSTEM_TENANT_ID);
         } finally {
             MetaContext.clear();
         }
+    }
+
+    @Autowired
+    private com.auraboot.framework.aurabot.service.FormFillSkillService formFillSkills;
+
+    @Autowired
+    private org.mybatis.spring.SqlSessionTemplate sqlSession;
+
+    @Test
+    void formFillSkillLoadsPlatformSeedAndAnIsolatedTenantOverrideFromPostgres() {
+        var provider = new com.auraboot.framework.agent.provider.OpenAiCompatibleLlmProvider(
+                null, new com.fasterxml.jackson.databind.ObjectMapper());
+        Long tenantId = testTenant.getId();
+        var builtin = formFillSkills.resolve(tenantId, provider, "fixture-model");
+        assertThat(builtin.version()).isEqualTo("1.1.0");
+        assertThat(builtin.prompt()).contains("Read the platform_fill_form input schema");
+        jdbcTemplate.update("""
+                INSERT INTO ab_agent_skill
+                (pid, tenant_id, skill_code, skill_name, skill_version, skill_tools, prompt_template, actionability)
+                VALUES (?, ?, 'form_draft_fill', 'Tenant form playbook', '2.0.0',
+                        '["platform.fill_form"]'::jsonb, 'Use the tenant vocabulary.', 'read_only')
+                ON CONFLICT (tenant_id, skill_code) DO UPDATE SET
+                    skill_version = EXCLUDED.skill_version, skill_tools = EXCLUDED.skill_tools,
+                    prompt_template = EXCLUDED.prompt_template, actionability = EXCLUDED.actionability,
+                    skill_status = 'active', deleted_flag = FALSE
+                """, com.auraboot.framework.common.util.UniqueIdGenerator.generate(), tenantId);
+        // The fixture uses JDBC inside one test transaction. Begin the equivalent of a
+        // fresh request read instead of reusing MyBatis' first-level SELECT cache.
+        sqlSession.clearCache();
+        var tenant = formFillSkills.resolve(tenantId, provider, "fixture-model");
+        assertThat(tenant.version()).isEqualTo("2.0.0");
+        assertThat(tenant.prompt()).isEqualTo("Use the tenant vocabulary.");
+        assertThat(formFillSkills.resolve(SYSTEM_TENANT_ID, provider, "fixture-model").prompt())
+                .isEqualTo(builtin.prompt());
     }
 
     // =========================================================================
@@ -56,7 +92,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        assertThat(count).isEqualTo(8);
+        assertThat(count).isEqualTo(6);
     }
 
     @Test
@@ -66,7 +102,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT * FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(skills).hasSize(8);
+        assertThat(skills).hasSize(6);
         for (Map<String, Object> skill : skills) {
             assertThat(skill.get("skill_code")).isNotNull();
             assertThat(skill.get("skill_name")).isNotNull();
@@ -92,31 +128,13 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 String.class,
                 SYSTEM_TENANT_ID);
         assertThat(codes).containsExactlyInAnyOrder(
-                "approval_workflow",
                 "data_entry_assistant",
                 "report_analysis",
-                "crm_operations",
-                "crm_quarterly_review",
                 "ops_inspector",
                 "dsl.command",
-                "dsl.query"
+                "dsl.query",
+                "form_draft_fill"
         );
-    }
-
-    @Test
-    @Order(4)
-    void quarterlyReviewSkill_requiresVerifiableCustomerNamesAndNoFabricatedDimensions() {
-        String prompt = jdbcTemplate.queryForObject(
-                "SELECT prompt_template FROM ab_agent_skill WHERE tenant_id = ? AND skill_code = ?",
-                String.class,
-                SYSTEM_TENANT_ID,
-                "crm_quarterly_review");
-
-        assertThat(prompt)
-                .contains("【事实样本】")
-                .contains("真实客户名称")
-                .contains("数据缺失")
-                .contains("不得猜测");
     }
 
     @Test
@@ -140,7 +158,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(4)
     void builtinSkills_promptTemplate_mentionsDelegateTask() {
-        // C.4: each of the 5 workflow-level builtin skills must teach the LLM
+        // C.4: each platform-owned workflow-level builtin skill must teach the LLM
         // about platform.delegate_task so it can spawn child runs.
         // Re-seed in this @Transactional method to pick up the latest
         // prompt_template constants from source (seeder is INSERT ... ON
@@ -152,10 +170,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
         agentTemplateSeeder.seed();
 
         List<String> workflowSkillCodes = List.of(
-                "approval_workflow",
                 "data_entry_assistant",
                 "report_analysis",
-                "crm_operations",
                 "ops_inspector");
 
         for (String code : workflowSkillCodes) {
@@ -239,7 +255,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * F.2 negative case: the four non-analytical skills must keep execution_config = {}.
+     * F.2 negative case: the two non-analytical platform workflow skills keep execution_config = {}.
      * Guarantees we did not accidentally enable thinking on workflow skills where
      * Anthropic billing or non-thinking-capable models would produce HTTP 400.
      */
@@ -250,11 +266,11 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT skill_code, execution_config::text AS cfg " +
                 "FROM ab_agent_skill " +
                 "WHERE tenant_id = ? AND is_builtin = TRUE " +
-                "AND skill_code IN ('approval_workflow','data_entry_assistant','crm_operations','ops_inspector') " +
+                "AND skill_code IN ('data_entry_assistant','ops_inspector') " +
                 "ORDER BY skill_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(rows).hasSize(4);
+        assertThat(rows).hasSize(2);
         for (Map<String, Object> row : rows) {
             String code = (String) row.get("skill_code");
             String cfg = (String) row.get("cfg");
@@ -306,7 +322,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%'",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        assertThat(count).isEqualTo(3);
+        assertThat(count).isEqualTo(1);
     }
 
     @Test
@@ -317,11 +333,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%' ORDER BY agent_code",
                 String.class,
                 SYSTEM_TENANT_ID);
-        assertThat(codes).containsExactlyInAnyOrder(
-                "tpl_aurabot_internal",
-                "tpl_approval_assistant",
-                "tpl_customer_service"
-        );
+        assertThat(codes).containsExactly("tpl_aurabot_internal");
     }
 
     @Test
@@ -344,28 +356,15 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(8)
-    void agentTemplate_aurabotInternal_hasAllSkills() {
+    void agentTemplate_aurabotInternal_hasOnlyPlatformSkills() {
         String skills = jdbcTemplate.queryForObject(
                 "SELECT skills FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_aurabot_internal'",
                 String.class,
                 SYSTEM_TENANT_ID);
-        assertThat(skills).contains("approval_workflow");
         assertThat(skills).contains("data_entry_assistant");
         assertThat(skills).contains("report_analysis");
-        assertThat(skills).contains("crm_operations");
         assertThat(skills).contains("ops_inspector");
-    }
-
-    @Test
-    @Order(9)
-    void agentTemplate_approvalAssistant_hasCorrectSkills() {
-        String skills = jdbcTemplate.queryForObject(
-                "SELECT skills FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_approval_assistant'",
-                String.class,
-                SYSTEM_TENANT_ID);
-        assertThat(skills).contains("approval_workflow");
-        // Should NOT include CRM or full ops skills
-        assertThat(skills).doesNotContain("crm_operations");
+        assertThat(skills).doesNotContain("approval_workflow", "crm_operations", "crm_quarterly_review");
     }
 
     @Test
@@ -391,44 +390,6 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 .isNotBlank();
     }
 
-    @Test
-    @Order(11)
-    void agentTemplate_approvalAssistant_soulProfile_toneIsFormal() {
-        String soulProfileJson = jdbcTemplate.queryForObject(
-                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_approval_assistant'",
-                String.class,
-                SYSTEM_TENANT_ID);
-
-        assertThat(soulProfileJson).isNotNull();
-        java.util.Map<String, Object> profile =
-                com.auraboot.framework.agent.service.SoulProfileParser.parse(soulProfileJson);
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getTone(profile))
-                .isEqualTo("formal");
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getValues(profile))
-                .contains("accuracy", "policy-compliance", "timeliness");
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getBoundaries(profile))
-                .hasSize(2);
-    }
-
-    @Test
-    @Order(12)
-    void agentTemplate_customerService_soulProfile_toneIsFriendly() {
-        String soulProfileJson = jdbcTemplate.queryForObject(
-                "SELECT soul_profile::text FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = 'tpl_customer_service'",
-                String.class,
-                SYSTEM_TENANT_ID);
-
-        assertThat(soulProfileJson).isNotNull();
-        java.util.Map<String, Object> profile =
-                com.auraboot.framework.agent.service.SoulProfileParser.parse(soulProfileJson);
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getTone(profile))
-                .isEqualTo("friendly");
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getValues(profile))
-                .contains("customer-first", "patience", "problem-resolution");
-        assertThat(com.auraboot.framework.agent.service.SoulProfileParser.getGreeting(profile))
-                .isEqualTo("Hi! I'm here to help. What can I do for you?");
-    }
-
     // =========================================================================
     // Agent Identity — system user binding (F5)
     // =========================================================================
@@ -442,7 +403,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "ORDER BY agent_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(agents).hasSize(3);
+        assertThat(agents).hasSize(1);
         for (Map<String, Object> agent : agents) {
             String code = (String) agent.get("agent_code");
             assertThat(agent.get("system_user_id"))
@@ -486,7 +447,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "ORDER BY a.agent_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(agents).hasSize(3);
+        assertThat(agents).hasSize(1);
         for (Map<String, Object> row : agents) {
             String code  = (String) row.get("agent_code");
             String email = (String) row.get("email");
@@ -531,7 +492,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_user WHERE deleted_flag = FALSE",
                 Integer.class);
 
-        assertThat(systemAgentCount).isGreaterThanOrEqualTo(3);
+        assertThat(systemAgentCount).isGreaterThanOrEqualTo(1);
         assertThat(humanCount).as("human count excludes system agents")
                 .isEqualTo(totalCount - systemAgentCount);
     }

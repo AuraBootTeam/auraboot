@@ -1,7 +1,5 @@
 package com.auraboot.framework.dashboard.service;
 
-import com.auraboot.framework.dashboard.dto.WorkbenchBpmStatsDTO;
-import com.auraboot.framework.dashboard.dto.WorkbenchPipelineDTO;
 import com.auraboot.framework.dashboard.dto.WorkbenchStatsDTO;
 
 import java.util.List;
@@ -19,17 +17,4 @@ public interface WorkbenchStatsService {
      */
     WorkbenchStatsDTO getStats(List<String> keys);
 
-    /**
-     * Get CRM opportunity pipeline grouped by stage.
-     *
-     * @return pipeline stages with counts and amounts
-     */
-    WorkbenchPipelineDTO getPipeline();
-
-    /**
-     * Get BPM process statistics.
-     *
-     * @return BPM stats including running count, completion rate, etc.
-     */
-    WorkbenchBpmStatsDTO getBpmStats();
 }

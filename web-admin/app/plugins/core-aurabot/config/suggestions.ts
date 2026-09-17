@@ -6,77 +6,6 @@ export interface Suggestion {
 }
 
 const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
-  // CRM
-  'detail:crm_lead_common': [
-    {
-      icon: '📊',
-      label: 'Summarize lead',
-      labelZh: '总结线索',
-      prompt: '请总结这个线索的关键信息和历史',
-    },
-    {
-      icon: '✉️',
-      label: 'Draft follow-up',
-      labelZh: '生成跟进邮件',
-      prompt: '请为这个线索生成一封跟进邮件',
-    },
-    {
-      icon: '📈',
-      label: 'Win probability',
-      labelZh: '分析成交概率',
-      prompt: '分析这个线索的成交概率和建议',
-    },
-    {
-      icon: '📅',
-      label: 'Create task',
-      labelZh: '创建跟进任务',
-      prompt: '为这个线索创建一个跟进任务',
-    },
-  ],
-  'detail:crm_opportunity_common': [
-    {
-      icon: '📊',
-      label: 'Deal summary',
-      labelZh: '商机摘要',
-      prompt: '总结这个商机的状态和关键信息',
-    },
-    {
-      icon: '💰',
-      label: 'Revenue forecast',
-      labelZh: '营收预测',
-      prompt: '预测这个商机的营收和时间线',
-    },
-    {
-      icon: '📋',
-      label: 'Next steps',
-      labelZh: '建议下一步',
-      prompt: '建议推进这个商机的下一步行动',
-    },
-  ],
-  'detail:crm_complaint': [
-    {
-      icon: '🔍',
-      label: 'Analyze complaint',
-      labelZh: '分析投诉',
-      prompt: '分析这个投诉的严重程度和处理建议',
-    },
-    { icon: '✉️', label: 'Draft response', labelZh: '生成回复', prompt: '生成一封专业的客户回复' },
-  ],
-  'list:crm_lead_common': [
-    {
-      icon: '📊',
-      label: 'Lead analysis',
-      labelZh: '线索分析',
-      prompt: '分析当前线索的状态和来源分布',
-    },
-    {
-      icon: '🎯',
-      label: 'Conversion tips',
-      labelZh: '转化建议',
-      prompt: '给出提高线索转化率的建议',
-    },
-  ],
-
   // PCBA Procurement
   'list:pe_procurement_comparison': [
     {
@@ -207,6 +136,13 @@ const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
 };
 
 export function getSuggestions(pageType: string, modelCode: string): Suggestion[] {
+  const provider = getKernel().contributionRegistry.getPrimaryService(
+    'aura.aurabot.suggestions',
+  )?.provider as
+    | { getSuggestions?: (pageType: string, modelCode: string) => Suggestion[] }
+    | undefined;
+  const contributed = provider?.getSuggestions?.(pageType, modelCode);
+  if (contributed?.length) return contributed;
   const exact = CONTEXT_SUGGESTIONS[`${pageType}:${modelCode}`];
   if (exact) return exact;
   const wildcard = CONTEXT_SUGGESTIONS[`${pageType}:*`];
@@ -215,3 +151,4 @@ export function getSuggestions(pageType: string, modelCode: string): Suggestion[
 }
 
 export default CONTEXT_SUGGESTIONS;
+import { getKernel } from '~/framework/bootstrap';

@@ -242,21 +242,21 @@ export const triggerNodes: FlowNodeDefinition[] = [
     },
   },
   {
-    // Triggers when a BPM process event occurs (process_started, task_completed, etc.).
-    // modelCode stores the BPM processKey so the backend listener can match
-    // automation.modelCode == bpmEvent.processKey via findEnabledByModelCodeAndTriggerType.
-    type: 'trigger-bpm-event',
-    label: '$i18n:automation.trigger.bpmEvent',
+    // Triggers when a workflow event occurs (process_started, task_completed, etc.).
+    // modelCode stores the workflowKey so the backend listener can match
+    // automation.modelCode == workflowEvent.processKey via findEnabledByModelCodeAndTriggerType.
+    type: 'trigger-workflow-event',
+    label: '$i18n:automation.trigger.workflowEvent',
     icon: 'Workflow',
     category: 'trigger',
-    description: '$i18n:automation.trigger.bpmEvent.desc',
+    description: '$i18n:automation.trigger.workflowEvent.desc',
     configSchema: [
       {
         // processKey stored as modelCode so the existing dispatch lookup
         // (findEnabledByModelCodeAndTriggerType) works without schema changes.
         key: 'modelCode',
-        label: '$i18n:automation.field.bpmProcess',
-        type: 'process-select',
+        label: '$i18n:automation.field.workflowProcess',
+        type: 'workflow-select',
         required: true,
         group: 'trigger_source',
       },
@@ -277,7 +277,7 @@ export const triggerNodes: FlowNodeDefinition[] = [
       ...automationRuleBindingFields,
     ],
     defaultConfig: {
-      triggerType: 'on_bpm_event',
+      triggerType: 'on_workflow_event',
     },
   },
   {

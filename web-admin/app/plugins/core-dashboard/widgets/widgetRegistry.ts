@@ -221,6 +221,115 @@ const widgetDefinitions: WidgetDefinition[] = [
     ],
   },
   {
+    type: 'smart-waterfall-chart',
+    label: '瀑布图',
+    icon: 'StockOutlined',
+    category: '图表',
+    description: '瀑布图/增减桥（含合计锚点行）',
+    defaultConfig: {
+      title: '瀑布图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'sum' }],
+      },
+      visualization: { showLabel: true },
+    },
+    defaultSize: {
+      w: 6,
+      h: 4,
+      minW: 4,
+      minH: 3,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+      {
+        key: 'visualization.totalField',
+        label: '合计行字段（可选）',
+        type: 'text',
+        placeholder: 'bridge_kind',
+      },
+      {
+        key: 'visualization.totalValues',
+        label: '合计行取值（逗号分隔）',
+        type: 'text',
+        placeholder: 'total,subtotal,合计,小计',
+      },
+      {
+        key: 'visualization.showLabel',
+        label: '显示标签',
+        type: 'boolean',
+        defaultValue: true,
+      },
+    ],
+  },
+  {
+    type: 'smart-pareto-chart',
+    label: '帕累托图',
+    icon: 'BarChartOutlined',
+    category: '图表',
+    description: '帕累托图（柱状+累计百分比线）',
+    defaultConfig: {
+      title: '帕累托图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'sum' }],
+      },
+    },
+    defaultSize: {
+      w: 6,
+      h: 4,
+      minW: 4,
+      minH: 3,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+    ],
+  },
+  {
+    type: 'smart-gantt-chart',
+    label: '甘特图',
+    icon: 'OrderedListOutlined',
+    category: '图表',
+    description: '甘特图（任务起止与进度）',
+    defaultConfig: {
+      title: '甘特图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'count' }],
+      },
+    },
+    defaultSize: {
+      w: 8,
+      h: 5,
+      minW: 5,
+      minH: 4,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+    ],
+  },
+  {
     type: 'smart-area-chart',
     label: '面积图',
     icon: 'AreaChartOutlined',
@@ -1323,149 +1432,6 @@ const widgetDefinitions: WidgetDefinition[] = [
       minH: 3,
       maxW: 12,
       maxH: 8,
-    },
-    configSchema: [
-      {
-        key: 'title',
-        label: '标题',
-        type: 'text',
-        required: true,
-      },
-    ],
-  },
-  // ==================== Workbench Widgets: CRM ====================
-  {
-    type: 'smart-pipeline',
-    label: '销售管道',
-    icon: '🔄',
-    category: '工作台 · CRM',
-    description: '销售管道概览，按阶段展示商机分布',
-    defaultConfig: {
-      title: '销售管道',
-      dataSource: { type: 'static' },
-    },
-    defaultSize: {
-      w: 6,
-      h: 4,
-      minW: 4,
-      minH: 3,
-      maxW: 12,
-      maxH: 8,
-    },
-    configSchema: [
-      {
-        key: 'title',
-        label: '标题',
-        type: 'text',
-        required: true,
-      },
-    ],
-  },
-  {
-    type: 'smart-leads',
-    label: '线索看板',
-    icon: '🎯',
-    category: '工作台 · CRM',
-    description: '线索管理看板，展示线索状态分布',
-    defaultConfig: {
-      title: '线索看板',
-      dataSource: { type: 'static' },
-    },
-    defaultSize: {
-      w: 6,
-      h: 4,
-      minW: 4,
-      minH: 3,
-      maxW: 12,
-      maxH: 8,
-    },
-    configSchema: [
-      {
-        key: 'title',
-        label: '标题',
-        type: 'text',
-        required: true,
-      },
-    ],
-  },
-  {
-    type: 'smart-activities',
-    label: '活动记录',
-    icon: '📝',
-    category: '工作台 · CRM',
-    description: '最近的客户活动和跟进记录',
-    defaultConfig: {
-      title: '活动记录',
-      dataSource: { type: 'static' },
-    },
-    defaultSize: {
-      w: 6,
-      h: 4,
-      minW: 4,
-      minH: 3,
-      maxW: 12,
-      maxH: 8,
-    },
-    configSchema: [
-      {
-        key: 'title',
-        label: '标题',
-        type: 'text',
-        required: true,
-      },
-    ],
-  },
-  // ==================== Workbench Widgets: BPM ====================
-  {
-    type: 'smart-my-process',
-    label: '我的流程',
-    icon: '🚀',
-    category: '工作台 · BPM',
-    description: '我发起和参与的流程实例',
-    defaultConfig: {
-      title: '我的流程',
-      dataSource: { type: 'static' },
-    },
-    defaultSize: {
-      w: 6,
-      h: 4,
-      minW: 4,
-      minH: 3,
-      maxW: 12,
-      maxH: 8,
-    },
-    configSchema: [
-      {
-        key: 'title',
-        label: '标题',
-        type: 'text',
-        required: true,
-      },
-      {
-        key: 'visualization.maxItems',
-        label: '最大显示条数',
-        type: 'number',
-        defaultValue: 5,
-      },
-    ],
-  },
-  {
-    type: 'smart-process-stats',
-    label: '流程统计',
-    icon: '📊',
-    category: '工作台 · BPM',
-    description: '流程运行统计，展示各状态数量',
-    defaultConfig: {
-      title: '流程统计',
-      dataSource: { type: 'static' },
-    },
-    defaultSize: {
-      w: 6,
-      h: 3,
-      minW: 4,
-      minH: 2,
-      maxW: 12,
-      maxH: 6,
     },
     configSchema: [
       {

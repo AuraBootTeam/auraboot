@@ -1,15 +1,7 @@
-/**
- * DslFormRenderer.aiLock.test.tsx
- *
- * DslFormRenderer is the single mount point for both AI-fill apply seams:
- *   1. the DslFormFillProvider (consumed by the ai-fill-banner block), and
- *   2. the AuraBot form-fill handler (chat AI populating the form).
- * Both must honour fields marked `props.aiLocked` in the loaded schema (D5).
- */
+/** The SDK wrapper must not register a handler against its separate draft state. */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { useDslFormFill } from '../DslFormFillContext';
 
 // Capture the form-fill handler that DslFormRenderer registers with AuraBot.
 let capturedHandler: ((fields: Record<string, unknown>) => void) | null = null;
@@ -27,8 +19,7 @@ vi.mock('~/plugins/core-aurabot/hooks/useAuraBotSafe', () => ({
 // A fake form page renderer that surfaces the lockedFields the provider exposes,
 // so we can assert DslFormRenderer threads the schema lock set into the provider.
 function FakeFormPage() {
-  const { lockedFields } = useDslFormFill();
-  return <div data-testid="locked-codes">{lockedFields.join(',')}</div>;
+  return <div data-testid="actual-page">Page owns its form state</div>;
 }
 
 const fakeProfile = {
@@ -65,25 +56,15 @@ function stubForm(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
-describe('DslFormRenderer AI lock wiring', () => {
+describe('DslFormRenderer form state ownership', () => {
   beforeEach(() => {
     capturedHandler = null;
   });
-
-  it('threads schema locked field codes into the fill provider', () => {
-    render(<DslFormRenderer form={stubForm()} />);
-    expect(screen.getByTestId('locked-codes').textContent).toBe('wd_req_reason');
-  });
-
-  it('AuraBot form-fill handler skips locked fields and applies the rest', () => {
+  it('does not register a fill handler against the disconnected SDK values', () => {
     const setFieldValue = vi.fn();
     render(<DslFormRenderer form={stubForm({ setFieldValue })} />);
-
-    expect(typeof capturedHandler).toBe('function');
-    capturedHandler!({ wd_req_reason: 'family matter', wd_req_type: 'annual' });
-
-    expect(setFieldValue).toHaveBeenCalledTimes(1);
-    expect(setFieldValue).toHaveBeenCalledWith('wd_req_type', 'annual');
-    expect(setFieldValue).not.toHaveBeenCalledWith('wd_req_reason', 'family matter');
+    expect(screen.getByTestId('actual-page')).toBeVisible();
+    expect(capturedHandler).toBeNull();
+    expect(setFieldValue).not.toHaveBeenCalled();
   });
 });

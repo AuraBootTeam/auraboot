@@ -118,7 +118,6 @@ sync_public() {
     sync_file "${MONO_ROOT}/web-admin" "${dst}/web-admin"
 
     # Public plugins
-    sync_file "${MONO_ROOT}/plugins/crm" "${dst}/plugins/crm"
     sync_file "${MONO_ROOT}/plugins/cli" "${dst}/plugins/cli"
     sync_file "${MONO_ROOT}/plugins/schemas" "${dst}/plugins/schemas"
     sync_file "${MONO_ROOT}/plugins/templates" "${dst}/plugins/templates"

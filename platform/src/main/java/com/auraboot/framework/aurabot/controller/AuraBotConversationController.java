@@ -36,7 +36,8 @@ public class AuraBotConversationController {
         return ApiResponse.success(conversationService.ensureConversation(
                 MetaContext.getCurrentTenantId(),
                 currentHumanMemberId(),
-                agentCode
+                agentCode,
+                request != null && request.isNewConversation()
         ));
     }
 

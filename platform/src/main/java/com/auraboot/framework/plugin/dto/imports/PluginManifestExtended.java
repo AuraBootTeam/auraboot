@@ -108,11 +108,6 @@ public class PluginManifestExtended extends PluginManifest {
     private List<MenuDefinitionDTO> menus;
 
     /**
-     * Process definitions to import.
-     */
-    private List<ProcessDefinitionDTO> processes;
-
-    /**
      * Page schema definitions to import.
      */
     private List<PageSchemaDTO> pages;
@@ -157,16 +152,6 @@ public class PluginManifestExtended extends PluginManifest {
      * This is the first-class contract (Plan #8); no BlockToDashboardConverter step is needed.
      */
     private List<DashboardDefinitionDTO> dashboards;
-
-    /**
-     * Drools rule definitions to import (maps to {@code ab_bpm_rule}).
-     */
-    private List<BpmRuleDefinitionDTO> rules;
-
-    /**
-     * SLA config definitions to import (maps to {@code ab_sla_config}).
-     */
-    private List<SlaConfigDefinitionDTO> slaConfigs;
 
     /**
      * Decision Runtime definitions to seed through DRT lifecycle services.
@@ -313,15 +298,6 @@ public class PluginManifestExtended extends PluginManifest {
         if (menus != null) {
             for (MenuDefinitionDTO menu : menus) {
                 if (!menu.isValid()) {
-                    return false;
-                }
-            }
-        }
-
-        // Validate processes
-        if (processes != null) {
-            for (ProcessDefinitionDTO process : processes) {
-                if (!process.isValid()) {
                     return false;
                 }
             }
@@ -534,19 +510,6 @@ public class PluginManifestExtended extends PluginManifest {
             }
         }
 
-        // Validate processes
-        if (processes != null) {
-            for (int i = 0; i < processes.size(); i++) {
-                ProcessDefinitionDTO process = processes.get(i);
-                if (process.getKey() == null || process.getKey().isBlank()) {
-                    errors.add("processes[" + i + "]: key is required");
-                }
-                if (process.getBpmnFile() == null && process.getBpmnContent() == null && process.getDesignerJson() == null) {
-                    errors.add("processes[" + i + "]: bpmnFile, bpmnContent or designerJson is required");
-                }
-            }
-        }
-
         // Validate named queries
         if (namedQueries != null) {
             for (int i = 0; i < namedQueries.size(); i++) {
@@ -694,7 +657,6 @@ public class PluginManifestExtended extends PluginManifest {
                 || (permissions != null && !permissions.isEmpty())
                 || (roles != null && !roles.isEmpty())
                 || (menus != null && !menus.isEmpty())
-                || (processes != null && !processes.isEmpty())
                 || (pages != null && !pages.isEmpty())
                 || (pageContributions != null && !pageContributions.isEmpty())
                 || (dicts != null && !dicts.isEmpty())
@@ -704,8 +666,6 @@ public class PluginManifestExtended extends PluginManifest {
                 || (savedViews != null && !savedViews.isEmpty())
                 || (notificationTemplates != null && !notificationTemplates.isEmpty())
                 || (dashboards != null && !dashboards.isEmpty())
-                || (rules != null && !rules.isEmpty())
-                || (slaConfigs != null && !slaConfigs.isEmpty())
                 || (decisionDefinitions != null && !decisionDefinitions.isEmpty())
                 || (conditionFragments != null && !conditionFragments.isEmpty())
                 || (eventPolicies != null && !eventPolicies.isEmpty())
@@ -727,7 +687,6 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("permissions", permissions != null ? permissions.size() : 0),
                 Map.entry("roles", roles != null ? roles.size() : 0),
                 Map.entry("menus", menus != null ? menus.size() : 0),
-                Map.entry("processes", processes != null ? processes.size() : 0),
                 Map.entry("pages", pages != null ? pages.size() : 0),
                 Map.entry("pageContributions", pageContributions != null ? pageContributions.size() : 0),
                 Map.entry("dicts", dicts != null ? dicts.size() : 0),
@@ -737,8 +696,6 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
                 Map.entry("notificationTemplates", notificationTemplates != null ? notificationTemplates.size() : 0),
                 Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
-                Map.entry("rules", rules != null ? rules.size() : 0),
-                Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0),
                 Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0),
                 Map.entry("conditionFragments", conditionFragments != null ? conditionFragments.size() : 0),
                 Map.entry("eventPolicies", eventPolicies != null ? eventPolicies.size() : 0),
@@ -764,7 +721,6 @@ public class PluginManifestExtended extends PluginManifest {
         permissions = sanitized(permissions, p -> isCommentObject(p.getCode(), p.getUnknownFields()));
         roles = sanitized(roles, r -> isCommentObject(r.getCode(), r.getUnknownFields()));
         menus = sanitized(menus, m -> isCommentObject(m.getCode(), m.getUnknownFields()));
-        processes = sanitized(processes, p -> isCommentObject(p.getKey(), p.getUnknownFields()));
         pages = sanitized(pages, p -> isCommentObject(p.getPageKey(), p.getUnknownFields()));
         pageContributions = sanitized(pageContributions,
                 contribution -> isCommentObject(contribution.getId(), contribution.getUnknownFields()));
@@ -874,7 +830,7 @@ public class PluginManifestExtended extends PluginManifest {
         private Boolean validateReferences;
 
         /**
-         * Whether to auto-deploy BPM processes.
+         * Whether to auto-deploy workflowes.
          */
         private Boolean autoDeployProcesses;
 

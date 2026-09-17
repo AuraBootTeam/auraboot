@@ -303,11 +303,15 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
             {/* Aggregations */}
             {showAggregations && column.aggregations && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {Object.entries(column.aggregations).map(([key, value]) => (
-                  <span key={key} className="text-xs text-gray-500">
-                    {getLocalizedText(key, locale, t)}: <span className="font-medium">{value}</span>
-                  </span>
-                ))}
+                {Object.entries(column.aggregations).map(([key, value]) => {
+                  const label = column.aggregationLabels?.[key] ?? key;
+                  return (
+                    <span key={key} className="text-xs text-gray-500">
+                      {getLocalizedText(label, locale, t)}:{' '}
+                      <span className="font-medium">{value}</span>
+                    </span>
+                  );
+                })}
               </div>
             )}
           </div>

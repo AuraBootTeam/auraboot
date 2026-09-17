@@ -1,14 +1,18 @@
+import type { ReactNode } from 'react';
+import { DashboardQueryContext } from '../DashboardQueryContext';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { fetchChartDataMock, fetchResultMock } = vi.hoisted(() => ({
+const { fetchChartDataMock, fetchDashboardWidgetMock, fetchResultMock } = vi.hoisted(() => ({
   fetchChartDataMock: vi.fn(),
+  fetchDashboardWidgetMock: vi.fn(),
   fetchResultMock: vi.fn(),
 }));
 
 vi.mock('~/shared/services/chartDataService', () => ({
   chartDataService: {
     fetchChartData: fetchChartDataMock,
+    fetchDashboardWidget: fetchDashboardWidgetMock,
   },
 }));
 
@@ -21,7 +25,65 @@ import { useChartData } from '../useChartData';
 describe('useChartData', () => {
   beforeEach(() => {
     fetchChartDataMock.mockReset();
+    fetchDashboardWidgetMock.mockReset();
     fetchResultMock.mockReset();
+  });
+
+  it('loads the bound saved widget without sending a replacement query', async () => {
+    fetchDashboardWidgetMock.mockResolvedValue({
+      rows: [{ count: 2 }],
+      meta: { dimensions: [], metrics: ['count'] },
+    });
+    const binding = { dashboardPid: 'saved', widgetId: 'widget', usageId: 'visit' };
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <DashboardQueryContext.Provider value={binding}>{children}</DashboardQueryContext.Provider>
+    );
+    const { result, rerender } = renderHook(
+      () =>
+        useChartData({
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'orders',
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'count' }],
+          },
+          linkageFilters: [{ field: 'region', operator: 'eq', value: 'East' }],
+        }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data?.rows).toEqual([{ count: 2 }]));
+    expect(fetchDashboardWidgetMock).toHaveBeenCalledWith('saved', 'widget', {
+      usageId: 'visit',
+      linkageFilters: [{ field: 'region', operator: 'eq', value: 'East' }],
+      drillFilters: undefined,
+    });
+    rerender();
+    expect(fetchDashboardWidgetMock).toHaveBeenCalledTimes(1);
+    expect(fetchChartDataMock).not.toHaveBeenCalled();
+  });
+
+  it('exposes a saved-query failure without falling back to a client query', async () => {
+    fetchDashboardWidgetMock.mockRejectedValue(new Error('Access denied'));
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <DashboardQueryContext.Provider
+        value={{ dashboardPid: 'saved', widgetId: 'widget', usageId: 'visit' }}
+      >
+        {children}
+      </DashboardQueryContext.Provider>
+    );
+    const { result } = renderHook(
+      () =>
+        useChartData({
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'orders',
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'count' }],
+          },
+        }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.error?.message).toBe('Access denied'));
+    expect(result.current.data).toBeNull();
+    expect(fetchChartDataMock).not.toHaveBeenCalled();
   });
 
   it('does not update state for static data when disabled', async () => {

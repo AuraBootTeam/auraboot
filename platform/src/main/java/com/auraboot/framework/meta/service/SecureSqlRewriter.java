@@ -209,6 +209,32 @@ public class SecureSqlRewriter {
      * @param sql SQL语句
      * @return true如果是SELECT语句
      */
+    /** Resolve physical source names before a named query reaches its SQL executor. */
+    public java.util.Set<String> referencedTables(String sql) {
+        if (sql == null || sql.isBlank()) throw new MetaServiceException("SQL source is required");
+        try {
+            Statement statement = CCJSqlParserUtil.parse(normalizeMybatisParams(sql).sql);
+            if (!(statement instanceof Select)) throw new MetaServiceException("A SELECT source is required");
+            java.util.Set<String> tables = new java.util.LinkedHashSet<>();
+            StringBuilder output = new StringBuilder();
+            var expressions = new net.sf.jsqlparser.util.deparser.ExpressionDeParser(null, output);
+            var visitor = new ScopedSelectDeParser(expressions, output) {
+                @Override public <S> StringBuilder visit(net.sf.jsqlparser.schema.Table table, S context) {
+                    if (!isCte(table)) tables.add(table.getFullyQualifiedName());
+                    return super.visit(table, context);
+                }
+                @Override public <S> StringBuilder visit(net.sf.jsqlparser.statement.select.TableFunction function, S context) {
+                    throw new org.springframework.security.access.AccessDeniedException("Table function sources require explicit resolution");
+                }
+            };
+            expressions.setSelectVisitor(visitor);
+            ((Select) statement).accept((net.sf.jsqlparser.statement.select.SelectVisitor<StringBuilder>) visitor, null);
+            return tables;
+        } catch (JSQLParserException invalid) {
+            throw new MetaServiceException("Cannot establish named query source tables", invalid);
+        }
+    }
+
     public boolean isSelectStatement(String sql) {
         if (sql == null || sql.trim().isEmpty()) {
             return false;

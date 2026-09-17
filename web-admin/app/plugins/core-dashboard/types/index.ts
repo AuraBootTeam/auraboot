@@ -49,6 +49,7 @@ export type WidgetType =
   | 'smart-pareto-chart'
   | 'smart-spc-chart'
   | 'smart-gantt-chart'
+  | 'smart-waterfall-chart'
   | 'smart-calendar'
   // New widgets
   | 'smart-gallery'
@@ -61,11 +62,6 @@ export type WidgetType =
   | 'smart-recent'
   | 'smart-shortcuts'
   | 'smart-stats-row'
-  | 'smart-my-process'
-  | 'smart-process-stats'
-  | 'smart-pipeline'
-  | 'smart-leads'
-  | 'smart-activities'
   | 'smart-calendar'
   | 'smart-announcement'
   | 'smart-quick-note'
@@ -120,6 +116,9 @@ export interface DataSourceConfig {
    * `<semanticModelCode>.<metric_code>`. Leave blank for the raw SQL path.
    */
   semanticModelCode?: string;
+  timeRange?: import('~/framework/smart/types/chart').SemanticTimeRange;
+  orderBy?: { field: string; direction: string }[];
+  limit?: number;
 }
 
 /**

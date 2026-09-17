@@ -15,7 +15,7 @@ import { expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,8 +87,9 @@ export async function openAsRole(
   browser: Browser,
   email: string,
   password: string,
+  locale?: string,
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, locale });
   const page = await context.newPage();
   await loginViaUI(page, email, password);
   return { context, page };

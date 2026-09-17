@@ -116,7 +116,7 @@ export const VIEW_TYPE_CONFIGS: ViewTypeConfig[] = [
  */
 export interface KanbanCardFieldConfig {
   field: string;
-  label?: string;
+  label?: string | Record<string, string>; // localized map resolved via getLocalizedText (WMS-UX-02)
   /** Display type: text, number, date, tag, avatar */
   type?: string;
 }
@@ -128,7 +128,7 @@ export interface KanbanAggregationConfig {
   field: string;
   /** Aggregation function: COUNT, SUM, AVG, MIN, MAX */
   function: 'count' | 'sum' | 'avg' | 'min' | 'max';
-  label?: string;
+  label?: string | Record<string, string>; // localized map via getLocalizedText (WMS-UX-02)
 }
 
 /**

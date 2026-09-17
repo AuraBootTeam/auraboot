@@ -16,6 +16,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -176,5 +178,55 @@ class TestFixtureControllerRouteInboxTest {
         assertEquals("open", action.get("action"));
         assertEquals("Open seeded order", action.get("label"));
         assertEquals("primary", action.get("style"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void inboxEmptyFixtureQueriesStoredLowercaseStatusAndDismissesPendingItems() throws Exception {
+        TestFixtureController controller = new TestFixtureController();
+        ApplicationContext applicationContext = mock(ApplicationContext.class);
+        InboxService inboxService = mock(InboxService.class);
+        TenantService tenantService = mock(TenantService.class);
+        UserService userService = mock(UserService.class);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        User user = new User();
+        user.setId(200L);
+        user.setEmail("e2e@test.local");
+
+        when(applicationContext.containsBean("inboxService")).thenReturn(true);
+        when(applicationContext.getBean("inboxService")).thenReturn(inboxService);
+        when(tenantService.findByName("e2e_test")).thenReturn(tenant);
+        when(userService.findByEmail("e2e@test.local")).thenReturn(user);
+
+        ReflectionTestUtils.setField(controller, "applicationContext", applicationContext);
+        ReflectionTestUtils.setField(controller, "tenantService", tenantService);
+        ReflectionTestUtils.setField(controller, "userService", userService);
+
+        InboxItem pending = new InboxItem();
+        pending.setId(16L);
+        pending.setStatus("pending");
+        IPage<InboxItem> withPending = mock(IPage.class);
+        when(withPending.getRecords()).thenReturn(List.of(pending));
+        IPage<InboxItem> empty = mock(IPage.class);
+        when(empty.getRecords()).thenReturn(List.of());
+        // Status must be queried exactly as stored ("pending") — the old
+        // uppercase "PENDING" matched 0 rows and dismissed nothing.
+        when(inboxService.listByUser(eq(200L), eq(100L), eq((String) null), eq("pending"), eq(1), eq(200)))
+                .thenReturn(withPending, empty);
+        when(inboxService.batchDismiss(anyList(), eq(200L), eq(100L))).thenReturn(1);
+
+        FixtureResult result = ReflectionTestUtils.invokeMethod(
+                controller,
+                "createInboxEmptyFixture",
+                "empty_run",
+                Map.of()
+        );
+
+        assertNotNull(result);
+        assertTrue(result.isSuccess());
+        verify(inboxService, times(2)).listByUser(eq(200L), eq(100L), eq((String) null), eq("pending"), eq(1), eq(200));
+        verify(inboxService).batchDismiss(List.of(16L), 200L, 100L);
     }
 }

@@ -18,7 +18,7 @@ interface PipeCreateOptions {
  * Otherwise, generates a minimal scaffold.
  *
  * Examples:
- *   aura pipe create --from daily-sales-report -o my-report.yaml
+ *   aura pipe create --from overdue-tasks-alert -o my-alert.yaml
  *   aura pipe create -o my-workflow.yaml
  */
 export async function pipeCreateCommand(options: PipeCreateOptions): Promise<void> {

@@ -23,7 +23,7 @@ class ExtractionRuleMatcherTest {
     }
 
     private static ExtractionSignal bpm(String event, Map<String, Object> payload) {
-        return new ExtractionSignal("bpm_event", event, payload);
+        return new ExtractionSignal("workflow_event", event, payload);
     }
 
     @Test

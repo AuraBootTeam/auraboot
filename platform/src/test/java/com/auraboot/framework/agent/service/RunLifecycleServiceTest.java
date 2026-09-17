@@ -40,6 +40,7 @@ class RunLifecycleServiceTest {
     @Mock private LlmProvider provider;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @Mock private AgentRunTerminalStore terminalStore;
     private RunLifecycleService service;
 
     @BeforeEach
@@ -51,7 +52,7 @@ class RunLifecycleServiceTest {
                 observationService,
                 providerFactory,
                 jdbcTemplate,
-                eventPublisher);
+                eventPublisher, terminalStore);
     }
 
     @Test
@@ -81,16 +82,12 @@ class RunLifecycleServiceTest {
     @ValueSource(strings = "   ")
     @DisplayName("failed runs always persist a non-blank diagnostic")
     void failedRunsAlwaysPersistDiagnostic(String error) {
-        when(dynamicDataMapper.selectByQuery(anyString(), eq(Map.of("pid", "task-1"))))
-                .thenReturn(List.of());
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
 
         service.failRun(7L, "run-1", "task-1", LocalDateTime.now(), error);
 
-        verify(dynamicDataMapper).update(
-                eq("ab_agent_run"),
-                updateCaptor.capture(),
-                eq(Map.of("pid", "run-1")));
+        verify(terminalStore).complete(eq(7L), eq("run-1"), eq("task-1"),
+                updateCaptor.capture(), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any());
         assertThat(updateCaptor.getValue())
                 .containsEntry("run_status", "failed")
                 .containsEntry("error_message", "Agent execution failed without a diagnostic");

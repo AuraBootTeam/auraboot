@@ -32,6 +32,7 @@ public sealed interface RunOutcome
         permits RunOutcome.Success,
                 RunOutcome.PendingApproval,
                 RunOutcome.Failed,
+                RunOutcome.Cancelled,
                 RunOutcome.Skipped {
 
     /**
@@ -61,6 +62,8 @@ public sealed interface RunOutcome
     record PendingApproval(String runPid, String approvalPid, String message) implements RunOutcome {}
 
     record Failed(String runPid, String errorMessage) implements RunOutcome {}
+
+    record Cancelled(String runPid, String reason) implements RunOutcome {}
 
     record Skipped(String reason) implements RunOutcome {
         @Override

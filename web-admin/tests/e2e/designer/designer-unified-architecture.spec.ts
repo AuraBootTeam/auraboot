@@ -34,7 +34,7 @@ async function openReportDesigner(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('block-palette')).toBeVisible({ timeout: 30000 });
   // Wait for React hydration + store initialization: the title input gets a value
   // only after the useEffect runs createReport(), which happens after hydration.
-  const titleInput = page.locator('input[placeholder="Report Title"]');
+  const titleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/);
   await expect(titleInput).toHaveValue('Untitled Report', { timeout: 15000 });
 }
 
@@ -112,12 +112,12 @@ test.describe('GAP 2: Report Version History', () => {
     await openReportDesigner(page);
 
     // History button visible
-    const historyBtn = page.locator('button[title="Version History"]');
+    const historyBtn = page.getByTitle(/^(版本历史|Version History)$/);
     await expect(historyBtn).toBeVisible();
 
     // Click opens panel
     await historyBtn.click();
-    await expect(page.getByText('Version History', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('No versions yet')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Save to create the first version')).toBeVisible();
   });
@@ -127,7 +127,7 @@ test.describe('GAP 2: Report Version History', () => {
     const panel = page.locator('.fixed.right-0.z-40');
 
     // Open panel
-    await page.locator('button[title="Version History"]').click();
+    await page.getByTitle(/^(版本历史|Version History)$/).click();
     await expect(panel).toHaveClass(/translate-x-0/, { timeout: 5000 });
 
     // Verify close button exists in panel header
@@ -143,7 +143,7 @@ test.describe('GAP 2: Report Version History', () => {
 
     // Set unique title
     const title = `VH Test ${uniqueId('vh')}`;
-    await page.locator('input[placeholder="Report Title"]').fill(title);
+    await page.getByPlaceholder(/^(报表标题|Report Title)$/).fill(title);
 
     // Save
     const saveBtn = page.getByTestId('report-designer-toolbar-btn-save');
@@ -167,8 +167,8 @@ test.describe('GAP 2: Report Version History', () => {
     await expect(saveBtn).toBeDisabled({ timeout: 5000 });
 
     // Open version history — should trigger API call
-    await page.locator('button[title="Version History"]').click();
-    await expect(page.getByText('Version History', { exact: true })).toBeVisible({ timeout: 5000 });
+    await page.getByTitle(/^(版本历史|Version History)$/).click();
+    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
 
     // Wait for version list to load (API call)
     const versionApi = page
@@ -322,7 +322,7 @@ test.describe('Integration', () => {
     const saveBtn = page.getByTestId('report-designer-toolbar-btn-save');
 
     // 1. Set title
-    await page.locator('input[placeholder="Report Title"]').fill(title);
+    await page.getByPlaceholder(/^(报表标题|Report Title)$/).fill(title);
 
     // 2. Add block via palette testId
     await page.getByTestId('block-palette-item-rich-text').click();
@@ -346,8 +346,8 @@ test.describe('Integration', () => {
     await expect(saveBtn).toBeDisabled({ timeout: 5000 });
 
     // 4. Open/close version history
-    await page.locator('button[title="Version History"]').click();
-    await expect(page.getByText('Version History', { exact: true })).toBeVisible({ timeout: 5000 });
+    await page.getByTitle(/^(版本历史|Version History)$/).click();
+    await expect(page.getByText(/^(版本历史|Version History)$/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Escape');
 
     // 5. Undo block addition

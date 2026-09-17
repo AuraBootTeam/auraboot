@@ -123,7 +123,9 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
                         && updates.get("completed_at") != null
                         && String.valueOf(updates.get("output_data")).contains("provider timeout")
                         && !updates.containsKey("error_message")),
-                argThat(where -> where.get("pid") != null));
+                argThat(where -> where.get("pid") != null
+                        && tenantId.equals(where.get("tenant_id"))
+                        && "in_progress".equals(where.get("task_status"))));
     }
 
     @Test
@@ -148,7 +150,9 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
                         && String.valueOf(updates.get("output_data"))
                                 .contains("interrupted:user_cancelled")
                         && !updates.containsKey("error_message")),
-                argThat(where -> where.get("pid") != null));
+                argThat(where -> where.get("pid") != null
+                        && tenantId.equals(where.get("tenant_id"))
+                        && "in_progress".equals(where.get("task_status"))));
     }
 
     private ConversationTurnServiceImpl newService() {

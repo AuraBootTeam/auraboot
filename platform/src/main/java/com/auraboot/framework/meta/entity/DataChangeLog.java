@@ -51,6 +51,14 @@ public class DataChangeLog {
     @TableField("changed_by")
     private Long changedBy;
 
+    /**
+     * Display name of the actor, resolved at query time (ab_user.nick_name /
+     * user_name). Not a DB column — populated by read paths that return logs
+     * to clients, so timelines can show a readable actor instead of a raw id.
+     */
+    @TableField(exist = false)
+    private String changedByName;
+
     @TableField("changed_at")
     private Instant changedAt;
 

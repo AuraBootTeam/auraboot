@@ -2,7 +2,7 @@ import { test, expect, type APIResponse, type Page, type Request, type TestInfo 
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   createFieldBindingData,
   createFieldData,
@@ -1492,8 +1492,8 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     path: testInfo.outputPath('model-publish-sla-node-report.png'),
   });
 
-  const bpmProcessInstanceId = `BPM-${suffix}`;
-  await page.getByTestId('model-publish-bpm-process-instance-id').fill(bpmProcessInstanceId);
+  const workflowProcessInstanceId = `BPM-${suffix}`;
+  await page.getByTestId('model-publish-bpm-process-instance-id').fill(workflowProcessInstanceId);
   await page.getByTestId('model-publish-bpm-process-key').fill(bpmUsage.processKey);
   await page.getByTestId('model-publish-bpm-record-pid').fill(`bpm-record-${suffix}`);
   await page.getByTestId('model-publish-bpm-record-json').fill(
@@ -1517,7 +1517,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
     };
   };
   expect(bpmReplayBody.executeAutomated).toBe(true);
-  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(bpmProcessInstanceId);
+  expect(bpmReplayBody.sampleContext?.bpm?.processInstanceId).toBe(workflowProcessInstanceId);
   expect(bpmReplayBody.sampleContext?.bpm?.processKey).toBe(bpmUsage.processKey);
   expect(bpmReplayBody.sampleContext?.record?.pid).toBe(`bpm-record-${suffix}`);
   expect(bpmReplayBody.sampleContext?.record?.data?.[fieldCode]).toBe(2400);
@@ -1532,7 +1532,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   expect(bpmResult.matched).toBe(true);
   expect(bpmResult.outputs).toEqual(expect.objectContaining({
     processKey: bpmUsage.processKey,
-    processInstanceId: bpmProcessInstanceId,
+    processInstanceId: workflowProcessInstanceId,
     edgeId: bpmUsage.edgeId,
     edgeSource: bpmUsage.sourceNodeId,
     edgeTarget: bpmUsage.targetNodeId,
@@ -1545,7 +1545,7 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).toContainText('已执行');
   await expect(replayReport).toContainText('BPM 规则复核结果：命中');
   await expect(replayReport).toContainText('流程实例');
-  await expect(replayReport).toContainText(bpmProcessInstanceId);
+  await expect(replayReport).toContainText(workflowProcessInstanceId);
   await expect(replayReport).toContainText('流程标识');
   await expect(replayReport).toContainText(bpmUsage.processKey);
   await expect(replayReport).toContainText('节点类型: 流程连线');

@@ -304,7 +304,7 @@ public class SendNotificationExecutor implements ActionExecutor {
                 : parts[1];
         // DynamicDataService.getById(String modelCode, String recordPid) takes the row pid as a String.
         // Resolving a reference hop to build the notification recipient is an internal system read
-        // (automations run subject-less on @Async threads — AutomationProcessRuntime sets tenant but no
+        // (automations run subject-less on @Async threads — AutomationWorkflowRuntime sets tenant but no
         // user). getById enforces per-subject record permission, which with no subject throws
         // "Permission context missing". Execute this system read under explicit ALL authority, like
         // other internal read-backs (cf. #1405).

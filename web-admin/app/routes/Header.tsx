@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
+import { useTenantTheme } from '~/contexts/TenantThemeContext';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
@@ -41,7 +42,14 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
-  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
+  const deploymentBranding = rootData?.branding ?? COMMUNITY_BRANDING;
+  // Tenant-level skin (ui.theme) wins over deployment branding when configured.
+  const tenantTheme = useTenantTheme();
+  const branding = {
+    ...deploymentBranding,
+    logoUrl: tenantTheme?.logoUrl || deploymentBranding.logoUrl,
+    productName: tenantTheme?.brandName || deploymentBranding.productName,
+  };
   const hasMenus = (rootData?.menus?.length ?? 0) > 0;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();

@@ -128,6 +128,12 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        String externalPermission = MetaContext.getExternalCommandPermission();
+        if (externalPermission != null && ctx.getAuthorizationVerdict() != null
+                && ctx.getAuthorizationVerdict().isAuthorized()
+                && externalPermission.equals(ctx.getAuthorizationVerdict().permissionCode())) {
+            return ScopeGrade.ALL;
+        }
         if (hasSharedTargetWrite(ctx)) {
             return ScopeGrade.TARGET;
         }

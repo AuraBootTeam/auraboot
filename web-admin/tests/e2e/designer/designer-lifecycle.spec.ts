@@ -8,7 +8,7 @@
  *   4. Publish/Deploy/Enable + API Verify
  *   5. Backend Data Verify
  *
- * BPMN lifecycle coverage moved to tests/e2e/bpm-designer, where the specs
+ * BPMN lifecycle coverage is product-owned by aura-bpm/e2e/bpm, where the specs
  * assert designerJson, BPMN XML, and selected SmartEngine runtime behavior
  * without permission-gated skip wrappers.
  * Automation coverage moved to tests/e2e/automation/automation-designer-golden.spec.ts,
@@ -244,7 +244,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
       .first()
       .click();
 
-    const reportTitleInput = page.locator('input[placeholder="Report Title"]').first();
+    const reportTitleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/).first();
     if (await reportTitleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await reportTitleInput.fill(uniqueId('dl_rpt'));
     }
@@ -287,7 +287,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
         .first()
         .click();
 
-      const reportTitleInput = page.locator('input[placeholder="Report Title"]').first();
+      const reportTitleInput = page.getByPlaceholder(/^(报表标题|Report Title)$/).first();
       if (await reportTitleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await reportTitleInput.fill(uniqueId('dl_rpt'));
       }

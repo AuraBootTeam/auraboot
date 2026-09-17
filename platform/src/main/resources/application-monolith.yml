@@ -15,7 +15,6 @@ aura:
   modules:
     meta-core: true
     biz-runtime: true
-    bpm-engine: true
     im-service: true
     agent-runtime: true
 

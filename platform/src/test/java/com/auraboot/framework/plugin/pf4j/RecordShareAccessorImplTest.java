@@ -46,8 +46,7 @@ class RecordShareAccessorImplTest {
         new RecordShareAccessorImpl(recordShareService, tenantMemberMapper)
                 .replaceReadSharesForUsers(7L, "crm_lead_pool_item_common", "item-1", Set.of("user-a", "user-b"));
 
-        verify(recordShareService).removeByPid(7L, "share-old");
-        verify(recordShareService, never()).removeByPid(7L, "share-a");
+        verify(recordShareService).removeByPids(7L, List.of("share-old"));
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         verify(recordShareService, times(2)).shareRecordByPid(
                 eq(7L), eq("crm_lead_pool_item_common"), eq("item-1"), eq("member"),

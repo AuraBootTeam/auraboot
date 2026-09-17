@@ -4,6 +4,8 @@ import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.entity.AbCapability;
 import com.auraboot.framework.agent.mapper.AbCapabilityMapper;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class CapabilityViewService {
     private final CapabilitySyncService capabilitySyncService;
     private final CapabilityGraphService capabilityGraphService;
     private final CapabilityMappingSupport mappingSupport;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
 
     // ==================== Write-Path Delegation (see CapabilitySyncService) ====================
 
@@ -339,7 +342,7 @@ public class CapabilityViewService {
             String processKey = code.startsWith("workflow:") ? code.substring(9) : code;
             modes.add(CapabilityView.InteractionMode.builder()
                     .channel("api").available(true)
-                    .reference("POST /api/bpm/process/" + processKey + "/start").build());
+                    .reference("workflow capability: start (" + processKey + ")").build());
         }
 
         // AGENT — check ab_agent_tool
@@ -354,7 +357,7 @@ public class CapabilityViewService {
         } else if ("workflow".equals(type)) {
             modes.add(CapabilityView.InteractionMode.builder()
                     .channel("agent").available(true)
-                    .reference("Via AgentBpmBridge.startBpmProcess()").build());
+                    .reference("Via AgentWorkflowBridge.startWorkflow()").build());
         }
 
         // WORKFLOW — automations can trigger on this capability
@@ -484,12 +487,10 @@ public class CapabilityViewService {
      * List all deployed workflow capabilities.
      */
     public List<CapabilityView> listWorkflowCapabilities(Long tenantId) {
-        String sql = "SELECT pid, process_key, process_name, description, category " +
-                "FROM ab_bpm_process_definition WHERE tenant_id = #{params.tenantId} " +
-                "AND status = 'deployed' AND is_current = true " +
-                "AND deleted_flag = FALSE";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId));
+        if (!workflowCapabilities.available("catalog.list")) return List.of();
+        Object value = workflowCapabilities.execute("catalog.list",
+                new WorkflowCapability.WorkflowRequest(tenantId, null, Map.of())).payload().get("items");
+        List<Map<String, Object>> rows = mapRows(value);
 
         List<CapabilityView> views = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -499,12 +500,11 @@ public class CapabilityViewService {
     }
 
     private CapabilityView buildFromWorkflow(Long tenantId, String processKey) {
-        String sql = "SELECT pid, process_key, process_name, description, category " +
-                "FROM ab_bpm_process_definition WHERE tenant_id = #{params.tenantId} " +
-                "AND process_key = #{params.processKey} AND status = 'deployed' AND is_current = true " +
-                "AND deleted_flag = FALSE";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId, "processKey", processKey));
+        if (!workflowCapabilities.available("catalog.list")) return null;
+        Object value = workflowCapabilities.execute("catalog.list",
+                new WorkflowCapability.WorkflowRequest(tenantId, null, Map.of("processKey", processKey)))
+                .payload().get("items");
+        List<Map<String, Object>> rows = mapRows(value);
         if (rows.isEmpty()) return null;
         return mapWorkflowRow(rows.get(0));
     }
@@ -530,6 +530,13 @@ public class CapabilityViewService {
                 .idempotent(false)
                 .reversible(false)
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> mapRows(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        return values.stream().filter(Map.class::isInstance)
+                .map(item -> (Map<String, Object>) item).toList();
     }
 
     // ==================== Private: Command ====================

@@ -31,9 +31,9 @@ import java.time.Duration;
  *
  * <p>The stub answers normal calls with a single text block containing
  * {@code "[stub response]"} and stop_reason {@code "end_turn"}. When a test
- * turn has just returned a {@code tool_result}, the final text includes a
- * compact deterministic digest of that result so browser E2E can assert the
- * real tool loop outcome without a real LLM summarizer.
+ * turn explicitly requests {@link #TOOL_RESULT_DIGEST_MARKER}, the final text includes a
+ * diagnostic digest of the latest tool result. Ordinary UI tests assert structured
+ * tool results and persisted facts instead of echoing internal payloads as prose.
  *
  * <p>Streaming: {@link #streamChat} emits a single delta chunk followed by a
  * terminal {@code done} chunk wrapping the same response. This matches the
@@ -88,6 +88,8 @@ public class StubLlmProvider implements LlmProvider {
     static final long MAX_STUB_DELAY_MS = 10_000L;
 
     /** Fixed response text returned for every chat request. */
+    static final String TOOL_RESULT_DIGEST_MARKER = "@@AURABOOT_STUB_TOOL_RESULT_DIGEST@@";
+
     static final String STUB_RESPONSE_TEXT = "[stub response]";
 
     private static final int MAX_TOOL_RESULT_DIGEST_CHARS = 2000;
@@ -138,7 +140,7 @@ public class StubLlmProvider implements LlmProvider {
         // Emit one delta chunk + one terminal done chunk so downstream
         // aggregators that expect at least one delta before the terminal frame
         // (mirroring Anthropic's wire shape) stay byte-compatible.
-        LlmChunk deltaChunk = LlmChunk.delta(0L, STUB_RESPONSE_TEXT);
+        LlmChunk deltaChunk = LlmChunk.delta(0L, aggregate.getContent().get(0).getText());
         LlmChunk doneChunk = LlmChunk.done(1L, aggregate);
         Flux<LlmChunk> stream = Flux.just(deltaChunk, doneChunk);
         // DELAY_MARKER spreads the two chunks across the requested window so any
@@ -198,6 +200,12 @@ public class StubLlmProvider implements LlmProvider {
     }
 
     private String latestToolResultDigest(LlmChatRequest request) {
+        boolean requested = request != null && request.getMessages() != null
+                && request.getMessages().stream().anyMatch(message -> message != null
+                    && "user".equals(message.getRole())
+                    && message.getContent() instanceof String text
+                    && text.contains(TOOL_RESULT_DIGEST_MARKER));
+        if (!requested) return null;
         Object result = latestToolResult(request);
         if (result == null) {
             return null;
@@ -273,7 +281,7 @@ public class StubLlmProvider implements LlmProvider {
             return null;
         }
         ToolUseDirective directive = latestToolUseDirective(request);
-        if (directive == null || hasToolResultAfter(request, directive.messageIndex())) {
+        if (directive == null) {
             return null;
         }
         String json = directive.json();
@@ -283,23 +291,31 @@ public class StubLlmProvider implements LlmProvider {
         try {
             Map<String, Object> payload = OBJECT_MAPPER.readValue(
                     json, new TypeReference<Map<String, Object>>() {});
-            Object name = payload.get("name");
-            if (name == null || String.valueOf(name).isBlank()) {
-                return null;
+            // Explicit fixture batches exercise real multi-command runs, with bounded output.
+            List<Map<String, Object>> calls = payload.containsKey("calls")
+                    ? OBJECT_MAPPER.convertValue(payload.get("calls"), new TypeReference<List<Map<String, Object>>>() {})
+                    : List.of(payload);
+            if (calls == null || calls.isEmpty() || calls.size() > 20) return null;
+            List<LlmChatResponse.ContentBlock> toolUses = new ArrayList<>();
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            int completed = countToolResultsAfter(request, directive.messageIndex());
+            if (completed >= calls.size()) return null;
+            // Keep fixture batches within the runtime's ordinary fanout limit.
+            for (int index = completed; index < Math.min(calls.size(), completed + 5); index++) {
+                Map<String, Object> call = calls.get(index);
+                Object name = call.get("name");
+                if (name == null || String.valueOf(name).isBlank()) return null;
+                String id = call.get("id") == null
+                        ? (calls.size() == 1 ? "toolu-stub" : "toolu-stub-" + index)
+                        : String.valueOf(call.get("id"));
+                if (!ids.add(id)) return null;
+                toolUses.add(LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use").id(id).name(String.valueOf(name))
+                        .input(toStringObjectMap(call.get("input"))).build());
             }
-            Object input = payload.get("input");
-            String id = payload.get("id") == null
-                    ? "toolu-stub"
-                    : String.valueOf(payload.get("id"));
-            LlmChatResponse.ContentBlock toolUse = LlmChatResponse.ContentBlock.builder()
-                    .type("tool_use")
-                    .id(id)
-                    .name(String.valueOf(name))
-                    .input(toStringObjectMap(input))
-                    .build();
             return LlmChatResponse.builder()
                     .stopReason("tool_use")
-                    .content(List.of(toolUse))
+                    .content(toolUses)
                     .inputTokens(estimateInputTokens(request))
                     .outputTokens(1)
                     .build();
@@ -325,7 +341,8 @@ public class StubLlmProvider implements LlmProvider {
         return null;
     }
 
-    private boolean hasToolResultAfter(LlmChatRequest request, int messageIndex) {
+    private int countToolResultsAfter(LlmChatRequest request, int messageIndex) {
+        int count = 0;
         for (int i = messageIndex + 1; i < request.getMessages().size(); i++) {
             LlmChatRequest.Message message = request.getMessages().get(i);
             if (message == null || message.getContent() == null) continue;
@@ -334,16 +351,16 @@ public class StubLlmProvider implements LlmProvider {
                 for (Object item : list) {
                     if (item instanceof LlmChatRequest.ContentBlock block
                             && "tool_result".equals(block.getType())) {
-                        return true;
+                        count++;
                     }
                     if (item instanceof Map<?, ?> map
                             && "tool_result".equals(String.valueOf(map.get("type")))) {
-                        return true;
+                        count++;
                     }
                 }
             }
         }
-        return false;
+        return count;
     }
 
     private Map<String, Object> toStringObjectMap(Object input) {

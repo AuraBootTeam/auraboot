@@ -32,6 +32,9 @@ common:
   new: 新建
   add: 添加
   create: 新建
+  save: 保存
+  saved: 已保存
+  copy: 复制
   detail: 详情
   submit: 提交
   export: 导出
@@ -549,24 +552,6 @@ notification:
     load_failed: 加载通知偏好失败
     update_failed: 更新通知偏好失败
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 您有新的待办任务
-    task_completed:
-      title: 任务已完成
-    process_started:
-      title: 流程已发起
-    process_ended:
-      title: 流程已结束
-    sla_warning:
-      title: SLA 预警提醒
-    sla_escalated:
-      title: SLA 已升级
-    default:
-      title: 流程通知
-
 # Flow Designer SDK
 flow:
   palette:
@@ -626,8 +611,8 @@ automation:
     scheduled.desc: 按照 Cron 表达式定时触发
     webhook: Webhook 触发
     webhook.desc: 当收到外部 Webhook 请求时触发
-    bpmEvent: 流程事件触发
-    bpmEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
+    workflowEvent: 流程事件触发
+    workflowEvent.desc: 当 BPM 流程事件发生时触发（流程启动、任务完成等）
     inactivity: 记录闲置时
     inactivity.desc: 当记录在指定时长内没有活动（未更新）时触发，由定时巡检驱动
 
@@ -724,7 +709,7 @@ automation:
     collection.desc: 要遍历的数组或列表
     itemVariable: 元素变量名
     itemVariable.desc: 当前元素的变量名，默认为 item
-    bpmProcess: BPM 流程
+    workflowProcess: BPM 流程
     eventTypes: 事件类型
     eventTypes.desc: 留空表示监听所有事件类型
     eventTypes.process_started: 流程启动
@@ -1281,10 +1266,6 @@ workbench:
     title: 统计概览
     inbox_pending: 待办事项
     inbox_urgent: 紧急待办
-    crm_opportunity_amount: 活跃商机
-    crm_account_active: 活跃客户
-    bpm_running: 运行中流程
-    bpm_completed_week: 本周完成
     this_week: 本周
     this_month: 本月
   inbox:
@@ -1394,11 +1375,6 @@ workbench:
     done: 完成
     customize: 点击编辑自定义快捷操作
     customize_hint: 点击编辑自定义
-    newLead: 新建线索
-    newAccount: 新建客户
-    newOpportunity: 新建商机
-    startProcess: 发起流程
-    newContract: 新建合同
     reports: 报表
   recent:
     title: 最近访问
@@ -1406,8 +1382,6 @@ workbench:
   category:
     stats: 统计指标
     tasks: 待办与任务
-    crm: CRM 销售
-    bpm: 流程管理
     general: 通用组件
   widget:
     stats_row: 指标行
@@ -1418,16 +1392,6 @@ workbench:
     inbox_desc: 审批/任务/提醒列表
     calendar: 日程视图
     calendar_desc: 月历视图标记待办日期
-    pipeline: 商机漏斗
-    pipeline_desc: 各阶段商机数量与金额
-    leads: 最新线索
-    leads_desc: 最新线索列表
-    activities: 活动记录
-    activities_desc: 近期跟进活动时间线
-    my_process: 我的流程
-    my_process_desc: 我发起的流程状态
-    process_stats: 流程统计
-    process_stats_desc: 完成率/平均耗时
     shortcuts: 快捷操作
     shortcuts_desc: 常用操作快捷入口
     recent: 最近访问
@@ -1436,50 +1400,11 @@ workbench:
     announcement_desc: 系统公告和团队通知
     quick_note: 快速备忘
     quick_note_desc: 个人备忘录
-  activities:
-    title: 近期活动
-    empty: 暂无活动记录
-    justNow: 刚刚
-    minutesAgo: "{minutes}分钟前"
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
   announcement:
     title: 公告通知
     empty: 暂无公告
     pinned: 置顶
     urgent: 紧急
-  pipeline:
-    title: 商机漏斗
-    empty: 暂无商机数据
-    goToCrm: 前往 CRM
-    total: 合计
-  leads:
-    title: 最新线索
-    empty: 暂无线索
-    viewAll: 查看全部
-    unnamed: 未命名线索
-    justNow: 刚刚
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
-  processStats:
-    title: 流程统计
-    noData: 暂无数据
-    completionRate: 完成率
-    hours: 小时
-    avgDuration: 平均耗时
-    processes: 个流程
-    running: 运行中
-    completedThisWeek: 本周完成
-  process:
-    title: 我的流程
-    empty: 暂无发起的流程
-    viewAll: 查看全部
-    filterAll: 全部
-    filterRunning: 运行中
-    filterCompleted: 已完成
-    justNow: 刚刚
-    hoursAgo: "{hours}小时前"
-    daysAgo: "{days}天前"
   quickNote:
     title: 快速备忘
     placeholder: 写下备忘内容…
@@ -1989,6 +1914,97 @@ notification_rule:
   saving: 保存中...
   update_rule: 更新规则
   create_rule: 创建规则
+
+openPlatform:
+  title: 开放平台
+  badge: 系统对系统访问
+  subtitle: 创建租户级应用，按最小权限授权，轮换凭据，并查看统一的公共 API 契约。
+  apiReference: API 参考
+  newApplication: 新建应用
+  connectionFlow: 接入流程
+  step1: 创建应用并建立环境安装
+  step2: 授予明确的 Scope 并创建凭据
+  step3: 用凭据换取短期 Access Token
+  loadFailed: 开放平台加载失败
+  emptyTitle: 暂无外部应用
+  emptyBody: 创建第一个应用，开始签发租户绑定的访问凭据。
+  applicationCreated: 应用已创建
+  createFailed: 应用创建失败
+  createTitle: 创建外部应用
+  name: 应用名称
+  description: 描述
+  addInstallation: 添加安装
+  noInstallations: 暂无安装
+  installTitle: 安装应用
+  install: 安装
+  installed: 应用已安装
+  installFailed: 应用安装失败
+  environmentLabel: 环境
+  environment:
+    development: 开发环境
+    staging: 预发布环境
+    production: 生产环境
+  rateLimit: 限流
+  rateLimitPerMinute: 每分钟请求数
+  scopes: 权限范围
+  minimumScopes: 仅授予此安装实际需要的能力。
+  viewCredentials: 查看凭据
+  newCredential: 新建凭据
+  credentialsFailed: 凭据加载失败
+  credentialCreateFailed: 凭据创建失败
+  credentialRotated: 凭据已轮换；旧凭据在宽限期内仍有效
+  rotateFailed: 凭据轮换失败
+  rotateTitle: 轮换凭据
+  rotateWarning: 现在创建新密钥。旧凭据可在宽限期结束前签发 Token；已签发的 Token 按自身短期 TTL 失效。
+  graceMinutes: 宽限期（分钟）
+  rotate: 轮换
+  noCredentials: 暂无凭据
+  secretTitle: 立即保存此凭据
+  secretWarning: Client Secret 仅显示一次；AuraBoot 只保存它的哈希值。
+  saved: 我已保存
+  lastUsed: 最近使用
+  revoke: 吊销
+  revokeTitle: 确认吊销凭据？
+  revokeWarning: 此凭据签发的现有 Access Token 将立即失效。
+  credentialRevoked: 凭据已吊销
+  revokeFailed: 凭据吊销失败
+  editScopes: 编辑 Scope
+  scopeRevokeWarning: 保存新的 Scope 集合会立即吊销此安装的现有 Access Token。
+  scopesUpdated: Scope 已更新，现有 Access Token 已吊销
+  scopeUpdateFailed: Scope 更新失败
+  disable: 停用
+  disableInstallation: 停用安装
+  disableTitle: 确认停用访问？
+  disableWarning: 此操作会立即吊销有效 Token，且无法在本页面恢复。
+  disabled: 访问已停用，有效 Token 已吊销
+  disableFailed: 停用失败
+  operations: 运维
+  operationsTitle: 运维
+  operationsSubtitle: 最近 24 小时 API 流量与出站投递健康状况。
+  refresh: 刷新
+  retry: 重试
+  operationsLoadFailed: 运维数据加载失败
+  totalCalls: 调用数
+  errorRate: 错误率
+  errorCalls: 错误调用
+  deadLetters: 死信
+  callAudit: 调用审计
+  noCalls: 没有符合筛选条件的调用
+  deliveryStatus: 投递状态
+  webhookDeliveries: Webhook 投递
+  noDeliveries: 没有符合筛选条件的投递
+  deletedSubscription: 已删除的订阅
+  replay: 重放
+  replayQueued: Webhook 重放已入队
+  replayFailed: Webhook 重放失败
+  replayConfirmTitle: 重放此投递？
+  replayConfirmBody: 原始签名载荷将再次投递，可能重复触发下游副作用。
+  confirmReplay: 确认重放
+  status:
+    active: 已启用
+    disabled: 已停用
+    revoked: 已吊销
+    success: 成功
 
 aurabot:
   error:

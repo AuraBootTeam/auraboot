@@ -261,7 +261,7 @@
     },
     "ConversionTypeParams": {
       "type": "object",
-      "required": ["base_measure", "conversion_measure", "entity", "window"],
+      "required": ["base_measure", "conversion_measure", "entity", "window", "base_filter", "conversion_filter"],
       "additionalProperties": false,
       "properties": {
         "base_measure": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
@@ -271,6 +271,16 @@
           "type": "string",
           "pattern": "^\\d+[dhwmy]$",
           "description": "Duration like 30d, 24h, 4w, 6m, 1y"
+        },
+        "base_filter": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Row predicate selecting base (cohort entry) event rows; denylist-checked at publish and compile time"
+        },
+        "conversion_filter": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Row predicate selecting conversion event rows; denylist-checked at publish and compile time"
         }
       }
     },

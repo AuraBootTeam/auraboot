@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Gate: VERSION (release version, single source of truth) must equal
-# auraboot.platform.version in application.yml — they must never drift.
+# Gate: VERSION is the release version single source of truth for runtime config
+# and Gradle-published artifacts.
 # Bump both together via scripts/release/bump-version.sh. Run before push.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -37,4 +37,21 @@ if [[ "$v_file" != "$v_yaml" ]]; then
   echo "[version-sync] Fix: scripts/release/bump-version.sh $v_file   (re-syncs application.yml)" >&2
   exit 1
 fi
-echo "[version-sync] OK — VERSION == platform.version == $v_file"
+
+if [[ "$v_file" == *SNAPSHOT* || "$v_file" == "latest" ]]; then
+  echo "[version-sync] mutable release version is forbidden: $v_file" >&2
+  exit 1
+fi
+
+if rg -n "^version\\s*=.*SNAPSHOT|^version=.*SNAPSHOT" "$ROOT/platform" \
+  --glob 'build.gradle' --glob 'build.gradle.kts' --glob 'gradle.properties'; then
+  echo "[version-sync] Gradle project versions must not be hard-coded to SNAPSHOT" >&2
+  exit 1
+fi
+
+if ! rg -q "version = file\\('../VERSION'\\)\\.text\\.trim\\(\\)" "$ROOT/platform/build.gradle"; then
+  echo "[version-sync] platform/build.gradle must derive its version from ../VERSION" >&2
+  exit 1
+fi
+
+echo "[version-sync] OK — VERSION == platform.version == Gradle artifact version == $v_file"

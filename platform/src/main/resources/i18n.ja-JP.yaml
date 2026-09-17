@@ -91,24 +91,6 @@ notification:
     load_failed: 通知設定の読み込みに失敗しました
     update_failed: 通知設定の更新に失敗しました
 
-# BPM Notification
-bpm:
-  notification:
-    task_created:
-      title: 新しいタスクがあります
-    task_completed:
-      title: タスクが完了しました
-    process_started:
-      title: プロセスが開始されました
-    process_ended:
-      title: プロセスが完了しました
-    sla_warning:
-      title: SLA 警告
-    sla_escalated:
-      title: SLA エスカレーション
-    default:
-      title: BPM 通知
-
 # Flow Designer SDK
 flow:
   palette:
@@ -168,8 +150,8 @@ automation:
     scheduled.desc: Cron 式に従って定期実行
     webhook: Webhook トリガー
     webhook.desc: 外部 Webhook リクエストを受信したときに実行
-    bpmEvent: BPM イベント トリガー
-    bpmEvent.desc: BPM プロセスイベント発生時に実行（プロセス開始・タスク完了など）
+    workflowEvent: BPM イベント トリガー
+    workflowEvent.desc: BPM プロセスイベント発生時に実行（プロセス開始・タスク完了など）
     inactivity: 無活動時
     inactivity.desc: レコードが指定時間内に活動（更新）がない場合に実行され、定期スイープで駆動されます
 
@@ -266,7 +248,7 @@ automation:
     collection.desc: 反復処理する配列またはリスト
     itemVariable: 要素変数名
     itemVariable.desc: 現在の要素の変数名（デフォルト：item）
-    bpmProcess: BPM プロセス
+    workflowProcess: BPM プロセス
     eventTypes: イベントタイプ
     eventTypes.desc: 空欄の場合はすべてのイベントタイプを監視
     eventTypes.process_started: Process Started

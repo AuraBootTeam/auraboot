@@ -16,7 +16,7 @@ describe('StatItem.series', () => {
   });
 
   it('allows series to be omitted', () => {
-    const item: StatItem = { value: 0, label: 'workbench.stats.bpm_running' };
+    const item: StatItem = { value: 0, label: 'workbench.stats.inbox_urgent' };
     expect(item.series).toBeUndefined();
   });
 });

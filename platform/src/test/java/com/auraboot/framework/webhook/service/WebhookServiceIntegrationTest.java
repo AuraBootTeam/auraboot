@@ -10,11 +10,10 @@ import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
 import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
+import com.auraboot.framework.webhook.service.impl.WebhookDeliveryWorker;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.util.AopTestUtils;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +37,9 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WebhookDeliveryLogMapper deliveryLogMapper;
+
+    @Autowired
+    private WebhookDeliveryWorker deliveryWorker;
 
     @Autowired
     private TenantService tenantService;
@@ -233,7 +235,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Dispatch to blocked internal URL records failed delivery log")
+    @DisplayName("Dispatch to blocked internal URL enters durable dead letter")
     void testDispatchBlockedUrlCreatesFailedLog() {
         WebhookCreateRequest request = new WebhookCreateRequest();
         request.setName("Blocked URL Webhook");
@@ -242,13 +244,13 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
         request.setMaxRetries(0);
         WebhookSubscription subscription = webhookService.create(request);
 
-        Object dispatcherTarget = AopTestUtils.getTargetObject(webhookDispatcher);
-        ReflectionTestUtils.invokeMethod(dispatcherTarget,
-                "deliverAttempt", subscription, Map.of("key", "value"), 0);
+        webhookDispatcher.dispatchTracked(subscription.getEventType(), Map.of("key", "value"),
+                subscription.getTenantId());
+        deliveryWorker.poll();
 
         WebhookDeliveryLog logEntry = waitForLatestLog(subscription.getPid());
         assertNotNull(logEntry);
-        assertEquals("failed", logEntry.getDeliveryStatus());
+        assertEquals("dead_letter", logEntry.getDeliveryStatus());
         assertTrue(logEntry.getErrorMessage().contains("not allowed"));
     }
 
@@ -271,7 +273,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
         WebhookDispatchResult.Receipt receipt = result.receipts().get(0);
         assertEquals(subscription.getPid(), receipt.subscriptionPid());
         assertEquals("evt-tracked-1", receipt.eventId());
-        assertEquals("failed", receipt.deliveryStatus());
+        assertEquals("pending", receipt.deliveryStatus());
         assertNotNull(receipt.deliveryLogPid());
 
         WebhookDeliveryLog logEntry = deliveryLogMapper.selectOne(new QueryWrapper<WebhookDeliveryLog>()
@@ -317,7 +319,7 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Dispatch with secret and invalid headers records failed delivery log")
+    @DisplayName("Dispatch with secret and invalid headers enters durable dead letter")
     void testDispatchInvalidHeadersRecordsFailure() {
         WebhookCreateRequest request = new WebhookCreateRequest();
         request.setName("Invalid Headers Webhook");
@@ -328,13 +330,13 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
         request.setMaxRetries(0);
         WebhookSubscription subscription = webhookService.create(request);
 
-        Object dispatcherTarget = AopTestUtils.getTargetObject(webhookDispatcher);
-        ReflectionTestUtils.invokeMethod(dispatcherTarget,
-                "deliverAttempt", subscription, Map.of("key", "value"), 0);
+        webhookDispatcher.dispatchTracked(subscription.getEventType(), Map.of("key", "value"),
+                subscription.getTenantId());
+        deliveryWorker.poll();
 
         WebhookDeliveryLog logEntry = waitForLatestLog(subscription.getPid());
         assertNotNull(logEntry);
-        assertEquals("failed", logEntry.getDeliveryStatus());
+        assertEquals("dead_letter", logEntry.getDeliveryStatus());
         assertNotNull(logEntry.getErrorMessage());
     }
 

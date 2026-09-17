@@ -25,7 +25,11 @@ import type { Page } from '@playwright/test';
 /**
  * Click a sidebar menu item. Returns false if parent menu not found (caller should skip).
  */
-async function clickSidebarMenu(page: Page, parentName: RegExp, childHref: string): Promise<boolean> {
+async function clickSidebarMenu(
+  page: Page,
+  parentName: RegExp,
+  childHref: string,
+): Promise<boolean> {
   // Navigate to admin dashboard (/ is marketing website, not admin)
   await page.goto('/dashboards', { waitUntil: 'load' });
 
@@ -37,13 +41,24 @@ async function clickSidebarMenu(page: Page, parentName: RegExp, childHref: strin
   // Wait for nav to be ready, then check for parent menu
   await page.waitForLoadState('domcontentloaded');
   // Give sidebar time to render
-  await nav.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+  await nav
+    .first()
+    .waitFor({ state: 'visible', timeout: 10000 })
+    .catch(() => {});
 
-  const btnVisible = await parentBtn.first().waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  const btnVisible = await parentBtn
+    .first()
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
   if (btnVisible) {
     await parentBtn.first().evaluate((el: HTMLElement) => el.click());
   } else {
-    const linkVisible = await parentLink.first().waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    const linkVisible = await parentLink
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
     if (linkVisible) {
       await parentLink.first().evaluate((el: HTMLElement) => el.click());
     } else {
@@ -54,7 +69,11 @@ async function clickSidebarMenu(page: Page, parentName: RegExp, childHref: strin
 
   // Click child menu link
   const childLink = page.locator(`a[href="${childHref}"]`);
-  const childVisible = await childLink.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true).catch(() => false);
+  const childVisible = await childLink
+    .first()
+    .waitFor({ state: 'visible', timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
   if (!childVisible) return false;
   await childLink.first().evaluate((el) => (el as HTMLAnchorElement).click());
 
@@ -86,7 +105,11 @@ test.describe('Community Edition Smoke', () => {
    * CM-02: AuraBot Providers page via sidebar menu
    */
   test('CM-02: AuraBot Providers page loads via sidebar menu', async ({ page }) => {
-    const found = await clickSidebarMenu(page, /AuraBot|AuraBot 管理|AI 中心|AI Center/, '/aurabot/providers');
+    const found = await clickSidebarMenu(
+      page,
+      /AuraBot|AuraBot 管理|AI 中心|AI Center/,
+      '/aurabot/providers',
+    );
     if (!found) {
       // Fallback: navigate directly if menu structure differs
       await page.goto('/aurabot/providers', { waitUntil: 'domcontentloaded' });
@@ -109,7 +132,11 @@ test.describe('Community Edition Smoke', () => {
    * CM-03: AuraBot Prompts page via sidebar menu
    */
   test('CM-03: AuraBot Prompts page loads via sidebar menu', async ({ page }) => {
-    const found = await clickSidebarMenu(page, /AuraBot|AuraBot 管理|AI 中心|AI Center/, '/aurabot/prompts');
+    const found = await clickSidebarMenu(
+      page,
+      /AuraBot|AuraBot 管理|AI 中心|AI Center/,
+      '/aurabot/prompts',
+    );
     if (!found) {
       await page.goto('/aurabot/prompts', { waitUntil: 'domcontentloaded' });
     }
@@ -132,7 +159,11 @@ test.describe('Community Edition Smoke', () => {
     page,
   }) => {
     // Navigate to AuraBot Dashboard via sidebar
-    const found = await clickSidebarMenu(page, /AuraBot|AuraBot 管理|AI 中心|AI Center/, '/aurabot/dashboard');
+    const found = await clickSidebarMenu(
+      page,
+      /AuraBot|AuraBot 管理|AI 中心|AI Center/,
+      '/aurabot/dashboard',
+    );
     if (!found) {
       await page.goto('/aurabot/dashboard', { waitUntil: 'domcontentloaded' });
     }
@@ -143,19 +174,10 @@ test.describe('Community Edition Smoke', () => {
     await expect(page.locator('[data-testid="enterprise-upsell"]')).toHaveCount(0); // gate:absent-by-design — enterprise-only element must not leak into OSS
   });
 
-  /**
-   * CM-05: ChatBI API is wired (not 404 / not 500)
-   *
-   * The legacy /api/ai/chat-bi API was retired — ChatBI now runs through the agent
-   * runtime (chat_bi skill) and the ChatBiV2Controller at /api/chatbi/v2. Verify the
-   * v2 conversations endpoint is reachable instead of the removed health path.
-   */
-  test('CM-05: ChatBI v2 API exists and does not error', async ({ page }) => {
+  /** CM-05: conversational analytics has one AuraBot entry, with no independent API. */
+  test('CM-05: independent ChatBI conversation API is retired', async ({ page }) => {
     const resp = await page.request.get('/api/chatbi/v2/conversations');
-
-    // Endpoint should exist (not 404) and not crash (not 500)
-    expect(resp.status()).not.toBe(404);
-    expect(resp.status()).not.toBe(500);
+    expect(resp.status()).toBe(404);
   });
 
   /**
@@ -163,8 +185,7 @@ test.describe('Community Edition Smoke', () => {
    */
   test('CM-06: DSL engine renders e2e-test-order list with real data', async ({ page }) => {
     const listRespPromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/dynamic/e2et_order/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/api/dynamic/e2et_order/list') && resp.status() === 200,
       { timeout: 10000 },
     );
     await navigateToDynamicPage(page, 'e2et_order');

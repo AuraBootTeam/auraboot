@@ -379,11 +379,10 @@ class PluginResourceServiceImplTest {
 
         assertThat(service.getCurrentDatabaseState(1L, ResourceType.MENU, "menu")).containsEntry("ok", true);
         assertThat(service.getCurrentDatabaseState(1L, ResourceType.PAGE, "page")).containsEntry("ok", true);
-        assertThat(service.getCurrentDatabaseState(1L, ResourceType.PROCESS, "process")).containsEntry("ok", true);
         assertThat(service.getCurrentDatabaseState(
                 1L, ResourceType.AGENT_DEFINITION, "agent")).containsEntry("ok", true);
         assertThat(service.getCurrentDatabaseState(1L, ResourceType.NAMED_QUERY, "query")).containsEntry("ok", true);
-        verify(jdbcTemplate, times(5)).queryForObject(
+        verify(jdbcTemplate, times(4)).queryForObject(
                 anyString(),
                 any(RowMapper.class),
                 any(Object[].class));

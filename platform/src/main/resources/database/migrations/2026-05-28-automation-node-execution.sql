@@ -3,7 +3,7 @@
 -- runtime state is never persisted by the engine itself. This table captures one row
 -- per (automation_log, node) so the designer can overlay run history on the graph.
 --
--- Lifecycle: AutomationActionServiceTaskDelegate inserts a 'running' row on entry and
+-- Lifecycle: AutomationActionAccessorImpl inserts a 'running' row on entry and
 -- updates it to 'completed' or 'failed' on exit. The delegate must propagate the
 -- original exception (no swallow-and-ignore): the failure row is the observability
 -- artefact, the exception is the control-flow signal SmartEngine needs.

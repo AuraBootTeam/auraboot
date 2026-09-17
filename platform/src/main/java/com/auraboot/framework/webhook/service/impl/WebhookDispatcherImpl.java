@@ -10,6 +10,7 @@ import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatchResult;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
+import com.auraboot.framework.webhook.service.WebhookSignature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,8 +20,6 @@ import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -28,9 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -60,8 +56,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     private final WebhookDeliveryLogMapper deliveryLogMapper;
     private final ObjectMapper objectMapper;
     private final FieldEncryptionService fieldEncryptionService;
-    private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor(
-            r -> { Thread t = new Thread(r, "webhook-retry"); t.setDaemon(true); return t; });
+    private final WebhookSignature webhookSignature;
 
     private static final Pattern DANGEROUS_SPEL_PATTERN = Pattern.compile(
             "(?i)(T\\s*\\(|new\\s+|getClass|forName|invoke|exec|Runtime|Process|System|Thread|Class\\." +
@@ -86,7 +81,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
 
         List<WebhookDispatchResult.Receipt> receipts = new ArrayList<>();
         for (WebhookSubscription subscription : subscriptions) {
-            WebhookDispatchResult.Receipt receipt = deliverWithRetry(subscription, payload);
+            WebhookDispatchResult.Receipt receipt = enqueue(subscription, payload);
             if (receipt != null) {
                 receipts.add(receipt);
             }
@@ -94,35 +89,48 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         return new WebhookDispatchResult(receipts);
     }
 
-    private WebhookDispatchResult.Receipt deliverWithRetry(WebhookSubscription subscription, Map<String, Object> payload) {
+    private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload) {
         if (!matchesFilter(subscription, payload)) {
             log.debug("Webhook filtered out: subscription={}, filter={}",
                     subscription.getPid(), subscription.getFilterExpression());
             return null;
         }
-        WebhookDeliveryLog logEntry = deliverAttempt(subscription, payload, 0);
-        return receiptFrom(subscription, logEntry);
-    }
-
-    private WebhookDeliveryLog deliverAttempt(WebhookSubscription subscription, Map<String, Object> payload, int retryCount) {
-        int maxRetries = subscription.getMaxRetries() != null ? subscription.getMaxRetries() : 3;
-
-        WebhookDeliveryLog logEntry = new WebhookDeliveryLog();
-        logEntry.setPid(UniqueIdGenerator.generate());
-        logEntry.setTenantId(subscription.getTenantId());
-        logEntry.setSubscriptionPid(subscription.getPid());
-        logEntry.setRequestUrl(subscription.getTargetUrl());
-        logEntry.setRetryCount(retryCount);
-
-        // Extract event ID from payload
+        WebhookDeliveryLog delivery = new WebhookDeliveryLog();
+        delivery.setPid(UniqueIdGenerator.generate());
+        delivery.setTenantId(subscription.getTenantId());
+        delivery.setSubscriptionPid(subscription.getPid());
+        delivery.setInstallationPid(subscription.getInstallationPid());
+        delivery.setRequestUrl(subscription.getTargetUrl());
+        delivery.setRetryCount(0);
+        delivery.setMaxRetries(subscription.getMaxRetries() != null ? subscription.getMaxRetries() : 3);
+        delivery.setDeliveryStatus("pending");
+        delivery.setNextRetryAt(Instant.now());
+        delivery.setCreatedAt(Instant.now());
         Object eventId = payload.get("_eventId");
         if (eventId != null) {
-            logEntry.setEventId(String.valueOf(eventId));
+            delivery.setEventId(String.valueOf(eventId));
         }
-
         try {
-            String body = objectMapper.writeValueAsString(payload);
-            logEntry.setRequestBody(body);
+            delivery.setRequestBody(objectMapper.writeValueAsString(payload));
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Webhook payload is not JSON serializable", exception);
+        }
+        deliveryLogMapper.insert(delivery);
+        return receiptFrom(subscription, delivery);
+    }
+
+    /** Execute exactly one persisted and leased attempt. The worker owns retries and recovery. */
+    @Override
+    public void processClaimed(WebhookDeliveryLog delivery) {
+        WebhookSubscription subscription = subscriptionMapper.findByPid(
+                delivery.getTenantId(), delivery.getSubscriptionPid());
+        if (subscription == null || !Boolean.TRUE.equals(subscription.getEnabled())) {
+            deliveryLogMapper.markPermanentFailure(delivery.getId(), delivery.getLeaseToken(),
+                    "Webhook subscription is missing or disabled");
+            return;
+        }
+        try {
+            String body = delivery.getRequestBody();
 
             // Validate URL + pin the resolved IP so the HTTP send cannot be
             // re-resolved to a different address (P3-E #1 DNS rebinding TOCTOU).
@@ -137,16 +145,18 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     ? subscription.getTimeoutMs()
                     : DEFAULT_READ_TIMEOUT_MS;
 
+            String timestamp = String.valueOf(Instant.now().getEpochSecond());
             HttpRequest.Builder requestBuilder = PinnedHttpRequests.newPinnedRequestBuilder(target)
                     .timeout(Duration.ofMillis(readTimeoutMs))
                     .header("Content-Type", "application/json")
                     .header("X-Webhook-Event", subscription.getEventType())
-                    .header("X-Webhook-Timestamp", String.valueOf(Instant.now().toEpochMilli()));
+                    .header("X-Webhook-Timestamp", timestamp)
+                    .header("X-Webhook-Delivery", delivery.getPid());
 
             // Add HMAC signature if secret is configured
             if (subscription.getSecret() != null && !subscription.getSecret().isBlank()) {
                 String decryptedSecret = fieldEncryptionService.decrypt(subscription.getSecret());
-                String signature = computeHmac(body, decryptedSecret);
+                String signature = webhookSignature.sign(decryptedSecret, timestamp, body);
                 requestBuilder.header("X-Webhook-Signature", signature);
             }
 
@@ -164,46 +174,31 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
             int status = response.statusCode();
-            logEntry.setResponseStatus(status);
-            logEntry.setResponseBody(response.body());
             if (status >= 400) {
-                // Preserve prior RestTemplate semantics: 4xx/5xx trigger retry.
-                throw new RuntimeException("Webhook returned error status " + status);
+                throw new ResponseFailure(status, truncate(response.body()));
             }
-            logEntry.setDeliveryStatus("success");
-            logEntry.setDeliveredAt(Instant.now());
-            deliveryLogMapper.insert(logEntry);
+            deliveryLogMapper.markSuccess(delivery.getId(), delivery.getLeaseToken(),
+                    status, truncate(response.body()));
 
             log.debug("Webhook delivered: subscription={}, url={}, status={}",
                     subscription.getPid(), subscription.getTargetUrl(), status);
 
-        } catch (IllegalArgumentException e) {
-            // SSRF or invalid URL — do not retry
+        } catch (IllegalArgumentException exception) {
             log.warn("SSRF blocked or invalid URL for webhook: subscription={}, url={}, reason={}",
-                    subscription.getPid(), subscription.getTargetUrl(), e.getMessage());
-            logEntry.setDeliveryStatus("failed");
-            logEntry.setErrorMessage(e.getMessage());
-            deliveryLogMapper.insert(logEntry);
-        } catch (Exception e) {
-            logEntry.setDeliveryStatus("failed");
-            logEntry.setErrorMessage(e.getMessage());
-            deliveryLogMapper.insert(logEntry);
-
-            int nextRetry = retryCount + 1;
-            if (nextRetry <= maxRetries) {
-                // Non-blocking exponential backoff with jitter: ~1s, ~2s, ~4s, ~8s...
-                long backoffMs = (long) (Math.pow(2, retryCount) * 1000 * (0.5 + Math.random() * 0.5));
-                log.warn("Webhook delivery failed (retry {}/{}): url={}, error={}, next attempt in {}ms",
-                        nextRetry, maxRetries, subscription.getTargetUrl(), e.getMessage(), backoffMs);
-                retryScheduler.schedule(
-                        () -> deliverAttempt(subscription, payload, nextRetry),
-                        backoffMs, TimeUnit.MILLISECONDS);
-            } else {
-                log.error("Webhook delivery failed after {} retries: url={}",
-                        maxRetries, subscription.getTargetUrl());
-            }
+                    subscription.getPid(), subscription.getTargetUrl(), exception.getMessage());
+            deliveryLogMapper.markPermanentFailure(delivery.getId(), delivery.getLeaseToken(),
+                    truncate(exception.getMessage()));
+        } catch (Exception exception) {
+            int retryCount = delivery.getRetryCount() == null ? 0 : delivery.getRetryCount();
+            long backoffSeconds = Math.min(3600L, 1L << Math.min(retryCount, 12));
+            Instant nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
+            Integer status = exception instanceof ResponseFailure failure ? failure.status : null;
+            String body = exception instanceof ResponseFailure failure ? failure.body : null;
+            deliveryLogMapper.markFailure(delivery.getId(), delivery.getLeaseToken(), status, body,
+                    truncate(exception.getMessage()), nextRetryAt);
+            log.warn("Webhook delivery attempt failed: delivery={}, retry={}, nextRetryAt={}, error={}",
+                    delivery.getPid(), retryCount + 1, nextRetryAt, exception.getMessage());
         }
-        return logEntry;
     }
 
     private WebhookDispatchResult.Receipt receiptFrom(WebhookSubscription subscription, WebhookDeliveryLog logEntry) {
@@ -243,20 +238,21 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         }
     }
 
-    private String computeHmac(String data, String secret) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(keySpec);
-            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return "sha256=" + sb;
-        } catch (Exception e) {
-            // Do not send unsigned webhooks — throw to prevent delivery (25.2 fix)
-            throw new IllegalStateException("Failed to compute HMAC signature", e);
+    private String truncate(String value) {
+        if (value == null || value.length() <= 16_384) {
+            return value;
+        }
+        return value.substring(0, 16_384);
+    }
+
+    private static final class ResponseFailure extends RuntimeException {
+        private final int status;
+        private final String body;
+
+        private ResponseFailure(int status, String body) {
+            super("Webhook returned error status " + status);
+            this.status = status;
+            this.body = body;
         }
     }
 }

@@ -37,6 +37,8 @@ export interface KanbanColumn {
   hasMore?: boolean;
   /** Aggregation results for this column */
   aggregations?: Record<string, number>;
+  /** Display label per aggregation key — values may be localized maps (WMS-UX-02 family). */
+  aggregationLabels?: Record<string, string | Record<string, string>>;
   /** Column accent color (resolved from dict extras or view config) */
   color?: string;
   /** Terminal stage marker for visual treatment (won/lost) */
@@ -51,8 +53,11 @@ export interface KanbanAggregation {
   field: string;
   /** Aggregation function */
   function: 'count' | 'sum' | 'avg' | 'min' | 'max';
-  /** Display label for the aggregation result */
-  label?: string;
+  /**
+   * Display label: plain string or localized map ({zh-CN, en}) — maps are
+   * resolved via getLocalizedText at render time (WMS-UX-02).
+   */
+  label?: string | Record<string, string>;
 }
 
 /**

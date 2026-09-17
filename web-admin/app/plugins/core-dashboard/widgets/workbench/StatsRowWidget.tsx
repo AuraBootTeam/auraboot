@@ -20,9 +20,7 @@ const TREND_COLOR: Record<string, string> = {
 
 const DEFAULT_STATS: StatsConfig[] = [
   { key: 'inbox_pending', title: 'workbench.stats.inbox_pending' },
-  { key: 'crm_opportunity_amount', title: 'workbench.stats.crm_opportunity_amount' },
-  { key: 'bpm_running', title: 'workbench.stats.bpm_running' },
-  { key: 'crm_account_active', title: 'workbench.stats.crm_account_active' },
+  { key: 'inbox_urgent', title: 'workbench.stats.inbox_urgent' },
 ];
 
 function formatValue(item: StatItem): string {
@@ -59,7 +57,10 @@ export function StatsRowWidget({ stats: statConfigs, className = '' }: StatsRowW
 
   return (
     <div
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 ${className}`}
+      className={`grid gap-4 ${className}`}
+      style={{
+        gridTemplateColumns: `repeat(${Math.min(Math.max(configs.length, 1), 4)}, minmax(0, 1fr))`,
+      }}
       data-testid="stats-row"
     >
       {configs.map((cfg) => {

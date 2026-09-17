@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 import type { VersionEntry } from './types';
 import { getOperationConfig } from './types';
@@ -39,6 +40,7 @@ interface VersionItemProps {
 }
 
 function VersionItem({ version, isActive, isLatest, onClick, labels }: VersionItemProps) {
+  const text = useSmartText();
   const opConfig = getOperationConfig(version.operation);
 
   return (
@@ -66,7 +68,13 @@ function VersionItem({ version, isActive, isLatest, onClick, labels }: VersionIt
       </div>
       <div className="text-xs text-gray-500">
         <span>{formatDate(version.operationAt)}</span>
-        {version.operationBy && <span className="ml-2">{labels.by} {version.operationBy}</span>}
+        {version.operationBy && (
+          <span className="ml-2">
+            {labels.by}{' '}
+            {version.operationByDisplayName ||
+              text({ zh: '操作人不可用', en: 'Actor unavailable' })}
+          </span>
+        )}
       </div>
       {version.description && (
         <p className="mt-1 line-clamp-2 text-xs text-gray-400">{version.description}</p>
@@ -94,6 +102,7 @@ export interface VersionHistoryPanelProps {
   onRollback: (versionPid: string) => Promise<void>;
   /** Whether rollback is in progress */
   isRollingBack: boolean;
+  canRollback?: boolean;
 }
 
 export function VersionHistoryPanel({
@@ -106,6 +115,7 @@ export function VersionHistoryPanel({
   onExitPreview,
   onRollback,
   isRollingBack,
+  canRollback = true,
 }: VersionHistoryPanelProps) {
   const [rollbackTarget, setRollbackTarget] = useState<VersionEntry | null>(null);
   const { t } = useI18n();
@@ -174,9 +184,7 @@ export function VersionHistoryPanel({
         {/* Previewing old version banner */}
         {viewingVersionPid && (
           <div className="flex items-center justify-between border-b border-yellow-200 bg-yellow-50 px-4 py-2">
-            <span className="text-xs font-medium text-yellow-800">
-              {labels.previewing}
-            </span>
+            <span className="text-xs font-medium text-yellow-800">{labels.previewing}</span>
             <button
               type="button"
               onClick={onExitPreview}
@@ -254,17 +262,19 @@ export function VersionHistoryPanel({
               >
                 {labels.back}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const target = versions.find((v) => v.pid === viewingVersionPid);
-                  if (target) setRollbackTarget(target);
-                }}
-                disabled={isRollingBack}
-                className="flex-1 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
-              >
-                {isRollingBack ? labels.rollingBack : labels.rollback}
-              </button>
+              {canRollback && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = versions.find((v) => v.pid === viewingVersionPid);
+                    if (target) setRollbackTarget(target);
+                  }}
+                  disabled={isRollingBack}
+                  className="flex-1 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {isRollingBack ? labels.rollingBack : labels.rollback}
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-center text-xs text-gray-500">
@@ -275,7 +285,7 @@ export function VersionHistoryPanel({
       </div>
 
       {/* Rollback confirmation dialog */}
-      {rollbackTarget && (
+      {canRollback && rollbackTarget && (
         <RollbackDialog
           version={rollbackTarget}
           isRollingBack={isRollingBack}

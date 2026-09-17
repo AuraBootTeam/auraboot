@@ -65,6 +65,8 @@ describe('renderReportChartSvg (echarts-SSR via the real frontend renderer)', ()
     const svg = renderReportChartSvg(spec, rows, { width: 400, height: 240 });
     expect(svg).toContain('<svg');
     expect(svg).toContain('<path');
+    expect(svg).not.toContain('@keyframes');
+    expect(svg).not.toContain('animation:');
     // The whole point of Phase 3: this is a real chart, not the "Category | Value" dump.
     expect(svg).not.toContain('Category');
   });

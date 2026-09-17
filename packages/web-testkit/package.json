@@ -1,0 +1,12 @@
+{
+  "name": "@auraboot/web-testkit",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.50.0 <2"
+  }
+}

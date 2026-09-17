@@ -16,7 +16,9 @@ import { isSystemTenant } from '~/constants/SpaceConstants';
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
 import { ThemeProvider } from '~/contexts/ThemeContext';
 import { ToastProvider } from '~/contexts/ToastContext';
+import { Toaster } from 'sonner';
 import { TimezoneProvider } from '~/contexts/TimezoneContext';
+import { TenantThemeProvider } from '~/contexts/TenantThemeContext';
 import { ConfirmDialogProvider } from '~/contexts/ConfirmDialogContext';
 import { getI18nData } from '~/shared/services/form';
 import { getUserMenus } from '~/shared/services/menu';
@@ -385,11 +387,16 @@ export default function App() {
           initialTimezone={data.initialTimezone}
           skipTenantPreferences={data.skipTenantPreferences}
         >
-          <ToastProvider>
-            <ConfirmDialogProvider>
-              {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
-            </ConfirmDialogProvider>
-          </ToastProvider>
+          <TenantThemeProvider>
+            <ToastProvider>
+              <ConfirmDialogProvider>
+                {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
+              </ConfirmDialogProvider>
+              {/* sonner-based feedback (designer saves, export failures) previously had no
+                  mounted Toaster and was invisible; render it once at the app root. */}
+              <Toaster richColors position="top-right" />
+            </ToastProvider>
+          </TenantThemeProvider>
         </TimezoneProvider>
       </I18nProvider>
     </RuntimeProfileProvider>

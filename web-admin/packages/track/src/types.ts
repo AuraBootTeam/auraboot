@@ -11,6 +11,12 @@ export interface BehaviorEventInput {
   occurredAt: string;             // ISO8601
   clientSessionId: string;
   anonId?: string;                // public/anonymous mode: client-generated persistent visitor id
+  /**
+   * Run-scoped isolation identity (maps to ab_behavior_event.run_id). Set by the
+   * host so one execution's events can be asserted and cleaned up without
+   * touching any other run's or tenant's data (AMOS cockpit gap G10).
+   */
+  runId?: string;
   uiElementId?: string;
   appId?: string;
   pageId?: string;
@@ -25,6 +31,7 @@ export interface RawEventInput {
   eventCategory: string;
   clientSessionId: string;
   anonId?: string;
+  runId?: string;
   ui?: {
     uiElementId: string;
     appId?: string;

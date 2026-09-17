@@ -17,6 +17,10 @@ public class DashboardCreateRequest {
     @Size(max = 100, message = "Dashboard code must be less than 100 characters")
     private String code;
 
+    /** Server-issued source analysis; validated against the successful query. */
+    @Size(max = 64)
+    private String sourceAnalysisId;
+
     @NotBlank(message = "Dashboard title is required")
     @Size(max = 200, message = "Dashboard title must be less than 200 characters")
     private String title;

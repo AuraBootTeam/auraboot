@@ -21,7 +21,7 @@ aura query <entity> --nq <named_query_code>                  # aggregations / da
 aura query <entity> | aura analyze "summarize by owner"      # stdin -> AI -> stdout
 ```
 
-Domain shortcuts exist too: `aura crm leads`, `aura finance invoices`, `aura inventory low-stock`, etc. Use `--help` on any of them.
+Installed domain shortcuts can extend the generic CLI. Core examples include `aura finance invoices` and `aura inventory low-stock`; use `--help` to discover what the current installation exposes.
 
 ## Run commands
 

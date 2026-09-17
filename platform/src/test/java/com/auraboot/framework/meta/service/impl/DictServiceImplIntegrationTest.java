@@ -460,6 +460,19 @@ class DictServiceImplIntegrationTest {
     }
 
     @Test
+    @DisplayName("plugin-owned dictionary items are plugin-sourced at creation time")
+    void pluginOwnedItemsAreCreatedWithPluginSource() {
+        DictCreateRequest request = newRequest(uniqueCode("pluginitems"), "Plugin Items");
+        request.setPluginPid(UniqueIdGenerator.generate());
+        request.setItems(List.of(item("p1", "Plugin Item", 1)));
+
+        DictDTO created = dictService.create(request);
+        Long dictId = dictMapper.findByPid(created.getPid()).getId();
+
+        assertEquals("plugin", dictItemMapper.findByDictId(dictId).getFirst().getSource());
+    }
+
+    @Test
     @DisplayName("loadDictData / batchLoadDictData return data for a dynamic dict")
     void loadDictData() {
         String code = uniqueCode("load");

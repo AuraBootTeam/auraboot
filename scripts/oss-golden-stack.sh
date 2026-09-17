@@ -15,13 +15,16 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
 #                   otherwise refuses to run on a database that predates the current
 #                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
 #                   TABLE, so it cannot back-fill columns into tables that already exist).
+#       --product-migration-root: repeatable directory of product-owned V*.sql migrations.
+#                   Requires --fresh-db and applies after the Core snapshot but before backend
+#                   startup, recording path + SHA-256 in the runtime state directory.
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
 #   ./scripts/oss-golden-stack.sh import <name> [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
@@ -33,7 +36,7 @@
 #
 # Then run golden specs (the `up` banner prints this, `env` re-prints it):
 #   cd web-admin && eval "$(../scripts/oss-golden-stack.sh env <name>)" \
-#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/<spec>.spec.ts
+#     && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/<spec>.spec.ts
 #
 set -euo pipefail
 
@@ -67,6 +70,43 @@ ADMIN_PASSWORD="Test2026x"
 
 log() { printf '\033[36m[golden-stack]\033[0m %s\n' "$*"; }
 die() { printf '\033[31m[golden-stack] FATAL:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# ---- per-checkout stack lock -----------------------------------------------------------
+# Gradle outputs are not safe to write concurrently on one checkout: a second build
+# rewriting platform/build/libs while our backend boots replaces the jar inode under the
+# running JVM, which then dies with ServiceLoader NoSuchFileException (observed
+# 2026-09-14: a CI release suite built the same checkout during 'up'). 'up' holds this
+# lock across build → backend health so golden-stack runs serialize per checkout. CI
+# suites that don't take the lock are covered separately by spawning from a copied jar.
+GOLDEN_STACK_LOCK_DIR=""
+
+golden_stack_lock_dir() {
+  local key; key="$(printf '%s' "$REPO_ROOT" | cksum | cut -d' ' -f1)"
+  printf '%s/aura-golden-stack-%s.lock' "${TMPDIR:-/tmp}" "$key"
+}
+
+release_stack_lock() {
+  [ -n "$GOLDEN_STACK_LOCK_DIR" ] || return 0
+  rm -rf "$GOLDEN_STACK_LOCK_DIR"
+  GOLDEN_STACK_LOCK_DIR=""
+}
+
+acquire_stack_lock() {
+  local lock_dir; lock_dir="$(golden_stack_lock_dir)"
+  if ! mkdir "$lock_dir" 2>/dev/null; then
+    local holder; holder="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+      log "taking over stale golden-stack lock (holder pid $holder is gone)"
+      rm -rf "$lock_dir"
+      mkdir "$lock_dir" || die "cannot take over stale golden-stack lock $lock_dir"
+    else
+      die "another golden-stack operation is running on $REPO_ROOT (holder pid ${holder:-?}, lock $lock_dir)"
+    fi
+  fi
+  printf '%s\n' "$$" >"$lock_dir/pid"
+  GOLDEN_STACK_LOCK_DIR="$lock_dir"
+  trap release_stack_lock EXIT
+}
 
 state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
 
@@ -168,12 +208,21 @@ stage_requested_backend_jars() {
       >"$sd/platform-publications.log" 2>&1 \
     || die "platform-plugin-api/auraboot-core publish failed — see $sd/platform-publications.log"
 
+  # External hybrid plugins use artifact mode: they deliberately cannot resolve a moving
+  # platform SNAPSHOT and require the immutable API jar produced by this exact Core checkout.
+  # Passing the property to every plugin build is harmless for in-repo plugins and keeps one
+  # build path for both repository layouts.
+  local platform_plugin_api_jar="$REPO_ROOT/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar"
+  [ -f "$platform_plugin_api_jar" ] \
+    || die "platform-plugin-api jar missing after publication build: $platform_plugin_api_jar"
+
   local spec staged_path jar_hash jar_entry_class entry_class_path
   for spec in "${backend_specs[@]}"; do
     IFS=$'\t' read -r plugin_name plugin_dir backend_dir jar_path entry_class <<< "$spec"
     [ -d "$backend_dir" ] || die "plugin backend missing for $plugin_name: $backend_dir"
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
-      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar --console=plain \
+      --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar \
+      "-PplatformPluginApiJar=$platform_plugin_api_jar" --console=plain \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
@@ -283,8 +332,8 @@ PY
 cmd_up() {
   local name="$1"; shift
   local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
-  local plugin_profile="" import_plugins=() extra_plugin_roots=()
-  local extra_root plugin_item
+  local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
+  local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
@@ -292,6 +341,17 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --product-migration-root)
+      [ -d "$2" ] || die "product migration root does not exist: $2"
+      product_migration_roots+=("$(cd "$2" && pwd)")
+      shift 2
+      ;;
+    --product-migration-root=*)
+      migration_root="${1#--product-migration-root=}"
+      [ -d "$migration_root" ] || die "product migration root does not exist: $migration_root"
+      product_migration_roots+=("$(cd "$migration_root" && pwd)")
+      shift
+      ;;
     --extra-plugin-root)
       [ -d "$2" ] || die "extra plugin root does not exist: $2"
       extra_plugin_roots+=("$(cd "$2" && pwd)")
@@ -315,12 +375,16 @@ cmd_up() {
     *) die "unknown arg: $1";;
   esac; done
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
+  [ "${#product_migration_roots[@]}" -eq 0 ] || [ "$fresh_db" = "1" ] \
+    || die "--product-migration-root requires --fresh-db so product SQL is never replayed onto an unknown database"
   case "$runtime_mode" in
     development|verification|control|performance) ;;
     *) die "--runtime-mode must be development|verification|control|performance" ;;
   esac
 
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
+
+  acquire_stack_lock
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
   # `runtime ensure` is the idempotent allocation contract: the same stable name + slot +
@@ -410,6 +474,28 @@ cmd_up() {
       || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
   fi
 
+  if [ "${#product_migration_roots[@]}" -gt 0 ]; then
+    log "2.5/9 apply product-owned migrations"
+    : >"$sd/product-migrations.log"
+    printf 'root\tfile\tsha256\n' >"$sd/product-migrations.tsv"
+    local product_root migration_file migration_count=0 migration_hash
+    for product_root in "${product_migration_roots[@]}"; do
+      while IFS= read -r migration_file; do
+        [ -n "$migration_file" ] || continue
+        migration_count=$((migration_count + 1))
+        migration_hash="$(shasum -a 256 "$migration_file" | awk '{print $1}')"
+        printf '%s\t%s\t%s\n' "$product_root" "$migration_file" "$migration_hash" \
+          >>"$sd/product-migrations.tsv"
+        PGPASSWORD="$pg_pass" psql -v ON_ERROR_STOP=1 \
+          -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -f "$migration_file" \
+          >>"$sd/product-migrations.log" 2>&1 \
+          || { tail -20 "$sd/product-migrations.log" >&2; die "product migration failed: $migration_file"; }
+      done < <(find "$product_root" -maxdepth 1 -type f -name 'V*.sql' -print | LC_ALL=C sort)
+    done
+    [ "$migration_count" -gt 0 ] || die "product migration roots contain no V*.sql files"
+    log "    applied $migration_count product migration(s); receipt: $sd/product-migrations.tsv"
+  fi
+
   log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
   if [ ! -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ]; then
     mkdir -p "$REPO_ROOT/platform/gradle/wrapper"
@@ -428,6 +514,12 @@ cmd_up() {
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
+  # Run from a copy, not the build output: the JVM lazily re-opens nested jars from this
+  # path for its whole lifetime, and a build that rewrites build/libs mid-boot (CI suite,
+  # second 'up' that lost the lock race on an older checkout) kills the process. The
+  # golden-stack lock above only covers cooperating golden-stack runs.
+  local run_jar="$sd/boot-run.jar"
+  cp "$jar" "$run_jar"
 
   local staging_args=(--profile "${plugin_profile:-none}")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
@@ -459,7 +551,7 @@ cmd_up() {
       LOGGING_LEVEL_COM_AURABOOT_FRAMEWORK_OBSERVABILITY_MAPPER=DEBUG \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
       AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-true}" \
-      java -jar "$jar"
+      java -jar "$run_jar"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
@@ -760,7 +852,7 @@ export PG_PORT=${pg_port:-5432}
 export PG_USER=${pg_user:-auraboot}
 export PG_DB=${pg_db:-aura_boot}
 # example: cd web-admin && eval "\$(../scripts/oss-golden-stack.sh env $name)" \\
-#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/bpm-designer/designer-property-edit.spec.ts
+#   && npx playwright test -c playwright.gt5.config.ts tests/e2e/designer/designer-lifecycle.spec.ts
 # NOTE: 'up' runs an internal warm step (full setup → auth storageState → pre-warm
 #       /report-designer + /dashboard), and web-admin/vite.config.ts pre-bundles the
 #       heavy lazy-route deps (optimizeDeps.include, #947). The FIRST golden run after
