@@ -108,10 +108,10 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
         return false;
       })).length;
     }, samples), { message: `${path} trend ${index} must draw every line segment, not only symbols` }).toBe(samples.length);
-    const bounds = await chart.boundingBox();
-    expect(bounds).not.toBeNull();
+    // locator.hover 先把图表滚入视口再派发悬停；数据多的租户首页图表常在
+    // 折叠线以下，page.mouse.move(boundingBox) 会悬到视口外导致 tooltip 不出现。
     const last = rendered.points[11];
-    await page.mouse.move(bounds!.x + last[0], bounds!.y + last[1]);
+    await chart.hover({ position: { x: last[0], y: last[1] } });
     await expect(chart).toContainText(`创建数量`);
     await expect(chart).toContainText(String(expectedSeries[index][11]));
     await page.mouse.move(0, 0);
