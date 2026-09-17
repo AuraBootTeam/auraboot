@@ -18,6 +18,7 @@ import com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
+import com.auraboot.framework.permission.engine.model.SharedRootReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -478,6 +479,26 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                     .collect(Collectors.joining(","));
             if (!pids.isBlank()) {
                 predicates.add("pid IN (" + pids + ")");
+            }
+        }
+        for (SharedRootReference reference : condition.sharedRootReferences()) {
+            if (reference.rootRecordPids().isEmpty()) {
+                continue;
+            }
+            if (!SqlSafetyUtils.isValidIdentifier(reference.referenceField())) {
+                log.warn("Invalid reference field in shared-root surface: {}",
+                        reference.referenceField());
+                continue;
+            }
+            String rootPids = reference.rootRecordPids().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(pid -> !pid.isEmpty())
+                    .distinct()
+                    .map(pid -> "'" + pid.replace("'", "''") + "'")
+                    .collect(Collectors.joining(","));
+            if (!rootPids.isBlank()) {
+                predicates.add(reference.referenceField() + " IN (" + rootPids + ")");
             }
         }
         if (predicates.isEmpty()) {

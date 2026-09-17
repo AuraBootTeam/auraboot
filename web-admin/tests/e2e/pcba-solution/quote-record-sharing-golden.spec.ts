@@ -227,6 +227,28 @@ test('quote sharing release gate: collaborator full processing, record isolation
   await expect(memberPage.getByRole('columnheader', { name: '资料类型' })).toBeVisible();
   await expect(memberPage.getByRole('columnheader', { name: '文件名' })).toBeVisible();
 
+  // 报价Excel tab: generate, download and parse the workbook as the collaborator, before the
+  // process-fee recalculation step below changes the quote's fee accounting. The workbook
+  // contract mirrors the admin control (quote-excel-download) and doubles as the regression
+  // guard for the shared-aggregate row surface: collaborator-initiated generate_document used
+  // to render an empty BOM明细 when the child-record query missed the record-share grant.
+  await memberPage.getByRole('tab',{name:'报价Excel',exact:true}).click();
+  await expect(memberPage.getByTestId('workbench-action-generate_quote_excel')).toBeVisible({ timeout: 15_000 });
+  const excelCommand = memberPage.waitForResponse(response =>
+    response.url().includes('/api/meta/commands/execute/') &&
+    response.url().includes('generate_document') &&
+    response.request().method() === 'POST', { timeout: 60_000 });
+  const download = memberPage.waitForEvent('download', { timeout: 60_000 });
+  await memberPage.getByTestId('workbench-action-generate_quote_excel').click();
+  const excelResponse = await excelCommand;
+  const excelBody = await excelResponse.json().catch(() => ({}));
+  expect(String(excelBody.code), `generate_document: ${JSON.stringify(excelBody).slice(0,400)}`).toBe('0');
+  const downloaded = await download;
+  expect(downloaded.suggestedFilename()).toContain(processed.quoteCode);
+  const savedPath = path.join(testInfo.outputDir, 'shared-quote-download.xlsx');
+  await saveWorkbookDownload(downloaded, savedPath, testInfo, 'shared-quote-standard');
+  validateQuoteWorkbook(savedPath, { expectedFirstBomUnitPrice: 1.25, fixedCounts: { apertures: 3, holes: 2 } });
+
   // 加工点数 tab: the collaborator can recalculate process points via the toolbar command
   // (the configured button carries count_hole_mode=default and dispatches directly, then an
   // async-task completion modal must be dismissed before the rest of the page is clickable).
@@ -303,34 +325,6 @@ test('quote sharing release gate: collaborator full processing, record isolation
   const dynContainer = dynPage.getByTestId('ab:detail:qo_quote_common:container');
   await expect(dynContainer.getByRole('heading', { level: 2 })).toHaveText('无法访问此记录');
   await dynPage.screenshot({path:testInfo.outputPath('role-membership-revoked.png'), fullPage:true});
-
-  // 报价Excel tab: generate, download and parse the workbook as the collaborator.
-  // KNOWN RED (product bug, found by this coverage): generate_document dispatched by a
-  // record-share collaborator renders the workbook with an empty BOM明细 — the async
-  // generation queries lines through the initiator's base data scope without the
-  // record-share grant, while every UI surface shows the lines. Admin path is green
-  // (quote-excel-download). Do not weaken this assertion; fix the product instead.
-  const memberExcelLoad = memberPage.waitForResponse(response =>
-    new URL(response.url()).pathname === shareRoot(processed.quoteId) &&
-    response.request().method() === 'GET');
-  await memberPage.goto(`/p/qo_quote_common/view/${processed.quoteId}#output_approval`);
-  await memberExcelLoad;
-  await memberPage.getByRole('tab',{name:'报价Excel',exact:true}).click();
-  await expect(memberPage.getByTestId('workbench-action-generate_quote_excel')).toBeVisible({ timeout: 15_000 });
-  const excelCommand = memberPage.waitForResponse(response =>
-    response.url().includes('/api/meta/commands/execute/') &&
-    response.url().includes('generate_document') &&
-    response.request().method() === 'POST', { timeout: 60_000 });
-  const download = memberPage.waitForEvent('download', { timeout: 60_000 });
-  await memberPage.getByTestId('workbench-action-generate_quote_excel').click();
-  const excelResponse = await excelCommand;
-  const excelBody = await excelResponse.json().catch(() => ({}));
-  expect(String(excelBody.code), `generate_document: ${JSON.stringify(excelBody).slice(0,400)}`).toBe('0');
-  const downloaded = await download;
-  expect(downloaded.suggestedFilename()).toContain(processed.quoteCode);
-  const savedPath = path.join(testInfo.outputDir, 'shared-quote-download.xlsx');
-  await saveWorkbookDownload(downloaded, savedPath, testInfo, 'shared-quote-standard');
-  validateQuoteWorkbook(savedPath, { expectedFirstBomUnitPrice: 1.25, fixedCounts: { apertures: 3, holes: 2 } });
 
   await memberCtx.context.close();
   await dynCtx.context.close();

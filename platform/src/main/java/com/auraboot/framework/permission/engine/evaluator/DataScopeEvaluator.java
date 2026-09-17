@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
+import com.auraboot.framework.permission.engine.model.SharedRootReference;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.RecordShareService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,11 @@ import java.util.Map;
  *
  * <p>Delegates to {@link DataScopeService} for scope resolution and applies
  * the result to individual record access checks or SQL condition generation.
+ *
+ * <p>On top of the surface scope, both {@link #evaluate} and {@link #getCondition} union the
+ * declared shared-aggregate surface resolved by {@link RecordShareRowSurfaceResolver}: a record
+ * referencing an aggregate root that is shared with the caller stays visible even when the child
+ * resource's own surface scope (self/dept/none) would deny it.
  */
 @Component
 @RequiredArgsConstructor
@@ -25,6 +31,7 @@ public class DataScopeEvaluator {
 
     private final DataScopeService dataScopeService;
     private final RecordShareService recordShareService;
+    private final RecordShareRowSurfaceResolver rowSurfaceResolver;
 
     /**
      * Evaluate whether the member can access a specific record based on data scope.
@@ -51,7 +58,14 @@ public class DataScopeEvaluator {
         }
 
         if ("none".equals(scopeType)) {
-            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Scope: none — access denied");
+            EvaluationStep denied = new EvaluationStep(NAME, EvaluationVerdict.DENY,
+                    "Scope: none — access denied");
+            if (!(record instanceof Map)) {
+                return denied;
+            }
+            return allowWithinSharedRootSurfaceOr(
+                    enrichWithSharedRootSurface(condition, memberId, resource, action),
+                    (Map<String, Object>) record, denied);
         }
 
         // For record-level checks, we need the record as a Map
@@ -63,16 +77,51 @@ public class DataScopeEvaluator {
 
         Map<String, Object> recordMap = (Map<String, Object>) record;
 
+        condition = enrichWithSharedRootSurface(condition, memberId, resource, action);
+
         if ("self".equals(scopeType)) {
-            return evaluateSelf(condition, recordMap);
+            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateSelf(condition, recordMap));
         }
 
         if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType)) {
-            return evaluateDept(condition, recordMap);
+            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap));
         }
 
         return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE,
                 "Unknown scope type: " + scopeType);
+    }
+
+    /**
+     * Union the declared shared-aggregate surface into the condition (no-op without tenant
+     * context or without a declaration).
+     */
+    private DataScopeCondition enrichWithSharedRootSurface(
+            DataScopeCondition condition, Long memberId, String resource, String action) {
+        if (!MetaContext.exists()) {
+            return condition;
+        }
+        return condition.withSharedRootReferences(rowSurfaceResolver.resolveSharedRootReferences(
+                MetaContext.getCurrentTenantId(), memberId, resource, action));
+    }
+
+    /**
+     * A record whose declared reference field points at a shared aggregate root belongs to the
+     * caller's shared row surface — allow it even when the surface scope alone would deny it.
+     */
+    private EvaluationStep allowWithinSharedRootSurfaceOr(
+            DataScopeCondition condition, Map<String, Object> record, EvaluationStep denied) {
+        for (SharedRootReference reference : condition.sharedRootReferences()) {
+            Object value = record.get(reference.referenceField());
+            if (value == null) {
+                continue;
+            }
+            if (reference.rootRecordPids().contains(String.valueOf(value))) {
+                return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
+                        "Scope: " + condition.scopeType()
+                                + " — record references an aggregate root shared with the caller");
+            }
+        }
+        return denied;
     }
 
     /**
@@ -104,14 +153,17 @@ public class DataScopeEvaluator {
             return condition;
         }
 
-        return condition.withSharedRecords(
-                recordShareService.getSharedRecordIds(tenantId, resource, memberId, action),
-                recordShareService.getSharedRecordPids(
-                        tenantId,
-                        resource,
-                        memberId,
-                        MetaContext.getCurrentUserPid(),
-                        action));
+        return condition
+                .withSharedRecords(
+                        recordShareService.getSharedRecordIds(tenantId, resource, memberId, action),
+                        recordShareService.getSharedRecordPids(
+                                tenantId,
+                                resource,
+                                memberId,
+                                MetaContext.getCurrentUserPid(),
+                                action))
+                .withSharedRootReferences(rowSurfaceResolver.resolveSharedRootReferences(
+                        tenantId, memberId, resource, action));
     }
 
     // ========================================================================
