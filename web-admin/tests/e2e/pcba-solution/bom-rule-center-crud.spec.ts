@@ -972,3 +972,51 @@ for (const kind of ['aml', 'avl'] as const) {
     await info.attach(`${kind}-issue-resolution`, { body: JSON.stringify({ before, missing, ineffective, after }), contentType: 'application/json' });
   });
 }
+
+// B04-04: 格式档案 — 保存后刷新与列表一致;必填缺失不发命令(编辑表单必填项清空后提交)。
+test('B04-04 format profile: required-missing edit fires no command; saved rename survives reload in the list', async ({ page }, info) => {
+  test.setTimeout(180_000);
+  const marker = `SFP-B0404-${Date.now()}`;
+  const field = (name: string) => page.getByTestId(`form-field-${name}`);
+  const profileRows = () => queryDynamicRecords(page, 'bom_source_format_profile', [
+    { fieldName: 'bom_sfp_code', operator: 'EQ', value: marker },
+  ]);
+  // 治理型页面无直接新建:经 API 种子(生命周期治理由 :340 用例覆盖)
+  await dynamicCreate(page, 'bom_source_format_profile', {
+    bom_sfp_code: marker,
+    bom_sfp_name: `E2E 格式档案 ${marker}`,
+    bom_sfp_status: 'candidate',
+    bom_sfp_enabled: false,
+    bom_sfp_auto_apply: false,
+    bom_sfp_priority: 10,
+    bom_sfp_revision: 1,
+  }, []);
+
+  let updateCalls = 0;
+  page.on('request', (req) => {
+    if (req.url().includes('/api/meta/commands/execute/bom:update_source_format_profile')) updateCalls += 1;
+  });
+  await page.goto('/p/bom_source_format_profile', { waitUntil: 'domcontentloaded' });
+  await searchBusinessList(page, '/p/bom_source_format_profile', marker);
+  const row = page.getByRole('row').filter({ hasText: marker });
+  await expect(row.first()).toBeVisible({ timeout: 20_000 });
+  await clickRowActionByLocator(page, row.first(), 'edit', '编辑');
+  await field('bom_sfp_name').getByRole('textbox').fill('');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.waitForTimeout(1_500);
+  expect(updateCalls, 'required-missing submit must not fire the update command').toBe(0);
+  await expect(field('bom_sfp_name')).toContainText(/必填|不能为空|请输入|请填写|required/i);
+  await info.attach('B04-04-required-missing', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
+  const newName = `E2E 格式档案改名 ${marker}`;
+  await field('bom_sfp_name').getByRole('textbox').fill(newName);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.waitForTimeout(1_500);
+  expect(updateCalls, 'valid save fires the update command exactly once').toBe(1);
+  expect((await profileRows())[0].bom_sfp_name).toBe(newName);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await searchBusinessList(page, '/p/bom_source_format_profile', marker);
+  await expect(page.locator('main')).toContainText(newName, { timeout: 20_000 });
+  await info.attach('B04-04-rename-survives-reload', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+});

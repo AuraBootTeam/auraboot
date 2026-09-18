@@ -2,8 +2,11 @@ import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
   dynamicCreate,
+  ensureQuoteRoleUser,
+  makeQuoteRoleUser,
   queryDynamicRecords,
   type CreatedRows,
+  type QuoteRoleUser,
 } from './quote-e2e-helpers';
 
 test.describe('X03-04 team data scope golden', () => {
@@ -36,4 +39,63 @@ test.describe('X03-04 team data scope golden', () => {
       await cleanupRows(page, created);
     }
   });
+});
+
+test('X03-04 team member change: add surfaces in the roster, removal takes effect immediately', async ({ browser }) => {
+  // 成员管理的真产品面是团队专用 REST(/api/org/teams*):ab_team_member 未注册为
+  // 动态模型,成员腿必须走该 API。断言成员变更在成员名册上即时生效:
+  // 加入后名册可见,移除后旧成员不可再见。
+  const marker = `TEAMM-${Date.now()}`;
+  const adminContext = await browser.newContext({
+    storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+  });
+  const adminPage = await adminContext.newPage();
+  try {
+    const memberUser: QuoteRoleUser = makeQuoteRoleUser('team_member_x03', marker.slice(-10).replace(/-/g, ''), ['qo_sales']);
+    await ensureQuoteRoleUser(adminPage, memberUser);
+    const members = await queryDynamicRecords(adminPage, 'tenant_member', []);
+    const memberRow = members.find(
+      (m) => String(m.user_email ?? '').toLowerCase() === memberUser.email.toLowerCase(),
+    );
+    expect(memberRow, 'member user has a tenant member row').toBeTruthy();
+    const memberUserId = Number(memberRow!.user_id);
+
+    const createTeam = await adminPage.request.post('/api/org/teams', {
+      data: { code: marker, name: `E2E X03-04 member team ${marker}`, status: 'active' },
+      timeout: 20_000,
+    });
+    const teamBody = await createTeam.json().catch(() => ({}));
+    expect(createTeam.ok(), JSON.stringify(teamBody).slice(0, 300)).toBe(true);
+    const teamPid = String((teamBody as any).data?.pid ?? '');
+
+    const addMember = await adminPage.request.post(`/api/org/teams/${teamPid}/members`, {
+      data: { userId: memberUserId, role: 'member' },
+      timeout: 20_000,
+    });
+    const addBody = await addMember.json().catch(() => ({}));
+    expect(addMember.ok(), `add member: ${JSON.stringify(addBody).slice(0, 300)}`).toBe(true);
+    const addedMemberPid = String((addBody as any).data?.pid ?? '');
+    expect(addedMemberPid, 'added member returns a member pid').toBeTruthy();
+
+    const rosterAfterAdd = await adminPage.request.get(`/api/org/teams/${teamPid}/members`, { timeout: 20_000 });
+    const rosterBody = await rosterAfterAdd.json().catch(() => ({}));
+    const roster = ((rosterBody as any).data ?? []) as Array<Record<string, unknown>>;
+    expect(
+      roster.some((m) => Number(m.userId) === memberUserId),
+      'added member surfaces in the team roster',
+    ).toBe(true);
+
+    const removal = await adminPage.request.delete(`/api/org/teams/${teamPid}/members/${addedMemberPid}`, { timeout: 20_000 });
+    expect(removal.ok(), `remove member: ${JSON.stringify(await removal.json().catch(() => ({}))).slice(0, 300)}`).toBe(true);
+    const rosterAfterRemove = await adminPage.request.get(`/api/org/teams/${teamPid}/members`, { timeout: 20_000 });
+    const remaining = ((await rosterAfterRemove.json().catch(() => ({})) as any).data ?? []) as Array<Record<string, unknown>>;
+    expect(
+      remaining.some((m) => Number(m.userId) === memberUserId),
+      'removed member is no longer visible in the team roster',
+    ).toBe(false);
+
+    await adminPage.request.delete(`/api/org/teams/${teamPid}`, { timeout: 20_000 }).catch(() => {});
+  } finally {
+    await adminContext.close();
+  }
 });

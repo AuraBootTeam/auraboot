@@ -40,8 +40,25 @@ test.describe('PCBA requirement set golden', () => {
       expect(String(lineRows[0].bom_cl_mpn)).toBe(`E2E-REQ-${marker}`);
       expect(Number(lineRows[0].bom_cl_qty)).toBe(5);
 
-      // 非法取值拒绝腿:需求行模型 DSL 未声明 MPN/数量约束(缺 MPN、负数量均被接受),
-      // 已立产品发现留 owner 裁决约束声明层;本测试保留合法持久化与回显腿。 // 校验缺失时允许保存,由 UI 层兜底
+      // 非法取值拒绝腿:约束已在模型 DSL 声明(bom_cl_qty min=1+required;bom_cl_mpn required),
+      // 服务端对 min 强制拒绝;required 目前仅 UI 表单层强制(动态插入不拦,框架层缺口已登记)。
+      const negativeQty = await page.request.post('/api/dynamic/req_requirement_line_pcba_bom', {
+        data: {
+          bom_cl_task_id: setPid, bom_cl_line_no: 2, bom_cl_mpn: `E2E-NEG-${marker}`,
+          bom_cl_qty: -5, bom_cl_level: '1', bom_cl_review_status: 'pending',
+        },
+        timeout: 20_000,
+      });
+      const negativeBody = await negativeQty.json().catch(() => ({}));
+      const negativeRejected = !negativeQty.ok() || String((negativeBody as { code?: unknown }).code ?? '0') !== '0';
+      expect(
+        negativeRejected,
+        `negative quantity must be rejected server-side: ${JSON.stringify(negativeBody).slice(0, 260)}`,
+      ).toBe(true);
+      expect(
+        JSON.stringify(negativeBody),
+        'the rejection names the minimum-value rule',
+      ).toContain('minimum');
     } finally {
       await cleanupRows(page, created);
     }
