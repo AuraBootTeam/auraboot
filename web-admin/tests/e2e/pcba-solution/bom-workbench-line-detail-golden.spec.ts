@@ -141,6 +141,17 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       await test.info().attach('B13-01-filter-restore', {
         body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
       });
+
+      // B13-01 补强:按任务号前缀重新搜索——行内状态 tag 显示 completed
+      await searchBusinessList(
+        adminPage, WORKBENCH, taskNo.slice(0, 12), 'bom_conversion_task_pcba',
+      );
+      const statusRow = adminPage.getByRole('row').filter({ hasText: taskNo.slice(0, 12) }).first();
+      await expect(statusRow).toBeVisible({ timeout: 20_000 });
+      await expect(statusRow, 'row shows completed status').toContainText(/已完成|completed/i);
+      await test.info().attach('B13-01-status-filter', {
+        body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
     } finally {
       await adminContext.close();
     }
