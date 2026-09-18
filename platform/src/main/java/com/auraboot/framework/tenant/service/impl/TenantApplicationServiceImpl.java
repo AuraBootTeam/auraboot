@@ -33,6 +33,7 @@ import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,6 +89,15 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
 
     @Autowired
     private com.auraboot.framework.plugin.service.BuiltinPluginImportService builtinPluginImportService;
+
+    /**
+     * Roles bound to the tenant creator after bootstrap + plugin import, e.g.
+     * {@code aura.tenant.creator-roles=xy_school_admin} for a Xiaoya deployment
+     * ("the school founder is the school admin"). Comma-separated role codes; must
+     * reference roles seeded by the tenant template or the declared product plugins.
+     */
+    @Value("${aura.tenant.creator-roles:}")
+    private String tenantCreatorRoles;
     
     /**
      * 获取当前用户的租户信息
@@ -230,6 +240,20 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             createdTenant.getId(),
             user.getId()
         );
+
+        // Bind the deployment-declared creator roles (e.g. xy_school_admin) after
+        // bootstrap + plugin import so the role definitions exist in the new tenant.
+        if (tenantCreatorRoles != null && !tenantCreatorRoles.isBlank() && newMember != null) {
+            for (String roleCode : tenantCreatorRoles.split(",")) {
+                String trimmed = roleCode.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                userRoleService.assignRolesToMemberByRoleCodes(
+                        newMember.getPid(), List.of(trimmed), createdTenant.getId(), user.getId());
+                log.info("Bound creator role {} to member {} in tenant {}", trimmed, newMember.getPid(), createdTenant.getId());
+            }
+        }
 
         // 生成新的JWT令牌（包含租户信息 + memberId + security version）。
         // memberId is required: PermissionInterceptor/UserPermissionServiceImpl resolves

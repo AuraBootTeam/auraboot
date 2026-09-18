@@ -2489,6 +2489,16 @@
       "priority": 6,
       "isDefault": false,
       "isDeletable": true
+    },
+    {
+      "code": "xy_teacher",
+      "name": "老师",
+      "description": "授课教师:查看班级与学生、提交评分;由学校管理员分配",
+      "type": "tenant",
+      "scopeType": "tenant",
+      "priority": 7,
+      "isDefault": false,
+      "isDeletable": true
     }
   ],
   "menus": [],
@@ -2569,6 +2579,32 @@
         "xy.class.read",
         "xy.pet.read",
         "xy.roster.read",
+        "xy.scoring.read"
+      ]
+    },
+    {
+      "roleCode": "xy_teacher",
+      "permissionCodes": [
+        "model.xy_behavior_rule.read",
+        "model.xy_class_goal.read",
+        "model.xy_classroom.read",
+        "model.xy_enrollment.read",
+        "model.xy_evaluation.create",
+        "model.xy_evaluation.read",
+        "model.xy_evaluation.update",
+        "model.xy_evaluation_line.create",
+        "model.xy_evaluation_line.read",
+        "model.xy_ledger_entry.create",
+        "model.xy_ledger_entry.read",
+        "model.xy_pet_instance.read",
+        "model.xy_student.create",
+        "model.xy_student.read",
+        "model.xy_student.update",
+        "xy.class.read",
+        "xy.pet.read",
+        "xy.roster.manage",
+        "xy.roster.read",
+        "xy.scoring.manage",
         "xy.scoring.read"
       ]
     }
