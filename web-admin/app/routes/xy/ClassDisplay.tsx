@@ -130,7 +130,7 @@ export default function ClassDisplay() {
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>CLASS GROWTH · 共同目标</div>
+            <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>🐝 CLASS GROWTH · 共同目标</div>
             <h1 className="mt-1 text-4xl font-bold tracking-tight" style={{ color: '#213D32' }} data-testid="display-title">
               {loaded ? name || '班级大屏' : '加载中…'}
             </h1>
@@ -158,7 +158,7 @@ export default function ClassDisplay() {
             {goal && (
               <>
                 <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-5xl font-bold" style={{ color: '#35745B' }} data-testid="display-progress">{progress}</span>
+                  <span className="text-5xl font-bold" style={{ color: '#35745B' }} data-testid="display-progress">🍯{progress}</span>
                   <span className="text-base" style={{ color: '#91A17A' }}>/ {target} 能量</span>
                 </div>
                 <div className="mt-4 h-3 overflow-hidden rounded-pill" style={{ background: '#E3EAD6' }}>

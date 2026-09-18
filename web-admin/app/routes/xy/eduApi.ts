@@ -89,6 +89,7 @@ export const STAGE_LABEL: Record<string, string> = {
 };
 
 export const SPECIES_EMOJI: Record<string, string> = {
+  bee: '🐝',
   cat: '🐱',
   dog: '🐶',
   rabbit: '🐰',
