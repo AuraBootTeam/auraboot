@@ -74,6 +74,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-domain-gap-fill-golden',
   'bom-domain-gap-fill-golden',
   'x-governance-gap-fill-golden',
+  'x03-team-scope-golden',
   'quote-process-fee-review',
   'quote-record-sharing-golden',
   'quote-gerber-runtime',
