@@ -37,6 +37,7 @@ public class WechatMiniIdentityService {
     private final AuthIdentityMapper authIdentityMapper;
     private final UserMapper userMapper;
     private final WechatMiniClient wechatMiniClient;
+    private final WechatMiniProperties wechatMiniProperties;
 
     /** Resolve the platform user for a wx.login code, or null when unbound. */
     @Transactional
@@ -97,6 +98,7 @@ public class WechatMiniIdentityService {
         identity.setPid(com.baomidou.mybatisplus.core.toolkit.IdWorker.getIdStr());
         identity.setUserId(userId);
         identity.setProvider(PROVIDER_WECHAT_MINI);
+        identity.setAppId(wechatMiniProperties.getAppId());
         identity.setOpenid(session.openid());
         identity.setUnionid(isBlank(session.unionid()) ? unionid : session.unionid());
         identity.setLastLoginAt(Instant.now());

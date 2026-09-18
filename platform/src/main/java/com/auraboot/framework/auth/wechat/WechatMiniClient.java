@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
+
 /**
  * WeChat mini-program client: exchanges a wx.login code for the caller's
  * openid/unionid via jscode2session. The session_key never leaves this class —
@@ -31,18 +33,16 @@ public class WechatMiniClient {
             throw new RootUnCheckedException(ResponseCode.BadParam,
                     "WeChat mini-program login is not configured (aura.wechat.mini.*)");
         }
+        // Full-URI build honors the apiBase scheme (http for local stubs/tests).
+        String base = properties.getApiBase().replaceAll("/+$", "");
+        String uri = base + "/sns/jscode2session"
+                + "?appid=" + urlEncode(properties.getAppId())
+                + "&secret=" + urlEncode(properties.getAppSecret())
+                + "&js_code=" + urlEncode(jsCode)
+                + "&grant_type=authorization_code";
         SessionResponse body;
         try {
-            body = restClient().get()
-                    .uri(uri -> uri.scheme("https").host(hostOf(properties.getApiBase()))
-                            .path("/sns/jscode2session")
-                            .queryParam("appid", properties.getAppId())
-                            .queryParam("secret", properties.getAppSecret())
-                            .queryParam("js_code", jsCode)
-                            .queryParam("grant_type", "authorization_code")
-                            .build())
-                    .retrieve()
-                    .body(SessionResponse.class);
+            body = restClient().get().uri(URI.create(uri)).retrieve().body(SessionResponse.class);
         } catch (Exception e) {
             log.warn("WeChat jscode2session call failed: {}", e.getMessage());
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login exchange failed");
@@ -54,6 +54,10 @@ public class WechatMiniClient {
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login code rejected (" + code + ")");
         }
         return new WxSession(body.getOpenid(), body.getUnionid());
+    }
+
+    private static String urlEncode(String v) {
+        return java.net.URLEncoder.encode(v, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /** apiBase is "https://api.weixin.qq.com" or an https://host[:port] override. */

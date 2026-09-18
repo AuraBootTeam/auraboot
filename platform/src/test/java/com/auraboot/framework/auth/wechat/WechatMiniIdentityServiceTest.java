@@ -43,7 +43,10 @@ class WechatMiniIdentityServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient);
+        var properties = new WechatMiniProperties();
+        properties.setAppId("wx-test-appid");
+        properties.setAppSecret("test-secret");
+        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient, properties);
     }
 
     private void stubSession(String openid, String unionid) {
