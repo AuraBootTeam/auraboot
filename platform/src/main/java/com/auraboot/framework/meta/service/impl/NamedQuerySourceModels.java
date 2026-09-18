@@ -72,7 +72,10 @@ public class NamedQuerySourceModels {
         Map<String, String> result = new TreeMap<>();
         Map<String, String> views = new TreeMap<>();
         String projections = fields.stream().map(field -> field.getColumnExpr() + " AS " + field.getFieldCode()).collect(java.util.stream.Collectors.joining(", "));
-        for (String table : sql.referencedTables("SELECT " + projections + " FROM " + source))
+        // Queries without declared output fields cannot project a column list; a star
+        // projection keeps source resolution working for field-less sources.
+        String projectionClause = projections.isBlank() ? "*" : projections;
+        for (String table : sql.referencedTables("SELECT " + projectionClause + " FROM " + source))
             resolveRelation(identity(table), catalog, result, views, new HashSet<>());
         return new Sources(result, views);
     }

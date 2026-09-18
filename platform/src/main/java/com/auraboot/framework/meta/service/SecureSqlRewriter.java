@@ -231,6 +231,7 @@ public class SecureSqlRewriter {
             ((Select) statement).accept((net.sf.jsqlparser.statement.select.SelectVisitor<StringBuilder>) visitor, null);
             return tables;
         } catch (JSQLParserException invalid) {
+            log.warn("referencedTables cannot parse sql: {}", sql, invalid);
             throw new MetaServiceException("Cannot establish named query source tables", invalid);
         }
     }
