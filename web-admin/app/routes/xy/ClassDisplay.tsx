@@ -6,10 +6,11 @@ import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
 import { PetAvatar, usePetVisual } from './PetAvatar';
 
 /**
- * Xiaoya class display (班级大屏) — read-only celebration surface for the
- * classroom screen: class card, shared-goal progress, recent praise ticker and
- * the companion parade. No student rows are editable here and no negative
- * events are shown (PRD 8.3 / FR-039).
+ * Xiaoya class display (班级大屏) — read-only surface for the classroom screen:
+ * class card, shared-goal progress, recent praise ticker, deduction records and
+ * the companion parade. No student rows are editable here. Negative records are
+ * shown since the PRD 8.3 / FR-039 口径变更 (deductions public with mandatory
+ * reason) — deduction batches render in their own card, never mixed into praise.
  *
  * Auth: same session as the console (revocable read-only session tokens stay
  * out of V4 scope — recorded in the acceptance report).
@@ -27,6 +28,7 @@ export default function ClassDisplay() {
   const [goal, setGoal] = useState<XyRow | null>(null);
   const [progress, setProgress] = useState(0);
   const [praise, setPraise] = useState<XyRow[]>([]);
+  const [deductions, setDeductions] = useState<XyRow[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async (classPid: string) => {
@@ -65,6 +67,11 @@ export default function ClassDisplay() {
       { field: 'xy_ev_class', value: String(cls.pid) },
       { field: 'xy_ev_status', value: 'effective' },
       { field: 'xy_ev_visibility', value: 'public' },
+    ]));
+    setDeductions(await xyList('xy_evaluation', [
+      { field: 'xy_ev_class', value: String(cls.pid) },
+      { field: 'xy_ev_status', value: 'effective' },
+      { field: 'xy_ev_kind', value: 'deduct' },
     ]));
     setLoaded(true);
   }, []);
@@ -181,6 +188,26 @@ export default function ClassDisplay() {
             </div>
           </div>
         </div>
+
+        {/* recent deductions (PRD 8.3 口径变更: 扣分记录大屏公开, reason 必填留痕) */}
+        {deductions.length > 0 && (
+          <div className="mt-8 rounded-card-lg border p-6" style={{ background: '#FFF9F5B5', borderColor: '#F0D2D0' }} data-testid="display-deduct">
+            <div className="mb-3 text-sm font-semibold" style={{ color: '#8C3A36' }}>扣分记录 · 共同改进</div>
+            <div className="space-y-3">
+              {deductions.slice(0, 6).map((d) => (
+                <div key={String(d.pid)} className="flex items-center gap-3 border-b pb-3 text-sm last:border-0 last:pb-0" style={{ borderColor: '#F6E8E6' }}>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: '#FBEFEE' }}>📝</span>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium" style={{ color: '#213D32' }}>
+                      {String(d.xy_ev_rule_name)} {d.xy_ev_target_type === 'class' ? '· 全班' : d.xy_ev_target_type === 'group' ? '· 小组' : ''} {String(d.xy_ev_score)}
+                    </div>
+                    <div className="text-xs" style={{ color: '#B08583' }}>{String(d.xy_ev_reason || '')} · {String(d.xy_ev_target_count ?? '')} 位同学 · {String(d.xy_ev_occurred_at || '').slice(0, 16).replace('T', ' ')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* pet parade */}
         <div className="mt-8 grid grid-cols-3 gap-4 sm:grid-cols-6" data-testid="display-pets">
