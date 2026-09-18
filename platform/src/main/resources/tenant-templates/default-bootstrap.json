@@ -2447,6 +2447,56 @@
       "resource": "/api/dynamic",
       "action": "read",
       "resourceType": "function"
+    },
+    {
+      "code": "model.xy_school.create",
+      "name": "创建学校档案",
+      "description": "创建本校档案记录",
+      "type": "data",
+      "module": "meta",
+      "resource": "/api/dynamic/xy_school",
+      "action": "create",
+      "resourceType": "data"
+    },
+    {
+      "code": "model.xy_school.read",
+      "name": "查看学校档案",
+      "description": "查看本校档案记录",
+      "type": "data",
+      "module": "meta",
+      "resource": "/api/dynamic/xy_school",
+      "action": "read",
+      "resourceType": "data"
+    },
+    {
+      "code": "model.xy_school.update",
+      "name": "编辑学校档案",
+      "description": "编辑本校档案记录",
+      "type": "data",
+      "module": "meta",
+      "resource": "/api/dynamic/xy_school",
+      "action": "update",
+      "resourceType": "data"
+    },
+    {
+      "code": "xy.school.manage",
+      "name": "学校档案管理",
+      "description": "管理本校档案(名称/省市区/学段/地址)",
+      "type": "function",
+      "module": "xy",
+      "resource": "/api/meta/commands/execute/xy:*_school",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "xy.school.read",
+      "name": "查看学校档案",
+      "description": "查看本校档案",
+      "type": "function",
+      "module": "xy",
+      "resource": "/api/meta/commands/execute/xy:list_school",
+      "action": "read",
+      "resourceType": "function"
     }
   ],
   "roles": [
@@ -2538,6 +2588,9 @@
         "model.xy_pet_species.read",
         "model.xy_reward_order.read",
         "model.xy_reward_sku.read",
+        "model.xy_school.create",
+        "model.xy_school.read",
+        "model.xy_school.update",
         "model.xy_skin_asset.read",
         "model.xy_skin_ownership.read",
         "model.xy_student.read",
@@ -2550,6 +2603,8 @@
         "xy.reward.manage",
         "xy.roster.manage",
         "xy.roster.read",
+        "xy.school.manage",
+        "xy.school.read",
         "xy.scoring.manage",
         "xy.scoring.read"
       ]
@@ -2573,12 +2628,14 @@
         "model.xy_pet_species.read",
         "model.xy_reward_order.read",
         "model.xy_reward_sku.read",
+        "model.xy_school.read",
         "model.xy_skin_asset.read",
         "model.xy_skin_ownership.read",
         "model.xy_student.read",
         "xy.class.read",
         "xy.pet.read",
         "xy.roster.read",
+        "xy.school.read",
         "xy.scoring.read"
       ]
     },
@@ -2597,6 +2654,7 @@
         "model.xy_ledger_entry.create",
         "model.xy_ledger_entry.read",
         "model.xy_pet_instance.read",
+        "model.xy_school.read",
         "model.xy_student.create",
         "model.xy_student.read",
         "model.xy_student.update",
@@ -2604,6 +2662,7 @@
         "xy.pet.read",
         "xy.roster.manage",
         "xy.roster.read",
+        "xy.school.read",
         "xy.scoring.manage",
         "xy.scoring.read"
       ]
