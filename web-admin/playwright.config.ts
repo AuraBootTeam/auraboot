@@ -72,6 +72,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-send-audit-golden',
   'quote-pcba-requirement-golden',
   'quote-domain-gap-fill-golden',
+  'x-governance-gap-fill-golden',
   'quote-process-fee-review',
   'quote-record-sharing-golden',
   'quote-gerber-runtime',

@@ -120,12 +120,14 @@ test.describe('PCBA quote domain gap fill golden', () => {
   // Q11-04 / G05-02: 批量重算大报价表——多行报价重算全部成功且行数不丢失。
   test('Q11-04 bulk recompute over a large quote completes and keeps every line', async ({ page }) => {
     const lineCount = 30;
-    const lines = Array.from({ length: lineCount }, (_, i) => ({
+    const bulkMpns = Array.from({ length: lineCount }, (_, i) => `E2E-BULK-${Date.now()}-${i + 1}`);
+    const lines = bulkMpns.map((mpn, i) => ({
       sourceRef: `BULK-R${i + 1}`,
       sourceRowNo: i + 2,
       description: `bulk resistor ${i + 1}`,
       refdes: `R${i + 1}`,
-      mpn: `E2E-BULK-${Date.now()}-${i + 1}`,
+      mpn,
+      packageName: '0402',
       qty: 10,
       unitCost: 0.01,
       lineCost: 0.1,
