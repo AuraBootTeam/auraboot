@@ -34,6 +34,7 @@ test.describe('BOM domain gap fill golden', () => {
         crm_acc_code: `B09-${marker}`,
         crm_acc_name: `B09 客户 ${marker}`,
         crm_acc_status: 'active',
+        crm_acc_pool_state: 'owned',
       }, created.rows);
       const project = await dynamicCreate(page, 'req_requirement_set_pcba_bom', {
         bom_pcba_code: `B09-PRJ-${marker}`,

@@ -17,9 +17,15 @@ test.describe('X governance gap fill golden', () => {
       // 联系人必填:crm_ct_account_id(挂客户)+ crm_ct_name
       const accounts = await queryDynamicRecords(page, 'crm_account_common', [], { pageSize: 1 });
       expect(accounts.length, 'fixture must contain an account').toBeGreaterThan(0);
+      // crm_ct_owner/status 为表单真实必填(约束已激活):负责人取当前用户 pid
+      const me = await (await page.request.get('/api/auth/me')).json().catch(() => ({}));
+      const ownerPid = String(me?.data?.user?.pid ?? '');
+      expect(ownerPid, 'current user pid for contact owner').toBeTruthy();
       const contactPid = await dynamicCreate(page, 'crm_contact_common', {
         crm_ct_account_id: String(accounts[0].pid),
         crm_ct_name: `E2E 联系人 ${marker}`,
+        crm_ct_owner: ownerPid,
+        crm_ct_status: 'active',
         crm_ct_phone: '13800000000',
         crm_ct_email: `e2e-${marker}@example.com`,
         crm_ct_title: '采购经理',
