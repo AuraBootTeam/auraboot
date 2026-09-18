@@ -116,6 +116,8 @@ const quoteOpsCurrentSpecNames = [
   'quote-price-channel-sources-golden',
   // B01-03 customer transfer-owner self-scope contract.
   'quote-customer-transfer-owner-golden',
+  // B01-01 customer detail related-projects tab.
+  'quote-customer-projects-tab-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,

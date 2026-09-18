@@ -24,6 +24,46 @@ test.describe('PCBA quote customer view golden', () => {
     await ctx.close();
   });
 
+  // Q20-01: 客户报价视图对常规报价可加载(曾因 <key>_detail 页未注册 404 加载失败,
+  // 已补注册别名页修复);视图只读——无保存入口,直写被拒绝。
+  test('Q20-01 customer view loads for a regular quote and stays read-only', async ({ page }, info) => {
+    const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
+    const seeded = await seedQuoteForCorrectedBomUpload(page);
+    created.rows.push({ model: 'qo_quote_common', pid: seeded.quoteId });
+    try {
+      await page.goto(`/p/qo_quote_customer_view/view/${seeded.quoteId}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('main')).toContainText(seeded.quoteCode, { timeout: 20_000 });
+      await expect(page.locator('main')).not.toContainText(/加载失败|Business error/);
+      expect(await page.getByRole('button', { name: /保存|Save/ }).count()).toBe(0);
+
+      // 只读面:只读角色(viewer)对报价直写被拒绝;admin 特权写是设计内行为,不作断言
+      const viewerContext = await page.context().browser()!.newContext({
+        storageState: process.env.PW_VIEWER_STORAGE_STATE || 'tests/storage/viewer.json',
+      });
+      const viewerPage = await viewerContext.newPage();
+      const writeAttempt = await viewerPage.request.put(`/api/dynamic/qo_quote_common/${seeded.quoteId}`, {
+        data: { qo_quote_notes: 'Q20-01 read-only bypass attempt' },
+      });
+      const writeBody = await writeAttempt.json().catch(() => ({}));
+      expect(
+        writeAttempt.ok() && String((writeBody as { code?: unknown }).code ?? '0') === '0',
+        `read-only persona write attempt must be rejected: ${JSON.stringify(writeBody).slice(0, 240)}`,
+      ).toBe(false);
+      await viewerContext.close();
+
+      const rows = await queryDynamicRecords(page, 'qo_quote_common', [
+        { fieldName: 'pid', operator: 'EQ', value: seeded.quoteId },
+      ]);
+      expect(rows).toHaveLength(1);
+      await info.attach('q20-01-customer-view', {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+      });
+    } finally {
+      await cleanupRows(page, created);
+    }
+  });
+
   // Q20-02: 下载报价附件——文件名为原文件名而非内部 ID;内容与记录一致。
   test('Q20-02 customer attachment download keeps the original filename and content', async ({
     page,

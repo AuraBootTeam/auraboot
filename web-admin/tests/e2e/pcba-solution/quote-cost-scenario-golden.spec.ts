@@ -26,10 +26,8 @@ test.describe('PCBA quote cost scenario golden', () => {
     const scenarioId = String(created.recordId);
     expect(scenarioId).not.toBe('undefined');
     await executeCommand(page, 'qo_cost_scenario_common:calculate', {}, scenarioId, 'update');
-    await executeCommand(page, 'qo_cost_scenario_common:freeze', { frozen_by: 'Local E2E' }, scenarioId, 'update');
 
-    // 假设与缺口行直挂场景(create_from_mdp 的内联假设受 GT-Q02/字段写权限约束;
-    // status 类字段仅授权命令可写,走默认值)
+    // 假设与缺口行在冻结前直挂场景(冻结后直写被 Q18-02 守卫正确拒绝,种子必须前置)
     const fixtureRows: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     const assumptionId = await dynamicCreate(page, 'qo_cost_assumption_common', {
       qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
@@ -42,6 +40,8 @@ test.describe('PCBA quote cost scenario golden', () => {
     }, fixtureRows.rows);
     expect(assumptionId).toBeTruthy();
     expect(gapId).toBeTruthy();
+
+    await executeCommand(page, 'qo_cost_scenario_common:freeze', { frozen_by: 'Local E2E' }, scenarioId, 'update');
 
     await page.goto(`/p/qo_cost_scenario_common/view/${scenarioId}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: /成本方案|Cost/i })).toBeVisible({ timeout: 20_000 });
@@ -157,6 +157,26 @@ test.describe('PCBA quote cost scenario golden', () => {
     });
     // 冻结后档位值保持最后一次 ready 保存的 200,未被后续尝试改动
     expect(Number((await tierRows())[0].qo_cst_quantity)).toBe(200);
+
+    // 直写旁路守卫(DB 触发器最后防线):冻结后 dynamic PUT 直改档位/方案一律拒绝,
+    // 值保持 200;draft/ready 下同样的 PUT 是合法保存面(上方已验证)。
+    const frozenTierPut = await page.request.put(`/api/dynamic/qo_cost_scenario_tier_common/${tierPid}`, {
+      data: { qo_cst_quantity: 999 },
+    });
+    const frozenTierBody = await frozenTierPut.json().catch(() => ({}));
+    expect(
+      frozenTierPut.ok() && String((frozenTierBody as { code?: unknown }).code ?? '0') === '0',
+      `frozen tier dynamic PUT must be rejected: ${JSON.stringify(frozenTierBody).slice(0, 240)}`,
+    ).toBe(false);
+    const frozenScenarioPut = await page.request.put(`/api/dynamic/qo_cost_scenario_common/${scenarioId}`, {
+      data: { qo_cs_name: 'frozen-bypass-should-not-apply' },
+    });
+    expect(
+      frozenScenarioPut.ok(),
+      'frozen scenario dynamic PUT must be rejected',
+    ).toBe(false);
+    expect(Number((await tierRows())[0].qo_cst_quantity)).toBe(200);
+    expect((await scenarioRecord()).qo_cs_name).not.toBe('frozen-bypass-should-not-apply');
   });
 
   // Q18-03: 含成本缺口与假设的方案详情——缺口与假设人类可读展示(豁免原因/批准原因/
@@ -208,6 +228,11 @@ test.describe('PCBA quote cost scenario golden', () => {
 
     await page.goto(`/p/qo_cost_scenario_common/view/${scenarioId}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: /成本方案|Cost/i })).toBeVisible({ timeout: 20_000 });
+    // 假设/缺口子表异步加载:轮询等待渲染完成再取正文
+    await expect(
+      page.getByText('汇率假设 7.0 CNY/USD').first(),
+      'assumption description renders',
+    ).toBeVisible({ timeout: 20_000 });
     const bodyText = await page.locator('main').innerText();
     // 人类可读:假设描述/批准原因、缺口描述/豁免原因全部可见
     expect(bodyText).toContain('汇率假设 7.0 CNY/USD');
