@@ -1028,7 +1028,17 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   test.setTimeout(600_000);
   const marker = `B18-${Date.now()}`;
   const customerPn = `CUSTPNB18${Date.now()}`;
-  const mappedMaterial = `E2EMAPPED${marker}`;
+  // V2 召回查冻结算力投影:映射目标必须是库内已存在的标准料号(生产语义:
+  // 客户料号 → 内部标准料号),新建料号不在冻结投影中不可召回
+  const libraryMaterial = (
+    await queryDynamicRecords(page, 'bom_material_master', [
+      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
+    ])
+  ).find((row) => String(row.bom_mm_material_code ?? '').startsWith('10'))
+    ?? (await queryDynamicRecords(page, 'bom_material_master', [
+      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
+    ]))[0];
+  const mappedMaterial = String(libraryMaterial.bom_mm_material_code);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
     ['物料名称', '规格', '位号', '数量', 'MPN', '客户料号'],
@@ -1090,19 +1100,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
     { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
   ]);
   expect(mappings, 'mapping persisted').toHaveLength(1);
-  // 物料主档必须经产品命令创建(自动生成 norm_text 并同步投影);
-  // 直接动态插入会缺 norm_text,污染匹配管线
-  await executeCommand(page, 'bom:create_material', {
-    bom_mm_material_code: mappedMaterial,
-    bom_mm_mpn: mappedMaterial,
-    bom_mm_material_name: `E2E mapped material ${marker}`,
-    bom_mm_spec_model: '100nF 50V 0402',
-    bom_mm_unit: 'PCS',
-    bom_mm_brand: 'Mock Manufacturer',
-    bom_mm_package: '0402',
-    bom_mm_category: 'capacitor',
-    bom_mm_enabled: true,
-  }, undefined, 'create');
+  // 映射目标已在冻结物料库中,无需建料(物料库投影按快照绑定)
   // V2 召回查物料投影而非主档:建料后刷新投影,新料才进入 K1 召回视野
   await executeCommand(page, 'bom:refresh_material_snapshot', {});
 
