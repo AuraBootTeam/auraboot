@@ -112,6 +112,10 @@ const quoteOpsCurrentSpecNames = [
   'quote-data-scope-isolation',
   'quote-doc-excel',
   'quote-form-dropdowns',
+  // Q06-03 real-stack price-channel sources contract (api-driven, no UI surface).
+  'quote-price-channel-sources-golden',
+  // B01-03 customer transfer-owner self-scope contract.
+  'quote-customer-transfer-owner-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
