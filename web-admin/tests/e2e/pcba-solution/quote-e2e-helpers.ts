@@ -910,7 +910,7 @@ export function createCorrectedBomWorkbook(filePath: string): string {
   return filePath;
 }
 
-async function seedQuoteScaffold(
+export async function seedQuoteScaffold(
   page: Page,
   marker: string,
   lines: QuoteLineSeed[],
