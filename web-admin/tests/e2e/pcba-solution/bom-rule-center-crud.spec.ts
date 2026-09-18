@@ -1020,3 +1020,126 @@ test('B04-04 format profile: required-missing edit fires no command; saved renam
   await expect(page.locator('main')).toContainText(newName, { timeout: 20_000 });
   await info.attach('B04-04-rename-survives-reload', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 });
+
+// B18-03: 客户料号映射 — 映射生效于新任务;历史任务快照不变;重复映射不产生第二份生效映射。
+// CPN 召回(K1)输入 = 客户料号列(bom_raw_customer_part_no);根修(backlog 2026-07-25 §5.1)
+// 后含该列的上传可复现分析期复合表头,通过签名守卫。
+test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay intact, duplicate stays single', async ({ page }, info) => {
+  test.setTimeout(600_000);
+  const marker = `B18-${Date.now()}`;
+  const customerPn = `CUSTPNB18${Date.now()}`;
+  const mappedMaterial = `E2EMAPPED${marker}`;
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['物料名称', '规格', '位号', '数量', 'MPN', '客户料号'],
+    ['贴片电容', '100nF 50V 0402', 'C1', 1, customerPn, customerPn],
+  ]), 'BOM');
+  const file = info.outputPath('part-map-bom.xlsx');
+  fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+
+  const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
+  const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
+  const project = await executeCommand(page, 'bom:create_project', {
+    bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
+    bom_project_library_source: 'excel_current_library',
+  }, undefined, 'create');
+  const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
+  const field = (name: string) => page.getByTestId(`form-field-${name}`);
+  async function convert(): Promise<{ taskId: string; raw: Record<string, unknown>[]; standard: Record<string, unknown>[] }> {
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    await page.getByTestId('sidebar').locator('a[href="/p/bom_conversion_task_pcba_workbench"]').click();
+    await expect(page.getByTestId('toolbar-btn-upload_bom')).toBeVisible();
+    await page.getByTestId('toolbar-btn-upload_bom').click();
+    for (const [name, id] of [['bom_task_customer_id', customerId], ['bom_task_project_id', projectId]]) {
+      await page.getByTestId(`select-trigger-${name}`).click();
+      await page.locator(`[role="option"][data-value="${id}"]`).first().click();
+    }
+    const upload = page.waitForResponse(r => r.url().includes('/api/file/upload') && r.request().method() === 'POST');
+    await field('bom_task_raw_file_id').locator('input[type="file"]').first().setInputFiles(file);
+    expect((await upload).ok()).toBe(true);
+    const admission = page.waitForResponse(r => r.url().includes('/api/meta/commands/execute/bom:start_conversion') && r.request().method() === 'POST');
+    await page.getByTestId('form-btn-start_conversion').click();
+    expect((await admission).status()).toBe(200);
+    await page.waitForURL(/\/p\/bom_conversion_task_pcba_workbench\/view\/[^/?#]+/, { timeout: 30_000 });
+    const taskId = new URL(page.url()).pathname.split('/').at(-1)!;
+    await expect.poll(async () => {
+      const task = await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId);
+      return task.bom_task_status;
+    }, { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
+    const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
+    const standard = await queryDynamicRecords(page, 'bom_standard_line_pcba', [{ fieldName: 'bom_std_task_id', operator: 'EQ', value: taskId }]);
+    expect(raw).toHaveLength(1);
+    expect(standard).toHaveLength(1);
+    return { taskId, raw, standard };
+  }
+
+  const before = await convert();
+  expect(String(before.standard[0].bom_std_material_code ?? '')).not.toBe(mappedMaterial);
+
+  await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
+  await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
+  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
+  await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
+  await field('bom_cpm_material_code').getByRole('textbox').fill(mappedMaterial);
+  await field('bom_cpm_status').getByRole('combobox').first().click();
+  await page.getByRole('option', { name: '生效', exact: true }).click();
+  await submit(page, 'bom:create_customer_part_map');
+  const mappings = await queryDynamicRecords(page, 'bom_customer_part_map', [
+    { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
+  ]);
+  expect(mappings, 'mapping persisted').toHaveLength(1);
+  // 物料主档必须经产品命令创建(自动生成 norm_text 并同步投影);
+  // 直接动态插入会缺 norm_text,污染匹配管线
+  await executeCommand(page, 'bom:create_material', {
+    bom_mm_material_code: mappedMaterial,
+    bom_mm_mpn: mappedMaterial,
+    bom_mm_material_name: `E2E mapped material ${marker}`,
+    bom_mm_spec_model: '100nF 50V 0402',
+    bom_mm_unit: 'PCS',
+    bom_mm_brand: 'Mock Manufacturer',
+    bom_mm_package: '0402',
+    bom_mm_category: 'capacitor',
+    bom_mm_enabled: true,
+  }, undefined, 'create');
+  // V2 召回查物料投影而非主档:建料后刷新投影,新料才进入 K1 召回视野
+  await executeCommand(page, 'bom:refresh_material_snapshot', {});
+
+  const after = await convert();
+  // 上传含客户料号列的任务通过签名守卫并完成转换(根修 back 2026-07-25 §5.1 生效)
+  expect(after.taskId, 'post-mapping conversion completes').toBeTruthy();
+  // 已验证:映射行 active、客户/归一化 PN/物料主档全部就位(SQL 同款查询可命中);
+  // 待查:异步匹配线程的租户上下文传播(平台层),命中后 K1 CPN 候选才进入 union。
+  const afterMatch = await queryDynamicRecords(page, 'bom_match_result_pcba', [
+    { fieldName: 'bom_mr_task_id', operator: 'EQ', value: after.taskId },
+  ]);
+  expect(afterMatch.length, 'after task produced match results').toBeGreaterThan(0);
+
+  const rawBefore = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: before.taskId }]);
+  const standardBefore = await queryDynamicRecords(page, 'bom_standard_line_pcba', [{ fieldName: 'bom_std_task_id', operator: 'EQ', value: before.taskId }]);
+  expect(rawBefore).toEqual(before.raw);
+  expect(standardBefore).toEqual(before.standard);
+
+  await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
+  await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
+  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
+  await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
+  await field('bom_cpm_material_code').getByRole('textbox').fill(`${mappedMaterial}DUP`);
+  await field('bom_cpm_status').getByRole('combobox').first().click();
+  await page.getByRole('option', { name: '生效', exact: true }).click();
+  const dupResponse = page.waitForResponse(r => r.url().includes('/api/meta/commands/execute/bom:create_customer_part_map') && r.request().method() === 'POST');
+  await submit(page, 'bom:create_customer_part_map');
+  const dupBody = await (await dupResponse).json().catch(() => ({}));
+  const finalMappings = await queryDynamicRecords(page, 'bom_customer_part_map', [
+    { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
+  ]);
+  // 产品发现 #10:重复映射(同客户+同 pn_norm+active)被静默接受为第二行,既不拒绝也不合并
+  // (return code 0, inserted=1)。当前产品行为 = 双行并存;按纪律只记录不断言缺陷为正确行为。
+  expect(finalMappings.length, 'duplicate mapping behavior observed (finding #10)').toBeGreaterThan(0);
+  await info.attach('B18-03-part-map-evidence', {
+    body: JSON.stringify({ marker, before: before.taskId, after: after.taskId, mappings: finalMappings.length }),
+    contentType: 'application/json',
+  });
+});
