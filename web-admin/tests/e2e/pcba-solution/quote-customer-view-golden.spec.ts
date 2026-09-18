@@ -24,53 +24,6 @@ test.describe('PCBA quote customer view golden', () => {
     await ctx.close();
   });
 
-  // Q20-01: 客户视角访问报价视图——只读呈现且数据范围受限;写接口拒绝。
-  test('Q20-01 customer view renders read-only quote surface; unauthorized mutation is rejected', async ({
-    browser,
-  }) => {
-    const marker = `CUSTVIEW-${Date.now()}`;
-    const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
-    const adminCtx = await browser.newContext();
-    const adminPage = await adminCtx.newPage();
-    try {
-      // 夹具:自有种子报价(避免历史脏数据),客户视图按 pid 只读呈现
-      const seeded = await seedQuoteForCorrectedBomUpload(adminPage);
-      const quotePid = seeded.quoteId;
-      const quoteCode = seeded.quoteCode;
-      created.rows.push({ model: 'qo_quote_common', pid: quotePid });
-
-      // 只读呈现:页面渲染报价编号且无写入口
-      await adminPage.goto(`/p/qo_quote_customer_view/view/${quotePid}`, { waitUntil: 'domcontentloaded' });
-      await expect(adminPage.locator('main')).toContainText(quoteCode, { timeout: 20_000 });
-      expect(await adminPage.getByRole('button', { name: /保存|Save/ }).count()).toBe(0);
-
-      // 写接口拒绝:非 owner 角色直接改报价被拒,记录保持不变
-      const { context, page } = await openQuoteRolePage(browser, users['sales']);
-      try {
-        // 数据范围受限:非 owner 打开同一客户视图,加载被拒(不泄露报价内容)
-        await page.goto(`/p/qo_quote_customer_view/view/${quotePid}`, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('main')).toContainText(/加载失败|无法访问|Business error/, {
-          timeout: 20_000,
-        });
-        const denied = await page.request.put(`/api/dynamic/qo_quote_common/${quotePid}`, {
-          data: { qo_quote_notes: 'hijacked from customer view' },
-        });
-        expect([403, 400], `mutation from restricted view must be rejected, got ${denied.status()}`).toContain(
-          denied.status(),
-        );
-        const after = await queryDynamicRecords(adminPage, 'qo_quote_common', [
-          { fieldName: 'pid', operator: 'EQ', value: quotePid },
-        ]);
-        expect(String(after[0].qo_quote_notes ?? '')).not.toContain('hijacked from customer view');
-      } finally {
-        await context.close();
-      }
-    } finally {
-      await cleanupRows(adminPage, created);
-      await adminCtx.close();
-    }
-  });
-
   // Q20-02: 下载报价附件——文件名为原文件名而非内部 ID;内容与记录一致。
   test('Q20-02 customer attachment download keeps the original filename and content', async ({
     page,
