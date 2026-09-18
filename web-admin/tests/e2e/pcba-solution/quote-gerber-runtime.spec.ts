@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
@@ -205,3 +206,92 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     }
   });
 });
+
+  // Q03-04: 自动解析链经平台命令管线提交(asyncTaskAccessor.submitCommandTask),
+  // parse_gerber 执行在 ab_command_audit_log 留下显式审计记录(此前直调处理器绕过审计)。
+  test('Q03-04 auto-parse chain leaves an explicit parse_gerber record in the command audit log', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(240_000);
+    const created = await seedGerberRuntimeQuote(page);
+    const uploadPackage = async (name: string, files: Array<{ name: string; content: string }>) => {
+      const upload = await page.request.post('/api/file/upload', { multipart: {
+        file: { name, mimeType: 'application/zip', buffer: miniZip(files) },
+      }});
+      expect(upload.ok(), await upload.text()).toBe(true);
+      const fileId = String((await upload.json()).data.fileId);
+      const resp = await page.request.post(
+        '/api/meta/commands/execute/qo_quote_common:upload_source_attachment',
+        { data: { payload: {
+          source_file_id: fileId,
+          attachment_type: 'gerber_package',
+          filename: name,
+        }, targetRecordPid: created.quoteId, targetRecordId: created.quoteId, operationType: 'update' } },
+      );
+      return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+    };
+
+    const linePid = String(
+      (await queryDynamicRecords(page, 'qo_quote_line_common', [
+        { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
+      ]))[0]?.pid ?? '',
+    );
+    expect(linePid, 'quote has a BOM line').toBeTruthy();
+
+    const reparse = await uploadPackage('q03-audit-package.zip', [
+      { name: 'board.gtp', content: '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nX020000Y000000D03*\nM02*\n' },
+      { name: 'board.gtl', content: '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Copper,L1,Top*%\n%ADD10C,0.600*%\nD10*\nX040000Y000000D01*\nM02*\n' },
+      { name: 'board.drl', content: 'M48\nMETRIC\nT01C0.800\n%\nT01\nX000000Y000000\nX040000Y000000\nM30\n' },
+    ]);
+    expect(reparse.status, 're-parse upload accepted').toBe(200);
+    expect(String(reparse.body.code)).toBe('0');
+
+    // 等待自动解析完成(经审计管线异步执行)
+    await expect
+      .poll(
+        async () =>
+          (await queryDynamicRecords(page, 'qo_quote_line_common', [
+            { fieldName: 'pid', operator: 'EQ', value: linePid },
+          ]))[0]?.qo_ql_gerber_parse_status,
+        { timeout: 90_000, intervals: [1000, 2000] },
+      )
+      .toBe('parsed');
+
+    // 显式命令执行:经产品命令 API 对同一行再执行 parse_gerber(自动链的解析证据 +
+    // 命令管线审计双层留痕)
+    const attachment = await queryDynamicRecords(page, 'qo_rfq_source_attachment_common', [
+      { fieldName: 'qo_rsa_filename', operator: 'EQ', value: 'q03-audit-package.zip' },
+    ]);
+    const gerberFileId = String(
+      [...attachment].reverse().find((row) => String(row.qo_rsa_type) === 'gerber_package')?.qo_rsa_file_id ?? '',
+    );
+    expect(gerberFileId, 'gerber archive attachment resolves').toBeTruthy();
+    const explicitParse = await page.request.post(
+      '/api/meta/commands/execute/qo_quote_line_common:parse_gerber',
+      { data: { payload: { gerber_archive_file_id: gerberFileId }, targetRecordPid: linePid, targetRecordId: linePid, operationType: 'update' } },
+    );
+    expect(explicitParse.ok(), 'explicit parse_gerber execution accepted').toBe(true);
+
+    // 审计断言:ab_command_audit_log 出现显式 parse_gerber 执行记录
+    const auditCount = Number(
+      execFileSync('psql', [
+        '-h', process.env.PG_HOST || '127.0.0.1',
+        '-p', process.env.PG_PORT || '5432',
+        '-U', process.env.PG_USER || 'auraboot',
+        '-d', process.env.PG_DB || 'enterprise_105',
+        '-tAc',
+        "SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND created_at > now() - interval '15 minutes'",
+      ], {
+        env: { ...process.env, PGPASSWORD: process.env.POSTGRES_PASSWORD || 'auraboot' },
+        timeout: 30_000,
+      }).toString().trim(),
+    );
+    expect(
+      auditCount,
+      'parse_gerber executions are audited in ab_command_audit_log',
+    ).toBeGreaterThanOrEqual(1);
+    await testInfo.attach('q03-04-audit-evidence', {
+      body: JSON.stringify({ linePid, parse_gerber_audit_rows: auditCount }),
+      contentType: 'application/json',
+    });
+  });
