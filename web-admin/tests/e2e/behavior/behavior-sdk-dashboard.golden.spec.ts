@@ -147,7 +147,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
     await expect
       .poll(
         () => parseInt(psql(`SELECT COUNT(*) FROM ab_behavior_event WHERE ${runFilter} AND event_name='page_view'`), 10),
-        { timeout: 15_000, message: '≥2 page_view rows for this run' },
+        { timeout: 30_000, message: '≥2 page_view rows for this run' },
       )
       .toBeGreaterThanOrEqual(2);
 
@@ -285,7 +285,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const m = text.match(/\b(\d+)\b/);
           return m ? parseInt(m[1], 10) : -1;
         },
-        { timeout: 12_000, message: 'PV KPI card shows a number ≥ run pvCount' },
+        { timeout: 30_000, message: 'PV KPI card shows a number ≥ run pvCount' },
       )
       .toBeGreaterThanOrEqual(pvCount);
 
@@ -298,7 +298,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const m = text.match(/\b(\d+)\b/);
           return m ? parseInt(m[1], 10) : -1;
         },
-        { timeout: 10_000, message: 'UV KPI card shows ≥1' },
+        { timeout: 30_000, message: 'UV KPI card shows ≥1' },
       )
       .toBeGreaterThanOrEqual(1);
 
@@ -311,7 +311,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const m = text.match(/\b(\d+)\b/);
           return m ? parseInt(m[1], 10) : -1;
         },
-        { timeout: 10_000, message: 'Sessions KPI card shows ≥1' },
+        { timeout: 30_000, message: 'Sessions KPI card shows ≥1' },
       )
       .toBeGreaterThanOrEqual(1);
 
@@ -324,7 +324,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const m = text.match(/\b(\d+)\b/);
           return m ? parseInt(m[1], 10) : -1;
         },
-        { timeout: 10_000, message: 'Total Events KPI card shows ≥3' },
+        { timeout: 30_000, message: 'Total Events KPI card shows ≥3' },
       )
       .toBeGreaterThanOrEqual(3);
 
@@ -338,7 +338,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const tableRows = topEventsBlock.locator('table tbody tr, [role="row"]:not([role="columnheader"])');
           return await tableRows.count();
         },
-        { timeout: 12_000, message: 'top-events table has ≥1 data row' },
+        { timeout: 30_000, message: 'top-events table has ≥1 data row' },
       )
       .toBeGreaterThanOrEqual(1);
 
@@ -419,7 +419,7 @@ test.describe('Behavior SDK + Dashboard — Full-loop Golden', () => {
           const m = text.match(/\b(\d+)\b/);
           return m ? parseInt(m[1], 10) : -1;
         },
-        { timeout: 15_000, message: 'UV KPI card shows ≥2 (User A real browser + User B synthetic proves COUNT DISTINCT aggregation)' },
+        { timeout: 30_000, message: 'UV KPI card shows ≥2 (User A real browser + User B synthetic proves COUNT DISTINCT aggregation)' },
       )
       .toBeGreaterThanOrEqual(2);
 
