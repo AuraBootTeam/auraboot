@@ -15,61 +15,61 @@ import type { PaletteItem } from '~/shared/designer';
 const BLOCK_DEFINITIONS: BlockDefinition[] = [
   {
     type: 'table',
-    label: 'Data Table',
+    label: '数据表格 Data Table',
     icon: 'table',
     description: 'Tabular data from a model or query',
   },
   {
     type: 'grouped-table',
-    label: 'Grouped Table',
+    label: '分组表格 Grouped Table',
     icon: 'grouped',
     description: 'Group rows by field with subtotals',
   },
   {
     type: 'stat-card',
-    label: 'Stat Card',
+    label: '指标卡片 Stat Card',
     icon: 'stat',
     description: 'KPI metric with aggregation',
   },
   {
     type: 'rich-text',
-    label: 'Rich Text',
+    label: '富文本 Rich Text',
     icon: 'text',
     description: 'Static text content or notes',
   },
   {
     type: 'cross-tab',
-    label: 'Cross Tab',
+    label: '交叉表 Cross Tab',
     icon: 'crosstab',
     description: 'Pivot table with row/column grouping',
   },
   {
     type: 'chart',
-    label: 'Chart',
+    label: '图表 Chart',
     icon: 'chart',
     description: 'Bar, horizontal bar, or pie chart',
   },
   {
     type: 'barcode',
-    label: 'Barcode',
+    label: '条码 Barcode',
     icon: 'barcode',
     description: 'Barcode from static value or data field',
   },
   {
     type: 'watermark',
-    label: 'Watermark',
+    label: '水印 Watermark',
     icon: 'watermark',
     description: 'Text watermark overlay on the page',
   },
   {
     type: 'page-header',
-    label: 'Page Header',
+    label: '页眉 Page Header',
     icon: 'header',
     description: 'Repeated on every page top',
   },
   {
     type: 'page-footer',
-    label: 'Page Footer',
+    label: '页脚 Page Footer',
     icon: 'footer',
     description: 'Repeated on every page bottom',
   },
@@ -335,7 +335,7 @@ export const BlockPalette: React.FC = () => {
   return (
     <DesignerPalette
       items={items}
-      title="Blocks"
+      title={text({ zh: '块面板', en: 'Blocks' })}
       subtitle={text({ zh: '点击添加到报表', en: 'Click to add to report' })}
       onItemClick={(item) => handleAddBlock(item.data as BlockDefinition)}
       className="w-56 bg-gray-50"
