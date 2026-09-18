@@ -13,7 +13,8 @@ import { PetAvatar, usePetVisual } from './PetAvatar';
  *
  * Auth: same session as the console (revocable read-only session tokens stay
  * out of V4 scope — recorded in the acceptance report).
- * Auto-refresh every 15s keeps the screen current without interaction.
+ * Data freshness: platform data-sync SSE push (FR-036), with a 5s polling
+ * safety net for dropped connections.
  */
 export default function ClassDisplay() {
   const { isAuthenticated, user } = useAuth();
@@ -72,8 +73,43 @@ export default function ClassDisplay() {
     if (!isAuthenticated) return;
     const classPid = String(params.classPid || '');
     load(classPid);
-    const timer = setInterval(() => load(classPid), 3000); // 3s 短轮询:SSE 管线落地前的时延兜底(验收口径见 FR-036)
-    return () => clearInterval(timer);
+
+    // FR-036: real-time push over the platform data-sync SSE channel. The screen
+    // subscribes to the models it renders, so any command touching them (evaluation
+    // submitted, ledger entry, goal update) delivers a named `data:changed` event
+    // and the data reloads within the push latency. Named events never reach
+    // `onmessage`, so both listeners must be explicit. A 5s poll stays as the
+    // safety net while EventSource re-establishes a dropped connection.
+    const models = [
+      'xy_classroom',
+      'xy_enrollment',
+      'xy_student',
+      'xy_pet_instance',
+      'xy_class_goal',
+      'xy_ledger_entry',
+      'xy_evaluation',
+    ];
+    const es = new EventSource('/api/notifications/stream', { withCredentials: true });
+    es.addEventListener('data-sync-connected', (event) => {
+      try {
+        const { connectionId } = JSON.parse(String((event as MessageEvent).data)) as { connectionId: number };
+        void fetch('/api/data-sync/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ connectionId, modelCodes: models }),
+        });
+      } catch {
+        // Malformed handshake frame — the fallback poll keeps the screen correct.
+      }
+    });
+    es.addEventListener('data:changed', () => void load(classPid));
+
+    const timer = setInterval(() => load(classPid), 5000);
+    return () => {
+      es.close();
+      clearInterval(timer);
+    };
   }, [isAuthenticated, params.classPid, load]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
