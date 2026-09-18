@@ -2028,7 +2028,7 @@ function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function miniZip(files: Array<{ name: string; content: string }>): Buffer {
+export function miniZip(files: Array<{ name: string; content: string }>): Buffer {
   const local: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;

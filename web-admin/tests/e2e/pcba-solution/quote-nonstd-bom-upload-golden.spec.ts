@@ -547,7 +547,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     const postConfirmPreview = await (
       await page.request.get(`/api/ext/qoe/quotes/${created.quoteId}/price-confirmation-categories`)
     ).json();
-    const postItems = postConfirmPreview.items ?? [];
+    const postItems: Array<{ value: string; confirmableCount: number; disabled: boolean }> = postConfirmPreview.items ?? [];
     expect(postItems.length, 'all priced categories remain listed').toBe(3);
     const postByValue = new Map(postItems.map((item) => [item.value, item]));
     // 已确认的两类:归零且禁用;未选的 diode:保持可确认(未选类别不受影响)
