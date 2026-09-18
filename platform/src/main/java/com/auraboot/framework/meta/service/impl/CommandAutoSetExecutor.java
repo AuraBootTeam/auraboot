@@ -122,10 +122,14 @@ public class CommandAutoSetExecutor {
             }
             String fullPrefix = codePrefix + "-" + datePrefix + "-";
 
-            // Use MAX to get the highest existing sequence number
-            String sql = "SELECT MAX(CAST(SUBSTRING(" + fieldCode + " FROM "
-                    + (fullPrefix.length() + 1) + ") AS INTEGER)) as max_seq FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND " + fieldCode + " LIKE #{params.prefix}";
+            // Use MAX to get the highest existing sequence number. Only pure-numeric
+            // suffixes may enter the CAST: fallback or imported values sharing the
+            // prefix would otherwise abort the MAX(...) query — and with it the
+            // caller's transaction — and brick every subsequent create in the tenant.
+            String seqExpr = "SUBSTRING(" + fieldCode + " FROM " + (fullPrefix.length() + 1) + ")";
+            String sql = "SELECT MAX(CAST(" + seqExpr + " AS INTEGER)) as max_seq FROM " + tableName
+                    + " WHERE tenant_id = #{params.tenantId} AND " + fieldCode + " LIKE #{params.prefix}"
+                    + " AND " + seqExpr + " ~ '^[0-9]+$'";
             Map<String, Object> params = Map.of("tenantId", tenantId, "prefix", fullPrefix + "%");
             List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
             long nextSeq = 1;
