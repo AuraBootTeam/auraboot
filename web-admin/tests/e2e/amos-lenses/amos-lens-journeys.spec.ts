@@ -50,6 +50,30 @@ const LENSES = [
     texts: ['已分配数量'],
     shot: 'amos-lens-supply-allocation.png',
   },
+  {
+    code: 'amos_closeout',
+    heading: 'AMOS 关闭周期',
+    headings: ['M16 关闭周期 · 治理状态'],
+    texts: ['MISSING'],
+    metricRow: 'm16_close_cycle_days',
+    shot: 'amos-lens-closeout.png',
+  },
+  {
+    code: 'amos_group',
+    heading: 'AMOS 集团合并',
+    headings: ['M24 合并确认收入 · 治理状态'],
+    texts: ['MISSING'],
+    metricRow: 'm24_consolidated_revenue',
+    shot: 'amos-lens-group.png',
+  },
+  {
+    code: 'amos_demand_funnel',
+    heading: 'AMOS 需求漏斗',
+    headings: ['漏斗指标 · 治理状态'],
+    texts: ['MISSING'],
+    metricRow: 'm01_valid_leads',
+    shot: 'amos-lens-demand-funnel.png',
+  },
 ];
 
 function isProductError(text: string): boolean {
