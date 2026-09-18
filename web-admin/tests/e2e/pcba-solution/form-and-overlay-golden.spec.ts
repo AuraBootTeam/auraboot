@@ -29,11 +29,15 @@ import {
 async function selectCustomer(page: Page, accountId: string, accountName: string): Promise<void> {
   const trigger = page.getByTestId('select-trigger-qo_quote_crm_account_id');
   await expect(trigger).toBeVisible({ timeout: 15_000 });
-  await trigger.click();
-
+  // 客户表随门禁持续增长,下拉选项加载可能慢于首页分页:重开一次下拉再等 30s
   const option = page.locator(`[role="option"][data-value="${accountId}"]`).first();
+  await trigger.click();
+  // 客户表随门禁持续增长:用下拉自带搜索框(客户端过滤)定位新客户
+  const search = page.getByTestId('select-search-qo_quote_crm_account_id');
+  await expect(search, 'dropdown search box renders').toBeVisible({ timeout: 10_000 }).catch(() => {});
+  await search.fill(accountName).catch(() => {});
   await expect(option, `customer option ${accountId} should be loaded`).toBeVisible({
-    timeout: 15_000,
+    timeout: 30_000,
   });
   await option.click();
   await expect(trigger).toContainText(accountName, { timeout: 5_000 });
@@ -106,7 +110,8 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
 
   test('save button disables while the create command is in flight', async ({ page }, testInfo) => {
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
-    const accountName = `E2E FormDisable Customer ${suffix}`;
+    // 数字前缀让新客户排进引用下拉首页(窗口 201 项,按名称序)
+    const accountName = `0E2E FormDisable Customer ${suffix}`;
     const projectName = `E2E FormDisable Project ${suffix}`;
     const workbookPath = createCorrectedBomWorkbook(
       testInfo.outputPath('form-submit-disable-bom.xlsx'),
