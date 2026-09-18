@@ -251,10 +251,10 @@ export const BlockPropertyPanel: React.FC = () => {
 
   // No selection — show report-level properties + parameter editor
   return (
-    <PanelShell title="Report Properties">
+    <PanelShell title={text({ zh: '报表属性', en: 'Report Properties' })}>
       <div className="space-y-4">
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">Description</label>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-400">{text({ zh: '描述', en: 'Description' })}</label>
           <textarea
             value={report.description || ''}
             onChange={(e) => updateDescription(e.target.value)}
