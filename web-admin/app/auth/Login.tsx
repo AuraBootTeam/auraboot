@@ -520,24 +520,13 @@ export default function LoginPage() {
   // Pure-wechat school deployments: branding flag removes every email/sms channel
   // from the school-side /login page. /admin-login renders the full page regardless.
   const wechatOnly = branding.loginWechatOnly === true && !location.pathname.startsWith('/admin-login');
-  // Embedded WeChat QR (wechat-only deployments): render the snsapi_login QR
-  // inline in the auth panel instead of redirecting to WeChat's qrconnect page.
+  // Embedded WeChat QR (wechat-only deployments): iframe the official qrconnect
+  // page (login_type=jssdk) so the QR renders inline; after scan+confirm WeChat
+  // navigates the page to our social callback, which completes the session.
+  const [wechatQrSrc, setWechatQrSrc] = useState('');
   useEffect(() => {
     if (!wechatOnly || !wechatQrEnabled) return;
     let cancelled = false;
-    const mount = (appid: string, redirectUri: string, state: string) => {
-      const container = document.getElementById('fengyun-wx-qr');
-      if (!container || typeof (window as unknown as { WxLogin?: unknown }).WxLogin !== 'function') return;
-      // eslint-disable-next-line no-new
-      new (window as unknown as { WxLogin: new (opts: Record<string, unknown>) => void }).WxLogin({
-        id: 'fengyun-wx-qr',
-        appid,
-        scope: 'snsapi_login',
-        redirect_uri: encodeURIComponent(redirectUri),
-        state,
-        style: 'black',
-      });
-    };
     const origin = window.location.origin;
     fetchResult<{ url: string; state: string }>('/api/auth/login/wechat-pc/qr-url', {
       method: 'get',
@@ -551,17 +540,13 @@ export default function LoginPage() {
         const state = result.data.state;
         if (!appid || !redirectUri) return;
         window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), state);
-        const src = 'https://res.wx.qq.com/connect/zh_CN/CH-Dist/weixin_qr_login.js';
-        if ((window as unknown as { WxLogin?: unknown }).WxLogin) { mount(appid, redirectUri, state); return; }
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => mount(appid, redirectUri, state);
-        document.head.appendChild(script);
+        setWechatQrSrc(
+          `https://open.weixin.qq.com/connect/qrconnect?appid=${encodeURIComponent(appid)}&scope=snsapi_login&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&login_type=jssdk&self_redirect=false`,
+        );
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [wechatOnly, wechatQrEnabled]);
-
 
   const tiles: CapabilityRow[] = [
     {
@@ -677,10 +662,19 @@ export default function LoginPage() {
           <div className="rounded-[13px] border border-[#e0e6d8] bg-white p-4 text-[14px] leading-relaxed text-[#52604d] dark:border-gray-600 dark:bg-gray-700/40 dark:text-gray-300">
             请使用微信扫码登录。首次使用请先在小程序内输入学校教师码完成绑定。
           </div>
-          <div
-            id="fengyun-wx-qr"
-            className="mt-4 flex min-h-[260px] items-center justify-center overflow-hidden rounded-[13px] border border-[#e5ebdf] bg-white dark:border-gray-600"
-          />
+          <div className="mt-4 flex min-h-[300px] items-center justify-center overflow-hidden rounded-[13px] border border-[#e5ebdf] bg-white dark:border-gray-600">
+            {wechatQrSrc ? (
+              <iframe
+                src={wechatQrSrc}
+                title="微信登录二维码"
+                scrolling="no"
+                frameBorder="0"
+                className="h-[300px] w-full"
+              />
+            ) : (
+              <span className="text-[13px] text-[#819184]">二维码加载中…</span>
+            )}
+          </div>
         </div>
       ) : (
       <>
