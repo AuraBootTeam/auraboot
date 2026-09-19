@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from './EChartsHost';
 import type { EChartsOption } from 'echarts';
 import 'echarts-wordcloud';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
@@ -213,7 +213,6 @@ export const SmartWordCloudChart: React.FC<SmartWordCloudChartProps> = ({
         style={{ height: '100%', minHeight: 0 }}
         onEvents={onEvents}
         notMerge
-        lazyUpdate
       />
     </div>
   );

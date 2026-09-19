@@ -53,6 +53,12 @@ test.describe('Dashboard designer high-fidelity', () => {
     await page.getByTestId('toolbar-btn-presentation').click();
     await expect(page.getByTestId('big-screen-exit')).toBeVisible({ timeout: 20000 });
     await expect(dp.canvas).toBeVisible();
+    // Regression guard: under echarts 6, echarts-for-react's async init used to
+    // stall before its first setOption, mounting the bound chart as a blank card
+    // in presentation mode. The chart must actually paint its canvas here.
+    await expect(
+      page.locator('[data-testid^="dashboard-block-"] canvas').first(),
+    ).toBeVisible({ timeout: 15000 });
     await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/hifi-dashboard-bigscreen.png`, fullPage: true });
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('big-screen-exit')).toHaveCount(0);
