@@ -81,12 +81,12 @@ export function DesignerToolbar({
         )}
         {status && <StatusBadge status={status} />}
         {isDirty && !isSaving && (
-          <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+          <span className="shrink-0 whitespace-nowrap rounded bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
             {unsavedLabel}
           </span>
         )}
         {isSaving && (
-          <span className="flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+          <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
             <Loader2 className="h-3 w-3 animate-spin" />
             {savingLabel}
           </span>
@@ -161,7 +161,7 @@ function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={cn('rounded px-2 py-0.5 text-xs font-medium', colorClasses)}>{status}</span>
+    <span className={cn('shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium', colorClasses)}>{status}</span>
   );
 }
 
