@@ -231,6 +231,41 @@ test.describe('AMOS lens freshness + permission journeys', () => {
     const denied = resp.status() === 403 || resp.status() === 400 || body?.code !== '0';
     expect(denied, 'operator write is denied by the permission boundary').toBeTruthy();
   });
+
+  test('permission denied UI: operator sidebar omits admin-only entries', async ({ page, request }) => {
+    // The sidebar is permission-driven: a restricted role must not see the
+    // metadata-admin entries that the admin account does.
+    const login = await request.post('/api/auth/login', {
+      data: { email: 'e2e-operator@test.com', password: 'Test2026x' },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const operatorJwt = (await login.json())?.data?.jwt;
+    if (!operatorJwt) test.skip(true, 'operator account not provisioned on this stack');
+
+    const { createCookieSessionStorage } = await import('react-router');
+    const storage = createCookieSessionStorage({
+      cookie: {
+        name: '__session', httpOnly: true, path: '/', sameSite: 'lax',
+        secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
+      },
+    });
+    const session = await storage.getSession();
+    session.set('jwtToken', operatorJwt);
+    const cookieValue = (await storage.commitSession(session, { maxAge: 3600 })).match(/__session=([^;]+)/)?.[1];
+        await page.goto('/');
+    const origin = new URL(page.url()).origin;
+    await page.context().addCookies([{ name: '__session', value: cookieValue!, url: origin }]);
+
+    await page.goto('/dashboards/view/amos_metric_governance', { waitUntil: 'domcontentloaded' });
+    // The app shell (permission-driven navigation) must render; whether the
+    // restricted role also gets the lens content is entitlement-dependent.
+    await page.locator('nav').first().waitFor({ state: 'visible', timeout: 20_000 });
+    // admin-only metadata management entry absent for the restricted role
+    await expect(
+      page.getByRole('link', { name: '模型管理' }),
+      'restricted role does not see metadata admin entries',
+    ).toHaveCount(0);
+  });
 });
 
 
