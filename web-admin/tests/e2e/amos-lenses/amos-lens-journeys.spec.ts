@@ -232,3 +232,59 @@ test.describe('AMOS lens freshness + permission journeys', () => {
     expect(denied, 'operator write is denied by the permission boundary').toBeTruthy();
   });
 });
+
+
+test.describe('AMOS lens fault/filter/trace journeys', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  const ERROR_PAGES = [
+    { code: 'amos_metric_governance', heading: 'AMOS 指标治理' },
+    { code: 'amos_data_trust', heading: 'AMOS 数据可信度' },
+    { code: 'amos_inventory_lens', heading: 'AMOS 库存库龄 · 治理状态' },
+  ];
+
+  for (const page of ERROR_PAGES) {
+    test(`query error: ${page.code} expresses the failure state`, async ({ page }) => {
+      // Fault injection at the transport boundary: the dashboard must render
+      // its governed failure state instead of a blank canvas or stale values.
+      await page.route('**/api/meta/chart-data*', (route) => route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '1', message: 'S12 fault injection' }),
+      }));
+      await page.goto(`/dashboards/view/${page.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(
+        page.getByRole('heading', { name: page.heading }),
+        `${page.code} shell still renders under query failure`,
+      ).toBeVisible({ timeout: 20_000 });
+      await page.screenshot({ path: `test-results/artifacts/amos-lens-${page.code}-query-error.png` });
+    });
+  }
+
+  test('detail trace: data trust surfaces refresh provenance', async ({ page }) => {
+    await page.goto('/dashboards/view/amos_data_trust', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: '刷新血缘' }).waitFor({ state: 'visible', timeout: 20_000 });
+    // provenance columns: metric, refresh reason, input count, observation window
+    for (const col of ['指标', '刷新原因', '输入数', 'As Of']) {
+      await expect(
+        page.getByRole('columnheader', { name: col }).or(page.getByText(col, { exact: true })).first(),
+        `lineage column "${col}" present`,
+      ).toBeVisible();
+    }
+    await page.screenshot({ path: 'test-results/artifacts/amos-lens-data-trust-trace.png' });
+  });
+
+  test('filter scoped: applied time window scopes the analytics query', async ({ page }) => {
+    // The behavior analytics page owns the platform time-window control:
+    // draft edits stay local until 应用时间范围 commits them to query params.
+    await page.goto('/p/c/behavior_analytics', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('textbox', { name: '开始时间（含）' }).fill('2026-01-01T00:00');
+    await page.getByRole('textbox', { name: '结束时间（不含）' }).fill('2026-02-01T00:00');
+    await page.getByRole('button', { name: '应用时间范围' }).click();
+    await expect(
+      page.getByText('已应用：2026年1月1日 00:00 — 2026年2月1日 00:00'),
+      'applied window text reflects the committed draft',
+    ).toBeVisible();
+  });
+});
