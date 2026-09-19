@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.ApplicationModuleExtension;
+import com.auraboot.framework.plugin.extension.DecisionUsageSourceContributor;
 import org.springframework.context.ApplicationContext;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import lombok.extern.slf4j.Slf4j;
@@ -23,16 +24,19 @@ public class ApplicationModuleRegistry {
     private final AuraPluginManager pluginManager;
     private final PluginRequestMappingHandlerMapping requestMappings;
     private final WorkflowCapabilityRegistry workflowCapabilities;
+    private final DecisionUsageSourceRegistry usageSources;
     private final Map<String, List<LoadedModule>> modulesByPlugin = new LinkedHashMap<>();
 
     public ApplicationModuleRegistry(ConfigurableApplicationContext hostContext,
                                      AuraPluginManager pluginManager,
                                      PluginRequestMappingHandlerMapping requestMappings,
-                                     WorkflowCapabilityRegistry workflowCapabilities) {
+                                     WorkflowCapabilityRegistry workflowCapabilities,
+                                     DecisionUsageSourceRegistry usageSources) {
         this.hostContext = hostContext;
         this.pluginManager = pluginManager;
         this.requestMappings = requestMappings;
         this.workflowCapabilities = workflowCapabilities;
+        this.usageSources = usageSources;
     }
 
     public synchronized void register(String pluginId) {
@@ -58,8 +62,11 @@ public class ApplicationModuleRegistry {
                 controllers.forEach(requestMappings::registerApplicationModuleController);
                 child.getBeansOfType(WorkflowCapability.class).values()
                         .forEach(provider -> workflowCapabilities.register(pluginId, provider));
+                List<DecisionUsageSourceContributor> contributors = child
+                        .getBeansOfType(DecisionUsageSourceContributor.class).values().stream().toList();
+                contributors.forEach(contributor -> usageSources.register(pluginId, contributor));
                 child.publishEvent(new ApplicationModuleReadyEvent(extension.moduleId()));
-                loaded.add(new LoadedModule(extension.moduleId(), child, controllers));
+                loaded.add(new LoadedModule(extension.moduleId(), child, controllers, contributors));
                 log.info("Registered plugin application module {} ({})", extension.moduleId(), pluginId);
             }
             modulesByPlugin.put(pluginId, List.copyOf(loaded));
@@ -72,6 +79,7 @@ public class ApplicationModuleRegistry {
 
     public synchronized void unregister(String pluginId) {
         workflowCapabilities.unregister(pluginId);
+        usageSources.unregister(pluginId);
         closeReverse(modulesByPlugin.remove(pluginId));
     }
 
@@ -106,5 +114,6 @@ public class ApplicationModuleRegistry {
 
     public record ApplicationModuleReadyEvent(String moduleId) {}
     private record LoadedModule(String moduleId, AnnotationConfigApplicationContext context,
-                                List<Object> controllers) {}
+                                List<Object> controllers,
+                                List<DecisionUsageSourceContributor> usageSources) {}
 }
