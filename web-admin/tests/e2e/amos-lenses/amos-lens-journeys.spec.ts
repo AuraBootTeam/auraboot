@@ -185,3 +185,50 @@ test.describe('AMOS lens state/layout/focus journeys', () => {
     });
   }
 });
+
+
+test.describe('AMOS lens freshness + permission journeys', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test('query stale: inventory lens expresses the STALE freshness state', async ({ page }) => {
+    // m20 was refreshed with a fresh_until in the past — the canonical seam
+    // must surface it as STALE (freshness is expressed, never hidden).
+    await page.goto('/dashboards/view/amos_inventory_lens', { waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('heading', { name: 'AMOS 库存库龄 · 治理状态' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('m20_inventory_ageing').first(),
+      'm20 row renders on the inventory lens',
+    ).toBeVisible();
+    await expect
+      .poll(
+        async () => (await page.getByText('STALE', { exact: true }).count()),
+        { timeout: 20_000, message: 'STALE freshness is expressed for m20' },
+      )
+      .toBeGreaterThan(0);
+    await page.screenshot({ path: 'test-results/artifacts/amos-lens-inventory-stale.png' });
+  });
+
+  test('permission denied: operator role cannot create disclosure packages', async ({ request }) => {
+    // Provisioned e2e-operator has no oi.disclosure.manage permission — the
+    // command boundary must deny the write (permission archetype, API level).
+    const login = await request.post('/api/auth/login', {
+      data: { email: 'e2e-operator@test.com', password: 'Test2026x' },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const operatorJwt = (await login.json())?.data?.jwt;
+    if (!operatorJwt) {
+      // operator account absent on this stack — skip deterministically
+      test.skip(true, 'operator account not provisioned on this stack');
+    }
+    const resp = await request.post('/api/meta/commands/execute/oi:create_disclosure_package', {
+      data: { payload: { code: `s12_operator_denied_${Date.now()}`, title: 'x', period: '2026-08', contentQuery: 'q', author: 'operator' } },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${operatorJwt}` },
+    });
+    const body = await resp.json().catch(() => ({}));
+    const denied = resp.status() === 403 || resp.status() === 400 || body?.code !== '0';
+    expect(denied, 'operator write is denied by the permission boundary').toBeTruthy();
+  });
+});
