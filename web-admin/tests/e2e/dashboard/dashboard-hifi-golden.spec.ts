@@ -18,6 +18,22 @@ test.describe('Dashboard designer high-fidelity', () => {
 
   test('DHIFI-01 bind real aggregates, save, verify rendered numbers and chart bars', async ({ page, request }) => {
     await nameViaSettings(page, `hifi_dash_${Date.now()}`);
+    // Self-sufficiency: spec files run alphabetically (dashboard before designer),
+    // so on a fresh stack e2et_order is still empty when this file runs — the
+    // aggregate card would render "0" and never match the 2+ digit guard. Seed a
+    // compact CJK dataset of our own instead of leaning on the report spec's.
+    const dashRun = `hifid_${Date.now()}`;
+    for (let i = 0; i < 12; i++) {
+      const created = await request.post('/api/dynamic/e2et_order/create', {
+        data: {
+          e2et_order_title: `HiFi看板-${dashRun}-${String(i + 1).padStart(3, '0')}`,
+          e2et_order_type: ['normal', 'urgent', 'bulk'][i % 3],
+          e2et_order_urgent: i % 4 === 0,
+          e2et_order_status: ['draft', 'confirmed', 'shipped', 'completed'][i % 4],
+        },
+      });
+      expect(created.status(), await created.text()).toBe(200);
+    }
     // 数字卡片 bound to e2et_order (aggregate count over the hifi dataset).
     await dp.addWidget('数字卡片');
     await bindModel(page, 'e2et_order');
