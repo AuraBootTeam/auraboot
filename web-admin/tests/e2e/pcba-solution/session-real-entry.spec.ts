@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import { openPgClient } from './quote-e2e-helpers';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@auraboot.com';

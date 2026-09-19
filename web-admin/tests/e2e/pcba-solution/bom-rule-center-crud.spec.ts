@@ -1105,14 +1105,21 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   await executeCommand(page, 'bom:refresh_material_snapshot', {});
 
   const after = await convert();
-  // 上传含客户料号列的任务通过签名守卫并完成转换(根修 back 2026-07-25 §5.1 生效)
+  // 上传含客户料号列的任务通过签名守卫并完成转换(根修 backlog 2026-07-25 §5.1 生效)。
   expect(after.taskId, 'post-mapping conversion completes').toBeTruthy();
-  // 已验证:映射行 active、客户/归一化 PN/物料主档全部就位(SQL 同款查询可命中);
-  // 待查:异步匹配线程的租户上下文传播(平台层),命中后 K1 CPN 候选才进入 union。
-  const afterMatch = await queryDynamicRecords(page, 'bom_match_result_pcba', [
-    { fieldName: 'bom_mr_task_id', operator: 'EQ', value: after.taskId },
+  // “映射生效”验收 K1 的可审计决策证据。默认 auto-green 关闭时黄态不得把候选
+  // 写进 bom_std_material_code；首候选/decision candidate 才是此处的权威输出。
+  expect(String(after.standard[0].bom_std_candidate_codes ?? '').split(',')[0]).toBe(mappedMaterial);
+  const mappedEvidence = await queryDynamicRecords(page, 'bom_match_evidence', [
+    { fieldName: 'bom_me_task_id', operator: 'EQ', value: after.taskId },
+    { fieldName: 'bom_me_material_code', operator: 'EQ', value: mappedMaterial },
   ]);
-  expect(afterMatch.length, 'after task produced match results').toBeGreaterThan(0);
+  expect(mappedEvidence, 'mapped material has one auditable match-evidence row').toHaveLength(1);
+  const evidence = JSON.parse(String(mappedEvidence[0].bom_me_evidence_json ?? '{}'));
+  expect(evidence.lanes).toContain('K1_CPN_ACTIVE');
+  expect(evidence.decisionCandidateCode).toBe(mappedMaterial);
+  expect(evidence.isDecisionCandidate).toBe(true);
+  expect(evidence.identityOrderingPriority).toBe(3);
 
   const rawBefore = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: before.taskId }]);
   const standardBefore = await queryDynamicRecords(page, 'bom_standard_line_pcba', [{ fieldName: 'bom_std_task_id', operator: 'EQ', value: before.taskId }]);
@@ -1128,16 +1135,29 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   await field('bom_cpm_status').getByRole('combobox').first().click();
   await page.getByRole('option', { name: '生效', exact: true }).click();
   const dupResponse = page.waitForResponse(r => r.url().includes('/api/meta/commands/execute/bom:create_customer_part_map') && r.request().method() === 'POST');
-  await submit(page, 'bom:create_customer_part_map');
-  const dupBody = await (await dupResponse).json().catch(() => ({}));
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  const duplicate = await dupResponse;
+  expect(duplicate.status()).toBe(500);
+  const dupBody = await duplicate.json().catch(() => ({}));
+  expect(String(dupBody.code)).not.toBe('0');
+  expect(JSON.stringify(dupBody)).not.toMatch(/INSERT INTO|SQL:|DuplicateKeyException|Mapper\.xml|mt_bom_customer_part_map|duplicate key/i);
   const finalMappings = await queryDynamicRecords(page, 'bom_customer_part_map', [
     { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
   ]);
-  // 产品发现 #10:重复映射(同客户+同 pn_norm+active)被静默接受为第二行,既不拒绝也不合并
-  // (return code 0, inserted=1)。当前产品行为 = 双行并存;按纪律只记录不断言缺陷为正确行为。
-  expect(finalMappings.length, 'duplicate mapping behavior observed (finding #10)').toBeGreaterThan(0);
+  expect(finalMappings, 'duplicate mapping is rejected without creating another row').toHaveLength(1);
+  expect(finalMappings[0].bom_cpm_status).toBe('active');
+  expect(finalMappings[0].bom_cpm_material_code).toBe(mappedMaterial);
   await info.attach('B18-03-part-map-evidence', {
-    body: JSON.stringify({ marker, before: before.taskId, after: after.taskId, mappings: finalMappings.length }),
+    body: JSON.stringify({
+      marker,
+      before: before.taskId,
+      after: after.taskId,
+      mappedMaterial,
+      lanes: evidence.lanes,
+      decisionCandidateCode: evidence.decisionCandidateCode,
+      mappings: finalMappings.length,
+      duplicateStatus: duplicate.status(),
+    }),
     contentType: 'application/json',
   });
 });
