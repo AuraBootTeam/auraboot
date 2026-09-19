@@ -455,6 +455,10 @@ function main() {
     resolve(repoRoot, 'plugins/core-decisionops'),
     resolve(output, 'config/core-decisionops'),
   );
+  const showcase = copyArtifact(
+    resolve(repoRoot, 'plugins/showcase'),
+    resolve(output, 'config/showcase'),
+  );
   materializeAndBuildCoreWeb({
     repoRoot,
     output,
@@ -490,6 +494,7 @@ function main() {
       { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
       { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
       { source: coreDecisionops, destination: '/opt/auraboot/config/core-decisionops' },
+      { source: showcase, destination: '/opt/auraboot/config/showcase' },
       { source: resolve(output, 'web'), destination: '/opt/auraboot/web' },
       { source: deploymentScript, destination: '/opt/auraboot/bin/auraboot-core-env.sh' },
       { source: resolve(output, 'app.yaml'), destination: '/opt/auraboot/app.yaml' },
