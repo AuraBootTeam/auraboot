@@ -473,14 +473,12 @@ public class PluginDirectoryLoader {
             }
             return List.of(objectMapper.convertValue(node, clazz));
         } catch (Exception e) {
-            // Directory layout intentionally keeps per-file resilience (a malformed auxiliary file skips
+            // Directory layout keeps per-file resilience for auxiliary resources (a malformed file skips
             // itself rather than failing the whole plugin — see PluginDirectoryLoaderTest
-            // #shouldSkipInvalidJsonAndLoadValidOnes). Log at ERROR (not WARN) so a dropped resource file
-            // is visible and diagnosable instead of vanishing quietly into a later "Command not found".
-            // (The single-file loadResourceList path stays fail-loud; that was the actual incident source.)
-            log.error("Failed to parse plugin resource file {} as List<{}> — skipping this file: {}",
-                    file, clazz.getSimpleName(), e.getMessage());
-            return List.of();
+            // #shouldSkipInvalidJsonAndLoadValidOnes). Command files are the fail-closed carve-out
+            // (PluginResourceParsePolicy): a dropped command silently removes a user-visible action
+            // while the import still reports success.
+            return PluginResourceParsePolicy.onResourceParseFailure(file.toString(), clazz, e);
         }
     }
 

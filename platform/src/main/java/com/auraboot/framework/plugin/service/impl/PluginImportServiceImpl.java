@@ -610,8 +610,9 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .constructCollectionType(List.class, clazz);
                 return objectMapper.readValue(new String(content, StandardCharsets.UTF_8), listType);
             } catch (Exception e) {
-                log.warn("Failed to parse resource file {}: {}", logSafe(path), logSafe(e.getMessage()));
-                return List.of();
+                // Commands are fail-closed via PluginResourceParsePolicy: a dropped command file must
+                // fail the import instead of disappearing behind a green result.
+                return PluginResourceParsePolicy.onResourceParseFailure(path, clazz, e);
             }
         }
 
@@ -641,7 +642,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                     resources.add(objectMapper.convertValue(node, clazz));
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse resource file {}: {}", logSafe(child), logSafe(e.getMessage()));
+                resources.addAll(PluginResourceParsePolicy.onResourceParseFailure(child, clazz, e));
             }
         }
         return resources;
