@@ -29,6 +29,12 @@ export interface BrandingConfig {
   loginLead?: string;
   loginHeroUrl?: string;
   loginFeatures?: string[];
+  /**
+   * Pure-wechat school deployment: the school-side login page renders only the
+   * WeChat entry (no email/password channels). Platform admins use the separate
+   * admin login route. Branding-level flag — applies when commercial branding resolves.
+   */
+  loginWechatOnly?: boolean;
 }
 
 export interface DeploymentBrandingDocument {
@@ -53,6 +59,12 @@ export interface DeploymentBrandingDocument {
   loginLead?: string;
   loginHeroUrl?: string;
   loginFeatures?: string[];
+  /**
+   * Pure-wechat school deployment: the school-side login page renders only the
+   * WeChat entry (no email/password channels). Platform admins use the separate
+   * admin login route. Branding-level flag — applies when commercial branding resolves.
+   */
+  loginWechatOnly?: boolean;
 }
 
 export interface BuildIdentity {
@@ -109,6 +121,7 @@ const DEPLOYMENT_KEYS = new Set<keyof DeploymentBrandingDocument>([
   'loginLead',
   'loginHeroUrl',
   'loginFeatures',
+  'loginWechatOnly',
 ]);
 
 const FIELD_LIMITS: Partial<Record<keyof DeploymentBrandingDocument, number>> = {
@@ -230,6 +243,7 @@ export function resolveCommercialBranding(
     loginLead: optionalText(document.loginLead, 'loginLead'),
     loginHeroUrl: optionalText(document.loginHeroUrl, 'loginHeroUrl'),
     loginFeatures: optionalTextList(document.loginFeatures, 'loginFeatures'),
+    loginWechatOnly: document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
   };
 }
 

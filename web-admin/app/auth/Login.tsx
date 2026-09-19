@@ -7,8 +7,7 @@ import {
   useActionData,
   useLoaderData,
   data,
-  redirect,
-} from 'react-router';
+  redirect, useLocation } from 'react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createUserSession, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
 import { safeRedirect, validateEmail } from '~/utils/utils';
@@ -410,6 +409,7 @@ export default function LoginPage() {
   const displayName = resolveBrandDisplayName(branding, compliance);
   const { t, locale } = useI18n();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const actionData = useActionData<typeof action>();
   const visibleActionData = actionData ?? getLoginFailureActionData(searchParams);
@@ -516,6 +516,10 @@ export default function LoginPage() {
     if (errors?.email) emailRef.current?.focus();
     else if (errors?.password) passwordRef.current?.focus();
   }, [visibleActionData]);
+
+  // Pure-wechat school deployments: branding flag removes every email/sms channel
+  // from the school-side /login page. /admin-login renders the full page regardless.
+  const wechatOnly = branding.loginWechatOnly === true && !location.pathname.startsWith('/admin-login');
 
   const tiles: CapabilityRow[] = [
     {
@@ -626,6 +630,12 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {wechatOnly ? (
+        <div className="rounded-[13px] border border-[#e0e6d8] bg-white p-4 text-[14px] leading-relaxed text-[#52604d] dark:border-gray-600 dark:bg-gray-700/40 dark:text-gray-300">
+          请使用微信扫码登录。首次使用请先在小程序内输入学校教师码完成绑定。
+        </div>
+      ) : (
+      <>
       {/* Tab Selector — only show if more than 1 tab channel */}
       {tabChannels.length > 1 && (
         <div
@@ -704,6 +714,9 @@ export default function LoginPage() {
         />
       )}
 
+      </>
+      )}
+
       {/* Social / SSO login (conditional) */}
       {socialOptions.length > 0 && (
         <div className="mt-6">
@@ -763,7 +776,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {registrationOpen && (
+      {registrationOpen && !wechatOnly && (
         <div className="mt-7 text-center text-[14px] text-[#819184] dark:text-gray-400">
           {t('auth.noAccount') || 'No account yet?'}{' '}
           <Link

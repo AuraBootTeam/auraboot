@@ -41,6 +41,41 @@ public class WechatMiniIdentityService {
 
     /** Resolve the platform user for a wx.login code, or null when unbound. */
     @Transactional
+    /** Resolve the platform user behind an already-exchanged session (null when unbound). */
+    public User resolveLoginUserBySession(WechatMiniClient.WxSession session) {
+        AuthIdentity identity = findByOpenid(session.openid());
+        if (identity != null) {
+            touchLastLogin(identity);
+            return userMapper.selectById(identity.getUserId());
+        }
+        if (!isBlank(session.unionid())) {
+            AuthIdentity byUnion = findByUnionid(session.unionid());
+            if (byUnion != null) {
+                return userMapper.selectById(byUnion.getUserId());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Attach a WeChat identity to an existing user from an already-exchanged session
+     * (join flow: the js code is single-use, so the session must be resolved exactly once).
+     * Conflict on openid surfaces as Bad parameter, mirroring bindToUser.
+     */
+    @Transactional
+    public void attachIdentity(Long userId, WechatMiniClient.WxSession session) {
+        AuthIdentity existing = findByOpenid(session.openid());
+        if (existing != null) {
+            if (!existing.getUserId().equals(userId)) {
+                throw new RootUnCheckedException(ResponseCode.BadParam,
+                        "This WeChat account is already bound to another user");
+            }
+            touchLastLogin(existing);
+            return;
+        }
+        createIdentity(userId, session, session.unionid());
+    }
+
     public User resolveLoginUser(String jsCode) {
         WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
         AuthIdentity identity = findByOpenid(session.openid());

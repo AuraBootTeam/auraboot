@@ -30,6 +30,7 @@ export default [
   layout('./auth/AuthLayout.tsx', [
     route('/logout', './auth/Logout.tsx'),
     route('/login', './auth/Login.tsx'),
+    route('/admin-login', './auth/Login.tsx', { id: 'admin-login' }),
     route('/signup', './auth/SignUp.tsx'),
     route('/forgot-password', './routes/auth/ForgotPassword.tsx'),
     route('/reset-password', './routes/auth/ResetPassword.tsx'),
