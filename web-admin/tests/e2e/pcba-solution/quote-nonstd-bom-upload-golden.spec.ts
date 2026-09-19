@@ -542,6 +542,52 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         diodeDecisionId: '',
       });
 
+    // Q10-02 补强:批量确认后三处一致 + 刷新一致。
+    // 1) 类别确认预览归零:所有类别均已确认,无可确认项
+    const postConfirmPreview = await (
+      await page.request.get(`/api/ext/qoe/quotes/${created.quoteId}/price-confirmation-categories`)
+    ).json();
+    const postItems: Array<{ value: string; confirmableCount: number; disabled: boolean }> = postConfirmPreview.items ?? [];
+    expect(postItems.length, 'all priced categories remain listed').toBe(3);
+    const postByValue = new Map(postItems.map((item) => [item.value, item]));
+    // 已确认的两类:归零且禁用;未选的 diode:保持可确认(未选类别不受影响)
+    for (const value of ['resistor', 'capacitor']) {
+      expect(postByValue.get(value)).toMatchObject({ confirmableCount: 0, disabled: true });
+    }
+    expect(postByValue.get('diode')).toMatchObject({ confirmableCount: 1, disabled: false });
+
+    // 2) 详情刷新回显:工作台三行确认行可见且采用价格为数值,排除行仍可见
+    await page.reload();
+    for (const line of quickConfirmedLines) {
+      const confirmedRow = page.getByTestId(`table-row-${line.pid}`);
+      await expect(confirmedRow).toBeVisible({ timeout: 30_000 });
+      const rowText = await confirmedRow.innerText();
+      expect(rowText, `confirmed line ${line.pid} renders an adopted price`).toMatch(/\d/);
+    }
+    const excludedRowAfterReload = page.getByTestId(`table-row-${excludedDiode?.pid}`);
+    await expect(excludedRowAfterReload).toBeVisible({ timeout: 30_000 });
+
+    // 3) 导出预览重生成:确认后的报价 Excel 重新生成且结构/客户数据一致
+    await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
+    const regenerateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/commands/execute/qo_quote_common:generate_document') &&
+        response.request().method() === 'POST',
+      { timeout: 60_000 },
+    );
+    const regenerateDownload = page.waitForEvent('download', { timeout: 60_000 });
+    await page.getByTestId('workbench-action-generate_quote_excel').click();
+    const regenerateBody = await (await regenerateResponse).json().catch(() => ({}));
+    expect(String((regenerateBody as any).code)).toBe('0');
+    const regenerated = await regenerateDownload;
+    const regeneratedPath = path.join(testInfo.outputDir, 'nonstd-customer-bom-quote-post-confirm.xlsx');
+    await saveWorkbookDownload(regenerated, regeneratedPath, testInfo, 'quote-nonstandard-post-confirm');
+    validateQuickCustomerBomWorkbook(regeneratedPath, mpnSuffix);
+    await testInfo.attach('nonstd-customer-bom-quote-post-confirm.xlsx', {
+      path: regeneratedPath,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
     await expect(consoleIssues).toEqual([]);
   });
 });

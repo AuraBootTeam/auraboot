@@ -140,7 +140,18 @@ async function updateQuotePricingInputs(
   await page.getByRole('tab', { name: /资料上传|Materials/ }).click();
   await page.getByRole('button', { name: /修改套数|Edit Sets/ }).click();
   await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
-  await fillDialogField(page, 'qo_quote_set_count', String(setCount));
+  // 受控输入在数据源刷新时可能被 React 重渲染清空——填入后轮询确认值保持,
+  // 被清空则重填(高负载门禁下必填对话框偶发此竞态)。
+  await expect
+    .poll(async () => {
+      const setCountInput = page.getByTestId('form-dialog-field-qo_quote_set_count');
+      if ((await setCountInput.inputValue()) !== String(setCount)) {
+        await setCountInput.fill('');
+        await setCountInput.pressSequentially(String(setCount), { delay: 10 });
+      }
+      return setCountInput.inputValue();
+    }, { timeout: 20_000, intervals: [200, 500, 1_000] })
+    .toBe(String(setCount));
   await fillDialogField(page, 'qo_quote_price_factor', String(priceFactor));
   const recomputeResponsePromise = page.waitForResponse(
     (response) =>

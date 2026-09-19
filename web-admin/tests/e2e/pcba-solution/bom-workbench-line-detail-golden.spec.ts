@@ -21,13 +21,15 @@ import {
 } from './quote-e2e-helpers';
 
 /**
- * Quote/BOM 真机 — 工作台列表筛选/翻页 与 行明细渲染/决策审计 (B13-01 / B09-04 / B20-03).
+ * Quote/BOM 真机 — 工作台列表筛选/翻页 与 行明细渲染/决策审计 (B13-01 / B09-04 / B20-03 / B13-02).
  * 复用确定性已完成任务 seed（与 BOM-05/06/07 相同的 seedBomWorkbench），断言：
  * - B13-01: 工作台列表翻页遍历可定位目标任务；按客户关键字筛选后仅见该客户任务、
  *   清空筛选恢复全集；可见任务集合与后台 API 集合一致。
  * - B09-04: 工作台明细页行表渲染位号/数量，首行内容与后台记录一致；
  *   有效行计数（metric strip）与后台 active 行数一致（隔离行不进有效行集合）。
  * - B20-03: 点击行打开复核浮层，位号/数量/候选/决策字段与后台一致，决策历史（导出影响）可见。
+ * - B13-02: 评审队列列出待确认行计数；批量确认后行转 confirmed/green、任务 yellow 归零，
+ *   任务退出待复核聚合，刷新后一致。
  */
 const WORKBENCH = '/p/bom_conversion_task_pcba_workbench';
 const uid = uniqueId('wbld').replace(/_/g, '-');
@@ -124,8 +126,9 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
         'seeded task belongs to the seeded customer per API',
       ).toBe(true);
 
-      // 客户筛选：列表按客户名过滤后仅见该客户的任务行
-      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, customerName, 'bom_conversion_task_pcba');
+      // 关键字过滤:工作台页面的搜索框走模型 keyword 面(含任务号),不承诺按
+      // 客户名过滤(任务表无客户名列,客户归属由上方 API EQ 断言覆盖)。
+      const filteredCount = await searchBusinessList(adminPage, WORKBENCH, taskNo.slice(0, 12), 'bom_conversion_task_pcba');
       const bodyText = await adminPage.locator('main').innerText();
       expect(bodyText, 'filtered workbench list still shows the seeded task').toContain(taskNo.slice(0, 12));
       expect(filteredCount, 'filtered list returns at least the seeded task row').toBeGreaterThan(0);
@@ -138,6 +141,17 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
         filteredCount,
       );
       await test.info().attach('B13-01-filter-restore', {
+        body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+
+      // B13-01 补强:按任务号前缀重新搜索——行内状态 tag 显示 completed
+      await searchBusinessList(
+        adminPage, WORKBENCH, taskNo.slice(0, 12), 'bom_conversion_task_pcba',
+      );
+      const statusRow = adminPage.getByRole('row').filter({ hasText: taskNo.slice(0, 12) }).first();
+      await expect(statusRow).toBeVisible({ timeout: 20_000 });
+      await expect(statusRow, 'row shows completed status').toContainText(/已完成|completed/i);
+      await test.info().attach('B13-01-status-filter', {
         body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
       });
     } finally {
@@ -235,6 +249,96 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       });
     } finally {
       await context.close();
+    }
+  });
+
+  test('B13-02 review queue: task lists pending count, batch confirm flips line to confirmed/green, task leaves pending aggregate, consistent on reload', async ({ browser }) => {
+    const adminContext = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const adminPage = await adminContext.newPage();
+    const QUEUE = '/p/bom_review_queue';
+    // 队列表按 DSL 列序渲染;按表头文本定位"待确认行"列，读精确单元格而非整行文本
+    const yellowCountCell = async (row: ReturnType<typeof adminPage.getByRole>) => {
+      const headers = adminPage.locator('table').first().locator('thead th');
+      const headerTexts = await headers.allInnerTexts();
+      const yellowIdx = headerTexts.findIndex((t) => /待确认行|Review Lines/i.test(t));
+      expect(yellowIdx, 'queue table renders the pending review count column').toBeGreaterThanOrEqual(0);
+      return row.locator('td').nth(yellowIdx);
+    };
+    try {
+      // 后台事实:确认前任务 yellow=1，canonical 行 pending/yellow
+      const taskBefore = await readDynamicRecord(adminPage, 'bom_conversion_task_pcba', taskId);
+      expect(Number(taskBefore.bom_task_yellow_count ?? 0), 'seeded task starts with 1 pending review line').toBe(1);
+      const lineBefore = await readDynamicRecord(adminPage, 'req_requirement_line_pcba_bom', created!.canonicalLineId);
+      expect(String(lineBefore.bom_cl_review_status), 'canonical line starts pending').toBe('pending');
+
+      // 评审队列聚合:队列行列出任务及其待确认行计数
+      await adminPage.goto(QUEUE, { waitUntil: 'domcontentloaded' });
+      await waitForDynamicPageLoad(adminPage, 20_000);
+      const queueRow = await findRowInPaginatedList(adminPage, taskNo, 25_000);
+      await expect(
+        await yellowCountCell(queueRow),
+        'queue row carries the pending (yellow) count before confirm',
+      ).toHaveText(String(taskBefore.bom_task_yellow_count));
+      await test.info().attach('B13-02-queue-before', {
+        body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+
+      // 评审详情:行动作进入详情页（URL 含任务记录 id）
+      await clickRowActionByLocator(adminPage, queueRow, 'review', '评审');
+      await waitForDynamicPageLoad(adminPage, 20_000);
+      await expect(adminPage).toHaveURL(new RegExp(taskId));
+
+      // 批量确认行:命令执行返回 confirmedCount=1
+      const confirmResponsePromise = adminPage.waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/bom:confirm_pending_canonical_lines') &&
+          r.request().method() === 'POST',
+        { timeout: 30_000 },
+      );
+      await adminPage.getByRole('button', { name: /批量确认行|Confirm Lines/i }).click();
+      const confirmDialog = adminPage.getByTestId('confirm-dialog');
+      if (await confirmDialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await adminPage.getByTestId('confirm-ok').click();
+      }
+      const confirmBody = await (await confirmResponsePromise).json().catch(() => ({}));
+      expect(
+        confirmBody?.data?.data?.confirmedCount ?? confirmBody?.data?.confirmedCount ?? confirmBody?.confirmedCount,
+        `confirm command confirms exactly the pending line: ${JSON.stringify(confirmBody).slice(0, 400)}`,
+      ).toBe(1);
+
+      // 计数变化正确:任务 yellow 归零、green +1；行转 confirmed/green
+      const taskAfter = await readDynamicRecord(adminPage, 'bom_conversion_task_pcba', taskId);
+      expect(Number(taskAfter.bom_task_yellow_count ?? 0), 'task yellow count drops to zero').toBe(0);
+      expect(
+        Number(taskAfter.bom_task_green_count ?? 0),
+        'task green count absorbs the confirmed line',
+      ).toBe(Number(taskBefore.bom_task_green_count ?? 0) + 1);
+      const lineAfter = await readDynamicRecord(adminPage, 'req_requirement_line_pcba_bom', created!.canonicalLineId);
+      expect(String(lineAfter.bom_cl_review_status), 'confirmed line leaves the pending set').toBe('confirmed');
+      expect(String(lineAfter.bom_cl_review_tone), 'confirmed line tone flips to green').toBe('green');
+
+      // 退出待复核聚合:回到队列，待确认行单元格归零；刷新后一致
+      await adminPage.goto(QUEUE, { waitUntil: 'domcontentloaded' });
+      await waitForDynamicPageLoad(adminPage, 20_000);
+      const queueRowAfter = await findRowInPaginatedList(adminPage, taskNo, 25_000);
+      await expect(
+        await yellowCountCell(queueRowAfter),
+        'queue row no longer advertises a pending count',
+      ).toHaveText(String(taskAfter.bom_task_yellow_count));
+      await adminPage.reload({ waitUntil: 'domcontentloaded' });
+      await waitForDynamicPageLoad(adminPage, 20_000);
+      const queueRowReloaded = await findRowInPaginatedList(adminPage, taskNo, 25_000);
+      await expect(
+        await yellowCountCell(queueRowReloaded),
+        'reload keeps the task outside the pending aggregate',
+      ).toHaveText(String(taskAfter.bom_task_yellow_count));
+      await test.info().attach('B13-02-queue-after', {
+        body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+    } finally {
+      await adminContext.close();
     }
   });
 });

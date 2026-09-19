@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { utils as XLSXUtils, write } from 'xlsx';
 import { expect } from '../../fixtures';
-import { loginViaUI } from '../../helpers/auth-fixtures';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,
@@ -910,7 +910,7 @@ export function createCorrectedBomWorkbook(filePath: string): string {
   return filePath;
 }
 
-async function seedQuoteScaffold(
+export async function seedQuoteScaffold(
   page: Page,
   marker: string,
   lines: QuoteLineSeed[],
@@ -2028,7 +2028,7 @@ function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function miniZip(files: Array<{ name: string; content: string }>): Buffer {
+export function miniZip(files: Array<{ name: string; content: string }>): Buffer {
   const local: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
@@ -2182,14 +2182,24 @@ export async function seedProcessFeeGeometryQuote(page: Page): Promise<CreatedRo
 }
 
 /** Current fixed-count fixture: real uploaded Paste geometry, no seeded calculation result. */
-export async function seedFixedCountQuote(page: Page): Promise<CreatedRows> {
+export async function seedFixedCountQuote(
+  page: Page,
+  opts: { withDrillFile?: boolean } = {},
+): Promise<CreatedRows> {
   const created = await seedQuoteScaffold(page, 'FIXEDCOUNT', []);
   const rfq = created.rows.find((row) => row.model === 'crm_customer_request_pcba_rfq');
   expect(rfq, 'quote scaffold must retain its RFQ').toBeTruthy();
   const geometry = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nX020000Y000000D03*\nX040000Y000000D03*\nM02*\n';
+  // pads 口径需要包内有钻孔文件;纯 Paste 包用于验证"大声拒绝"契约,不要默认加。
+  const files: Array<{ name: string; content: string }> = [{ name: 'board.gtp', content: geometry }];
+  if (opts.withDrillFile) {
+    files.push({ name: 'board.gtl', content: geometry });
+    files.push({ name: 'board.drl', content: 'M48\nMETRIC\nT01C0.800\n%\nT01\nX000000Y000000\nX020000Y000000\nX040000Y000000\nM30\n' });
+    files.push({ name: 'board-via.drl', content: 'M48\nMETRIC\nT01C0.300\n%\nT01\nX000000Y000000\nX040000Y000000\nM30\n' });
+  }
   const upload = await page.request.post('/api/file/upload', { multipart: {
     file: { name: 'fixed-count.gbr.zip', mimeType: 'application/zip',
-      buffer: miniZip([{ name: 'board.gtp', content: geometry }]) },
+      buffer: miniZip(files) },
   } });
   const body = await upload.json();
   expect(upload.ok(), JSON.stringify(body)).toBe(true);

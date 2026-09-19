@@ -64,6 +64,17 @@ const quoteOpsCurrentSpecNames = [
   'quote-bom-price-yunhan-adoption',
   'quote-bom-price-ladder-moq',
   'quote-bom-price-deepseek-suggestions',
+  'quote-price-workbench-golden',
+  'quote-offline-price-library-golden',
+  'quote-cost-scenario-golden',
+  'quote-supplier-inquiry-golden',
+  'quote-customer-view-golden',
+  'quote-send-audit-golden',
+  'quote-pcba-requirement-golden',
+  'quote-domain-gap-fill-golden',
+  'bom-domain-gap-fill-golden',
+  'x-governance-gap-fill-golden',
+  'x03-team-scope-golden',
   'quote-process-fee-review',
   'quote-record-sharing-golden',
   'quote-gerber-runtime',
@@ -101,6 +112,12 @@ const quoteOpsCurrentSpecNames = [
   'quote-data-scope-isolation',
   'quote-doc-excel',
   'quote-form-dropdowns',
+  // Q06-03 real-stack price-channel sources contract (api-driven, no UI surface).
+  'quote-price-channel-sources-golden',
+  // B01-03 customer transfer-owner self-scope contract.
+  'quote-customer-transfer-owner-golden',
+  // B01-01 customer detail related-projects tab.
+  'quote-customer-projects-tab-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,

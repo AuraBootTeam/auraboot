@@ -18,6 +18,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 
 import { test, expect } from '../../fixtures';
+import { queryDynamicRecords } from './quote-e2e-helpers';
 
 const LIST = '/p/bom_material_master';
 
@@ -235,4 +236,18 @@ test.describe('BOM material library navigation @smoke', () => {
     await openMaterialLibraryFromSidebar(page);
     expect(new URL(page.url()).pathname).toContain(path.posix.basename(LIST));
   });
+});
+
+// B16-01/B16-02: 物料主库列表与详情可查询;原始库表可访问作为来源证据。
+test('B16 material master list/detail queryable and raw library traceable', async ({ page }) => {
+  const rows = await queryDynamicRecords(page, 'bom_material_master', [], { pageSize: 5 });
+  expect(rows.length, 'material master list returns rows').toBeGreaterThan(0);
+  const first = rows[0];
+  const detail = await page.request.get(`/api/dynamic/bom_material_master/${first.pid}`);
+  expect(detail.ok(), 'detail read succeeds').toBe(true);
+  const detailData = (await detail.json()).data ?? {};
+  expect(String(detailData.pid ?? '')).toBe(String(first.pid));
+
+  const rawInfo = await page.request.get('/api/dynamic/bom_material_raw/list?pageNum=1&pageSize=1');
+  expect(rawInfo.ok(), 'raw library list endpoint accessible').toBe(true);
 });
