@@ -35,4 +35,15 @@ public interface WebhookService {
      * Dispatches asynchronously; does not return delivery result.
      */
     void testWebhook(String pid, Map<String, Object> testPayload);
+
+    /**
+     * Delivery logs of a subscription, newest first, capped at 200 rows.
+     */
+    List<WebhookDeliveryLog> listDeliveryLogs(String subscriptionPid, int limit);
+
+    /**
+     * Replay one delivery of the current tenant. Returns false when the
+     * delivery is missing or not in a replayable state.
+     */
+    boolean replayDelivery(String deliveryPid);
 }

@@ -2,7 +2,6 @@ package com.auraboot.framework.webhook.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -10,9 +9,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
-import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.service.WebhookService;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +30,6 @@ public class WebhookController {
 
     private final WebhookService webhookService;
     private final FieldEncryptionService fieldEncryptionService;
-    private final WebhookDeliveryLogMapper deliveryLogMapper;
 
     @PostMapping
     public ApiResponse<WebhookSubscription> create(@Valid @RequestBody WebhookCreateRequest request) {
@@ -93,25 +89,16 @@ public class WebhookController {
     public ApiResponse<List<WebhookDeliveryLog>> deliveries(
             @PathVariable String pid,
             @RequestParam(defaultValue = "50") int limit) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-        List<WebhookDeliveryLog> logs = deliveryLogMapper.selectList(
-                new LambdaQueryWrapper<WebhookDeliveryLog>()
-                        .eq(WebhookDeliveryLog::getTenantId, tenantId)
-                        .eq(WebhookDeliveryLog::getSubscriptionPid, pid)
-                        .orderByDesc(WebhookDeliveryLog::getCreatedAt)
-                        .last("LIMIT " + Math.min(limit, 200)));
-        return ApiResponse.success(logs);
+        return ApiResponse.success(webhookService.listDeliveryLogs(pid, limit));
     }
 
     @PostMapping("/{pid}/deliveries/{deliveryPid}/replay")
     public ApiResponse<Void> replay(@PathVariable String pid, @PathVariable String deliveryPid) {
-        Long tenantId = MetaContext.getCurrentTenantId();
         WebhookSubscription subscription = webhookService.getByPid(pid);
         if (subscription == null) {
             return ApiResponse.error("Webhook not found: " + pid);
         }
-        int replayed = deliveryLogMapper.replay(tenantId, deliveryPid, MetaContext.getCurrentUserPid());
-        if (replayed != 1) {
+        if (!webhookService.replayDelivery(deliveryPid)) {
             return ApiResponse.error("Delivery is not replayable: " + deliveryPid);
         }
         return ApiResponse.success();
