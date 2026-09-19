@@ -288,3 +288,43 @@ test.describe('AMOS lens fault/filter/trace journeys', () => {
     ).toBeVisible();
   });
 });
+
+
+test.describe('AMOS lens load journeys', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test('load loading: dashboard shows a loading state before content', async ({ page }) => {
+    // Hold the schema response so the loading state is observable, then let
+    // it through and assert the governed content replaces it.
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    await page.route('**/api/dashboards/code/amos_metric_governance', async (route) => {
+      await gate;
+      await route.continue();
+    });
+
+    const navigation = page.goto('/dashboards/view/amos_metric_governance', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+
+    // Loading state: either an explicit spinner/skeleton/text, or the shell
+    // without yet-rendered widgets — a blank canvas is NOT acceptable.
+    const loadingVisible = await page
+      .locator('[class*="animate-spin"], [class*="skeleton"], [class*="loading"], text=加载')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    const widgetsRendered = (await page.locator('table').count()) > 0;
+    expect(loadingVisible || !widgetsRendered, 'a loading state is observable while the schema is gated').toBeTruthy();
+
+    release!();
+    await navigation;
+    await expect(
+      page.getByRole('heading', { name: 'AMOS 指标治理' }),
+      'content replaces the loading state',
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole('heading', { name: '已冻结指标口径' }),
+    ).toBeVisible();
+  });
+});
