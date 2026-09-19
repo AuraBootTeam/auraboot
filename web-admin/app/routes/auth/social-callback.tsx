@@ -100,7 +100,14 @@ export default function SocialCallback() {
       );
 
       if (!ResultHelper.isSuccess(result)) {
-        setError(result.message || 'Authentication failed');
+        // The platform folds the real reason into `context` while `message` stays
+        // the generic ResponseCode text (e.g. "Bad parameter") — surface both.
+        const ctx = (result as unknown as { context?: unknown }).context;
+        const detail = typeof ctx === 'string' && ctx.trim() ? ctx.trim()
+          : typeof ctx === 'object' && ctx && 'message' in (ctx as Record<string, unknown>)
+            ? String((ctx as Record<string, unknown>).message ?? '')
+            : '';
+        setError([result.message, detail].filter((m) => m && m !== 'Bad parameter').join('：') || 'Authentication failed');
         setState('error');
         return;
       }
