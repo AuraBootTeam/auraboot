@@ -107,6 +107,12 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         dynamicDataMapper.deleteByQuery(
                 "DELETE FROM ab_approval_policy WHERE policy_name = #{params.name}",
                 Map.of("name", "wildcard-test-policy-" + testRunId));
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_agent_run WHERE pid LIKE #{params.pattern}",
+                Map.of("pattern", "run-" + testRunId + "-%"));
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_agent_task WHERE pid LIKE #{params.pattern}",
+                Map.of("pattern", "task-004-" + testRunId));
     }
 
     // ========== Test 1: checkAndRequestApproval - tool requires approval ==========
@@ -215,6 +221,18 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
     void reject_withReason_updatesStatusToRejected() {
         Long tenantId = getTestTenant().getId();
 
+        // The reject flow fails the associated run through AgentRunTerminalStore, whose
+        // scoped join requires the ab_agent_run/ab_agent_task rows an executor creates
+        // before reaching the gate in production. Arrange them here — without them the
+        // terminal store fails closed with "Run/task relationship is unavailable".
+        dynamicDataMapper.insert("ab_agent_task", Map.of(
+                "pid", "task-004-" + testRunId, "tenant_id", tenantId,
+                "title", "Approval gate fixture", "task_status", "in_progress"));
+        dynamicDataMapper.insert("ab_agent_run", Map.of(
+                "pid", "run-" + testRunId + "-004", "tenant_id", tenantId,
+                "task_id", "task-004-" + testRunId, "agent_id", "aurabot",
+                "run_status", "pending"));
+
         String pid4 = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-" + testRunId + "-004",
@@ -232,6 +250,12 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
                 "Returned map must reflect the REJECTED status");
         assertFalse(approvalGateService.isApproved(pid4),
                 "isApproved() should return false for a REJECTED approval");
+        // The rejection must cascade to the paused run and its task.
+        List<Map<String, Object>> runRows = dynamicDataMapper.selectByQuery(
+                "SELECT run_status FROM ab_agent_run WHERE pid = #{params.pid}",
+                Map.of("pid", "run-" + testRunId + "-004"));
+        assertEquals("failed", runRows.get(0).get("run_status"),
+                "The rejected approval must fail its pending run");
     }
 
     // ========== Test 7: approve - non-existent approval returns null ==========
