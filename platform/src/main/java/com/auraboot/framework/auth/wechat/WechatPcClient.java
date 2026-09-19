@@ -52,9 +52,13 @@ public class WechatPcClient {
         String tokenUri = base + "/sns/oauth2/access_token?appid=" + enc(properties.getAppId())
                 + "&secret=" + enc(properties.getAppSecret())
                 + "&code=" + enc(code) + "&grant_type=authorization_code";
+        // WeChat answers with Content-Type: text/plain even for JSON bodies — the
+        // Spring converters can't bind that to a POJO, so fetch the raw string and
+        // parse explicitly.
         TokenResponse token;
         try {
-            token = restClient().get().uri(URI.create(tokenUri)).retrieve().body(TokenResponse.class);
+            String body = restClient().get().uri(URI.create(tokenUri)).retrieve().body(String.class);
+            token = json().readValue(body, TokenResponse.class);
         } catch (Exception e) {
             log.warn("WeChat access_token call failed: {}", e.getMessage());
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login exchange failed");
@@ -68,7 +72,8 @@ public class WechatPcClient {
                 + "&openid=" + enc(token.getOpenid()) + "&lang=zh_CN";
         UserInfoResponse user;
         try {
-            user = restClient().get().uri(URI.create(userUri)).retrieve().body(UserInfoResponse.class);
+            String userBody = restClient().get().uri(URI.create(userUri)).retrieve().body(String.class);
+            user = json().readValue(userBody, UserInfoResponse.class);
         } catch (Exception e) {
             log.warn("WeChat userinfo call failed (identity fields already obtained): {}", e.getMessage());
             user = null;
@@ -109,5 +114,11 @@ public class WechatPcClient {
         private String headimgurl;
         private String unionid;
         private Integer errcode;
+        }
+
+    private static com.fasterxml.jackson.databind.ObjectMapper json() {
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 }
+
