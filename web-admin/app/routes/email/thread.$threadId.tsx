@@ -4,9 +4,9 @@
  * Features:
  *  - Chronological message list with HTML body rendering
  *  - Tracking stats for outbound messages
- *  - Right sidebar: linked CRM records
+ *  - Right sidebar: linked business records
  *  - "Reply" button → navigate to compose with threadId pre-set
- *  - "Link to CRM" modal (basic)
+ *  - "Link to record" modal (basic)
  */
 
 import { useState, useEffect } from 'react';
@@ -25,7 +25,7 @@ import {
   getMessageLinks,
   type EmailMessage,
   type EmailThread,
-  type CrmLink,
+  type RecordLink,
 } from '~/shared/services/emailService';
 import TrackingStats from '~/ui/email/TrackingStats';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
@@ -153,12 +153,12 @@ function MessageCard({ message, defaultExpanded = false }: MessageCardProps) {
   );
 }
 
-interface CrmLinksPanelProps {
+interface RecordLinksPanelProps {
   messageId: number;
 }
 
-function CrmLinksPanel({ messageId }: CrmLinksPanelProps) {
-  const [links, setLinks] = useState<CrmLink[]>([]);
+function RecordLinksPanel({ messageId }: RecordLinksPanelProps) {
+  const [links, setLinks] = useState<RecordLink[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ function CrmLinksPanel({ messageId }: CrmLinksPanelProps) {
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
       ) : links.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500">No CRM records linked</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">No business records linked</p>
       ) : (
         <ul className="space-y-2">
           {links.map((link) => (
@@ -272,17 +272,17 @@ export default function EmailThreadPage() {
           {/* Sidebar */}
           <aside className="w-64 flex-shrink-0">
             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-              {/* Link to CRM button */}
+              {/* Link to a business record */}
               <button
                 className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                data-testid="link-crm-btn"
+                data-testid="link-record-btn"
               >
                 <LinkIcon className="h-4 w-4" />
-                Link to CRM
+                Link to record
               </button>
 
               {/* Linked records */}
-              {lastMessage && <CrmLinksPanel messageId={lastMessage.id} />}
+              {lastMessage && <RecordLinksPanel messageId={lastMessage.id} />}
             </div>
           </aside>
         </div>

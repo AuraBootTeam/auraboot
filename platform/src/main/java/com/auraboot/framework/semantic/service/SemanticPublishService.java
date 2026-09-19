@@ -117,10 +117,12 @@ public class SemanticPublishService {
     private void persistDimensions(SemanticModelDTO dto, String modelPid, Long tenantId) {
         // Simple strategy for v0.1: soft-delete any existing dims under this model, then re-insert.
         // OK because semantic.yml is the source of truth and re-imports are infrequent.
+        // MUST use deleteById — with @TableLogic on deleted_flag, updateById excludes the
+        // flag from its SET clause, so the logical delete silently never happens and the
+        // re-insert collides with uk_semantic_dimension_code (found in live execution).
         List<AbSemanticDimension> existing = dimensionMapper.listByModel(tenantId, modelPid);
         for (AbSemanticDimension d : existing) {
-            d.setDeletedFlag(Boolean.TRUE);
-            dimensionMapper.updateById(d);
+            dimensionMapper.deleteById(d.getId());
         }
         for (DimensionDTO d : dto.getDimensions()) {
             AbSemanticDimension row = new AbSemanticDimension();
@@ -141,11 +143,11 @@ public class SemanticPublishService {
     // -- metrics ---------------------------------------------------------------
 
     private void persistMetrics(SemanticModelDTO dto, String modelPid, Long tenantId, Long userId) {
-        // Soft-delete existing
+        // Soft-delete existing — deleteById, not updateById (see persistDimensions:
+        // @TableLogic fields are excluded from updateById's SET clause).
         List<AbSemanticMetric> existing = metricMapper.listActiveByModel(tenantId, modelPid);
         for (AbSemanticMetric m : existing) {
-            m.setDeletedFlag(Boolean.TRUE);
-            metricMapper.updateById(m);
+            metricMapper.deleteById(m.getId());
         }
         for (MetricDTO m : dto.getMetrics()) {
             AbSemanticMetric row = new AbSemanticMetric();

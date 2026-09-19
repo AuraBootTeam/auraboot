@@ -15,10 +15,7 @@ on:
       - 'scripts/db/cleanup-scheduler-residue.test.mjs'
       - 'scripts/seed-marketplace.sh'
       - 'scripts/docker-ga-e2e-bootstrap.sh'
-      - 'scripts/docker-ga-showcase-e2e.sh'
       - 'web-admin/package.json'
-      - 'web-admin/scripts/run-showcase-seed-sequence.mjs'
-      - 'web-admin/scripts/run-showcase-seed-sequence.test.mjs'
       - '.github/workflows/reset-init-contracts.yml'
   pull_request:
     branches: [main]
@@ -34,10 +31,7 @@ on:
       - 'scripts/db/cleanup-scheduler-residue.test.mjs'
       - 'scripts/seed-marketplace.sh'
       - 'scripts/docker-ga-e2e-bootstrap.sh'
-      - 'scripts/docker-ga-showcase-e2e.sh'
       - 'web-admin/package.json'
-      - 'web-admin/scripts/run-showcase-seed-sequence.mjs'
-      - 'web-admin/scripts/run-showcase-seed-sequence.test.mjs'
       - '.github/workflows/reset-init-contracts.yml'
 
 concurrency:

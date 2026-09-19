@@ -64,6 +64,12 @@ public class CommandAuthorizationPhase implements CommandPhase {
 
         Long userId = ctx.getUserId();
         if (userId == null) {
+            String externalPermission = com.auraboot.framework.application.tenant.MetaContext
+                    .getExternalCommandPermission();
+            if (externalPermission != null && requiredPermissions.contains(externalPermission)) {
+                applyVerdict(ctx, CommandAuthorizationVerdict.authorized(externalPermission));
+                return;
+            }
             log.warn("Skipping command permission check because userId is absent: command={}",
                     ctx.getCommandCode());
             applyVerdict(ctx, CommandAuthorizationVerdict

@@ -171,6 +171,11 @@ public class TestSeedController {
         ensureModelPermissionsExist(tenant, user);
         installE2eTestPlugin(tenant, user);
         repairDynamicTableIdentitySequences(tenant);
+        // Fixed analytics view fixture belongs to the test-profile initializer only.
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE VIEW public.v_e2et_analytics_order AS
+                SELECT pid, tenant_id, created_by, e2et_order_title AS label FROM public.mt_e2et_order
+                """);
 
         // 5.6 Ensure a second "colleague" user exists in the test tenant so that
         // mobile user-search (which excludes self) returns at least one result.
@@ -290,15 +295,17 @@ public class TestSeedController {
     private void installE2eTestPlugin(Tenant tenant, User user) {
         MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
         try {
+            boolean orgManagementImported = false;
+            boolean showcaseImported = false;
             try {
                 importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
-                importFirstAvailableTestPlugin(
+                orgManagementImported = importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "org-management",
                         "../plugins/org-management",
                         "../../auraboot/plugins/org-management"
                 );
-                importFirstAvailableTestPlugin(
+                showcaseImported = importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "showcase",
                         "../plugins/showcase",
@@ -308,35 +315,38 @@ public class TestSeedController {
                 // resolves to the Enterprise test-fixtures whose pages currently fail
                 // page validation; the OSS copy is the validation-clean canonical one
                 // (also what the docker mobile-e2e stack imports). Docker is unaffected:
-                // the "../../auraboot/..." path does not exist there, so it falls back to
-                // "../plugins/test-fixtures" (= the OSS mount).
+                // the "../../auraboot/plugins/test-fixtures" path does not exist there, so
+                // it falls back to "../plugins/test-fixtures" (= the OSS mount).
                 importFirstAvailableTestPlugin(
                         tenant.getId(),
                         "test-fixtures",
                         "../../auraboot/plugins/test-fixtures",
                         "../plugins/test-fixtures"
                 );
-                // Mobile E2E (Android/iOS) targets crm_account_common as the canonical "real" model
-                // (see EndpointRegistryTest in apps/android and EndpointRegistryTests.swift in
-                // apps/ios). The CRM plugin lives in the enterprise overlay; importTestPlugin
-                // safely skips when the directory is absent (OSS-only checkouts).
-                importTestPlugin("../plugins/crm", "crm", tenant.getId());
             } catch (Exception e) {
                 log.warn("test-fixtures plugin install threw exception for tenant {}: {}",
                         tenant.getId(), e.getMessage());
             }
 
             ensureTestAdminCanUseImportedResources(tenant, user);
-            ensureShowcasePagesImportedForMobileE2e(tenant);
-            ensureOrgDepartmentSeedDataForMobileE2e(tenant, user);
-            ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user);
-            seedCrmDemoRecords(tenant, user);
+            // Applications that do not ship the showcase/org-management plugins
+            // (e.g. the extracted standalone BPM/CRM apps) legitimately have no
+            // showcase pages or org_department table — the seed must not fail
+            // there; only enforce when the plugin was actually importable.
+            ensureShowcasePagesImportedForMobileE2e(tenant, showcaseImported);
+            ensureOrgDepartmentSeedDataForMobileE2e(tenant, user, orgManagementImported);
+            ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user, showcaseImported);
         } finally {
             MetaContext.clear();
         }
     }
 
-    private void ensureShowcasePagesImportedForMobileE2e(Tenant tenant) {
+    private void ensureShowcasePagesImportedForMobileE2e(Tenant tenant, boolean showcaseImported) {
+        if (!showcaseImported) {
+            log.warn("Showcase plugin not importable for tenant {} — skipping mobile showcase page assertion "
+                    + "(application does not ship the showcase plugin)", tenant.getId());
+            return;
+        }
         Integer pageCount = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM ab_page_schema
@@ -357,7 +367,12 @@ public class TestSeedController {
         }
     }
 
-    private void ensureOrgDepartmentSeedDataForMobileE2e(Tenant tenant, User user) {
+    private void ensureOrgDepartmentSeedDataForMobileE2e(Tenant tenant, User user, boolean orgManagementImported) {
+        if (!orgManagementImported) {
+            log.warn("Org-management plugin not importable for tenant {} — skipping mobile org_department seed "
+                    + "(application does not ship the org-management plugin)", tenant.getId());
+            return;
+        }
         Boolean tableExists = jdbcTemplate.queryForObject(
                 "SELECT to_regclass(?) IS NOT NULL",
                 Boolean.class,
@@ -395,8 +410,13 @@ public class TestSeedController {
         log.info("Inserted mobile showcase organization seed rows: tenantId={}, rows=1", tenant.getId());
     }
 
-    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user) {
-            Integer existing = jdbcTemplate.queryForObject("""
+    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user, boolean showcaseImported) {
+        if (!showcaseImported) {
+            log.warn("Showcase plugin not importable for tenant {} — skipping mobile showcase_all_fields seed "
+                    + "(application does not ship the showcase plugin)", tenant.getId());
+            return;
+        }
+        Integer existing = jdbcTemplate.queryForObject("""
                     SELECT COUNT(*)
                     FROM mt_showcase_all_fields
                     WHERE tenant_id = ?
@@ -638,77 +658,6 @@ public class TestSeedController {
                 "electronics/gateway/edge", "engineering", user.getPid(), user.getPid(),
                 "platform", address, aiSummary, user.getPid(),
                 attachmentJson, advancedSettings);
-    }
-
-    /**
-     * Seed a small set of demo {@code crm_account_common} records for mobile E2E smoke tests.
-     * <p>
-     * Mobile EndpointRegistry tests assert that {@code /api/dynamic/crm_account_common/list}
-     * and {@code /api/dynamic/crm_account_common/{id}} return at least one record. The CRM
-     * plugin import only registers the model definition; without explicit seeding the
-     * table is empty in the freshly-bootstrapped test tenant.
-     * <p>
-     * Idempotent: skips when the model is missing (CRM plugin not present in OSS-only
-     * checkouts) or when records already exist for the tenant. Goes through
-     * {@link DynamicDataService#create} so tenant context, soft-delete, audit and
-     * primary-key generation match production paths (no manual SQL INSERTs).
-     */
-    private void seedCrmDemoRecords(Tenant tenant, User user) {
-        String modelCode = "crm_account_common";
-
-        Integer modelExists = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM ab_meta_model
-                WHERE tenant_id = ?
-                  AND code = ?
-                  AND deleted_flag = FALSE
-                """, Integer.class, tenant.getId(), modelCode);
-        if (modelExists == null || modelExists == 0) {
-            log.info("Skipping crm_account_common demo seed; model not imported for tenant {}", tenant.getId());
-            return;
-        }
-
-        Integer existingRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM mt_crm_account_common WHERE tenant_id = ?",
-                Integer.class, tenant.getId());
-        if (existingRows != null && existingRows >= 3) {
-            log.info("Skipping crm_account_common demo seed; tenant {} already has {} record(s)",
-                    tenant.getId(), existingRows);
-            return;
-        }
-
-        // Minimum payload follows the current CRM account creation contract. Pool state is
-        // required and read-only in the page schema, so test fixtures must supply the same
-        // initial "owned" state that the production create command assigns.
-        List<Map<String, Object>> demoRecords = List.of(
-                buildCrmAccountPayload("E2E-ACC-001", "E2E Demo Account Alpha",
-                        "technology", "active", "A"),
-                buildCrmAccountPayload("E2E-ACC-002", "E2E Demo Account Beta",
-                        "manufacturing", "active", "B"),
-                buildCrmAccountPayload("E2E-ACC-003", "E2E Demo Account Gamma",
-                        "automotive", "active", "C")
-        );
-
-        int created = 0;
-        for (Map<String, Object> payload : demoRecords) {
-            Map<String, Object> result = dynamicDataService.create(modelCode, payload);
-            if (result != null) {
-                created++;
-            }
-        }
-        log.info("Seeded {} crm_account_common demo record(s) for E2E tenant {}", created, tenant.getId());
-    }
-
-    static Map<String, Object> buildCrmAccountPayload(String code, String name,
-            String industry, String status, String rating) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("crm_acc_code", code);
-        payload.put("crm_acc_name", name);
-        payload.put("crm_acc_industry", industry);
-        payload.put("crm_acc_status", status);
-        payload.put("crm_acc_rating", rating);
-        payload.put("crm_acc_pool_state", "owned");
-        return payload;
     }
 
     private void ensureTestAdminCanUseImportedResources(Tenant tenant, User user) {
@@ -953,17 +902,18 @@ public class TestSeedController {
         }
     }
 
-    private void importFirstAvailableTestPlugin(Long tenantId, String pluginName, String... relativePaths) {
+    private boolean importFirstAvailableTestPlugin(Long tenantId, String pluginName, String... relativePaths) {
         Path workingDir = Path.of(System.getProperty("user.dir"));
         for (String relativePath : relativePaths) {
             Path pluginDir = workingDir.resolve(relativePath).normalize();
             if (pluginDir.toFile().isDirectory()) {
                 importTestPlugin(relativePath, pluginName, tenantId);
-                return;
+                return true;
             }
         }
         log.warn("{} plugin directory not found in any candidate path {}, skipping plugin install",
                 pluginName, List.of(relativePaths));
+        return false;
     }
 
     /**

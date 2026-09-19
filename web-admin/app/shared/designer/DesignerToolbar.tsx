@@ -71,8 +71,14 @@ export function DesignerToolbar({
     >
       {/* Left: Title + Subtitle + Status + Dirty indicator */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {titleElement || <h1 className="text-xl font-semibold text-gray-900">{title}</h1>}
-        {subtitle && <span className="text-sm text-gray-600">{subtitle}</span>}
+        {titleElement || (
+          <h1 className="shrink-0 whitespace-nowrap text-xl font-semibold text-gray-900">{title}</h1>
+        )}
+        {subtitle && (
+          <span className="min-w-0 truncate text-sm text-gray-600" title={subtitle}>
+            {subtitle}
+          </span>
+        )}
         {status && <StatusBadge status={status} />}
         {isDirty && !isSaving && (
           <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">

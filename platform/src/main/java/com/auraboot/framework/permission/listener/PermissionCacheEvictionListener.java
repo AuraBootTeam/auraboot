@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.listener;
 
+import com.auraboot.framework.meta.cache.DataAccessCacheEpoch;
 import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
@@ -68,6 +69,10 @@ public class PermissionCacheEvictionListener {
         log.info("Role-Permission changed, evicting cache: roleId={}, operation={}",
             roleId, operation);
 
+        // Orphan every epoch-keyed data-access result (aggregateQuery etc.) so a
+        // revoked subject cannot keep reading pre-change results until TTL.
+        DataAccessCacheEpoch.bump();
+
         // Evict all users' permission cache for this role
         if (event.getTenantId() != null) {
             userPermissionService.evictRoleUsers(event.getTenantId(), roleId);
@@ -100,6 +105,8 @@ public class PermissionCacheEvictionListener {
         log.info("User-Role changed, evicting cache: userId={}, operation={}",
             userId, operation);
 
+        DataAccessCacheEpoch.bump();
+
         // Evict the user's permission cache
         if (event.getTenantId() != null) {
             userPermissionService.evictUserPermissions(event.getTenantId(), userId);
@@ -112,6 +119,7 @@ public class PermissionCacheEvictionListener {
     public void onPermissionDefinitionChanged(PermissionDefinitionChangedEvent event) {
         log.info("Permission definition changed, evicting tenant catalog: tenantId={}, code={}, operation={}",
                 event.getTenantId(), event.getPermissionCode(), event.getOperation());
+        DataAccessCacheEpoch.bump();
         userPermissionService.evictPermissionDefinitions(event.getTenantId());
     }
 

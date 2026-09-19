@@ -1,7 +1,7 @@
 package com.auraboot.framework.application.web.filter;
 
 import com.auraboot.framework.application.security.WhiteList;
-import com.auraboot.framework.application.security.ExternalApiKeyAuthenticationFilter;
+import com.auraboot.framework.application.security.ExternalMachineAuthenticationFilter;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
@@ -325,7 +325,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         if (Boolean.TRUE.equals(request.getAttribute(
-                ExternalApiKeyAuthenticationFilter.AUTHENTICATED_ATTRIBUTE))) {
+                ExternalMachineAuthenticationFilter.AUTHENTICATED_ATTRIBUTE))) {
             return true;
         }
         if ("options".equals(request.getMethod())) {
@@ -335,7 +335,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String requestPath = request.getServletPath();
         // Check both main whitelist and swagger whitelist
         // NOTE: for "/**" patterns, match by path-segment boundary:
-        //   "/api/crm/inbound/**" must match "/api/crm/inbound/x" but NOT "/api/crm/inbound-channels"
+        //   "/api/ext/*/public/**" must match product public routes but not authenticated siblings.
         java.util.function.Predicate<String> matchesPath = path -> {
             if (path.endsWith("/**")) {
                 String base = path.substring(0, path.length() - 3); // strip "/**"

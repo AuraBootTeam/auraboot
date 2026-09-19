@@ -1,6 +1,7 @@
 package com.auraboot.framework.semantic.compiler;
 
 import com.auraboot.framework.semantic.dto.DimensionDTO;
+import com.auraboot.framework.semantic.dto.EntityDTO;
 import com.auraboot.framework.semantic.dto.MeasureDTO;
 import com.auraboot.framework.semantic.dto.MetricDTO;
 import com.auraboot.framework.semantic.dto.SemanticModelDTO;
@@ -33,8 +34,10 @@ import java.util.regex.Pattern;
  *   <li>{@link MetricType#CUMULATIVE} → window function over primary_time grain</li>
  *   <li>{@link MetricType#DERIVED} → expression composed from other metric placeholders
  *       (substituted with their compiled expression — same level, no CTE in v0.1)</li>
- *   <li>{@link MetricType#CONVERSION} → simplified ratio with 30d/Nd window
- *       (TODO v0.2 full cohort self-join)</li>
+ *   <li>{@link MetricType#CONVERSION} → cohort self-join (v0.2): first base
+ *       event per (entity, dims) opens a cohort; the rate counts entities with
+ *       a conversion event inside the observation window; immature cohorts
+ *       (window not closed at as-of) stay out of the denominator</li>
  * </ul>
  *
  * <p>Hard rules (canonical AGENTS.md):
@@ -53,6 +56,18 @@ import java.util.regex.Pattern;
 public class MetricCompiler {
 
     private static final Pattern IDENT = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
+    /** Internal cohort subquery alias names (exact-match collision guard). */
+    private static final String COHORT_ENTITY_ALIAS = "amos_ce";
+    private static final String COHORT_ENTRY_TIME_ALIAS = "amos_et";
+    private static final String COHORT_CONV_ALIAS = "amos_cv";
+    /**
+     * Mirrors the SemanticYamlValidator / AccessPolicyCompiler denylist. Keep in
+     * sync — cohort filters are interpolated into subquery WHERE fragments, so
+     * {@code select}/{@code with} would open the cross-tenant exfiltration vector.
+     */
+    private static final Pattern COHORT_FILTER_DENY = Pattern.compile(
+            "(--|/\\*|\\*/|;|\\b(drop|delete|truncate|alter|create|grant|revoke|insert|update|union|exec|execute|select|with)\\b)",
+            Pattern.CASE_INSENSITIVE);
     private static final List<String> ALLOWED_AGG =
             List.of("SUM", "COUNT", "AVG", "MAX", "MIN", "COUNT_DISTINCT");
     private static final List<String> ALLOWED_GRAIN =
@@ -115,6 +130,20 @@ public class MetricCompiler {
             if (!already) {
                 resolvedDims.add(new ResolvedDim(pt, null));
             }
+        }
+
+        // Conversion metrics take the dedicated cohort path (v0.2): the flat
+        // single-FROM shape cannot express the entity self-join + window.
+        List<MetricDTO> conversionMetrics = selectedMetrics.stream()
+                .filter(m -> MetricType.CONVERSION.yamlValue().equalsIgnoreCase(m.getType()))
+                .toList();
+        if (!conversionMetrics.isEmpty()) {
+            if (selectedMetrics.size() != 1) {
+                throw new MetricCompileException("UNSUPPORTED_METRIC_COMBINATION",
+                        "conversion metrics use a cohort self-join and must be queried alone:"
+                                + " no mixing with other metric types, one conversion metric per request");
+            }
+            return compileCohortQuery(model, req, user, conversionMetrics.get(0), resolvedDims, measureMap, dimMap);
         }
 
         // SELECT columns + GROUP BY
@@ -254,7 +283,10 @@ public class MetricCompiler {
             case DERIVED:
                 return derivedExpr(m, measures, metrics, model, p, referencedColumns);
             case CONVERSION:
-                return conversionExpr(m, measures, p, referencedColumns);
+                throw new MetricCompileException("UNSUPPORTED_METRIC_COMBINATION",
+                        "conversion metric " + m.getCode()
+                                + " compiles via the cohort self-join path and cannot be referenced"
+                                + " from derived metrics; query it directly");
             default:
                 throw new MetricCompileException("UNSUPPORTED_METRIC_TYPE",
                         "metric type " + type + " not implemented in v0.1");
@@ -365,23 +397,280 @@ public class MetricCompiler {
     }
 
     /**
-     * Simplified v0.1 conversion: base_measure and conversion_measure are both
-     * counts/sums over the same table; the ratio is conversion / base. The
-     * declared {@code window} is recorded but enforcement is deferred to v0.2
-     * when we add cohort self-joins via {@code entity}.
+     * v0.2 cohort conversion: replaces the v0.1 simplified ratio, which ignored
+     * the declared window entirely.
      *
-     * <p>TODO v0.2: full cohort self-join — find first base event, then look
-     * within {@code window} for matching conversion event keyed by {@code entity}.
+     * <p>Fixed semantics (asserted in {@code MetricCompilerTest} and the
+     * semantic-layer integration tests):
+     * <ul>
+     *   <li>Cohort entry = first base event (MIN(primary_time)) per
+     *       (entity, dims); later base events (reopens) never multiply a cohort.</li>
+     *   <li>Conversion = EXISTS a conversion event for the same entity whose
+     *       event time falls in {@code [entry, entry + window)}; duplicate
+     *       conversion events count once.</li>
+     *   <li>Denominator = mature cohorts only: {@code entry + window <= as-of},
+     *       where as-of is the request time-range end or CURRENT_DATE. Immature
+     *       cohorts stay out of the denominator ("observing"), never counted
+     *       as failures. Conversions after the window are ignored.</li>
+     * </ul>
+     *
+     * <p>{@code base_filter} / {@code conversion_filter} are YAML-author SQL
+     * fragments selecting base vs conversion event rows (publish-time checked
+     * by SemanticYamlValidator, re-checked here — they are interpolated into a
+     * subquery WHERE, so {@code SELECT}/{@code WITH} etc. must never compile).
+     * Request filters, time range and RLS constrain the base (entry) side; the
+     * conversion side is constrained by tenant, entity equality, its filter,
+     * RLS and the window bounds.
      */
-    private String conversionExpr(MetricDTO m, Map<String, MeasureDTO> measures,
-                                   Map<String, Object> p, LinkedHashSet<String> referencedColumns) {
-        MeasureDTO base = requireMeasure((String) p.get("base_measure"), measures, m.getCode());
-        MeasureDTO conv = requireMeasure((String) p.get("conversion_measure"), measures, m.getCode());
-        String baseExpr = aggExpr(base, referencedColumns);
-        String convExpr = aggExpr(conv, referencedColumns);
-        // TODO v0.2 cohort: self-join on entity within window
-        return convExpr + "::numeric / NULLIF(" + baseExpr + ", 0)";
+    private CompiledQuery compileCohortQuery(SemanticModelDTO model,
+                                              SemanticQueryRequest req,
+                                              UserContext user,
+                                              MetricDTO metric,
+                                              List<ResolvedDim> resolvedDims,
+                                              Map<String, MeasureDTO> measureMap,
+                                              Map<String, DimensionDTO> dimMap) {
+        String table = model.getSemanticModel().getModelRef();
+        String modelCode = model.getSemanticModel().getCode();
+        DimensionDTO pt = findPrimaryTime(model);
+        if (pt == null) {
+            throw new MetricCompileException("NO_PRIMARY_TIME",
+                    "conversion metric requires a primary_time dimension for cohort entry");
+        }
+        String ptRef = pt.getFieldRef();
+        assertIdent(ptRef, "primary_time.field_ref");
+
+        LinkedHashSet<String> referencedColumns = new LinkedHashSet<>();
+        referencedColumns.add("tenant_id");
+        referencedColumns.add(ptRef);
+        for (ResolvedDim rd : resolvedDims) {
+            assertIdent(rd.dim.getFieldRef(), "dimension.field_ref");
+            referencedColumns.add(rd.dim.getFieldRef());
+        }
+        CohortSpec spec = cohortSpec(metric, model, measureMap, referencedColumns);
+        // Ambiguity guard: a model column EXACTLY named like an internal cohort
+        // alias would make the outer references ambiguous. Prefix matches are
+        // harmless — platform field codes routinely carry arbitrary product
+        // prefixes (e.g. amos_cf_*), so only the exact names are rejected.
+        for (String col : referencedColumns) {
+            if (COHORT_ENTITY_ALIAS.equals(col) || COHORT_ENTRY_TIME_ALIAS.equals(col)
+                    || COHORT_CONV_ALIAS.equals(col)) {
+                throw new MetricCompileException("UNKNOWN_DIMENSION",
+                        "column '" + col + "' collides with an internal cohort alias name");
+            }
+        }
+
+        // SELECT: dims (same shape as the flat path — the subquery carries raw
+        // columns under their field_ref names) + the cohort rate.
+        StringBuilder select = new StringBuilder("SELECT ");
+        List<String> groupByOrdinals = new ArrayList<>();
+        for (int i = 0; i < resolvedDims.size(); i++) {
+            ResolvedDim rd = resolvedDims.get(i);
+            String expr = rd.grain == null
+                    ? rd.dim.getFieldRef()
+                    : "DATE_TRUNC('" + rd.grain + "', " + rd.dim.getFieldRef() + ")";
+            String alias = '"' + modelCode + "." + rd.dim.getCode()
+                    + (rd.grain == null ? "" : "__" + rd.grain) + '"';
+            if (i > 0) select.append(", ");
+            select.append(expr).append(" AS ").append(alias);
+            groupByOrdinals.add(String.valueOf(i + 1));
+        }
+        if (!resolvedDims.isEmpty()) select.append(", ");
+        select.append("COUNT(DISTINCT CASE WHEN t.amos_cv THEN t.amos_ce END)::numeric")
+                .append(" / NULLIF(COUNT(DISTINCT t.amos_ce), 0)::numeric AS \"")
+                .append(modelCode).append('.').append(metric.getCode()).append('"');
+
+        List<String> requestedDimCodes = new ArrayList<>();
+        for (ResolvedDim rd : resolvedDims) requestedDimCodes.add(rd.dim.getCode());
+        for (SemanticQueryRequest.Filter f : nullToEmpty(req.getFilters())) requestedDimCodes.add(f.getField());
+
+        // Params must follow textual order: EXISTS → maturity → base side → tail.
+        List<Object> params = new ArrayList<>();
+        List<Object> tailParams = new ArrayList<>();
+
+        StringBuilder existsSql = new StringBuilder();
+        existsSql.append("EXISTS (\n             SELECT 1 FROM ").append(table)
+                .append(" cv\n             WHERE cv.tenant_id = ?");
+        params.add(user.tenantId());
+        existsSql.append("\n               AND cv.").append(spec.entityRef())
+                .append(" = b.").append(spec.entityRef())
+                .append("\n               AND (").append(spec.convFilter()).append(')')
+                .append("\n               AND cv.").append(ptRef).append(" >= b.amos_et")
+                .append("\n               AND cv.").append(ptRef)
+                .append(" < b.amos_et + (?::bigint * INTERVAL '1 second')");
+        params.add(spec.windowSeconds());
+        StringBuilder convRls = new StringBuilder();
+        params.addAll(accessPolicyCompiler.injectRls(convRls, model.getAccessPolicies(), requestedDimCodes, user));
+        existsSql.append(convRls).append("\n           )");
+
+        List<Object> matureParams = new ArrayList<>();
+        StringBuilder matureSql = new StringBuilder("WHERE b.amos_et + (?::bigint * INTERVAL '1 second') <= ");
+        matureParams.add(spec.windowSeconds());
+        List<LocalDate> range = List.of();
+        if (req.getTimeRange() != null) {
+            DimensionDTO tDim = dimMap.get(req.getTimeRange().getField());
+            if (tDim == null) {
+                throw new MetricCompileException("UNKNOWN_DIMENSION",
+                        "timeRange.field not in model dims: " + req.getTimeRange().getField());
+            }
+            range = TimeRangeResolver.resolve(req.getTimeRange());
+        }
+        if (!range.isEmpty()) {
+            matureSql.append("?::date");
+            matureParams.add(range.get(1));
+        } else {
+            matureSql.append("CURRENT_DATE");
+        }
+
+        List<Object> baseParams = new ArrayList<>();
+        StringBuilder baseWhere = new StringBuilder("tenant_id = ? AND (")
+                .append(spec.baseFilter()).append(')');
+        baseParams.add(user.tenantId());
+        if (!range.isEmpty()) {
+            baseWhere.append(" AND ").append(ptRef).append(" BETWEEN ?::date AND ?::date");
+            baseParams.add(range.get(0));
+            baseParams.add(range.get(1));
+        }
+        for (SemanticQueryRequest.Filter f : nullToEmpty(req.getFilters())) {
+            DimensionDTO d = dimMap.get(f.getField());
+            if (d == null) {
+                throw new MetricCompileException("UNKNOWN_DIMENSION",
+                        "filter.field not in model dims: " + f.getField());
+            }
+            assertIdent(d.getFieldRef(), "filter.field_ref");
+            appendFilter(baseWhere, d.getFieldRef(), f, baseParams);
+        }
+        StringBuilder baseRls = new StringBuilder();
+        baseParams.addAll(accessPolicyCompiler.injectRls(baseRls, model.getAccessPolicies(), requestedDimCodes, user));
+
+        StringBuilder sql = new StringBuilder();
+        sql.append(select)
+                .append("\nFROM (\n  SELECT b.").append(spec.entityRef()).append(" AS amos_ce")
+                .append(",\n         b.amos_et AS amos_et");
+        for (ResolvedDim rd : resolvedDims) {
+            sql.append(",\n         b.").append(rd.dim.getFieldRef());
+        }
+        sql.append(",\n         ").append(existsSql).append(" AS amos_cv");
+        sql.append("\n  FROM (\n    SELECT ").append(spec.entityRef())
+                .append(", MIN(").append(ptRef).append(") AS amos_et");
+        for (ResolvedDim rd : resolvedDims) {
+            sql.append(", ").append(rd.dim.getFieldRef());
+        }
+        sql.append("\n    FROM ").append(table)
+                .append("\n    WHERE ").append(baseWhere).append(baseRls)
+                .append("\n    GROUP BY ").append(spec.entityRef());
+        for (ResolvedDim rd : resolvedDims) {
+            sql.append(", ").append(rd.dim.getFieldRef());
+        }
+        sql.append("\n  ) b\n  ").append(matureSql).append("\n) t");
+
+        if (!groupByOrdinals.isEmpty()) {
+            sql.append("\nGROUP BY ").append(String.join(", ", groupByOrdinals));
+        }
+
+        // ORDER BY (by alias, validated against the selected metric + dims)
+        if (req.getOrder() != null && !req.getOrder().isEmpty()) {
+            sql.append("\nORDER BY ");
+            for (int i = 0; i < req.getOrder().size(); i++) {
+                SemanticQueryRequest.OrderBy o = req.getOrder().get(i);
+                String dir = "desc".equalsIgnoreCase(o.getDir()) ? "DESC" : "ASC";
+                String alias = '"' + modelCode + "." + o.getField() + '"';
+                boolean known = metric.getCode().equals(o.getField())
+                        || resolvedDims.stream().anyMatch(rd -> rd.dim.getCode().equals(o.getField()));
+                if (!known) {
+                    throw new MetricCompileException("UNKNOWN_METRIC",
+                            "order field not in select list: " + o.getField());
+                }
+                if (i > 0) sql.append(", ");
+                sql.append(alias).append(' ').append(dir);
+            }
+        }
+        if (req.getLimit() > 0) {
+            sql.append("\nLIMIT ?");
+            tailParams.add(req.getLimit());
+        }
+        if (req.getOffset() > 0) {
+            sql.append(" OFFSET ?");
+            tailParams.add(req.getOffset());
+        }
+
+        // Textual order: EXISTS → base (entry) side → maturity → tail. The base
+        // subquery appears in FROM, before the maturity WHERE, so its params must
+        // bind first — an order slip here silently mismatches every parameter.
+        params.addAll(baseParams);
+        params.addAll(matureParams);
+        params.addAll(tailParams);
+        String finalSql = sql.toString();
+        return new CompiledQuery(finalSql, params, referencedColumns, fingerprint(finalSql));
     }
+
+    /** Resolves and validates the conversion metric's cohort parameters. */
+    private CohortSpec cohortSpec(MetricDTO m, SemanticModelDTO model,
+                                   Map<String, MeasureDTO> measures,
+                                   LinkedHashSet<String> referencedColumns) {
+        Map<String, Object> p = m.getTypeParams() == null ? Map.of() : m.getTypeParams();
+        // The measures stay part of the declared contract (what counts as
+        // base/conversion); the SQL selects event rows via the filters below.
+        requireMeasure((String) p.get("base_measure"), measures, m.getCode());
+        requireMeasure((String) p.get("conversion_measure"), measures, m.getCode());
+        String entityName = String.valueOf(p.get("entity"));
+        String entityRef = nullToEmpty(model.getEntities()).stream()
+                .filter(e -> entityName.equals(e.getName()))
+                .map(EntityDTO::getFieldRef)
+                .findFirst()
+                .orElseThrow(() -> new MetricCompileException("UNKNOWN_DIMENSION",
+                        "metric " + m.getCode() + " conversion.entity '" + entityName
+                                + "' not declared in entities[]"));
+        if (entityRef == null || !IDENT.matcher(entityRef).matches()) {
+            throw new MetricCompileException("UNKNOWN_DIMENSION",
+                    "metric " + m.getCode() + " conversion entity field_ref invalid: " + entityRef);
+        }
+        referencedColumns.add(entityRef);
+        String baseFilter = requireCohortFilter(p, "base_filter", m.getCode());
+        String convFilter = requireCohortFilter(p, "conversion_filter", m.getCode());
+        long seconds = windowSeconds(String.valueOf(p.get("window")), m.getCode());
+        return new CohortSpec(m.getCode(), entityRef, baseFilter, convFilter, seconds);
+    }
+
+    private String requireCohortFilter(Map<String, Object> p, String key, String metricCode) {
+        Object v = p.get(key);
+        if (v == null || String.valueOf(v).isBlank()) {
+            throw new MetricCompileException("COHORT_FILTER_MISSING",
+                    "metric " + metricCode + " type_params." + key
+                            + " is required: the cohort self-join selects event rows via explicit filters");
+        }
+        String f = String.valueOf(v);
+        if (COHORT_FILTER_DENY.matcher(f).find()) {
+            throw new MetricCompileException("SQL_INJECTION_DETECTED",
+                    "metric " + metricCode + " type_params." + key + " contains denylisted token");
+        }
+        return f;
+    }
+
+    /**
+     * {@code window: \d+[dhwmy]} → seconds. {@code m} is a fixed 30-day month
+     * and {@code y} a fixed 365-day year (documented approximation; AMOS
+     * observation windows are declared in days).
+     */
+    private long windowSeconds(String raw, String metricCode) {
+        Matcher m = Pattern.compile("^(\\d+)([dhwmy])$").matcher(raw == null ? "" : raw);
+        if (!m.matches()) {
+            throw new MetricCompileException("TIMERANGE_INVALID",
+                    "metric " + metricCode + " conversion.window must match \\d+[dhwmy] (was: " + raw + ")");
+        }
+        long n = Long.parseLong(m.group(1));
+        return switch (m.group(2)) {
+            case "h" -> n * 3600L;
+            case "d" -> n * 86400L;
+            case "w" -> n * 604800L;
+            case "m" -> n * 2592000L;
+            case "y" -> n * 31536000L;
+            default -> throw new MetricCompileException("TIMERANGE_INVALID",
+                    "metric " + metricCode + " unknown window unit: " + m.group(2));
+        };
+    }
+
+    private record CohortSpec(String code, String entityRef, String baseFilter,
+                              String convFilter, long windowSeconds) {}
 
     // ---- helpers ------------------------------------------------------------
 

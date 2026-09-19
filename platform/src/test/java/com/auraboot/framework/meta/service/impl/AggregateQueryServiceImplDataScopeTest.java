@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.dto.MetricConfig;
 import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -49,12 +50,20 @@ class AggregateQueryServiceImplDataScopeTest {
     @Mock private MetaModelService metaModelService;
     @Mock private DataPermissionEngine dataPermissionEngine;
     @Mock private DataDomainService dataDomainService;
+    @Mock private NamedQueryFieldProtection fieldProtection;
 
     @InjectMocks
     private AggregateQueryServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(fieldProtection.rewrite(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
+        org.mockito.Mockito.lenient().when(fieldProtection.prepare(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("list")))
+                .thenReturn(new NamedQueryFieldProtection.Plan(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode(), List.of(), Map.of()));
+        org.mockito.Mockito.lenient().when(fieldProtection.apply(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         MetaContext.setMemberId(MEMBER_ID);
     }
@@ -133,6 +142,39 @@ class AggregateQueryServiceImplDataScopeTest {
         verify(dataPermissionEngine).buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID);
     }
 
+    @Test
+    @DisplayName("semantic-routed chart query fails closed when the semantic stack is absent")
+    void semanticRouted_withoutAdapter_failsClosed() {
+        AggregateQueryRequest request = countRequest();
+        request.setSemanticModelCode("crm");
+        // @InjectMocks leaves the optional semanticAggregateAdapter unset — the
+        // request must be rejected, never silently downgraded to a raw aggregate.
+        assertThatThrownBy(() -> service.execute(request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("SEMANTIC_ADAPTER_UNAVAILABLE");
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("named query with rowScope=require_row_filter fails closed without an evaluated row filter")
+    void namedQueryAggregate_requireRowFilterWithoutScope_failsClosed() {
+        NamedQuery query = namedQuery();
+        query.setResourceCode(null);
+        query.setActionCode(null);
+        NamedQueryPolicy policy = new NamedQueryPolicy();
+        policy.setRowScope(NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER);
+        query.setPolicy(policy);
+        when(namedQueryMapper.findByCode("phase_one_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.selectList(any())).thenReturn(List.of(
+                new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")
+        ));
+
+        assertThatThrownBy(() -> service.execute(namedQueryCountRequest()))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("NAMED_QUERY_ROW_SCOPE_REQUIRED");
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
+    }
+
     private AggregateQueryRequest countRequest() {
         MetricConfig metric = new MetricConfig();
         metric.setField("pid");
@@ -163,5 +205,22 @@ class AggregateQueryServiceImplDataScopeTest {
         query.setResourceCode(MODEL_CODE);
         query.setActionCode("read");
         return query;
+    }
+    @Test
+    void semanticSourceDoesNotRequireAnUnrelatedDynamicModel() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("revenue");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.execute(request))
+                .hasMessageContaining("Semantic query service is unavailable");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
+    }
+
+    @Test
+    void invalidSemanticSourceCannotReachAnExecutor() {
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setSemanticModelCode("invalid;source");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.execute(request))
+                .hasMessage("Invalid semantic model code format");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
     }
 }

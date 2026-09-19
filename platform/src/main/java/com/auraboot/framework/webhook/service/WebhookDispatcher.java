@@ -1,5 +1,6 @@
 package com.auraboot.framework.webhook.service;
 
+import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import java.util.Map;
 
 /**
@@ -23,4 +24,7 @@ public interface WebhookDispatcher {
      * caller.
      */
     WebhookDispatchResult dispatchTracked(String eventType, Map<String, Object> payload, Long tenantId);
+
+    /** Execute one delivery that has already been durably claimed by a worker. */
+    void processClaimed(WebhookDeliveryLog delivery);
 }

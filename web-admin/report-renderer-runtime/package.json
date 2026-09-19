@@ -1,0 +1,14 @@
+{
+  "name": "@auraboot/report-renderer-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "dependencies": {
+    "echarts": "6.1.0",
+    "jsbarcode": "3.12.3",
+    "playwright": "1.60.0"
+  }
+}

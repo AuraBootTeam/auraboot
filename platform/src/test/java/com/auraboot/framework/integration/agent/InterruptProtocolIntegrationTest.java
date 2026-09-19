@@ -37,6 +37,7 @@ class InterruptProtocolIntegrationTest extends BaseIntegrationTest {
     @Autowired private InterruptDispatcher dispatcher;
     @Autowired private InterruptController controller;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.auraboot.framework.meta.mapper.DynamicDataMapper data;
 
     private Long tenantId;
     private String sessionId;
@@ -50,17 +51,17 @@ class InterruptProtocolIntegrationTest extends BaseIntegrationTest {
 
     @AfterEach
     void cleanup() {
-        jdbc.update("DELETE FROM ab_agent_interrupt_log WHERE tenant_id = ?", tenantId);
-        jdbc.update("DELETE FROM ab_agent_run WHERE tenant_id = ?", tenantId);
+        MetaContext.clear();
     }
 
     /** Seed a running agent run for this session's "active" state. */
     private String seedRunningRun() {
         String pid = UniqueIdGenerator.generate();
-        jdbc.update("INSERT INTO ab_agent_run (pid, tenant_id, task_id, agent_id, run_status, " +
-                        " started_at, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, 'aurabot', 'running', NOW(), NOW(), NOW())",
-                pid, tenantId, UniqueIdGenerator.generate());
+        String taskPid = UniqueIdGenerator.generate();
+        assertThat(data.insert("ab_agent_task", Map.of("pid", taskPid, "tenant_id", tenantId,
+                "title", "Interrupt fixture", "task_status", "in_progress"))).isEqualTo(1);
+        assertThat(data.insert("ab_agent_run", Map.of("pid", pid, "tenant_id", tenantId,
+                "task_id", taskPid, "agent_id", "aurabot", "run_status", "running"))).isEqualTo(1);
         return pid;
     }
 

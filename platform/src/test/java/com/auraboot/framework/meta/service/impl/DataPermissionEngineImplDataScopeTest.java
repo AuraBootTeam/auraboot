@@ -273,4 +273,32 @@ class DataPermissionEngineImplDataScopeTest {
         assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", noneWithShare))
                 .isEqualTo("pid IN ('rec-allowed')");
     }
+    @Test
+    void historicalReadRequiresMemberEvenForOwnedRecord() {
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, null,
+                Map.of("created_by", USER_ID))).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"custom", "department", "department_tree", "project"})
+    void historicalReadDoesNotUseLegacySelfApproximations(String scope) {
+        var policy = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        policy.setPolicyType("row");
+        policy.setScopeType(scope);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of(policy));
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, MEMBER_ID,
+                Map.of("created_by", USER_ID))).isFalse();
+    }
+
+    @Test
+    void historicalReadRequiresActualScopeVerdict() {
+        var record = Map.<String, Object>of("created_by", USER_ID);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
+        when(dataScopeEvaluator.getHistoricalCondition(MEMBER_ID, MODEL_CODE, "read")).thenReturn(DataScopeCondition.all());
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, MEMBER_ID, record)).isFalse();
+        when(dataScopeEvaluator.evaluateHistorical(MEMBER_ID, MODEL_CODE, "read", record)).thenReturn(
+                new EvaluationStep("DataScope", EvaluationVerdict.NOT_APPLICABLE, "Scope: all"));
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID, MODEL_CODE, USER_ID, MEMBER_ID, record)).isTrue();
+    }
+
 }

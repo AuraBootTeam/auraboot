@@ -35,6 +35,9 @@ import { SubTable } from '~/framework/meta/components/SubTable';
 import { ContributedSubTableViewer as SubTableViewer } from '~/framework/extensions/contributed-components';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
+import { useFormFill } from '~/framework/meta/rendering/useFormFill';
+import { collectFormFillFields } from '~/framework/meta/rendering/formFill';
+import { FormFillReceipt } from './form/FormFillReceipt';
 import { DslFormFillProvider } from '~/framework/meta/rendering/DslFormFillContext';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
@@ -1416,18 +1419,18 @@ export function FormPageContent(props: PageContentProps) {
     [setError],
   );
 
-  // B-003 (DR-20260715-B-003): the field setter handed to top-level blocks via
-  // DslFormFillProvider. An ai-fill-banner (or any block that calls useDslFormFill)
-  // writes AI-extracted values straight into this page's formData so the form updates.
-  // Defined before early returns to keep hook order stable. setFormData identity is
-  // stable, so [] deps is correct.
-  const applyAiFilledField = useCallback((field: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
-
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
+  const aiFields = useMemo(() => collectFormFillFields(schema, modelFields, fieldPermissions,
+    (value) => getLocalizedText(value as any, locale, t) || t('ai.fill.field')),
+    [schema, modelFields, fieldPermissions, locale, t]);
+  const aiFill = useFormFill(
+    `${schema?.id ?? schema?.pageKey ?? tableName}:${routeRecordPid ?? 'new'}`,
+    schema?.modelCode || tableName, aiFields, formData, setFormData,
+    mainRecordLoaded && fieldMetaLoaded,
+  );
+
   useEffect(() => {
     fieldDataTypesRef.current = collectFormFieldDataTypes(schema?.blocks, modelFields);
   }, [schema?.blocks, modelFields]);
@@ -2482,7 +2485,7 @@ export function FormPageContent(props: PageContentProps) {
   return (
     <DataSourceProvider manager={dataSourceManager}>
       {/* B-003: give top-level blocks (ai-fill-banner) a working applyFields wired to formData. */}
-      <DslFormFillProvider setFieldValue={applyAiFilledField} lockedFields={[]}>
+      <DslFormFillProvider target={aiFill.target}>
         {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
@@ -2580,6 +2583,13 @@ export function FormPageContent(props: PageContentProps) {
                 <>
                   {/* B-003: top-level non-whitelist blocks (ai-fill-banner etc.) via the kernel
                     BlockRenderer, rendered above the form so operators see them first. */}
+                  {runtime && !miscFormBlocks.some((block: any) => block.blockType === 'ai-fill-banner')
+                    && aiFields.some((field) => !field.locked) && (
+                    <div className="mb-4">
+                      <BlockRenderer block={{ id: 'form-ai-fill', blockType: 'ai-fill-banner' } as any}
+                        runtime={runtime} areaId="form-ai-fill" />
+                    </div>
+                  )}
                   {runtime &&
                     miscFormBlocks.map((block: any, idx: number) => (
                       <div
@@ -2590,6 +2600,7 @@ export function FormPageContent(props: PageContentProps) {
                         <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
                       </div>
                     ))}
+                  {aiFill.receipt && <FormFillReceipt receipt={aiFill.receipt} fields={aiFields} t={t} onUndo={aiFill.undo} />}
                   {customBlocks.length > 0 &&
                     customBlocks.map((block: any) => {
                       // Honour DSL visibility condition (matches form-section behavior below).

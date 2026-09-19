@@ -47,7 +47,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
         classes = TestApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE
+        // FileService and the controller graph depend on servlet upload configuration.
+        // MOCK loads the production servlet auto-configuration without binding a real port;
+        // NONE would omit MultipartProperties and make this wiring gate fail by construction.
+        webEnvironment = SpringBootTest.WebEnvironment.MOCK
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SpringContextLoadsSmokeTest {

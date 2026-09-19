@@ -31,16 +31,7 @@ class WorkbenchStatsServiceIntegrationTest extends BaseIntegrationTest {
 
         Map<String, StatItem> stats = result.getStats();
 
-        // All 6 default keys should be present
-        assertThat(stats).containsKeys(
-                "inbox_pending",
-                "inbox_urgent",
-                "crm_opportunity_amount",
-                "crm_account_active",
-                "bpm_running",
-                "bpm_completed_week"
-        );
-        assertThat(stats).hasSize(6);
+        assertThat(stats).containsOnlyKeys("inbox_pending", "inbox_urgent");
 
         // Verify inbox_pending has correct format and label
         StatItem inboxPending = stats.get("inbox_pending");
@@ -55,18 +46,6 @@ class WorkbenchStatsServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(inboxUrgent.getFormat()).isEqualTo("number");
         assertThat(inboxUrgent.getLabel()).isEqualTo("workbench.stats.inbox_urgent");
 
-        // Verify CRM opportunity amount uses currency format
-        StatItem crmOpp = stats.get("crm_opportunity_amount");
-        assertThat(crmOpp).isNotNull();
-        assertThat(crmOpp.getLabel()).isEqualTo("workbench.stats.crm_opportunity_amount");
-        // Format may be "currency" if CRM plugin is installed, or "number" if it fell back
-        assertThat(crmOpp.getFormat()).isIn("currency", "number");
-
-        // Verify BPM stats
-        StatItem bpmRunning = stats.get("bpm_running");
-        assertThat(bpmRunning).isNotNull();
-        assertThat(bpmRunning.getFormat()).isEqualTo("number");
-        assertThat(bpmRunning.getLabel()).isEqualTo("workbench.stats.bpm_running");
     }
 
     @Test
@@ -75,7 +54,7 @@ class WorkbenchStatsServiceIntegrationTest extends BaseIntegrationTest {
         WorkbenchStatsDTO result = workbenchStatsService.getStats(List.of());
 
         assertThat(result).isNotNull();
-        assertThat(result.getStats()).hasSize(6);
+        assertThat(result.getStats()).hasSize(2);
     }
 
     @Test
@@ -117,14 +96,14 @@ class WorkbenchStatsServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("getStats with single key returns correct stat")
     void getStats_singleKey_returnsCorrectStat() {
-        WorkbenchStatsDTO result = workbenchStatsService.getStats(List.of("bpm_completed_week"));
+        WorkbenchStatsDTO result = workbenchStatsService.getStats(List.of("inbox_pending"));
 
         assertThat(result).isNotNull();
         assertThat(result.getStats()).hasSize(1);
 
-        StatItem item = result.getStats().get("bpm_completed_week");
+        StatItem item = result.getStats().get("inbox_pending");
         assertThat(item).isNotNull();
-        assertThat(item.getLabel()).isEqualTo("workbench.stats.bpm_completed_week");
+        assertThat(item.getLabel()).isEqualTo("workbench.stats.inbox_pending");
         assertThat(item.getFormat()).isEqualTo("number");
         assertThat(item.getValue()).isNotNull();
     }

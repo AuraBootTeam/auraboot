@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
@@ -90,6 +91,32 @@ class CommandAuthorizationPhaseTest {
         CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), null);
 
         phase.execute(ctx);
+
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
+        assertThat(ctx.getAuthorizationVerdict().reason())
+                .isEqualTo(CommandAuthorizationVerdict.REASON_NO_USER_CONTEXT);
+        verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
+    void executeAuthorizesExactServerPublishedMachinePermission() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService, recordShareService, dynamicDataServiceProvider);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("tasset.asset.manage"), null);
+
+        MetaContext.runWithExternalCommandPermission("tasset.asset.manage", () -> phase.execute(ctx));
+
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isTrue();
+        assertThat(ctx.getAuthorizationVerdict().permissionCode()).isEqualTo("tasset.asset.manage");
+        verifyNoInteractions(userPermissionService);
+        assertThat(MetaContext.getExternalCommandPermission()).isNull();
+    }
+
+    @Test
+    void executeDoesNotGrantMachinePermissionWhenDeclarationDoesNotMatch() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService, recordShareService, dynamicDataServiceProvider);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("tasset.asset.admin"), null);
+
+        MetaContext.runWithExternalCommandPermission("tasset.asset.manage", () -> phase.execute(ctx));
 
         assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
         assertThat(ctx.getAuthorizationVerdict().reason())

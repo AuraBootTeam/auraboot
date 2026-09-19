@@ -63,7 +63,7 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
                 String.class, baselineRoleId);
         assertThat(boundCodes).as("tenant_member must carry the L1 render-support read codes")
                 .contains("meta.model.read", "page.page.read", "dashboard.saved_view.read",
-                        "bpm.process.read", "notification.view");
+                        "notification.view");
     }
 
     @Test

@@ -44,8 +44,30 @@ public class DataScopeEvaluator {
      */
     @SuppressWarnings("unchecked")
     public EvaluationStep evaluate(Long memberId, String resource, String action, Object record) {
-        DataScopeCondition condition = dataScopeService.resolveScope(memberId, resource, action);
+        return evaluateCondition(dataScopeService.resolveScope(memberId, resource, action),
+                memberId, resource, action, record, false);
+    }
 
+    public DataScopeCondition getHistoricalCondition(Long memberId, String resource, String action) {
+        return dataScopeService.resolveHistoricalScope(memberId, resource, action);
+    }
+
+    public EvaluationStep evaluateHistorical(Long memberId, String resource, String action, Object record) {
+        return evaluateCondition(getHistoricalCondition(memberId, resource, action),
+                memberId, resource, action, record, true);
+    }
+
+    /**
+     * @param strict historical/audit evaluation: the declared shared-root surface is intentionally
+     *               NOT applied — it reflects current grants and must not alter past verdicts.
+     */
+    @SuppressWarnings("unchecked")
+    private EvaluationStep evaluateCondition(DataScopeCondition condition, Long memberId,
+                                             String resource, String action,
+                                             Object record, boolean strict) {
+        if (condition == null) {
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Scope unavailable");
+        }
         String scopeType = condition.scopeType();
 
         if ("not_configured".equals(scopeType)) {
@@ -63,9 +85,9 @@ public class DataScopeEvaluator {
             if (!(record instanceof Map)) {
                 return denied;
             }
-            return allowWithinSharedRootSurfaceOr(
-                    enrichWithSharedRootSurface(condition, memberId, resource, action),
-                    (Map<String, Object>) record, denied);
+            DataScopeCondition withSurface = strict ? condition
+                    : enrichWithSharedRootSurface(condition, memberId, resource, action);
+            return allowWithinSharedRootSurfaceOr(withSurface, (Map<String, Object>) record, denied);
         }
 
         // For record-level checks, we need the record as a Map
@@ -77,14 +99,15 @@ public class DataScopeEvaluator {
 
         Map<String, Object> recordMap = (Map<String, Object>) record;
 
-        condition = enrichWithSharedRootSurface(condition, memberId, resource, action);
+        condition = strict ? condition
+                : enrichWithSharedRootSurface(condition, memberId, resource, action);
 
         if ("self".equals(scopeType)) {
             return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateSelf(condition, recordMap));
         }
 
         if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType)) {
-            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap));
+            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap, strict));
         }
 
         return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE,
@@ -209,7 +232,7 @@ public class DataScopeEvaluator {
         return String.valueOf(recordOwner).equals(String.valueOf(ownerValue));
     }
 
-    private EvaluationStep evaluateDept(DataScopeCondition condition, Map<String, Object> record) {
+    private EvaluationStep evaluateDept(DataScopeCondition condition, Map<String, Object> record, boolean strict) {
         if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
             return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                     "Scope: dept — no department PIDs resolved");
@@ -221,7 +244,10 @@ public class DataScopeEvaluator {
                 return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                         "Record has no " + condition.deptOwnerField() + " department-owner field");
             }
-            if (dataScopeService.isOwnerInDepartments(String.valueOf(ownerValue), condition.deptPids())) {
+            boolean inDepartment = "created_by".equals(condition.deptOwnerField()) && ownerValue instanceof Number creator
+                    ? dataScopeService.isCreatorInDepartments(creator.longValue(), condition.deptPids())
+                    : dataScopeService.isOwnerInDepartments(String.valueOf(ownerValue), condition.deptPids());
+            if (inDepartment) {
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
                         "Scope: " + condition.scopeType() + " — owner belongs to accessible department");
             }
@@ -231,7 +257,9 @@ public class DataScopeEvaluator {
 
         Object deptValue = record.get(condition.deptField());
         if (deptValue == null) {
-            // If record has no dept field, fall back to owner check
+            if (strict) {
+                return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Historical department field unavailable");
+            }
             return evaluateSelf(condition, record);
         }
 

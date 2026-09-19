@@ -41,6 +41,7 @@ import {
   SmartParetoChart,
   SmartSPCChart,
   SmartGanttChart,
+  SmartWaterfallChart,
   SmartCalendar,
 } from '../charts';
 
@@ -288,6 +289,13 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
         return (
           <SmartGanttChart
             {...(commonProps as React.ComponentProps<typeof SmartGanttChart>)}
+            className="h-full"
+          />
+        );
+      case 'smart-waterfall-chart':
+        return (
+          <SmartWaterfallChart
+            {...(commonProps as React.ComponentProps<typeof SmartWaterfallChart>)}
             className="h-full"
           />
         );

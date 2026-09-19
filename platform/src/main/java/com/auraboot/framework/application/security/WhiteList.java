@@ -7,6 +7,7 @@ public class WhiteList {
             "/api/auth/login",
             "/api/auth/login/sms",
             "/api/auth/login/email-code",
+            "/api/auth/login/wechat-mini",
             "/api/auth/login/channels",
             "/api/auth/login/channel-options",
             "/api/auth/access-policy",
@@ -15,6 +16,10 @@ public class WhiteList {
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/auth/verify-code/**",
+
+            // OAuth2 client_credentials entrypoint. Client authentication, installation status,
+            // scope subset and secret verification are enforced by OpenPlatformTokenService.
+            "/oauth2/token",
 
             "/api/bootstrap/**",
 
@@ -52,13 +57,6 @@ public class WhiteList {
             // Automation webhook receiver (no auth — controller enforces per-automation
             // signature/token validation and fails closed when none is configured)
             "/api/automations/webhooks/**",
-
-            // CRM public inbound endpoint (no auth — adapters perform their own verification)
-            "/api/crm/inbound/**",
-            "/api/crm/forms/**",
-
-            // CRM Calendar OAuth callback (no auth — state token carries identity)
-            "/api/crm/calendar/callback/**",
 
             // Public shared views (GAP-121)
             "/api/views/shared/**",

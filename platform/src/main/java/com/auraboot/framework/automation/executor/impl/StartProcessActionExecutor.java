@@ -2,10 +2,9 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
-import com.auraboot.framework.bpm.service.BpmIntegrationService;
-import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
-import com.auraboot.smart.framework.engine.storage.StorageMode;
-import com.auraboot.smart.framework.engine.storage.StorageModeHolder;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,15 +13,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Executor for the START_PROCESS action type — starts a BPM process instance.
+ * Executor for the START_PROCESS action type — starts a workflow instance.
  *
  * <p>Golden FINDING (2026-06-05): the {@code action-start-process} palette node shipped
  * without a backend executor, so {@code CompositeActionExecutor} threw
  * {@code UnsupportedOperationException("No executor found for action type: start_process")}
- * for every automation that used it. This executor closes that gap by delegating to
- * {@link BpmIntegrationService#startBusinessProcess} (the same entry point used by the
- * command pipeline's {@code start_process} post-action and the builtin start-approval
- * handler), so the visual designer's start-process node is actually usable.
+ * for every automation that used it. This executor delegates through the installed
+ * {@link WorkflowCapability}, so the visual designer remains independent of a concrete
+ * workflow product.
  *
  * <p>Config (mirrors {@code nodes/actions.ts} action-start-process configSchema):
  * <ul>
@@ -43,7 +41,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StartProcessActionExecutor implements ActionExecutor {
 
-    private final BpmIntegrationService bpmIntegrationService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
 
     @Override
     public Object execute(AutomationAction action, Map<String, Object> context) {
@@ -72,15 +70,21 @@ public class StartProcessActionExecutor implements ActionExecutor {
 
         log.info("START_PROCESS starting process: key={}, businessKey={}", processKey, businessKey);
 
-        ProcessInstance instance = startBusinessProcessInDatabaseMode(
-                processKey, businessKey, variables, title);
+        Map<String, Object> started = workflowCapabilities.execute("start",
+                new WorkflowCapability.WorkflowRequest(
+                        MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                        MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                        Map.of("processDefinitionKey", processKey,
+                                "businessKey", businessKey == null ? "" : businessKey,
+                                "variables", variables,
+                                "title", title))).payload();
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("processKey", processKey);
         result.put("businessKey", businessKey);
-        if (instance != null && instance.getInstanceId() != null) {
-            result.put("processInstanceId", instance.getInstanceId());
+        if (started.get("processInstanceId") != null) {
+            result.put("processInstanceId", started.get("processInstanceId"));
         }
         return result;
     }
@@ -88,30 +92,6 @@ public class StartProcessActionExecutor implements ActionExecutor {
     @Override
     public boolean supports(String actionType) {
         return "start_process".equals(actionType);
-    }
-
-    /**
-     * Automation flows run their own SmartEngine process in CUSTOM storage mode. A
-     * start-process action is different: it must create a durable business BPM instance,
-     * so temporarily switch the thread-local SmartEngine storage mode to DATABASE and
-     * then restore the outer automation mode.
-     */
-    private ProcessInstance startBusinessProcessInDatabaseMode(
-            String processKey,
-            String businessKey,
-            Map<String, Object> variables,
-            String title) {
-        StorageMode previousMode = StorageModeHolder.get();
-        StorageModeHolder.set(StorageMode.DATABASE);
-        try {
-            return bpmIntegrationService.startBusinessProcess(processKey, businessKey, variables, title);
-        } finally {
-            if (previousMode == null) {
-                StorageModeHolder.clear();
-            } else {
-                StorageModeHolder.set(previousMode);
-            }
-        }
     }
 
     @SuppressWarnings("unchecked")

@@ -19,14 +19,15 @@ import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
-import {
-  buildDrillDownTarget,
-  type DrillDownPayload,
-} from '../utils/drillDownNavigation';
+import { buildDrillDownTarget, type DrillDownPayload } from '../utils/drillDownNavigation';
+
+import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryContext';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
 
 interface DashboardViewerProps {
+  /** Saved analytics dashboard identity; queries are resolved on the server. */
+  dashboardPid?: string;
   widgets: Widget[];
   layoutConfig: LayoutConfig;
   className?: string;
@@ -45,6 +46,7 @@ interface DashboardViewerProps {
 
 export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   widgets,
+  dashboardPid,
   layoutConfig,
   className = '',
   title = 'dashboard',
@@ -53,6 +55,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 }) => {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
+  const usageId = useMemo(() => crypto.randomUUID(), [dashboardPid]);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [linkageFilters, setLinkageFilters] = useState<LinkageFiltersMap>({});
 
@@ -70,9 +73,9 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const nextWidth = Math.max(0, Math.floor(entry.contentRect.width - 32));
-        setContainerWidth((currentWidth) => (
-          Math.abs(currentWidth - nextWidth) <= 1 ? currentWidth : nextWidth
-        ));
+        setContainerWidth((currentWidth) =>
+          Math.abs(currentWidth - nextWidth) <= 1 ? currentWidth : nextWidth,
+        );
       }
     });
 
@@ -118,34 +121,40 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
       onLinkageEmit: linkageConfig?.emitFilter
         ? (filters: FilterConfig[]) => handleLinkageEmit(groupId, filters)
         : undefined,
-      onDrillDown: drillDownConfig?.enabled || cardDrillDownEnabled
-        ? (payload: DrillDownPayload) => {
-            const activeDrillDownConfig = Array.isArray(payload) ? drillDownConfig : payload;
-            if (!activeDrillDownConfig) return;
-            const target = buildDrillDownTarget(
-              activeDrillDownConfig,
-              Array.isArray(payload) ? payload : [],
-            );
-            if (target) {
-              window.location.href = target;
+      onDrillDown:
+        drillDownConfig?.enabled || cardDrillDownEnabled
+          ? (payload: DrillDownPayload) => {
+              const activeDrillDownConfig = Array.isArray(payload) ? drillDownConfig : payload;
+              if (!activeDrillDownConfig) return;
+              const target = buildDrillDownTarget(
+                activeDrillDownConfig,
+                Array.isArray(payload) ? payload : [],
+              );
+              if (target) {
+                window.location.href = target;
+              }
             }
-          }
-        : undefined,
+          : undefined,
     });
 
     return (
-      <ChartWidgetWrapper
-        title={widgetTitle}
-        dataSource={
-          widget.config.dataSource as unknown as import('~/framework/smart/types/chart').ChartDataSource
-        }
-        linkageFilters={
-          widgetLinkageFilters as unknown as import('~/framework/smart/types/chart').FilterConfig[]
-        }
-        enableExport={!hideWidgetActions}
+      <DashboardQueryContext.Provider
+        value={dashboardPid ? { dashboardPid, widgetId: widget.id, usageId } : null}
       >
-        {chartElement}
-      </ChartWidgetWrapper>
+        <ChartWidgetWrapper
+          title={widgetTitle}
+          dataSource={
+            widget.config
+              .dataSource as unknown as import('~/framework/smart/types/chart').ChartDataSource
+          }
+          linkageFilters={
+            widgetLinkageFilters as unknown as import('~/framework/smart/types/chart').FilterConfig[]
+          }
+          enableExport={!hideWidgetActions}
+        >
+          {chartElement}
+        </ChartWidgetWrapper>
+      </DashboardQueryContext.Provider>
     );
   };
 

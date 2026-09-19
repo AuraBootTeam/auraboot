@@ -26,6 +26,12 @@ export const RESOURCES: PluginResource[] = [
     file: './plugins/core-ops/pages/audit-logs/index.tsx',
   },
   {
+    key: 'ops.i18n-resources', path: '/i18n-resources',
+    title: { en: 'I18n Resources', zh: 'i18n 资源管理' }, icon: 'language',
+    menu: { order: 45, group: 'ops' },
+    file: './plugins/core-ops/pages/i18n-resources/index.tsx',
+  },
+  {
     key: 'ops.documents', path: '/documents',
     title: { en: 'Documents', zh: '文档' }, icon: 'file-text',
     menu: { order: 50, group: 'ops' },

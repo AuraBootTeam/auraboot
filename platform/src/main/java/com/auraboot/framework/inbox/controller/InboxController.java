@@ -1,7 +1,8 @@
 package com.auraboot.framework.inbox.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.bpm.service.TaskService;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.inbox.dto.InboxItemResponse;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
@@ -32,7 +33,7 @@ import java.util.Set;
 public class InboxController {
 
     private final InboxService inboxService;
-    private final TaskService taskService;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
     private static final Set<String> REJECTION_ACTIONS = Set.of("reject", "rejected");
 
     /**
@@ -132,7 +133,7 @@ public class InboxController {
         }
 
         // Build approval detail response from InboxItem
-        // For items without a real BPM process, return a stub with basic approval capabilities
+        // For items without a real workflow, return a stub with basic approval capabilities
         Map<String, Object> currentStep = Map.of(
             "id", "step-1",
             "approverName", "You",
@@ -205,13 +206,21 @@ public class InboxController {
             return;
         }
         InboxItem item = inboxService.getItem(itemId, userId, tenantId);
-        if (item == null || !"bpm".equals(item.getSourceType()) || item.getSourceId() == null) {
+        // InboxEventListener creates BPM task items with sourceType "workflow"; older
+        // paths used "bpm". Both carry the engine task id in sourceId — gating on the
+        // literal "bpm" alone turned every listener-created approval into a silent
+        // no-op (item acted, engine task left pending).
+        boolean bpmSourced = item != null
+                && ("bpm".equals(item.getSourceType()) || "workflow".equals(item.getSourceType()));
+        if (!bpmSourced || item.getSourceId() == null) {
             return;
         }
         if (approval) {
-            taskService.approveTask(item.getSourceId(), resolvedComment, Map.of());
+            workflowCapabilities.execute("task.approve", workflowRequest(Map.of(
+                    "taskId", item.getSourceId(), "comment", resolvedComment == null ? "" : resolvedComment, "variables", Map.of())));
         } else {
-            taskService.rejectTask(item.getSourceId(), resolvedComment, Map.of());
+            workflowCapabilities.execute("task.reject", workflowRequest(Map.of(
+                    "taskId", item.getSourceId(), "comment", resolvedComment == null ? "" : resolvedComment, "variables", Map.of())));
         }
     }
 
@@ -438,6 +447,11 @@ public class InboxController {
             return "acted";
         }
         return action.trim().toLowerCase();
+    }
+
+    private WorkflowCapability.WorkflowRequest workflowRequest(Map<String, Object> payload) {
+        return new WorkflowCapability.WorkflowRequest(
+                MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), payload);
     }
 
     private <T> ApiResponse<T> validateRejectionComment(String action, Object comment) {

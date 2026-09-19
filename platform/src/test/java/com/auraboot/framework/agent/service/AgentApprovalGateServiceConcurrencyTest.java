@@ -41,16 +41,20 @@ class AgentApprovalGateServiceConcurrencyTest {
                 .thenReturn(List.of(pendingApproval()))
                 .thenReturn(List.of());
         when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any())).thenReturn(List.of());
-        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+        when(dynamicDataMapper.updateByQuery(anyString(), any())).thenReturn(1);
 
         service.approve(1L, "apv-1", 99L, false);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(), conditions.capture());
         assertThat(conditions.getValue())
                 .containsEntry("pid", "apv-1")
-                .containsEntry("approval_status", "pending");
+                .containsEntry("tenantId", 1L)
+                .containsEntry("approverId", 99L);
+        assertThat(sql.getValue()).contains("approval_status = 'pending'",
+                "tenant_id = #{params.tenantId}", "expires_at IS NULL OR expires_at > NOW()");
     }
 
     @Test
@@ -60,7 +64,7 @@ class AgentApprovalGateServiceConcurrencyTest {
         when(dynamicDataMapper.selectByQuery(anyString(), any()))
                 .thenReturn(List.of(Map.of("pid", "apv-1", "approval_status", "pending")))
                 .thenReturn(List.of(pendingApproval()));
-        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+        when(dynamicDataMapper.updateByQuery(anyString(), any())).thenReturn(0);
 
         assertThatThrownBy(() -> service.approve(1L, "apv-1", 99L, false))
                 .isInstanceOf(IllegalStateException.class)
@@ -103,33 +107,97 @@ class AgentApprovalGateServiceConcurrencyTest {
                         "tenant_id", 1L,
                         "run_id", "run-1",
                         "task_id", "task-1")))
-                .thenReturn(List.of(Map.of("agent_id", "agent-1")))
-                .thenReturn(List.of(Map.of("run_status", "pending")));
+                .thenReturn(List.of(Map.of("agent_id", "agent-1")));
 
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+
+        when(terminalStore.failPendingApproval(1L, "run-1", "task-1", "Approval expired"))
+                .thenAnswer(invocation -> {
+                    assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(1L);
+                    return true;
+                });
+        com.auraboot.framework.application.tenant.MetaContext.clear();
         service.enforceApprovalTimeouts();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> conditionCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(dynamicDataMapper, times(2)).update(anyString(), updateCaptor.capture(), conditionCaptor.capture());
+        verify(dynamicDataMapper).update(anyString(), updateCaptor.capture(), conditionCaptor.capture());
         assertThat(updateCaptor.getAllValues().get(0))
                 .containsEntry("approval_status", "expired")
                 .containsEntry("rejection_reason", "Auto-expired: approval timeout exceeded");
-        assertThat(conditionCaptor.getAllValues().get(0)).containsEntry("pid", "apv-expired");
-        assertThat(updateCaptor.getAllValues().get(1))
-                .containsEntry("run_status", "failed")
-                .containsEntry("error_message", "Approval expired");
-        assertThat(conditionCaptor.getAllValues().get(1)).containsEntry("pid", "run-1");
+        assertThat(conditionCaptor.getAllValues().get(0))
+                .containsEntry("pid", "apv-expired")
+                .containsEntry("approval_status", "pending");
+        verify(terminalStore).failPendingApproval(1L, "run-1", "task-1", "Approval expired");
+        verify(transactionManager).commit(any());
+        verify(transactionManager, never()).rollback(any());
         verify(eventBus).publishAfterCommit(any());
     }
 
+    @Test
+    void rejectionCannotOverwriteAConcurrentDecisionOrEmitSideEffects() {
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenReturn(List.of(pendingApproval()));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+        assertThatThrownBy(() -> newService().reject(1L, "apv-1", 99L, "deny"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("already processed");
+        @SuppressWarnings("unchecked") ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        assertThat(conditions.getValue()).containsEntry("approval_status", "pending");
+        verify(eventBus, never()).publishAfterCommit(any());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), any());
+        verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
+    }
+
+    @Test
+    void timeoutCannotOverwriteAConcurrentDecisionOrEmitSideEffects() {
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "apv-expired", "tenant_id", 1L,
+                        "run_id", "run-1", "task_id", "task-1")));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(0);
+
+        newService().enforceApprovalTimeouts();
+
+        @SuppressWarnings("unchecked") ArgumentCaptor<Map<String, Object>> conditions = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq("ab_agent_approval"), any(), conditions.capture());
+        assertThat(conditions.getValue()).containsEntry("approval_status", "pending");
+        verify(eventBus, never()).publishAfterCommit(any());
+        verify(dynamicDataMapper, times(1)).selectByQueryWithoutTenant(anyString(), any());
+        verify(dynamicDataMapper, never()).update(eq("ab_agent_run"), any(), any());
+    }
+
+    @Test
+    void timeoutCompletionFailureRollsBackItsTransactionAndClearsContext() {
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "expired", "tenant_id", 1L,
+                        "run_id", "run", "task_id", "task")))
+                .thenReturn(List.of(Map.of("agent_id", "agent")));
+        when(dynamicDataMapper.update(eq("ab_agent_approval"), any(), any())).thenReturn(1);
+        when(terminalStore.failPendingApproval(1L, "run", "task", "Approval expired"))
+                .thenThrow(new IllegalStateException("terminal write failed"));
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        newService().enforceApprovalTimeouts();
+        verify(transactionManager).rollback(any());
+        verify(transactionManager, never()).commit(any());
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
+    private final AgentRunTerminalStore terminalStore = org.mockito.Mockito.mock(AgentRunTerminalStore.class);
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager =
+            org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
+
+
     private AgentApprovalGateService newService() {
-        return new AgentApprovalGateService(
+        AgentApprovalGateService service = new AgentApprovalGateService(
                 dynamicDataMapper,
                 new ObjectMapper(),
                 eventBus,
                 dispatchHandler);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "terminalStore", terminalStore);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "transactionManager", transactionManager);
+        return service;
     }
 
     private Map<String, Object> pendingApproval() {

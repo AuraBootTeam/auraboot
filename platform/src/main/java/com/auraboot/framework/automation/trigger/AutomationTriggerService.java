@@ -56,14 +56,18 @@ public interface AutomationTriggerService {
     void onStateChange(String modelCode, String recordPid, String fromState, String toState);
 
     /**
-     * Handle BPM event (process started, task completed, etc.)
+     * Handle workflow event (process started, task completed, etc.)
      *
-     * @param eventType BPM event type (e.g. PROCESS_STARTED, TASK_COMPLETED)
+     * @param eventType workflow event type (e.g. PROCESS_STARTED, TASK_COMPLETED)
      * @param processKey process definition key
      * @param instanceId process instance ID
      * @param payload event payload
      */
     void onBpmEvent(String eventType, String processKey, String instanceId, Map<String, Object> payload);
+
+    /** Consume an authenticated external event from the reliable integration worker. */
+    void onExternalEvent(String sourceCode, String eventType, String eventId,
+                         String subject, Map<String, Object> payload);
 
     /**
      * Execute an automation

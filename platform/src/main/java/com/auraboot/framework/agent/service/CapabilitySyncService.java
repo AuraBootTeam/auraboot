@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.entity.AbCapability;
 import com.auraboot.framework.agent.mapper.AbCapabilityMapper;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.plugin.extension.WorkflowCapability;
+import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class CapabilitySyncService {
     private final AbCapabilityMapper capabilityMapper;
     private final CapabilityGraphService capabilityGraphService;
     private final CapabilityMappingSupport mappingSupport;
+    private final WorkflowCapabilityRegistry workflowCapabilities;
 
     // ==================== Write-Path: Sync to ab_capability ====================
 
@@ -261,12 +264,12 @@ public class CapabilitySyncService {
     }
 
     private List<AbCapability> collectWorkflowCapabilities(Long tenantId) {
-        String sql = "SELECT id, pid, process_key, process_name, description, category " +
-                "FROM ab_bpm_process_definition WHERE tenant_id = #{params.tenantId} " +
-                "AND status = 'deployed' AND is_current = true " +
-                "AND deleted_flag = FALSE";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId));
+        if (!workflowCapabilities.available("catalog.list")) {
+            return List.of();
+        }
+        Object value = workflowCapabilities.execute("catalog.list",
+                new WorkflowCapability.WorkflowRequest(tenantId, null, Map.of())).payload().get("items");
+        List<Map<String, Object>> rows = mapRows(value);
         List<AbCapability> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             result.add(mapWorkflowRowToEntity(row));
@@ -459,7 +462,7 @@ public class CapabilitySyncService {
         cap.setCode("workflow:" + processKey);
         cap.setType("workflow");
         cap.setDisplayName(processName);
-        cap.setSourceTable("ab_bpm_process_definition");
+        cap.setSourceTable("workflow-capability");
         cap.setSourceId(row.get("id") instanceof Number n ? n.longValue() : null);
         cap.setPurpose(purpose);
         cap.setWhenToUse("When a " + processName + " workflow needs to be initiated, involving human approval steps");
@@ -468,6 +471,13 @@ public class CapabilitySyncService {
         cap.setIdempotent(false);
         cap.setReversible(false);
         return cap;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> mapRows(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        return values.stream().filter(Map.class::isInstance)
+                .map(item -> (Map<String, Object>) item).toList();
     }
 
     /**
@@ -496,7 +506,7 @@ public class CapabilitySyncService {
         } else if ("workflow".equals(type)) {
             String processKey = code.startsWith("workflow:") ? code.substring(9) : code;
             modes.add(Map.of("channel", "api", "available", true,
-                    "reference", "POST /api/bpm/process/" + processKey + "/start"));
+                    "reference", "workflow capability: start (" + processKey + ")"));
         }
 
         // AGENT
@@ -508,7 +518,7 @@ public class CapabilitySyncService {
                     "reference", "Automations trigger automatically, not agent-callable"));
         } else if ("workflow".equals(type)) {
             modes.add(Map.of("channel", "agent", "available", true,
-                    "reference", "Via AgentBpmBridge.startBpmProcess()"));
+                    "reference", "Via AgentWorkflowBridge.startWorkflow()"));
         }
 
         // WORKFLOW channel

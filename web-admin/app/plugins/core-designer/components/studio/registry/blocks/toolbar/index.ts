@@ -22,7 +22,7 @@ export const toolbarBlock: BlockDefinition = {
         { label: 'Builtin', value: 'builtin' },
         { label: 'Flow (Handler)', value: 'flow' },
         { label: 'Flow (Steps)', value: 'flow_steps' },
-        { label: 'BPM (Start Process)', value: 'bpm' },
+        { label: 'Workflow (Start)', value: 'workflow' },
       ],
     },
     {
@@ -74,15 +74,15 @@ export const toolbarBlock: BlockDefinition = {
       description: 'Array of FlowStep objects: [{type, action, condition, ...}]',
       dependsOn: { field: 'action.type', value: 'flow_steps' },
     },
-    // ── BPM action fields (type=bpm) ────────────────────────────
+    // ── Workflow action fields (type=workflow) ────────────────────────────
     {
-      key: 'action.processDefinitionKey',
-      label: 'Process Definition',
-      type: 'process-select',
+      key: 'action.workflowKey',
+      label: 'Workflow Definition',
+      type: 'workflow-select',
       group: 'Action',
       required: true,
-      description: 'BPMN process definition to start when button is clicked',
-      dependsOn: { field: 'action.type', value: 'bpm' },
+      description: 'Workflow definition to start when button is clicked',
+      dependsOn: { field: 'action.type', value: 'workflow' },
     },
     {
       key: 'action.businessKeyField',
@@ -92,7 +92,7 @@ export const toolbarBlock: BlockDefinition = {
       required: true,
       placeholder: 'e.g. orderNo',
       description: 'Record field whose value becomes the process businessKey',
-      dependsOn: { field: 'action.type', value: 'bpm' },
+      dependsOn: { field: 'action.type', value: 'workflow' },
     },
     {
       key: 'action.variables',
@@ -101,7 +101,7 @@ export const toolbarBlock: BlockDefinition = {
       group: 'Action',
       description:
         'Map of variable name to JSONPath ($.field.sub) or literal, e.g. {"amount": "$.totalAmount"}',
-      dependsOn: { field: 'action.type', value: 'bpm' },
+      dependsOn: { field: 'action.type', value: 'workflow' },
     },
 
     // ── Appearance ──────────────────────────────────────────────

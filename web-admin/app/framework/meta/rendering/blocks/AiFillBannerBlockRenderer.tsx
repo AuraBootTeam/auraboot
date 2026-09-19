@@ -1,20 +1,4 @@
-/**
- * AiFillBannerBlockRenderer — P1' vertical-slice block.
- *
- * Renders a banner with a "智能填写" button above the form. Clicking opens
- * a dialog with a single NL textarea; on submit it POSTs to the backend
- * /api/wd-leave-request/ai-fill endpoint and applies the returned field
- * map via DslFormFillContext.
- *
- * Block schema:
- *   { id, blockType: "ai-fill-banner",
- *     endpoint: string (defaults to /api/wd-leave-request/ai-fill),
- *     placeholder?: LocalizedText, examples?: string[] }
- *
- * P2' will replace this with a generic schema-driven AI fill widget that
- * derives the endpoint + field schema from the surrounding form's modelCode.
- * Do not extend this component — replace it.
- */
+/** Generic text extraction via the conversation runtime; explicit endpoints remain supported. */
 import React, { useCallback, useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -37,10 +21,10 @@ interface AiFillResponse {
   errorKey: string | null;
 }
 
-const DEFAULT_ENDPOINT = '/api/wd-leave-request/ai-fill';
+
 
 export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ block, runtime }) => {
-  const { applyFields, lockedFields } = useDslFormFill();
+  const { applyFields, extractFromText, lockedFields } = useDslFormFill();
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
@@ -50,7 +34,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const endpoint = (block as any).endpoint || DEFAULT_ENDPOINT;
+  const endpoint = (block as any).endpoint;
   const placeholder =
     getLocalizedText((block as any).placeholder, locale) ||
     t('ai.fill.placeholder') ||
@@ -67,7 +51,13 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
     setLoading(true);
     setError(null);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      if (!endpoint) {
+        await extractFromText(nlInput);
+        setOpen(false);
+        setNlInput('');
+        return;
+      }
+      const today = new Intl.DateTimeFormat('en-CA').format(new Date());
       const result = await post<AiFillResponse>(endpoint, {
         nlInput,
         currentDate: today,
@@ -94,11 +84,11 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      setError(message);
+      setError(message.startsWith('ai.fill.') ? t(message) : t('ai.fill.failed'));
     } finally {
       setLoading(false);
     }
-  }, [nlInput, endpoint, applyFields, t]);
+  }, [nlInput, endpoint, applyFields, extractFromText, lockedFields, t]);
 
   return (
     <div
@@ -131,6 +121,8 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
         <div
           role="dialog"
           aria-modal="true"
+          aria-label={t('ai.fill.dialog_title')}
+          onKeyDown={(event) => { if (event.key === 'Escape' && !loading) setOpen(false); }}
           data-testid="ai-fill-dialog"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
           onClick={() => !loading && setOpen(false)}
@@ -144,6 +136,8 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
             </div>
             <textarea
               data-testid="ai-fill-input"
+              aria-label={t('ai.fill.placeholder')}
+              autoFocus
               value={nlInput}
               onChange={(e) => setNlInput(e.target.value)}
               placeholder={placeholder}
@@ -180,7 +174,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={loading}
-                className="hover:bg-hover rounded px-3 py-1.5 text-sm"
+                className="hover:bg-hover rounded px-3 py-1.5 text-sm disabled:text-text-3 disabled:cursor-not-allowed"
               >
                 {t('common.cancel') || (locale === 'zh-CN' ? '取消' : 'Cancel')}
               </button>
@@ -189,7 +183,8 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
                 data-testid="ai-fill-confirm"
                 onClick={onSubmit}
                 disabled={loading || !nlInput.trim()}
-                className="bg-accent hover:bg-accent-hover rounded px-3 py-1.5 text-sm text-white disabled:bg-accent-weak"
+                aria-busy={loading}
+                className="bg-accent hover:bg-accent-hover rounded px-3 py-1.5 text-sm text-white disabled:bg-accent-weak disabled:text-text-2 disabled:cursor-not-allowed"
               >
                 {loading
                   ? t('ai.fill.parsing') || (locale === 'zh-CN' ? '解析中…' : 'Parsing…')

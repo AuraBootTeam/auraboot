@@ -70,7 +70,11 @@ describe('useKanbanData - authoritative full-pipeline aggregates', () => {
       count: 5333,
       loadedCount: 2,
       hasMore: true,
-      aggregations: { Pipeline: 79993332, Quantity: 5333 },
+      aggregations: { sum_amount: 79993332, count_pid: 5333 },
+      aggregationLabels: {
+        sum_amount: 'Pipeline',
+        count_pid: 'Quantity',
+      },
     });
     expect(negotiation).toMatchObject({ count: 2000, loadedCount: 2, hasMore: true });
     expect(list).toHaveBeenCalledTimes(2);

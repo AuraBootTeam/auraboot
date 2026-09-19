@@ -1,4 +1,4 @@
-import { startProcessFromAction } from '~/plugins/core-bpm/services/bpmWorkbenchService';
+import { getKernel } from '~/framework/bootstrap';
 import {
   queryBuilderService,
   type QueryBuilderRequest,
@@ -307,8 +307,8 @@ async function executeRuntimeAction(
       getRecordPropOrUndefined(block.props?.payload);
     const configuredBusinessKey = getStringProp(block.props?.businessKey);
 
-    const result = await startProcessFromAction({
-      processDefinitionKey: workflowKey,
+    const result = await getKernel().pluginLoader.invoke('workflow.start', {
+      workflowKey,
       businessKey:
         (configuredBusinessKey
           ? resolveRuntimeTemplateString(configuredBusinessKey, block, context)
@@ -316,7 +316,7 @@ async function executeRuntimeAction(
       variables: workflowVariables
         ? sanitizeRuntimeActionPayload(workflowVariables, block, context)
         : undefined,
-    });
+    }) as { processInstanceId: string };
 
     return {
       status:
@@ -723,7 +723,7 @@ function mapRowsToHelperBlockData(
     };
   }
 
-  if (block.blockType === 'bpm-panel') {
+  if (block.blockType === 'workflow-panel') {
     const firstRow = rows[0] ?? {};
     return {
       source,

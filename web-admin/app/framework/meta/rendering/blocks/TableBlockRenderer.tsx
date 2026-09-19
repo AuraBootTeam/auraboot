@@ -744,12 +744,24 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           currency: column.currencyCode || 'cny',
         }).format(value);
 
-      case 'tag':
+      case 'tag': {
+        // Semantic pill: match common lifecycle keywords so status color carries meaning
+        // instead of a single uniform blue (lost/risk -> red, active/claim -> green,
+        // pending/waiting -> amber, everything else stays neutral blue).
+        const semantic = String(value);
+        const tone = /丢失|流失|失败|拒绝|风险|lost|fail|reject|risk/i.test(semantic)
+          ? 'bg-status-red-bg text-status-red'
+          : /活跃|合格|成功|已领|完成|通过|active|success|complete|qualif/i.test(semantic)
+            ? 'bg-status-green-bg text-status-green'
+            : /待|暂停|阻塞|pending|wait|block|paused/i.test(semantic)
+              ? 'bg-status-amber-bg text-status-amber'
+              : 'bg-status-blue-bg text-status-blue';
         return (
-          <span className="rounded-pill bg-status-blue-bg text-status-blue inline-flex px-2 py-1 text-xs font-medium">
-            {value}
+          <span className={`rounded-pill inline-flex px-2.5 py-1 text-xs font-medium ${tone}`}>
+            {semantic}
           </span>
         );
+      }
 
       case 'progress':
         return (
@@ -1300,17 +1312,61 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                   colSpan={
                     columns.length + (rowActions.length > 0 ? 1 : 0) + (isMultipleSelection ? 1 : 0)
                   }
-                  className="text-text-2 px-6 py-4 text-center"
+                  className="text-text-2 px-6 py-12 text-center"
                 >
                   {/* A table that only fills in once you select something upstream should say so.
                     "No data" on an empty transcript reads as "this conversation has no messages"
                     when what it means is "you have not picked one yet" — the same two words for
                     two different situations, and the user cannot tell which they are in. */}
-                  {(block as any).empty?.title
-                    ? getLocalizedText((block as any).empty.title, locale, t)
-                    : t('common.noData') !== 'common.noData'
-                      ? t('common.noData')
-                      : 'No data'}
+                  <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+                    <div
+                      aria-hidden="true"
+                      className="border-border bg-subtle text-text-2 rounded-full border border-dashed p-3"
+                    >
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+                        <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                      </svg>
+                    </div>
+                    <div className="text-text font-medium">
+                      {(block as any).empty?.title
+                        ? getLocalizedText((block as any).empty.title, locale, t)
+                        : t('common.noData') !== 'common.noData'
+                          ? t('common.noData')
+                          : 'No data'}
+                    </div>
+                    {(block as any).empty?.description && (
+                      <div className="text-text-2 text-sm">
+                        {getLocalizedText((block as any).empty.description, locale, t)}
+                      </div>
+                    )}
+                    {(block as any).empty?.action && (
+                      <button
+                        type="button"
+                        data-testid="table-empty-cta"
+                        onClick={() => {
+                          void executeSimpleWorkbenchAction(
+                            runtime,
+                            (block as any).empty.action,
+                          ).catch((error) => {
+                            console.error('[TableBlockRenderer] empty action failed:', error);
+                          });
+                        }}
+                        className="bg-accent hover:bg-accent-hover rounded-control mt-1 px-4 py-2 text-white"
+                      >
+                        {getLocalizedText((block as any).empty.action.label, locale, t)}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -1345,6 +1401,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                       <td
                         key={column.field}
                         className={`${bodyCellClass} text-text text-sm ${
+                          colIdx === 0 ? 'font-medium' : ''
+                        } ${
                           column.ellipsis ? 'truncate' : ''
                         } text-${column.align || 'left'}`}
                         title={getCellTitle(column, row)}

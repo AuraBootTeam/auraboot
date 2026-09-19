@@ -295,4 +295,45 @@ class DataScopeEvaluatorTest {
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    void historicalDepartmentRequiresDepartmentFieldEvenForOwner() {
+        when(dataScopeService.resolveHistoricalScope(1L, "M", "read")).thenReturn(
+                new DataScopeCondition("dept", "created_by", 1L, "department", List.of("dept-1"), List.of()));
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("created_by", 1L)).verdict());
+        assertEquals(EvaluationVerdict.ALLOW,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("department", "dept-1")).verdict());
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("department", "dept-2")).verdict());
+    }
+
+    @Test
+    void historicalDepartmentOwnerChecksCurrentMembership() {
+        when(dataScopeService.resolveHistoricalScope(1L, "M", "read")).thenReturn(
+                new DataScopeCondition("dept", "created_by", 1L, null, "owner_pid",
+                        List.of("dept-1"), List.of(), List.of()));
+        when(dataScopeService.isOwnerInDepartments("owner", List.of("dept-1"))).thenReturn(true, false);
+        assertEquals(EvaluationVerdict.ALLOW,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("owner_pid", "owner")).verdict());
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("owner_pid", "owner")).verdict());
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("created_by", 1L)).verdict());
+    }
+
+    @Test
+    void historicalCreatorDepartmentUsesNumericIdentity() {
+        when(dataScopeService.resolveHistoricalScope(1L, "M", "read")).thenReturn(
+                new DataScopeCondition("dept", "created_by", 1L, null, "created_by",
+                        List.of("dept-a"), List.of(), List.of()));
+        when(dataScopeService.isCreatorInDepartments(77L, List.of("dept-a"))).thenReturn(true, false);
+        assertEquals(EvaluationVerdict.ALLOW,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("created_by", 77L)).verdict());
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluateHistorical(1L, "M", "read", Map.of("created_by", 77L)).verdict());
+        org.mockito.Mockito.verify(dataScopeService, org.mockito.Mockito.never())
+                .isOwnerInDepartments(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
+    }
+
 }

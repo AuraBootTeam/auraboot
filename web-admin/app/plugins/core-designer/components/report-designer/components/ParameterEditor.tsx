@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { ReportParameter, ParameterType, ReportDataSource } from '../types';
 
 interface ParameterEditorProps {
@@ -17,6 +18,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
   dataSources,
   onChange,
 }) => {
+  const text = useSmartText();
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -218,7 +220,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
 
       {parameters.length === 0 && !showAdd && (
         <p className="text-xs text-gray-400">
-          No parameters. Add parameters to let users filter report data at runtime.
+          {text({ zh: '暂无参数。添加参数以供运行时筛选报表数据。', en: 'No parameters. Add parameters to let users filter report data at runtime.' })}
         </p>
       )}
     </div>

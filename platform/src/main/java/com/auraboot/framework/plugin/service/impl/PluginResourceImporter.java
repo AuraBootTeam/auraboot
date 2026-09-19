@@ -16,7 +16,6 @@ public interface PluginResourceImporter {
     boolean checkPermissionExists(Long tenantId, String code);
     boolean checkRoleExists(Long tenantId, String code);
     boolean checkMenuExists(Long tenantId, String code);
-    boolean checkProcessExists(Long tenantId, String key);
     boolean checkPageExists(Long tenantId, String pageKey);
     boolean checkDictExists(Long tenantId, String code);
     boolean checkNamedQueryExists(Long tenantId, String code);
@@ -59,10 +58,6 @@ public interface PluginResourceImporter {
 
     PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
-
-    PluginResource importProcess(ProcessDefinitionDTO dto, String pluginPid, String importId,
-                                 Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,
-                                 Boolean autoDeploy);
 
     PluginResource importPage(PageSchemaDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy,

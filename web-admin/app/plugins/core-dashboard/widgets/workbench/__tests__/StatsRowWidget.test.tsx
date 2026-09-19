@@ -6,9 +6,7 @@ vi.mock('../useWorkbenchStats', () => ({
   useWorkbenchStats: vi.fn(() => ({
     stats: {
       inbox_pending: { value: 241, label: 'workbench.stats.inbox_pending' },
-      bpm_running: { value: 0, label: 'workbench.stats.bpm_running' },
-      crm_account_active: { value: 107, label: 'workbench.stats.crm_account_active' },
-      crm_opportunity_amount: { value: 0, label: 'workbench.stats.crm_opportunity_amount' },
+      inbox_urgent: { value: 7, label: 'workbench.stats.inbox_urgent' },
     },
     loading: false,
   })),
@@ -19,10 +17,10 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 
 describe('StatsRowWidget — redesign', () => {
-  it('renders 4 cards in a grid without gradient classes', () => {
+  it('renders the two core inbox cards without gradient classes', () => {
     const { container } = render(<StatsRowWidget />);
     const cards = container.querySelectorAll('[data-testid^="stat-card-"]');
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(2);
     cards.forEach((card: Element) => {
       const className = card.getAttribute('class') ?? '';
       expect(className).not.toMatch(/from-(blue|amber|emerald|violet|rose|cyan|indigo|orange)-/);

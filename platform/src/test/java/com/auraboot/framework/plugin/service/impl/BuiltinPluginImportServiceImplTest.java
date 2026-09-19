@@ -28,7 +28,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -204,15 +206,12 @@ class BuiltinPluginImportServiceImplTest {
     void shouldNotImportRemovedAcpShowcaseDirectory(@TempDir Path tempDir) throws IOException {
         String[] pluginDirs = {
                 "core-meta",
-                "core-bpm",
                 "core-aurabot",
                 "page-manager",
                 "org-management",
                 "platform-admin",
-                "crm",
                 "showcase",
                 "agent-control-plane",
-                "workflow-demo",
                 "acp-showcase"
         };
         for (String pluginDir : pluginDirs) {
@@ -238,5 +237,69 @@ class BuiltinPluginImportServiceImplTest {
 
         verify(pluginImportService, never())
                 .parseDirectory(argThat(path -> path != null && path.endsWith("acp-showcase")));
+    }
+
+    @Test
+    @DisplayName("aura.tenant.product-plugins dirs are imported for new tenants, in declared order")
+    void shouldImportConfiguredProductPluginsInOrder(@TempDir Path tempDir) throws IOException {
+        Path eduCore = Files.createDirectories(tempDir.resolve("products").resolve("edu-core"));
+        Path eduEngine = Files.createDirectories(tempDir.resolve("products").resolve("edu-engine"));
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+        ReflectionTestUtils.setField(service, "tenantProductPlugins",
+                eduCore + "," + eduEngine);
+
+        ImportPreviewResult validPreview = ImportPreviewResult.builder()
+                .valid(true).importId("IMP").pluginId("any").version("1.0.0").build();
+        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
+        when(pluginImportService.execute(anyString(), any(ImportRequest.class)))
+                .thenReturn(ImportExecuteResult.builder().success(true).importId("IMP")
+                        .pluginId("any").durationMs(10L).build());
+
+        service.importForTenant(100L, 1L);
+
+        inOrder(pluginImportService).verify(pluginImportService)
+                .parseDirectory(contains("edu-core"));
+        inOrder(pluginImportService).verify(pluginImportService)
+                .parseDirectory(contains("edu-engine"));
+        verify(pluginImportService, org.mockito.Mockito.times(2))
+                .execute(anyString(), any(ImportRequest.class));
+    }
+
+    @Test
+    @DisplayName("missing configured product plugin directory is skipped without failing tenant creation")
+    void shouldSkipMissingConfiguredProductPlugin(@TempDir Path tempDir) throws IOException {
+        Path eduCore = Files.createDirectories(tempDir.resolve("products").resolve("edu-core"));
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+        ReflectionTestUtils.setField(service, "tenantProductPlugins",
+                tempDir.resolve("products").resolve("definitely-not-here") + "," + eduCore);
+
+        ImportPreviewResult validPreview = ImportPreviewResult.builder()
+                .valid(true).importId("IMP").pluginId("any").version("1.0.0").build();
+        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
+        when(pluginImportService.execute(anyString(), any(ImportRequest.class)))
+                .thenReturn(ImportExecuteResult.builder().success(true).importId("IMP")
+                        .pluginId("any").durationMs(10L).build());
+
+        service.importForTenant(100L, 1L);
+
+        verify(pluginImportService, org.mockito.Mockito.times(1))
+                .parseDirectory(anyString());
+        verify(pluginImportService, org.mockito.Mockito.times(1))
+                .execute(anyString(), any(ImportRequest.class));
+    }
+
+    @Test
+    @DisplayName("blank aura.tenant.product-plugins imports core catalogue only")
+    void shouldImportOnlyCoreWhenProductConfigBlank(@TempDir Path tempDir) {
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+        ReflectionTestUtils.setField(service, "tenantProductPlugins", "");
+
+        service.importForTenant(100L, 1L);
+
+        // No core plugin dirs exist under the temp dir and no product dirs configured —
+        // nothing may be parsed at all.
+        verify(pluginImportService, never()).parseDirectory(anyString());
     }
 }

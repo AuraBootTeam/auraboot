@@ -174,9 +174,8 @@ env.sh
 
 prepare-bugfix-demo.sh
   explicit OSS daily bugfix demo contract: imports profile=e2e (all OSS
-  plugins), refreshes private Playwright auth, runs showcase seeds, creates
-  workflow-demo business/process/task data, syncs BPM process definitions into
-  the dynamic bpm_process_management mirror, and fails on scenario invariants.
+  plugins), refreshes private Playwright auth, and checks platform invariants.
+  CRM and BPM seed data are run explicitly from the independent application.
 
 test-dev-env-scripts.sh
   non-mutating smoke tests for dry-run, r2 env export, and Maven local helper

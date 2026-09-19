@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { TimeWindowFilter } from './TimeWindowFilter';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
@@ -16,6 +17,8 @@ export interface FiltersBlockRendererProps {
 
 export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
   const { t } = useI18n();
+  const windowConfig = (block as any).props?.timeWindow;
+  if (windowConfig) return <TimeWindowFilter config={windowConfig} runtime={runtime} />;
   const fields = block.fields || [];
   const density = (block as any).density || 'default';
   const compact = density === 'compact';

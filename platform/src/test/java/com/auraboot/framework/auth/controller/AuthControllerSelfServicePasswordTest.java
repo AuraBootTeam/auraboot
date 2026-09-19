@@ -41,6 +41,8 @@ class AuthControllerSelfServicePasswordTest {
     @Mock
     private SessionRenewalService sessionRenewalService;
     @Mock
+    private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
+    @Mock
     private SystemModeService systemModeService;
 
     @Test
@@ -112,7 +114,8 @@ class AuthControllerSelfServicePasswordTest {
                 userInfoService,
                 passwordManagementService,
                 loginRateLimiter,
-                sessionRenewalService);
+                sessionRenewalService,
+                wechatMiniIdentityService);
         ReflectionTestUtils.setField(controller, "passwordSelfServiceEnabled", selfServiceEnabled);
         return controller;
     }

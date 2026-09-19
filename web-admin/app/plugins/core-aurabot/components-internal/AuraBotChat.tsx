@@ -179,6 +179,8 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 
   // Tool result — any result with records array gets a chart card; others get collapsible table
   if (message.type === 'tool_result') {
+    // Analytics is rendered by its canonical result_contract event.
+    if (message.toolName === 'aurabot:chat-bi' || message.toolName === 'aurabot_chat-bi') return null;
     // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
     const resultData = message.toolResult?.data || message.toolResult;
     if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
@@ -279,10 +281,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         } `}
       >
         {!isUser ? (
-          <BotMessageContent
-            content={message.content}
-            evidence={message.retrievalEvidence}
-          />
+          <BotMessageContent content={message.content} evidence={message.retrievalEvidence} />
         ) : (
           <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
         )}
@@ -645,37 +644,34 @@ export function AuraBotChat() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFilesSelected = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      // Reset the input so picking the same file twice in a row still fires.
-      if (e.target) e.target.value = '';
-      if (files.length === 0) return;
+  const handleFilesSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // Reset the input so picking the same file twice in a row still fires.
+    if (e.target) e.target.value = '';
+    if (files.length === 0) return;
 
-      setAttachmentError(null);
-      const next: ChatImageAttachment[] = [];
-      for (const f of files) {
-        if (f.size > MAX_IMAGE_BYTES) {
-          setAttachmentError(`图片 ${f.name} 超过 4MB 限制`);
-          continue;
-        }
-        if (!ACCEPTED_IMAGE_MIME_TYPES.split(',').includes(f.type)) {
-          setAttachmentError(`图片 ${f.name} 格式不支持，仅支持 JPEG/PNG/GIF/WEBP`);
-          continue;
-        }
-        try {
-          const data = await readFileAsBase64(f);
-          next.push({ mediaType: f.type, data, name: f.name });
-        } catch (err) {
-          setAttachmentError(`读取图片 ${f.name} 失败`);
-        }
+    setAttachmentError(null);
+    const next: ChatImageAttachment[] = [];
+    for (const f of files) {
+      if (f.size > MAX_IMAGE_BYTES) {
+        setAttachmentError(`图片 ${f.name} 超过 4MB 限制`);
+        continue;
       }
-      if (next.length > 0) {
-        setAttachments((prev) => [...prev, ...next]);
+      if (!ACCEPTED_IMAGE_MIME_TYPES.split(',').includes(f.type)) {
+        setAttachmentError(`图片 ${f.name} 格式不支持，仅支持 JPEG/PNG/GIF/WEBP`);
+        continue;
       }
-    },
-    [],
-  );
+      try {
+        const data = await readFileAsBase64(f);
+        next.push({ mediaType: f.type, data, name: f.name });
+      } catch (err) {
+        setAttachmentError(`读取图片 ${f.name} 失败`);
+      }
+    }
+    if (next.length > 0) {
+      setAttachments((prev) => [...prev, ...next]);
+    }
+  }, []);
 
   const handleRemoveAttachment = useCallback((idx: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
@@ -712,7 +708,11 @@ export function AuraBotChat() {
       }
 
       // Enter without shift to send (if not empty OR attachments staged)
-      if (e.key === 'Enter' && !e.shiftKey && (e.currentTarget.value.trim() || attachments.length > 0)) {
+      if (
+        e.key === 'Enter' &&
+        !e.shiftKey &&
+        (e.currentTarget.value.trim() || attachments.length > 0)
+      ) {
         e.preventDefault();
         dispatchSend(e.currentTarget.value);
       }

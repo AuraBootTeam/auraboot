@@ -23,7 +23,7 @@
     "component": null,
     "icon": "IconChartLine",
     "type": 1,
-    "permissionCode": null,
+    "permissionCode": "dashboard.read",
     "orderNo": 10,
     "visible": true,
     "extension": { "platforms": ["web"] }

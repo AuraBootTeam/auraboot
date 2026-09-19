@@ -10,7 +10,7 @@ import {
   findRowInPaginatedList,
   waitForDynamicPageLoad,
 } from '../helpers';
-import { loginViaUI } from '../../helpers/wd-fixtures';
+import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickSidebarPage,
   isTransientViteDynamicImportIssue,

@@ -21,6 +21,8 @@ public class MetaContext {
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
+    /** Server-published machine command permission; never propagated across async boundaries. */
+    private static final ThreadLocal<String> EXTERNAL_COMMAND_PERMISSION = new ThreadLocal<>();
     /** Exact command code whose permit plan authorized the current mutation stages. */
     private static final ThreadLocal<String> AUTHORIZED_COMMAND_CODE = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
@@ -113,6 +115,7 @@ public class MetaContext {
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
+        EXTERNAL_COMMAND_PERMISSION.remove();
         AUTHORIZED_COMMAND_CODE.remove();
         COMMAND_AGGREGATE.remove();
         COMMAND_PERMIT.remove();
@@ -357,6 +360,36 @@ public class MetaContext {
 
     public static boolean hasCommandAuthority() {
         return COMMAND_AUTHORITY.get() != null;
+    }
+
+    /**
+     * Open a narrow grant after an authenticated external route resolved through the explicit
+     * publication registry. The command pipeline still verifies this exact permission against the
+     * command declaration; arbitrary commands and mismatched declarations remain ungranted.
+     */
+    public static <T> T runWithExternalCommandPermission(
+            String permissionCode, java.util.function.Supplier<T> action) {
+        if (!StringUtils.hasText(permissionCode)) {
+            throw new IllegalArgumentException("External command permission is required");
+        }
+        String prior = EXTERNAL_COMMAND_PERMISSION.get();
+        EXTERNAL_COMMAND_PERMISSION.set(permissionCode.trim());
+        try {
+            return action.get();
+        } finally {
+            EXTERNAL_COMMAND_PERMISSION.set(prior);
+        }
+    }
+
+    public static void runWithExternalCommandPermission(String permissionCode, Runnable action) {
+        runWithExternalCommandPermission(permissionCode, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    public static String getExternalCommandPermission() {
+        return EXTERNAL_COMMAND_PERMISSION.get();
     }
 
     /**

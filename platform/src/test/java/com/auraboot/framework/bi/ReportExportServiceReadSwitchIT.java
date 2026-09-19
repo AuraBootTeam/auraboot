@@ -32,11 +32,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Real-stack read-switch IT for the report export service (Phase 4 slice 2b-2).
  *
- * <p>Proves {@link ReportExportService} reads the ReportDsl from the first-class {@code ab_report}
- * store FIRST (via {@link ReportStorageService} → {@code ab_report}), against a genuinely committed
- * row re-read from the DB, and that the parsed dsl renders a correct export. Also proves the
- * page-schema fallback branch is exercised when no {@code ab_report} row exists (a pid present in
- * neither store 404s through the legacy {@code pageSchemaMapper.selectByPid} path).
+ * <p>Proves committed report definitions are re-read for export from their canonical store.
+ * A missing report fails without consulting another store.
  *
  * <p>Uses the {@code @Commit + Propagation.NEVER} harness (mirrors {@link ReportStorageServiceIT})
  * so the {@code ab_report} row is committed and genuinely re-read, with explicit {@link AfterEach}
@@ -44,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @Commit
 @Transactional(propagation = Propagation.NEVER)
-@DisplayName("report export read-switch: ab_report-first + page-schema fallback (Phase 4 slice 2b-2)")
+@DisplayName("report export read-switch: canonical report export persistence")
 class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
 
     /** Same static-table ReportDsl shape the page-schema path stores in extension.reportDsl. */
@@ -172,16 +169,12 @@ class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("fallback: no ab_report row → delegates to page-schema (unknown pid 404s through legacy path)")
-    void exportFallsBackToPageSchemaWhenNoAbReportRow() {
-        // A pid that exists in NEITHER ab_report NOR ab_page_schema. The read switch finds no
-        // ab_report row and falls back to pageSchemaMapper.selectByPid, which returns null → the
-        // legacy "Report not found" 404. This proves the fallback branch is actually taken.
-        String unknownPid = "RPT-NEITHER-STORE-" + System.nanoTime();
-        assertThat(reportStorageService.findByPid(unknownPid)).isNull();
+    @DisplayName("missing report definition fails export")
+    void exportRejectsMissingReportDefinition() {
+        // A missing report must fail rather than resolving a different artifact.
 
         ReportExportRequest request = new ReportExportRequest();
-        request.setReportPid(unknownPid);
+        request.setReportPid("missing-report-definition");
 
         assertThatThrownBy(() -> reportExportService.exportExcel(request))
                 .isInstanceOf(ValidationException.class)

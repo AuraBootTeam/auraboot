@@ -20,7 +20,6 @@ public class MarketplaceCategorySeeder {
                 """;
 
         Object[][] categories = {
-            {UniqueIdGenerator.generate(), "crm", "客户关系管理", "crm", "IconUsers", 10},
             {UniqueIdGenerator.generate(), "erp", "企业资源计划", "erp", "IconBuilding", 20},
             {UniqueIdGenerator.generate(), "finance", "财务管理", "Finance", "IconCurrencyDollar", 30},
             {UniqueIdGenerator.generate(), "hr", "人力资源", "HR", "IconUserGroup", 40},

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { assertRendererAgnostic } from '~/framework/smart/charts/chart-spec';
 import type { ReportDsl } from '../../types';
 import { DEFAULT_PAGE_CONFIG } from '../../types';
-import { reportDslToBlockTree } from '../reportDslCompatibilityAdapter';
+import { blockTreeToReportDsl, reportDslToBlockTree } from '../reportDslCompatibilityAdapter';
 
 const base = {
   $schema: 'auraboot://schemas/report/v1' as const,
@@ -206,4 +206,15 @@ describe('reportDslToBlockTree', () => {
       expect(reportDslToBlockTree(bandedReport(), { pageId: 'fixed' })).toMatchSnapshot();
     });
   });
+});
+
+
+it('preserves governed aggregate sources through chart conversion and save', () => {
+  const dsl = tableOnly();
+  const aggregateQuery = { type: 'aggregate' as const, semanticModelCode: 'sales', dimensions: ['region'], limit: 42 };
+  dsl.dataSources.orders = { type: 'aggregate', aggregateQuery };
+  dsl.body = [{ id: 'sales-chart', blockType: 'chart', dataSource: 'orders', chartType: 'bar', categoryField: 'region', valueField: 'revenue' }];
+  const result = reportDslToBlockTree(dsl);
+  expect(result.charts['sales-chart'].dataSource).toEqual(aggregateQuery);
+  expect(blockTreeToReportDsl(result.page).dataSources).toEqual(dsl.dataSources);
 });

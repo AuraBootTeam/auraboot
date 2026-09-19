@@ -9,6 +9,8 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.SessionRenewalService;
 import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.auth.dto.TokenRenewResponse;
+import com.auraboot.framework.auth.strategy.WechatMiniAuthStrategy;
+import com.auraboot.framework.auth.wechat.WechatMiniIdentityService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.BusinessException;
@@ -34,6 +36,7 @@ public class AuthController {
     private final PasswordManagementService passwordManagementService;
     private final LoginRateLimiter loginRateLimiter;
     private final SessionRenewalService sessionRenewalService;
+    private final WechatMiniIdentityService wechatMiniIdentityService;
 
     @Autowired
     private ApiRateLimiter apiRateLimiter;
@@ -111,6 +114,32 @@ public class AuthController {
         request.setIpAddress(ip);
         request.setUserAgent(httpRequest.getHeader("User-Agent"));
         return ApiResponse.success(authService.authenticateByChannel(request));
+    }
+
+    @PostMapping("/login/wechat-mini")
+    @ResponseBody
+    public ApiResponse<AuthenticationResponse> loginByWechatMini(
+            @RequestBody AuthStrategyRequest request,
+            HttpServletRequest httpRequest) {
+        String ip = extractIp(httpRequest);
+        request.setChannelCode(WechatMiniAuthStrategy.CHANNEL);
+        request.setIpAddress(ip);
+        request.setUserAgent(httpRequest.getHeader("User-Agent"));
+        return ApiResponse.success(authService.authenticateByChannel(request));
+    }
+
+    /**
+     * Bind a WeChat identity to the currently authenticated user (one-time;
+     * idempotent per openid). After binding, the wechat_mini login channel
+     * recognizes this WeChat account.
+     */
+    @PostMapping("/wechat/mini/bind")
+    @ResponseBody
+    public ApiResponse<java.util.Map<String, Object>> bindWechatMini(
+            @RequestBody AuthStrategyRequest request) {
+        Long userId = MetaContext.getCurrentUserId();
+        wechatMiniIdentityService.bindToUser(request.getCode(), userId);
+        return ApiResponse.success(java.util.Map.of("bound", true));
     }
 
     @PostMapping("/login/email-code")

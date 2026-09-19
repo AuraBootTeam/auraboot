@@ -5,7 +5,6 @@ plugins {
 }
 
 group = 'com.auraboot'
-version = '1.0.0-SNAPSHOT'
 
 java {
     toolchain {

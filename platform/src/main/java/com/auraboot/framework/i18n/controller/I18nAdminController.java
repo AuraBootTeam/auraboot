@@ -61,6 +61,7 @@ public class I18nAdminController {
             .build();
 
         I18nResource created = i18nResourceService.create(resource);
+        i18nService.clearCache(request.getLang());
         return ApiResponse.success(created);
     }
 
@@ -79,6 +80,9 @@ public class I18nAdminController {
             .build();
 
         I18nResource updated = i18nResourceService.update(pid, resource);
+        // The pack cache is keyed by locale; the update payload carries no
+        // lang, so invalidate all — rebuild is cheap (≤ a few thousand keys).
+        i18nService.clearCache(null);
         return ApiResponse.success(updated);
     }
 
@@ -87,7 +91,13 @@ public class I18nAdminController {
      */
     @DeleteMapping("/resources/{pid}")
     public ApiResponse<Void> delete(@PathVariable String pid) {
+        String lang = null;
+        I18nResource existing = i18nResourceService.findByPid(pid);
+        if (existing != null) {
+            lang = existing.getLang();
+        }
         i18nResourceService.delete(pid);
+        i18nService.clearCache(lang);
         return ApiResponse.success(null);
     }
 

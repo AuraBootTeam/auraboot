@@ -23,9 +23,23 @@ class MetaCacheKeyGeneratorTest {
         MetaContext.setMemberId(31L);
         String second = MetaCacheKeyGenerator.getDataAccessContextSuffix();
 
-        assertThat(first).isEqualTo("10:20:30:scoped");
-        assertThat(second).isEqualTo("10:21:31:scoped");
+        assertThat(first).startsWith("10:20:30:scoped:e");
+        assertThat(second).startsWith("10:21:31:scoped:e");
         assertThat(second).isNotEqualTo(first);
+    }
+
+    @Test
+    void dataAccessContextSuffixOrphansEntriesOnEpochBump() {
+        MetaContext.setContext(10L, 20L, "user-a", "user-a");
+        MetaContext.setMemberId(30L);
+        String before = MetaCacheKeyGenerator.getDataAccessContextSuffix();
+
+        DataAccessCacheEpoch.bump();
+        String after = MetaCacheKeyGenerator.getDataAccessContextSuffix();
+
+        assertThat(after).isNotEqualTo(before);
+        assertThat(Long.parseLong(after.substring(after.lastIndexOf(":e") + 2)))
+                .isEqualTo(DataAccessCacheEpoch.current());
     }
 
     @Test
@@ -39,9 +53,9 @@ class MetaCacheKeyGeneratorTest {
         String self = MetaContext.runWithCommandPermitScope("SELF",
                 MetaCacheKeyGenerator::getDataAccessContextSuffix);
 
-        assertThat(scoped).isEqualTo("10:20:30:scoped");
-        assertThat(all).isEqualTo("10:20:30:permit-ALL");
-        assertThat(self).isEqualTo("10:20:30:permit-SELF");
+        assertThat(scoped).startsWith("10:20:30:scoped:e");
+        assertThat(all).startsWith("10:20:30:permit-ALL:e");
+        assertThat(self).startsWith("10:20:30:permit-SELF:e");
         assertThat(all).isNotEqualTo(self);
     }
 }
