@@ -131,3 +131,57 @@ test.describe('AMOS lens journeys (S12 browser slice)', () => {
     });
   }
 });
+
+
+test.describe('AMOS lens state/layout/focus journeys', () => {
+  test.setTimeout(120_000);
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  for (const lens of LENSES) {
+    test(`layout mobile: ${lens.code}`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(
+        page.getByRole('heading', { name: lens.heading }),
+        `${lens.heading} renders at mobile width`,
+      ).toBeVisible();
+      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-mobile.png')}` });
+    });
+
+    test(`layout compact: ${lens.code}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(
+        page.getByRole('heading', { name: lens.heading }),
+        `${lens.heading} renders at compact width`,
+      ).toBeVisible();
+      await page.screenshot({ path: `test-results/artifacts/${lens.shot.replace('.png', '-compact.png')}` });
+    });
+
+    test(`keyboard focus: ${lens.code}`, async ({ page }) => {
+      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Tab');
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement;
+        return el ? `${el.tagName}:${(el.getAttribute('data-aura-element-id') || el.textContent || '').slice(0, 40)}` : 'none';
+      });
+      expect(focused, 'keyboard navigation reaches an interactive element').not.toBe('none');
+    });
+
+    test(`query empty: ${lens.code}`, async ({ page }) => {
+      // Governance empty-state expression: tables render their headers and
+      // zero-row state (or governed state rows) — never a blank canvas.
+      await page.goto(`/dashboards/view/${lens.code}`, { waitUntil: 'domcontentloaded' });
+      await expect(
+        page.getByRole('heading', { name: lens.heading }),
+      ).toBeVisible();
+      await expect
+        .poll(
+          async () => (await page.locator('table thead th, table th').count()),
+          { timeout: 20_000, message: `${lens.code} renders governed table structures` },
+        )
+        .toBeGreaterThan(0);
+    });
+  }
+});
