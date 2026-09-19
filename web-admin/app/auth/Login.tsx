@@ -608,10 +608,10 @@ export default function LoginPage() {
   const card = (
     <div className="w-full max-w-[404px]">
       <div className="mb-8">
-        <h1 className="text-[28px] font-extrabold tracking-tight text-[#15131C] lg:text-[30px] dark:text-white">
+        <h1 className="text-[28px] font-extrabold tracking-tight text-[#213d32] lg:text-[30px] dark:text-white">
           {t('auth.welcome') || '欢迎回来'}
         </h1>
-        <p className="mt-2 text-[15px] text-[#8A8694] dark:text-gray-400">
+        <p className="mt-2 text-[15px] text-[#819184] dark:text-gray-400">
           {branding.mode === 'commercial'
             ? t(
                 'auth.commercialBranding.welcomeSub',
@@ -632,7 +632,7 @@ export default function LoginPage() {
           role="tablist"
           aria-label="login channels"
           data-testid="login-channel-tabs"
-          className="mb-6 flex rounded-xl bg-[#EEEDF2] p-1 dark:bg-gray-700/60"
+          className="mb-6 flex rounded-xl bg-[#e5ebdf] p-1 dark:bg-gray-700/60"
         >
           {tabChannels.map((ch: string) => (
             <button
@@ -644,8 +644,8 @@ export default function LoginPage() {
               onClick={() => setActiveTab(ch)}
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-150 ${
                 activeTab === ch
-                  ? 'bg-white text-[#4B3FE4] shadow-sm dark:bg-gray-600 dark:text-[#a99dff]'
-                  : 'text-[#8A8694] hover:text-[#54505E] dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'bg-white text-[#35745b] shadow-sm dark:bg-gray-600 dark:text-[#a4c08b]'
+                  : 'text-[#819184] hover:text-[#52604d] dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
               {CHANNEL_I18N_KEYS[ch]
@@ -707,10 +707,10 @@ export default function LoginPage() {
       {/* Social / SSO login (conditional) */}
       {socialOptions.length > 0 && (
         <div className="mt-6">
-          <div className="flex items-center gap-3.5 text-[12.5px] text-[#B4B0BE] dark:text-gray-500">
-            <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
+          <div className="flex items-center gap-3.5 text-[12.5px] text-[#a3ad9c] dark:text-gray-500">
+            <span className="h-px flex-1 bg-[#e5ebdf] dark:bg-gray-700" />
             {t('auth.or', undefined, '或')}
-            <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
+            <span className="h-px flex-1 bg-[#e5ebdf] dark:bg-gray-700" />
           </div>
 
           {wechatQrEnabled && (
@@ -732,7 +732,7 @@ export default function LoginPage() {
               type="button"
               data-testid="login-sso-oidc"
               onClick={() => startSocialLogin(oidcOption.code)}
-              className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white text-[14.5px] font-semibold text-[#54505E] transition hover:border-[#CFCCDA] hover:bg-[#FAFAFD] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#e0e6d8] bg-white text-[14.5px] font-semibold text-[#52604d] transition hover:border-[#CFCCDA] hover:bg-[#FAFAFD] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
               <svg
                 className="h-5 w-5"
@@ -764,10 +764,10 @@ export default function LoginPage() {
       )}
 
       {registrationOpen && (
-        <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
+        <div className="mt-7 text-center text-[14px] text-[#819184] dark:text-gray-400">
           {t('auth.noAccount') || 'No account yet?'}{' '}
           <Link
-            className="font-semibold text-[#4B3FE4] transition-colors hover:text-[#3B33C9] dark:text-[#a99dff] dark:hover:text-[#c4baff]"
+            className="font-semibold text-[#35745b] transition-colors hover:text-[#2b5a47] dark:text-[#a4c08b] dark:hover:text-[#bcd3a2]"
             to={{ pathname: '/signup', search: searchParams.toString() }}
           >
             {t('auth.registerNow') || 'Sign Up'}
@@ -785,10 +785,10 @@ export default function LoginPage() {
     >
       {isMobile ? (
         // Mobile: single column with brand on top, card centered
-        <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F7F8FB] px-4 py-8 sm:px-6 dark:bg-gray-900">
+        <div className="relative flex flex-1 flex-col items-center justify-center bg-[#f6f8f3] px-4 py-8 sm:px-6 dark:bg-gray-900">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_400px_at_50%_0%,rgba(124,92,255,0.10),transparent_60%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_400px_at_50%_0%,rgba(53,116,91,0.10),transparent_60%)]"
           />
           <div className="relative mb-6 flex items-center gap-2.5">
             <img
@@ -814,64 +814,110 @@ export default function LoginPage() {
           <section className="flex flex-col justify-center bg-white px-8 py-12 lg:px-14 xl:px-20 2xl:px-24 dark:bg-gray-900">
             <div className="flex w-full max-w-[600px] flex-col">
               {/* Badge */}
-              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[#F3F2FE] px-3.5 py-1.5 text-[13px] font-semibold text-[#4B3FE4] dark:bg-[#4B3FE4]/15 dark:text-[#a99dff]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#4B3FE4]" />
-                {t('auth.badge', undefined, 'AI 原生 · 企业应用运行时')}
+              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef4e7] px-3.5 py-1.5 text-[13px] font-semibold text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#35745b]" />
+                {branding.loginBadge ?? t('auth.badge', undefined, 'AI 原生 · 企业应用运行时')}
               </span>
 
               {/* Headline with brand-colored highlight word */}
-              <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">
-                {t('auth.headline.pre', undefined, '配置即应用,')}
-                <span className="mx-1.5 text-[#4B3FE4] dark:text-[#8d7fff]">
-                  {t('auth.headline.em', undefined, 'AI 即战力')}
-                </span>
-                {t('auth.headline.post', undefined, '')}
-              </h1>
+              {branding.loginHeadline ? (
+                <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
+                  {branding.loginHeadline}
+                  {branding.loginHeadlineEm && (
+                    <span className="mx-1.5 text-[#35745b] dark:text-[#86a663]">
+                      {branding.loginHeadlineEm}
+                    </span>
+                  )}
+                </h1>
+              ) : (
+                <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
+                  {t('auth.headline.pre', undefined, '配置即应用,')}
+                  <span className="mx-1.5 text-[#35745b] dark:text-[#86a663]">
+                    {t('auth.headline.em', undefined, 'AI 即战力')}
+                  </span>
+                  {t('auth.headline.post', undefined, '')}
+                </h1>
+              )}
 
               {/* Lead */}
-              <p className="mt-5 max-w-[480px] text-[15px] leading-[1.7] text-[#54505E] xl:text-[17px] dark:text-gray-400">
-                {t(
-                  'auth.lead',
-                  undefined,
-                  '把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。',
-                )}
+              <p className="mt-5 max-w-[480px] text-[15px] leading-[1.7] text-[#52604d] xl:text-[17px] dark:text-gray-400">
+                {branding.loginLead ??
+                  t(
+                    'auth.lead',
+                    undefined,
+                    '把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。',
+                  )}
               </p>
 
-              {/* Feature list */}
+              {/* Optional deployment hero illustration (hi-fi island art) */}
+              {branding.loginHeroUrl && (
+                <img
+                  src={branding.loginHeroUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="mt-7 w-full max-w-[520px]"
+                  loading="eager"
+                />
+              )}
+
+              {/* Feature list — deployment story rows win over platform tiles */}
               <div className="mt-10 max-w-[540px]">
-                {tiles.map((tile) => (
-                  <div
-                    key={tile.key}
-                    className="flex items-start gap-4 border-t border-[#EEEDF2] py-5 last:border-b dark:border-gray-800"
-                  >
-                    <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#F3F2FE] text-[#4B3FE4] dark:bg-[#4B3FE4]/15 dark:text-[#a99dff]">
-                      {tile.icon}
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-[#15131C] dark:text-white">
-                        {tile.title}
+                {branding.loginFeatures
+                  ? branding.loginFeatures.map((feature) => (
+                      <div
+                        key={feature}
+                        className="flex items-center gap-3 border-t border-[#e5ebdf] py-4 text-[14.5px] font-medium text-[#213d32] last:border-b dark:border-gray-800 dark:text-white"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="h-5 w-5 flex-none text-[#35745b] dark:text-[#a4c08b]"
+                        >
+                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+                          <path
+                            d="M8.5 12.2l2.4 2.4 4.6-5"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        {feature}
                       </div>
-                      <div className="mt-1 text-[13.5px] text-[#8A8694] dark:text-gray-500">
-                        {tile.desc}
+                    ))
+                  : tiles.map((tile) => (
+                      <div
+                        key={tile.key}
+                        className="flex items-start gap-4 border-t border-[#e5ebdf] py-5 last:border-b dark:border-gray-800"
+                      >
+                        <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
+                          {tile.icon}
+                        </div>
+                        <div>
+                          <div className="text-base font-bold text-[#213d32] dark:text-white">
+                            {tile.title}
+                          </div>
+                          <div className="mt-1 text-[13.5px] text-[#819184] dark:text-gray-500">
+                            {tile.desc}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
               </div>
 
               {/* Trust pillars */}
-              <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#54505E] dark:text-gray-400">
+              <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#52604d] dark:text-gray-400">
                 <span>{t('auth.pillar.model', undefined, '模型驱动')}</span>
-                <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
+                <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
                 <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
-                <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
+                <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
                 <span>{t('auth.pillar.plugin', undefined, '全端交付')}</span>
               </div>
             </div>
           </section>
 
           {/* Right: form region */}
-          <section className="flex items-center justify-center border-l border-[#EEEDF2] bg-[#F7F7FB] px-6 py-14 lg:px-12 xl:px-16 dark:border-gray-800 dark:bg-gray-800">
+          <section className="flex items-center justify-center border-l border-[#e5ebdf] bg-[#f0f5e6] px-6 py-14 lg:px-12 xl:px-16 dark:border-gray-800 dark:bg-gray-800">
             <div className="w-full max-w-[404px]">{card}</div>
           </section>
         </div>
@@ -886,12 +932,12 @@ export default function LoginPage() {
 // ============================================================
 
 const INPUT_CLS =
-  'h-[52px] w-full rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white px-4 text-[15px] text-[#15131C] placeholder-[#B4B0BE] outline-none transition focus:border-[#4B3FE4] focus:ring-4 focus:ring-[#4B3FE4]/15 dark:border-gray-600 dark:bg-gray-700/60 dark:text-white dark:placeholder-gray-500';
+  'h-[52px] w-full rounded-[13px] border-[1.5px] border-[#e0e6d8] bg-white px-4 text-[15px] text-[#213d32] placeholder-[#a3ad9c] outline-none transition focus:border-[#35745b] focus:ring-4 focus:ring-[#35745b]/15 dark:border-gray-600 dark:bg-gray-700/60 dark:text-white dark:placeholder-gray-500';
 
 const SUBMIT_CLS =
-  'h-[52px] w-full rounded-[13px] bg-[#4B3FE4] text-[15.5px] font-bold text-white shadow-[0_8px_22px_-8px_rgba(75,63,228,0.6)] transition-all duration-150 hover:-translate-y-px hover:bg-[#3B33C9] hover:shadow-[0_12px_26px_-8px_rgba(75,63,228,0.65)] focus:outline-none focus:ring-4 focus:ring-[#4B3FE4]/30';
+  'h-[52px] w-full rounded-[13px] bg-[#35745b] text-[15.5px] font-bold text-white shadow-[0_8px_22px_-8px_rgba(53,116,91,0.6)] transition-all duration-150 hover:-translate-y-px hover:bg-[#2b5a47] hover:shadow-[0_12px_26px_-8px_rgba(53,116,91,0.65)] focus:outline-none focus:ring-4 focus:ring-[#35745b]/30';
 
-const LABEL_CLS = 'mb-2 block text-[13px] font-semibold text-[#54505E] dark:text-gray-300';
+const LABEL_CLS = 'mb-2 block text-[13px] font-semibold text-[#52604d] dark:text-gray-300';
 
 const SECONDARY_BTN_CLS =
   'flex-shrink-0 rounded-[11px] border px-3.5 text-xs font-semibold transition-colors';
@@ -1071,7 +1117,7 @@ function EmailPasswordForm({
               undefined,
               showPwd ? '隐藏密码' : '显示密码',
             )}
-            className="absolute top-1/2 right-2.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#9A96A4] transition-colors hover:bg-[#F1F0F8] hover:text-[#4B3FE4] dark:hover:bg-gray-600"
+            className="absolute top-1/2 right-2.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#9A96A4] transition-colors hover:bg-[#F1F0F8] hover:text-[#35745b] dark:hover:bg-gray-600"
           >
             {showPwd ? (
               <svg
@@ -1117,14 +1163,14 @@ function EmailPasswordForm({
       </div>
 
       <div className="flex items-center justify-between">
-        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#52604d] select-none dark:text-gray-400">
           <input
             id="remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#35745b] focus:ring-[#35745b] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
@@ -1186,13 +1232,13 @@ function LdapLoginForm({
           placeholder={t('auth.passwordPlaceholder', undefined, '••••••••')}
         />
       </div>
-      <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
+      <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#52604d] select-none dark:text-gray-400">
         <input
           name="remember"
           type="checkbox"
           checked={remember}
           onChange={(event) => setRemember(event.target.checked)}
-          className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
+          className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#35745b] focus:ring-[#35745b] dark:border-gray-600"
         />
         {t('auth.rememberMe', undefined, '记住我')}
       </label>
@@ -1296,8 +1342,8 @@ function SmsLoginForm({
             disabled={countdown > 0 || sending || mobile.trim().length < 10}
             className={`${SECONDARY_BTN_CLS} h-[52px] ${
               countdown > 0 || sending || mobile.trim().length < 10
-                ? 'cursor-not-allowed border-[#E4E2EC] text-[#B4B0BE] dark:border-gray-700 dark:text-gray-500'
-                : 'border-[#4B3FE4] text-[#4B3FE4] hover:bg-[#F3F2FE] dark:hover:bg-[#4B3FE4]/15'
+                ? 'cursor-not-allowed border-[#e0e6d8] text-[#a3ad9c] dark:border-gray-700 dark:text-gray-500'
+                : 'border-[#35745b] text-[#35745b] hover:bg-[#eef4e7] dark:hover:bg-[#35745b]/15'
             }`}
           >
             {countdown > 0
@@ -1315,14 +1361,14 @@ function SmsLoginForm({
       </div>
 
       <div className="flex items-center">
-        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#52604d] select-none dark:text-gray-400">
           <input
             id="sms-remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#35745b] focus:ring-[#35745b] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
@@ -1431,8 +1477,8 @@ function EmailCodeLoginForm({
             disabled={countdown > 0 || sending || !validateEmail(email)}
             className={`${SECONDARY_BTN_CLS} h-[52px] ${
               countdown > 0 || sending || !validateEmail(email)
-                ? 'cursor-not-allowed border-[#E4E2EC] text-[#B4B0BE] dark:border-gray-700 dark:text-gray-500'
-                : 'border-[#4B3FE4] text-[#4B3FE4] hover:bg-[#F3F2FE] dark:hover:bg-[#4B3FE4]/15'
+                ? 'cursor-not-allowed border-[#e0e6d8] text-[#a3ad9c] dark:border-gray-700 dark:text-gray-500'
+                : 'border-[#35745b] text-[#35745b] hover:bg-[#eef4e7] dark:hover:bg-[#35745b]/15'
             }`}
           >
             {countdown > 0
@@ -1450,14 +1496,14 @@ function EmailCodeLoginForm({
       </div>
 
       <div className="flex items-center">
-        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#52604d] select-none dark:text-gray-400">
           <input
             id="ec-remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#35745b] focus:ring-[#35745b] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
@@ -1530,7 +1576,7 @@ function SocialLoginButton({ option }: { option: LoginChannelOption }) {
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border-[1.5px] border-[#E4E2EC] bg-white text-[#54505E] transition-colors hover:border-[#CFCCDA] hover:bg-[#FAFAFD] hover:text-[#15131C] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border-[1.5px] border-[#e0e6d8] bg-white text-[#52604d] transition-colors hover:border-[#CFCCDA] hover:bg-[#FAFAFD] hover:text-[#213d32] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
       title={title || provider}
       aria-label={title || provider}
     >

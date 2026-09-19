@@ -144,14 +144,14 @@ export default function Join() {
     <div
       className={`relative flex min-h-screen overflow-hidden ${
         isMobile
-          ? 'items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-600 p-4'
-          : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50'
+          ? 'items-center justify-center bg-gradient-to-br from-[#4a8a6b] via-[#35745b] to-[#2b5a47] p-4'
+          : 'bg-gradient-to-br from-[#f6f8f3] via-[#eef4e7] to-[#e2eeda]'
       }`}
     >
       {/* Decorative background */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-gradient-to-br from-indigo-400/20 to-purple-600/20 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-gradient-to-tr from-blue-400/20 to-pink-600/20 blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-gradient-to-br from-[#35745b]/20 to-[#86a663]/20 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-gradient-to-tr from-[#86a663]/20 to-[#dcefad]/20 blur-3xl"></div>
       </div>
 
       {isMobile ? (
@@ -179,7 +179,7 @@ export default function Join() {
         /* Desktop: two-column layout */
         <div className="relative z-10 flex min-h-screen w-full">
           {/* Left: branding panel */}
-          <div className="relative hidden items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-700 p-12 lg:flex lg:w-1/2">
+          <div className="relative hidden items-center justify-center overflow-hidden bg-gradient-to-br from-[#35745b] via-[#2f6650] to-[#213d32] p-12 lg:flex lg:w-1/2">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute top-20 left-20 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
               <div className="absolute right-20 bottom-20 h-40 w-40 rounded-full bg-white/10 blur-2xl"></div>
@@ -251,7 +251,7 @@ export default function Join() {
             <div className="w-full max-w-md">
               <div className="mb-8 text-center">
                 <div className="mb-4 lg:hidden">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-purple-600">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-[#35745b] to-[#4a8a6b]">
                     <svg
                       className="h-8 w-8 text-white"
                       fill="none"
@@ -320,7 +320,7 @@ function SignUpForm({
           placeholder="请输入邮箱地址"
           aria-invalid={actionData?.errors?.email ? true : undefined}
           aria-describedby="email-error"
-          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-indigo-800 ${
+          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-[#35745b] focus:bg-white focus:ring-2 focus:ring-[#a4c08b] dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-[#35745b] ${
             isMobile ? 'rounded-lg px-4 py-4 text-base' : 'rounded-xl px-4 py-3 text-base'
           }`}
         />
@@ -348,7 +348,7 @@ function SignUpForm({
           maxLength={50}
           aria-invalid={actionData?.errors?.displayName ? true : undefined}
           aria-describedby="displayName-error"
-          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-indigo-800 ${
+          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-[#35745b] focus:bg-white focus:ring-2 focus:ring-[#a4c08b] dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-[#35745b] ${
             isMobile ? 'rounded-lg px-4 py-4 text-base' : 'rounded-xl px-4 py-3 text-base'
           }`}
         />
@@ -375,7 +375,7 @@ function SignUpForm({
           placeholder="请输入密码（至少6位）"
           aria-invalid={actionData?.errors?.password ? true : undefined}
           aria-describedby="password-error"
-          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-indigo-800 ${
+          className={`w-full border-2 border-gray-300 bg-gray-50 text-gray-900 placeholder-gray-500 shadow-sm transition-all duration-200 focus:border-[#35745b] focus:bg-white focus:ring-2 focus:ring-[#a4c08b] dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:bg-gray-600 dark:focus:ring-[#35745b] ${
             isMobile ? 'rounded-lg px-4 py-4 text-base' : 'rounded-xl px-4 py-3 text-base'
           }`}
         />
@@ -390,10 +390,10 @@ function SignUpForm({
 
       <button
         type="submit"
-        className={`w-full bg-gradient-to-r from-indigo-500 to-purple-600 font-semibold text-white transition-all duration-200 focus:ring-4 focus:ring-indigo-300 focus:outline-none dark:focus:ring-indigo-800 ${
+        className={`w-full bg-gradient-to-r from-[#35745b] to-[#4a8a6b] font-semibold text-white transition-all duration-200 focus:ring-4 focus:ring-[#a4c08b] focus:outline-none dark:focus:ring-[#35745b] ${
           isMobile
-            ? 'rounded-lg px-6 py-4 text-base shadow-lg hover:from-indigo-600 hover:to-purple-700 active:scale-95'
-            : 'transform rounded-xl px-6 py-3 text-lg shadow-lg hover:-translate-y-0.5 hover:from-indigo-600 hover:to-purple-700 hover:shadow-xl'
+            ? 'rounded-lg px-6 py-4 text-base shadow-lg hover:from-[#2b5a47] hover:to-[#35745b] active:scale-95'
+            : 'transform rounded-xl px-6 py-3 text-lg shadow-lg hover:-translate-y-0.5 hover:from-[#2b5a47] hover:to-[#35745b] hover:shadow-xl'
         }`}
       >
         创建账号
@@ -404,7 +404,7 @@ function SignUpForm({
           已有账号？
         </span>
         <Link
-          className={`ml-2 font-medium text-indigo-600 transition-colors duration-200 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 ${isMobile ? 'text-sm' : 'text-base'}`}
+          className={`ml-2 font-medium text-[#35745b] transition-colors duration-200 hover:text-[#2b5a47] dark:text-[#a4c08b] dark:hover:text-[#bcd3a2] ${isMobile ? 'text-sm' : 'text-base'}`}
           to={`/login${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
         >
           立即登录

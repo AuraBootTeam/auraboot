@@ -96,7 +96,7 @@ export default function AuthHeader() {
                     }}
                     className={`flex w-full items-center px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                       locale === option.value
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                        ? 'bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/20 dark:text-[#a4c08b]'
                         : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
@@ -134,7 +134,7 @@ export default function AuthHeader() {
                       }}
                       className={`flex w-full items-center px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                         theme === option.value
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                          ? 'bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/20 dark:text-[#a4c08b]'
                           : 'text-gray-700 dark:text-gray-300'
                       }`}
                     >
@@ -169,7 +169,7 @@ export default function AuthHeader() {
                 {registrationOpen && (
                   <Link
                     to="/signup"
-                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    className="rounded-lg bg-[#35745b] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#2b5a47]"
                   >
                     {t('auth.register') || '注册'}
                   </Link>
