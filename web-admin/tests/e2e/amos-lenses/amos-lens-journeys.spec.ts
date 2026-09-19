@@ -321,6 +321,13 @@ test.describe('AMOS lens fault/filter/trace journeys', () => {
       page.getByText('已应用：2026年1月1日 00:00 — 2026年2月1日 00:00'),
       'applied window text reflects the committed draft',
     ).toBeVisible();
+
+    // state switch: 最近 30 天 resets the applied window to the trailing month
+    await page.getByRole('button', { name: '最近 30 天' }).click();
+    await expect(
+      page.getByText('已应用：2026年1月1日 00:00 — 2026年2月1日 00:00'),
+      'preset switch must replace the committed custom range',
+    ).not.toBeVisible();
   });
 });
 
