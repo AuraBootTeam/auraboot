@@ -92,14 +92,11 @@ export default function SocialCallback() {
 
     try {
       const result = await fetchResult<AuthResponse>(
-        `/api/auth/login/social/${provider}/callback`,
-        {
-          method: 'post',
-          params: {
-            code,
-            state: stateParam,
-          },
-        },
+        // The backend callback endpoint reads code/state as @RequestParam query
+        // parameters — buildRequest only serializes params into the query for GET,
+        // so the POST must carry them explicitly on the path.
+        `/api/auth/login/social/${provider}/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(stateParam)}`,
+        { method: 'post' },
       );
 
       if (!ResultHelper.isSuccess(result)) {
