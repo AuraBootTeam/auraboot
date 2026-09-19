@@ -23,11 +23,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
@@ -74,6 +77,10 @@ public class DictServiceImpl implements DictService {
 
 
     private final ApplicationEventPublisher eventPublisher;  // ✅ 新增: 用于发布 Release 事件
+
+    private final CacheManager cacheManager;
+
+    private static final String DICT_CACHE_NAME = "dictData";
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -305,7 +312,43 @@ public class DictServiceImpl implements DictService {
         }
 
         Dict dict = dictMapper.findCurrentByCode(code);
-        return dict != null ? dictConverter.toDTO(dict) : null;
+        if (dict == null) {
+            return null;
+        }
+        registerRollbackCacheGuard();
+        return dictConverter.toDTO(dict);
+    }
+
+    /**
+     * A cacheable read inside an open transaction can observe that transaction's
+     * own uncommitted dictionary row. If the transaction later rolls back, the
+     * cache entry created after this method returns must not survive and expose a
+     * pid that no longer exists. One guard per transaction is sufficient because
+     * all dictionary lookup variants share {@value #DICT_CACHE_NAME}.
+     */
+    private void registerRollbackCacheGuard() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        boolean alreadyRegistered = TransactionSynchronizationManager.getSynchronizations().stream()
+                .anyMatch(DictRollbackCacheGuard.class::isInstance);
+        if (!alreadyRegistered) {
+            TransactionSynchronizationManager.registerSynchronization(new DictRollbackCacheGuard());
+        }
+    }
+
+    private final class DictRollbackCacheGuard implements TransactionSynchronization {
+        @Override
+        public void afterCompletion(int status) {
+            if (status == TransactionSynchronization.STATUS_COMMITTED) {
+                return;
+            }
+            var cache = cacheManager.getCache(DICT_CACHE_NAME);
+            if (cache != null) {
+                cache.clear();
+                log.warn("dictData cache swept after a transaction that primed it did not commit");
+            }
+        }
     }
 
     @Override
@@ -314,7 +357,11 @@ public class DictServiceImpl implements DictService {
         if (dictId == null) {
             return List.of();
         }
-        return dictItemMapper.selectByDictIdAndStatus(dictId, "enabled");
+        List<DictItem> items = dictItemMapper.selectByDictIdAndStatus(dictId, "enabled");
+        if (!items.isEmpty()) {
+            registerRollbackCacheGuard();
+        }
+        return items;
     }
 
     // ==================== 查询操作（修复租户上下文） ====================

@@ -27,12 +27,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Real-stack test for dict cache invalidation.
@@ -71,6 +75,8 @@ class DictCacheEvictionIntegrationTest {
     private TenantService tenantService;
     @Autowired
     private TenantMemberService tenantMemberService;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -196,5 +202,30 @@ class DictCacheEvictionIntegrationTest {
 
         assertEquals("gray", readColour(code),
                 "a plugin import replaced the items; readers must not keep seeing the stale colour");
+    }
+
+    @Test
+    @DisplayName("a dictionary cached inside a rolled-back import transaction does not survive")
+    void rolledBackTransactionalReadDoesNotLeavePhantomDictInCache() {
+        String code = CODE_PREFIX + "rollback" + RUN;
+        DictCreateRequest request = new DictCreateRequest();
+        request.setCode(code);
+        request.setName("Rolled-back plugin dictionary");
+        request.setDictType("static");
+
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        assertThrows(RollbackProbe.class, () -> transaction.executeWithoutResult(status -> {
+            DictDTO created = dictService.create(request);
+            assertNotNull(created);
+            assertNotNull(dictService.findByCode(code),
+                    "the importing transaction must be able to read its own new dictionary");
+            throw new RollbackProbe();
+        }));
+
+        assertNull(dictService.findByCode(code),
+                "a rolled-back dictionary must not remain addressable through dictData cache");
+    }
+
+    private static final class RollbackProbe extends RuntimeException {
     }
 }
