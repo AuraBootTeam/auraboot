@@ -16,9 +16,11 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Runtime request mapping owned by dynamically activated application modules. */
 @Component
@@ -50,6 +52,26 @@ public final class PluginRequestMappingHandlerMapping extends RequestMappingHand
         );
     }
 
+    /**
+     * Controllers owned by application-phase product modules. Such a module IS
+     * the application for its product domain: its controllers win over host
+     * duplicates instead of being shadowed by the host-wins policy (which
+     * exists for facet re-declarations).
+     */
+    private final Set<Class<?>> applicationModuleControllers =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+
+    /**
+     * Register a controller owned by an application-phase product module.
+     * Identical to {@link #registerController(Object)} except that a host
+     * mapping on the same path does NOT shadow it (the product owns its
+     * routes). Non-application facets keep the host-wins semantics.
+     */
+    public synchronized void registerApplicationModuleController(Object controller) {
+        applicationModuleControllers.add(AopUtils.getTargetClass(controller));
+        registerController(controller);
+    }
+
     public synchronized void registerController(Object controller) {
         Class<?> controllerType = AopUtils.getTargetClass(controller);
         if (!AnnotatedElementUtils.hasAnnotation(controllerType, RestController.class)) {
@@ -68,7 +90,7 @@ public final class PluginRequestMappingHandlerMapping extends RequestMappingHand
             // host), the plugin method is skipped with a warning instead of
             // failing the whole module registration. Plugin-vs-plugin duplicates
             // still fail closed through registerMapping's ambiguity check.
-            if (isHostOwned(mapping)) {
+            if (isHostOwned(mapping) && !applicationModuleControllers.contains(controllerType)) {
                 log.warn("Plugin controller {} duplicates host mapping(s) {} — host wins, skipping",
                         controllerType.getName(), mapping.getDirectPaths());
                 continue;

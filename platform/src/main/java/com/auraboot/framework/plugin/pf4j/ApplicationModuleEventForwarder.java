@@ -44,12 +44,22 @@ public class ApplicationModuleEventForwarder implements ApplicationListener<Comm
 
     @Override
     public void onApplicationEvent(CommandCompletedEvent event) {
+        org.slf4j.LoggerFactory.getLogger(getClass())
+                .info("[SLA-PROBE] forwarder got event: command={}, record={}, forwardedSize={}",
+                        event.getCommandCode(), event.getRecordId(), forwarded.size());
         if (forwarded.remove(event)) {
             return; // our own child re-publication bubbled back up — stop the cycle
         }
         forwarded.add(event);
+        int i = 0;
         for (ApplicationContext child : moduleRegistry.childContexts()) {
             child.publishEvent(event);
+            org.slf4j.LoggerFactory.getLogger(getClass())
+                    .info("[SLA-PROBE] forwarded to child #{}: {}", i++, event.getCommandCode());
+        }
+        if (i == 0) {
+            org.slf4j.LoggerFactory.getLogger(getClass())
+                    .info("[SLA-PROBE] no child contexts registered");
         }
     }
 }

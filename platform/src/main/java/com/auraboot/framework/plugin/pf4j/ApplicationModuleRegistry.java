@@ -55,7 +55,7 @@ public class ApplicationModuleRegistry {
 
                 List<Object> controllers = child.getBeansWithAnnotation(RestController.class)
                         .values().stream().toList();
-                controllers.forEach(requestMappings::registerController);
+                controllers.forEach(requestMappings::registerApplicationModuleController);
                 child.getBeansOfType(WorkflowCapability.class).values()
                         .forEach(provider -> workflowCapabilities.register(pluginId, provider));
                 child.publishEvent(new ApplicationModuleReadyEvent(extension.moduleId()));
