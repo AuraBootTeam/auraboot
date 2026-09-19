@@ -23,7 +23,11 @@
 import { forwardRef, useEffect, useRef } from 'react';
 import ReactECharts, { type EChartsReactProps } from 'echarts-for-react';
 
-type EChartsHostComponent = ReactECharts & {
+// ReactECharts declares updateEChartsOption as PRIVATE, so a plain
+// intersection `ReactECharts & { updateEChartsOption?: ... }` collapses to
+// never (private members are invariant under intersection). Drop the
+// private member from the host type and re-add it as a public optional.
+type EChartsHostComponent = Omit<ReactECharts, 'updateEChartsOption'> & {
   updateEChartsOption?: () => unknown;
 };
 
