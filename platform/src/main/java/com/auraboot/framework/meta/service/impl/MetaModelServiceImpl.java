@@ -95,6 +95,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final MetaDefinitionCacheService metaDefinitionCacheService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Autowired
     @Lazy
@@ -2454,6 +2455,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                         : "unknown schema creation error";
                 throw new MetaServiceException("Failed to publish model because schema creation failed: " + errorMessage);
             }
+
+            // The dynamic table now exists. Post-publish hooks run synchronously inside the same
+            // transaction: a failing hook (e.g. an installable guard trigger) fails the publish,
+            // so a model can never end up published without a guard it declared.
+            eventPublisher.publishEvent(new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, model.getCode()));
         }
 
         // Update model status
