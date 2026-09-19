@@ -19,7 +19,8 @@ public class NamedQuerySourceModels {
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
     /** Platform reference sources resolvable without a tenant model, as qualified identities. */
-    private static final Set<String> PLATFORM_REFERENCE_SOURCES = Set.of("\"public\".\"ab_user\"");
+    private static final Set<String> PLATFORM_REFERENCE_SOURCES =
+            Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */

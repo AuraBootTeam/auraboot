@@ -98,6 +98,17 @@ class NamedQuerySourceModelsTest {
         Map<String, String> resolved = resolve("public.ab_user");
         assertTrue(resolved.containsKey("\"public\".\"ab_user\""));
     }
+    @Test void platformTenantRegistryResolvesWithoutAnyModel() {
+        // ab_tenant is the platform tenant registry: no tenant_id column, no meta model on
+        // any database (fresh-seed included). It must resolve as a platform reference source
+        // regardless of catalog state, or every NQ touching it is denied on clean databases
+        // (the AggregateQueryServiceIntegrationTest fresh-seed red cluster).
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        Map<String, String> resolved = resolve("public.ab_tenant");
+        assertTrue(resolved.containsKey("\"public\".\"ab_tenant\""));
+        assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
+                resolved.get("\"public\".\"ab_tenant\""));
+    }
     @Test void bpmProductTablesResolveAsSystemSources() {
         // ab_bpm_* product tables (audit, process definition) sit under the
         // tenant-bypass prefixes alongside se_* engine tables.
