@@ -35,7 +35,15 @@ test.describe('Dashboard designer high-fidelity', () => {
     // assert the bound bar widget container is present and capture for review.
     await expect(dp.widgets).toHaveCount(2);
     await expect(dp.canvas.getByText(/^\d{2,}$/).first()).toBeVisible({ timeout: 15000 });
-    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/hifi-dashboard-designer.png`, fullPage: true });
+    // Visual guard: the draft status badge must stay a single-line pill — toolbar
+    // flex pressure used to squeeze it into a vertical two-character stack.
+    const draftBadge = dp.page.getByTestId('designer-toolbar').getByText('草稿', { exact: true });
+    await expect(draftBadge).toBeVisible({ timeout: 10000 });
+    const badgeBox = await draftBadge.boundingBox();
+    expect(badgeBox?.height ?? 99).toBeLessThan(30);
+    // Viewport capture: the canvas scrolls internally, so fullPage only adds a
+    // blank band below the app chrome.
+    await page.screenshot({ path: `${process.env.AURA_EVIDENCE_DIR}/hifi-dashboard-designer.png` });
     const versions = await (await request.get(`/api/dashboards`)).json();
     expect(versions).toBeTruthy();
   });
@@ -64,7 +72,7 @@ test.describe('Dashboard designer high-fidelity', () => {
     await expect(page.getByTestId('big-screen-exit')).toHaveCount(0);
   });
 
-  test('DHIFI-03 settings dialog exposes the three scopes', async ({ page }) => {
+  test('DHIFI-03 settings dialog exposes the three scopes', async () => {
     await dp.settingsButton.click();
     const dialog = dp.page.getByRole('dialog', { name: 'Dashboard Settings' });
     await expect(dialog).toBeVisible();

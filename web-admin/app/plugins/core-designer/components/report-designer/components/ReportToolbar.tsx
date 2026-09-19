@@ -96,7 +96,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       type="text"
       value={report.title}
       onChange={(e) => updateTitle(e.target.value)}
-      className="w-64 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
+      className="w-64 min-w-0 max-w-full border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
       placeholder={text({ zh: '报表标题', en: 'Report Title' })}
     />
   );
