@@ -56,7 +56,7 @@ public class WechatPcLoginController {
         User user = wechatPcIdentityService.resolveLoginUser(code);
         if (user == null) {
             return ApiResponse.error(com.auraboot.framework.common.constant.ResponseCode.BadParam,
-                    "This WeChat account is not bound yet — log in with email/password once and bind WeChat");
+                    "该微信尚未绑定账号：请在小程序使用学校教师码入校（入校即自动绑定），绑定后即可扫码登录");
         }
         return ApiResponse.success(loginCompletionHelper.completeLogin(user, null, null));
     }
