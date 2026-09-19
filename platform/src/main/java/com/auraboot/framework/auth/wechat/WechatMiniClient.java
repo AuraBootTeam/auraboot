@@ -34,7 +34,7 @@ public class WechatMiniClient {
                     "WeChat mini-program login is not configured (aura.wechat.mini.*)");
         }
         // Full-URI build honors the apiBase scheme (http for local stubs/tests).
-        String base = properties.getApiBase().replaceAll("/+$", "");
+        String base = properties.getApiBaseUrl().replaceAll("/+$", "");
         String uri = base + "/sns/jscode2session"
                 + "?appid=" + urlEncode(properties.getAppId())
                 + "&secret=" + urlEncode(properties.getAppSecret())

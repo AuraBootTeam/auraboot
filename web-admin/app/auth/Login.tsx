@@ -442,6 +442,20 @@ export default function LoginPage() {
   // Determine which tab channels and social channels are available
   const tabOptions = channelOptions.filter((option) => option.kind !== 'oauth');
   const socialOptions = channelOptions.filter((option) => option.kind === 'oauth');
+  // WeChat PC QR login (open-platform website app). Gated by a public flag so the
+  // button only renders when the backend reports the channel as available.
+  const [wechatQrEnabled, setWechatQrEnabled] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchResult<{ enabled: boolean }>('/api/auth/login/wechat-pc/status', { method: 'get' })
+      .then((r) => {
+        if (!cancelled && ResultHelper.isSuccess(r) && r.data?.enabled) setWechatQrEnabled(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const tabChannels = tabOptions.map((option) => option.code);
   const preferredTab =
     actionChannel && tabChannels.includes(actionChannel)
@@ -699,6 +713,20 @@ export default function LoginPage() {
             <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
           </div>
 
+          {wechatQrEnabled && (
+            <button
+              type="button"
+              data-testid="login-wechat-qr"
+              onClick={startWechatQrLogin}
+              className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#07C160]/40 bg-[#07C160]/8 text-[14.5px] font-semibold text-[#07C160] transition hover:border-[#07C160] hover:bg-[#07C160]/15"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.69 3C5.55 3 3 5.16 3 7.83c0 1.51.8 2.85 2.05 3.73l-.51 1.55 1.8-.9c.62.17 1.28.27 1.97.28a5.7 5.7 0 0 1-.15-1.28c0-2.9 2.66-5.25 5.94-5.25.2 0 .4.01.6.03C14.11 4.34 11.62 3 8.69 3zm5.81 6.13c-2.82 0-5.11 1.98-5.11 4.43 0 2.44 2.29 4.42 5.11 4.42.53 0 1.04-.07 1.52-.2l1.53.77-.42-1.32c1.09-.8 1.79-1.98 1.79-3.67 0-2.45-2.6-4.43-5.42-4.43z" />
+              </svg>
+              微信扫码登录
+            </button>
+          )}
+
           {oidcOption && (
             <button
               type="button"
@@ -867,6 +895,25 @@ const LABEL_CLS = 'mb-2 block text-[13px] font-semibold text-[#54505E] dark:text
 
 const SECONDARY_BTN_CLS =
   'flex-shrink-0 rounded-[11px] border px-3.5 text-xs font-semibold transition-colors';
+
+// Start the WeChat PC QR login: resolve qr-url from the backend, remember state,
+// and send the browser to WeChat. The callback lands on
+// /api/auth/login/wechat-pc/callback, which issues the platform JWT via redirect
+// query (handled by the platform's oauth callback shell).
+async function startWechatQrLogin() {
+  try {
+    const result = await fetchResult<{ url: string; state: string }>(
+      '/api/auth/login/wechat-pc/qr-url',
+      { method: 'get', params: { redirectUri: `${window.location.origin}/login/social/wechat_web/callback` } },
+    );
+    if (ResultHelper.isSuccess(result) && result.data?.url && result.data?.state) {
+      window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), result.data.state);
+      window.location.href = result.data.url;
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 // Start an OAuth/SSO social login by resolving the provider authorize URL.
 async function startSocialLogin(provider: string) {

@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 @Data
 @Component
 @ConfigurationProperties(prefix = "aura.wechat.mini")
+// PC website-app credentials live in aura.wechat.pc (open-platform website app).
 public class WechatMiniProperties {
     private String appId;
     private String appSecret;
     /** Overridable for integration tests; production default is the real endpoint. */
-    private String apiBase = "https://api.weixin.qq.com";
+    private String apiBaseUrl = "https://api.weixin.qq.com";
 }
