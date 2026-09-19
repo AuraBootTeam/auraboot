@@ -8,7 +8,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from './EChartsHost';
 import type { EChartsOption } from 'echarts';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type {
@@ -320,7 +320,6 @@ export const SmartWaterfallChart: React.FC<SmartWaterfallChartProps> = ({
       <ReactECharts
         option={options}
         notMerge
-        lazyUpdate
         style={{ height: '100%', width: '100%' }}
         onEvents={onEvents}
       />

@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from './EChartsHost';
 import type { EChartsOption } from 'echarts';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, FilterConfig, LinkageConfig } from '~/framework/smart/types/chart';
@@ -251,7 +251,7 @@ export const SmartHeatmapChart: React.FC<SmartHeatmapChartProps> = ({
 
   return (
     <div className={cn('rounded-lg border border-gray-200 bg-white p-4', className)} style={style}>
-      <ReactECharts option={options} style={{ height: '100%', minHeight: 0 }} notMerge lazyUpdate />
+      <ReactECharts option={options} style={{ height: '100%', minHeight: 0 }} notMerge />
     </div>
   );
 };
