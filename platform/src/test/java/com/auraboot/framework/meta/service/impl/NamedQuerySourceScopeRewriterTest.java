@@ -41,6 +41,19 @@ class NamedQuerySourceScopeRewriterTest {
         assertThrows(AccessDeniedException.class, () -> rewriter.rewrite("WITH RECURSIVE c AS (SELECT * FROM customers) SELECT * FROM c", scopes));
     }
 
+    @Test void tableFunctionOverScopedSourcePassesThrough() {
+        // The price-evidence/workbench named queries expand jsonb arrays via set-returning
+        // functions over columns of already-scoped tables (fresh-seed red cluster
+        // 2026-09-20). The function adds no new relation: it deparses as-is while the base
+        // table keeps its injected scope condition.
+        String sql = rewriter.rewrite(
+            "SELECT e.pid, (SELECT string_agg(n.val, ',') FROM jsonb_array_elements_text(e.snapshot) AS n(val)) AS ladders "
+            + "FROM customers e",
+            scopes);
+        assertTrue(sql.contains("created_by = 20"), sql);
+        assertTrue(sql.contains("jsonb_array_elements_text"), sql);
+    }
+
     @Test void chainedCtesScopeOnlyTheirPhysicalInputs() {
         String sql = rewriter.rewrite("WITH c AS (SELECT * FROM customers), d AS (SELECT * FROM c) SELECT * FROM d", scopes);
         assertEquals(1, sql.split("created_by = 20", -1).length - 1, sql);

@@ -71,9 +71,11 @@ final class NamedQuerySourceScopeRewriter {
                     output.append(table.getAlias() != null ? table.getAlias().toString() : " AS " + table.getName());
                     return output;
                 }
-                @Override public <S> StringBuilder visit(TableFunction function, S context) {
-                    throw new AccessDeniedException("Scoped table functions require explicit resolution");
-                }
+                // A set-returning table function (jsonb_array_elements_text, unnest, ...) expands
+                // columns of relations already rewritten above — their scope conditions were
+                // injected at the Table visit — so it introduces no new relation to scope and is
+                // deparsed as-is. Any real table inside its arguments is still visited (and
+                // scope-checked) through the same visitors.
             };
             expressions.setSelectVisitor(selects);
             select.accept((SelectVisitor<StringBuilder>) selects, null);
