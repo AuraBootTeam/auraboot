@@ -262,19 +262,6 @@ public class DynamicSqlProvider {
         return sql.toString();
     }
 
-    /**
-     * Build the single-row lock used by command CAS enforcement. Only metadata-derived
-     * identifiers are interpolated and every value is bound by MyBatis.
-     */
-    public static String selectRowVersionForUpdate(Map<String, Object> params) {
-        String tableName = requireName((String) params.get("tableName"), "table name");
-        String pkColumn = requireName((String) params.get("pkColumn"), "primary key column");
-        return "SELECT row_version FROM " + tableName
-                + " WHERE tenant_id = #{tenantId}"
-                + " AND " + pkColumn + " = #{recordId}"
-                + " FOR UPDATE";
-    }
-
     private static void appendExactPredicates(StringBuilder sql, Map<String, Object> filters) {
         if (filters == null) return;
         for (String column : filters.keySet()) {

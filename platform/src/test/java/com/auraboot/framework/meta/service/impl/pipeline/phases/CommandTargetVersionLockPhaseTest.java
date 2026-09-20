@@ -22,8 +22,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,21 +51,23 @@ class CommandTargetVersionLockPhaseTest {
     @Test
     void locksTheTenantScopedPidAndRetainsTheAuthoritativeVersion() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString()))
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("row_version", 7L)));
         CommandPipelineContext ctx = context(7);
 
         phase.execute(ctx);
 
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
-        verify(dynamicDataMapper).selectRowVersionForUpdate(
-                "dq_quote_request", "pid", 41L, "REQ-1");
+        verify(dynamicDataMapper).selectByQueryWithoutTenant(
+                eq("SELECT row_version FROM dq_quote_request WHERE tenant_id = #{params.tenantId}"
+                        + " AND pid = #{params.targetRecordPid} FOR SHARE"),
+                eq(Map.of("tenantId", 41L, "targetRecordPid", "REQ-1")));
     }
 
     @Test
     void rejectsAStaleVersionAfterTheRowIsLocked() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString()))
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("row_version", 8L)));
 
         assertThatThrownBy(() -> phase.execute(context(7)))
@@ -77,7 +79,7 @@ class CommandTargetVersionLockPhaseTest {
     @Test
     void failsClosedWhenTheTargetDisappearsOrHasNoVersion() {
         givenPhysicalModel();
-        when(dynamicDataMapper.selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString()))
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap()))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> phase.execute(context(7)))
@@ -92,7 +94,7 @@ class CommandTargetVersionLockPhaseTest {
         assertThatThrownBy(() -> phase.execute(context(7)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("active transaction");
-        verify(dynamicDataMapper, never()).selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test
@@ -100,7 +102,7 @@ class CommandTargetVersionLockPhaseTest {
         CommandPipelineContext ctx = context(null);
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test
@@ -111,7 +113,7 @@ class CommandTargetVersionLockPhaseTest {
         ctx.getRequest().setOperationType("UPDATE");
 
         assertThat(phase.shouldSkip(ctx)).isTrue();
-        verify(dynamicDataMapper, never()).selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test
@@ -128,7 +130,7 @@ class CommandTargetVersionLockPhaseTest {
                         .isInstanceOf(CasVersionRequiredException.class)
                         .extracting(item -> ((CasVersionRequiredException) item).getConflictCode())
                         .isEqualTo(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED));
-        verify(dynamicDataMapper, never()).selectRowVersionForUpdate(anyString(), anyString(), eq(41L), anyString());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test
