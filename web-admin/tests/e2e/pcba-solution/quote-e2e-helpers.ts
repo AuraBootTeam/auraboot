@@ -603,6 +603,17 @@ export async function dynamicCreate(
   data: Record<string, unknown>,
   rows: CreatedRows['rows'],
 ): Promise<string> {
+  if (model === 'qo_price_evidence_common' && !data.qo_pe_quote_id && data.qo_pe_quote_line_id) {
+    // Evidence rows must carry the denormalized quote anchor: the record-share row
+    // surface (extension.recordShare) grants collaborators visibility through the quote
+    // root, and rows created without the anchor stay invisible to them. Read the anchor
+    // from the line itself so the value is correct regardless of seeding order.
+    const lineResp = await page.request.get(`/api/dynamic/qo_quote_line_common/${data.qo_pe_quote_line_id}`);
+    const lineBody = await lineResp.json().catch(() => ({}));
+    const lineRecord = ((lineBody as any).data?.data ?? (lineBody as any).data ?? {}) as Record<string, unknown>;
+    const quoteId = lineRecord.qo_ql_quote_id;
+    if (quoteId) data.qo_pe_quote_id = String(quoteId);
+  }
   const resp = await page.request.post(`/api/dynamic/${model}/create`, {
     data,
     timeout: 15_000,
