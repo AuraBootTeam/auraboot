@@ -87,6 +87,22 @@ class WechatMiniIdentityServiceTest {
     }
 
     @Test
+    void openidHitBackfillsUnionidOnceTheClaimArrives() {
+        // Identity pre-dates the open-platform binding (no unionid); a later login
+        // that now carries the claim must persist it on the existing row so
+        // cross-app (PC scan ↔ mini) resolution starts working for it.
+        stubSession("OPEN-A", "UNION-9");
+        when(authIdentityMapper.selectOne(any())).thenReturn(identity(USER_A, "OPEN-A", null));
+        stubUser(USER_A);
+
+        service.resolveLoginUser("jscode");
+
+        ArgumentCaptor<AuthIdentity> captor = ArgumentCaptor.forClass(AuthIdentity.class);
+        verify(authIdentityMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getUnionid()).isEqualTo("UNION-9");
+    }
+
+    @Test
     void unionidAttachesNewOpenidToSameUser() {
         stubSession("OPEN-B", "UNION-1");
         // no openid hit (first arg null); unionid query returns user A's identity.

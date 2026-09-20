@@ -44,6 +44,14 @@ public class WechatMiniIdentityService {
     public User resolveLoginUserBySession(WechatMiniClient.WxSession session) {
         AuthIdentity identity = findByOpenid(session.openid());
         if (identity != null) {
+            // Backfill: identities created before the app joined the WeChat open
+            // platform carry no unionid; once logins start delivering it, persist it
+            // on first sight so cross-app resolution (PC scan ↔ mini) works for the
+            // existing row instead of only for newly created ones.
+            if (isBlank(identity.getUnionid()) && !isBlank(session.unionid())) {
+                identity.setUnionid(session.unionid());
+                log.info("WeChat mini identity unionid backfilled: userId={}", identity.getUserId());
+            }
             touchLastLogin(identity);
             return userMapper.selectById(identity.getUserId());
         }
