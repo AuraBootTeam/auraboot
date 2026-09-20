@@ -125,6 +125,23 @@ class NamedQuerySourceModelsTest {
                     resolved.get("\"public\"." + key));
         }
     }
+    @Test void platformRbacTablesResolveAsSystemSources() {
+        // ab_user_role / ab_role_permission / ab_permission (owner security sign-off
+        // 2026-09-20): the people-workload named queries join all three with explicit
+        // tenant_id = anchor-tenant filters; without this admission the workload tools
+        // are denied on every Flyway-clean database.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        for (String table : List.of("public.ab_user_role", "public.ab_role_permission",
+                "public.ab_permission")) {
+            Map<String, String> resolved = resolve(table);
+            String key = "\"public\".\"" + table.substring("public.".length()) + "\"";
+            assertTrue(resolved.containsKey(key), table + " should resolve as a platform reference source");
+            assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER, resolved.get(key));
+        }
+    }
+
     @Test void bpmProductTablesResolveAsSystemSources() {
         // ab_bpm_* product tables (audit, process definition) sit under the
         // tenant-bypass prefixes alongside se_* engine tables.
