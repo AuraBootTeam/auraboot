@@ -56,8 +56,10 @@ public class WechatJoinService {
             throw new BusinessException(ResponseCode.BadParam, "邀请码不能为空");
         }
         Invitation invite = tenantInviteService.findByInvitationCode(request.getInviteCode().trim());
+        // Platform convention (TenantInviteServiceImpl): generated invites are born
+        // status=active and that is the valid state — not the entity-comment PENDING.
         if (invite == null || Boolean.TRUE.equals(invite.getDeletedFlag()) || invite.getTenantId() == null
-                || !"PENDING".equals(invite.getStatus())
+                || !"active".equalsIgnoreCase(invite.getStatus())
                 || (invite.getExpiredAt() != null && invite.getExpiredAt().isBefore(Instant.now()))) {
             throw new BusinessException(ResponseCode.BadParam, "邀请码无效或已过期，请联系学校管理员");
         }
