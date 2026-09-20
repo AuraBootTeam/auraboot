@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.wechat.WechatMiniClient.WxSession;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +41,7 @@ class WechatMiniIdentityServiceTest {
     private WechatMiniClient wechatMiniClient;
 
     @Mock
-    private com.auraboot.framework.user.service.UserService userService;
+    private UserService userService;
 
     private WechatMiniIdentityService service;
 
