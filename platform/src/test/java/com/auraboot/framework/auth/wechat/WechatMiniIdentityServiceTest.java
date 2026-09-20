@@ -87,12 +87,12 @@ class WechatMiniIdentityServiceTest {
     }
 
     @Test
-    void unionidResolvesNewOpenidToSameUser() {
+    void unionidAttachesNewOpenidToSameUser() {
         stubSession("OPEN-B", "UNION-1");
         // no openid hit (first arg null); unionid query returns user A's identity.
-        // Stage-2b semantics: resolveLoginUserBySession resolves the unionid to the SAME
-        // user and no longer auto-inserts an identity row for the new openid — the
-        // OPEN-B attachment belongs to the later bind-school flow.
+        // Stage-2b: the unionid match resolves to the SAME user AND materializes the new
+        // openid (createIdentity, mirroring WechatPcIdentityService) so future logins
+        // resolve directly without depending on the unionid claim.
         when(authIdentityMapper.selectOne(any()))
                 .thenReturn(null)                    // openid lookup
                 .thenReturn(identity(USER_A, "OPEN-A", "UNION-1")); // unionid lookup
@@ -101,7 +101,11 @@ class WechatMiniIdentityServiceTest {
         User user = service.resolveLoginUser("jscode");
 
         assertThat(user.getId()).isEqualTo(USER_A);
-        verify(authIdentityMapper, never()).insert(any(AuthIdentity.class));
+        ArgumentCaptor<AuthIdentity> captor = ArgumentCaptor.forClass(AuthIdentity.class);
+        verify(authIdentityMapper).insert(captor.capture());
+        assertThat(captor.getValue().getUserId()).isEqualTo(USER_A);
+        assertThat(captor.getValue().getOpenid()).isEqualTo("OPEN-B");
+        assertThat(captor.getValue().getUnionid()).isEqualTo("UNION-1");
     }
 
     @Test
