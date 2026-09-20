@@ -62,6 +62,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const descriptionField: string | undefined = cfg.descriptionField;
   const categoryField: string | undefined = cfg.categoryField;
   const badgeField: string | undefined = cfg.badgeField;
+  // Optional image per card (URL string field, e.g. a cover/asset column).
+  // Missing or broken URLs degrade to a neutral placeholder tile, never a
+  // broken-image icon.
+  const imageField: string | undefined = cfg.imageField;
   const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const columnsClass: string = cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
@@ -192,6 +196,25 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             {/* Category tag */}
             {category && (
               <span className="text-text-2 mb-2 text-xs font-medium">{category}</span>
+            )}
+
+            {/* Image tile (imageField) */}
+            {imageField && (
+              <div
+                data-testid="card-grid-image"
+                className="bg-subtle border-border mb-3 flex h-24 items-center justify-center overflow-hidden rounded-[var(--radius-card)] border"
+              >
+                {row[imageField] ? (
+                  <img
+                    src={String(row[imageField])}
+                    alt={title || ''}
+                    className="h-full w-full object-contain p-1.5"
+                    onError={(e) => {
+                      e.currentTarget.style.visibility = 'hidden';
+                    }}
+                  />
+                ) : null}
+              </div>
             )}
 
             {/* Title */}

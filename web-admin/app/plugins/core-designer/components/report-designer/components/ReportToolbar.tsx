@@ -96,7 +96,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
       type="text"
       value={report.title}
       onChange={(e) => updateTitle(e.target.value)}
-      className="w-64 border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
+      className="w-64 min-w-0 max-w-full border-none bg-transparent text-lg font-semibold text-gray-900 outline-none focus:ring-0"
       placeholder={text({ zh: '报表标题', en: 'Report Title' })}
     />
   );
@@ -186,7 +186,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         <p
           id="report-export-status"
           role="status"
-          className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-900"
+          className="mx-4 mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
         >
           {text({
             zh: '请先保存当前修改，再导出报表。导出使用已保存的报表定义。',

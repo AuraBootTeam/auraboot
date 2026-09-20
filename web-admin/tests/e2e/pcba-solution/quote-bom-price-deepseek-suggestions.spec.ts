@@ -209,7 +209,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
           },
           { timeout: 30_000, intervals: [1000, 2000, 3000] },
         )
-        .toMatch(/CNY|待定|\d|暂不可用|unavailable/i);
+        .toMatch(/CNY|待定|\d|暂不可用|未配置|unavailable/i);
 
       const evidenceRows = await queryDynamicRecords(
         page,
@@ -221,7 +221,30 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
       expect(evidenceText).not.toMatch(
         /java\.lang|IllegalStateException|MetaContext not initialized/i,
       );
-      expect(evidenceRows.some((row) => row.qo_pe_source === 'deepseek_llm')).toBe(true);
+      const suggestions = evidenceRows.filter((row) => row.qo_pe_source === 'deepseek_llm');
+      expect(suggestions.length, 'must persist a suggestion or an explained failure').toBeGreaterThan(0);
+      for (const row of suggestions) {
+        if (row.qo_pe_status === 'failed') {
+          const snapshot = typeof row.qo_pe_snapshot === 'string'
+            ? JSON.parse(row.qo_pe_snapshot) : row.qo_pe_snapshot;
+          expect(row.qo_pe_override_reason).toMatch(/未配置|暂不可用|请求超时/);
+          expect(['source_unavailable', 'llm_timeout', 'llm_request_failed']).toContain(snapshot.failureCode);
+          expect(Number(row.qo_pe_unit_price || 0)).toBe(0);
+        } else {
+          expect(row.qo_pe_status).toBe('suggested');
+          expect(Number(row.qo_pe_unit_price)).toBeGreaterThan(0);
+        }
+      }
+      // An AI suggestion or unavailable provider must never adopt a quote cost.
+      const lines = await queryDynamicRecords(page, 'qo_quote_line_common', [
+        { fieldName: 'pid', operator: 'EQ', value: created.lineId },
+      ]);
+      expect(lines).toHaveLength(1);
+      expect(Number(lines[0].qo_ql_unit_cost || 0)).toBe(0);
+      test.info().annotations.push({ type: 'provider-outcome', description:
+        suggestions.every((row) => row.qo_pe_status === 'failed')
+          ? 'Unavailable-provider journey only; not live price-generation evidence.'
+          : 'Suggestion persisted without cost adoption.' });
 
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();

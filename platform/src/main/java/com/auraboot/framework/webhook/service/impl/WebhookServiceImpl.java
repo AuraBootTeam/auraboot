@@ -7,9 +7,11 @@ import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
+import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class WebhookServiceImpl implements WebhookService {
     private final FieldEncryptionService fieldEncryptionService;
     private final ApplicationInstallationMapper installationMapper;
     private final OpenApiEventCatalog eventCatalog;
+    private final WebhookDeliveryLogMapper deliveryLogMapper;
 
     @Override
     @Transactional
@@ -154,6 +157,24 @@ public class WebhookServiceImpl implements WebhookService {
             payload = eventCatalog.envelope(descriptor, version, "test-" + subscription.getPid(), testPayload);
         }
         webhookDispatcher.dispatch(subscription.getEventType(), payload, MetaContext.getCurrentTenantId());
+    }
+
+    @Override
+    public List<WebhookDeliveryLog> listDeliveryLogs(String subscriptionPid, int limit) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        return deliveryLogMapper.selectList(
+                new LambdaQueryWrapper<WebhookDeliveryLog>()
+                        .eq(WebhookDeliveryLog::getTenantId, tenantId)
+                        .eq(WebhookDeliveryLog::getSubscriptionPid, subscriptionPid)
+                        .orderByDesc(WebhookDeliveryLog::getCreatedAt)
+                        .last("LIMIT " + Math.min(limit, 200)));
+    }
+
+    @Override
+    public boolean replayDelivery(String deliveryPid) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int replayed = deliveryLogMapper.replay(tenantId, deliveryPid, MetaContext.getCurrentUserPid());
+        return replayed == 1;
     }
 
     private String validateInstallation(Long tenantId, String installationPid) {

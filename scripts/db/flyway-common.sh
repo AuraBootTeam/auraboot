@@ -41,6 +41,9 @@ _require_db() {
 # Build the comma-separated Flyway locations for an edition.
 # oss        -> core
 # enterprise -> core + enterprise (layered into the same database/history)
+# AURA_FLYWAY_EXTRA_LOCATIONS (colon-separated filesystem paths) is appended
+# when set — extracted product applications (e.g. aura-bpm/migrations/bpm)
+# layer their migrations into the same database/history this way.
 _build_locations() {
   local edition="$1" ent_root="${2:-}"
   if [[ ! -d "$CORE_MIGRATION_DIR" ]]; then
@@ -60,7 +63,63 @@ _build_locations() {
     fi
     locs="$locs,filesystem:$ent_dir"
   fi
+  if [[ -n "${AURA_FLYWAY_EXTRA_LOCATIONS:-}" ]]; then
+    local extra="" part
+    while IFS= read -r part; do
+      [[ -n "$part" ]] || continue
+      extra="${extra:+$extra,}filesystem:$part"
+    done < <(printf '%s\n' "$AURA_FLYWAY_EXTRA_LOCATIONS" | tr ':' '\n')
+    locs="$locs,$extra"
+  fi
   printf '%s' "$locs"
+}
+
+# Known-drift checksum realignment policy (2026-09-19 quote/BOM fresh-runtime fixes).
+#
+# V20260919050000 / V20260919051000 (enterprise) and V20260919052000 (aura-crm,
+# layered via AURA_FLYWAY_EXTRA_LOCATIONS) were made fresh-safe in place AFTER
+# they had already shipped on main and been applied to long-lived databases.
+# Those databases record the ORIGINAL checksums, so a plain `flyway migrate`
+# would fail validation on upgrade. Policy: before `migrate`, run the official
+# `flyway repair` realignment ONLY when the history table records exactly the
+# known pre-change checksum below for one of these versions. Any other drift is
+# never repaired here — Flyway validation still fails loudly. Set
+# AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR=1 to disable the realignment.
+KNOWN_DRIFT_OLD_CHECKSUMS_20260919050000=-1983915974
+KNOWN_DRIFT_OLD_CHECKSUMS_20260919051000=-1381363862
+KNOWN_DRIFT_OLD_CHECKSUMS_20260919052000=450260653
+
+# _preflight_known_drift_repair <flyway args without command>
+# Inspects ab_flyway_schema_history and, when exactly a known pre-change
+# checksum is recorded for one of the versions above, runs `flyway repair`
+# with the same configuration the subsequent migrate would use.
+_preflight_known_drift_repair() {
+  if [ -n "${AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR:-}" ]; then
+    return 0
+  fi
+  command -v psql >/dev/null 2>&1 || return 0
+  local query_result
+  query_result="$(PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
+    -v ON_ERROR_STOP=1 -Atc \
+    "SELECT version || '=' || checksum FROM ab_flyway_schema_history
+      WHERE version IN ('20260919050000','20260919051000','20260919052000')" 2>/dev/null)" || return 0
+  [ -n "$query_result" ] || return 0
+
+  local version checksum var known needs_repair=0
+  while IFS='=' read -r version checksum; do
+    [ -n "$version" ] || continue
+    var="KNOWN_DRIFT_OLD_CHECKSUMS_${version}"
+    known="${!var:-}"
+    if [ -n "$known" ] && [ "$checksum" = "$known" ]; then
+      needs_repair=1
+    fi
+  done <<< "$query_result"
+
+  if [ "$needs_repair" -eq 1 ]; then
+    echo "[flyway] known-drift preflight: history records pre-2026-09-19 checksums for the" >&2
+    echo "[flyway] fresh-safe quote/BOM migrations; running official 'flyway repair' realignment first" >&2
+    flyway "$@" repair
+  fi
 }
 
 # run_flyway <flyway-command> <edition: oss|enterprise> [enterprise-root]
@@ -81,5 +140,8 @@ run_flyway() {
   )
   echo "[flyway] $cmd  db=$PG_DB  edition=$edition" >&2
   echo "[flyway] locations=$locations" >&2
+  if [ "$cmd" = "migrate" ]; then
+    _preflight_known_drift_repair "${args[@]}"
+  fi
   flyway "${args[@]}" "$cmd"
 }

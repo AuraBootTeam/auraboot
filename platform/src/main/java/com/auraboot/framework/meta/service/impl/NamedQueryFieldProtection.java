@@ -50,11 +50,16 @@ public class NamedQueryFieldProtection {
         Long memberId = MetaContext.getCurrentMemberId();
         if (memberId == null) memberId = MetaContext.getCurrentUserId();
         for (String model : new TreeSet<>(sourceModels.values())) {
+            // Platform reference sources carry no model-level permission or scope; see
+            // NamedQuerySourceModels.PLATFORM_REFERENCE_SOURCES.
+            if (model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)
+                    || model.startsWith(com.auraboot.framework.meta.service.impl.NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) continue;
             if (memberId == null || !permissionEvaluator.canAction(memberId, model, "read")) {
                 throw new AccessDeniedException("Access denied for named query source: " + model);
             }
         }
         Set<String> resources = new TreeSet<>(sourceModels.values());
+        resources.removeIf(model -> model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER));
         if (query.getResourceCode() != null && !query.getResourceCode().isBlank()) resources.add(query.getResourceCode());
         var evidence = JSON.createObjectNode();
         evidence.set("sourceModels", JSON.valueToTree(sourceModels));
@@ -62,14 +67,26 @@ public class NamedQueryFieldProtection {
         Map<String, String> sourceScopes = new TreeMap<>();
         Map<String, String> modelScopes = new HashMap<>();
         for (var source : sourceModels.entrySet()) {
-            String scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
-                String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
-                String row = permit != null ? permit : policies.buildRowFilter(MetaContext.getCurrentTenantId(), model, "read", MetaContext.getCurrentUserId());
-                String domain = domains.buildDomainFilter(model, MetaContext.getCurrentUserId());
-                return java.util.stream.Stream.of("tenant_id = " + MetaContext.getCurrentTenantId(), row, domain).filter(value -> value != null && !value.isBlank())
-                        .map(value -> "(" + value.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "") + ")")
-                        .collect(java.util.stream.Collectors.joining(" AND "));
-            });
+            String scope;
+            if (source.getValue().startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)) {
+                // Global reference table joined by unique pid against a tenant-scoped anchor:
+                // no tenant column to filter and no model policies to apply.
+                scope = "true";
+            } else if (source.getValue().startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) {
+                // Engine tables (se_*) keep their own tenant_id column (varchar in the BPM
+                // store). Filter on the text form so the literal cannot collide with a
+                // bigint-typed sibling column in another source.
+                scope = "tenant_id::text = '" + MetaContext.getCurrentTenantId() + "'";
+            } else {
+                scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
+                    String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
+                    String row = permit != null ? permit : policies.buildRowFilter(MetaContext.getCurrentTenantId(), model, "read", MetaContext.getCurrentUserId());
+                    String domain = domains.buildDomainFilter(model, MetaContext.getCurrentUserId());
+                    return java.util.stream.Stream.of("tenant_id = " + MetaContext.getCurrentTenantId(), row, domain).filter(value -> value != null && !value.isBlank())
+                            .map(value -> "(" + value.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "") + ")")
+                            .collect(java.util.stream.Collectors.joining(" AND "));
+                });
+            }
             sourceScopes.put(source.getKey(), scope);
         }
         evidence.set("sourceScopes", JSON.valueToTree(sourceScopes));

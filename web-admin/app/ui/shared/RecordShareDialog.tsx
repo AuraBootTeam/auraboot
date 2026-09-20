@@ -24,6 +24,8 @@ export interface RecordShareDialogProps {
   onClose: () => void;
   resourceCode?: string;
   recordPid?: string;
+  permissionMode?: 'standard' | 'collaborate-only';
+  allowedRoleCodes?: string[];
 }
 
 interface ShareEntry {
@@ -75,13 +77,19 @@ function MemberRecordShareDialog({
   onClose,
   resourceCode,
   recordPid,
+  permissionMode = 'standard',
+  allowedRoleCodes,
 }: RecordShareDialogProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [shares, setShares] = useState<ShareEntry[]>([]);
   const [subjectPid, setSubjectPid] = useState<string[]>();
   const [subjectType, setSubjectType] = useState<'member' | 'role'>('member');
-  const [roles, setRoles] = useState<Array<{pid: string; name: string}>>([]);
+  const [roles, setRoles] = useState<Array<{pid: string; code: string; name: string}>>([]);
+  const allowedRoleCodeSet = useMemo(
+    () => new Set((allowedRoleCodes || []).map(code => code.trim()).filter(Boolean)),
+    [allowedRoleCodes],
+  );
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesError, setRolesError] = useState(false);
   useEffect(() => {
@@ -93,12 +101,23 @@ function MemberRecordShareDialog({
     fetch(`/api/record-share/roles?${params}`).then(async response => {
       const body = await response.json();
       if (!response.ok || !ResultHelper.isSuccess(body)) throw new Error('Role lookup failed');
-      if (!cancelled) setRoles(body.data);
+      if (!cancelled) {
+        const options = Array.isArray(body.data) ? body.data : [];
+        setRoles(
+          allowedRoleCodeSet.size === 0
+            ? options
+            : options.filter((role: {code?: string}) =>
+                allowedRoleCodeSet.has(String(role?.code || '')),
+              ),
+        );
+      }
     }).catch(() => { if (!cancelled) setRolesError(true); })
       .finally(() => { if (!cancelled) setRolesLoading(false); });
     return () => { cancelled = true; };
-  }, [open, subjectType, resourceCode, recordPid]);
-  const [permissionMask, setPermissionMask] = useState('read');
+  }, [allowedRoleCodeSet, open, subjectType, resourceCode, recordPid]);
+  const [permissionMask, setPermissionMask] = useState(
+    permissionMode === 'collaborate-only' ? 'read,update' : 'read',
+  );
   const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>('never');
   const [customExpiry, setCustomExpiry] = useState('');
   const [editingShare, setEditingShare] = useState<ShareEntry>();
@@ -132,8 +151,8 @@ function MemberRecordShareDialog({
         ),
         icon: PenLine,
       },
-    ],
-    [t],
+    ].filter((option) => permissionMode !== 'collaborate-only' || option.value === 'read,update'),
+    [permissionMode, t],
   );
 
   const loadShares = useCallback(async () => {
@@ -157,28 +176,32 @@ function MemberRecordShareDialog({
   useEffect(() => {
     if (!open) return;
     setSubjectPid(undefined);
-    setPermissionMask('read');
+    setPermissionMask(permissionMode === 'collaborate-only' ? 'read,update' : 'read');
     setExpiryPreset('never');
     setCustomExpiry('');
     setEditingShare(undefined);
     setSelectedSharePids([]);
     setConfirmBatchDelete(false);
     void loadShares();
-  }, [loadShares, open]);
+  }, [loadShares, open, permissionMode]);
 
   const resetEditor = useCallback(() => {
     setSubjectPid(undefined);
-    setPermissionMask('read');
+    setPermissionMask(permissionMode === 'collaborate-only' ? 'read,update' : 'read');
     setExpiryPreset('never');
     setCustomExpiry('');
     setEditingShare(undefined);
     setPickerVersion((current) => current + 1);
-  }, []);
+  }, [permissionMode]);
 
   const editShare = useCallback((share: ShareEntry) => {
     setEditingShare(share);
     setSubjectPid(undefined);
-    setPermissionMask(share.permissionMask.includes('update') ? 'read,update' : 'read');
+    setPermissionMask(
+      permissionMode === 'collaborate-only' || share.permissionMask.includes('update')
+        ? 'read,update'
+        : 'read',
+    );
     if (share.expiresAt) {
       setExpiryPreset('custom');
       setCustomExpiry(toLocalDateValue(share.expiresAt));
@@ -186,7 +209,7 @@ function MemberRecordShareDialog({
       setExpiryPreset('never');
       setCustomExpiry('');
     }
-  }, []);
+  }, [permissionMode]);
 
   const saveShare = useCallback(async () => {
     if (!resourceCode || !recordPid || (!editingShare && !subjectPid?.length)) return;

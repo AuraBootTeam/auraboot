@@ -46,6 +46,16 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
     @Value("${aura.builtin-plugins.dir:}")
     private String builtinPluginsDir;
 
+    /**
+     * Deployment-declared product plugins imported for every NEW tenant after the
+     * core profile, in the listed order. Comma-separated entries; each entry is a
+     * plugin source directory — absolute, or relative to the builtin plugins base
+     * directory. Example:
+     * {@code aura.tenant.product-plugins=/srv/aura-edu/plugin-aura/edu-core,/srv/aura-edu/plugin-aura/edu-engine}.
+     */
+    @Value("${aura.tenant.product-plugins:}")
+    private String tenantProductPlugins;
+
     /** Profile classifier for built-in plugins. */
     enum Profile {
         /** Always imported — required by every deployment. */
@@ -107,6 +117,9 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
             for (BuiltinPlugin plugin : selected) {
                 importPlugin(baseDir, plugin, tenantId);
             }
+            for (Path productDir : productPluginDirectories(baseDir)) {
+                importPluginDirectory(productDir.toString(), productDir.getFileName().toString(), tenantId);
+            }
         } finally {
             MetaContext.clear();
             if (previousContext != null) {
@@ -131,11 +144,12 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
     }
 
     private void importPlugin(String baseDir, BuiltinPlugin plugin, Long tenantId) {
-        String pluginPath = baseDir + "/" + plugin.dirName;
+        importPluginDirectory(baseDir + "/" + plugin.dirName, plugin.pluginId, tenantId);
+    }
 
+    private void importPluginDirectory(String pluginPath, String pluginLabel, Long tenantId) {
         if (!Files.isDirectory(Path.of(pluginPath))) {
-            log.warn("Built-in plugin directory not found ({}), skipping: {}",
-                    plugin.profile, pluginPath);
+            log.warn("Plugin directory not found, skipping: {}", pluginPath);
             return;
         }
 
@@ -143,23 +157,25 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
             ImportPreviewResult preview = pluginImportService.parseDirectory(pluginPath);
 
             if (!preview.isValid()) {
-                log.error("Built-in plugin validation failed: {} - {}",
-                        plugin.pluginId, preview.getErrors());
+                log.error("Plugin validation failed: {} - {}",
+                        pluginLabel, preview.getErrors());
                 return;
             }
 
+            String pluginId = preview.getPluginId() != null ? preview.getPluginId() : pluginLabel;
+
             // Check if already imported with same version — skip if up-to-date
-            PluginRecord existing = pluginRecordMapper.findByTenantAndPluginId(plugin.pluginId);
+            PluginRecord existing = pluginRecordMapper.findByTenantAndPluginId(pluginId);
             if (existing != null) {
                 String diskVersion = preview.getVersion();
                 String dbVersion = existing.getVersion();
                 if (diskVersion != null && diskVersion.equals(dbVersion)) {
-                    log.info("Built-in plugin already up-to-date (v{}), skipping: {}",
-                            dbVersion, plugin.pluginId);
+                    log.info("Plugin already up-to-date (v{}), skipping: {}",
+                            dbVersion, pluginId);
                     return;
                 }
-                log.info("Built-in plugin version changed ({} -> {}), re-importing: {}",
-                        dbVersion, diskVersion, plugin.pluginId);
+                log.info("Plugin version changed ({} -> {}), re-importing: {}",
+                        dbVersion, diskVersion, pluginId);
             }
 
             ImportRequest request = new ImportRequest();
@@ -168,15 +184,45 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
                     preview.getImportId(), request);
 
             if (result.isSuccess()) {
-                log.info("Built-in plugin imported successfully: {} ({}ms)",
-                        plugin.pluginId, result.getDurationMs());
+                log.info("Plugin imported successfully: {} ({}ms)",
+                        pluginId, result.getDurationMs());
             } else {
-                log.error("Built-in plugin import failed: {} - {}",
-                        plugin.pluginId, result.getErrorMessage());
+                log.error("Plugin import failed: {} - {}",
+                        pluginId, result.getErrorMessage());
             }
         } catch (Exception e) {
-            log.error("Error importing built-in plugin: {}", plugin.pluginId, e);
+            log.error("Error importing plugin: {}", pluginLabel, e);
         }
+    }
+
+    /**
+     * Resolve {@code aura.tenant.product-plugins} to existing plugin source directories,
+     * preserving the declared order. Entries that do not resolve to a directory are
+     * warned and skipped — a deployment naming a product it did not ship must not
+     * break tenant creation.
+     */
+    private List<Path> productPluginDirectories(String baseDir) {
+        if (tenantProductPlugins == null || tenantProductPlugins.isBlank()) {
+            return List.of();
+        }
+        List<Path> dirs = new ArrayList<>();
+        for (String entry : tenantProductPlugins.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            Path dir = Path.of(trimmed);
+            if (!dir.isAbsolute()) {
+                dir = Path.of(baseDir).resolve(trimmed);
+            }
+            dir = dir.normalize();
+            if (!Files.isDirectory(dir)) {
+                log.warn("Configured product plugin directory not found, skipping: {}", dir);
+                continue;
+            }
+            dirs.add(dir);
+        }
+        return dirs;
     }
 
     private String resolveBaseDir() {

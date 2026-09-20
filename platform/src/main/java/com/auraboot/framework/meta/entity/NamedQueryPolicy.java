@@ -11,6 +11,27 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class NamedQueryPolicy {
 
+    /**
+     * rowScope value: legacy default. When resource_code/action_code are absent
+     * the query runs tenant-wide, explicitly accepted by the author.
+     */
+    public static final String ROW_SCOPE_TENANT = "tenant";
+
+    /**
+     * rowScope value: the query MUST yield a non-empty evaluated row filter.
+     * Execution fails closed when resource_code/action_code are missing or the
+     * scope evaluates empty (AMOS cockpit gap G06, fallback hole C — a
+     * controlled query must never silently run unscoped).
+     */
+    public static final String ROW_SCOPE_REQUIRE_ROW_FILTER = "require_row_filter";
+
+    /**
+     * Row-scope enforcement intent: {@code tenant} (default/legacy) or
+     * {@code require_row_filter} (fail-closed; also validated at save time to
+     * require resource_code + action_code).
+     */
+    private String rowScope;
+
     /** Optional aggregate-root authorization required before reading a section query. */
     private RootAccess rootAccess;
 
@@ -60,6 +81,9 @@ public class NamedQueryPolicy {
 
         /** Root action to evaluate; defaults to {@code read}. */
         private String actionCode = "read";
+
+        /** Allow an active update-level record share to satisfy this query's surface permission. */
+        private Boolean allowCollaborator = false;
     }
 
     /**

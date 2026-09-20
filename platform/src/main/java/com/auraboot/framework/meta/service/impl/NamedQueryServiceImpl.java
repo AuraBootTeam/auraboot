@@ -21,6 +21,7 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
+import com.auraboot.framework.permission.service.RecordShareService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -68,6 +69,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private final DecisionUsageIndexService usageIndexService;
     private final DataPermissionEngine dataPermissionEngine;
     private final PermissionEvaluator permissionEvaluator;
+    private final RecordShareService recordShareService;
     /**
      * Lazy proxy avoids the natural DynamicData -> NamedQuery -> DynamicData service cycle.
      * It is only resolved when a query explicitly declares an aggregate-root guard.
@@ -122,6 +124,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (request.getPolicy() != null) {
             entity.setPolicy(request.getPolicy());
         }
+        validateRowScopeContract(entity);
         entity.setStatus(request.getStatus() != null
                 ? NamedQueryStatus.fromString(request.getStatus()).name().toLowerCase(Locale.ROOT)
                 : StatusConstants.DRAFT);
@@ -222,6 +225,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (request.getPolicy() != null) {
             entity.setPolicy(request.getPolicy());
         }
+        validateRowScopeContract(entity);
 
         entity.setUpdatedAt(Instant.now());
         namedQueryMapper.updateById(entity);
@@ -646,8 +650,17 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         Long tenantId = getCurrentTenantId();
-        authorizeDeclaredResource(query);
         NamedQueryPolicy policy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
+        Map<String, Object> authorizationParams = new HashMap<>();
+        if (request.getParameters() != null) {
+            authorizationParams.putAll(request.getParameters());
+        }
+        authorizationParams.put("tenantId", tenantId);
+        authorizationParams.put("currentUserId", getCurrentUserId());
+        authorizationParams.put("currentUserPid", MetaContext.getCurrentUserPid());
+        boolean collaboratorGrant = hasCollaboratorGrant(
+                policy, authorizationParams, MetaContext.getCurrentMemberId());
+        authorizeDeclaredResource(query, policy, authorizationParams);
 
         // 2. Rate limit check
         if (policy.isRateLimitEnabled()) {
@@ -719,7 +732,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         authorizeRootRecord(query, policy, params);
 
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
-        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
+        // The declared aggregate-root PID is already an exact row boundary for a collaborator.
+        // A surface DataScope the collaborator does not own must not erase that explicit grant.
+        if (!collaboratorGrant) {
+            appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
+        }
 
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -768,7 +785,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
      * Applying DataScope without first checking RBAC turns "no matching scope" into an
      * unrestricted query for roles that were never granted the resource permission.
      */
-    private void authorizeDeclaredResource(NamedQuery query) {
+    private void authorizeDeclaredResource(
+            NamedQuery query,
+            NamedQueryPolicy policy,
+            Map<String, Object> params) {
         String resourceCode = trimToNull(query.getResourceCode());
         String actionCode = trimToNull(query.getActionCode());
         if (resourceCode == null || actionCode == null) {
@@ -778,9 +798,41 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (memberId == null) {
             memberId = getCurrentUserId();
         }
-        if (!permissionEvaluator.canAction(memberId, resourceCode, actionCode)) {
-            throw new AccessDeniedException("Access denied for named query resource: " + resourceCode);
-        }
+        if (permissionEvaluator.canAction(memberId, resourceCode, actionCode)) return;
+        if (hasCollaboratorGrant(policy, params, memberId)) return;
+        throw new AccessDeniedException("Access denied for named query resource: " + resourceCode);
+    }
+
+    /**
+     * Authorize a loaded query outside a parameterized execution (e.g. export download) using
+     * caller identity only. Without the root-pid request parameter the collaborator shortcut
+     * cannot match, so the declared resource permission decides — fail-closed by design.
+     */
+    private void authorizeDeclaredResource(NamedQuery query) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("tenantId", MetaContext.getCurrentTenantId());
+        Long userId = getCurrentUserId();
+        params.put("currentUserId", userId != null ? userId.toString() : null);
+        params.put("currentUserPid", MetaContext.getCurrentUserPid());
+        NamedQueryPolicy policy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
+        authorizeDeclaredResource(query, policy, params);
+    }
+
+    private boolean hasCollaboratorGrant(
+            NamedQueryPolicy policy,
+            Map<String, Object> params,
+            Long memberId) {
+        NamedQueryPolicy.RootAccess root = policy == null ? null : policy.getRootAccess();
+        if (root == null || !Boolean.TRUE.equals(root.getAllowCollaborator())) return false;
+        String modelCode = trimToNull(root.getModelCode());
+        String pidParam = trimToNull(root.getPidParam());
+        if (modelCode == null || pidParam == null) return false;
+        Object rawPid = params.get(pidParam);
+        String recordPid = rawPid == null ? null : String.valueOf(rawPid).trim();
+        if (recordPid == null || recordPid.isBlank()) return false;
+        return recordShareService.isSharedByPid(
+                getCurrentTenantId(), modelCode, recordPid, memberId,
+                MetaContext.getCurrentUserPid(), "update");
     }
 
     /**
@@ -818,6 +870,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         String action = trimToNull(rootAccess.getActionCode());
         if (action == null) {
             action = "read";
+        }
+        if (hasCollaboratorGrant(policy, params, memberId)) {
+            return;
         }
         if (!permissionEvaluator.canAction(memberId, modelCode, action)) {
             throw new AccessDeniedException("Access denied for named query root: " + modelCode);
@@ -1264,6 +1319,31 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             log.error("Connector query failed: connectorPid={}, endpoint={}, error={}",
                     query.getConnectorPid(), query.getConnectorEndpointCode(), e.getMessage());
             throw new MetaServiceException("Connector query failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Save-time half of the row-scope contract: a query declaring
+     * {@code policy.rowScope = require_row_filter} must carry resource_code and
+     * action_code, otherwise every execution would fail closed with no rows
+     * scoping possible. Unknown scope values are rejected outright.
+     */
+    private void validateRowScopeContract(NamedQuery entity) {
+        NamedQueryPolicy policy = entity.getPolicy();
+        if (policy == null || policy.getRowScope() == null || policy.getRowScope().isBlank()) {
+            return;
+        }
+        String scope = policy.getRowScope();
+        if (!NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(scope)
+                && !NamedQueryPolicy.ROW_SCOPE_TENANT.equals(scope)) {
+            throw new MetaServiceException("Unknown named query policy.rowScope: " + scope);
+        }
+        if (NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(scope)
+                && (trimToNull(entity.getResourceCode()) == null
+                        || trimToNull(entity.getActionCode()) == null)) {
+            throw new MetaServiceException(
+                    "named query policy.rowScope=require_row_filter requires resourceCode and actionCode: "
+                            + entity.getCode());
         }
     }
 

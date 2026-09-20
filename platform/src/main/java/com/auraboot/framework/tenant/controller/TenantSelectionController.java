@@ -158,6 +158,13 @@ public class TenantSelectionController {
             default -> throw new RootUnCheckedException(UnreachableCodePathException);
         }
 
+        if (response.getJwt() != null) {
+            String bearer = httpRequest.getHeader("Authorization");
+            if (bearer == null || !bearer.startsWith("Bearer ")) {
+                throw new RootUnCheckedException(ResponseCode.Unauthorized, "Missing session token");
+            }
+            response.setJwt(jwtUtil.inheritSessionLifetime(response.getJwt(), bearer.substring(7)));
+        }
         localizeResponse(response, httpRequest);
         return ApiResponse.success(response);
     }

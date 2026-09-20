@@ -14,6 +14,8 @@ import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -74,6 +76,13 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private StorageProvider storageProvider;
     @Autowired(required = false)
     private RecordShareAccessor recordShareAccessor;
+    @Autowired(required = false)
+    private PlatformTransactionManager platformTransactionManager;
+
+    @Autowired
+    private com.auraboot.framework.tenant.service.TenantMemberService tenantMemberService;
+    @Autowired
+    private com.auraboot.framework.rbac.service.UserRoleService userRoleService;
 
     @Override
     public String getTaskType() {
@@ -109,8 +118,29 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
 
         callback.report(1, "Starting " + (commandCode != null ? commandCode : handlerCode));
 
+        if (tenantId == null || userId == null) {
+            return AsyncTaskResult.nonRetryableFailure("Command task requires persisted tenant and user identity");
+        }
+        MetaContext.Snapshot previousContext = MetaContext.snapshot();
+        // Recovery is dispatched by a scheduler with no request-thread context. Always
+        // establish persisted task identity rather than relying on TaskDecorator inheritance.
+        MetaContext.clear();
+        MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId));
         DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
         try {
+            // Resolve current membership/roles from IAM, never trust a stale role snapshot
+            // from the enqueue request or permissions supplied by the task payload.
+            var member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+            if (member == null || member.getId() == null || member.getId() <= 0
+                    || !tenantId.equals(member.getTenantId()) || !userId.equals(member.getUserId())
+                    || Boolean.TRUE.equals(member.getDeletedFlag())
+                    || !com.auraboot.framework.common.constant.StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())) {
+                return AsyncTaskResult.nonRetryableFailure("Command task initiator is not an active tenant member");
+            }
+            var roles = userRoleService.getRoleIdsByMemberIdAndTenantId(member.getId(), tenantId);
+            MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId),
+                    roles == null ? java.util.Set.of() : new java.util.HashSet<>(roles));
+            MetaContext.setMemberId(member.getId());
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
@@ -131,6 +161,12 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                         commandExpectedVersion);
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+            if (platformTransactionManager != null) {
+                pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
+                        new IndependentTransactionAccessorImpl(platformTransactionManager, dynamicDataService));
+            } else if (inputParams.path("resumeOnRestart").asBoolean(false)) {
+                return AsyncTaskResult.nonRetryableFailure("Resumable command requires checkpoint transactions");
+            }
             final ProgressCallback cb = callback;
             pluginSettings.put("__progressReporter",
                     (java.util.function.BiConsumer<Integer, String>)
@@ -214,6 +250,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             return failureResult(ex);
         } finally {
             queryScope.close();
+            MetaContext.clear();
+            MetaContext.restore(previousContext);
         }
     }
 

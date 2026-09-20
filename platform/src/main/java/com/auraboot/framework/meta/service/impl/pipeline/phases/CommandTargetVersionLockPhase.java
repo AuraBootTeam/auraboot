@@ -22,7 +22,7 @@ import java.util.Map;
  * Re-checks and transaction-holds the version of the client-named command target.
  *
  * <p>This phase deliberately runs after every authorization gate and the atomic idempotency claim,
- * but before any mutation or plugin handler. The {@code FOR UPDATE} row lock remains held by the
+ * but before any mutation or plugin handler. The {@code FOR SHARE} row lock remains held by the
  * caller's command transaction until commit/rollback, closing the gap between the earlier boundary
  * observation and the write phases.</p>
  */
@@ -47,6 +47,7 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())) {
             return true;
         }
+        if (usesCurrentStateLock(ctx)) return false;
         if (ctx.getRequest().getExpectedVersion() == null) {
             // Only commands that declare casRequired in their executionConfig are strict
             // legacy mutations; entering execute fail-closes with the platform conflict
@@ -60,7 +61,8 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        if (ctx.getRequest().getExpectedVersion() == null) {
+        boolean currentStateLock = usesCurrentStateLock(ctx);
+        if (!currentStateLock && ctx.getRequest().getExpectedVersion() == null) {
             if (isStrictLegacyMutation(ctx.getRequest(), ctx.getCommand())) {
                 throw new CasVersionRequiredException(
                         "Strict existing-target mutation requires expectedVersion",
@@ -87,16 +89,23 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(
                 primaryKeyColumn, "command target version primary key");
 
-        // SECURITY: the typed mapper seam carries an explicit tenant predicate, binds values,
-        // and revalidates both metadata-derived identifiers before adding FOR UPDATE.
-        List<Map<String, Object>> rows = dynamicDataMapper.selectRowVersionForUpdate(
-                tableName,
-                primaryKeyColumn,
-                ctx.getTenantId(),
-                ctx.getRequest().getTargetRecordId());
+        // SECURITY: selectByQueryWithoutTenant bypasses the tenant interceptor. This query carries
+        // an explicit tenant_id predicate and binds both tenant and pid; identifiers are resolved
+        // from MetaModelService and independently validated above.
+        String sql = "SELECT row_version FROM " + tableName
+                + " WHERE tenant_id = #{params.tenantId}"
+                + " AND " + primaryKeyColumn + " = #{params.targetRecordPid}"
+                + " FOR SHARE";
+        Map<String, Object> params = Map.of(
+                "tenantId", ctx.getTenantId(),
+                "targetRecordPid", ctx.getRequest().getTargetRecordId());
+        List<Map<String, Object>> rows = currentStateLock
+                ? dynamicDataMapper.selectTargetVersionForUpdate(tableName, primaryKeyColumn,
+                        ctx.getTenantId(), ctx.getRequest().getTargetRecordId())
+                : dynamicDataMapper.selectByQueryWithoutTenant(sql, params);
         Long authoritative = resolveVersion(rows);
         Integer requested = ctx.getRequest().getExpectedVersion();
-        if (authoritative == null || requested.longValue() != authoritative) {
+        if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {
             throw new CasVersionConflictException(
                     "Command target version conflict (expected " + requested
                             + ", current " + (authoritative == null ? "unavailable" : authoritative)
@@ -104,12 +113,51 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
                     Map.of(
                             "modelCode", ctx.getCommand().getModelCode(),
                             "recordPid", ctx.getRequest().getTargetRecordId(),
-                            "expectedVersion", requested,
+                            "expectedVersion", requested == null ? "unspecified" : requested,
                             "currentVersion", authoritative == null ? "unavailable" : authoritative,
                             "errorCode", ConflictException.ConflictCodes.CAS_VERSION_CONFLICT
                     ));
         }
         ctx.setTargetRecordVersion(authoritative);
+    }
+
+    /**
+     * Explicit intent commands may judge the latest lifecycle state instead of a stale
+     * progress version. Keep an exclusive row lock through StateCheckPhase and commit:
+     * skipping CAS alone would let a completed task be cancelled after a stale state read.
+     * This policy is server-owned and restricted to bounded state transitions; ordinary
+     * value edits retain their existing expectedVersion contract.
+     */
+    private boolean usesCurrentStateLock(CommandPipelineContext ctx) {
+        String config = ctx.getCommand().getExecutionConfig();
+        if (!StringUtils.hasText(config)) return false;
+        com.fasterxml.jackson.databind.JsonNode root;
+        try {
+            root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(config);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+            return false; // Preserve the existing legacy policy for unrelated malformed config.
+        }
+        if (root == null || !"current_state".equals(
+                root.path("options").path("targetVersionPolicy").asText())) return false;
+        if (!"state_transition".equals(root.path("type").asText())
+                || root.path("casRequired").asBoolean(false)) {
+            throw new IllegalArgumentException(
+                    "current_state targetVersionPolicy requires a non-strict state_transition command");
+        }
+        var fromStates = root.path("fromStates");
+        if (!StringUtils.hasText(root.path("stateField").asText())
+                || !StringUtils.hasText(root.path("toState").asText())
+                || !fromStates.isArray() || fromStates.isEmpty()
+                || root.has("stateTransitionRules")) {
+            throw new IllegalArgumentException(
+                    "current_state targetVersionPolicy requires stateField, non-empty fromStates and toState");
+        }
+        for (var state : fromStates) {
+            if (!state.isTextual() || !StringUtils.hasText(state.asText())) {
+                throw new IllegalArgumentException("current_state requires textual non-empty fromStates");
+            }
+        }
+        return true;
     }
 
     /**

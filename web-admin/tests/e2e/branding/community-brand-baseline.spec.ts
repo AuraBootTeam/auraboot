@@ -6,7 +6,7 @@ test.describe('Community branding baseline', () => {
     await page.context().clearCookies();
     await page.goto('/login');
 
-    await expect(page.getByTestId('auth-site-title')).toHaveText('AuraBoot');
+    await expect(page.getByTestId('login-desktop-site-title')).toHaveText('AuraBoot');
     await expect(page.getByRole('img', { name: 'AuraBoot' }).first()).toBeVisible();
     await expect(page.getByText(/登录以继续使用 AuraBoot/)).toBeVisible();
 

@@ -18,6 +18,23 @@ export interface BrandingConfig {
   aurabootCopyrightHolder: string;
   poweredByText: string;
   generatedByText: string;
+  /**
+   * Optional login-story copy (deployment-specific vertical, e.g. a school
+   * product). When present the auth pages render this instead of the
+   * platform-default feature tiles; every field is independently optional.
+   */
+  loginBadge?: string;
+  loginHeadline?: string;
+  loginHeadlineEm?: string;
+  loginLead?: string;
+  loginHeroUrl?: string;
+  loginFeatures?: string[];
+  /**
+   * Pure-wechat school deployment: the school-side login page renders only the
+   * WeChat entry (no email/password channels). Platform admins use the separate
+   * admin login route. Branding-level flag — applies when commercial branding resolves.
+   */
+  loginWechatOnly?: boolean;
 }
 
 export interface DeploymentBrandingDocument {
@@ -36,6 +53,18 @@ export interface DeploymentBrandingDocument {
   copyrightHolder: string;
   poweredByText: string;
   generatedByText: string;
+  loginBadge?: string;
+  loginHeadline?: string;
+  loginHeadlineEm?: string;
+  loginLead?: string;
+  loginHeroUrl?: string;
+  loginFeatures?: string[];
+  /**
+   * Pure-wechat school deployment: the school-side login page renders only the
+   * WeChat entry (no email/password channels). Platform admins use the separate
+   * admin login route. Branding-level flag — applies when commercial branding resolves.
+   */
+  loginWechatOnly?: boolean;
 }
 
 export interface BuildIdentity {
@@ -86,6 +115,13 @@ const DEPLOYMENT_KEYS = new Set<keyof DeploymentBrandingDocument>([
   'copyrightHolder',
   'poweredByText',
   'generatedByText',
+  'loginBadge',
+  'loginHeadline',
+  'loginHeadlineEm',
+  'loginLead',
+  'loginHeroUrl',
+  'loginFeatures',
+  'loginWechatOnly',
 ]);
 
 const FIELD_LIMITS: Partial<Record<keyof DeploymentBrandingDocument, number>> = {
@@ -103,6 +139,11 @@ const FIELD_LIMITS: Partial<Record<keyof DeploymentBrandingDocument, number>> = 
   websiteUrl: 2048,
   docsUrl: 2048,
   supportUrl: 2048,
+  loginBadge: 80,
+  loginHeadline: 120,
+  loginHeadlineEm: 120,
+  loginLead: 240,
+  loginHeroUrl: 2048,
 };
 
 function requiredText(value: unknown, field: keyof DeploymentBrandingDocument): string {
@@ -143,6 +184,32 @@ function printableAsciiText(value: unknown, field: keyof DeploymentBrandingDocum
 
 export function isCommercialEdition(edition: string | undefined): boolean {
   return ['standard', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
+}
+
+/**
+ * A deployment that ships any part of the login story owns the whole
+ * positioning narrative of the brand panel; the platform-level trust pillars
+ * (model/command/delivery) would read as off-brand there and are hidden.
+ */
+export function hasDeploymentLoginStory(
+  branding: Pick<
+    BrandingConfig,
+    | 'loginBadge'
+    | 'loginHeadline'
+    | 'loginLead'
+    | 'loginHeroUrl'
+    | 'loginFeatures'
+    | 'loginWechatOnly'
+  >,
+): boolean {
+  return Boolean(
+    branding.loginBadge ||
+    branding.loginHeadline ||
+    branding.loginLead ||
+    branding.loginHeroUrl ||
+    branding.loginFeatures?.length ||
+    branding.loginWechatOnly,
+  );
 }
 
 export function resolveBrandDisplayName(
@@ -196,7 +263,31 @@ export function resolveCommercialBranding(
     aurabootCopyrightHolder: COMMUNITY_BRANDING.aurabootCopyrightHolder,
     poweredByText: requiredText(document.poweredByText, 'poweredByText'),
     generatedByText: printableAsciiText(document.generatedByText, 'generatedByText'),
+    loginBadge: optionalText(document.loginBadge, 'loginBadge'),
+    loginHeadline: optionalText(document.loginHeadline, 'loginHeadline'),
+    loginHeadlineEm: optionalText(document.loginHeadlineEm, 'loginHeadlineEm'),
+    loginLead: optionalText(document.loginLead, 'loginLead'),
+    loginHeroUrl: optionalText(document.loginHeroUrl, 'loginHeroUrl'),
+    loginFeatures: optionalTextList(document.loginFeatures, 'loginFeatures'),
+    loginWechatOnly:
+      document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
   };
+}
+
+function optionalText(value: unknown, field: keyof DeploymentBrandingDocument): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  return requiredText(value, field);
+}
+
+function optionalTextList(
+  value: unknown,
+  field: keyof DeploymentBrandingDocument,
+): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length === 0 || value.length > 4) {
+    throw new Error(`Deployment branding field "${field}" must be an array of 1-4 strings.`);
+  }
+  return value.map((item) => requiredText(item, field));
 }
 
 export function resolveCommunityBranding(): BrandingConfig {

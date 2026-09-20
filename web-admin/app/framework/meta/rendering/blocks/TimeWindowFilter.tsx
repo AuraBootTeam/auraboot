@@ -14,7 +14,10 @@ interface WindowValue {
 const DAY = 86400000;
 
 function recentWindow(days: number): WindowValue {
-  const end = Math.floor(Date.now() / 60000) * 60000;
+  // `to` is an exclusive end at minute granularity: rounding it DOWN dropped
+  // every event that arrived within the current minute, so a freshly mounted
+  // window silently ignored the most recent data. Round UP instead.
+  const end = Math.ceil(Date.now() / 60000) * 60000;
   return { from: new Date(end - days * DAY).toISOString(), to: new Date(end).toISOString() };
 }
 function inputValue(iso: string): string {

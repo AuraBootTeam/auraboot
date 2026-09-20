@@ -9,6 +9,9 @@ import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   dynamicCreate,
   queryDynamicRecords,
+  readDynamicRecord,
+  probeCommand,
+  isPermissionDeniedResult,
   QUOTE_ROLE_TEST_PASSWORD,
   type QuoteRoleUser,
 } from './quote-e2e-helpers';
@@ -27,9 +30,8 @@ import {
  *   BOM workbench list opened from the sidebar shows eng's own task and DOES NOT show the
  *   admin-owned task; admin (all-scope) sees BOTH. API cross-checks pin the same truth.
  *
- * NOTE: this directly contradicts the stale "conversion tasks are not self-scoped" comment
- * in bom-workbench-role-eng-golden.spec.ts — self scope IS enforced on this stack (verified
- * empirically: eng's list returns only eng-owned rows). See the session report.
+ * Direct record reads and deletion attempts against the admin-owned task must also be
+ * denied; list filtering alone is insufficient. Positive UI requests remain error-free.
  *
  * RUN (host-first quoteops golden stack):
  *   PW_PROFILE=quoteops PW_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:<web> \
@@ -122,6 +124,7 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
   let adminContext: BrowserContext;
   let adminPage: Page;
   let adminTaskNo: string;
+  let adminTaskId: string;
   const adminRows: { model: string; pid: string }[] = [];
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
@@ -151,7 +154,7 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
     // admin-owned task (created_by=admin)
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
     adminTaskNo = `E2E-SCOPE-ADMIN-${suffix}`;
-    await dynamicCreate(
+    adminTaskId = await dynamicCreate(
       adminPage,
       'bom_conversion_task_pcba',
       {
@@ -172,7 +175,7 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
     await adminContext?.close();
   });
 
-  test('eng sees only own task; admin sees all', async ({ browser }) => {
+  test('eng sees only own task; admin sees all', async ({ browser }, testInfo) => {
     const incident = findIncidentBom();
     expect(incident, 'fixed E1 incident fixture present').toBeTruthy();
     expect(sha256(incident!), 'fixed E1 incident fixture checksum').toBe(INCIDENT_SHA256);
@@ -186,7 +189,7 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       const status = resp.status();
       const url = resp.url();
       if (!url.includes('/api/')) return;
-      if (status === 401 || status === 403) forbidden.push({ step, url, status });
+      if ((status === 401 || status === 403) && !step.startsWith('negative ')) forbidden.push({ step, url, status });
       if (status >= 500) serverErrors.push({ step, url, status });
     });
 
@@ -219,7 +222,7 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
 
       // Drive the user-visible core action through the real workbench form.
       step = 'eng open upload form';
-      await engPage.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+      await engPage.goto('/home', { waitUntil: 'domcontentloaded' });
       await ensureSidebarExpanded(engPage);
       const sidebar = engPage.getByTestId('sidebar');
       await sidebar.locator(`a[href="${WORKBENCH_HREF}"]`).first().click();
@@ -271,6 +274,12 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
         String(startBody?.code ?? '0'),
         `start_conversion body: ${JSON.stringify(startBody)}`,
       ).toBe('0');
+
+      // Admission redirects asynchronously to the task page. Observe that navigation
+      // before polling/using the sidebar; a competing goto can abort either transition.
+      await engPage.waitForURL(/\/p\/bom_conversion_task_pcba_workbench\/view\/[^/?#]+/, {
+        waitUntil: 'domcontentloaded', timeout: 30_000,
+      });
 
       // The previous golden stopped as soon as the record appeared. The incident
       // happens later inside the async handler, so the release verdict must wait
@@ -333,7 +342,6 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
 
       // 3. real browser AS eng: workbench list shows own task, hides admin's task
       step = 'eng open workbench list';
-      await engPage.goto('/dashboards', { waitUntil: 'domcontentloaded' });
       await ensureSidebarExpanded(engPage);
       const engSidebar = engPage.getByTestId('sidebar');
       await engSidebar.locator(`a[href="${WORKBENCH_HREF}"]`).first().click();
@@ -347,14 +355,88 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       await expect(engRow).toContainText(engTaskUiToken, { timeout: 25_000 });
       // admin task NOT rendered anywhere in eng's scoped list
       step = 'eng workbench hides admin task';
-      const engMain = await engPage
-        .locator('main')
-        .innerText()
-        .catch(() => '');
+      const adminTaskUiToken = adminTaskNo.slice(0, 12);
+      await expect(engPage.locator('tbody tr', { hasText: adminTaskUiToken })).toHaveCount(0);
+      await testInfo.attach('scope-engineering-browser', { body: await engPage.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach('scope-engineering-persistence', { body: JSON.stringify({ engTaskNo, adminTaskNo, own: engSeesOwn, other: engSeesAdmin, incidentSha256: INCIDENT_SHA256 }), contentType: 'application/json' });
+
+      // List filtering is not enough: direct record access must enforce the same scope.
+      const adminBeforeRead = await readDynamicRecord(adminPage, 'bom_conversion_task_pcba', adminTaskId);
+      step = 'negative direct read';
+      const directResponse = await engPage.request.get(`/api/dynamic/bom_conversion_task_pcba/${adminTaskId}`);
+      const directBody = await directResponse.json();
+      const directRecord = directBody?.data?.data ?? directBody?.data;
+      const adminAfterRead = await readDynamicRecord(adminPage, 'bom_conversion_task_pcba', adminTaskId);
+      await testInfo.attach('scope-direct-read-persistence', { body: JSON.stringify({ status: directResponse.status(), body: directBody, adminBeforeRead, adminAfterRead }), contentType: 'application/json' });
+      expect([403, 404].includes(directResponse.status()) ||
+        (directResponse.status() === 200 && directBody.code !== undefined && String(directBody.code) !== '0'),
+      'direct foreign task read must be refused, not return a successful record').toBe(true);
+      expect(directRecord?.pid ?? directRecord?.id).toBeFalsy();
+      expect(JSON.stringify(directBody)).not.toContain(adminTaskNo);
+      expect(adminAfterRead).toEqual(adminBeforeRead);
+      step = 'negative foreign delete';
+      const foreignDelete = await probeCommand(engPage, 'bom:delete_task', {}, adminTaskId, 'delete');
+      const adminAfterDelete = await queryDynamicRecords(adminPage, 'bom_conversion_task_pcba', [
+        { fieldName: 'bom_task_no', operator: 'EQ', value: adminTaskNo },
+      ]);
+      await testInfo.attach('scope-foreign-delete-persistence', { body: JSON.stringify({ status: foreignDelete.status, body: foreignDelete.body, before: adminBeforeRead, after: adminAfterDelete }), contentType: 'application/json' });
+      expect(isPermissionDeniedResult(foreignDelete), 'foreign task deletion must be denied by data scope').toBe(true);
+      expect(adminAfterDelete, 'denied delete must preserve the complete admin task').toEqual([adminBeforeRead]);
+
+      // Negative foreign candidate confirm: data scope must also gate line-level
+      // decision writes (bom:confirm_candidate), not just task-level reads/deletes.
+      step = 'negative foreign candidate confirm';
+      const confirmProbeSuffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+      const adminForeignLineId = await dynamicCreate(
+        adminPage,
+        'bom_standard_line_pcba',
+        {
+          bom_std_task_id: adminTaskId,
+          bom_std_row_no: 91,
+          bom_std_category: 'resistor',
+          bom_std_material_code: '',
+          bom_std_material_name: 'scope probe resistor',
+          bom_std_spec: '10K 1% 0603',
+          bom_std_package: '0603',
+          bom_std_brand: 'Yageo',
+          bom_std_mpn: 'RC0603FR-0710KL',
+          bom_std_refdes: 'R91',
+          bom_std_qty: 1,
+          bom_std_unit: 'PCS',
+          bom_std_reason_code: 'match_multi_candidate',
+          bom_std_manual_confirmed: false,
+          bom_std_raw_hash: `raw-hash-scope-confirm-${confirmProbeSuffix}`,
+          bom_std_exclusion_status: 'active',
+          bom_std_visibility_status: 'committed',
+        },
+        [],
+      );
+      const beforeForeignConfirm = await readDynamicRecord(adminPage, 'bom_standard_line_pcba', adminForeignLineId);
+      const foreignConfirm = await probeCommand(
+        engPage,
+        'bom:confirm_candidate',
+        { lineId: adminForeignLineId, candidateCode: 'SCOPE-PROBE-CODE' },
+        adminForeignLineId,
+        'update',
+      );
+      const afterForeignConfirm = await readDynamicRecord(adminPage, 'bom_standard_line_pcba', adminForeignLineId);
+      await testInfo.attach('scope-foreign-confirm-persistence', {
+        body: JSON.stringify({ status: foreignConfirm.status, body: foreignConfirm.body, before: beforeForeignConfirm, after: afterForeignConfirm }),
+        contentType: 'application/json',
+      });
       expect(
-        engMain.includes(adminTaskNo),
-        `SELF-SCOPE (UI): eng workbench must not render admin task ${adminTaskNo}`,
-      ).toBe(false);
+        isPermissionDeniedResult(foreignConfirm),
+        'foreign line candidate confirm must be denied by data scope',
+      ).toBe(true);
+      expect(
+        afterForeignConfirm?.bom_std_manual_confirmed,
+        'denied confirm must not flip manual_confirmed',
+      ).toBe(beforeForeignConfirm?.bom_std_manual_confirmed);
+      expect(
+        String(afterForeignConfirm?.bom_std_material_code ?? ''),
+        'denied confirm must not set the candidate material code',
+      ).toBe(String(beforeForeignConfirm?.bom_std_material_code ?? ''));
+      step = 'admin cross-check';
 
       // 4. admin (all-scope) sees BOTH — API definitive
       const adminSeesAdmin = await queryDynamicRecords(adminPage, 'bom_conversion_task_pcba', [
@@ -374,10 +456,13 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       const adminRow = adminPage.locator('tbody tr', { hasText: engTaskUiToken }).first();
       await expect(adminRow).toContainText(engTaskUiToken, { timeout: 25_000 });
 
-      // 5. hard gates for the eng session: no 403 (scope must filter, not forbid) / no 5xx
+      await testInfo.attach('scope-admin-browser', { body: await adminPage.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach('scope-admin-persistence', { body: JSON.stringify({ engTaskNo, adminTaskNo, own: adminSeesAdmin, engineering: adminSeesEng }), contentType: 'application/json' });
+
+      // Positive flow must not hit 401/403; the intentional foreign-ID probe is separate.
       expect(
         forbidden.map((h) => `[${h.step}] ${h.status} ${h.url}`),
-        'eng session: scope filters rows, never 401/403',
+        'eng positive flow: scope filters rows, no unexpected 401/403',
       ).toEqual([]);
       expect(
         serverErrors.map((h) => `[${h.step}] ${h.status} ${h.url}`),

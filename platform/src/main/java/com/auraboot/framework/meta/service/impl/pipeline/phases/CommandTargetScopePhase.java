@@ -177,6 +177,16 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
         ctx.setTargetRecordVersion(resolveRecordVersion(record));
 
+        // The authorization phase has already resolved this exact target (or its explicitly
+        // declared aggregate reference) and verified an active record-share grant. Re-running
+        // ordinary model RBAC here would erase that record-scoped grant for collaborator roles.
+        if (ctx.getAuthorizationVerdict() != null
+                && ctx.getAuthorizationVerdict().isAuthorized()
+                && ctx.getAuthorizationVerdict().permissionCode() != null
+                && ctx.getAuthorizationVerdict().permissionCode().startsWith("record-share:")) {
+            return true;
+        }
+
         Long memberId = resolveMemberId(ctx);
         if (memberId == null) {
             // No subject to evaluate (system/scheduled invocation), but D5 still retains the

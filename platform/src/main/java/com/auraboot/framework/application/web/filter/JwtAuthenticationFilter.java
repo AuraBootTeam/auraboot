@@ -133,6 +133,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Verify security version — invalidate token if password changed
                 int tokenSv = jwtUtil.extractSecurityVersion(jwt);
                 User user = userService.findByPid(userPid);
+                if (user == null || !user.isEnabled()) {
+                    reject(request, response, ApiResponse.errorWithContext(ResponseCode.Unauthorized, request.getRequestURI()));
+                    return;
+                }
                 if (user != null) {
                     int dbSv = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
                     if (tokenSv < dbSv) {
@@ -381,6 +385,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/tenant-selection")
                 || path.startsWith("/api/actors")
                 || path.startsWith("/api/user/sessions")
-                || path.startsWith("/api/auth/logout");
+                || path.startsWith("/api/auth/logout")
+                // Two-step pure-wechat login (SOT 05): an ONBOARDING session's whole
+                // purpose is to reach the school-binding step.
+                || "/api/tenant/bind-school".equals(path);
     }
 }

@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.dto.MetricConfig;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
@@ -127,14 +128,19 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     public AggregateQueryResponse execute(AggregateQueryRequest request) {
         validateRequest(request);
 
-        // Semantic-routed path: if the caller declared a semanticModelCode AND the
-        // adapter is available, delegate the entire request through the governed
-        // semantic layer (PRD 16 §6 W4 D4). Bit-identical legacy behaviour
-        // preserved when either is absent — existing widgets do not regress.
+        // Semantic-routed path: if the caller declared a semanticModelCode, the
+        // entire request must go through the governed semantic layer (PRD 16 §6
+        // W4 D4). When the semantic stack is not wired, fail closed instead of
+        // silently downgrading to the raw aggregate path — a controlled metric
+        // with metric-level permissions and compiled RLS must never execute as
+        // an ungoverned aggregate (AMOS cockpit gap G06, fallback hole A).
         if (request.getSemanticModelCode() != null
                 && !request.getSemanticModelCode().isBlank()) {
             if (semanticAggregateAdapter == null) {
-                throw new MetaServiceException("Semantic query service is unavailable");
+                throw new MetaServiceException(
+                        "SEMANTIC_ADAPTER_UNAVAILABLE: Semantic query service is unavailable (semanticModelCode="
+                                + request.getSemanticModelCode()
+                                + "; the semantic layer is not wired in this runtime)");
             }
             return semanticAggregateAdapter.execute(request);
         }
@@ -230,6 +236,19 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         Long currentUserId = getCurrentUserId();
         List<String> accessClauses = buildNamedQueryDataAccessClauses(query, tenantId, currentUserId);
+
+        // Row-scope contract (AMOS cockpit gap G06, fallback hole C): a query
+        // declared with rowScope=require_row_filter MUST produce a non-empty row
+        // filter — resource_code/action_code absent or a permit-less evaluation
+        // would otherwise run tenant-wide with no error. Legacy queries without
+        // the declaration keep the documented tenant-wide behaviour.
+        if (query.getPolicy() != null
+                && NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(query.getPolicy().getRowScope())
+                && accessClauses.isEmpty()) {
+            throw new MetaServiceException("NAMED_QUERY_ROW_SCOPE_REQUIRED: named query "
+                    + queryCode + " declares rowScope=require_row_filter but no row filter"
+                    + " could be evaluated (resource_code/action_code missing or empty scope)");
+        }
 
         // 6. Build SQL. Filter (incl. nested OR groups + relative-time) params are bound during
         // the build so the WHERE tree and its parameter keys stay in a single in-sync pass.

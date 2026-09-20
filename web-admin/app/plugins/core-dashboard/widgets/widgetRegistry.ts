@@ -221,6 +221,115 @@ const widgetDefinitions: WidgetDefinition[] = [
     ],
   },
   {
+    type: 'smart-waterfall-chart',
+    label: '瀑布图',
+    icon: 'StockOutlined',
+    category: '图表',
+    description: '瀑布图/增减桥（含合计锚点行）',
+    defaultConfig: {
+      title: '瀑布图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'sum' }],
+      },
+      visualization: { showLabel: true },
+    },
+    defaultSize: {
+      w: 6,
+      h: 4,
+      minW: 4,
+      minH: 3,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+      {
+        key: 'visualization.totalField',
+        label: '合计行字段（可选）',
+        type: 'text',
+        placeholder: 'bridge_kind',
+      },
+      {
+        key: 'visualization.totalValues',
+        label: '合计行取值（逗号分隔）',
+        type: 'text',
+        placeholder: 'total,subtotal,合计,小计',
+      },
+      {
+        key: 'visualization.showLabel',
+        label: '显示标签',
+        type: 'boolean',
+        defaultValue: true,
+      },
+    ],
+  },
+  {
+    type: 'smart-pareto-chart',
+    label: '帕累托图',
+    icon: 'BarChartOutlined',
+    category: '图表',
+    description: '帕累托图（柱状+累计百分比线）',
+    defaultConfig: {
+      title: '帕累托图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'sum' }],
+      },
+    },
+    defaultSize: {
+      w: 6,
+      h: 4,
+      minW: 4,
+      minH: 3,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+    ],
+  },
+  {
+    type: 'smart-gantt-chart',
+    label: '甘特图',
+    icon: 'OrderedListOutlined',
+    category: '图表',
+    description: '甘特图（任务起止与进度）',
+    defaultConfig: {
+      title: '甘特图',
+      dataSource: {
+        type: 'aggregate',
+        dimensions: [],
+        metrics: [{ field: 'id', aggregation: 'count' }],
+      },
+    },
+    defaultSize: {
+      w: 8,
+      h: 5,
+      minW: 5,
+      minH: 4,
+    },
+    configSchema: [
+      {
+        key: 'title',
+        label: '标题',
+        type: 'text',
+        required: true,
+      },
+      ...dataSourcePropertySchemas,
+    ],
+  },
+  {
     type: 'smart-area-chart',
     label: '面积图',
     icon: 'AreaChartOutlined',

@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +68,10 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
+    // Product-owned usage sources (SLA_RULE, WORKFLOW_PROCESS, ...) live behind
+    // plugin boundaries; the registry is absent in core-only runtimes.
+    private final ObjectProvider<com.auraboot.framework.plugin.pf4j.DecisionUsageSourceRegistry>
+            usageSources;
 
     @Override
     @Transactional
@@ -80,8 +85,15 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         refs.addAll(scanEventPolicies(tenantId));
         refs.addAll(scanNamedQueries(tenantId));
         refs.addAll(scanPermissionPolicies(tenantId));
+        DecisionUsageIndexRebuildDTO summary = insertRefs(tenantId, refs);
 
-        return insertRefs(tenantId, refs);
+        // Product-owned sources re-publish themselves through the accessor port;
+        // without this pull a rebuild would drop every product-side reference.
+        var registry = usageSources.getIfAvailable();
+        if (registry != null) {
+            registry.republishAll();
+        }
+        return summary;
     }
 
     @Override

@@ -28,7 +28,20 @@ import {
   shouldRenderDefaultDetailEditAction,
   canRenderDetailToolbarButton,
   unwrapDetailRecord,
+  isDetailRecordAccessDenied,
 } from '../DetailPageContent';
+
+describe('detail record access-denied feedback', () => {
+  it('uses the HTTP status even when the backend supplies a semantic error code', () => {
+    expect(isDetailRecordAccessDenied({ httpStatus: 403, code: 'ACCESS_FORBIDDEN' })).toBe(true);
+    expect(isDetailRecordAccessDenied({ code: '403' })).toBe(true);
+  });
+
+  it('does not classify a missing record or a network failure as access denial', () => {
+    expect(isDetailRecordAccessDenied({ httpStatus: 404, code: '403' })).toBe(false);
+    expect(isDetailRecordAccessDenied({ code: 'NETWORK_ERROR' })).toBe(false);
+  });
+});
 
 describe('loadDetailRecordRefreshSnapshot', () => {
   it('does not settle until the post-command record and display enrichment are both fresh', async () => {

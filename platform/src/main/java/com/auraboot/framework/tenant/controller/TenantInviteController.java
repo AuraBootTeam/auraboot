@@ -25,10 +25,13 @@ public class TenantInviteController {
     @RequirePermission("org.tenant.invite.manage")
     public ApiResponse<String> generateInviteCode(
             @CurrentUserId Long userId,
-            @RequestParam(required = true) Integer expiryDays) {
-        
+            @RequestParam(required = true) Integer expiryDays,
+            @RequestParam(required = false) String roleCodes) {
 
         String   inviteCode = tenantInviteService.generateInviteCode(userId, expiryDays);
+        if (roleCodes != null && !roleCodes.isBlank()) {
+            tenantInviteService.attachRoleCodes(inviteCode, roleCodes);
+        }
 
         return ApiResponse.success(inviteCode);
     }

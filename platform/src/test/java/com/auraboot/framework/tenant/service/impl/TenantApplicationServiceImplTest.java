@@ -13,6 +13,7 @@ import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dto.TenantRequest;
 import com.auraboot.framework.tenant.dto.TenantResponse;
 import com.auraboot.framework.tenant.dto.TenantSelectionRequest;
@@ -33,9 +34,11 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -196,6 +199,55 @@ class TenantApplicationServiceImplTest {
         verify(tenantMemberService).addMember(7L, 99L, StatusConstants.ACTIVE);
         verify(builtinPluginImportService).importForTenant(99L, 7L);
         verify(sessionManagementService).createSession(eq(7L), eq("jwt-token"), any(), any());
+    }
+
+    @Test
+    @DisplayName("createTenantForUser binds configured creator roles (aura.tenant.creator-roles)")
+    void createForUserBindsCreatorRoles() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        when(tenantService.findByName("acme")).thenReturn(null);
+        when(tenantService.createTenant(any(Tenant.class))).thenReturn(tenant(99L, "acme"));
+        when(tenantBootstrapService.bootstrapTenant(99L, 7L))
+                .thenReturn(TenantBootstrapService.BootstrapResult.success(3, 5, 10, 100));
+        TenantMember member = new TenantMember();
+        member.setPid("member-pid-1");
+        when(tenantMemberService.addMember(7L, 99L, StatusConstants.ACTIVE)).thenReturn(member);
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(null);
+        when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), any(), anyInt()))
+                .thenReturn("jwt-token");
+        ReflectionTestUtils.setField(service, "tenantCreatorRoles", "xy_school_admin");
+
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("acme");
+        req.setDisplayName("Acme Inc");
+        TenantSelectionResponse resp = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(StatusConstants.SUCCESS, resp.getStatus());
+        verify(userRoleService).assignRolesToMemberByRoleCodes(
+                eq("member-pid-1"), eq(List.of("xy_school_admin")), eq(99L), eq(7L));
+    }
+
+    @Test
+    @DisplayName("createTenantForUser skips creator-role binding when config blank")
+    void createForUserSkipsCreatorRolesWhenBlank() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        when(tenantService.findByName("acme")).thenReturn(null);
+        when(tenantService.createTenant(any(Tenant.class))).thenReturn(tenant(99L, "acme"));
+        when(tenantBootstrapService.bootstrapTenant(99L, 7L))
+                .thenReturn(TenantBootstrapService.BootstrapResult.success(3, 5, 10, 100));
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(null);
+        when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), any(), anyInt()))
+                .thenReturn("jwt-token");
+        ReflectionTestUtils.setField(service, "tenantCreatorRoles", "");
+
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("acme");
+        req.setDisplayName("Acme Inc");
+        TenantSelectionResponse resp = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(StatusConstants.SUCCESS, resp.getStatus());
+        verify(userRoleService, never()).assignRolesToMemberByRoleCodes(
+                anyString(), any(), anyLong(), anyLong());
     }
 
     @Test

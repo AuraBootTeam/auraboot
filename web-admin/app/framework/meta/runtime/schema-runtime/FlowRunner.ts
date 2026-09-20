@@ -128,6 +128,8 @@ export class FlowRunner {
       getAllFormFields: this.deps.getAllFormFields,
       expressionEvaluator: this.deps.evaluator,
       expressionContext: context,
+      locale: context.global?.locale,
+      t: context.global?.t,
     };
 
     await this.deps.actionRegistry.execute(action, actionContext);

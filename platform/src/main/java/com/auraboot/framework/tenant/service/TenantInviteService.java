@@ -57,6 +57,9 @@ public interface TenantInviteService {
      */
     Invitation findByInvitationCode(String invitationCode);
 
+    /** Attach join-time role codes to an invitation (read back at bind time). */
+    void attachRoleCodes(String invitationCode, String roleCodes);
+
 
 
     /**

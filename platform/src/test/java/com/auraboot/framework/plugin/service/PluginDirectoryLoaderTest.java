@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service;
 
+import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PageContributionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
@@ -201,6 +202,112 @@ class PluginDirectoryLoaderTest {
 
         assertThatThrownBy(() -> loader.loadFromDirectory(tempDir))
                 .hasMessageContaining("models.json");
+    }
+
+    // ==================== Fail-Closed Command Files ====================
+
+    @Test
+    @DisplayName("Should fail closed when a command file in a directory layout fails to parse")
+    void shouldFailClosedWhenCommandFileFailsToParseInDirectoryLayout() throws IOException {
+        // Commands drive user-visible actions: a dropped command file must abort the load instead of
+        // vanishing behind a green import result (PluginResourceParsePolicy fail-closed carve-out).
+        String pluginJson = """
+                {
+                  "pluginId": "com.test.unit-test",
+                  "namespace": "ut",
+                  "version": "1.0.0",
+                  "displayName": "Unit Test Plugin",
+                  "resourceDirs": {
+                    "commands": "config/commands"
+                  }
+                }
+                """;
+        Files.writeString(tempDir.resolve("plugin.json"), pluginJson);
+        Path commandsDir = tempDir.resolve("config/commands");
+        Files.createDirectories(commandsDir);
+
+        Files.writeString(commandsDir.resolve("01_valid.json"),
+                """
+                [{"code": "app:do_thing", "modelCode": "thing"}]
+                """);
+        Files.writeString(commandsDir.resolve("02_invalid.json"), "this is not valid json {{{");
+
+        assertThatThrownBy(() -> loader.loadFromDirectory(tempDir))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("02_invalid.json")
+                .hasMessageContaining("must not be silently dropped");
+    }
+
+    @Test
+    @DisplayName("Should fail closed when a command file violates the CommandDefinitionDTO contract")
+    void shouldFailClosedWhenCommandFileViolatesDtoContract() throws IOException {
+        // crm_credit_hold.json regression: inputFields shipped as objects while the DTO declares
+        // List<String>; the importer used to skip the whole file and both credit hold commands
+        // disappeared while the import still reported ok.
+        String pluginJson = """
+                {
+                  "pluginId": "com.test.unit-test",
+                  "namespace": "ut",
+                  "version": "1.0.0",
+                  "displayName": "Unit Test Plugin",
+                  "resourceDirs": {
+                    "commands": "config/commands"
+                  }
+                }
+                """;
+        Files.writeString(tempDir.resolve("plugin.json"), pluginJson);
+        Path commandsDir = tempDir.resolve("config/commands");
+        Files.createDirectories(commandsDir);
+
+        Files.writeString(commandsDir.resolve("crm_like.json"),
+                """
+                [{
+                  "code": "app:place_hold",
+                  "modelCode": "account",
+                  "inputFields": [{"field": "reason", "required": true}]
+                }]
+                """);
+
+        assertThatThrownBy(() -> loader.loadFromDirectory(tempDir))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("crm_like.json")
+                .hasMessageContaining("CommandDefinitionDTO");
+    }
+
+    @Test
+    @DisplayName("Auxiliary resource files still skip themselves when a sibling command file is valid")
+    void auxiliaryResourceFilesKeepPerFileResilience() throws IOException {
+        String pluginJson = """
+                {
+                  "pluginId": "com.test.unit-test",
+                  "namespace": "ut",
+                  "version": "1.0.0",
+                  "displayName": "Unit Test Plugin",
+                  "resourceDirs": {
+                    "commands": "config/commands",
+                    "dicts": "config/dicts"
+                  }
+                }
+                """;
+        Files.writeString(tempDir.resolve("plugin.json"), pluginJson);
+        Path commandsDir = tempDir.resolve("config/commands");
+        Files.createDirectories(commandsDir);
+        Path dictsDir = tempDir.resolve("config/dicts");
+        Files.createDirectories(dictsDir);
+
+        Files.writeString(commandsDir.resolve("commands.json"),
+                """
+                [{"code": "app:do_thing", "modelCode": "thing"}]
+                """);
+        Files.writeString(dictsDir.resolve("broken.json"), "this is not valid json {{{");
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(tempDir);
+
+        assertThat(manifest.getCommands())
+                .isNotNull()
+                .hasSize(1)
+                .extracting(CommandDefinitionDTO::getCode)
+                .containsExactly("app:do_thing");
     }
 
     // ==================== Validation Tests ====================

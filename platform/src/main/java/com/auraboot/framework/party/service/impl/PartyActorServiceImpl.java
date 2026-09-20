@@ -183,6 +183,8 @@ public class PartyActorServiceImpl implements PartyActorService {
                 securityVersion);
         String newToken = jwtUtil.generateTokenWithContext(toUserDetails(user), user.getPid(), tokenContext);
 
+        newToken = jwtUtil.inheritSessionLifetime(newToken, currentToken);
+
         // Persist the replacement before revoking the old token. A persistence failure leaves
         // the caller's existing session intact; a successful replacement invalidates it.
         sessionManagementService.createSession(user.getId(), newToken, ipAddress, userAgent);

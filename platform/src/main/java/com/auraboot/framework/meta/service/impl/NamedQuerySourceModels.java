@@ -18,6 +18,57 @@ public class NamedQuerySourceModels {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
+    /**
+     * Platform reference sources resolvable without a tenant model, as qualified identities.
+     *
+     * <p>Admission rule (see #1968 for ab_tenant): platform-owned tables that the named
+     * query joins on their unique pid (or with an explicit tenant filter) against an
+     * already tenant-scoped anchor, so no cross-tenant rows can leak through the join.
+     * ab_file and ab_async_task carry tenant_id and the quoting named queries filter them
+     * by #{params.tenantId} / the anchor's tenant explicitly.</p>
+     *
+     * <p>ab_user_role / ab_role_permission / ab_permission (owner security sign-off
+     * 2026-09-20): all three carry tenant_id, and the people-workload named queries join
+     * each of them with an explicit {@code tenant_id = <anchor tenant>} filter plus
+     * soft-delete predicates, chained off the tenant-scoped member/role anchor rows —
+     * the workload tooling pages were fully denied without this admission.</p>
+     */
+    private static final Set<String> PLATFORM_REFERENCE_SOURCES =
+            Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"",
+                    "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"",
+                    "\"public\".\"ab_user_role\"", "\"public\".\"ab_role_permission\"",
+                    "\"public\".\"ab_permission\"");
+    /** Marker model code for a platform reference source; protection must skip model checks. */
+    public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
+    /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
+    public static final String ENGINE_SOURCE_MARKER_PREFIX = "engine.";
+
+    static String platformReferenceMarker(String key) {
+        return PLATFORM_REFERENCE_MARKER;
+    }
+
+    /** Marker for an engine-table source under the tenant-bypass prefixes (own tenant_id column). */
+    static String engineSourceMarker(String key) {
+        String bare = key.trim().toLowerCase();
+        int lastDot = bare.lastIndexOf('.');
+        if (lastDot >= 0) bare = bare.substring(lastDot + 1);
+        bare = bare.replace("\"", "");
+        return ENGINE_SOURCE_MARKER_PREFIX + bare;
+    }
+
+    /** True when the quoted identity's bare table name starts with an engine (bypass) prefix. */
+    static boolean isBypassEngineSource(String key) {
+        String bare = key.trim().toLowerCase();
+        int lastDot = bare.lastIndexOf('.');
+        if (lastDot >= 0) bare = bare.substring(lastDot + 1);
+        bare = bare.replace("\"", "");
+        // se_ is the SmartEngine table prefix configured via
+        // aura.persistence.tenant-bypass-table-prefixes on standalone applications.
+        // se_* = SmartEngine tables; ab_bpm_* = BPM product tables. Both live under
+        // the tenant-bypass prefixes on standalone applications.
+        return bare.startsWith("se_") || bare.startsWith("ab_bpm_");
+    }
+
     record Sources(Map<String, String> models, Map<String, String> views) {
         Sources { models = Map.copyOf(models); views = Map.copyOf(views); }
     }
@@ -39,7 +90,10 @@ public class NamedQuerySourceModels {
         Map<String, String> result = new TreeMap<>();
         Map<String, String> views = new TreeMap<>();
         String projections = fields.stream().map(field -> field.getColumnExpr() + " AS " + field.getFieldCode()).collect(java.util.stream.Collectors.joining(", "));
-        for (String table : sql.referencedTables("SELECT " + projections + " FROM " + source))
+        // Queries without declared output fields cannot project a column list; a star
+        // projection keeps source resolution working for field-less sources.
+        String projectionClause = projections.isBlank() ? "*" : projections;
+        for (String table : sql.referencedTables("SELECT " + projectionClause + " FROM " + source))
             resolveRelation(identity(table), catalog, result, views, new HashSet<>());
         return new Sources(result, views);
     }
@@ -49,8 +103,25 @@ public class NamedQuerySourceModels {
         if (visiting.contains(key)) throw new AccessDeniedException("Recursive view source is unsupported");
         if (result.containsKey(key)) return;
         if (visiting.size() >= 32) throw new AccessDeniedException("View source nesting exceeds the supported depth");
+        if (PLATFORM_REFERENCE_SOURCES.contains(key)) {
+            // Platform reference tables (identity and similar global registries) have no tenant
+            // column and no tenant model, so they cannot take row scopes or field protections.
+            // They are only ever joined on their unique pid against an already tenant-scoped
+            // anchor (e.g. ab_user.pid = activity owner), which exposes no rows beyond that
+            // anchor's scope. Mapping them to a reserved marker lets protection skip them.
+            result.put(key, platformReferenceMarker(key));
+            return;
+        }
+        if (isBypassEngineSource(key)) {
+            // Engine tables (se_*) sit under the configured tenant-bypass prefixes: the
+            // runtime maintains their tenant_id column and NQ SQL on them carries explicit
+            // tenant filters, so they cannot back meta-model source resolution.
+            result.put(key, engineSourceMarker(key));
+            return;
+        }
         Set<String> candidates = catalog.getOrDefault(key, Set.of());
-        if (candidates.size() != 1) throw new AccessDeniedException("Export source model is unknown or ambiguous");
+        if (candidates.size() != 1) throw new AccessDeniedException(
+                "Export source model is unknown or ambiguous: " + key + " (candidates=" + candidates.size() + ")");
         Map<String, Object> relation = jdbc.queryForMap("""
                 SELECT c.relkind::text AS kind,
                     EXISTS(SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=c.oid

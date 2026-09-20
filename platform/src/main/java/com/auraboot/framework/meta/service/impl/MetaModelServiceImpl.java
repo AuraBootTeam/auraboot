@@ -95,6 +95,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final MetaDefinitionCacheService metaDefinitionCacheService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Autowired
     @Lazy
@@ -2411,7 +2412,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 throw new MetaServiceException("Model must have at least one field bound before publishing");
             }
 
-            // Auto-mark searchable fields if none are explicitly marked
+            // Keep the keyword surface at a sensible minimum (additive; explicit marks win)
             autoMarkSearchableFields(model.getId(), bindings);
 
             // Expand MONEY type fields (auto-create _base fields, currency headers, binding rules)
@@ -2454,6 +2455,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                         : "unknown schema creation error";
                 throw new MetaServiceException("Failed to publish model because schema creation failed: " + errorMessage);
             }
+
+            // The dynamic table now exists. Post-publish hooks run synchronously inside the same
+            // transaction: a failing hook (e.g. an installable guard trigger) fails the publish,
+            // so a model can never end up published without a guard it declared.
+            eventPublisher.publishEvent(new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, model.getCode()));
         }
 
         // Update model status
@@ -2565,32 +2571,40 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
 
     /**
-     * Auto-mark the first N STRING/TEXT fields as searchable if none are explicitly marked.
-     * Called during model publish to ensure keyword search has fields to work with.
+     * Ensure keyword search always covers the model's business identity fields
+     * (name/code-style string/text bindings), additively and idempotently.
+     * Called during model publish. Explicitly searchable bindings stay untouched;
+     * when fewer than maxAutoSearchable string/text bindings are searchable in
+     * total (e.g. a plugin binding file marks only its add-on enum fields), the
+     * first string/text bindings in field order are marked so the keyword surface
+     * never degrades to a narrow add-on subset.
      */
     private void autoMarkSearchableFields(Long modelId, List<ModelFieldBinding> bindings) {
-        // Check if any binding already has searchable=true
-        boolean anySearchable = bindings.stream()
-                .anyMatch(b -> Boolean.TRUE.equals(b.getSearchable()));
-        if (anySearchable) {
-            log.debug("Model {} already has searchable fields marked, skipping auto-mark", modelId);
-            return;
-        }
-
-        // Load field entities to check data types
-        List<Long> fieldIds = bindings.stream()
-                .map(ModelFieldBinding::getFieldId)
-                .toList();
-        List<Field> fields = metaFieldMapper.findByIds(fieldIds);
-        Map<Long, Field> fieldMap = fields.stream()
-                .collect(java.util.stream.Collectors.toMap(Field::getId, f -> f));
-
         Set<String> searchableTypes = Set.of("string", "text", "enum", "dict");
-        int marked = 0;
         int maxAutoSearchable = 5;
 
-        for (ModelFieldBinding binding : bindings) {
-            if (marked >= maxAutoSearchable) break;
+        List<ModelFieldBinding> ordered = bindings.stream()
+                .sorted(Comparator.comparing(
+                        b -> b.getFieldOrder() != null ? b.getFieldOrder() : Integer.MAX_VALUE))
+                .toList();
+        List<Long> fieldIds = ordered.stream()
+                .map(ModelFieldBinding::getFieldId)
+                .toList();
+        Map<Long, Field> fieldMap = metaFieldMapper.findByIds(fieldIds).stream()
+                .collect(Collectors.toMap(Field::getId, f -> f));
+
+        int searchableTextFields = 0;
+        for (ModelFieldBinding binding : ordered) {
+            Field field = fieldMap.get(binding.getFieldId());
+            if (field == null) continue;
+            String dt = field.getDataType() != null ? field.getDataType().toUpperCase() : "";
+            if (!searchableTypes.contains(dt)) continue;
+            if (Boolean.TRUE.equals(binding.getSearchable())) searchableTextFields++;
+        }
+
+        int marked = 0;
+        for (ModelFieldBinding binding : ordered) {
+            if (searchableTextFields + marked >= maxAutoSearchable) break;
             Field field = fieldMap.get(binding.getFieldId());
             if (field == null) continue;
             String dt = field.getDataType() != null ? field.getDataType().toUpperCase() : "";
@@ -2599,6 +2613,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             String code = field.getCode();
             if (code == null) continue;
             if (Set.of("pid", "created_by", "updated_by", "tenant_id").contains(code)) continue;
+            if (Boolean.TRUE.equals(binding.getSearchable())) continue;
 
             binding.setSearchable(true);
             binding.setUpdatedAt(Instant.now());
@@ -2608,7 +2623,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         }
 
         if (marked > 0) {
-            log.info("Auto-marked {} fields as searchable for model {}", marked, modelId);
+            log.info("Auto-marked {} fields as searchable for model {} ({} already marked)",
+                    marked, modelId, searchableTextFields);
         }
     }
 

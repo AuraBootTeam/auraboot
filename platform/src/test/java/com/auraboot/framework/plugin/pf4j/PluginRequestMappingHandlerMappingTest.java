@@ -86,4 +86,79 @@ class PluginRequestMappingHandlerMappingTest {
             return "ok";
         }
     }
+
+
+    @Test
+    void applicationModuleControllerWinsOverHostDuplicate() throws Exception {
+        AdminRoleInterceptor admin = mock(AdminRoleInterceptor.class);
+        EnvironmentResolverInterceptor environment = mock(EnvironmentResolverInterceptor.class);
+        AuthoringBusinessWriteInterceptor authoring = mock(AuthoringBusinessWriteInterceptor.class);
+        PermissionInterceptor permission = mock(PermissionInterceptor.class);
+        StaticApplicationContext host = new StaticApplicationContext();
+        host.registerBean("hostRules", HostRulesController.class);
+        host.refresh();
+        PluginRequestMappingHandlerMapping mapping = new PluginRequestMappingHandlerMapping(
+                admin, environment, authoring, permission);
+        mapping.setApplicationContext(host);
+        mapping.afterPropertiesSet();
+
+        // An application-phase product module registers a controller for the
+        // same path the host already maps — the product owns its routes and
+        // must NOT be shadowed by the host-wins policy.
+        mapping.registerApplicationModuleController(new ProductBpmRulesController());
+
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/api/bpm/rules");
+        post.setRequestURI("/api/bpm/rules");
+        ServletRequestPathUtils.parseAndCache(post);
+        HandlerExecutionChain chain = mapping.getHandler(post);
+
+        assertThat(chain).isNotNull();
+        // The product module's controller handles the POST — not shadowed.
+        var handler = (org.springframework.web.method.HandlerMethod) chain.getHandler();
+        assertThat(handler.getBean()).isInstanceOf(ProductBpmRulesController.class);
+    }
+
+    @Test
+    void featureFacetControllerIsStillShadowedByHostDuplicate() throws Exception {
+        AdminRoleInterceptor admin = mock(AdminRoleInterceptor.class);
+        EnvironmentResolverInterceptor environment = mock(EnvironmentResolverInterceptor.class);
+        AuthoringBusinessWriteInterceptor authoring = mock(AuthoringBusinessWriteInterceptor.class);
+        PermissionInterceptor permission = mock(PermissionInterceptor.class);
+        StaticApplicationContext host = new StaticApplicationContext();
+        host.registerBean("hostRules", HostRulesController.class);
+        host.refresh();
+        PluginRequestMappingHandlerMapping mapping = new PluginRequestMappingHandlerMapping(
+                admin, environment, authoring, permission);
+        mapping.setApplicationContext(host);
+        mapping.afterPropertiesSet();
+
+        // Non-application facets keep the host-wins semantics: a facet that
+        // re-declares a host path is skipped.
+        mapping.registerController(new ProductBpmRulesController());
+
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/api/bpm/rules");
+        post.setRequestURI("/api/bpm/rules");
+        ServletRequestPathUtils.parseAndCache(post);
+        // The facet handler is skipped — only the host's GET mapping remains,
+        // so the POST finds no handler and Spring answers 405.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapping.getHandler(post))
+                .isInstanceOf(org.springframework.web.HttpRequestMethodNotSupportedException.class);
+    }
+
+    @RestController
+    @RequestMapping("/api/bpm/rules")
+    public static class ProductBpmRulesController {
+        @org.springframework.web.bind.annotation.PostMapping
+        public String create() {
+            return "created";
+        }
+    }
+
+    @RestController
+    public static class HostRulesController {
+        @org.springframework.web.bind.annotation.GetMapping("/api/bpm/rules")
+        public String list() {
+            return "host";
+        }
+    }
 }

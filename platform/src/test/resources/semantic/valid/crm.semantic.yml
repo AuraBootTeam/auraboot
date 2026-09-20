@@ -88,6 +88,8 @@ metrics:
       conversion_measure: paid_count
       entity: customer_id
       window: 30d
+      base_filter: "lifecycle_stage = 'TRIAL'"
+      conversion_filter: "lifecycle_stage = 'CUSTOMER'"
 
   - code: lead_to_customer_rate
     type: ratio

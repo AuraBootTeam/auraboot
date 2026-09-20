@@ -30,6 +30,7 @@ export default [
   layout('./auth/AuthLayout.tsx', [
     route('/logout', './auth/Logout.tsx'),
     route('/login', './auth/Login.tsx'),
+    route('/admin-login', './auth/Login.tsx', { id: 'admin-login' }),
     route('/signup', './auth/SignUp.tsx'),
     route('/forgot-password', './routes/auth/ForgotPassword.tsx'),
     route('/reset-password', './routes/auth/ResetPassword.tsx'),
@@ -40,6 +41,12 @@ export default [
   layout('./tenant/TenantSelectionLayout.tsx', [
     route('/tenant-selection', './tenant/TenantSelection.tsx'),
   ]),
+
+  // Xiaoya (edu) consumer surfaces — standalone shells without admin chrome.
+  // Authenticated via the same session; see app/routes/xy/ for details.
+  route('/xy/import/:classPid?', './routes/xy/RosterImport.tsx'),
+  route('/xy/child/:studentPid?', './routes/xy/ChildSpace.tsx'),
+  route('/xy/display/:classPid?', './routes/xy/ClassDisplay.tsx'),
 
   // Explicit admin namespace. During the compatibility window it redirects
   // /admin/* to the existing admin paths while the shell remains admin-scoped.

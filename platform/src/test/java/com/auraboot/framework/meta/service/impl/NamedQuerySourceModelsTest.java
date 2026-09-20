@@ -74,4 +74,84 @@ class NamedQuerySourceModelsTest {
         }
     }
     private static String identity(String table) { return NamedQuerySourceModels.identity(table); }
+
+
+    @Test void engineBypassTableWithoutModelResolvesAsSystemSource() {
+        // E10: engine tables (se_*) under the tenant-bypass prefixes have no meta
+        // model but carry their own tenant_id column — resolve as SYSTEM sources
+        // instead of failing approval-history style named queries.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        Map<String, String> resolved = resolve("public.se_task_instance");
+        assertTrue(resolved.containsKey("\"public\".\"se_task_instance\""));
+        assertTrue(resolved.get("\"public\".\"se_task_instance\"")
+                .startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
+    }
+
+    @Test void nonBypassUnknownTableIsStillDenied() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        assertThrows(AccessDeniedException.class, () -> resolve("public.some_business_table"));
+    }
+        @Test void platformSharedUserTableResolvesAsSystemSource() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("users", "ab_user")));
+        Map<String, String> resolved = resolve("public.ab_user");
+        assertTrue(resolved.containsKey("\"public\".\"ab_user\""));
+    }
+    @Test void platformTenantRegistryResolvesWithoutAnyModel() {
+        // ab_tenant is the platform tenant registry: no tenant_id column, no meta model on
+        // any database (fresh-seed included). It must resolve as a platform reference source
+        // regardless of catalog state, or every NQ touching it is denied on clean databases
+        // (the AggregateQueryServiceIntegrationTest fresh-seed red cluster).
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        Map<String, String> resolved = resolve("public.ab_tenant");
+        assertTrue(resolved.containsKey("\"public\".\"ab_tenant\""));
+        assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
+                resolved.get("\"public\".\"ab_tenant\""));
+    }
+    @Test void platformFileAndAsyncTaskTablesResolveAsSystemSources() {
+        // ab_file (attachments) and ab_async_task carry tenant_id and the quoting named
+        // queries filter them explicitly by #{params.tenantId} / the anchor's tenant, so
+        // they resolve as platform reference sources even without meta models — otherwise
+        // the quote materials overview and recompute-status charts are denied on every
+        // Flyway-clean database (fresh-seed red cluster 2026-09-20).
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        for (String table : List.of("public.ab_file", "public.ab_async_task")) {
+            Map<String, String> resolved = resolve(table);
+            String key = "\"" + table.substring("public.".length()) + "\"";
+            assertTrue(resolved.containsKey("\"public\"." + key),
+                    table + " should resolve as a platform reference source");
+            assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
+                    resolved.get("\"public\"." + key));
+        }
+    }
+    @Test void platformRbacTablesResolveAsSystemSources() {
+        // ab_user_role / ab_role_permission / ab_permission (owner security sign-off
+        // 2026-09-20): the people-workload named queries join all three with explicit
+        // tenant_id = anchor-tenant filters; without this admission the workload tools
+        // are denied on every Flyway-clean database.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        for (String table : List.of("public.ab_user_role", "public.ab_role_permission",
+                "public.ab_permission")) {
+            Map<String, String> resolved = resolve(table);
+            String key = "\"public\".\"" + table.substring("public.".length()) + "\"";
+            assertTrue(resolved.containsKey(key), table + " should resolve as a platform reference source");
+            assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER, resolved.get(key));
+        }
+    }
+
+    @Test void bpmProductTablesResolveAsSystemSources() {
+        // ab_bpm_* product tables (audit, process definition) sit under the
+        // tenant-bypass prefixes alongside se_* engine tables.
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
+                Map.of("kind", "r", "tenant_column", true, "definition", ""));
+        for (String table : List.of("public.ab_bpm_audit_record", "public.ab_bpm_process_definition")) {
+            Map<String, String> resolved = resolve(table);
+            assertTrue(resolved.get("\"public\".\"" + table.substring("public.".length()) + "\"")
+                    .startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
+        }
+    }
 }

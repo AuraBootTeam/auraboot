@@ -164,7 +164,7 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * TARGET grade only when the current member has an explicit update share for the public PID.
      */
     private boolean hasSharedTargetWrite(CommandPipelineContext ctx) {
-        if (recordShareService == null || ctx == null || ctx.getCommand() == null
+        if (ctx == null || ctx.getCommand() == null
                 || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())) {
             return false;
         }
@@ -176,6 +176,16 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         if (!"update".equalsIgnoreCase(operation)) {
             return false;
         }
+        // CommandAuthorizationPhase already verified the exact shared aggregate, including an
+        // explicitly declared child-to-root reference. Preserve that verdict as a TARGET scope on
+        // the command's actual target model instead of re-checking the child as if it were shared.
+        if (ctx.getAuthorizationVerdict() != null
+                && ctx.getAuthorizationVerdict().isAuthorized()
+                && ctx.getAuthorizationVerdict().permissionCode() != null
+                && ctx.getAuthorizationVerdict().permissionCode().startsWith("record-share:")) {
+            return true;
+        }
+        if (recordShareService == null) return false;
         Long tenantId = ctx.getTenantId();
         Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
         String memberPid = MetaContext.exists() ? MetaContext.getCurrentUserPid() : null;

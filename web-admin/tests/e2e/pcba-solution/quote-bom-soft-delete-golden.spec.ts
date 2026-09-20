@@ -119,14 +119,33 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     );
     await clickRowActionByLocator(adminPage, row, 'delete', '删除');
 
-    // 3. confirm dialog → confirm
+    // 3. confirm dialog → cancel first (X06-01: dismiss preserves), then confirm
     step = 'confirm delete';
     const confirmDialog = adminPage.getByTestId('confirm-dialog');
+    await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
+    step = 'cancel delete (dismiss preserves)';
+    await adminPage.getByTestId('confirm-cancel').click();
+    await expect(confirmDialog).toHaveCount(0);
+    const dismissedStillThere = await queryDynamicRecords(adminPage, 'bom_conversion_task_pcba', [
+      { fieldName: 'bom_task_no', operator: 'EQ', value: taskNo },
+    ]);
+    expect(
+      dismissedStillThere.length,
+      'dismissed delete must keep the task (cancel must not change data)',
+    ).toBe(1);
+    step = 'confirm delete (after dismissed attempt)';
+    const deleteAgainPromise = adminPage.waitForResponse(
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/bom:delete_task') &&
+        r.request().method() === 'POST',
+      { timeout: 30_000 },
+    );
+    await clickRowActionByLocator(adminPage, row, 'delete', '删除');
     await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
     await adminPage.getByTestId('confirm-ok').click();
 
     // 4. bom:delete_task command succeeds
-    const deleteBody = await (await deleteResponsePromise).json().catch(() => ({}));
+    const deleteBody = await (await deleteAgainPromise).json().catch(() => ({}));
     expect(
       String((deleteBody as { code?: unknown }).code),
       `bom:delete_task response: ${JSON.stringify(deleteBody).slice(0, 500)}`,
@@ -156,6 +175,21 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
         { timeout: 15_000, intervals: [500, 1000, 1500] },
       )
       .toBe(0);
+
+    // 6b. X06-02: direct access after soft-delete — refused, or flagged deleted;
+    // never a live editable record.
+    step = 'direct access after soft-delete';
+    const direct = await adminPage.request.get(`/api/dynamic/bom_conversion_task_pcba/${taskPid}`);
+    const directBody = (await direct.json().catch(() => ({}))) as {
+      code?: unknown;
+      data?: { data?: Record<string, unknown>; deleted_flag?: unknown };
+    };
+    const directRecord = directBody?.data?.data ?? (directBody?.data as Record<string, unknown> | undefined);
+    const flaggedDeleted = String(directRecord?.deleted_flag ?? '') === 'true';
+    expect(
+      [404, 410].includes(direct.status()) || String(directBody?.code ?? '0') !== '0' || flaggedDeleted,
+      'soft-deleted task must not read back as a live record',
+    ).toBe(true);
 
     // 7. hard gates: no forbidden, no 500s across the whole flow
     expect(

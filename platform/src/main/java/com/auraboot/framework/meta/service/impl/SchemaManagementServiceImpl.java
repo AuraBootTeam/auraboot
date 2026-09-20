@@ -1233,6 +1233,19 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     ddlStatements.add(String.format("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL", tableName, columnName));
                 }
             }
+            // Remove only the generated uniqueness forms when the model relaxes a field.
+            // Custom/composite constraints and indexes remain outside this publish operation.
+            if (!field.isUnique() && !field.isPrimaryKey()
+                    && "PostgreSQL".equalsIgnoreCase(ddlDialectProvider.getDialect().getName())) {
+                SqlSafetyUtils.validateIdentifier(columnName, "column name");
+                if (tableMetadataService.hasGeneratedSingleColumnUniqueConstraint(tableName, columnName)) {
+                    ddlStatements.add("ALTER TABLE " + tableName + " DROP CONSTRAINT IF EXISTS "
+                            + tableName + "_" + columnName + "_key");
+                }
+                if (tableMetadataService.hasGeneratedTenantUniqueIndex(tableName, columnName)) {
+                    ddlStatements.add("DROP INDEX IF EXISTS idx_" + tableName + "_" + columnName + "_tenant_unique");
+                }
+            }
         }
 
         // Add remaining indexes: system-level (tenant_id, created_at, updated_at) and

@@ -4,21 +4,17 @@ import {
   createCorrectedBomWorkbook,
   isTransientViteDynamicImportIssue,
   openQuoteDetailFromList,
-  prepareReviewedCorrectedBomUpload,
+  createQuoteFromReviewedBom,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   type CreatedRows,
 } from './quote-e2e-helpers';
 
 test.describe('QuoteOps corrected BOM upload golden', () => {
-    // FIXME(#429 A1): the detail-page corrected-BOM upload button was removed;
-    // materials upload now happens only at quote creation. Rewrite this journey
-    // against the create-time upload-review once that slice lands.
-    test.fixme(true, 'detail-page corrected-BOM upload removed; pending create-time review rewrite');
 
   test.describe.configure({ timeout: 120_000 });
 
-  test('uploads a corrected BOM workbook from the quote workbench and refreshes trace rows', async ({
+  test('creates a quote with reviewed standard BOM and preserves valid/error row traceability', async ({
     page,
   }, testInfo) => {
     const created: CreatedRows = await seedQuoteForCorrectedBomUpload(page);
@@ -41,58 +37,9 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
     });
 
     try {
+      await createQuoteFromReviewedBom(page, created, workbookPath);
       await openQuoteDetailFromList(page, created);
-
-      await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByTestId('toolbar-btn-upload_raw_bom')).toHaveCount(0);
-
-      const uploadDialog = await prepareReviewedCorrectedBomUpload(page, workbookPath);
-      const uploadResponsePromise = page.waitForResponse(
-        (response) =>
-          response.url().includes('/api/file/upload') && response.request().method() === 'POST',
-        { timeout: 30_000 },
-      );
-      const commandResponsePromise = page.waitForResponse(
-        (response) =>
-          response
-            .url()
-            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
-          response.request().method() === 'POST',
-        { timeout: 60_000 },
-      );
-      await uploadDialog.getByTestId('form-dialog-submit').click();
-
-      const uploadResponse = await uploadResponsePromise;
-      expect(uploadResponse.ok(), `file upload HTTP ${uploadResponse.status()}`).toBe(true);
-      await expect(
-        page
-          .getByRole('alert')
-          .filter({ hasText: /customer-corrected-bom-e2e/ })
-          .first(),
-      ).toBeVisible({ timeout: 10_000 });
-
-      const commandResponse = await commandResponsePromise;
-      const commandBody = await commandResponse.json().catch(() => ({}));
-      expect(
-        String((commandBody as any).code),
-        `import_corrected_bom response: ${JSON.stringify(commandBody).slice(0, 1000)}`,
-      ).toBe('0');
-
-      await expect(
-        page
-          .getByRole('alert')
-          .filter({ hasText: /completed|完成|导入|Imported/i })
-          .first(),
-      ).toBeVisible({ timeout: 20_000 });
-      await expect(
-        page.getByText(/上传修正BOM已完成|任务已成功完成|Completed/i).first(),
-      ).toBeVisible({ timeout: 20_000 });
-
+      await expect(page.getByTestId('toolbar-btn-upload_corrected_bom')).toHaveCount(0);
       await expect
         .poll(
           async () => {
@@ -169,9 +116,7 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
 
       const main = page.locator('main');
       await expect(main).toContainText('customer-corrected-bom-e2e.xlsx', { timeout: 20_000 });
-      await expect(main).toContainText(/partial|部分|3|2|1/i);
-      await page.getByRole('button', { name: /^关闭$/ }).click();
-      await expect(page.getByText(/导入完成\s*\/\s*Completed/i)).toBeHidden();
+      await page.reload();
 
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({

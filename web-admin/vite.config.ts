@@ -213,6 +213,12 @@ export default defineConfig({
     // imported module"), which makes the designer golden suites flaky when run
     // cold/in isolation. Same rationale as the original react-grid-layout entry.
     include: [
+      // Shared runtime packages must be ready before the first dynamic page.
+      // Discovering these linked workspaces during navigation invalidates vendor
+      // URLs and can strand the page on its skeleton with Outdated Optimize Dep.
+      '@auraboot/runtime-kernel',
+      '@auraboot/track',
+      '@auraboot/plugin-sdk',
       'react',
       'react-dom',
       'react-dom/client',

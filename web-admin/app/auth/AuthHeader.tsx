@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useFetcher } from 'react-router';
+import { Link, useFetcher, useLocation } from 'react-router';
 import { SunIcon, MoonIcon, ComputerDesktopIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -20,6 +20,12 @@ export default function AuthHeader() {
   const isHydrated = useHydrated();
   const { isAuthenticated } = useAuth();
   const logoutFetcher = useFetcher();
+  const location = useLocation();
+  // The login card pages render the deployment brand inside the story panel
+  // (Login.tsx); the global header de-duplicates by dropping its brand row
+  // and the self-pointing auth links there, keeping only the locale/theme
+  // tools on a transparent bar.
+  const onLoginCardPage = location.pathname === '/login' || location.pathname === '/admin-login';
 
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
@@ -61,21 +67,29 @@ export default function AuthHeader() {
   ];
 
   return (
-    <header className="fixed top-0 right-0 left-0 z-50 border-b border-gray-200/50 bg-white/80 backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/80">
+    <header
+      className={`fixed top-0 right-0 left-0 z-50 ${
+        onLoginCardPage
+          ? 'bg-transparent'
+          : 'border-b border-gray-200/50 bg-white/80 backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/80'
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
-        <Link to="/" className="flex items-center">
-          <img className="h-8 w-8 rounded-lg" src={branding.logoUrl} alt={branding.productName} />
-          <span
-            data-testid="auth-site-title"
-            className="ml-3 text-xl font-bold text-gray-900 dark:text-white"
-          >
-            {displayName}
-          </span>
-        </Link>
+        {!onLoginCardPage && (
+          <Link to="/" className="flex items-center">
+            <img className="h-8 w-8 rounded-lg" src={branding.logoUrl} alt={branding.productName} />
+            <span
+              data-testid="auth-site-title"
+              className="ml-3 text-xl font-bold text-gray-900 dark:text-white"
+            >
+              {displayName}
+            </span>
+          </Link>
+        )}
 
         {/* Right: Toolbar */}
-        <div className="flex items-center space-x-2">
+        <div className="ml-auto flex items-center space-x-2">
           {/* Language toggle */}
           <div className="relative" ref={langDropdownRef}>
             <button
@@ -96,7 +110,7 @@ export default function AuthHeader() {
                     }}
                     className={`flex w-full items-center px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                       locale === option.value
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                        ? 'bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/20 dark:text-[#a4c08b]'
                         : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
@@ -134,7 +148,7 @@ export default function AuthHeader() {
                       }}
                       className={`flex w-full items-center px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                         theme === option.value
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                          ? 'bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/20 dark:text-[#a4c08b]'
                           : 'text-gray-700 dark:text-gray-300'
                       }`}
                     >
@@ -147,36 +161,38 @@ export default function AuthHeader() {
             )}
           </div>
 
-          {/* Auth buttons */}
-          <div className="ml-2 flex items-center space-x-2">
-            {isAuthenticated ? (
-              <logoutFetcher.Form method="post" action="/logout">
-                <button
-                  type="submit"
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                >
-                  {t('user.logout') || '退出'}
-                </button>
-              </logoutFetcher.Form>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white"
-                >
-                  {t('auth.login') || '登录'}
-                </Link>
-                {registrationOpen && (
-                  <Link
-                    to="/signup"
-                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          {/* Auth buttons — self-pointing on the login card pages */}
+          {!onLoginCardPage && (
+            <div className="ml-2 flex items-center space-x-2">
+              {isAuthenticated ? (
+                <logoutFetcher.Form method="post" action="/logout">
+                  <button
+                    type="submit"
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
                   >
-                    {t('auth.register') || '注册'}
+                    {t('user.logout') || '退出'}
+                  </button>
+                </logoutFetcher.Form>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white"
+                  >
+                    {t('auth.login') || '登录'}
                   </Link>
-                )}
-              </>
-            )}
-          </div>
+                  {registrationOpen && (
+                    <Link
+                      to="/signup"
+                      className="rounded-lg bg-[#35745b] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#2b5a47]"
+                    >
+                      {t('auth.register') || '注册'}
+                    </Link>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -31,6 +31,8 @@ public class AsyncTaskStartupRecoveryRunner implements ApplicationRunner {
     }
 
     private void recoverRunningTasks() {
+        int resumable = asyncTaskMapper.requeueResumableTasksOnStartup();
+        if (resumable > 0) log.info("Requeued {} checkpointed async task(s) after startup", resumable);
         int recovered = asyncTaskMapper.markRunningTasksFailedOnStartup(Instant.now(), RESTART_ERROR_MESSAGE);
         if (recovered > 0) {
             log.warn("Marked {} stale running async task(s) failed after application startup", recovered);

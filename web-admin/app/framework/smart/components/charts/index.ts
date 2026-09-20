@@ -72,5 +72,8 @@ export type { SmartSPCChartProps } from './SmartSPCChart';
 export { SmartGanttChart } from './SmartGanttChart';
 export type { SmartGanttChartProps } from './SmartGanttChart';
 
+export { SmartWaterfallChart } from './SmartWaterfallChart';
+export type { SmartWaterfallChartProps } from './SmartWaterfallChart';
+
 export { SmartCalendar } from './SmartCalendar';
 export type { SmartCalendarProps } from './SmartCalendar';

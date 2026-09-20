@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from './EChartsHost';
 import type { EChartsOption } from 'echarts';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type {
@@ -445,7 +445,6 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
         style={{ height: '100%', minHeight: 0 }}
         onEvents={onEvents}
         notMerge
-        lazyUpdate
       />
     </div>
   );

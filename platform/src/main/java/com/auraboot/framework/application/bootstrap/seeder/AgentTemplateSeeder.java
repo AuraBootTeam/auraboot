@@ -313,15 +313,31 @@ public class AgentTemplateSeeder {
         long newId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
         String pid = UniqueIdGenerator.generate();
 
-        jdbcTemplate.update("""
-                INSERT INTO ab_user
-                    (id, pid, email, nick_name, is_enabled, is_account_non_expired,
-                     is_account_non_locked, is_credentials_non_expired,
-                     user_type, created_at, updated_at)
-                VALUES (?, ?, ?, ?, FALSE, TRUE, TRUE, TRUE, 'system_agent', NOW(), NOW())
-                """,
-                newId, pid, email, displayName);
+        // Startup can run this seeder and SystemAgentUserProvisioner
+        // concurrently for the same agent email; tolerate the lost race and
+        // reuse the winner's row instead of crashing boot on duplicate key.
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO ab_user
+                        (id, pid, email, nick_name, is_enabled, is_account_non_expired,
+                         is_account_non_locked, is_credentials_non_expired,
+                         user_type, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, FALSE, TRUE, TRUE, TRUE, 'system_agent', NOW(), NOW())
+                    """,
+                    newId, pid, email, displayName);
+        } catch (org.springframework.dao.DuplicateKeyException race) {
+            var existing = jdbcTemplate.queryForList(
+                    "SELECT id FROM ab_user WHERE email = ? LIMIT 1", email);
+            if (rows_empty(existing)) {
+                throw race;
+            }
+            return ((Number) existing.get(0).get("id")).longValue();
+        }
 
         return newId;
+    }
+
+    private static boolean rows_empty(java.util.List<java.util.Map<String, Object>> rows) {
+        return rows == null || rows.isEmpty();
     }
 }

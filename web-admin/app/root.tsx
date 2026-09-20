@@ -18,6 +18,7 @@ import { ThemeProvider } from '~/contexts/ThemeContext';
 import { ToastProvider } from '~/contexts/ToastContext';
 import { Toaster } from 'sonner';
 import { TimezoneProvider } from '~/contexts/TimezoneContext';
+import { TenantThemeProvider } from '~/contexts/TenantThemeContext';
 import { ConfirmDialogProvider } from '~/contexts/ConfirmDialogContext';
 import { getI18nData } from '~/shared/services/form';
 import { getUserMenus } from '~/shared/services/menu';
@@ -109,8 +110,12 @@ export async function resolveDeploymentBrandingFromBff(
     return resolveCommunityBranding();
   }
 
-  const bffUrl =
-    environment.BFF_INTERNAL_URL || `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
+  // /api/runtime/branding exists only on this app's own BFF (license + branding
+  // file access are deliberately BFF-only). BFF_INTERNAL_URL must NOT be used
+  // here: deployments routinely point it at the backend/gateway for SSR data
+  // fetches, and hitting it yields a bare 401 from Spring. Always call the
+  // loopback BFF.
+  const bffUrl = `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
   const response = await fetch(`${bffUrl}/api/runtime/branding`, {
     signal: fetchTimeoutSignal(),
   });
@@ -386,14 +391,16 @@ export default function App() {
           initialTimezone={data.initialTimezone}
           skipTenantPreferences={data.skipTenantPreferences}
         >
-          <ToastProvider>
-            <ConfirmDialogProvider>
-              {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
-            </ConfirmDialogProvider>
-            {/* sonner-based feedback (designer saves, export failures) previously had no
-                mounted Toaster and was invisible; render it once at the app root. */}
-            <Toaster richColors position="top-right" />
-          </ToastProvider>
+          <TenantThemeProvider>
+            <ToastProvider>
+              <ConfirmDialogProvider>
+                {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
+              </ConfirmDialogProvider>
+              {/* sonner-based feedback (designer saves, export failures) previously had no
+                  mounted Toaster and was invisible; render it once at the app root. */}
+              <Toaster richColors position="top-right" />
+            </ToastProvider>
+          </TenantThemeProvider>
         </TimezoneProvider>
       </I18nProvider>
     </RuntimeProfileProvider>

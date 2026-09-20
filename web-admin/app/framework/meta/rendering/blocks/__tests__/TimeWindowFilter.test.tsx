@@ -49,6 +49,23 @@ describe('atomic query time window', () => {
     expect(Date.parse(read().to) - Date.parse(read().from)).toBe(30 * 86400000);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+  it('default recent window includes the current minute so fresh events are visible', async () => {
+    // recentWindow rounds the exclusive `to` UP to the minute. Rounding down
+    // made a freshly mounted dashboard drop events that arrived seconds before
+    // mount (they sit inside [floor(now), now) < to is violated) until the
+    // next minute boundary — the BSDK-04 golden failure mode.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-02-01T12:00:30.500Z'));
+    try {
+      const read = setup();
+      await waitFor(() => expect(read()).toBeDefined());
+      const applied = read();
+      expect(Date.parse(applied.to)).toBe(Date.parse('2026-02-01T12:01:00.000Z'));
+      expect(Date.parse(applied.to)).toBeGreaterThan(Date.now());
+      expect(Date.parse(applied.to) - Date.parse(applied.from)).toBe(30 * 86400000);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
   it('rejects an empty input and an oversized window without replacing the previous result', async () => {
     const read = setup();
     await waitFor(() => expect(read()).toBeDefined());

@@ -179,6 +179,15 @@ test.describe.serial('Anonymous Keyed Collect — End-to-End Golden (SP4)', () =
         `</body></html>`,
     );
     // Embed the built SDK bundle exactly as a published app would via <script>.
+    // Seed a run-unique anon id first: the SDK adopts an existing _aura_anon
+    // cookie (identity.ts reads it before minting one), which makes every
+    // keyed row this run writes addressable for exact assertions below —
+    // authenticated admin rows from concurrent golden files in the same
+    // tenant must not flip the identity contract.
+    const anonId = `ak02-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await page.evaluate((v) => {
+      document.cookie = `_aura_anon=${v}; path=/; max-age=31536000`;
+    }, anonId);
     await page.addScriptTag({ path: DIST });
 
     const cookie = await page.evaluate(
@@ -193,9 +202,9 @@ test.describe.serial('Anonymous Keyed Collect — End-to-End Golden (SP4)', () =
       },
       { siteKey: keyA, collectUrl: KEYED_URL },
     );
-
-    // anon_id is persisted client-side (cookie) for cross-visit stability.
-    expect(cookie, 'public SDK persists an anon id cookie').toContain('_aura_anon=');
+    // anon_id is persisted client-side (cookie) for cross-visit stability, and
+    // the SDK adopted the seeded run-unique id rather than minting a new one.
+    expect(cookie, 'public SDK persists an anon id cookie').toContain(`_aura_anon=${anonId}`);
 
     await page.screenshot({ path: 'test-results/ak-02-published-app.png' });
 
@@ -218,10 +227,11 @@ test.describe.serial('Anonymous Keyed Collect — End-to-End Golden (SP4)', () =
     expect(pv, 'page_view landed').toBeGreaterThanOrEqual(1);
     expect(click, 'element_click landed').toBeGreaterThanOrEqual(1);
 
-    // Anonymous identity contract: user_id NULL, anon_id non-null on every row.
+    // Anonymous identity contract, scoped to this run's visitor id: user_id
+    // NULL and anon_id non-null on every row the keyed endpoint wrote.
     const bad = parseInt(
       psql(
-        `SELECT COUNT(*) FROM ab_behavior_event WHERE tenant_id=${tenantId} AND (user_id IS NOT NULL OR anon_id IS NULL)`,
+        `SELECT COUNT(*) FROM ab_behavior_event WHERE tenant_id=${tenantId} AND anon_id='${anonId}' AND (user_id IS NOT NULL OR anon_id IS NULL)`,
       ),
       10,
     );
@@ -229,7 +239,9 @@ test.describe.serial('Anonymous Keyed Collect — End-to-End Golden (SP4)', () =
 
     // All events from one visitor share one anon_id (the persisted cookie value).
     const distinctAnon = parseInt(
-      psql(`SELECT COUNT(DISTINCT anon_id) FROM ab_behavior_event WHERE tenant_id=${tenantId}`),
+      psql(
+        `SELECT COUNT(DISTINCT anon_id) FROM ab_behavior_event WHERE tenant_id=${tenantId} AND anon_id='${anonId}'`,
+      ),
       10,
     );
     expect(distinctAnon, 'one visitor → one anon_id').toBe(1);

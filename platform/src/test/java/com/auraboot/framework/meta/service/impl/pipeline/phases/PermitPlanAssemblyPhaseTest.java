@@ -171,6 +171,25 @@ class PermitPlanAssemblyPhaseTest {
     }
 
     @Test
+    @DisplayName("a verified child command share pins the child target without a second root lookup")
+    void resolvesTargetScopeForVerifiedSharedChildCommand() {
+        DataPermissionEngine engine = Mockito.mock(DataPermissionEngine.class);
+        when(engine.buildRowFilter(anyLong(), anyString(), anyLong()))
+                .thenReturn("AND created_by = 10");
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        CommandPipelineContext ctx = ctxWithModel("quote-line-1", "qo_quote_line_common");
+        ctx.getRequest().setOperationType("update");
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized(
+                "record-share:qo_quote_common:update"));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.TARGET);
+        assertThat(ctx.getPermitPlan().aggregateId()).isEqualTo("quote-line-1");
+    }
+
+    @Test
     @DisplayName("no engine leaves scope unresolved (minimal context)")
     void leavesScopeUnresolvedWhenNoEngineAvailable() {
         CommandPipelineContext ctx = ctxWithModel("pur_01KPID", "mkt_purchase");

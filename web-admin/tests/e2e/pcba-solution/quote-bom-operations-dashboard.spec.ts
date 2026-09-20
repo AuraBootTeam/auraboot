@@ -3,6 +3,8 @@ import { test, expect } from '../../fixtures';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
 import {
   ensureQuoteRoleUser,
+  seedDownloadableQuote,
+  dynamicCreate,
   makeQuoteRoleUser,
   openQuoteRolePage,
   type QuoteRoleUser,
@@ -106,10 +108,10 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
         return false;
       })).length;
     }, samples), { message: `${path} trend ${index} must draw every line segment, not only symbols` }).toBe(samples.length);
-    const bounds = await chart.boundingBox();
-    expect(bounds).not.toBeNull();
+    // locator.hover 先把图表滚入视口再派发悬停；数据多的租户首页图表常在
+    // 折叠线以下，page.mouse.move(boundingBox) 会悬到视口外导致 tooltip 不出现。
     const last = rendered.points[11];
-    await page.mouse.move(bounds!.x + last[0], bounds!.y + last[1]);
+    await chart.hover({ position: { x: last[0], y: last[1] } });
     await expect(chart).toContainText(`创建数量`);
     await expect(chart).toContainText(String(expectedSeries[index][11]));
     await page.mouse.move(0, 0);
@@ -173,6 +175,16 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
     try {
       await createOrdinaryRole(page, roleCode);
       await ensureQuoteRoleUser(page, ordinaryUser);
+      // Current-week charts must not depend on leftovers from a previous gate/week.
+      await seedDownloadableQuote(page);
+      await dynamicCreate(page, 'bom_conversion_task_pcba', {
+        bom_task_no: `OPS-${uid}`,
+        bom_task_source_package: 'operations-dashboard-fixture',
+        bom_task_status: 'pending',
+        bom_task_raw_filename: `OPS-${uid}.xlsx`,
+        bom_task_total_rows: 0,
+      }, []);
+
     } finally {
       await context.close();
     }

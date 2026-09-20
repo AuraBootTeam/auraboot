@@ -15,7 +15,7 @@ import { parseDevAllowedPorts } from '~/server/utils/dev-cors-ports';
 import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
 import { register, proxyDurationHistogram } from './metrics.server';
 import { buildLoginFailureRedirect } from './login-failure';
-import { sessionStorage } from '~/shared/services/session';
+import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { resolveDeploymentBranding } from '~/config/branding.server';
 
@@ -204,15 +204,32 @@ async function commitLoginSession(
   token: string,
   remember: boolean,
 ) {
-  const session = await sessionStorage.getSession(req.headers.cookie);
-  session.set(JWT_TOKEN_KEY, token);
-  res.setHeader(
-    'Set-Cookie',
-    await sessionStorage.commitSession(session, {
-      maxAge: remember ? 60 * 60 * 24 * 7 : undefined,
-    }),
-  );
+  const request = new Request(`${req.protocol}://${req.get('host')}/login`, {
+    headers: { Cookie: req.headers.cookie || '' },
+  });
+  res.setHeader('Set-Cookie', await commitUserSession(request, token, remember));
 }
+
+// Cookie-authenticated renewal belongs to the BFF; JWTs never reach browser JS.
+app.post('/api/auth/session-renew', async (req, res, next) => {
+  const origin = req.get('origin');
+  if (!origin || !(origin === `${req.protocol}://${req.get('host')}`
+    || CREDENTIAL_ALLOWED_ORIGIN_HEADERS.has(origin)
+    || (config.server.env === 'development' && DEV_ALLOWED_ORIGIN_HEADERS.has(origin)))) {
+    return res.status(403).json({ renewed: false });
+  }
+  try {
+    const request = new Request(`${req.protocol}://${req.get('host')}${req.path}`, {
+      headers: { Cookie: req.headers.cookie || '' },
+    });
+    const result = await maybeRenewSession(request);
+    res.setHeader('Cache-Control', 'no-store');
+    if (result.setCookie) res.setHeader('Set-Cookie', result.setCookie);
+    return res.json({ renewed: result.renewed });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async (req, res, next) => {
   try {

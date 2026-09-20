@@ -107,6 +107,22 @@ export default function I18nResourcesPage() {
     [editValue, load],
   );
 
+  const review = useCallback(
+    async (pid: string, status: 'approved' | 'rejected') => {
+      let rejectReason: string | undefined
+      if (status === 'rejected') {
+        rejectReason = window.prompt(l('驳回原因', 'Rejection reason')) || undefined
+        if (!rejectReason) return
+      }
+      await fetchResult(`/api/admin/i18n/resources/${pid}`, {
+        method: 'put',
+        params: { status, rejectReason },
+      })
+      load()
+    },
+    [l, load],
+  )
+
   const remove = useCallback(
     async (pid: string) => {
       if (!window.confirm(l('确认删除该条目？', 'Delete this resource?'))) return;
@@ -234,7 +250,19 @@ export default function I18nResourcesPage() {
                     r.value
                   )}
                 </td>
-                <td className="p-2 whitespace-nowrap">{r.status}</td>
+                <td className="p-2 whitespace-nowrap">
+                  <span
+                    className={
+                      r.status === 'approved'
+                        ? 'text-green-700 bg-green-100 rounded px-1.5 py-0.5'
+                        : r.status === 'rejected'
+                          ? 'text-red-700 bg-red-100 rounded px-1.5 py-0.5'
+                          : 'text-amber-700 bg-amber-100 rounded px-1.5 py-0.5'
+                    }
+                  >
+                    {r.status}
+                  </span>
+                </td>
                 <td className="p-2 whitespace-nowrap">
                   {editingPid === r.pid ? (
                     <button onClick={() => saveEdit(r.pid)} className="text-blue-600 px-1">
@@ -247,6 +275,16 @@ export default function I18nResourcesPage() {
                       aria-label={`edit-${r.i18nKey}`}
                     >
                       <PencilSquareIcon className="h-4 w-4 inline" />
+                    </button>
+                  )}
+                  {r.status !== 'approved' && (
+                    <button onClick={() => review(r.pid, 'approved')} className="text-green-700 px-1" aria-label={`approve-${r.i18nKey}`} title={l('批准', 'Approve')}>
+                      ✓
+                    </button>
+                  )}
+                  {r.status !== 'rejected' && (
+                    <button onClick={() => review(r.pid, 'rejected')} className="text-red-600 px-1" aria-label={`reject-${r.i18nKey}`} title={l('驳回', 'Reject')}>
+                      ✕
                     </button>
                   )}
                   <button onClick={() => remove(r.pid)} className="text-red-600 px-1" aria-label={`delete-${r.i18nKey}`}>

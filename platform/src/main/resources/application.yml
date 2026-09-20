@@ -77,16 +77,13 @@ security:
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-key-replace-in-production-min-32-chars}
     kid: ${JWT_KID:key-1}
-    expiration: ${JWT_EXPIRATION:86400}
+    expiration: ${JWT_EXPIRATION:604800}
     previous-secret: ${JWT_PREVIOUS_SECRET:}
     previous-kid: ${JWT_PREVIOUS_KID:}
   session:
-    # Absolute lifetime of a login session for sliding renewal. The access token
-    # itself stays short (security.jwt.expiration, default 24h); renewals are
-    # only accepted while the session row is younger than this window, so a
-    # "remember me" session can stay alive for at most this long without
-    # re-authentication. Defaults to the 7-day remember-me cookie.
-    renew-window-seconds: ${SESSION_RENEW_WINDOW_SECONDS:604800}
+    # Fixed deadline from first authentication; renewal/context changes preserve it.
+    # Access JWTs last at most 7 days and are clamped to this 180-day deadline.
+    renew-window-seconds: ${SESSION_RENEW_WINDOW_SECONDS:15552000}
   field-encryption:
     key: ${FIELD_ENCRYPTION_KEY:}  # Production: openssl rand -base64 32
   password:
@@ -183,6 +180,14 @@ springdoc:
 spring:
   application:
     name: auraboot-platform
+  task:
+    scheduling:
+      # Multiple @Scheduled jobs share this pool (SLA scan, webhook delivery
+      # worker, export cleanup, ...). The default single thread starves the
+      # webhook delivery worker whenever the SLA scan runs long, leaving
+      # deliveries stuck in 'pending'.
+      pool:
+        size: 4
   config:
     import: optional:classpath:aurabot/synonyms.yml
   profiles:

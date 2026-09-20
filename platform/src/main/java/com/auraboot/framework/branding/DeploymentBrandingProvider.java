@@ -40,7 +40,16 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "supportUrl",
             "copyrightHolder",
             "poweredByText",
-            "generatedByText");
+            "generatedByText",
+            // Login-story fields (web-admin only) — accepted so a shared branding
+            // document cannot fail one tier and pass the other.
+            "loginBadge",
+            "loginHeadline",
+            "loginHeadlineEm",
+            "loginLead",
+            "loginHeroUrl",
+            "loginFeatures",
+            "loginWechatOnly");
 
     private final BrandingIdentity identity;
 
@@ -129,6 +138,71 @@ public class DeploymentBrandingProvider implements BrandingProvider {
                 "docsUrl",
                 "supportUrl")) {
             safeUrl(document, field);
+        }
+        validateLoginStoryFields(document);
+    }
+
+    /**
+     * Validates the login-story fields with the same contract web-admin
+     * enforces ({@code resolveCommercialBranding}), so one shared branding
+     * document either passes both tiers or fails both. These fields shape the
+     * login page only — the backend identity never carries them.
+     */
+    private static void validateLoginStoryFields(JsonNode document) {
+        optionalTextField(document, "loginBadge", 80);
+        optionalTextField(document, "loginHeadline", 120);
+        optionalTextField(document, "loginHeadlineEm", 120);
+        optionalTextField(document, "loginLead", 240);
+        JsonNode heroUrl = document.get("loginHeroUrl");
+        boolean heroUrlUnset = heroUrl == null || heroUrl.isNull()
+                || (heroUrl.isTextual() && heroUrl.textValue().isEmpty());
+        if (!heroUrlUnset) {
+            safeUrl(document, "loginHeroUrl");
+        }
+        optionalTextListField(document, "loginFeatures", 4);
+        // loginWechatOnly: web-admin coerces any present value through
+        // Boolean(value), so any JSON value is contractually accepted here too.
+    }
+
+    private static void optionalTextField(JsonNode document, String field, int maxLength) {
+        JsonNode value = document.get(field);
+        if (value == null || value.isNull()) {
+            return;
+        }
+        if (!value.isTextual()) {
+            throw new IllegalStateException(
+                    "Deployment branding field \"" + field + "\" must be a non-empty string.");
+        }
+        if (value.textValue().isEmpty()) {
+            return;
+        }
+        String normalized = value.textValue().trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalStateException(
+                    "Deployment branding field \"" + field + "\" must be a non-empty string.");
+        }
+        if (normalized.length() > maxLength) {
+            throw new IllegalStateException(
+                    "Deployment branding field \"" + field + "\" must be at most "
+                            + maxLength + " characters.");
+        }
+    }
+
+    private static void optionalTextListField(JsonNode document, String field, int maxItems) {
+        JsonNode value = document.get(field);
+        if (value == null || value.isNull()) {
+            return;
+        }
+        if (!value.isArray() || value.isEmpty() || value.size() > maxItems) {
+            throw new IllegalStateException(
+                    "Deployment branding field \"" + field + "\" must be an array of 1-4 strings.");
+        }
+        for (JsonNode item : value) {
+            if (!item.isTextual() || !StringUtils.hasText(item.textValue())) {
+                throw new IllegalStateException(
+                        "Deployment branding field \"" + field
+                                + "\" must be an array of 1-4 strings.");
+            }
         }
     }
 

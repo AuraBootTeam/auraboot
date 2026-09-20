@@ -18,7 +18,9 @@ class AsyncTaskStartupRecoveryRunnerTest {
 
         new AsyncTaskStartupRecoveryRunner(mapper).run();
 
-        verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mapper);
+        order.verify(mapper).requeueResumableTasksOnStartup();
+        order.verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
     }
 
     @Test
@@ -28,6 +30,8 @@ class AsyncTaskStartupRecoveryRunnerTest {
 
         new AsyncTaskStartupRecoveryRunner(mapper).run();
 
-        verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mapper);
+        order.verify(mapper).requeueResumableTasksOnStartup();
+        order.verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
     }
 }

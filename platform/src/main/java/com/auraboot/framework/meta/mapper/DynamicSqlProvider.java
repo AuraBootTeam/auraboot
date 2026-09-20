@@ -9,6 +9,19 @@ import java.util.Set;
 
 public class DynamicSqlProvider {
 
+    public static String selectTargetVersionForUpdate(Map<String, Object> params) {
+        String table = (String) params.get("tableName");
+        String key = (String) params.get("primaryKeyColumn");
+        SqlSafetyUtils.validateIdentifier(table, "target lock table");
+        SqlSafetyUtils.validateIdentifier(key, "target lock primary key");
+        if (params.get("tenantId") == null || params.get("targetRecordPid") == null) {
+            throw new IllegalArgumentException("Target lock requires tenantId and targetRecordPid");
+        }
+        return "SELECT row_version FROM " + table
+                + " WHERE tenant_id = #{tenantId} AND " + key + " = #{targetRecordPid} FOR UPDATE";
+    }
+
+
     /**
      * Validate export SQL: must be a SELECT statement and pass safety checks.
      */

@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 
 export type QuoteWorkbookExpectations = {
   expectedSetCount?: number;
+  fixedCounts?: { apertures: number; holes: number };
   expectedBomLine?: {
     mpn: string;
     unitCost: number;
@@ -56,8 +57,13 @@ function assertBomRows(workbook: XLSX.WorkBook, expectations: QuoteWorkbookExpec
     if (!populated) continue;
     populatedRows.push(excelRow);
     expectFormula(bom, `M${excelRow}`, `IF(L${excelRow}="","",G${excelRow}*L${excelRow})`);
-    expectFormula(bom, `O${excelRow}`, `G${excelRow}*N${excelRow}`);
-    expect(typeof bom[`N${excelRow}`]?.v, `BOM明细!N${excelRow} cached point value`).toBe('number');
+    if (expectations.fixedCounts) {
+      expect(bom[`O${excelRow}`]?.v).toBeUndefined();
+      expect(bom[`O${excelRow}`]?.f).toBeUndefined();
+    } else {
+      expectFormula(bom, `O${excelRow}`, `G${excelRow}*N${excelRow}`);
+      expect(typeof bom[`N${excelRow}`]?.v, `BOM明细!N${excelRow} cached point value`).toBe('number');
+    }
   }
 
   expect(populatedRows.length, 'BOM 明细 must contain at least one material row').toBeGreaterThan(
@@ -71,6 +77,11 @@ function assertBomRows(workbook: XLSX.WorkBook, expectations: QuoteWorkbookExpec
   }
 
   const bomRows = sheetRows(workbook, 'BOM明细');
+  if (expectations.fixedCounts) {
+    expect(bomRows[0]).not.toContain('加工点数');
+    expect(bomRows[0]).not.toContain('点数合计');
+    expect(bomRows[0]).toContain('备注');
+  }
   expect(JSON.stringify(bomRows), 'no raw qo_* field codes leak into the workbook').not.toMatch(
     /qo_(quote|ql|pe)_[a-z_]+/,
   );
@@ -81,25 +92,36 @@ function assertBomRows(workbook: XLSX.WorkBook, expectations: QuoteWorkbookExpec
     expect(headerIndex, 'BOM 明细应包含材料单价表头').toBeGreaterThanOrEqual(0);
     const headers = bomRows[headerIndex].map(String);
     const unitPriceColumn = headers.indexOf('材料单价');
-    const processPointColumn = headers.indexOf('加工点数');
     const materialRow = bomRows
       .slice(headerIndex + 1)
       .find((row) => row.some((cell) => String(cell).includes(mpn)));
     expect(materialRow, `BOM 明细应包含修正后的物料 ${mpn}`).toBeTruthy();
     expect(Number(materialRow?.[unitPriceColumn])).toBeCloseTo(unitCost, 4);
-    expect(
-      Number(materialRow?.[processPointColumn]),
-      '修正物料的加工点数应完成重算',
-    ).toBeGreaterThan(0);
+    // Repricing changes material evidence, not board geometry. Processing counts
+    // are validated independently in assertProcessRows; never require per-MPN points.
   }
 
   return populatedRows.at(-1) ?? 1;
 }
 
-function assertProcessRows(workbook: XLSX.WorkBook): void {
+function assertProcessRows(workbook: XLSX.WorkBook, expectations: QuoteWorkbookExpectations): void {
   const process = workbook.Sheets['加工明细'];
   for (let row = 3; row <= 11; row += 1) {
-    expectFormula(process, `H${row}`, `F${row}*G${row}`);
+    if (!(expectations.fixedCounts && row === 11)) expectFormula(process, `H${row}`, `F${row}*G${row}`);
+  }
+  if (expectations.fixedCounts) {
+    const { apertures, holes } = expectations.fixedCounts;
+    expectFormula(process, 'F3', 'D3*E3');
+    expectFormula(process, 'F4', 'D4*E4');
+    expectFormula(process, 'F12', 'SUM(F3:F4)');
+    expect(numericCell(process, 'D3')).toBe(apertures);
+    expect(numericCell(process, 'D4')).toBe(holes);
+    expect(numericCell(process, 'E3')).toBe(0.5);
+    expect(numericCell(process, 'E4')).toBe(1);
+    expect(numericCell(process, 'F3')).toBe(apertures * 0.5);
+    expect(numericCell(process, 'F4')).toBe(holes);
+    expect(numericCell(process, 'F12')).toBe(apertures * 0.5 + holes);
+    expect((process['!merges'] ?? []).some((r) => r.s.r <= 11 && r.e.r >= 11 && r.s.c <= 5 && r.e.c >= 5)).toBe(false);
   }
   expectFormula(process, 'H12', 'SUM(H3:H11)');
   const detailTotal = Array.from({ length: 9 }, (_, index) =>
@@ -158,7 +180,7 @@ export function validateQuoteWorkbook(
   expect(workbook.SheetNames).toEqual(['报价单', 'BOM明细', '加工明细']);
   assertNoFormulaErrors(workbook);
   const lastBomRow = assertBomRows(workbook, expectations);
-  assertProcessRows(workbook);
+  assertProcessRows(workbook, expectations);
   assertQuoteTotals(workbook, lastBomRow, expectations);
 }
 
@@ -198,7 +220,7 @@ export function validateQuickCustomerBomWorkbook(filePath: string, mpnSuffix: st
   }
   expect((bomRows[4] ?? []).slice(7, 10).map(String)).toEqual(['MDD', `1N4148W${mpnSuffix}`, '']);
 
-  assertProcessRows(workbook);
+  assertProcessRows(workbook, {});
   const process = workbook.Sheets['加工明细'];
   expect(String(process['F3']?.f ?? '')).not.toContain('BOM明细');
   expect(String(process['F4']?.f ?? '')).not.toContain('BOM明细');

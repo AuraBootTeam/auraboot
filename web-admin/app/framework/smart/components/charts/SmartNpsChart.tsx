@@ -7,7 +7,7 @@
  */
 
 import React, { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from './EChartsHost';
 import type { EChartsOption, GraphicComponentOption } from 'echarts';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, LinkageConfig, FilterConfig } from '~/framework/smart/types/chart';
@@ -265,7 +265,6 @@ export const SmartNpsChart: React.FC<SmartNpsChartProps> = ({
         option={options}
         style={{ height: '100%', minHeight: 0 }}
         notMerge
-        lazyUpdate
       />
     </div>
   );

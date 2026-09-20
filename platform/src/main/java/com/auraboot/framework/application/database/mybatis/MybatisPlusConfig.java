@@ -112,6 +112,7 @@ public class MybatisPlusConfig {
                     || "ab_login_channel_auth_method".equals(tableName) // No tenant_id; parent channel is explicit
                     || "ab_identity_provider_instance".equals(tableName) // Pre-auth routing; tenant selector is explicit
                     || "ab_external_identity_link".equals(tableName)  // Identity lookup occurs before tenant context
+                    || "ab_auth_identity".equals(tableName)           // WeChat identity lookup occurs before tenant context (login/bind)
                     || "ab_user_deactivation".equals(tableName)       // No tenant_id
                     || "ab_verification_code".equals(tableName)       // No tenant_id, pre-auth OTP
                     || "ab_system_config".equals(tableName)           // G1: no tenant_id
