@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -80,7 +81,7 @@ class BuiltinPluginImportServiceImplTest {
 
         service.importForTenant(100L, 1L);
 
-        verify(pluginImportService, never()).parseDirectory(anyString());
+        verify(pluginImportService, never()).parseDirectory(anyString(), anyBoolean());
     }
 
     @Test
@@ -91,7 +92,7 @@ class BuiltinPluginImportServiceImplTest {
         service.importForTenant(100L, 1L);
 
         // No org-management or platform-admin subdirs exist, so parse is never called.
-        verify(pluginImportService, never()).parseDirectory(anyString());
+        verify(pluginImportService, never()).parseDirectory(anyString(), anyBoolean());
     }
 
     @Test
@@ -111,7 +112,7 @@ class BuiltinPluginImportServiceImplTest {
                 .pluginId("com.auraboot.org-management")
                 .version("1.0.0")
                 .build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(validPreview);
 
         PluginRecord upToDate = PluginRecord.builder()
                 .pluginId("com.auraboot.org-management")
@@ -135,7 +136,7 @@ class BuiltinPluginImportServiceImplTest {
 
         ImportPreviewResult preview = ImportPreviewResult.builder()
                 .valid(true).importId("IMP").pluginId("any").version("2.0.0").build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(preview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(preview);
 
         PluginRecord oldVersion = PluginRecord.builder()
                 .pluginId("any").version("1.0.0").build();
@@ -163,7 +164,7 @@ class BuiltinPluginImportServiceImplTest {
                 .pluginId("com.auraboot.org-management")
                 .version("1.0.0")
                 .build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(preview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(preview);
         when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
         when(pluginImportService.execute(eq("IMP"), any(ImportRequest.class))).thenAnswer(invocation -> {
             org.assertj.core.api.Assertions.assertThat(MetaContext.get().getUserPid())
@@ -194,7 +195,7 @@ class BuiltinPluginImportServiceImplTest {
                 .valid(false)
                 .errors(java.util.List.of("missing manifest"))
                 .build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(invalid);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(invalid);
 
         service.importForTenant(100L, 1L);
 
@@ -225,7 +226,7 @@ class BuiltinPluginImportServiceImplTest {
                 .pluginId("any")
                 .version("1.0.0")
                 .build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(validPreview);
 
         PluginRecord upToDate = PluginRecord.builder()
                 .pluginId("any")
@@ -250,7 +251,7 @@ class BuiltinPluginImportServiceImplTest {
 
         ImportPreviewResult validPreview = ImportPreviewResult.builder()
                 .valid(true).importId("IMP").pluginId("any").version("1.0.0").build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(validPreview);
         when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
         when(pluginImportService.execute(anyString(), any(ImportRequest.class)))
                 .thenReturn(ImportExecuteResult.builder().success(true).importId("IMP")
@@ -259,9 +260,9 @@ class BuiltinPluginImportServiceImplTest {
         service.importForTenant(100L, 1L);
 
         inOrder(pluginImportService).verify(pluginImportService)
-                .parseDirectory(contains("edu-core"));
+                .parseDirectory(contains("edu-core"), eq(true));
         inOrder(pluginImportService).verify(pluginImportService)
-                .parseDirectory(contains("edu-engine"));
+                .parseDirectory(contains("edu-engine"), eq(true));
         verify(pluginImportService, org.mockito.Mockito.times(2))
                 .execute(anyString(), any(ImportRequest.class));
     }
@@ -276,7 +277,7 @@ class BuiltinPluginImportServiceImplTest {
 
         ImportPreviewResult validPreview = ImportPreviewResult.builder()
                 .valid(true).importId("IMP").pluginId("any").version("1.0.0").build();
-        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+        when(pluginImportService.parseDirectory(anyString(), anyBoolean())).thenReturn(validPreview);
         when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
         when(pluginImportService.execute(anyString(), any(ImportRequest.class)))
                 .thenReturn(ImportExecuteResult.builder().success(true).importId("IMP")
@@ -285,7 +286,7 @@ class BuiltinPluginImportServiceImplTest {
         service.importForTenant(100L, 1L);
 
         verify(pluginImportService, org.mockito.Mockito.times(1))
-                .parseDirectory(anyString());
+                .parseDirectory(anyString(), anyBoolean());
         verify(pluginImportService, org.mockito.Mockito.times(1))
                 .execute(anyString(), any(ImportRequest.class));
     }
@@ -300,6 +301,41 @@ class BuiltinPluginImportServiceImplTest {
 
         // No core plugin dirs exist under the temp dir and no product dirs configured —
         // nothing may be parsed at all.
-        verify(pluginImportService, never()).parseDirectory(anyString());
+        verify(pluginImportService, never()).parseDirectory(anyString(), anyBoolean());
+    }
+    @Test
+    @DisplayName("product seeding defers reference validation and force-overwrites (cold-tenant sibling deps)")
+    void shouldDeferValidationAndOverwriteForProductPlugins(@TempDir Path tempDir) throws IOException {
+        Files.createDirectories(tempDir.resolve("edu-core"));
+        Files.createDirectories(tempDir.resolve("edu-engine"));
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+        ReflectionTestUtils.setField(service, "tenantProductPlugins",
+                tempDir.resolve("edu-core") + "," + tempDir.resolve("edu-engine"));
+
+        ImportPreviewResult enginePreview = ImportPreviewResult.builder()
+                .valid(true)
+                .importId("IMP-ENGINE")
+                .pluginId("com.auraboot.edu-engine")
+                .version("0.1.0")
+                .build();
+        ImportPreviewResult corePreview = ImportPreviewResult.builder()
+                .valid(true).importId("IMP-CORE").pluginId("com.auraboot.edu-core").version("0.1.1").build();
+        when(pluginImportService.parseDirectory(contains("edu-core"), anyBoolean())).thenReturn(corePreview);
+        when(pluginImportService.parseDirectory(contains("edu-engine"), anyBoolean())).thenReturn(enginePreview);
+        when(pluginImportService.execute(anyString(), any(ImportRequest.class)))
+                .thenReturn(ImportExecuteResult.builder().success(true).build());
+
+        service.importForTenant(100L, 1L);
+
+        // The product plugin directory must be parsed with reference validation deferred,
+        // otherwise a sibling plugin's models are "missing" on cold tenants.
+        verify(pluginImportService).parseDirectory(
+                contains("edu-engine"), eq(true));
+        verify(pluginImportService).execute(eq("IMP-ENGINE"), argThat(req ->
+                req.getConflictStrategy() == ImportRequest.ConflictStrategy.OVERWRITE
+                        && Boolean.TRUE.equals(req.getAutoPublishModels())
+                        && Boolean.TRUE.equals(req.getAutoPublishFields())
+                        && Boolean.TRUE.equals(req.getAutoPublishCommands())
+                        && Boolean.TRUE.equals(req.getAutoPublishPages())));
     }
 }
