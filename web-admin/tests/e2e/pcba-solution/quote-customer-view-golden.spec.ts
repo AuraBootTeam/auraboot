@@ -21,6 +21,8 @@ test.describe('PCBA quote customer view golden', () => {
     const page = await ctx.newPage();
     users['sales'] = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
     await ensureQuoteRoleUser(page, users['sales']);
+    users['viewer'] = makeQuoteRoleUser('qo_view', `${uid}v`, []);
+    await ensureQuoteRoleUser(page, users['viewer']);
     await ctx.close();
   });
 
@@ -37,10 +39,12 @@ test.describe('PCBA quote customer view golden', () => {
       expect(await page.getByRole('button', { name: /保存|Save/ }).count()).toBe(0);
 
       // 只读面:只读角色(viewer)对报价直写被拒绝;admin 特权写是设计内行为,不作断言
-      const viewerContext = await page.context().browser()!.newContext({
-        storageState: process.env.PW_VIEWER_STORAGE_STATE || 'tests/storage/viewer.json',
-      });
-      const viewerPage = await viewerContext.newPage();
+      // viewer 会话在测试内自建(空角色用户 + UI 登录):不依赖 checkout 本地的
+      // tests/storage/viewer.json 残留文件,fresh checkout 也能跑。
+      const { context: viewerContext, page: viewerPage } = await openQuoteRolePage(
+        await page.context().browser()!,
+        users['viewer'],
+      );
       const writeAttempt = await viewerPage.request.put(`/api/dynamic/qo_quote_common/${seeded.quoteId}`, {
         data: { qo_quote_notes: 'Q20-01 read-only bypass attempt' },
       });
@@ -73,10 +77,11 @@ test.describe('PCBA quote customer view golden', () => {
     const content = '%PDF-1.4 E2E customer attachment payload\n';
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     try {
-      const quote = (
-        await queryDynamicRecords(page, 'qo_quote_common', [], { pageSize: 1 })
-      )[0];
-      const quotePid = String(quote.pid);
+      // 自播种报价:不依赖库中已有数据(fresh 库为空也可跑)。
+      const seeded = await seedQuoteForCorrectedBomUpload(page);
+      created.quoteId = seeded.quoteId;
+      created.rows.push({ model: 'qo_quote_common', pid: seeded.quoteId });
+      const quotePid = seeded.quoteId;
 
       const upload = await page.request.post('/api/file/upload', { multipart: {
         file: { name: originalName, mimeType: 'application/pdf', buffer: Buffer.from(content) },
