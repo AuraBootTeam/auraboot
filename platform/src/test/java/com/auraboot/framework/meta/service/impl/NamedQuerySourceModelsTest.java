@@ -109,6 +109,19 @@ class NamedQuerySourceModelsTest {
         assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
                 resolved.get("\"public\".\"ab_tenant\""));
     }
+    @Test void platformMemberDirectoryResolvesWithoutAnyModel() {
+        // ab_tenant_member is the tenant member directory joined by the quote/BOM dashboard
+        // chart queries purely for display names (unique pid against tenant-scoped anchors).
+        // It must resolve as a platform reference source like ab_user, otherwise every
+        // chart-data request is denied for business roles (107 gate 2026-09-20: 1004+ denied
+        // executions, all quote/BOM role journeys rendering "Access forbidden").
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        Map<String, String> resolved = resolve("public.ab_tenant_member");
+        assertTrue(resolved.containsKey("\"public\".\"ab_tenant_member\""),
+                "ab_tenant_member should resolve as a platform reference source");
+        assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
+                resolved.get("\"public\".\"ab_tenant_member\""));
+    }
     @Test void platformFileAndAsyncTaskTablesResolveAsSystemSources() {
         // ab_file (attachments) and ab_async_task carry tenant_id and the quoting named
         // queries filter them explicitly by #{params.tenantId} / the anchor's tenant, so
