@@ -38,11 +38,10 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
         if (code == null || code.isBlank()) {
             throw new BusinessException(ResponseCode.CommonValidationFailed, "wx.login code is required");
         }
-        User user = wechatMiniIdentityService.resolveLoginUser(code);
-        if (user == null) {
-            throw new BusinessException(ResponseCode.BadParam,
-                    "This WeChat account is not bound yet — log in with email/password once and bind WeChat");
-        }
+        // Two-step pure-wechat flow (SOT 05): an unknown WeChat self-provisions a
+        // bare account (no tenant, no roles) and logs in; the app then dispatches
+        // by school-binding state (unbound -> bind-school page).
+        User user = wechatMiniIdentityService.selfProvision(code);
         return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
     }
 }

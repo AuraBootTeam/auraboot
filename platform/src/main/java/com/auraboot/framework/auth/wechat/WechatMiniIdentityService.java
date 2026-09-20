@@ -6,6 +6,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,17 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 /**
- * Resolution and binding of WeChat mini-program identities to platform users.
- *
- * Login resolution (PRD-agnostic, per the open-platform UnionID model):
- *  1. (provider, appId, openid) hit  → that user logs in.
- *  2. no openid hit, but the session carries a unionid that an existing identity
- *     already holds → the SAME user; attach this app's openid to them.
- *  3. neither → null (caller decides: login endpoint rejects with
- *     "bind first"; the bind endpoint attaches to the current user).
- *
- * UnionID tolerance: absent unionid never blocks login — openid-only identities
- * are created and merged later when a unionid first appears.
+ * WeChat mini-program identity binding: one openid (per app) to one platform
+ * user. Two-step login (SOT 05): an unknown WeChat self-provisions a bare
+ * account here; school binding happens later via the authenticated
+ * bind-school flow.
  */
 @Slf4j
 @Service
@@ -38,9 +32,14 @@ public class WechatMiniIdentityService {
     private final UserMapper userMapper;
     private final WechatMiniClient wechatMiniClient;
     private final WechatMiniProperties wechatMiniProperties;
+    private final UserService userService;
 
     /** Resolve the platform user for a wx.login code, or null when unbound. */
-    @Transactional
+    public User resolveLoginUser(String jsCode) {
+        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
+        return resolveLoginUserBySession(session);
+    }
+
     /** Resolve the platform user behind an already-exchanged session (null when unbound). */
     public User resolveLoginUserBySession(WechatMiniClient.WxSession session) {
         AuthIdentity identity = findByOpenid(session.openid());
@@ -58,12 +57,34 @@ public class WechatMiniIdentityService {
     }
 
     /**
-     * Attach a WeChat identity to an existing user from an already-exchanged session
-     * (join flow: the js code is single-use, so the session must be resolved exactly once).
-     * Conflict on openid surfaces as Bad parameter, mirroring bindToUser.
+     * Pure-wechat login: an unknown WeChat account gets a bare platform account —
+     * synthetic email, unusable random password, no tenant, no roles. The school
+     * binding happens later via the authenticated bind-school flow.
      */
     @Transactional
-    public void attachIdentity(Long userId, WechatMiniClient.WxSession session) {
+    public User selfProvision(String jsCode) {
+        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
+        User existing = resolveLoginUserBySession(session);
+        if (existing != null) return existing;
+        String email = "wx-" + Integer.toHexString(session.openid().hashCode()) + "-"
+                + Long.toHexString(System.currentTimeMillis()) + "@wx.wechat";
+        try {
+            User user = userService.signUp(email, java.util.UUID.randomUUID().toString(), "微信用户", null);
+            createIdentity(user.getId(), session, session.unionid());
+            log.info("wechat self-provision: userId={} openid ...{}",
+                    user.getId(), session.openid().substring(Math.max(0, session.openid().length() - 6)));
+            return user;
+        } catch (Exception e) {
+            User byEmail = userMapper.selectOne(new QueryWrapper<User>().eq("email", email).last("LIMIT 1"));
+            if (byEmail != null) return byEmail;
+            throw e;
+        }
+    }
+
+    /** Bind the WeChat identity to an existing, authenticated user. Idempotent per openid. */
+    @Transactional
+    public void bindToUser(String jsCode, Long userId) {
+        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
         AuthIdentity existing = findByOpenid(session.openid());
         if (existing != null) {
             if (!existing.getUserId().equals(userId)) {
@@ -76,31 +97,9 @@ public class WechatMiniIdentityService {
         createIdentity(userId, session, session.unionid());
     }
 
-    public User resolveLoginUser(String jsCode) {
-        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
-        AuthIdentity identity = findByOpenid(session.openid());
-        if (identity != null) {
-            touchLastLogin(identity);
-            return userMapper.selectById(identity.getUserId());
-        }
-        if (!isBlank(session.unionid())) {
-            AuthIdentity byUnion = findByUnionid(session.unionid());
-            if (byUnion != null) {
-                // Same WeChat user, first login from this app — attach the openid.
-                AuthIdentity attached = createIdentity(byUnion.getUserId(), session, byUnion.getUnionid());
-                touchLastLogin(attached);
-                log.info("WeChat identity attached via unionid: userId={} app={}",
-                        byUnion.getUserId(), session.openid());
-                return userMapper.selectById(byUnion.getUserId());
-            }
-        }
-        return null;
-    }
-
-    /** Bind the WeChat identity to an existing, authenticated user. Idempotent per openid. */
+    /** Attach an identity from an already-exchanged session (join flow). */
     @Transactional
-    public void bindToUser(String jsCode, Long userId) {
-        WechatMiniClient.WxSession session = wechatMiniClient.code2Session(jsCode);
+    public void attachIdentity(Long userId, WechatMiniClient.WxSession session) {
         AuthIdentity existing = findByOpenid(session.openid());
         if (existing != null) {
             if (!existing.getUserId().equals(userId)) {

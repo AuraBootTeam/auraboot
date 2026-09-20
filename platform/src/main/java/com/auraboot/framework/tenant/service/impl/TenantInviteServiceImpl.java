@@ -206,6 +206,15 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
 
 
     @Override
+    public void attachRoleCodes(String invitationCode, String roleCodes) {
+        Invitation invitation = findByInvitationCode(invitationCode);
+        if (invitation == null) return;
+        invitation.setRoleCodes(roleCodes);
+        invitation.setUpdatedAt(Instant.now());
+        baseMapper.updateById(invitation);
+    }
+
+    @Override
     public Invitation findByInvitationCode(String invitationCode) {
         return invitationMapper.findByInviteCode(invitationCode);
     }
