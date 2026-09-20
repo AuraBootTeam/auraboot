@@ -50,6 +50,12 @@ public class WechatMiniIdentityService {
         if (!isBlank(session.unionid())) {
             AuthIdentity byUnion = findByUnionid(session.unionid());
             if (byUnion != null) {
+                // Same physical WeChat account seen through a second app: materialize
+                // the new openid so future logins resolve directly and never depend on
+                // the unionid claim continuing to arrive (mirrors WechatPcIdentityService).
+                AuthIdentity attached = createIdentity(byUnion.getUserId(), session, session.unionid());
+                touchLastLogin(attached);
+                log.info("WeChat mini identity attached via unionid: userId={}", byUnion.getUserId());
                 return userMapper.selectById(byUnion.getUserId());
             }
         }
