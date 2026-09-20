@@ -227,6 +227,15 @@ dependencyManagement {
     dependencies {
         dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
 
+        // Force jsqlparser 5.3 over the 5.2 pinned by mybatis-plus 3.5.x. 5.2
+        // catastrophically backtracks on large analytical named queries (e.g. the
+        // BOM price waterfall) and exceeds the 8s parser timeout, which turns every
+        // execution into "Cannot establish named query source tables". 5.3 parses
+        // the same SQL in ~1.1s. 5.4 would be faster (~130ms) but treats column
+        // names such as ab_tenant_member.permissions as reserved words, breaking
+        // every MyBatis-Plus query that selects them at runtime.
+        dependency 'com.github.jsqlparser:jsqlparser:5.3'
+
         dependency "io.jsonwebtoken:jjwt-api:${jwtVersion}"
         dependency "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
         dependency "io.jsonwebtoken:jjwt-jackson:${jwtVersion}"
