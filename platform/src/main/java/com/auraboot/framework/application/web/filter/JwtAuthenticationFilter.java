@@ -385,6 +385,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/tenant-selection")
                 || path.startsWith("/api/actors")
                 || path.startsWith("/api/user/sessions")
-                || path.startsWith("/api/auth/logout");
+                || path.startsWith("/api/auth/logout")
+                // Two-step pure-wechat login (SOT 05): an ONBOARDING session's whole
+                // purpose is to reach the school-binding step.
+                || "/api/tenant/bind-school".equals(path);
     }
 }
