@@ -78,6 +78,8 @@ class AgentApprovalTimeoutEnforcementIT extends BaseIntegrationTest {
         try {
             if (approvalPid != null) jdbcTemplate.update("DELETE FROM ab_agent_approval WHERE pid = ?", approvalPid);
             if (policyPid != null) jdbcTemplate.update("DELETE FROM ab_approval_policy WHERE pid = ?", policyPid);
+            jdbcTemplate.update("DELETE FROM ab_agent_run WHERE pid = ?", "run-timeout-" + suffix);
+            jdbcTemplate.update("DELETE FROM ab_agent_task WHERE pid = ?", "task-timeout-" + suffix);
         } catch (Exception ignored) {}
     }
 
@@ -105,6 +107,27 @@ class AgentApprovalTimeoutEnforcementIT extends BaseIntegrationTest {
         // push the deadline into the past, then run the scheduled enforcement directly
         jdbcTemplate.update("UPDATE ab_agent_approval SET expires_at = ? WHERE pid = ?",
                 Timestamp.from(Instant.now().minusSeconds(3600)), approvalPid);
+
+        // #1901: expiry closes the owning run through the terminal store, whose
+        // transaction joins the run/task pair — seed them so enforcement has a
+        // real relationship to fail instead of rolling back.
+        Map<String, Object> task = new HashMap<>();
+        task.put("pid", "task-timeout-" + suffix);
+        task.put("tenant_id", tenantId);
+        task.put("title", "approval-timeout-" + suffix);
+        task.put("task_status", "running");
+        task.put("deleted_flag", false);
+        dynamicDataMapper.insert("ab_agent_task", task);
+        Map<String, Object> run = new HashMap<>();
+        run.put("pid", "run-timeout-" + suffix);
+        run.put("tenant_id", tenantId);
+        run.put("agent_id", "timeout-agent-" + suffix);
+        run.put("task_id", "task-timeout-" + suffix);
+        run.put("run_status", "running");
+        run.put("started_at", LocalDateTime.now());
+        run.put("created_at", LocalDateTime.now());
+        run.put("updated_at", LocalDateTime.now());
+        dynamicDataMapper.insert("ab_agent_run", run);
 
         approvalGateService.enforceApprovalTimeouts();
 

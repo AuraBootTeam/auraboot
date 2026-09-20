@@ -48,22 +48,39 @@ class StaleRunRecoveryIT extends BaseIntegrationTest {
 
     private final String runTag = UniqueIdGenerator.generate().substring(18);
     private final String agentCode = "stale-run-" + runTag;
+    /** ULIDs generated in the same millisecond share their prefix; disambiguate per seed. */
+    private final java.util.concurrent.atomic.AtomicInteger taskSeq =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     @AfterEach
     void cleanup() {
         dynamicDataMapper.deleteByQuery(
                 "DELETE FROM ab_agent_run WHERE agent_id = #{params.agent}",
                 Map.of("agent", agentCode));
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_agent_task WHERE pid LIKE #{params.prefix}",
+                Map.of("prefix", "task-" + runTag + "%"));
     }
 
     /** A run row as the runtime leaves it: started, heartbeating, not yet finished. */
     private String seedRunningRun(LocalDateTime lastHeartbeat) {
         String pid = UniqueIdGenerator.generate();
+        String taskPid = "task-" + runTag + String.format("%02d", taskSeq.incrementAndGet());
+        // #1901: run and task rows are created atomically and every terminal
+        // transition joins the owning task, so the fixture must pair them.
+        Map<String, Object> task = new HashMap<>();
+        task.put("pid", taskPid);
+        task.put("tenant_id", getTestTenant().getId());
+        task.put("title", "stale-run-recovery-" + runTag);
+        task.put("task_status", "running");
+        task.put("deleted_flag", false);
+        dynamicDataMapper.insert("ab_agent_task", task);
+
         Map<String, Object> run = new HashMap<>();
         run.put("pid", pid);
         run.put("tenant_id", getTestTenant().getId());
         run.put("agent_id", agentCode);
-        run.put("task_id", "task-" + runTag);
+        run.put("task_id", taskPid);
         run.put("run_status", "running");
         run.put("started_at", lastHeartbeat.minusMinutes(1));
         run.put("created_at", lastHeartbeat.minusMinutes(1));
