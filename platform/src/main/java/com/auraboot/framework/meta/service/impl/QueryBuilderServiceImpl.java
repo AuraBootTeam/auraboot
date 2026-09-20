@@ -797,6 +797,33 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         }
     }
 
+    /**
+     * Accept both the documented local date-time ("2026-09-14T16:00:00") and
+     * full ISO-8601 instants with offset/Z ("2026-09-14T16:00:00.000Z" — what
+     * HTTP clients naturally send for timestamptz range filters). Re-throws the
+     * last failure so the caller's catch falls back to the raw string (previous
+     * behaviour) instead of masking the reason.
+     */
+    private java.sql.Timestamp parseTimestampValue(String str) {
+        Exception last;
+        try {
+            return java.sql.Timestamp.valueOf(java.time.LocalDateTime.parse(str));
+        } catch (Exception e) {
+            last = e;
+        }
+        try {
+            return java.sql.Timestamp.from(java.time.OffsetDateTime.parse(str).toInstant());
+        } catch (Exception e) {
+            last = e;
+        }
+        try {
+            return java.sql.Timestamp.from(java.time.Instant.parse(str));
+        } catch (Exception e) {
+            last = e;
+        }
+        throw new IllegalArgumentException("Unparseable datetime value: " + str, last);
+    }
+
     private Object convertValueByDataType(String dataType, Object value) {
         if (value == null || dataType == null) {
             return value;
@@ -815,7 +842,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
                 case "decimal", "numeric", "float", "double" -> new java.math.BigDecimal(str);
                 case "boolean", "bool" -> Boolean.valueOf(str);
                 case "date" -> java.sql.Date.valueOf(java.time.LocalDate.parse(str));
-                case "timestamp", "datetime" -> java.sql.Timestamp.valueOf(java.time.LocalDateTime.parse(str));
+                case "timestamp", "datetime" -> parseTimestampValue(str);
                 default -> value;
             };
         } catch (Exception ex) {
