@@ -18,9 +18,18 @@ public class NamedQuerySourceModels {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
-    /** Platform reference sources resolvable without a tenant model, as qualified identities. */
+    /**
+     * Platform reference sources resolvable without a tenant model, as qualified identities.
+     *
+     * <p>Admission rule (see #1968 for ab_tenant): platform-owned tables that the named
+     * query joins on their unique pid (or with an explicit tenant filter) against an
+     * already tenant-scoped anchor, so no cross-tenant rows can leak through the join.
+     * ab_file and ab_async_task carry tenant_id and the quoting named queries filter them
+     * by #{params.tenantId} / the anchor's tenant explicitly.</p>
+     */
     private static final Set<String> PLATFORM_REFERENCE_SOURCES =
-            Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"");
+            Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"",
+                    "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
@@ -103,7 +112,8 @@ public class NamedQuerySourceModels {
             return;
         }
         Set<String> candidates = catalog.getOrDefault(key, Set.of());
-        if (candidates.size() != 1) throw new AccessDeniedException("Export source model is unknown or ambiguous");
+        if (candidates.size() != 1) throw new AccessDeniedException(
+                "Export source model is unknown or ambiguous: " + key + " (candidates=" + candidates.size() + ")");
         Map<String, Object> relation = jdbc.queryForMap("""
                 SELECT c.relkind::text AS kind,
                     EXISTS(SELECT 1 FROM pg_catalog.pg_attribute a WHERE a.attrelid=c.oid

@@ -27,4 +27,25 @@ class ReferencedTablesReproTest {
         String wrapped = "SELECT title, type, status, order_date FROM (" + DETAIL + ") AS _nq";
         assertThat(rewriter.referencedTables(wrapped)).containsExactly("mt_e2et_order");
     }
+
+    @Test
+    void setReturningFunctionsInProjectionAddNoRelationsAndDoNotThrow() {
+        // Regression for the fresh-seed red cluster 2026-09-20: the quote price-evidence
+        // named query expands ladder arrays via jsonb_array_elements_text inside scalar
+        // subqueries of the projection. Table functions derive from already-resolved row
+        // columns — they add no relation provenance and must not be rejected.
+        String evidence = "SELECT e.pid AS pid,"
+            + " (SELECT string_agg(n.val || '+', ' ' ORDER BY n.ord) FROM jsonb_array_elements_text(e.qo_pe_snapshot -> 'ladderNums')"
+            + " WITH ORDINALITY AS n(val, ord) LEFT JOIN jsonb_array_elements_text(e.qo_pe_snapshot -> 'ladderPrices')"
+            + " WITH ORDINALITY AS p(val, ord) ON n.ord = p.ord) AS price_ladder"
+            + " FROM mt_qo_price_evidence_common e";
+        assertThat(rewriter.referencedTables(evidence)).containsExactly("mt_qo_price_evidence_common");
+    }
+
+    @Test
+    void unnestOverCteColumnsAddsNoRelationsAndDoesNotThrow() {
+        String workbench = "WITH facts AS (SELECT unnest(q.qo_ql_process_points) AS point FROM mt_qo_quote_line_common q)"
+            + " SELECT f.point FROM facts f";
+        assertThat(rewriter.referencedTables(workbench)).containsExactly("mt_qo_quote_line_common");
+    }
 }

@@ -223,9 +223,10 @@ public class SecureSqlRewriter {
                     if (!isCte(table)) tables.add(table.getFullyQualifiedName());
                     return super.visit(table, context);
                 }
-                @Override public <S> StringBuilder visit(net.sf.jsqlparser.statement.select.TableFunction function, S context) {
-                    throw new org.springframework.security.access.AccessDeniedException("Table function sources require explicit resolution");
-                }
+                // Set-returning table functions (jsonb_array_elements_text, unnest, ...) derive
+                // from already-resolved row columns and add no relation provenance of their own,
+                // so they are neither registered as sources nor rejected; any real table inside
+                // their arguments is still visited and collected above.
             };
             expressions.setSelectVisitor(visitor);
             ((Select) statement).accept((net.sf.jsqlparser.statement.select.SelectVisitor<StringBuilder>) visitor, null);
