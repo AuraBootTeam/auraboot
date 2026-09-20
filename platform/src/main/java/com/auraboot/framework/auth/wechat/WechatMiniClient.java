@@ -40,9 +40,13 @@ public class WechatMiniClient {
                 + "&secret=" + urlEncode(properties.getAppSecret())
                 + "&js_code=" + urlEncode(jsCode)
                 + "&grant_type=authorization_code";
+        // WeChat answers with Content-Type: text/plain even for JSON bodies — the
+        // Spring converters can't bind that to a POJO, so fetch the raw string and
+        // parse explicitly (same pattern as WechatPcClient).
         SessionResponse body;
         try {
-            body = restClient().get().uri(URI.create(uri)).retrieve().body(SessionResponse.class);
+            String raw = restClient().get().uri(URI.create(uri)).retrieve().body(String.class);
+            body = json().readValue(raw, SessionResponse.class);
         } catch (Exception e) {
             log.warn("WeChat jscode2session call failed: {}", e.getMessage());
             throw new RootUnCheckedException(ResponseCode.BadParam, "WeChat login exchange failed");
@@ -71,10 +75,16 @@ public class WechatMiniClient {
         return s == null || s.isBlank();
     }
 
+    private static com.fasterxml.jackson.databind.ObjectMapper json() {
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
     @Data
     static class SessionResponse {
         private String openid;
         private String unionid;
+        @com.fasterxml.jackson.annotation.JsonProperty("session_key")
         private String sessionKey;
         private Integer errcode;
         private String errmsg;
