@@ -69,10 +69,10 @@ public class BindSchoolController {
             throw new BusinessException(ResponseCode.BadParam, "邀请码无效或已过期，请联系学校管理员");
         }
 
-        // Bearer token → platform user. The token was minted by this platform for
-        // the bare account at login; its subject is the account email.
-        String identifier = jwtUtil.extractIdentifier(token);
-        User user = userService.findByEmail(identifier);
+        // Bearer token → platform user. The JWT subject is the user pid — the same
+        // identifier JwtAuthenticationFilter resolves via findByPid on every call
+        // (JwtUtil.extractUserPid is an alias of extractIdentifier), not an email.
+        User user = userService.findByPid(jwtUtil.extractIdentifier(token));
         if (user == null) throw new BusinessException(ResponseCode.BadParam, "账号不存在");
         Long userId = user.getId();
 
