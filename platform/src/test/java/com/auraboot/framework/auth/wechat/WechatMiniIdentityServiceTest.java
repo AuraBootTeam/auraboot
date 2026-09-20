@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.wechat.WechatMiniClient.WxSession;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,9 @@ class WechatMiniIdentityServiceTest {
     @Mock
     private WechatMiniClient wechatMiniClient;
 
+    @Mock
+    private UserService userService;
+
     private WechatMiniIdentityService service;
 
     @BeforeEach
@@ -46,7 +50,7 @@ class WechatMiniIdentityServiceTest {
         var properties = new WechatMiniProperties();
         properties.setAppId("wx-test-appid");
         properties.setAppSecret("test-secret");
-        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient, properties);
+        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient, properties, userService);
     }
 
     private void stubSession(String openid, String unionid) {
