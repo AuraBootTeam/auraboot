@@ -14,6 +14,7 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredential
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotatedCredentialSecret;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookDeliveryView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookSubscriptionHealthView;
 import com.auraboot.framework.openplatform.entity.ApplicationCredential;
 import com.auraboot.framework.openplatform.entity.ApplicationInstallation;
 import com.auraboot.framework.openplatform.entity.ExternalApplication;
@@ -24,6 +25,8 @@ import com.auraboot.framework.openplatform.mapper.ApplicationScopeGrantMapper;
 import com.auraboot.framework.openplatform.mapper.ExternalApplicationMapper;
 import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
 import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
+import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
+import com.auraboot.framework.webhook.entity.WebhookSubscription;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,6 +50,8 @@ public class OpenPlatformManagementService {
     private final PasswordEncoder passwordEncoder;
     private final OpenApiCallAuditMapper auditMapper;
     private final WebhookDeliveryLogMapper deliveryMapper;
+    private final WebhookSubscriptionMapper subscriptionMapper;
+    private final OpenApiEventCatalog eventCatalog;
 
     public List<ApplicationView> listApplications() {
         Long tenantId = requireTenant();
@@ -188,6 +193,39 @@ public class OpenPlatformManagementService {
                         item.replayCount(), item.lastReplayedAt(), item.createdAt(),
                         "dead_letter".equals(item.deliveryStatus()) || "failed".equals(item.deliveryStatus())))
                 .toList();
+    }
+
+    public List<WebhookSubscriptionHealthView> listWebhookHealth(String installationPid) {
+        Long tenantId = requireTenant();
+        requireInstallation(tenantId, installationPid);
+        Instant now = Instant.now();
+        return subscriptionMapper.findByTenant(tenantId).stream()
+                .filter(item -> installationPid.equals(item.getInstallationPid()))
+                .map(item -> toWebhookHealth(item, now))
+                .toList();
+    }
+
+    private WebhookSubscriptionHealthView toWebhookHealth(WebhookSubscription subscription, Instant now) {
+        int version = subscription.getEventVersion() == null ? 1 : subscription.getEventVersion();
+        OpenApiEventCatalog.EventDescriptor descriptor = eventCatalog.event(subscription.getEventType())
+                .filter(OpenApiEventCatalog.EventDescriptor::externallyDeliverable).orElse(null);
+        boolean compatible = descriptor != null && descriptor.supportedVersions().contains(version);
+        Instant dueAt = subscription.getSecretRotatedAt() == null ? null
+                : subscription.getSecretRotatedAt().plus(90, ChronoUnit.DAYS);
+        String rotationStatus;
+        if (subscription.getSecret() == null || subscription.getSecret().isBlank()) {
+            rotationStatus = "missing";
+        } else if (dueAt != null && !dueAt.isAfter(now)) {
+            rotationStatus = "overdue";
+        } else if (dueAt != null && !dueAt.isAfter(now.plus(14, ChronoUnit.DAYS))) {
+            rotationStatus = "due";
+        } else {
+            rotationStatus = "healthy";
+        }
+        return new WebhookSubscriptionHealthView(subscription.getPid(), subscription.getName(),
+                subscription.getEventType(), version, descriptor == null ? null : descriptor.currentVersion(),
+                compatible, rotationStatus, subscription.getSecretRotatedAt(), dueAt,
+                Boolean.TRUE.equals(subscription.getEnabled()));
     }
 
     private String safeFailureReason(String status, Integer responseStatus) {

@@ -24,10 +24,22 @@ public class OpenApiCapabilityRegistry {
         published.add(new Capability("automation.external-event.publish", HttpMethod.POST,
                 "/api/open/v1/event-sources/{sourceCode}/events", "automation.events.write",
                 "tenant-wide", 1));
+        published.add(new Capability("platform.event-catalog.list", HttpMethod.GET,
+                "/api/open/v1/event-catalog", "openapi.events.read", "tenant-wide", 1));
         published.add(new Capability("assets.get", HttpMethod.GET,
                 "/api/open/v1/resources/assets/{recordPid}", "assets.read", "tenant-wide", 1));
+        published.add(new Capability("assets.list", HttpMethod.GET,
+                "/api/open/v1/resources/assets", "assets.read", "tenant-wide", 1));
         published.add(new Capability("assets.assign", HttpMethod.POST,
                 "/api/open/v1/commands/assets.assign:execute", "assets.manage", "tenant-wide", 1));
+        published.add(new Capability("inventory.stock-ins.get", HttpMethod.GET,
+                "/api/open/v1/resources/inventory.stock-ins/{recordPid}",
+                "inventory.stock-ins.read", "tenant-wide", 1));
+        published.add(new Capability("inventory.stock-ins.list", HttpMethod.GET,
+                "/api/open/v1/resources/inventory.stock-ins", "inventory.stock-ins.read", "tenant-wide", 1));
+        published.add(new Capability("inventory.stock-ins.confirm", HttpMethod.POST,
+                "/api/open/v1/commands/inventory.stock-ins.confirm:execute",
+                "inventory.stock-ins.manage", "tenant-wide", 1));
         contributors.forEach(contributor -> published.addAll(contributor.capabilities()));
         this.capabilities = published.stream()
                 .sorted(Comparator.comparing(Capability::code))

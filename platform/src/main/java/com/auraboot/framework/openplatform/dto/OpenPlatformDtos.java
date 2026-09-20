@@ -66,6 +66,12 @@ public final class OpenPlatformDtos {
                                       Integer replayCount, Instant lastReplayedAt, Instant createdAt,
                                       boolean replayable) { }
 
+    public record WebhookSubscriptionHealthView(String pid, String name, String eventType,
+                                                Integer eventVersion, Integer catalogCurrentVersion,
+                                                boolean compatible, String rotationStatus,
+                                                Instant secretRotatedAt, Instant rotationDueAt,
+                                                boolean enabled) { }
+
     public record TokenResponse(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("token_type") String tokenType,

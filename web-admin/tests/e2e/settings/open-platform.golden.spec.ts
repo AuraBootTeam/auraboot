@@ -43,6 +43,11 @@ async function capture(page: import('@playwright/test').Page, id: string, fullPa
   });
 }
 
+async function captureLocator(locator: import('@playwright/test').Locator, id: string) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.screenshot({ path: path.join(EVIDENCE_DIR, `${id}.png`), timeout: 30_000 });
+}
+
 async function dismissToasts(page: import('@playwright/test').Page) {
   const closeButtons = page.getByRole('button', { name: 'Close notification' });
   while ((await closeButtons.count()) > 0) {
@@ -63,7 +68,7 @@ async function openAccountMenu(page: import('@playwright/test').Page) {
 }
 
 test.describe('Open Platform golden journey', () => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   test.use({
     storageState: { cookies: [], origins: [] },
     locale: 'zh-CN',
@@ -130,8 +135,11 @@ test.describe('Open Platform golden journey', () => {
     await installDialog.getByTestId('open-platform-rate-limit').fill('1200');
     const scopeChecks = installDialog.getByRole('checkbox');
     await expect(scopeChecks.first()).toBeChecked();
-    await expect(scopeChecks).toHaveCount(4);
+    await expect(scopeChecks).toHaveCount(7);
     await installDialog.getByLabel('assets.read').check();
+    await installDialog.getByLabel('inventory.stock-ins.read').check();
+    await installDialog.getByLabel('inventory.stock-ins.manage').check();
+    await installDialog.getByLabel('openapi.events.read').check();
     await installDialog.getByLabel('automation.events.write').check();
     await installDialog.getByLabel('openapi.profile.read').check();
     await capture(page, 'OP-UI-07');
@@ -163,7 +171,8 @@ test.describe('Open Platform golden journey', () => {
         grant_type: 'client_credentials',
         client_id: clientId!,
         client_secret: clientSecret!,
-        scope: 'assets.manage assets.read automation.events.write openapi.profile.read',
+        scope:
+          'assets.manage assets.read inventory.stock-ins.read inventory.stock-ins.manage openapi.events.read automation.events.write openapi.profile.read',
       },
     });
     expect(tokenResponse.status()).toBe(200);
@@ -173,6 +182,9 @@ test.describe('Open Platform golden journey', () => {
       'assets.manage',
       'assets.read',
       'automation.events.write',
+      'inventory.stock-ins.manage',
+      'inventory.stock-ins.read',
+      'openapi.events.read',
       'openapi.profile.read',
     ]);
     expect(token.access_token).toEqual(expect.any(String));
@@ -219,6 +231,14 @@ test.describe('Open Platform golden journey', () => {
       duplicate: false,
     });
 
+    for (const template of ['asset-management', 'simple-inventory']) {
+      const installTemplate = await page.request.post(`/api/templates/${template}/install`, {
+        data: {},
+      });
+      expect(installTemplate.status(), `install ${template}`).toBe(200);
+      expect(await installTemplate.json()).toMatchObject({ success: true, status: 'SUCCESS' });
+    }
+
     const assetCreateResponse = await page.request.post('/api/dynamic/tasset_asset/create', {
       data: {
         tasset_as_code: 'AST-OPEN-API-001',
@@ -247,12 +267,42 @@ test.describe('Open Platform golden journey', () => {
     });
     expect(Object.keys(publishedAsset)).not.toContain('tasset_as_name');
 
+    const raceAssetCreate = await page.request.post('/api/dynamic/tasset_asset/create', {
+      data: {
+        tasset_as_code: 'AST-OPEN-API-RACE',
+        tasset_as_name: 'Open API 并发验证资产',
+        tasset_as_status: 'available',
+      },
+    });
+    const raceAssetPid = (await raceAssetCreate.json()).data.pid as string;
+    const raceAssetRead = await page.request.get(
+      `${BACKEND_URL}/api/open/v1/resources/assets/${raceAssetPid}`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
+    );
+    const raceEtag = raceAssetRead.headers().etag!;
+    const raceResponses = await Promise.all(
+      ['alice', 'bob'].map((assignee, index) =>
+        page.request.post(`${BACKEND_URL}/api/open/v1/commands/assets.assign:execute`, {
+          headers: {
+            Authorization: `Bearer ${token.access_token}`,
+            'Idempotency-Key': `open-platform-race-${index}-0001`,
+            'If-Match': raceEtag,
+          },
+          data: { targetPid: raceAssetPid, input: { assignee } },
+        }),
+      ),
+    );
+    expect(raceResponses.map((response) => response.status()).sort()).toEqual([200, 412]);
+
     const idempotencyKey = 'open-platform-asset-assign-0001';
+    const assetEtag = assetReadResponse.headers().etag;
+    expect(assetEtag).toMatch(/^"ab1\./);
     const assignAsset = () =>
       page.request.post(`${BACKEND_URL}/api/open/v1/commands/assets.assign:execute`, {
         headers: {
           Authorization: `Bearer ${token.access_token}`,
           'Idempotency-Key': idempotencyKey,
+          'If-Match': assetEtag!,
         },
         data: { targetPid: assetPid, input: { assignee: 'alice' } },
       });
@@ -270,6 +320,94 @@ test.describe('Open Platform golden journey', () => {
       idempotentReplay: true,
       resource: { pid: assetPid, assignedTo: 'alice', status: 'in_use' },
     });
+    const staleAssignment = await page.request.post(
+      `${BACKEND_URL}/api/open/v1/commands/assets.assign:execute`,
+      {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          'Idempotency-Key': 'open-platform-asset-assign-stale-0002',
+          'If-Match': assetEtag!,
+        },
+        data: { targetPid: assetPid, input: { assignee: 'bob' } },
+      },
+    );
+    expect(staleAssignment.status()).toBe(412);
+    expect(await staleAssignment.json()).toMatchObject({ code: 'precondition_failed' });
+
+    const inventoryProduct = await page.request.post('/api/dynamic/tinv_product/create', {
+      data: { tinv_pd_code: 'OP-PROD-001', tinv_pd_name: 'Open API 入库商品' },
+    });
+    const inventoryWarehouse = await page.request.post('/api/dynamic/tinv_warehouse/create', {
+      data: { tinv_wh_code: 'OP-WH-001', tinv_wh_name: 'Open API 上海仓' },
+    });
+    expect(inventoryProduct.status()).toBe(200);
+    expect(inventoryWarehouse.status()).toBe(200);
+    const productPid = (await inventoryProduct.json()).data.pid as string;
+    const warehousePid = (await inventoryWarehouse.json()).data.pid as string;
+    const stockInCreate = await page.request.post('/api/dynamic/tinv_stock_in/create', {
+      data: {
+        tinv_si_code: 'OP-SI-001',
+        tinv_si_product_id: productPid,
+        tinv_si_warehouse_id: warehousePid,
+        tinv_si_quantity: 3,
+        tinv_si_unit_cost: 12.5,
+        tinv_si_supplier: 'Open API fixture',
+      },
+    });
+    expect(stockInCreate.status()).toBe(200);
+    const stockInPid = (await stockInCreate.json()).data.pid as string;
+    const stockInRead = await page.request.get(
+      `${BACKEND_URL}/api/open/v1/resources/inventory.stock-ins/${stockInPid}`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
+    );
+    expect(stockInRead.status()).toBe(200);
+    expect(await stockInRead.json()).toMatchObject({
+      pid: stockInPid,
+      productPid,
+      warehousePid,
+      quantity: 3,
+    });
+    const stockInConfirm = await page.request.post(
+      `${BACKEND_URL}/api/open/v1/commands/inventory.stock-ins.confirm:execute`,
+      {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          'Idempotency-Key': 'open-platform-stock-in-confirm-0001',
+          'If-Match': stockInRead.headers().etag,
+        },
+        data: { targetPid: stockInPid, input: {} },
+      },
+    );
+    expect(stockInConfirm.status()).toBe(200);
+    expect(await stockInConfirm.json()).toMatchObject({
+      command: 'inventory.stock-ins.confirm',
+      resource: { pid: stockInPid, status: 'confirmed' },
+    });
+
+    const assetPage = await page.request.get(
+      `${BACKEND_URL}/api/open/v1/resources/assets?limit=1`,
+      {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+      },
+    );
+    const assetPageBody = await assetPage.json();
+    expect(assetPageBody.hasMore).toBe(true);
+    expect(assetPageBody.nextCursor).toMatch(/^ab1\./);
+    expect(assetPageBody.nextCursor).not.toContain(assetPid);
+    const badCursor = await page.request.get(
+      `${BACKEND_URL}/api/open/v1/resources/assets?limit=1&cursor=${encodeURIComponent(`${assetPageBody.nextCursor}x`)}`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
+    );
+    expect(badCursor.status()).toBe(400);
+
+    const publicCatalog = await page.request.get(`${BACKEND_URL}/api/open/v1/event-catalog`, {
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    });
+    expect(publicCatalog.status()).toBe(200);
+    expect((await publicCatalog.json()).map((item: { type: string }) => item.type).sort()).toEqual([
+      'assets.assignment.changed',
+      'inventory.stock-in.confirmed',
+    ]);
 
     const internalResourceProbe = await page.request.get(
       `${BACKEND_URL}/api/open/v1/resources/tasset_asset/${assetPid}`,
@@ -285,9 +423,148 @@ test.describe('Open Platform golden journey', () => {
     await capture(page, 'OP-OPS-02');
     await capture(page, 'OP-OPS-03');
 
+    await page.route('**/api/open-platform/event-catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0',
+          data: [
+            {
+              type: 'assets.assignment.changed',
+              currentVersion: 1,
+              supportedVersions: [1],
+              classification: 'partner',
+              subjectResourceCode: 'assets',
+            },
+            {
+              type: 'inventory.stock-in.confirmed',
+              currentVersion: 1,
+              supportedVersions: [1],
+              classification: 'partner',
+              subjectResourceCode: 'inventory.stock-ins',
+            },
+          ],
+        }),
+      });
+    });
+    await page.route('**/api/open-platform/installations/*/webhook-health', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0',
+          data: [
+            {
+              pid: 'hook-healthy',
+              name: 'ERP asset sync',
+              eventType: 'assets.assignment.changed',
+              eventVersion: 1,
+              catalogCurrentVersion: 1,
+              compatible: true,
+              rotationStatus: 'healthy',
+              rotationDueAt: '2026-12-01T08:00:00Z',
+              enabled: true,
+            },
+            {
+              pid: 'hook-due',
+              name: 'Warehouse receipt sync',
+              eventType: 'inventory.stock-in.confirmed',
+              eventVersion: 1,
+              catalogCurrentVersion: 1,
+              compatible: true,
+              rotationStatus: 'due',
+              rotationDueAt: '2026-09-20T08:00:00Z',
+              enabled: true,
+            },
+            {
+              pid: 'hook-overdue',
+              name: 'Legacy asset bridge',
+              eventType: 'assets.assignment.changed',
+              eventVersion: 1,
+              catalogCurrentVersion: 1,
+              compatible: true,
+              rotationStatus: 'overdue',
+              rotationDueAt: '2026-08-01T08:00:00Z',
+              enabled: true,
+            },
+            {
+              pid: 'hook-missing',
+              name: 'Unsigned receipt bridge',
+              eventType: 'inventory.stock-in.confirmed',
+              eventVersion: 1,
+              catalogCurrentVersion: 1,
+              compatible: true,
+              rotationStatus: 'missing',
+              enabled: false,
+            },
+            {
+              pid: 'hook-incompatible',
+              name: 'Old schema consumer',
+              eventType: 'assets.assignment.changed',
+              eventVersion: 0,
+              catalogCurrentVersion: 1,
+              compatible: false,
+              rotationStatus: 'healthy',
+              enabled: false,
+            },
+          ],
+        }),
+      });
+    });
+    await operations.getByTestId('open-platform-operations-refresh').click();
+    const eventCatalog = operations.getByTestId('open-platform-event-catalog');
+    const webhookHealth = operations.getByTestId('open-platform-webhook-health');
+    await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
+    await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
+    await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
+    await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(
+      'Rotate the signing secret now.',
+    );
+    await expect(webhookHealth.locator('[data-rotation-status="missing"]')).toContainText(
+      'Add a signing secret before enabling delivery.',
+    );
+    await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText(
+      'Choose a supported event version.',
+    );
+    await expect(operations).not.toContainText(
+      /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
+    );
+    await captureLocator(eventCatalog, 'OP-PROTO-01');
+    await captureLocator(
+      webhookHealth.locator('[data-rotation-status="healthy"]').first(),
+      'OP-PROTO-02',
+    );
+    await captureLocator(webhookHealth.locator('[data-rotation-status="due"]'), 'OP-PROTO-03');
+    await captureLocator(webhookHealth.locator('[data-rotation-status="overdue"]'), 'OP-PROTO-04');
+    await captureLocator(webhookHealth.locator('[data-rotation-status="missing"]'), 'OP-PROTO-05');
+    await captureLocator(webhookHealth.locator('[data-compatible="false"]'), 'OP-PROTO-06');
+    await page.unroute('**/api/open-platform/event-catalog');
+    await page.unroute('**/api/open-platform/installations/*/webhook-health');
+
+    let releaseLoading!: () => void;
+    const loadingGate = new Promise<void>((resolve) => {
+      releaseLoading = resolve;
+    });
+    await page.route('**/api/open-platform/installations/*/overview*', async (route) => {
+      await loadingGate;
+      await route.continue();
+    });
+    await operations.getByTestId('open-platform-operations-refresh').click();
+    await expect(
+      operations.getByTestId('open-platform-operations-refresh').locator('svg'),
+    ).toHaveClass(/animate-spin/);
+    await captureLocator(operations, 'OP-PROTO-09');
+    releaseLoading();
+    await expect(
+      operations.getByTestId('open-platform-operations-refresh').locator('svg'),
+    ).not.toHaveClass(/animate-spin/);
+    await page.unroute('**/api/open-platform/installations/*/overview*');
+
     await operations.getByLabel('request_id').fill('open-platform-golden-whoami');
-    await expect(operations).toContainText('GET /api/open/v1/whoami');
-    await expect(operations).not.toContainText('assets.assign');
+    const callAudit = operations.getByTestId('open-platform-call-audit');
+    await expect(callAudit).toContainText('GET /api/open/v1/whoami');
+    await expect(callAudit).not.toContainText('assets.assign');
     await capture(page, 'OP-OPS-04');
     await operations.getByLabel('request_id').fill('request-id-with-no-match');
     await expect(operations).toContainText(/没有.*筛选条件的调用/);
@@ -449,12 +726,32 @@ test.describe('Open Platform golden journey', () => {
         body: JSON.stringify({ code: '0', data: [] }),
       });
     });
+    await page.route('**/api/open-platform/event-catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '0', data: [] }),
+      });
+    });
+    await page.route('**/api/open-platform/installations/*/webhook-health', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '0', data: [] }),
+      });
+    });
     await operations.getByTestId('open-platform-operations-refresh').click();
     await expect(operations).toContainText(/没有.*筛选条件的调用/);
     await capture(page, 'OP-OPS-13');
+    await captureLocator(
+      operations.getByTestId('open-platform-contract-health-grid'),
+      'OP-PROTO-07',
+    );
     await page.unroute('**/api/open-platform/installations/*/overview*');
     await page.unroute('**/api/open-platform/installations/*/audits*');
     await page.unroute('**/api/open-platform/installations/*/webhook-deliveries*');
+    await page.unroute('**/api/open-platform/event-catalog');
+    await page.unroute('**/api/open-platform/installations/*/webhook-health');
 
     await page.route('**/api/open-platform/installations/*/overview*', async (route) => {
       await route.fulfill({
@@ -466,6 +763,7 @@ test.describe('Open Platform golden journey', () => {
     await operations.getByTestId('open-platform-operations-refresh').click();
     await expect(operations).toContainText('受控运维加载失败');
     await capture(page, 'OP-OPS-14');
+    await captureLocator(operations, 'OP-PROTO-08');
     await page.unroute('**/api/open-platform/installations/*/overview*');
     await operations.getByRole('button', { name: /重试|Retry/ }).click();
     await expect(operations).toContainText('调用审计');
@@ -549,6 +847,9 @@ test.describe('Open Platform golden journey', () => {
     await page.getByRole('button', { name: '停用' }).first().click();
     const disableApplicationDialog = page.getByRole('dialog', { name: '确认停用访问？' });
     await expect(disableApplicationDialog).toContainText('无法在本页面恢复');
+    await expect
+      .poll(async () => (await disableApplicationDialog.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(400);
     await capture(page, 'OP-UI-12');
     await disableApplicationDialog.getByRole('button', { name: '停用' }).click();
     await expect(page.getByRole('button', { name: '添加安装' })).toBeDisabled();
@@ -570,6 +871,48 @@ test.describe('Open Platform golden journey', () => {
     await capture(apiReference, 'OP-UI-13', false);
     await apiReference.close();
 
+    await page.route('**/api/open-platform/event-catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0',
+          data: [
+            {
+              type: 'assets.assignment.changed',
+              currentVersion: 1,
+              supportedVersions: [1],
+              classification: 'partner',
+              subjectResourceCode: 'assets',
+            },
+          ],
+        }),
+      });
+    });
+    await page.route('**/api/open-platform/installations/*/webhook-health', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0',
+          data: [
+            {
+              pid: 'mobile-overdue',
+              name: 'Mobile overdue bridge',
+              eventType: 'assets.assignment.changed',
+              eventVersion: 0,
+              catalogCurrentVersion: 1,
+              compatible: false,
+              rotationStatus: 'overdue',
+              rotationDueAt: '2026-08-01T08:00:00Z',
+              enabled: false,
+            },
+          ],
+        }),
+      });
+    });
+    await operations.getByTestId('open-platform-operations-refresh').click();
+
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByTestId('sidebar')).toHaveClass(/-translate-x-full/);
     await expect
@@ -586,5 +929,12 @@ test.describe('Open Platform golden journey', () => {
     await expect(operations).toContainText('open-platform-golden-whoami');
     await operations.scrollIntoViewIfNeeded();
     await capture(page, 'OP-OPS-16', false);
+    await eventCatalog.scrollIntoViewIfNeeded();
+    await captureLocator(eventCatalog, 'OP-PROTO-10');
+    await expect
+      .poll(() => webhookHealth.evaluate((element) => element.scrollWidth - element.clientWidth))
+      .toBeLessThanOrEqual(1);
+    await webhookHealth.scrollIntoViewIfNeeded();
+    await captureLocator(webhookHealth, 'OP-PROTO-11');
   });
 });

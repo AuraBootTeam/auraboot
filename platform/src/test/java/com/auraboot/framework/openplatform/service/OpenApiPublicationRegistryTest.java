@@ -37,4 +37,20 @@ class OpenApiPublicationRegistryTest {
         assertThat(registry.resource("tasset_asset")).isEmpty();
         assertThat(registry.command("tasset:return_asset")).isEmpty();
     }
+
+    @Test
+    void publishesInventoryReceiptWithoutInternalAliases() {
+        var publication = registry.resource("inventory.stock-ins").orElseThrow();
+        assertThat(publication.modelCode()).isEqualTo("tinv_stock_in");
+        assertThat(registry.project(publication, Map.of(
+                "pid", "receipt-1", "tinv_si_code", "IN-001", "tinv_si_status", "draft",
+                "tinv_si_notes", "private")))
+                .containsEntry("receiptCode", "IN-001")
+                .containsEntry("status", "draft")
+                .doesNotContainKeys("tinv_si_code", "tinv_si_notes");
+        var command = registry.command("inventory.stock-ins.confirm").orElseThrow();
+        assertThat(command.commandCode()).isEqualTo("tinv:confirm_stock_in");
+        assertThat(command.permission()).isEqualTo("tinv.stockin.manage");
+        assertThat(registry.mapInput(command, Map.of())).isEmpty();
+    }
 }

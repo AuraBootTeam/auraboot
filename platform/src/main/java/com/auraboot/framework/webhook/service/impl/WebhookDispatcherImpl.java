@@ -11,6 +11,7 @@ import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatchResult;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookSignature;
+import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,7 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     private final ObjectMapper objectMapper;
     private final FieldEncryptionService fieldEncryptionService;
     private final WebhookSignature webhookSignature;
+    private final OpenApiEventCatalog eventCatalog;
 
     private static final Pattern DANGEROUS_SPEL_PATTERN = Pattern.compile(
             "(?i)(T\\s*\\(|new\\s+|getClass|forName|invoke|exec|Runtime|Process|System|Thread|Class\\." +
@@ -90,6 +92,18 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     }
 
     private WebhookDispatchResult.Receipt enqueue(WebhookSubscription subscription, Map<String, Object> payload) {
+        if (subscription.getInstallationPid() != null) {
+            int version = subscription.getEventVersion() == null ? 1 : subscription.getEventVersion();
+            try {
+                OpenApiEventCatalog.EventDescriptor descriptor =
+                        eventCatalog.requireExternal(subscription.getEventType(), version);
+                requirePublishedEnvelope(descriptor, version, payload);
+            } catch (IllegalArgumentException exception) {
+                log.warn("Skipping incompatible Open Platform webhook subscription: subscription={}, reason={}",
+                        subscription.getPid(), exception.getMessage());
+                return null;
+            }
+        }
         if (!matchesFilter(subscription, payload)) {
             log.debug("Webhook filtered out: subscription={}, filter={}",
                     subscription.getPid(), subscription.getFilterExpression());
@@ -106,7 +120,10 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         delivery.setDeliveryStatus("pending");
         delivery.setNextRetryAt(Instant.now());
         delivery.setCreatedAt(Instant.now());
-        Object eventId = payload.get("_eventId");
+        Object eventId = payload.get("id");
+        if (eventId == null && subscription.getInstallationPid() == null) {
+            eventId = payload.get("_eventId");
+        }
         if (eventId != null) {
             delivery.setEventId(String.valueOf(eventId));
         }
@@ -117,6 +134,25 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
         }
         deliveryLogMapper.insert(delivery);
         return receiptFrom(subscription, delivery);
+    }
+
+    private void requirePublishedEnvelope(OpenApiEventCatalog.EventDescriptor descriptor, int version,
+                                          Map<String, Object> payload) {
+        Object payloadVersion = payload.get("schemaVersion");
+        Object subject = payload.get("subject");
+        Object data = payload.get("data");
+        if (!descriptor.type().equals(payload.get("type"))
+                || !(payloadVersion instanceof Number number) || number.intValue() != version
+                || !(payload.get("id") instanceof String id) || id.isBlank()
+                || !(payload.get("occurredAt") instanceof String occurredAt) || occurredAt.isBlank()
+                || !(subject instanceof Map<?, ?> subjectMap)
+                || !(subjectMap.get("pid") instanceof String pid) || pid.isBlank()
+                || !descriptor.subjectResourceCode().equals(subjectMap.get("type"))
+                || !(data instanceof Map<?, ?> dataMap)
+                || !dataMap.keySet().stream()
+                        .allMatch(key -> descriptor.allowedDataFields().contains(String.valueOf(key)))) {
+            throw new IllegalArgumentException("Open Platform webhook payload is not a valid catalog envelope");
+        }
     }
 
     /** Execute exactly one persisted and leased attempt. The worker owns retries and recovery. */
@@ -150,6 +186,8 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                     .timeout(Duration.ofMillis(readTimeoutMs))
                     .header("Content-Type", "application/json")
                     .header("X-Webhook-Event", subscription.getEventType())
+                    .header("X-Webhook-Event-Version",
+                            String.valueOf(subscription.getEventVersion() == null ? 1 : subscription.getEventVersion()))
                     .header("X-Webhook-Timestamp", timestamp)
                     .header("X-Webhook-Delivery", delivery.getPid());
 

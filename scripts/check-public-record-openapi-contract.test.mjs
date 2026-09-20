@@ -81,6 +81,38 @@ test('does not flag generic resource ids on scoped non-record resources', () => 
   assert.equal(result.findingCount, 0);
 });
 
+test('scopes the stable Open Platform resource and command facade', () => {
+  const result = auditOpenApi({
+    paths: {
+      '/api/open/v1/resources/{resourceCode}/{recordPid}': {
+        get: {
+          parameters: [{ name: 'recordPid', schema: { type: 'string' } }],
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+      '/api/open/v1/commands/{commandCode}:execute': {
+        post: {
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { targetRecordId: { type: 'string' } },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+    },
+  });
+
+  assert.equal(result.scopedPathCount, 2);
+  assert.equal(result.findingCount, 1);
+  assert.equal(result.findings[0].field, 'targetRecordId');
+});
+
 test('resolves component schemas when scanning scoped responses', () => {
   const result = auditOpenApi({
     paths: {

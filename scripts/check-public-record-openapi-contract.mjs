@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 
 const PUBLIC_RECORD_PATH_RE =
-  /\/api\/(?:dynamic|records|record-share|email\/messages|email\/sequences|inbox|mobile\/inbox|mobile\/search|im\/conversations|automations?|automation\/debug|agent\/runs|meta\/auto-fill|meta\/ai|meta\/change-logs|sod|permissions\/matrix)/i;
+  /\/api\/(?:dynamic|records|record-share|open\/v1\/(?:resources|commands)|email\/messages|email\/sequences|inbox|mobile\/inbox|mobile\/search|im\/conversations|automations?|automation\/debug|agent\/runs|meta\/auto-fill|meta\/ai|meta\/change-logs|sod|permissions\/matrix)/i;
 
 const FORBIDDEN_RECORD_KEYS = new Set([
   'recordId',
