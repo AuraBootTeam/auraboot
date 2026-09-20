@@ -1,6 +1,7 @@
 package com.auraboot.framework.branding;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,6 +12,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -168,6 +170,66 @@ class DeploymentBrandingProviderTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("unsupported fields")
                 .hasMessageContaining("licenseUrl");
+    }
+
+    @Test
+    void standardEditionAcceptsSharedDocumentWithLoginStoryFields() throws IOException {
+        // A single branding document is shared between web-admin (which consumes
+        // the login story) and the backend; it must pass both tiers.
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
+        document.put("loginBadge", "SMALL STEPS. WONDERFUL GROWTH.");
+        document.put("loginHeadline", "今天的小小进步，");
+        document.put("loginHeadlineEm", "长成明天的大树。");
+        document.put("loginLead", "随手送出鼓励，让孩子拥有自己的成长伙伴。");
+        document.put("loginHeroUrl", "/customer-brand/login-island.svg");
+        document.putArray("loginFeatures")
+                .add("微信一键登录，无需短信验证码")
+                .add("导入名单，一分钟建好班级");
+        document.put("loginWechatOnly", true);
+        objectMapper.writeValue(config.toFile(), document);
+
+        BrandingIdentity identity = new DeploymentBrandingProvider(
+                environment("standard", config, "SO-2026-001"), objectMapper).current();
+
+        assertThat(identity.productName()).isEqualTo("Northstar");
+    }
+
+    @Test
+    void commercialBrandingRejectsInvalidLoginStoryFields() throws IOException {
+        assertLoginStoryRejected(document -> document.put("loginBadge", 42),
+                "loginBadge", "must be a non-empty string");
+        assertLoginStoryRejected(document -> document.put("loginHeadline", "x".repeat(121)),
+                "loginHeadline", "at most 120");
+        assertLoginStoryRejected(document -> document.put("loginLead", "   "),
+                "loginLead", "must be a non-empty string");
+        assertLoginStoryRejected(
+                document -> document.put("loginHeroUrl", "http://northstar.example.com/hero"),
+                "loginHeroUrl", "same-origin path or an HTTPS URL");
+        assertLoginStoryRejected(document -> document.putArray("loginFeatures").add(""),
+                "loginFeatures", "must be an array of 1-4 strings");
+        assertLoginStoryRejected(document -> {
+            ArrayNode features = document.putArray("loginFeatures");
+            for (int i = 0; i < 5; i++) {
+                features.add("feature-" + i);
+            }
+        }, "loginFeatures", "must be an array of 1-4 strings");
+    }
+
+    private void assertLoginStoryRejected(Consumer<ObjectNode> mutation, String field,
+            String message) throws IOException {
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
+        mutation.accept(document);
+        objectMapper.writeValue(config.toFile(), document);
+
+        assertThatThrownBy(() -> new DeploymentBrandingProvider(
+                environment("standard", config, "SO-2026-001"), objectMapper))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(field)
+                .hasMessageContaining(message);
     }
 
     private MockEnvironment environment(String edition, Path config, String orderReference) {
