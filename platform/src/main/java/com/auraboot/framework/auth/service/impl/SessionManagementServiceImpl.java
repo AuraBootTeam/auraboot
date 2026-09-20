@@ -7,6 +7,7 @@ import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.util.UlidGenerator;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Transactional
     public UserSession createSession(Long userId, String token, String ipAddress, String userAgent) {
         UserSession session = new UserSession();
-        String sid = jwtUtil == null ? null : jwtUtil.extractSessionId(token);
+        String sid = extractSidClaim(token);
         session.setPid(sid == null ? UlidGenerator.generate() : sid);
         session.setUserId(userId);
         session.setTokenHash(hashToken(token));
@@ -87,12 +88,29 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         return session != null && !Boolean.TRUE.equals(session.getRevoked());
     }
 
+    /**
+     * Returns the sid claim of a platform-issued JWT, or null for opaque tokens.
+     * Tokens arrive from the network and may be arbitrary strings; a parse failure
+     * must fall back to the token-hash lookup, not surface as a 500 (the #1947
+     * regression caught by SessionManagementIntegrationTest).
+     */
+    private String extractSidClaim(String token) {
+        if (jwtUtil == null) {
+            return null;
+        }
+        try {
+            return jwtUtil.extractSessionId(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     @Override
     public UserSession findByToken(String token) {
         if (token == null || token.isBlank()) {
             return null;
         }
-        String sid = jwtUtil == null ? null : jwtUtil.extractSessionId(token);
+        String sid = extractSidClaim(token);
         return sid == null ? userSessionMapper.findByTokenHash(hashToken(token)) : userSessionMapper.findByPid(sid);
     }
 

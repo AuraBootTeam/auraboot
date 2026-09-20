@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * F8 regression (execution-architecture review, 2026-07-20): approving a pending
@@ -169,11 +170,14 @@ class AgentApprovalGrantConsumptionIT extends BaseIntegrationTest {
         approvalGateService.approve(tenantId, pendingPid, approverId);
 
         // Same task, DIFFERENT tool: approving a delete must not silently authorize
-        // an export. requiresApproval=true with no matching policy fails secure
-        // (null), so assert on the grant instead: it must still be unconsumed.
-        approvalGateService.checkAndRequestApproval(
+        // an export. requiresApproval=true with no matching policy is an explicit
+        // denial (#1901: the gate throws fail-secure), so the export call is denied
+        // outright — and the delete grant must still be unconsumed.
+        assertThatThrownBy(() -> approvalGateService.checkAndRequestApproval(
                 tenantId, "run-" + runTag + "-s2", taskId,
-                "cmd_crm_export_account", "Export account", Map.of("recordPid", "acc-7"), true);
+                "cmd_crm_export_account", "Export account", Map.of("recordPid", "acc-7"), true))
+                .as("another tool's call must be denied, not authorized by this grant")
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThat(consumedAt(pendingPid))
                 .as("another tool's call must not consume this tool's grant")
                 .isNull();
