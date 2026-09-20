@@ -29,6 +29,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -136,6 +137,31 @@ class NamedQueryServiceImplIntegrationTest {
         } finally {
             MetaContext.clear();
         }
+    }
+
+    // ==================== empty-set aggregate row handling ====================
+
+    @Test
+    @DisplayName("executeQuery tolerates the all-NULL row MyBatis returns for an empty-set aggregate")
+    void executeQueryToleratesAllNullRowFromEmptySetAggregate() {
+        String code = uniqueCode("nullrow");
+        NamedQueryCreateRequest req = newRequest(code, "Empty Set Aggregate");
+        req.setFromSql("SELECT CASE WHEN COUNT(*)=0 THEN NULL ELSE COUNT(*) END AS hit_rows"
+                + " FROM ab_user WHERE pid = '__no_such_user_pid__'");
+        req.setFields(List.of(newFieldRequest("hit_rows", "hit_rows", "number")));
+        NamedQueryDTO dto = namedQueryService.create(req);
+        namedQueryService.updateStatus(dto.getPid(), "testing");
+        namedQueryService.updateStatus(dto.getPid(), "published");
+
+        NamedQueryTestRequest queryRequest = new NamedQueryTestRequest();
+        queryRequest.setPage(1);
+        queryRequest.setSize(10);
+
+        PaginationResult<Map<String, Object>> result = namedQueryService.executeQuery(code, queryRequest);
+
+        assertNotNull(result);
+        assertTrue(result.getRecords().isEmpty(),
+                "the all-NULL row MyBatis returns for an empty aggregate must not surface as a null entry");
     }
 
     // ---------- factory helpers ----------
