@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMMUNITY_BRANDING,
+  hasDeploymentLoginStory,
   isCommercialEdition,
   resolveBuildIdentity,
   resolveBrandDisplayName,
@@ -80,6 +81,43 @@ describe('community branding contract', () => {
     expect(isCommercialEdition('enterprise')).toBe(true);
     expect(isCommercialEdition('community')).toBe(false);
     expect(isCommercialEdition('oss')).toBe(false);
+  });
+
+  it('resolves the optional deployment login story fields', () => {
+    const branding = resolveCommercialBranding(
+      {
+        ...commercialDocument,
+        loginBadge: 'SMALL STEPS. WONDERFUL GROWTH.',
+        loginHeadline: '今天的小小进步，',
+        loginHeadlineEm: '长成明天的大树。',
+        loginLead: '随手送出鼓励，让孩子拥有自己的成长伙伴。',
+        loginHeroUrl: '/customer-brand/login-hero.png',
+        loginFeatures: ['微信一键登录，无需短信验证码', '导入名单，一分钟建好班级'],
+        loginWechatOnly: true,
+      },
+      'SO-2026-001',
+    );
+
+    expect(branding.loginHeadline).toBe('今天的小小进步，');
+    expect(branding.loginFeatures).toHaveLength(2);
+    expect(branding.loginWechatOnly).toBe(true);
+  });
+
+  it('treats any login story field as the deployment owning the brand panel', () => {
+    const empty = {};
+    expect(hasDeploymentLoginStory(empty)).toBe(false);
+
+    for (const field of [
+      'loginBadge',
+      'loginHeadline',
+      'loginLead',
+      'loginHeroUrl',
+      'loginWechatOnly',
+    ] as const) {
+      expect(hasDeploymentLoginStory({ [field]: 'x' })).toBe(true);
+    }
+    expect(hasDeploymentLoginStory({ loginFeatures: [] })).toBe(false);
+    expect(hasDeploymentLoginStory({ loginFeatures: ['微信一键登录'] })).toBe(true);
   });
 
   it('keeps commercial identity ahead of the Community ICP display fallback', () => {

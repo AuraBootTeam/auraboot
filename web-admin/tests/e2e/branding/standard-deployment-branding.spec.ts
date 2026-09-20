@@ -8,7 +8,7 @@ test.describe('Standard deployment branding', () => {
     await page.context().clearCookies();
     await page.goto('/login');
 
-    await expect(page.getByTestId('auth-site-title')).toHaveText('Northstar');
+    await expect(page.getByTestId('login-desktop-site-title')).toHaveText('Northstar');
     const logo = page.getByRole('img', { name: 'Northstar' }).first();
     await expect(logo).toHaveAttribute('src', '/customer-brand/logo.png');
     await expect(logo).toBeVisible();

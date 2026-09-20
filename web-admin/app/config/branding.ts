@@ -186,6 +186,32 @@ export function isCommercialEdition(edition: string | undefined): boolean {
   return ['standard', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
 }
 
+/**
+ * A deployment that ships any part of the login story owns the whole
+ * positioning narrative of the brand panel; the platform-level trust pillars
+ * (model/command/delivery) would read as off-brand there and are hidden.
+ */
+export function hasDeploymentLoginStory(
+  branding: Pick<
+    BrandingConfig,
+    | 'loginBadge'
+    | 'loginHeadline'
+    | 'loginLead'
+    | 'loginHeroUrl'
+    | 'loginFeatures'
+    | 'loginWechatOnly'
+  >,
+): boolean {
+  return Boolean(
+    branding.loginBadge ||
+    branding.loginHeadline ||
+    branding.loginLead ||
+    branding.loginHeroUrl ||
+    branding.loginFeatures?.length ||
+    branding.loginWechatOnly,
+  );
+}
+
 export function resolveBrandDisplayName(
   branding: BrandingConfig,
   compliance: { enabled: boolean; siteDisplayName: string },
@@ -243,7 +269,8 @@ export function resolveCommercialBranding(
     loginLead: optionalText(document.loginLead, 'loginLead'),
     loginHeroUrl: optionalText(document.loginHeroUrl, 'loginHeroUrl'),
     loginFeatures: optionalTextList(document.loginFeatures, 'loginFeatures'),
-    loginWechatOnly: document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
+    loginWechatOnly:
+      document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
   };
 }
 
