@@ -26,10 +26,18 @@ public class NamedQuerySourceModels {
      * already tenant-scoped anchor, so no cross-tenant rows can leak through the join.
      * ab_file and ab_async_task carry tenant_id and the quoting named queries filter them
      * by #{params.tenantId} / the anchor's tenant explicitly.</p>
+     *
+     * <p>ab_user_role / ab_role_permission / ab_permission (owner security sign-off
+     * 2026-09-20): all three carry tenant_id, and the people-workload named queries join
+     * each of them with an explicit {@code tenant_id = <anchor tenant>} filter plus
+     * soft-delete predicates, chained off the tenant-scoped member/role anchor rows —
+     * the workload tooling pages were fully denied without this admission.</p>
      */
     private static final Set<String> PLATFORM_REFERENCE_SOURCES =
             Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"",
-                    "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"");
+                    "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"",
+                    "\"public\".\"ab_user_role\"", "\"public\".\"ab_role_permission\"",
+                    "\"public\".\"ab_permission\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */

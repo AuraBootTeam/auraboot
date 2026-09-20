@@ -89,7 +89,10 @@ class WechatMiniIdentityServiceTest {
     @Test
     void unionidAttachesNewOpenidToSameUser() {
         stubSession("OPEN-B", "UNION-1");
-        // no openid hit (first arg null); unionid query returns user A's identity
+        // no openid hit (first arg null); unionid query returns user A's identity.
+        // Stage-2b: the unionid match resolves to the SAME user AND materializes the new
+        // openid (createIdentity, mirroring WechatPcIdentityService) so future logins
+        // resolve directly without depending on the unionid claim.
         when(authIdentityMapper.selectOne(any()))
                 .thenReturn(null)                    // openid lookup
                 .thenReturn(identity(USER_A, "OPEN-A", "UNION-1")); // unionid lookup
