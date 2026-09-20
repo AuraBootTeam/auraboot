@@ -154,7 +154,10 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
         }
 
         try {
-            ImportPreviewResult preview = pluginImportService.parseDirectory(pluginPath);
+            // Defer reference validation: product plugins (e.g. edu-engine) depend on
+            // models published by a sibling plugin in the same seeding run, so eager
+            // validation fails on cold tenants. Mirrors import-directory-sync flags.
+            ImportPreviewResult preview = pluginImportService.parseDirectory(pluginPath, true);
 
             if (!preview.isValid()) {
                 log.error("Plugin validation failed: {} - {}",
@@ -178,7 +181,14 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
                         dbVersion, diskVersion, pluginId);
             }
 
-            ImportRequest request = new ImportRequest();
+            ImportRequest request = ImportRequest.builder()
+                    .importId(preview.getImportId())
+                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
+                    .autoPublishModels(true)
+                    .autoPublishFields(true)
+                    .autoPublishCommands(true)
+                    .autoPublishPages(true)
+                    .build();
 
             ImportExecuteResult result = pluginImportService.execute(
                     preview.getImportId(), request);
