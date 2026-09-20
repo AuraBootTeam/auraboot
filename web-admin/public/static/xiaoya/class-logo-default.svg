@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="小芽班级成长">
+  <rect x="5" y="5" width="25" height="25" rx="9" fill="#1f5c45"/>
+  <rect x="35" y="5" width="24" height="25" rx="12" fill="#8fc1a5"/>
+  <rect x="5" y="34" width="25" height="25" rx="18" fill="#4d8f6d"/>
+  <rect x="35" y="34" width="24" height="24" rx="5" fill="#c9e3d2"/>
+</svg>
