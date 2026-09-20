@@ -554,31 +554,39 @@ public class RunLifecycleService {
                     Map.of("threshold", threshold));
 
             for (Map<String, Object> run : staleRuns) {
-                String pid = (String) run.get("pid");
-                Long tenantId = ((Number) run.get("tenant_id")).longValue();
-                String taskPid = (String) run.get("task_id");
-                Object startedAtRaw = run.get("started_at");
-                LocalDateTime startedAt = startedAtRaw instanceof LocalDateTime ldt ? ldt : LocalDateTime.now();
-
-                log.warn("Stale run detected: pid={}, marking as FAILED", pid);
-                stopHeartbeat(pid); // Clean up any orphaned heartbeat
-
-                // Borrow the thread's tenant scope, then put back whatever was
-                // there. An unconditional clear() is safe only while the caller is
-                // the scheduler; this method is public, and a caller that had its
-                // own context would find it wiped out from under it — the same
-                // shape as the sink-clears-instead-of-restores defect.
-                Long previousTenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
-                MetaContext.setSystemTenantContext(tenantId);
+                // Per-row isolation: one unreadable row must not leave every other
+                // stale run sitting in 'running' and holding a concurrency slot —
+                // that leak is what this sweep exists to close.
                 try {
-                    failRun(tenantId, pid, taskPid, startedAt,
-                            "Run stalled — no heartbeat for " + STALE_RUN_THRESHOLD_MINUTES + " minutes");
-                } finally {
-                    if (previousTenant != null) {
-                        MetaContext.setSystemTenantContext(previousTenant);
-                    } else {
-                        MetaContext.clear();
+                    String pid = (String) run.get("pid");
+                    Long tenantId = ((Number) run.get("tenant_id")).longValue();
+                    String taskPid = (String) run.get("task_id");
+                    Object startedAtRaw = run.get("started_at");
+                    LocalDateTime startedAt = startedAtRaw instanceof LocalDateTime ldt ? ldt : LocalDateTime.now();
+
+                    log.warn("Stale run detected: pid={}, marking as FAILED", pid);
+                    stopHeartbeat(pid); // Clean up any orphaned heartbeat
+
+                    // Borrow the thread's tenant scope, then put back whatever was
+                    // there. An unconditional clear() is safe only while the caller is
+                    // the scheduler; this method is public, and a caller that had its
+                    // own context would find it wiped out from under it — the same
+                    // shape as the sink-clears-instead-of-restores defect.
+                    Long previousTenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+                    MetaContext.setSystemTenantContext(tenantId);
+                    try {
+                        failRun(tenantId, pid, taskPid, startedAt,
+                                "Run stalled — no heartbeat for " + STALE_RUN_THRESHOLD_MINUTES + " minutes");
+                    } finally {
+                        if (previousTenant != null) {
+                            MetaContext.setSystemTenantContext(previousTenant);
+                        } else {
+                            MetaContext.clear();
+                        }
                     }
+                } catch (Exception e) {
+                    log.error("Failed to mark stale run {} as FAILED: {}",
+                            run.get("pid"), e.getMessage());
                 }
             }
 

@@ -44,6 +44,8 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
 
     @Mock private ExtensionRegistry extensionRegistry;
     @Mock private DynamicDataService dynamicDataService;
+    @Mock private com.auraboot.framework.tenant.service.TenantMemberService tenantMemberService;
+    @Mock private com.auraboot.framework.rbac.service.UserRoleService userRoleService;
 
     private final AtomicReference<String> authoritySeenByHandler = new AtomicReference<>();
     private final AtomicReference<String> permitScopeSeenByHandler = new AtomicReference<>();
@@ -117,8 +119,7 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
         };
         when(extensionRegistry.getCommandHandler("qo_quote_common:batch_source_prices"))
                 .thenReturn(Optional.of(handler));
-        CommandHandlerAsyncTaskExecutor executor =
-                new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+        CommandHandlerAsyncTaskExecutor executor = injectedExecutor();
 
         AsyncTaskResult result = executor.execute(input("qo.price.manage"), noopCallback());
 
@@ -140,7 +141,31 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
         };
         when(extensionRegistry.getCommandHandler("qo_quote_common:batch_source_prices"))
                 .thenReturn(Optional.of(handler));
-        return new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+        return injectedExecutor();
+    }
+
+    /**
+     * #1947: the executor re-resolves membership/roles from IAM before invoking the
+     * handler, so a manually-built executor needs those collaborators stubbed with an
+     * active member for the task identity used by {@code input(...)}.
+     */
+    private CommandHandlerAsyncTaskExecutor injectedExecutor() {
+        CommandHandlerAsyncTaskExecutor executor =
+                new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                executor, "tenantMemberService", tenantMemberService);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                executor, "userRoleService", userRoleService);
+        com.auraboot.framework.tenant.dao.entity.TenantMember member =
+                new com.auraboot.framework.tenant.dao.entity.TenantMember();
+        member.setId(7L);
+        member.setTenantId(1L);
+        member.setUserId(42L);
+        member.setStatus(com.auraboot.framework.common.constant.StatusConstants.ACTIVE);
+        member.setDeletedFlag(false);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 42L)).thenReturn(member);
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(7L, 1L)).thenReturn(java.util.List.of());
+        return executor;
     }
 
     private ObjectNode input(String commandAuthority) {

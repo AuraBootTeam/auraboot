@@ -118,13 +118,15 @@ class ApprovalGateP0FixIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("toolRequiresApproval=true with no matching policy: fail-secure, return null")
-        void no_matching_policy_fails_secure() throws Exception {
-            // Tool name that matches nothing in our test policy's trigger_rules
-            String pid = createApproval(true, Map.of("arg", 1), "unmatched_tool_xyz");
-            assertThat(pid)
-                    .as("P0 fix: refuse to create approval when policy missing; caller will fail the run")
-                    .isNull();
+        @DisplayName("toolRequiresApproval=true with no matching policy: fail secure, deny the tool")
+        void no_matching_policy_fails_secure() {
+            // Tool name that matches nothing in our test policy's trigger_rules.
+            // #1901 hardened the gate from "return null" to an explicit denial: the
+            // caller fails the run instead of silently receiving a null approval.
+            assertThatThrownBy(() -> createApproval(true, Map.of("arg", 1), "unmatched_tool_xyz"))
+                    .as("P0 fix: refuse to create an approval when policy missing; caller will fail the run")
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                    .hasMessageContaining("no matching policy: unmatched_tool_xyz");
         }
     }
 

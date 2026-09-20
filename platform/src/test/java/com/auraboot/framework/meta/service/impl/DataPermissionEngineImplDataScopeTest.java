@@ -191,7 +191,7 @@ class DataPermissionEngineImplDataScopeTest {
                 List.of("dept-1", "dept'2"), List.of(), List.of());
 
         assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", condition))
-                .isEqualTo("crm_opp_owner IN (SELECT org_emp_user_id FROM mt_org_employee"
+                .isEqualTo("CAST(crm_opp_owner AS VARCHAR) IN (SELECT org_emp_user_id FROM mt_org_employee"
                         + " WHERE tenant_id = 10 AND deleted_flag = FALSE"
                         + " AND org_emp_dept_id IN ('dept-1','dept''2'))");
     }
