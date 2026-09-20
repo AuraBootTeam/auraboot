@@ -4,7 +4,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { xyList, xyGet, xyExec } from './eduApi';
 
 /**
- * Xiaoya roster import (FR-017, PC-only per owner decision) — four steps over
+ * Fengyun roster import (FR-017, PC-only per owner decision) — four steps over
  * the two-phase engine command xy:submit_ij:
  *   1 上传   file (CSV UTF-8 / Xlsx, <=2MB, <=500 rows) -> phase upload
  *   2 预览   counts (新增/跳过/问题) + problem list from the server validation
@@ -101,7 +101,7 @@ export default function RosterImport() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }} data-testid="roster-import">
-      <div className="rail"><text><strong>小芽</strong>名册导入(PC 专有功能)</text></div>
+      <div className="rail"><text><strong>蜂耘</strong>名册导入(PC 专有功能)</text></div>
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-6">
         <div className="h1 mb-1" style={{ fontSize: 40, fontWeight: 650 }}>导入班级名册</div>
         <div className="muted mb-5">支持 .xlsx 与 UTF-8 .csv,≤2MB、≤500 行;模板四列:学号,姓名,小组,座位号。学号按文本保留前导零。</div>

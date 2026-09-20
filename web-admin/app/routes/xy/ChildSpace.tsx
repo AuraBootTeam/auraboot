@@ -15,7 +15,7 @@ import {
 import { PetAvatar, usePetVisual } from './PetAvatar';
 
 /**
- * Xiaoya child space (孩子空间) — consumer surface, standalone shell.
+ * Fengyun child space (孩子空间) — consumer surface, standalone shell.
  *
  * One companion per student (PRD 10): claim → rename → collect skins →
  * wear → redeem rewards. All mutations run through plugin commands, so the
@@ -143,7 +143,7 @@ export default function ChildSpace() {
             <span className="rounded-[8px_8px_3px_8px] -rotate-90" style={{ background: '#D7E7AD' }} />
             <span className="rounded-[8px_8px_3px_8px] rotate-180" style={{ background: 'var(--color-accent)', opacity: 0.75 }} />
           </span>
-          小芽 · 班级成长
+          蜂耘 · 班级成长
         </div>
         <button className="rounded-pill px-3 py-1 text-xs" style={{ background: '#FFFFFF22' }} onClick={() => navigate('/')}>
           返回工作台

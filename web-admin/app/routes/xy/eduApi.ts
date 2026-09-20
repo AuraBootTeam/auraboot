@@ -1,5 +1,5 @@
 /**
- * Xiaoya consumer-surface API helpers (child space / class display).
+ * Fengyun consumer-surface API helpers (child space / class display).
  *
  * Thin wrappers over the platform http client. All reads go through the same
  * dynamic-data / chart-data APIs the DSL pages use; writes go through plugin
