@@ -25,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +52,7 @@ class NamedQueryServiceImplTest {
     private final DataPermissionEngine dataPermissionEngine = mock(DataPermissionEngine.class);
     private final PermissionEvaluator permissionEvaluator = mock(PermissionEvaluator.class);
     private final RecordShareService recordShareService = mock(RecordShareService.class);
+    private final NamedQueryFieldProtection fieldProtection = mock(NamedQueryFieldProtection.class);
     @SuppressWarnings("unchecked")
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider =
             mock(ObjectProvider.class);
@@ -70,10 +72,10 @@ class NamedQueryServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void configureFieldProtection() {
-        NamedQueryFieldProtection protection = mock(NamedQueryFieldProtection.class);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", protection);
-        when(protection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
-        when(protection.apply(any(), org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> invocation.getArgument(1));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
+        when(fieldProtection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        when(fieldProtection.apply(any(), org.mockito.ArgumentMatchers.anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @AfterEach
@@ -359,6 +361,53 @@ class NamedQueryServiceImplTest {
                 .hasMessageContaining("reserved for internal identity")
                 .hasMessageContaining("tenant_id");
         verify(namedQueryFieldMapper, never()).insert(any(NamedQueryField.class));
+    }
+
+    @Test
+    void executeQueryDropsTheNullEntryMyBatisReturnsForAnAllNullRow() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        NamedQuery query = sqlQuery();
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(1L);
+        List<Map<String, Object>> rawRows = new ArrayList<>();
+        rawRows.add(null);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(rawRows);
+
+        var result = service.executeQuery("order_summary",
+                new com.auraboot.framework.meta.dto.NamedQueryTestRequest());
+
+        assertThat(result.getRecords()).isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void exportDataDropsTheNullEntryMyBatisReturnsForAnAllNullRow() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        MetaContext.setMemberId(30L);
+        NamedQuery query = sqlQuery();
+        query.setStatus("published");
+        NamedQueryField field = new NamedQueryField();
+        field.setFieldCode("total_points");
+        field.setColumnExpr("total_points");
+        field.setDataType("number");
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of(field));
+        List<Map<String, Object>> rawRows = new ArrayList<>();
+        rawRows.add(null);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(rawRows);
+
+        com.auraboot.framework.meta.dto.NamedQueryDataExportRequest request =
+                new com.auraboot.framework.meta.dto.NamedQueryDataExportRequest();
+        request.setFormat(com.auraboot.framework.meta.dto.DataExportRequest.ExportFormat.JSON);
+
+        service.exportData("order_summary", request);
+
+        ArgumentCaptor<List<Map<String, Object>>> captor =
+                ArgumentCaptor.forClass((Class<List<Map<String, Object>>>) (Class<?>) List.class);
+        verify(fieldProtection).apply(any(), captor.capture());
+        assertThat(captor.getValue()).doesNotContainNull();
     }
 
     private NamedQuery connectorQuery() {

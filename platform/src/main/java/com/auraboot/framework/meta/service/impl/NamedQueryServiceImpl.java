@@ -774,10 +774,22 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         sql.append(" LIMIT ").append(pageSize).append(" OFFSET ").append(offset);
 
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
-        List<Map<String, Object>> records = dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
+        List<Map<String, Object>> records = dropEmptyRowNullEntries(
+                dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params));
 
         records = fieldProtection.apply(protection, records);
         return PaginationResult.of(records, total, pageNum, pageSize);
+    }
+
+    /**
+     * MyBatis maps a result row whose selected columns are all NULL to a null list entry
+     * (returnInstanceForEmptyRow=false). Aggregate projections legitimately emit such a row
+     * for "no data yet" (e.g. CASE WHEN COUNT(*)=0 THEN NULL over an empty set), so drop the
+     * null entries before row processing instead of failing with a NullPointerException.
+     * Mirrors the guard in {@link AggregateQueryServiceImpl}.
+     */
+    private static List<Map<String, Object>> dropEmptyRowNullEntries(List<Map<String, Object>> rows) {
+        return rows == null ? List.of() : rows.stream().filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     /**
@@ -976,8 +988,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         sql.append(" LIMIT ").append(limit);
 
         // Physical source scopes already enforce tenant isolation, including CTE bodies.
-        List<Map<String, Object>> data = dynamicDataMapper.selectByQueryWithoutTenant(
-                fieldProtection.rewrite(protection, sql.toString()), params);
+        List<Map<String, Object>> data = dropEmptyRowNullEntries(dynamicDataMapper.selectByQueryWithoutTenant(
+                fieldProtection.rewrite(protection, sql.toString()), params));
         data = fieldProtection.apply(protection, data);
         return new ExportProjection(allFields, exportFieldCodes, exportScope, protection, data);
     }
