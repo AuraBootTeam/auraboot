@@ -2503,11 +2503,11 @@
     {
       "code": "tenant_admin",
       "name": "租户管理员",
-      "description": "租户管理员角色，拥有该租户的所有权限",
+      "description": "租户管理员角色，拥有该租户的所有权限(P0 2026-09-20: 管理员角色不得为默认角色——空 roleCodes 建户会静默授予默认角色)",
       "type": "tenant",
       "scopeType": "tenant",
       "priority": 1,
-      "isDefault": true,
+      "isDefault": false,
       "isDeletable": false
     },
     {
