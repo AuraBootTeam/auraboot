@@ -6,7 +6,7 @@ import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
 import { PetAvatar, usePetVisual } from './PetAvatar';
 
 /**
- * Xiaoya class display (班级大屏) — read-only surface for the classroom screen:
+ * Fengyun class display (班级大屏) — read-only surface for the classroom screen:
  * class card, shared-goal progress, recent praise ticker, deduction records and
  * the companion parade. No student rows are editable here. Negative records are
  * shown since the PRD 8.3 / FR-039 口径变更 (deductions public with mandatory
