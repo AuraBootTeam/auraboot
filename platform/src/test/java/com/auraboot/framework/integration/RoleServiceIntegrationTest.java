@@ -363,6 +363,10 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
     void createDefaultRolesForTenant_createsAdminRole() {
         // Call with existing test tenant — the method should add a 租户管理员 role
         long beforeCount = roleService.countByTenantId(testTenant.getId());
+        java.util.Set<String> beforePids = new java.util.HashSet<>();
+        for (Role r : roleService.findByTenantId(testTenant.getId())) {
+            beforePids.add(r.getPid());
+        }
         roleService.createDefaultRolesForTenant(testTenant.getId());
         long afterCount = roleService.countByTenantId(testTenant.getId());
 
@@ -371,5 +375,16 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
 
         List<Role> roles = roleService.findByTenantId(testTenant.getId());
         assertThat(roles).anyMatch(r -> "租户管理员".equals(r.getName()));
+        // P0 (2026-09-20): the admin role must never be the tenant's default role —
+        // empty-roleCodes provisioning assigns the default role, so a default
+        // tenant_admin is silent privilege escalation. Scope to roles created by THIS
+        // call: the shared integration database retains legacy isDefault=true rows from
+        // before the fix.
+        List<Role> newlyCreated = roles.stream()
+                .filter(r -> !beforePids.contains(r.getPid()))
+                .toList();
+        assertThat(newlyCreated).anyMatch(r -> "租户管理员".equals(r.getName()));
+        assertThat(newlyCreated).noneMatch(r ->
+                "租户管理员".equals(r.getName()) && Boolean.TRUE.equals(r.getIsDefault()));
     }
 }

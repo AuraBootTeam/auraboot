@@ -402,7 +402,10 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         adminRole.setType("business");
         adminRole.setPriority(1);
         adminRole.setStatus(StatusConstants.ACTIVE);
-        adminRole.setIsDefault(true);
+        // The admin role must never be the tenant's default role: provisioning with empty
+        // roleCodes assigns the default role (RoleAssignmentMode.DEFAULT), so a default
+        // tenant_admin silently grants admin to every casually created user (P0, 2026-09-20).
+        adminRole.setIsDefault(false);
         adminRole.setIsSystem(false);
         adminRole.setCreatedAt(Instant.now());
         adminRole.setUpdatedAt(Instant.now());
