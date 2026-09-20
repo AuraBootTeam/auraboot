@@ -39,6 +39,9 @@ class WechatMiniIdentityServiceTest {
     @Mock
     private WechatMiniClient wechatMiniClient;
 
+    @Mock
+    private com.auraboot.framework.user.service.UserService userService;
+
     private WechatMiniIdentityService service;
 
     @BeforeEach
@@ -46,7 +49,7 @@ class WechatMiniIdentityServiceTest {
         var properties = new WechatMiniProperties();
         properties.setAppId("wx-test-appid");
         properties.setAppSecret("test-secret");
-        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient, properties);
+        service = new WechatMiniIdentityService(authIdentityMapper, userMapper, wechatMiniClient, properties, userService);
     }
 
     private void stubSession(String openid, String unionid) {
@@ -83,9 +86,12 @@ class WechatMiniIdentityServiceTest {
     }
 
     @Test
-    void unionidAttachesNewOpenidToSameUser() {
+    void unionidResolvesNewOpenidToSameUser() {
         stubSession("OPEN-B", "UNION-1");
-        // no openid hit (first arg null); unionid query returns user A's identity
+        // no openid hit (first arg null); unionid query returns user A's identity.
+        // Stage-2b semantics: resolveLoginUserBySession resolves the unionid to the SAME
+        // user and no longer auto-inserts an identity row for the new openid — the
+        // OPEN-B attachment belongs to the later bind-school flow.
         when(authIdentityMapper.selectOne(any()))
                 .thenReturn(null)                    // openid lookup
                 .thenReturn(identity(USER_A, "OPEN-A", "UNION-1")); // unionid lookup
@@ -94,11 +100,7 @@ class WechatMiniIdentityServiceTest {
         User user = service.resolveLoginUser("jscode");
 
         assertThat(user.getId()).isEqualTo(USER_A);
-        ArgumentCaptor<AuthIdentity> captor = ArgumentCaptor.forClass(AuthIdentity.class);
-        verify(authIdentityMapper).insert(captor.capture());
-        assertThat(captor.getValue().getUserId()).isEqualTo(USER_A);
-        assertThat(captor.getValue().getOpenid()).isEqualTo("OPEN-B");
-        assertThat(captor.getValue().getUnionid()).isEqualTo("UNION-1");
+        verify(authIdentityMapper, never()).insert(any(AuthIdentity.class));
     }
 
     @Test
