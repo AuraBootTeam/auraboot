@@ -41,10 +41,14 @@ public class NamedQueryFieldProtection {
     }
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields) {
-        return prepare(query, fields, "export");
+        return prepare(query, fields, "export", false);
     }
 
     public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context) {
+        return prepare(query, fields, context, false);
+    }
+
+    public Plan prepare(NamedQuery query, List<NamedQueryField> fields, String context, boolean collaboratorRootGrant) {
         var resolved = sources.resolvePlan(MetaContext.getCurrentTenantId(), query.getFromSql(), fields);
         var sourceModels = resolved.models();
         Long memberId = MetaContext.getCurrentMemberId();
@@ -54,6 +58,13 @@ public class NamedQueryFieldProtection {
             // NamedQuerySourceModels.PLATFORM_REFERENCE_SOURCES.
             if (model.startsWith(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER)
                     || model.startsWith(com.auraboot.framework.meta.service.impl.NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX)) continue;
+            // A record-scoped collaborator was already authorized against the declared
+            // aggregate root (active update-capable record share + params bound to that
+            // record by authorizeRootRecord), which is narrower than any model-level
+            // grant. Demanding model read on every joined source here would deny the
+            // collaborator the shared record the owner explicitly shared, so the model
+            // check is skipped; the per-source tenant scopes below still apply.
+            if (collaboratorRootGrant) continue;
             if (memberId == null || !permissionEvaluator.canAction(memberId, model, "read")) {
                 throw new AccessDeniedException("Access denied for named query source: " + model);
             }

@@ -731,7 +731,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         authorizeRootRecord(query, policy, params);
 
-        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list");
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", collaboratorGrant);
         // The declared aggregate-root PID is already an exact row boundary for a collaborator.
         // A surface DataScope the collaborator does not own must not erase that explicit grant.
         if (!collaboratorGrant) {
@@ -959,10 +959,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         Long userId = getCurrentUserId();
         params.put("currentUserId", userId != null ? userId.toString() : null);
         authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+        boolean exportCollaboratorGrant = hasCollaboratorGrant(
+                query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(),
+                params, MetaContext.getCurrentMemberId());
 
         List<String> exportScope = new ArrayList<>();
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
-                exportFieldCodes.stream().map(fieldMap::get).toList());
+                exportFieldCodes.stream().map(fieldMap::get).toList(), "export", exportCollaboratorGrant);
         appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
         whereClauses.addAll(exportScope);
 
