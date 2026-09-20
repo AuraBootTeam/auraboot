@@ -7,6 +7,7 @@ import com.auraboot.framework.openplatform.mapper.ApplicationInstallationMapper;
 import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
+import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
