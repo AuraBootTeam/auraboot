@@ -109,6 +109,22 @@ class NamedQuerySourceModelsTest {
         assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
                 resolved.get("\"public\".\"ab_tenant\""));
     }
+    @Test void platformFileAndAsyncTaskTablesResolveAsSystemSources() {
+        // ab_file (attachments) and ab_async_task carry tenant_id and the quoting named
+        // queries filter them explicitly by #{params.tenantId} / the anchor's tenant, so
+        // they resolve as platform reference sources even without meta models — otherwise
+        // the quote materials overview and recompute-status charts are denied on every
+        // Flyway-clean database (fresh-seed red cluster 2026-09-20).
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        for (String table : List.of("public.ab_file", "public.ab_async_task")) {
+            Map<String, String> resolved = resolve(table);
+            String key = "\"" + table.substring("public.".length()) + "\"";
+            assertTrue(resolved.containsKey("\"public\"." + key),
+                    table + " should resolve as a platform reference source");
+            assertEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER,
+                    resolved.get("\"public\"." + key));
+        }
+    }
     @Test void bpmProductTablesResolveAsSystemSources() {
         // ab_bpm_* product tables (audit, process definition) sit under the
         // tenant-bypass prefixes alongside se_* engine tables.
