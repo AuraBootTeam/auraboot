@@ -7,7 +7,9 @@ import {
   useActionData,
   useLoaderData,
   data,
-  redirect, useLocation } from 'react-router';
+  redirect,
+  useLocation,
+} from 'react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createUserSession, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
 import { safeRedirect, validateEmail } from '~/utils/utils';
@@ -16,7 +18,12 @@ import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root-data';
-import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
+import {
+  COMMUNITY_BRANDING,
+  hasDeploymentLoginStory,
+  resolveBrandDisplayName,
+} from '~/config/branding';
+import { buildWechatPcQrConnectUrl } from './wechat-qr';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
@@ -519,7 +526,8 @@ export default function LoginPage() {
 
   // Pure-wechat school deployments: branding flag removes every email/sms channel
   // from the school-side /login page. /admin-login renders the full page regardless.
-  const wechatOnly = branding.loginWechatOnly === true && !location.pathname.startsWith('/admin-login');
+  const wechatOnly =
+    branding.loginWechatOnly === true && !location.pathname.startsWith('/admin-login');
   // Embedded WeChat QR (wechat-only deployments): iframe the official qrconnect
   // page (login_type=jssdk) so the QR renders inline; after scan+confirm WeChat
   // navigates the page to our social callback, which completes the session.
@@ -540,12 +548,12 @@ export default function LoginPage() {
         const state = result.data.state;
         if (!appid || !redirectUri) return;
         window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), state);
-        setWechatQrSrc(
-          `https://open.weixin.qq.com/connect/qrconnect?appid=${encodeURIComponent(appid)}&scope=snsapi_login&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&login_type=jssdk&self_redirect=false`,
-        );
+        setWechatQrSrc(buildWechatPcQrConnectUrl({ appid, redirectUri, state }));
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [wechatOnly, wechatQrEnabled]);
 
   const tiles: CapabilityRow[] = [
@@ -677,90 +685,89 @@ export default function LoginPage() {
           </div>
         </div>
       ) : (
-      <>
-      {/* Tab Selector — only show if more than 1 tab channel */}
-      {tabChannels.length > 1 && (
-        <div
-          role="tablist"
-          aria-label="login channels"
-          data-testid="login-channel-tabs"
-          className="mb-6 flex rounded-xl bg-[#e5ebdf] p-1 dark:bg-gray-700/60"
-        >
-          {tabChannels.map((ch: string) => (
-            <button
-              key={ch}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === ch}
-              data-testid={`login-tab-${ch.toLowerCase()}`}
-              onClick={() => setActiveTab(ch)}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-150 ${
-                activeTab === ch
-                  ? 'bg-white text-[#35745b] shadow-sm dark:bg-gray-600 dark:text-[#a4c08b]'
-                  : 'text-[#819184] hover:text-[#52604d] dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+        <>
+          {/* Tab Selector — only show if more than 1 tab channel */}
+          {tabChannels.length > 1 && (
+            <div
+              role="tablist"
+              aria-label="login channels"
+              data-testid="login-channel-tabs"
+              className="mb-6 flex rounded-xl bg-[#e5ebdf] p-1 dark:bg-gray-700/60"
             >
-              {CHANNEL_I18N_KEYS[ch]
-                ? t(CHANNEL_I18N_KEYS[ch])
-                : tabOptions.find((option) => option.code === ch)?.displayName || ch}
-            </button>
-          ))}
-        </div>
-      )}
+              {tabChannels.map((ch: string) => (
+                <button
+                  key={ch}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === ch}
+                  data-testid={`login-tab-${ch.toLowerCase()}`}
+                  onClick={() => setActiveTab(ch)}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-150 ${
+                    activeTab === ch
+                      ? 'bg-white text-[#35745b] shadow-sm dark:bg-gray-600 dark:text-[#a4c08b]'
+                      : 'text-[#819184] hover:text-[#52604d] dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {CHANNEL_I18N_KEYS[ch]
+                    ? t(CHANNEL_I18N_KEYS[ch])
+                    : tabOptions.find((option) => option.code === ch)?.displayName || ch}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {/* Active Form */}
-      {activeTab === 'email_password' && (
-        <EmailPasswordForm
-          emailRef={emailRef}
-          passwordRef={passwordRef}
-          actionData={visibleActionData}
-          redirectTo={redirectTo}
-          email={email}
-          setEmail={setEmail}
-          password={password}
-          setPassword={setPassword}
-          remember={remember}
-          setRemember={setRemember}
-          complianceEnabled={compliance.enabled}
-          t={t}
-        />
-      )}
-      {activeTab === 'sms' && (
-        <SmsLoginForm
-          actionData={visibleActionData}
-          redirectTo={redirectTo}
-          remember={remember}
-          setRemember={setRemember}
-          t={t}
-        />
-      )}
-      {activeTab === 'email_code' && (
-        <EmailCodeLoginForm
-          actionData={visibleActionData}
-          redirectTo={redirectTo}
-          email={email}
-          setEmail={setEmail}
-          remember={remember}
-          setRemember={setRemember}
-          t={t}
-        />
-      )}
-      {activeOption?.kind === 'ldap' && (
-        <LdapLoginForm
-          provider={activeOption.code}
-          actionData={visibleActionData}
-          redirectTo={redirectTo}
-          remember={remember}
-          setRemember={setRemember}
-          t={t}
-        />
-      )}
-
-      </>
+          {/* Active Form */}
+          {activeTab === 'email_password' && (
+            <EmailPasswordForm
+              emailRef={emailRef}
+              passwordRef={passwordRef}
+              actionData={visibleActionData}
+              redirectTo={redirectTo}
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              remember={remember}
+              setRemember={setRemember}
+              complianceEnabled={compliance.enabled}
+              t={t}
+            />
+          )}
+          {activeTab === 'sms' && (
+            <SmsLoginForm
+              actionData={visibleActionData}
+              redirectTo={redirectTo}
+              remember={remember}
+              setRemember={setRemember}
+              t={t}
+            />
+          )}
+          {activeTab === 'email_code' && (
+            <EmailCodeLoginForm
+              actionData={visibleActionData}
+              redirectTo={redirectTo}
+              email={email}
+              setEmail={setEmail}
+              remember={remember}
+              setRemember={setRemember}
+              t={t}
+            />
+          )}
+          {activeOption?.kind === 'ldap' && (
+            <LdapLoginForm
+              provider={activeOption.code}
+              actionData={visibleActionData}
+              redirectTo={redirectTo}
+              remember={remember}
+              setRemember={setRemember}
+              t={t}
+            />
+          )}
+        </>
       )}
 
       {/* Social / SSO login (conditional); in wechat-only mode only the non-WeChat extras render here — the QR is embedded above */}
-      {(socialOptions.length > 0) && (
+      {socialOptions.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-3.5 text-[12.5px] text-[#a3ad9c] dark:text-gray-500">
             <span className="h-px flex-1 bg-[#e5ebdf] dark:bg-gray-700" />
@@ -866,17 +873,34 @@ export default function LoginPage() {
         // Desktop: full-bleed 2-col, left brand region + right form region
         <div className="grid flex-1 lg:grid-cols-[1.15fr_1fr]">
           {/* Left: brand / positioning region */}
-          <section className="flex flex-col justify-center bg-white px-8 py-12 lg:px-14 xl:px-20 2xl:px-24 dark:bg-gray-900">
+          <section className="flex flex-col justify-center bg-white px-8 py-10 lg:px-14 xl:px-20 2xl:px-24 dark:bg-gray-900">
             <div className="flex w-full max-w-[600px] flex-col">
+              {/* Deployment brand row — anchors the logo to the story column,
+                  mirroring the mobile card. The global header hides its own
+                  brand on the login card pages to avoid the duplicate. */}
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.productName}
+                  className="h-9 w-9 rounded-lg shadow-sm"
+                />
+                <span
+                  data-testid="login-desktop-site-title"
+                  className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white"
+                >
+                  {displayName}
+                </span>
+              </div>
+
               {/* Badge */}
-              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[#eef4e7] px-3.5 py-1.5 text-[13px] font-semibold text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
+              <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-[#eef4e7] px-3.5 py-1.5 text-[13px] font-semibold text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#35745b]" />
                 {branding.loginBadge ?? t('auth.badge', undefined, 'AI 原生 · 企业应用运行时')}
               </span>
 
               {/* Headline with brand-colored highlight word */}
               {branding.loginHeadline ? (
-                <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
+                <h1 className="mt-6 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
                   {branding.loginHeadline}
                   {branding.loginHeadlineEm && (
                     <span className="mx-1.5 text-[#35745b] dark:text-[#86a663]">
@@ -885,7 +909,7 @@ export default function LoginPage() {
                   )}
                 </h1>
               ) : (
-                <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
+                <h1 className="mt-6 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
                   {t('auth.headline.pre', undefined, '配置即应用,')}
                   <span className="mx-1.5 text-[#35745b] dark:text-[#86a663]">
                     {t('auth.headline.em', undefined, 'AI 即战力')}
@@ -895,7 +919,7 @@ export default function LoginPage() {
               )}
 
               {/* Lead */}
-              <p className="mt-5 max-w-[480px] text-[15px] leading-[1.7] text-[#52604d] xl:text-[17px] dark:text-gray-400">
+              <p className="mt-4 max-w-[480px] text-[15px] leading-[1.7] text-[#52604d] xl:text-[17px] dark:text-gray-400">
                 {branding.loginLead ??
                   t(
                     'auth.lead',
@@ -904,24 +928,25 @@ export default function LoginPage() {
                   )}
               </p>
 
-              {/* Optional deployment hero illustration (hi-fi island art) */}
+              {/* Optional deployment hero illustration (hi-fi island art).
+                  Height-capped so the story column fits a laptop viewport. */}
               {branding.loginHeroUrl && (
                 <img
                   src={branding.loginHeroUrl}
                   alt=""
                   aria-hidden="true"
-                  className="mt-7 w-full max-w-[520px]"
+                  className="mt-4 h-auto max-h-[180px] w-auto max-w-[520px] self-start object-contain"
                   loading="eager"
                 />
               )}
 
               {/* Feature list — deployment story rows win over platform tiles */}
-              <div className="mt-10 max-w-[540px]">
+              <div className="mt-7 max-w-[540px]">
                 {branding.loginFeatures
                   ? branding.loginFeatures.map((feature) => (
                       <div
                         key={feature}
-                        className="flex items-center gap-3 border-t border-[#e5ebdf] py-4 text-[14.5px] font-medium text-[#213d32] last:border-b dark:border-gray-800 dark:text-white"
+                        className="flex items-center gap-3 border-t border-[#e5ebdf] py-3.5 text-[14.5px] font-medium text-[#213d32] last:border-b dark:border-gray-800 dark:text-white"
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -960,14 +985,17 @@ export default function LoginPage() {
                     ))}
               </div>
 
-              {/* Trust pillars */}
-              <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#52604d] dark:text-gray-400">
-                <span>{t('auth.pillar.model', undefined, '模型驱动')}</span>
-                <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
-                <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
-                <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
-                <span>{t('auth.pillar.plugin', undefined, '全端交付')}</span>
-              </div>
+              {/* Trust pillars — platform-level positioning only; deployments
+                  that ship their own login story replace it entirely. */}
+              {!hasDeploymentLoginStory(branding) && (
+                <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#52604d] dark:text-gray-400">
+                  <span>{t('auth.pillar.model', undefined, '模型驱动')}</span>
+                  <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
+                  <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
+                  <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
+                  <span>{t('auth.pillar.plugin', undefined, '全端交付')}</span>
+                </div>
+              )}
             </div>
           </section>
 
@@ -1005,7 +1033,10 @@ async function startWechatQrLogin() {
   try {
     const result = await fetchResult<{ url: string; state: string }>(
       '/api/auth/login/wechat-pc/qr-url',
-      { method: 'get', params: { redirectUri: `${window.location.origin}/login/social/wechat_web/callback` } },
+      {
+        method: 'get',
+        params: { redirectUri: `${window.location.origin}/login/social/wechat_web/callback` },
+      },
     );
     if (ResultHelper.isSuccess(result) && result.data?.url && result.data?.state) {
       window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), result.data.state);

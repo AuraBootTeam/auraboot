@@ -7,6 +7,10 @@ import { isPublicRuntimePathname } from '@auraboot/runtime-kernel';
 // Routes that never require authentication
 const PUBLIC_ROUTES = [
   '/login',
+  // Platform operators' full login on pure-wechat school deployments
+  // (loginWechatOnly). Without this entry the root loader bounces
+  // unauthenticated operators to /login before the route can render.
+  '/admin-login',
   '/signup',
   '/register',
   '/forgot-password',
