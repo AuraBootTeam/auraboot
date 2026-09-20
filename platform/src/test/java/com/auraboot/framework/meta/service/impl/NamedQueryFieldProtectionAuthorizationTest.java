@@ -75,4 +75,20 @@ class NamedQueryFieldProtectionAuthorizationTest {
         AccessDeniedException denied = assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of()));
         assertEquals("Protected field has no physical column mapping", denied.getMessage());
     }
+
+    @Test void collaboratorRootGrantSkipsSourceModelChecksButKeepsTenantScopes() {
+        // Regression for the quote record-sharing verification (2026-09-20): a record-scoped
+        // collaborator was denied named queries whose fromSql joins sources the collaborator's
+        // role has no model-level read on (e.g. qo_supplier_request_line_common), even though
+        // the caller holds an update-capable record share on the declared aggregate root and
+        // authorizeRootRecord bound the params to exactly that record. The grant must replace
+        // the per-source model check; the per-source tenant scopes still apply.
+        var plan = protection.prepare(query, List.of(), "list", true);
+        assertEquals(Map.of("orders", "(tenant_id = 10)", "customers", "(tenant_id = 10)"), plan.sourceScopes());
+        verifyNoInteractions(permissions);
+    }
+
+    @Test void collaboratorRootGrantDoesNotLeakIntoThreeArgPrepare() {
+        assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of(), "list"));
+    }
 }
