@@ -36,6 +36,21 @@ class NamedQueryFieldProtectionAuthorizationTest {
         assertEquals("Access denied for named query source: customers", denied.getMessage());
         verifyNoInteractions(policies, masks, models);
     }
+    @Test void platformReferenceSourceSkipsModelCheckAndTakesNoRowScope() {
+        // Platform reference sources (e.g. the ab_tenant_member directory joined by the
+        // quote/BOM dashboard charts for display names) carry no model permission and no
+        // row surface: they must skip the per-source model check entirely and take the
+        // "true" scope instead of any tenant/row predicate (107 gate 2026-09-20: every
+        // dashboard chart-data request denied for business roles without this).
+        when(sources.resolvePlan(10L, query.getFromSql(), List.of())).thenReturn(new NamedQuerySourceModels.Sources(
+                Map.of("orders", "orders", "\"public\".\"ab_tenant_member\"", NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER),
+                Map.of()));
+        when(permissions.canAction(30L, "orders", "read")).thenReturn(true);
+        var plan = protection.prepare(query, List.of(), "list");
+        assertEquals("true", plan.sourceScopes().get("\"public\".\"ab_tenant_member\""));
+        assertEquals("(tenant_id = 10)", plan.sourceScopes().get("orders"));
+        verify(permissions, never()).canAction(anyLong(), eq(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER), anyString());
+    }
     @Test void everyPhysicalSourceUsesCurrentMemberIdentity() {
         when(permissions.canAction(30L, "orders", "read")).thenReturn(true);
         when(permissions.canAction(30L, "customers", "read")).thenReturn(true);

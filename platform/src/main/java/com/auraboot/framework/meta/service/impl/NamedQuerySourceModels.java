@@ -32,12 +32,19 @@ public class NamedQuerySourceModels {
      * each of them with an explicit {@code tenant_id = <anchor tenant>} filter plus
      * soft-delete predicates, chained off the tenant-scoped member/role anchor rows —
      * the workload tooling pages were fully denied without this admission.</p>
+     *
+     * <p>ab_tenant_member (2026-09-21): the tenant member directory joined by the
+     * quote/BOM dashboard chart queries strictly on its unique pid (or an explicit
+     * tenant filter) off tenant-scoped anchors, purely to resolve display names.
+     * It is the same identity-registry class as ab_user; without the admission every
+     * dashboard chart-data request was denied for business roles (107 gate evidence:
+     * 1004+ denied executions, all quote/BOM role journeys showing "Access forbidden").</p>
      */
     private static final Set<String> PLATFORM_REFERENCE_SOURCES =
             Set.of("\"public\".\"ab_user\"", "\"public\".\"ab_tenant\"",
                     "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"",
                     "\"public\".\"ab_user_role\"", "\"public\".\"ab_role_permission\"",
-                    "\"public\".\"ab_permission\"");
+                    "\"public\".\"ab_permission\"", "\"public\".\"ab_tenant_member\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
