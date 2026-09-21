@@ -15,6 +15,7 @@
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
+import { useAuth } from '~/contexts/AuthContext';
 import { useDataSync } from '~/framework/meta/hooks/useDataSync';
 import { usePageDataSources } from '~/framework/meta/hooks/usePageDataSources';
 import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
@@ -126,13 +127,26 @@ export function usePageRuntime(
   );
 
   // Build expression context
+  const { user: sessionUser, permissions: sessionPermissions } = useAuth();
+  const runtimeUser = useMemo(
+    () => ({
+      id: sessionUser?.id ?? 'current-user',
+      name: sessionUser?.name ?? 'Current User',
+      email: sessionUser?.email ?? 'user@example.com',
+      // Real role codes are intentionally not mirrored here: expression hasRole
+      // checks must consult the session, not this display-shaped user object.
+      roles: [] as string[],
+      permissions: (sessionPermissions?.permissionCodes ?? []) as string[],
+    }),
+    [sessionUser, sessionPermissions],
+  );
   const expressionContext = useMemo(() => {
     return createExpressionContext({
       locale,
       global: {
         locale,
         theme: 'light',
-        user: undefined,
+        user: runtimeUser,
         tenant: undefined,
         t,
       },
@@ -144,7 +158,7 @@ export function usePageRuntime(
         ...((effectiveAdditionalContext as any).$page || {}),
       },
     });
-  }, [locale, t, pageMetadata, effectiveAdditionalContext]);
+  }, [locale, t, pageMetadata, effectiveAdditionalContext, runtimeUser]);
 
   // Initialize DataSourceManager
   const { manager: dataSourceManager } = usePageDataSources({
