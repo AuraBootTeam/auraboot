@@ -1,6 +1,5 @@
 package com.auraboot.framework.tenant.service.impl;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
@@ -154,10 +153,12 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
     
     @Override
     public Invitation getCurrentValidInviteCode(Long userId) {
-
-        
-        // 查找当前用户创建的有效邀请码
-        return this.findValidInvitationByInviter(MetaContext.getCurrentTenantId(), userId);
+        Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
+        if (tenantId == null) {
+            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
+        }
+        // Invitations are tenant-scoped so authorized administrators see the same current code.
+        return this.findValidInvitationByTenant(tenantId);
     }
     
     @Override
@@ -172,9 +173,9 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
                 return false;
             }
             
-            // 验证是否是该用户创建的邀请码
-            if (!invitation.getInviterUserId().equals(userId) ) {
-                log.warn("用户 {} 无权作废邀请码 {}", userId, code);
+            Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
+            if (tenantId == null || !tenantId.equals(invitation.getTenantId())) {
+                log.warn("用户 {} 无权作废其他租户的邀请码 {}", userId, code);
                 return false;
             }
             
@@ -276,6 +277,18 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
         QueryWrapper<Invitation> wrapper = new QueryWrapper<>();
         wrapper.eq("tenant_id", tenantId)
                 .eq("inviter_user_id", inviterUserId)
+                .eq("status", StatusConstants.ACTIVE)
+                .eq("deleted_flag", false)
+                .gt("expired_at", Instant.now())
+                .orderByDesc("created_at")
+                .last("LIMIT 1");
+        return getOne(wrapper);
+    }
+
+    @Override
+    public Invitation findValidInvitationByTenant(Long tenantId) {
+        QueryWrapper<Invitation> wrapper = new QueryWrapper<>();
+        wrapper.eq("tenant_id", tenantId)
                 .eq("status", StatusConstants.ACTIVE)
                 .eq("deleted_flag", false)
                 .gt("expired_at", Instant.now())

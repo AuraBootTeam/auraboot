@@ -182,10 +182,11 @@ class TenantInviteServiceImplTest {
     }
 
     @Test
-    @DisplayName("revokeInviteCode false when user not the inviter")
-    void revokeNotInviter() {
+    @DisplayName("revokeInviteCode false for another tenant")
+    void revokeOtherTenant() {
         when(invitationMapper.findByInviteCode("c")).thenReturn(
                 invitation("c", StatusConstants.ACTIVE, Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L));
+        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(2L);
         assertFalse(service.revokeInviteCode(7L, "c"));
     }
 
@@ -194,6 +195,7 @@ class TenantInviteServiceImplTest {
     void revokeSucceeds() {
         Invitation inv = invitation("c", StatusConstants.ACTIVE, Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 7L);
         when(invitationMapper.findByInviteCode("c")).thenReturn(inv);
+        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
         doReturn(true).when(spyService).updateById(any(Invitation.class));
 
         assertTrue(spyService.revokeInviteCode(7L, "c"));
@@ -241,5 +243,29 @@ class TenantInviteServiceImplTest {
         doReturn(inv).when(spyService).getOne(any(QueryWrapper.class));
 
         assertEquals(inv, spyService.findValidInvitationByInviter(1L, 7L));
+    }
+
+    @Test
+    @DisplayName("getCurrentValidInviteCode returns the tenant-wide current code")
+    void getCurrentValidInviteCodeIsTenantWide() {
+        Invitation inv = invitation("school-code", StatusConstants.ACTIVE,
+                Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L);
+        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
+        doReturn(inv).when(spyService).findValidInvitationByTenant(1L);
+
+        assertEquals(inv, spyService.getCurrentValidInviteCode(7L));
+    }
+
+    @Test
+    @DisplayName("a tenant invite manager may revoke a code created by another manager")
+    void revokeSameTenantCodeCreatedByAnotherManager() {
+        Invitation inv = invitation("school-code", StatusConstants.ACTIVE,
+                Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L);
+        when(invitationMapper.findByInviteCode("school-code")).thenReturn(inv);
+        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
+        doReturn(true).when(spyService).updateById(any(Invitation.class));
+
+        assertTrue(spyService.revokeInviteCode(7L, "school-code"));
+        assertEquals(StatusConstants.EXPIRED, inv.getStatus());
     }
 }

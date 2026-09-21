@@ -17,9 +17,11 @@ public interface TenantInviteService {
     String generateInviteCode(Long userId, Integer expiryDays);
     
     /**
-     * 获取当前有效的邀请码
-     * @param userId 用户ID
-     * @return 邀请信息
+     * Gets the latest valid invitation for the caller's tenant.
+     * Invitations are tenant-scoped rather than isolated by inviter.
+     *
+     * @param userId caller user ID
+     * @return invitation details
      */
     Invitation getCurrentValidInviteCode(Long userId);
     
@@ -76,6 +78,11 @@ public interface TenantInviteService {
      * @return 有效的邀请记录
      */
     Invitation findValidInvitationByInviter(Long tenantId, Long inviterUserId);
+
+    /**
+     * Finds the latest valid invitation in a tenant.
+     */
+    Invitation findValidInvitationByTenant(Long tenantId);
 
 
 }

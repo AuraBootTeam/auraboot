@@ -114,6 +114,7 @@ describe('TenantSelection product onboarding', () => {
 
     expect(screen.getByRole('textbox', { name: '学校名称 *' })).toBeVisible();
     expect(screen.getByText('创建成功后，你将自动成为学校管理员。')).toBeVisible();
+    expect(document.querySelector('input[name="postCreateRedirect"]')).toHaveValue('/xy/setup');
     expect(screen.queryByText(/\{entityLabel\}/)).not.toBeInTheDocument();
   });
 

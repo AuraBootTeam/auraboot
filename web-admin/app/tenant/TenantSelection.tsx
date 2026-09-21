@@ -110,6 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const formData = await request.formData();
   const action = formData.get('action');
+  const postCreateRedirect = formData.get('postCreateRedirect') === '/xy/setup' ? '/xy/setup' : '/';
   const accessPolicyResult = await fetchAccessPolicyResult();
   const accessPolicy = accessPolicyResult.policy;
 
@@ -177,7 +178,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           request: request,
           token: responseData.jwt,
           remember: false,
-          redirectTo: '/',
+          redirectTo: action === 'create' ? postCreateRedirect : '/',
         });
       } else if (responseData.status === 'pending') {
         // 加入申请已提交，显示等待审批页面
@@ -499,6 +500,9 @@ export default function TenantSelection() {
               {selectedAction === 'create' && (
                 <Form method="post" className="space-y-6" data-testid="tenant-create-form">
                   <input type="hidden" name="action" value="create" />
+                  {onboarding?.entityLabel === '学校' && (
+                    <input type="hidden" name="postCreateRedirect" value="/xy/setup" />
+                  )}
                   <TenantFormFields
                     formData={formData}
                     errors={errors}
