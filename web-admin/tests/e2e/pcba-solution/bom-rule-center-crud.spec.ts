@@ -417,6 +417,11 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
       const task = await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId);
       return task.bom_task_status;
     }, { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
+    // The completion banner refreshes from taskSummary, while header actions evaluate
+    // the detail form loaded at admission time. Reopen the persisted detail so both
+    // surfaces observe the same completed task state before asserting its actions.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(new RegExp(`/p/bom_conversion_task_pcba_workbench/view/${taskId}$`));
     const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
     const standard = await queryDynamicRecords(page, 'bom_standard_line_pcba', [{ fieldName: 'bom_std_task_id', operator: 'EQ', value: taskId }]);
     expect(raw).toHaveLength(1);
