@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 22 78 90" role="img" aria-label="班级树:小树苗">
+  <ellipse cx="60" cy="104" rx="24" ry="5" fill="#DCE5CC"/>
+  <path d="M60 102 V70" stroke="#8A6B4F" stroke-width="6" stroke-linecap="round"/>
+  <path d="M60 80 C46 76 40 64 43 52 C56 55 62 67 60 80 Z" fill="#8FC1A5"/>
+  <path d="M60 72 C74 68 80 56 77 44 C64 47 58 59 60 72 Z" fill="#4D8F6D"/>
+  <circle cx="60" cy="66" r="2.5" fill="#E8B94A"/>
+</svg>

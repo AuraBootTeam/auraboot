@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 22 78 90" role="img" aria-label="班级树:抽芽">
+  <ellipse cx="60" cy="104" rx="28" ry="5" fill="#DCE5CC"/>
+  <path d="M60 102 V54" stroke="#8A6B4F" stroke-width="7" stroke-linecap="round"/>
+  <path d="M60 84 C44 80 37 66 40 52 C55 56 62 70 60 84 Z" fill="#8FC1A5"/>
+  <path d="M60 76 C76 72 83 58 80 44 C65 48 58 62 60 76 Z" fill="#4D8F6D"/>
+  <path d="M60 58 C52 50 52 40 58 34 C64 40 64 50 60 58 Z" fill="#35745B"/>
+  <circle cx="52" cy="66" r="2.5" fill="#E8B94A"/>
+  <circle cx="70" cy="58" r="2.5" fill="#E8B94A"/>
+</svg>
