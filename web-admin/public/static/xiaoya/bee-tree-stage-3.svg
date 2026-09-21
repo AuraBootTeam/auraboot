@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 22 78 90" role="img" aria-label="班级树:枝繁">
+  <ellipse cx="60" cy="104" rx="32" ry="5" fill="#DCE5CC"/>
+  <path d="M60 102 V70" stroke="#8A6B4F" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="60" cy="52" r="26" fill="#4D8F6D"/>
+  <circle cx="42" cy="62" r="16" fill="#8FC1A5"/>
+  <circle cx="78" cy="62" r="16" fill="#35745B"/>
+  <circle cx="52" cy="44" r="3" fill="#E8F2D8"/>
+  <circle cx="68" cy="52" r="3" fill="#E8F2D8"/>
+  <circle cx="58" cy="64" r="3" fill="#E8F2D8"/>
+</svg>

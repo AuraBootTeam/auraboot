@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 22 78 90" role="img" aria-label="班级树:蜜果累累">
+  <ellipse cx="60" cy="104" rx="34" ry="5" fill="#DCE5CC"/>
+  <path d="M60 102 V70" stroke="#8A6B4F" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="60" cy="50" r="28" fill="#35745B"/>
+  <circle cx="40" cy="60" r="17" fill="#4D8F6D"/>
+  <circle cx="80" cy="60" r="17" fill="#4D8F6D"/>
+  <g fill="#E8B94A">
+    <circle cx="46" cy="42" r="5.5"/><circle cx="70" cy="36" r="5.5"/><circle cx="64" cy="56" r="5.5"/>
+    <circle cx="36" cy="60" r="4.5"/><circle cx="84" cy="62" r="4.5"/><circle cx="56" cy="70" r="4.5"/>
+  </g>
+  <g fill="#F6F2E8" opacity="0.9">
+    <circle cx="46" cy="42" r="2"/><circle cx="70" cy="36" r="2"/><circle cx="64" cy="56" r="2"/>
+  </g>
+  <g>
+    <ellipse cx="92" cy="34" rx="6" ry="4" fill="#E8B94A"/>
+    <rect x="90" y="31" width="1.8" height="6" fill="#3A3A2E" transform="rotate(12 92 34)"/>
+    <rect x="93.5" y="31" width="1.8" height="6" fill="#3A3A2E" transform="rotate(12 93.5 34)"/>
+  </g>
+</svg>

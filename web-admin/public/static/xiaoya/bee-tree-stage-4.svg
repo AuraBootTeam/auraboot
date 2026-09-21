@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 22 78 90" role="img" aria-label="班级树:花开">
+  <ellipse cx="60" cy="104" rx="32" ry="5" fill="#DCE5CC"/>
+  <path d="M60 102 V70" stroke="#8A6B4F" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="60" cy="50" r="27" fill="#4D8F6D"/>
+  <circle cx="41" cy="61" r="17" fill="#8FC1A5"/>
+  <circle cx="79" cy="61" r="17" fill="#35745B"/>
+  <g fill="#F6F2E8">
+    <circle cx="48" cy="42" r="5"/><circle cx="68" cy="38" r="5"/><circle cx="62" cy="58" r="5"/>
+  </g>
+  <g fill="#E8B94A">
+    <circle cx="48" cy="42" r="2.2"/><circle cx="68" cy="38" r="2.2"/><circle cx="62" cy="58" r="2.2"/>
+  </g>
+</svg>
