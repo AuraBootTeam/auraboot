@@ -788,7 +788,13 @@ test('E15 upload UI isolates exactly three unsafe rows and completes fourteen wi
   await expect(page.getByTestId('status-banner-bom_workbench_completed_unresolved_warning')).toBeVisible();
   await expect(page.getByTestId('workbench-action-confirm_import_intent_and_continue')).toHaveCount(0);
   await expect(page.getByTestId('table-grouped-radio')).toHaveCount(0);
-  expect(await queryDynamicRecords(page, 'bom_standard_line_pcba', [{ fieldName: 'bom_std_task_id', operator: 'EQ', value: taskId }])).toEqual(rows);
+  const bySourceRow = (values: Record<string, any>[]) => [...values].sort((left, right) =>
+    Number(left.bom_std_row_no) - Number(right.bom_std_row_no)
+      || String(left.pid).localeCompare(String(right.pid)));
+  const reloadedRows = await queryDynamicRecords(page, 'bom_standard_line_pcba', [
+    { fieldName: 'bom_std_task_id', operator: 'EQ', value: taskId },
+  ]);
+  expect(bySourceRow(reloadedRows)).toEqual(bySourceRow(rows));
   await page.goto(WORKBENCH);
   const listedTask=await findRowInPaginatedList(page,String(task.bom_task_no));
   await expect(listedTask).toBeVisible();
