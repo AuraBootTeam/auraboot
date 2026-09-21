@@ -543,8 +543,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/bluewing/stage_1.svg",
-          "bytes": 14288,
-          "sha256": "7bb4648864072959fba1cff6713adf76228d39bedec5936595c05c0738fdee31"
+          "bytes": 10483,
+          "sha256": "757eeba3d37a75968360295d61202b8a3ffe3adac6cde6b2e576f090d3d7c9c4"
         }
       ],
       "source_scene": "source/scenes/bee-bluewing-s1.json"
@@ -569,8 +569,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/bluewing/stage_2.svg",
-          "bytes": 14418,
-          "sha256": "b25a2dacd0e1b3c254ead129e4440b3095f75eb6f6a4ac0079c8f82f0b5a21b9"
+          "bytes": 10416,
+          "sha256": "4c815f0978be9d90beee235f1d19da9d72d51d4033b0acca103ad99cca2dd375"
         }
       ],
       "source_scene": "source/scenes/bee-bluewing-s2.json"
@@ -595,8 +595,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/bluewing/stage_3.svg",
-          "bytes": 15563,
-          "sha256": "146881cec1dfbe1d3dda98813a785097456d94de5297aae0451b45a8cb5cad9a"
+          "bytes": 10748,
+          "sha256": "a2777d33c77e1ae7841ae064872ee3df891b38c9b726b4eb821ff629f036fa19"
         }
       ],
       "source_scene": "source/scenes/bee-bluewing-s3.json"
@@ -621,8 +621,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/bluewing/stage_4.svg",
-          "bytes": 16285,
-          "sha256": "407ecb4ac7965dbdb08be45499fdadf90dc6402da3169bbc0f3ed75a8088d793"
+          "bytes": 11310,
+          "sha256": "d03dfebf365987ca8ca18bcc846f4dd9ebfb164d81cf1c6722646b663c4deed6"
         }
       ],
       "source_scene": "source/scenes/bee-bluewing-s4.json"
@@ -647,8 +647,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/bluewing/stage_5.svg",
-          "bytes": 16284,
-          "sha256": "f4224ee5338ded35c1228217f53409b0550a58bcf10600f70ca949123cbaefed"
+          "bytes": 11442,
+          "sha256": "237d41202700a823ef12502cc769def0bf894e618424e0159ca686584e8404a6"
         }
       ],
       "source_scene": "source/scenes/bee-bluewing-s5.json"
@@ -673,8 +673,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/rainbow/stage_1.svg",
-          "bytes": 14368,
-          "sha256": "11c4a43ed50ad4642731044645019fd9aa0d3287e76aacb687ab29ddc80577f4"
+          "bytes": 10963,
+          "sha256": "1f08d444de3c3600e2c4bb39522100248d820adebbc052de44f78e81aef5a1fc"
         }
       ],
       "source_scene": "source/scenes/bee-rainbow-s1.json"
@@ -699,8 +699,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/rainbow/stage_2.svg",
-          "bytes": 14498,
-          "sha256": "1ad195827c3fac48b9580d5b6205ee2d91f62944294ef8d2d64eee404f6bfded"
+          "bytes": 10898,
+          "sha256": "258178f3ddcde16b253767a3a6adb989aa835deb8abb5290bfbe31537d898071"
         }
       ],
       "source_scene": "source/scenes/bee-rainbow-s2.json"
@@ -725,8 +725,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/rainbow/stage_3.svg",
-          "bytes": 15169,
-          "sha256": "b30c3448b6d9fdaef1361340af4e24b9e65a16810c95bf943d3ae9df9ddc8a08"
+          "bytes": 11226,
+          "sha256": "560481aa06b4abf6f82de378251df7b16fdd74bc5a0a6f5be2ce8d2143ad1163"
         }
       ],
       "source_scene": "source/scenes/bee-rainbow-s3.json"
@@ -751,8 +751,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/rainbow/stage_4.svg",
-          "bytes": 15424,
-          "sha256": "ea2168bc8df22a860c75cc6848276aa4550692d28b8a4573ce09faaaf74c91ed"
+          "bytes": 11726,
+          "sha256": "1f54b3a615ac8470a27ca910caeebc27d1c8d6f01dd639bb9b3d832b1ac694bb"
         }
       ],
       "source_scene": "source/scenes/bee-rainbow-s4.json"
@@ -777,8 +777,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/rainbow/stage_5.svg",
-          "bytes": 15675,
-          "sha256": "104230fcb5e1082c1565babe19004ef9df08960ac6121a94114e70d021990c69"
+          "bytes": 11812,
+          "sha256": "a07bc16519c8f8685dac0cb3753758d69f80aabd40be722866c15105aa1ea8d5"
         }
       ],
       "source_scene": "source/scenes/bee-rainbow-s5.json"
@@ -803,8 +803,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/reading/stage_1.svg",
-          "bytes": 14069,
-          "sha256": "f90a8695fb004f733a8d41f676526f01db4d63e8a791fbb337131019b4696a85"
+          "bytes": 10607,
+          "sha256": "88d3dcf15b269878239539c917766bde57ffbfefa34eb198975c39fd5f9c8388"
         }
       ],
       "source_scene": "source/scenes/bee-reading-s1.json"
@@ -829,8 +829,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/reading/stage_2.svg",
-          "bytes": 14023,
-          "sha256": "4b10a8977c01d06cb594dccb7e4fce3da1e1019c42a60466feef10287c0c04e7"
+          "bytes": 11275,
+          "sha256": "9a3c3737c1af87d8513bf4bb9d2ed423a14fe1676de4f8118a220bee188f8ff4"
         }
       ],
       "source_scene": "source/scenes/bee-reading-s2.json"
@@ -855,8 +855,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/reading/stage_3.svg",
-          "bytes": 15848,
-          "sha256": "da75342d59dd21c909fcf0eec09f2e92aa8871ee7389ad81ee110bfe30590a19"
+          "bytes": 12464,
+          "sha256": "c88c2daf8b4c30b131d62a9b7ec005d975eb3a164c1a2aa7ce8682d6bb67e112"
         }
       ],
       "source_scene": "source/scenes/bee-reading-s3.json"
@@ -881,8 +881,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/reading/stage_4.svg",
-          "bytes": 14982,
-          "sha256": "7d12dbdf6559ec005eb2a49ba14c0a08e249523af63f5d648e0a4c0e02667566"
+          "bytes": 12776,
+          "sha256": "52bd9cea6bdda20d5e41f9d9634652f74b8e0d6fba753551fb2fc5da7c1d7adf"
         }
       ],
       "source_scene": "source/scenes/bee-reading-s4.json"
@@ -907,8 +907,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/reading/stage_5.svg",
-          "bytes": 14980,
-          "sha256": "f9a8bfa863a3bf6adc3bd5f1d71536e52e981059909acb920bbe9a640abd240c"
+          "bytes": 12345,
+          "sha256": "fc33d066d4faa58a34fcca8c456a37e1ab84b75187d153ac8e2e4139a5e6ecde"
         }
       ],
       "source_scene": "source/scenes/bee-reading-s5.json"
@@ -933,8 +933,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/sports/stage_1.svg",
-          "bytes": 14955,
-          "sha256": "832660eb472742dcf8fd75c53345e39483a23740e884713aab610fe83bfc8983"
+          "bytes": 11564,
+          "sha256": "9c6f7da09f43c159f8c94af50192b98bbb3bed175b37012883be0b1a2e0cf66e"
         }
       ],
       "source_scene": "source/scenes/bee-sports-s1.json"
@@ -959,8 +959,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/sports/stage_2.svg",
-          "bytes": 15089,
-          "sha256": "14a29ad96ca78229c59d4d9ada31a44427f224c035e915877d5a706ae5c047b3"
+          "bytes": 11555,
+          "sha256": "427eb40c86a7493740eb387804fd6d6d0c17c76117540ee9fcc8aefd13f0e63c"
         }
       ],
       "source_scene": "source/scenes/bee-sports-s2.json"
@@ -985,8 +985,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/sports/stage_3.svg",
-          "bytes": 15113,
-          "sha256": "a7491f921b36a27a5e34f8298b7e9832554e890b658024a966b007be37575846"
+          "bytes": 11590,
+          "sha256": "e3ce7c8972542f6ee953408756e21b424e5eeb77bdebf770a7072d92c0bcd6d7"
         }
       ],
       "source_scene": "source/scenes/bee-sports-s3.json"
@@ -1011,8 +1011,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/sports/stage_4.svg",
-          "bytes": 15525,
-          "sha256": "eeecc194f854b2b5076780aebe60585c6fc9f2b57cb3d436153e4f585fc9d1bc"
+          "bytes": 12135,
+          "sha256": "9401bfa7822fd0f4450284e5af30ce5d9a9529c6f6743fc0d510ff440016a647"
         }
       ],
       "source_scene": "source/scenes/bee-sports-s4.json"
@@ -1037,8 +1037,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/sports/stage_5.svg",
-          "bytes": 15553,
-          "sha256": "25d24043a927a12daeef0e98a2c9a6b545b0f39fe7f5b1a7197c0e194af22468"
+          "bytes": 12353,
+          "sha256": "b23563af22a141de7fbc8ec5e16ca303752e189491522df700c68cbef3d9ff38"
         }
       ],
       "source_scene": "source/scenes/bee-sports-s5.json"
@@ -1063,8 +1063,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/courage/stage_1.svg",
-          "bytes": 14286,
-          "sha256": "1916cd2895d9874111e023838a39b3a70838030b952038206cbcfad69fb7f769"
+          "bytes": 10670,
+          "sha256": "f6968a6652115987a76aa366ea394a87eb989c997f38a82845df3b0c346ee75f"
         }
       ],
       "source_scene": "source/scenes/bee-courage-s1.json"
@@ -1089,8 +1089,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/courage/stage_2.svg",
-          "bytes": 14672,
-          "sha256": "50e5ac0963bf45c3c89de30f4ce8ec8231704a09651c103c3cb60bd1f5593e3c"
+          "bytes": 10603,
+          "sha256": "38c40011903c7691cc2d2f417865230518c9e43431def4dc9b06710fd1e05e8c"
         }
       ],
       "source_scene": "source/scenes/bee-courage-s2.json"
@@ -1115,8 +1115,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/courage/stage_3.svg",
-          "bytes": 14712,
-          "sha256": "9d5407f3f7e70363db0373fbd23627935e7e63056902f7c7dd1846ecfc7c3bbe"
+          "bytes": 10935,
+          "sha256": "2db52bb55ecc7b067776ff8d3c8aa398b0a5d8732b79a5d817355b380ce831b0"
         }
       ],
       "source_scene": "source/scenes/bee-courage-s3.json"
@@ -1141,8 +1141,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/courage/stage_4.svg",
-          "bytes": 15473,
-          "sha256": "25a21a991d865d3175451a6a1fcbecea6e5e5f2f00c2fe7b3529653bcadba1a1"
+          "bytes": 11307,
+          "sha256": "9d666816c5be0d3043e95594689d282df5c63f10b5ba533dc5a865f28001ed9c"
         }
       ],
       "source_scene": "source/scenes/bee-courage-s4.json"
@@ -1167,8 +1167,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/courage/stage_5.svg",
-          "bytes": 15341,
-          "sha256": "11dfadb7c87e1fb12c357194c89c3ed384d996f3e379baefe601e846da167526"
+          "bytes": 11439,
+          "sha256": "b7f0af2b518ee879bdac67b52b3cdd5910ab49f3783c0c609d578f3b894e438b"
         }
       ],
       "source_scene": "source/scenes/bee-courage-s5.json"
@@ -1193,8 +1193,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/explorer/stage_1.svg",
-          "bytes": 13876,
-          "sha256": "e7e2eb363a067c4465725cc8c6feac7b42dc2e56e5ca143939c876ca4bbcd5c5"
+          "bytes": 11344,
+          "sha256": "42e12423ecd2f8157ccce51b7c83b818c72cd017910137d9e67f92960ba4441d"
         }
       ],
       "source_scene": "source/scenes/bee-explorer-s1.json"
@@ -1219,8 +1219,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/explorer/stage_2.svg",
-          "bytes": 14021,
-          "sha256": "de64b6634e74380ed4155564e9f8f43205cf7a86d4e9a4309800bf96dba68db4"
+          "bytes": 11686,
+          "sha256": "8395c3a3641127c696b3a6ea375ed4c064cffcd5d67d03b41439b690b4be3a63"
         }
       ],
       "source_scene": "source/scenes/bee-explorer-s2.json"
@@ -1245,8 +1245,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/explorer/stage_3.svg",
-          "bytes": 15472,
-          "sha256": "aae30bf1b8a05aa1d1dd9b75bf1751befc45660b3eef1d76d8ced5df0a5c5e3a"
+          "bytes": 11979,
+          "sha256": "c088e804531b4fa82c86607e4dccbac990d43062997490ed70f86e4344de304c"
         }
       ],
       "source_scene": "source/scenes/bee-explorer-s3.json"
@@ -1271,8 +1271,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/explorer/stage_4.svg",
-          "bytes": 14907,
-          "sha256": "ed432f16d67d3400f3f7173fabb816568ef80ecf3af6a174ad40841d96d7450d"
+          "bytes": 12520,
+          "sha256": "cae83a0adcae6be4615547d67963d3266e058304b98e754d43a96ed2957a9413"
         }
       ],
       "source_scene": "source/scenes/bee-explorer-s4.json"
@@ -1297,8 +1297,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/explorer/stage_5.svg",
-          "bytes": 14691,
-          "sha256": "bb98d18858d95c64c5b3a9a9a7a58076aead23219d5f7ac0bdff366ee0c04f22"
+          "bytes": 12650,
+          "sha256": "36ed89006beb86dac3acf72f2cf2030928dd36872d404e9ef747516cf26e03be"
         }
       ],
       "source_scene": "source/scenes/bee-explorer-s5.json"
@@ -1323,8 +1323,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/guardian/stage_1.svg",
-          "bytes": 14775,
-          "sha256": "9ac6e2f2f06bbc3fa9fe7b0db73e5f293fad2855ceabb2231d8d7d0689ff6ee9"
+          "bytes": 11108,
+          "sha256": "69d33673067ca3c9b60e4e2ebe730293e4ef1c428e149093c541f2e3c352a09c"
         }
       ],
       "source_scene": "source/scenes/bee-guardian-s1.json"
@@ -1349,8 +1349,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/guardian/stage_2.svg",
-          "bytes": 15874,
-          "sha256": "7310d268522500b4a0ca3e13b3f0cc388a99ab7844951eaa47a9adc3e5b25f7b"
+          "bytes": 11606,
+          "sha256": "0ecfaee234502b686a45433cf4a2fca27f3d1cc9159530172958ecd9f56873a3"
         }
       ],
       "source_scene": "source/scenes/bee-guardian-s2.json"
@@ -1375,8 +1375,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/guardian/stage_3.svg",
-          "bytes": 15023,
-          "sha256": "49dfe344b686f35418ab6a9dbfe62fc76ed3e344208ccdc6e0da23968c3e013b"
+          "bytes": 12210,
+          "sha256": "ef9c2d2ba706f563c814f44c1b935cf68dbd34d76f8bf96ed5eaadf8d8b8881f"
         }
       ],
       "source_scene": "source/scenes/bee-guardian-s3.json"
@@ -1401,8 +1401,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/guardian/stage_4.svg",
-          "bytes": 17179,
-          "sha256": "18b3a7512d80d632ff7719782b270f102dc413315c894c862464381e3d9026e8"
+          "bytes": 13338,
+          "sha256": "848b7a0caf2e351ed27c963a9781e8f41049051547825335eb8f4bcb84e4566f"
         }
       ],
       "source_scene": "source/scenes/bee-guardian-s4.json"
@@ -1427,8 +1427,8 @@
       "files": [
         {
           "path": "runtime/static/xiaoya/themes/guardian/stage_5.svg",
-          "bytes": 16514,
-          "sha256": "849fa2e78dea0999f22012857a65ec97451bd457fc6a3c4613b732cb1a6d0e49"
+          "bytes": 13164,
+          "sha256": "337b7bf8011a15566f021578791eb986102332b47936dd33f69a1a2c28dbac58"
         }
       ],
       "source_scene": "source/scenes/bee-guardian-s5.json"
@@ -3910,6 +3910,41 @@
         }
       ],
       "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。"
+    },
+    {
+      "id": "class-tree-motion-supplement-1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/tree/stage_1/animation.json",
+          "bytes": 5025,
+          "sha256": "24e6584a2e42ac36a2e856f273dbda36703fb5adc9ed9dbc2a80d4a7aa8e0e55"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/tree/stage_2/animation.json",
+          "bytes": 7490,
+          "sha256": "93af2ada24f817a1139613655ac657914bac3254cbbfbf73b503676e8fba1ee9"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/tree/stage_3/animation.json",
+          "bytes": 7494,
+          "sha256": "aa7bbd887637c2c3312f1b2986dffaec32d8cda410cc299a5afbe0a5f7f7d7d5"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/tree/stage_4/animation.json",
+          "bytes": 21073,
+          "sha256": "a8843627709126675cdd4f4ed510c08acdc1463038ec4a9c78ae50c5d2434aab"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/tree/stage_5/animation.json",
+          "bytes": 20539,
+          "sha256": "f131bed640523c36525d7097923156723e30afe3cb32fb3023c60c0b833ae700"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/tree/growth/growth.json",
+          "bytes": 1565,
+          "sha256": "a19e14b1efcc790826f67e8cf6e264e138a46141e7fcd67efddb09ea9f59beaf"
+        }
+      ]
     }
   ],
   "reference_scope_assumptions": [
@@ -3931,5 +3966,9 @@
     "runtime": "/static/xiaoya/motion/engine.js",
     "not_lottie_or_rive": true,
     "reason": "交付完整无外部依赖的Canvas曲线、图层、关键帧数据和播放器；不是只有动画规划，未伪装为第三方动画格式。"
+  },
+  "integrated_updates": {
+    "bee_artwork": "fengyun-bees-v2",
+    "class_tree_and_home": "fengyun-class-tree-and-home/supplement-1"
   }
 }

@@ -1,0 +1,63 @@
+{
+  "format": "fengyun-growth/1",
+  "kind": "tree",
+  "transitions": [
+    {
+      "from": "legacy-tree-s1",
+      "to": "legacy-tree-s2",
+      "from_stage": 1,
+      "to_stage": 2,
+      "duration": 3,
+      "method": "named_layer_interpolation",
+      "root_anchor": [
+        256,
+        456
+      ],
+      "from_package": "../stage_1/animation.json",
+      "to_package": "../stage_2/animation.json"
+    },
+    {
+      "from": "legacy-tree-s2",
+      "to": "legacy-tree-s3",
+      "from_stage": 2,
+      "to_stage": 3,
+      "duration": 3,
+      "method": "named_layer_interpolation",
+      "root_anchor": [
+        256,
+        456
+      ],
+      "from_package": "../stage_2/animation.json",
+      "to_package": "../stage_3/animation.json"
+    },
+    {
+      "from": "legacy-tree-s3",
+      "to": "legacy-tree-s4",
+      "from_stage": 3,
+      "to_stage": 4,
+      "duration": 3,
+      "method": "named_layer_interpolation",
+      "root_anchor": [
+        256,
+        456
+      ],
+      "from_package": "../stage_3/animation.json",
+      "to_package": "../stage_4/animation.json"
+    },
+    {
+      "from": "legacy-tree-s4",
+      "to": "legacy-tree-s5",
+      "from_stage": 4,
+      "to_stage": 5,
+      "duration": 3,
+      "method": "named_layer_interpolation",
+      "root_anchor": [
+        256,
+        456
+      ],
+      "from_package": "../stage_4/animation.json",
+      "to_package": "../stage_5/animation.json"
+    }
+  ],
+  "note": "同名图层插值；新增枝叶/花果局部渐显；不是五帧切图。阶段规则由业务系统决定。"
+}

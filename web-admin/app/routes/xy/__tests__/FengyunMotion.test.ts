@@ -11,9 +11,11 @@ describe('motionPacketForAsset', () => {
     );
   });
 
-  it('keeps legacy static artwork on the image path', () => {
+  it('maps the class tree and keeps unsupported legacy artwork on the image path', () => {
     expect(motionPacketForAsset('/static/xiaoya/bee-default-stage_1.svg')).toBeNull();
-    expect(motionPacketForAsset('/static/xiaoya/bee-tree-stage-5.svg')).toBeNull();
+    expect(motionPacketForAsset('/static/xiaoya/bee-tree-stage-5.svg')).toBe(
+      '/static/xiaoya/motion/tree/stage_5/animation.json',
+    );
     expect(motionPacketForAsset(null)).toBeNull();
   });
 });

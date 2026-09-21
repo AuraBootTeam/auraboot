@@ -56,6 +56,8 @@ export function motionPacketForAsset(assetUrl: string | null): string | null {
   if (bee) return `/static/xiaoya/motion/bees/${bee[1]}/${bee[2]}/animation.json`;
   const home = assetUrl.match(/\/static\/xiaoya\/home\/(stage_[1-5])\.svg$/);
   if (home) return `/static/xiaoya/motion/home/${home[1]}/animation.json`;
+  const tree = assetUrl.match(/\/static\/xiaoya\/bee-tree-(stage-[1-5])\.svg$/);
+  if (tree) return `/static/xiaoya/motion/tree/${tree[1].replace('-', '_')}/animation.json`;
   return null;
 }
 
