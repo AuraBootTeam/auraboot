@@ -694,6 +694,37 @@ describe('evaluateDetailVisibleWhen', () => {
     ).toBe(false);
     expect(evaluateDetailVisibleWhen("form.status == 'completed'", record)).toBe(true);
   });
+
+  it('preserves runtime user permissions for top-level detail visibility', () => {
+    const runtimeContext = {
+      global: {
+        locale: 'zh-CN',
+        theme: 'light',
+        user: {
+          id: 'sales-user',
+          name: 'Sales User',
+          email: 'sales@example.com',
+          roles: ['sales'],
+          permissions: ['model.crm_account_common.read'],
+        },
+      },
+    };
+
+    expect(
+      evaluateDetailVisibleWhen(
+        "hasPermission('model.crm_account_common.read')",
+        { status: 'draft' },
+        runtimeContext,
+      ),
+    ).toBe(true);
+    expect(
+      evaluateDetailVisibleWhen(
+        "hasPermission('model.crm_account_common.update')",
+        { status: 'draft' },
+        runtimeContext,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('getByDataPath', () => {

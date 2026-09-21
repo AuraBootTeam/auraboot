@@ -63,6 +63,7 @@ import { LazyContributedComponent } from '~/framework/extensions/contributed-com
 import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
+import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type {
   BlockConfig,
@@ -741,10 +742,11 @@ export function resolveDirectSpecializedDetailBlocks(blocks: BlockConfig[]): Blo
 export function evaluateDetailVisibleWhen(
   visibleWhen: string | undefined,
   recordData: Record<string, unknown> | null | undefined,
-  runtimeContext?: { state?: Record<string, unknown> } | null,
+  runtimeContext?: Partial<ExpressionContext> | null,
 ): boolean {
   const record = recordData || {};
   return evaluateVisibleWhenExpression(visibleWhen, {
+    context: runtimeContext ?? undefined,
     record,
     row: record,
     form: record,

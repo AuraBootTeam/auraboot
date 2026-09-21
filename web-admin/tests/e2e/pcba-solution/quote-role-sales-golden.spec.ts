@@ -879,7 +879,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
                 'yunhan after-factor cell should reach 0.0155 (tier2 0.0148 x factor 1.05) after the async recompute',
             },
           )
-          .toContainText('0.0155');
+          .toContain('0.0155');
         await factoredRow.click();
         const recentCandidateAfterFactor = page.getByTestId(
           `review-drawer-candidate-${recentEvidenceId}`,

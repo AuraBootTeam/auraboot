@@ -302,6 +302,7 @@ test.describe('QuoteOps bulk import + current sourcing golden', () => {
       if (await closeImportResult.isVisible().catch(() => false)) {
         await closeImportResult.click();
       }
+      await expect(page.getByTestId('loading-overlay')).toBeHidden({ timeout: 20_000 });
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       for (const line of lines) {
         const row = page.getByTestId(`table-row-${String(line.pid)}`);

@@ -181,6 +181,7 @@ export function usePageRuntime(
           disableAutoFetch: false,
           skipDataSourceRegistration: true,
           initialContext: effectiveAdditionalContext,
+          user: runtimeUser,
         },
   );
   let contributedRuntime: SchemaRuntime | null = runtime;
