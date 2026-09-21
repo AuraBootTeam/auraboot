@@ -118,7 +118,20 @@ export async function ensureSidebarExpanded(page: Page): Promise<void> {
     }
   }
   // Reload so the sidebar component picks up the cleared state
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const transientNavigationRace =
+        message.includes('net::ERR_ABORTED') || message.includes('frame was detached');
+      if (attempt === 1 || !transientNavigationRace) {
+        throw error;
+      }
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+    }
+  }
 }
 
 /**
