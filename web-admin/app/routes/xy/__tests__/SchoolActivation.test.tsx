@@ -8,6 +8,7 @@ const auth = vi.hoisted(() => ({ admin: true }));
 const api = vi.hoisted(() => ({
   rows: new Map<string, Array<Record<string, unknown>>>(),
   exec: vi.fn(),
+  list: vi.fn((model: string) => Promise.resolve(api.rows.get(model) || [])),
 }));
 
 vi.mock('~/contexts/AuthContext', () => ({
@@ -19,7 +20,7 @@ vi.mock('~/contexts/AuthContext', () => ({
 }));
 
 vi.mock('../eduApi', () => ({
-  xyList: (model: string) => Promise.resolve(api.rows.get(model) || []),
+  xyList: api.list,
   xyExec: api.exec,
 }));
 
@@ -33,6 +34,7 @@ describe('SchoolActivation', () => {
     auth.admin = true;
     api.rows.clear();
     api.exec.mockReset();
+    api.list.mockClear();
     api.exec.mockResolvedValue({ ok: true, message: '', data: {} });
     vi.stubGlobal(
       'fetch',
@@ -45,11 +47,18 @@ describe('SchoolActivation', () => {
 
   it('shows the ordered empty-school checklist and the teacher-code action', async () => {
     renderPage();
-    expect(await screen.findByTestId('setup-progress')).toHaveTextContent('0/3');
+    expect(await screen.findByTestId('setup-progress')).toHaveTextContent('0/2');
     expect(screen.getByRole('heading', { name: '1. 开启当前学期' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '2. 创建班级并选择玩法' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: '3. 导入学生名册' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: /导入学生名册/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/名册、评分等教学工作由班主任和任课老师负责/)).toBeVisible();
     expect(screen.getByRole('button', { name: '生成学校教师码' })).toBeVisible();
+  });
+
+  it('does not request enrollment data that belongs to teaching roles', async () => {
+    renderPage();
+    await screen.findByTestId('setup-progress');
+    expect(api.list).not.toHaveBeenCalledWith('xy_enrollment', expect.anything());
   });
 
   it('opens the irreversible semester confirmation before executing the command', async () => {
