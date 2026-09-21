@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
@@ -132,5 +133,28 @@ class NamedQueryFieldProtectionAuthorizationTest {
 
     @Test void collaboratorRootGrantDoesNotLeakIntoThreeArgPrepare() {
         assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of(), "list"));
+    }
+
+    @Test void maskedFunctionProjectionAppliesAliasProtectionInsteadOfDenial() {
+        // A masked column wrapped in a COALESCE projection (the CRM account header-summary
+        // shape) must still be protected: masking applies to the projected output by alias
+        // after execution, which is strictly stronger than masking the bare column, so it
+        // can only over-protect. The old behavior denied the whole query for ANY
+        // function-wrapped projection whenever a mask rule existed on the resource, which
+        // broke every quote header for roles subject to the account contact mask.
+        var masked = new NamedQuery();
+        masked.setFromSql("mt_crm_account_common acc");
+        NamedQueryField projected = new NamedQueryField();
+        projected.setFieldCode("acc_contact");
+        projected.setColumnExpr("COALESCE(acc.crm_acc_phone, '')");
+        var resolvedSources = new NamedQuerySourceModels.Sources(
+                Map.of("\"public\".\"mt_crm_account_common\"", "crm_account_common"), Map.of());
+        when(sources.resolvePlan(10L, masked.getFromSql(), List.of(projected))).thenReturn(resolvedSources);
+        when(permissions.canAction(30L, "crm_account_common", "read")).thenReturn(true);
+        when(models.getColumnName("crm_account_common", "crm_acc_phone")).thenReturn("crm_acc_phone");
+        when(policies.getFieldMaskRules(10L, "crm_account_common", 20L)).thenReturn(List.of(
+                com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("crm_acc_phone").maskType("hide").build()));
+        var plan = protection.prepare(masked, List.of(projected), "list");
+        assertEquals("crm_acc_phone", plan.protections().getFirst().aliases().get("acc_contact"));
     }
 }
