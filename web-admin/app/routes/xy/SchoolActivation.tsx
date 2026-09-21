@@ -39,7 +39,7 @@ export function academicSemesterName(date = new Date()): string {
 }
 
 async function loadTeacherCode(): Promise<TeacherCode | null> {
-  const response = await fetch('/api/xy/teacher-code');
+  const response = await fetch('/_action/xy/teacher-code');
   const body = await response.json();
   if (!response.ok || !body.success) throw new Error(body.error || '学校教师码加载失败');
   return body.data || null;
@@ -129,7 +129,7 @@ export default function SchoolActivation() {
     setError('');
     setNotice('');
     try {
-      const response = await fetch('/api/xy/teacher-code', {
+      const response = await fetch('/_action/xy/teacher-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

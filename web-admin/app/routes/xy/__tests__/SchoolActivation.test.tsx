@@ -87,7 +87,7 @@ describe('SchoolActivation', () => {
     await user.click(await screen.findByRole('button', { name: '生成学校教师码' }));
     expect(await screen.findByTestId('teacher-code')).toHaveTextContent('TEACH-123');
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/xy/teacher-code',
+      '/_action/xy/teacher-code',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ action: 'generate' }),

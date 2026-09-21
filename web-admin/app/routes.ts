@@ -20,7 +20,9 @@ const PLATFORM_LAYOUT = webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformL
 export default [
   // API routes (always)
   route('/api/address-data', './routes/api.address-data.tsx'),
-  route('/api/xy/teacher-code', './routes/api.xy.teacher-code.tsx'),
+  // React Router owns this product action. Keep it outside /api, which the
+  // production BFF reserves for direct Spring Boot proxying.
+  route('/_action/xy/teacher-code', './routes/api.xy.teacher-code.tsx'),
   route('/_action/switch-space', './routes/api.switch-space.tsx'),
   route('/_action/switch-actor', './routes/api.switch-actor.tsx'),
 
