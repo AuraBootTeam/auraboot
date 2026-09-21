@@ -53,6 +53,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.cache.annotation.CacheEvict;
@@ -104,9 +105,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired(required = false)
-    @Lazy
-    private com.auraboot.framework.meta.spi.MoneyFieldExpansionSpi moneyFieldTypeHandler;
+    @Autowired
+    private ObjectProvider<com.auraboot.framework.meta.spi.MoneyFieldExpansionSpi> moneyFieldTypeHandlerProvider;
 
     @Autowired
     private com.auraboot.framework.meta.handler.I18nFieldExpander i18nFieldExpander;
@@ -2417,6 +2417,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
             // Expand MONEY type fields (auto-create _base fields, currency headers, binding rules)
             // moneyFieldTypeHandler is provided by the enterprise finance module; absent in core-only deploys.
+            com.auraboot.framework.meta.spi.MoneyFieldExpansionSpi moneyFieldTypeHandler =
+                    moneyFieldTypeHandlerProvider.getIfAvailable();
             if (moneyFieldTypeHandler != null) {
                 try {
                     List<String> expandedFields = moneyFieldTypeHandler.expandMoneyFields(model);
