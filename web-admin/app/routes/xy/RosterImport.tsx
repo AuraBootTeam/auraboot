@@ -153,12 +153,10 @@ export default function RosterImport() {
       style={{ background: 'var(--color-bg)' }}
       data-testid="roster-import"
     >
-      <div className="rail">
-        <text>
-          <strong>蜂耘</strong>名册导入(PC 专有功能)
-        </text>
-      </div>
       <div className="mx-auto max-w-3xl px-6 pt-6 pb-24">
+        <div className="mb-2 text-sm font-medium" style={{ color: 'var(--color-text-3)' }}>
+          蜂耘 · 名册导入（PC 专用）
+        </div>
         <div className="h1 mb-1" style={{ fontSize: 40, fontWeight: 650 }}>
           导入班级名册
         </div>

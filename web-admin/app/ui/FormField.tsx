@@ -63,6 +63,7 @@ export function InputField({
         name={name}
         value={value}
         onChange={onChange}
+        required={required}
         disabled={disabled}
         className={`${baseInputClasses} ${error ? errorInputClasses : normalInputClasses}`}
         placeholder={placeholder}
@@ -98,6 +99,7 @@ export function SelectField({
         name={name}
         value={value}
         onChange={onChange}
+        required={required}
         disabled={disabled}
         className={`${baseInputClasses} ${error ? errorInputClasses : normalInputClasses}`}
       >
@@ -140,6 +142,7 @@ export function TextareaField({
         rows={rows}
         value={value}
         onChange={onChange}
+        required={required}
         disabled={disabled}
         className={`${baseInputClasses} ${error ? errorInputClasses : normalInputClasses}`}
         placeholder={placeholder}

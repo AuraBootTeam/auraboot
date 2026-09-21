@@ -215,7 +215,7 @@ export default function TenantSelection() {
   const navigation = useNavigation();
   const revalidator = useRevalidator();
   const { t } = useI18n();
-  const { formData, errors, handleInputChange } = useTenantForm();
+  const { formData, errors, setErrors, handleInputChange } = useTenantForm();
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const onboarding = branding.tenantOnboarding;
   const hasExistingSpaces = spaces.length > 0;
@@ -498,7 +498,18 @@ export default function TenantSelection() {
               </button>
 
               {selectedAction === 'create' && (
-                <Form method="post" className="space-y-6" data-testid="tenant-create-form">
+                <Form
+                  method="post"
+                  noValidate
+                  className="space-y-6"
+                  data-testid="tenant-create-form"
+                  onSubmit={(event) => {
+                    if (!formData.name.trim()) {
+                      event.preventDefault();
+                      setErrors((current) => ({ ...current, name: `${onboarding?.entityLabel ?? '租户'}名称不能为空` }));
+                    }
+                  }}
+                >
                   <input type="hidden" name="action" value="create" />
                   {onboarding?.entityLabel === '学校' && (
                     <input type="hidden" name="postCreateRedirect" value="/xy/setup" />

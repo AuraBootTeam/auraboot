@@ -49,6 +49,15 @@ vi.mock('~/contexts/ToastContext', () => ({
     showInfoToast: vi.fn(),
   }),
 }));
+vi.mock('~/framework/meta/rendering/pages/hooks/useDictCache', () => ({
+  useDictCache: () => ({
+    loaded: true,
+    getDictItems: () => [],
+    getDictLabel: (code: string, value: string) =>
+      code === 'content_status' && value === 'published' ? '已发布' : undefined,
+    cache: new Map(),
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Runtime mock factory
@@ -128,6 +137,39 @@ describe('CardGridBlockRenderer', () => {
     expect(screen.getByText('Template B')).toBeTruthy();
     expect(screen.getByText('Desc B')).toBeTruthy();
     expect(screen.getByText('IoT')).toBeTruthy();
+  });
+
+  it('renders a card badge through its declared dictionary', () => {
+    const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'published' }] });
+    render(
+      <CardGridBlockRenderer
+        block={{
+          ...baseBlock,
+          badgeField: 'status',
+          badgeDictCode: 'content_status',
+        }}
+        runtime={runtime as any}
+      />,
+    );
+
+    expect(screen.getByText('已发布')).toBeTruthy();
+    expect(screen.queryByText('published')).toBeNull();
+  });
+
+  it('never exposes a raw badge value when a declared dictionary has no label', () => {
+    const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'unknown' }] });
+    render(
+      <CardGridBlockRenderer
+        block={{
+          ...baseBlock,
+          badgeField: 'status',
+          badgeDictCode: 'content_status',
+        }}
+        runtime={runtime as any}
+      />,
+    );
+
+    expect(screen.queryByText('unknown')).toBeNull();
   });
 
   it('shows empty state when there are 0 rows', () => {
