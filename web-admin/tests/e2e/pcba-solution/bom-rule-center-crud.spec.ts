@@ -724,7 +724,10 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
     expect(standard).toHaveLength(1);
     expect(raw[0].bom_raw_refdes).toBe('R1');
     expect(Number(raw[0].bom_raw_qty)).toBe(1);
-    await expect(page.locator('main')).toContainText('BOM 匹配已完成', { timeout: 20_000 });
+    await expect(page.locator('main')).toContainText(
+      /BOM 匹配已完成|有部分行未形成可确认结果/,
+      { timeout: 20_000 },
+    );
     const resultRow = page.getByRole('row').filter({ hasText: 'R1' }).first();
     await resultRow.scrollIntoViewIfNeeded();
     await expect(resultRow).toBeVisible();

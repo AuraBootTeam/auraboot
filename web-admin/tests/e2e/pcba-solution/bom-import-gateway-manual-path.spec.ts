@@ -765,7 +765,22 @@ test('E15 upload UI isolates exactly three unsafe rows and completes fourteen wi
   const isolatedIds=new Set(isolated.map(r=>r.pid));
   const isolatedMatches=matches.filter(m=>isolatedIds.has(m.bom_mr_std_item_id));
   expect(isolatedMatches).toHaveLength(3);
-  expect(isolatedMatches.every(m=>m.bom_mr_match_state==='none' && m.bom_mr_evidence_state==='missing' && m.bom_mr_reason)).toBe(true);
+  const mismatchIds = new Set(
+    isolated.filter(r => r.bom_std_reason_code === 'mismatch_refdes_qty').map(r => r.pid),
+  );
+  const conflictIds = new Set(
+    isolated.filter(r => r.bom_std_reason_code === 'field_source_conflict').map(r => r.pid),
+  );
+  expect(
+    isolatedMatches
+      .filter(m => mismatchIds.has(m.bom_mr_std_item_id))
+      .every(m => m.bom_mr_match_state === 'none' && m.bom_mr_evidence_state === 'missing' && m.bom_mr_reason),
+  ).toBe(true);
+  expect(
+    isolatedMatches
+      .filter(m => conflictIds.has(m.bom_mr_std_item_id))
+      .every(m => m.bom_mr_match_state === 'conflict' && m.bom_mr_evidence_state === 'conflict' && m.bom_mr_reason),
+  ).toBe(true);
   expect(rows.filter(r => !isolated.includes(r))).toHaveLength(14);
   await expect(page.getByTestId('status-banner-bom_workbench_completed_unresolved_warning')).toContainText('有部分行未形成可确认结果');
   await page.reload();

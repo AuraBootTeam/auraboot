@@ -729,12 +729,15 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         params.put("currentUserId", userId != null ? userId.toString() : null);
         params.put("currentUserPid", MetaContext.getCurrentUserPid());
 
-        authorizeRootRecord(query, policy, params);
+        boolean rootRecordGrant = authorizeRootRecord(query, policy, params);
+        boolean aggregateRootGrant = collaboratorGrant || rootRecordGrant;
 
-        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", collaboratorGrant);
-        // The declared aggregate-root PID is already an exact row boundary for a collaborator.
-        // A surface DataScope the collaborator does not own must not erase that explicit grant.
-        if (!collaboratorGrant) {
+        NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query, fields, "list", aggregateRootGrant);
+        // The declared aggregate-root PID is already an exact row boundary after the normal
+        // record ACL (owner/self, data scope, or collaborator share) succeeds. Requiring raw
+        // model reads or applying unrelated surface scopes to joined implementation tables
+        // would erase a deliberately customer-safe projection of that aggregate.
+        if (!aggregateRootGrant) {
             appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses, protection);
         }
 
@@ -852,13 +855,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
      * permission still cannot read another owner's quote unless the root record itself is
      * visible through the normal DynamicData ACL (owner/self, data scope, or record share).
      */
-    private void authorizeRootRecord(
+    private boolean authorizeRootRecord(
             NamedQuery query,
             NamedQueryPolicy policy,
             Map<String, Object> params) {
         NamedQueryPolicy.RootAccess rootAccess = policy.getRootAccess();
         if (rootAccess == null) {
-            return;
+            return false;
         }
 
         String modelCode = trimToNull(rootAccess.getModelCode());
@@ -884,7 +887,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             action = "read";
         }
         if (hasCollaboratorGrant(policy, params, memberId)) {
-            return;
+            return true;
         }
         if (!permissionEvaluator.canAction(memberId, modelCode, action)) {
             throw new AccessDeniedException("Access denied for named query root: " + modelCode);
@@ -897,6 +900,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         dynamicDataService.getById(modelCode, recordPid);
         log.debug("Named query root access allowed: query={}, model={}, pid={}",
                 query.getCode(), modelCode, recordPid);
+        return true;
     }
 
     /**
@@ -958,15 +962,19 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         params.put("tenantId", tenantId);
         Long userId = getCurrentUserId();
         params.put("currentUserId", userId != null ? userId.toString() : null);
-        authorizeRootRecord(query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
+        boolean rootRecordGrant = authorizeRootRecord(
+                query, query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(), params);
         boolean exportCollaboratorGrant = hasCollaboratorGrant(
                 query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy(),
                 params, MetaContext.getCurrentMemberId());
+        boolean aggregateRootGrant = exportCollaboratorGrant || rootRecordGrant;
 
         List<String> exportScope = new ArrayList<>();
         NamedQueryFieldProtection.Plan protection = fieldProtection.prepare(query,
-                exportFieldCodes.stream().map(fieldMap::get).toList(), "export", exportCollaboratorGrant);
-        appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
+                exportFieldCodes.stream().map(fieldMap::get).toList(), "export", aggregateRootGrant);
+        if (!aggregateRootGrant) {
+            appendDeclaredDataScopeClause(query, tenantId, userId, exportScope, protection);
+        }
         whereClauses.addAll(exportScope);
 
         if (!whereClauses.isEmpty()) {

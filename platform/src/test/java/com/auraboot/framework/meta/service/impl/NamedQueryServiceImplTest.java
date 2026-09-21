@@ -234,6 +234,34 @@ class NamedQueryServiceImplTest {
     }
 
     @Test
+    void executeQueryUsesAnAuthorizedRootRecordWithoutRequiringRawJoinedModelAccess() {
+        MetaContext.setContext(10L, 30L, "owner-pid", "Owner");
+        NamedQuery query = sqlQuery();
+        NamedQueryPolicy policy = new NamedQueryPolicy();
+        NamedQueryPolicy.RootAccess rootAccess = new NamedQueryPolicy.RootAccess();
+        rootAccess.setModelCode("qo_quote_common");
+        rootAccess.setPidParam("quoteId");
+        policy.setRootAccess(rootAccess);
+        query.setPolicy(policy);
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "qo_quote_common", "read")).thenReturn(true);
+        when(dynamicDataServiceProvider.getObject()).thenReturn(dynamicDataService);
+        when(dynamicDataService.getById("qo_quote_common", "quote-1"))
+                .thenReturn(Map.of("pid", "quote-1"));
+        when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
+        when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
+        when(dynamicDataMapper.countByQueryWithoutTenant(anyString(), anyMap())).thenReturn(0L);
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), anyMap())).thenReturn(List.of());
+        var request = new com.auraboot.framework.meta.dto.NamedQueryTestRequest();
+        request.setParameters(Map.of("quoteId", "quote-1"));
+
+        service.executeQuery("order_summary", request);
+
+        verify(fieldProtection).prepare(query, List.of(), "list", true);
+        verify(dataPermissionEngine, never()).buildRowFilter(any(), anyString(), anyString(), any());
+    }
+
+    @Test
     void executeQueryRequiresRootRecordBeforeRunningSurfaceQuery() {
         MetaContext.setContext(10L, 30L, "tester", "Tester");
         NamedQuery query = sqlQuery();
