@@ -104,8 +104,9 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
   await expect(viewers[0].page.getByTestId('ab:detail:qo_quote_common:share-btn')).toHaveCount(0);
   await viewers[0].page.getByRole('tab',{name:'BOM价格计算',exact:true}).click();
-  await expect(viewers[0].page.getByTestId(`table-row-${quote.lineId}`)).toContainText(quote.mpn);
-  await expect(viewers[0].page.getByTestId(`table-row-${quote.lineId}`)).toContainText(/1\.1111|1\.111|1\.11/);
+  const sharedLine = viewers[0].page.getByTestId(`table-row-${quote.lineId}`);
+  await expect(sharedLine).toContainText(quote.mpn, {timeout: 20_000});
+  await expect(sharedLine).toContainText(/1\.1111|1\.111|1\.11/);
   expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();

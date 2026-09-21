@@ -306,10 +306,15 @@ test('formal quote approval: UI submit, explicit approval and immutable baseline
     unauthorizedApproval:denied.status(),unauthorizedRejection:rejectDenied.status(),replay:replay.status(),mutation:mutation.status()}),contentType:'application/json'});
   await page.reload();
   await page.getByRole('button',{name:'检查过期与重算',exact:true}).click();
-  await page.getByTestId('form-dialog-field-as_of').fill('2026-09-15');
-  await page.getByTestId('form-dialog-field-current_input_fingerprint').fill(`${marker}-changed`);
+  const freshnessDialog = page.getByRole('dialog', {name:'检查过期与输入变化'});
+  const freshnessFields = freshnessDialog.getByRole('textbox');
+  await expect(freshnessFields).toHaveCount(2);
+  await freshnessFields.nth(0).fill('2026-09-15');
+  await freshnessFields.nth(1).fill(`${marker}-changed`);
+  await expect(freshnessFields.nth(0)).toHaveValue('2026-09-15');
+  await expect(freshnessFields.nth(1)).toHaveValue(`${marker}-changed`);
   const freshnessResponse=page.waitForResponse(r=>r.url().includes('qo_quote_common:assess_freshness')&&r.request().method()==='POST');
-  await page.getByTestId('form-dialog-submit').click();
+  await freshnessDialog.getByTestId('form-dialog-submit').click();
   const fresh=await freshnessResponse;
   expect(fresh.status()).toBe(200);expect(String((await fresh.json()).code)).toBe('0');
   const after=await readDynamicRecord(page,'qo_quote_common',quoteId);
