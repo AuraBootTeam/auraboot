@@ -40,8 +40,7 @@ test.describe('PCBA requirement set golden', () => {
       expect(String(lineRows[0].bom_cl_mpn)).toBe(`E2E-REQ-${marker}`);
       expect(Number(lineRows[0].bom_cl_qty)).toBe(5);
 
-      // 非法取值拒绝腿:约束已在模型 DSL 声明(bom_cl_qty min=1+required;bom_cl_mpn required),
-      // 服务端对 min 强制拒绝;required 目前仅 UI 表单层强制(动态插入不拦,框架层缺口已登记)。
+      // 非法取值拒绝腿:数量最小值和 MPN 必填均由模型 binding 在服务端强制。
       const negativeQty = await page.request.post('/api/dynamic/req_requirement_line_pcba_bom', {
         data: {
           bom_cl_task_id: setPid, bom_cl_line_no: 2, bom_cl_mpn: `E2E-NEG-${marker}`,
@@ -59,6 +58,28 @@ test.describe('PCBA requirement set golden', () => {
         JSON.stringify(negativeBody),
         'the rejection names the minimum-value rule',
       ).toContain('minimum');
+
+      const missingMpn = await page.request.post('/api/dynamic/req_requirement_line_pcba_bom', {
+        data: {
+          bom_cl_task_id: setPid, bom_cl_line_no: 3, bom_cl_qty: 1,
+          bom_cl_level: '1', bom_cl_review_status: 'pending',
+        },
+        timeout: 20_000,
+      });
+      const missingMpnBody = await missingMpn.json().catch(() => ({}));
+      const missingMpnRejected = !missingMpn.ok()
+        || String((missingMpnBody as { code?: unknown }).code ?? '0') !== '0';
+      expect(
+        missingMpnRejected,
+        `missing MPN must be rejected server-side: ${JSON.stringify(missingMpnBody).slice(0, 260)}`,
+      ).toBe(true);
+      expect(JSON.stringify(missingMpnBody), 'the rejection names the required rule').toContain('required');
+
+      const invalidRows = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
+        { fieldName: 'bom_cl_task_id', operator: 'EQ', value: setPid },
+        { fieldName: 'bom_cl_line_no', operator: 'EQ', value: 3 },
+      ]);
+      expect(invalidRows, 'the rejected missing-MPN row is not persisted').toHaveLength(0);
     } finally {
       await cleanupRows(page, created);
     }
