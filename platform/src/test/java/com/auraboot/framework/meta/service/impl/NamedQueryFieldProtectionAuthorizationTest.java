@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +51,32 @@ class NamedQueryFieldProtectionAuthorizationTest {
         assertEquals("true", plan.sourceScopes().get("\"public\".\"ab_tenant_member\""));
         assertEquals("(tenant_id = 10)", plan.sourceScopes().get("orders"));
         verify(permissions, never()).canAction(anyLong(), eq(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER), anyString());
+    }
+    @Test void selfAnchoredPolicyReplacesMissingModelReadWithCreatedByAnchor() {
+        // Self-contribution analytics (home trend/workload charts) must stay executable for
+        // members without any product role: the policy declares the source is only consumed
+        // through rows the current user created, so the missing model read downgrades to a
+        // forced created_by anchor instead of a denial — narrower than any model grant.
+        var policy = new NamedQueryPolicy();
+        policy.setSelfAnchoredSources(true);
+        query.setPolicy(policy);
+        when(permissions.canAction(30L, "orders", "read")).thenReturn(false);
+        var plan = protection.prepare(query, List.of(), "list");
+        assertEquals("(tenant_id = 10 AND created_by = 20)", plan.sourceScopes().get("orders"));
+    }
+    @Test void withoutSelfAnchoredPolicyMissingModelReadStillDenied() {
+        when(permissions.canAction(30L, "customers", "read")).thenReturn(true);
+        when(permissions.canAction(30L, "orders", "read")).thenReturn(false);
+        AccessDeniedException denied = assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of(), "list"));
+        assertEquals("Access denied for named query source: orders", denied.getMessage());
+    }
+    @Test void selfAnchoredPolicyWithoutResolvableUserFailsClosed() {
+        var policy = new NamedQueryPolicy();
+        policy.setSelfAnchoredSources(true);
+        query.setPolicy(policy);
+        MetaContext.clear();
+        MetaContext.setContext(10L, null, null, null);
+        assertThrows(AccessDeniedException.class, () -> protection.prepare(query, List.of(), "list"));
     }
     @Test void everyPhysicalSourceUsesCurrentMemberIdentity() {
         when(permissions.canAction(30L, "orders", "read")).thenReturn(true);

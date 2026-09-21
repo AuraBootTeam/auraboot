@@ -41,6 +41,17 @@ public class NamedQueryPolicy {
     /** Query timeout in milliseconds (default 30000) */
     private Integer timeoutMs = 30000;
 
+    /**
+     * Declares that every fromSql source is consumed only through rows the CURRENT user
+     * created. When set, a caller without model-level read on a joined source is not
+     * denied: the source instead gets a forced {@code created_by = <current user>} scope,
+     * which is narrower than any model-level grant (same principle as the record-scoped
+     * collaborator admission). Sources without a created_by column fail at SQL time, so
+     * the flag fails closed. Intended for self-contribution analytics (home trend and
+     * workload charts) that must stay executable for members without any product role.
+     */
+    private Boolean selfAnchoredSources = false;
+
     /** Max executions per minute per tenant (default 60, 0 = unlimited) */
     private Integer rateLimitPerMinute = 60;
 

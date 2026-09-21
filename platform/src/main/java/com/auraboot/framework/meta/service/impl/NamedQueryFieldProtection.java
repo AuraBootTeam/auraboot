@@ -53,6 +53,10 @@ public class NamedQueryFieldProtection {
         var sourceModels = resolved.models();
         Long memberId = MetaContext.getCurrentMemberId();
         if (memberId == null) memberId = MetaContext.getCurrentUserId();
+        var policy = query.getPolicy();
+        boolean selfAnchoredSources = policy != null && Boolean.TRUE.equals(policy.getSelfAnchoredSources());
+        Long anchorUser = MetaContext.getCurrentUserId();
+        Set<String> selfAnchoredModels = new TreeSet<>();
         for (String model : new TreeSet<>(sourceModels.values())) {
             // Platform reference sources carry no model-level permission or scope; see
             // NamedQuerySourceModels.PLATFORM_REFERENCE_SOURCES.
@@ -66,6 +70,14 @@ public class NamedQueryFieldProtection {
             // check is skipped; the per-source tenant scopes below still apply.
             if (collaboratorRootGrant) continue;
             if (memberId == null || !permissionEvaluator.canAction(memberId, model, "read")) {
+                // A self-anchored query only ever consumes rows the current user created,
+                // so a missing model read downgrades to a forced created_by anchor on that
+                // source instead of a denial — narrower than any model-level grant. A
+                // caller without a resolvable user id still fails closed below.
+                if (selfAnchoredSources && anchorUser != null) {
+                    selfAnchoredModels.add(model);
+                    continue;
+                }
                 throw new AccessDeniedException("Access denied for named query source: " + model);
             }
         }
@@ -88,6 +100,11 @@ public class NamedQueryFieldProtection {
                 // store). Filter on the text form so the literal cannot collide with a
                 // bigint-typed sibling column in another source.
                 scope = "tenant_id::text = '" + MetaContext.getCurrentTenantId() + "'";
+            } else if (selfAnchoredModels.contains(source.getValue())) {
+                // Forced owner anchor for the self-anchored sources the caller could not
+                // model-read: the caller only ever sees rows they created in that source,
+                // regardless of any (absent) data scope the engine would otherwise apply.
+                scope = "(tenant_id = " + MetaContext.getCurrentTenantId() + " AND created_by = " + anchorUser + ")";
             } else {
                 scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
                     String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
