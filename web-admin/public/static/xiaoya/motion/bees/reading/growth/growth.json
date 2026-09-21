@@ -1,0 +1,56 @@
+{
+  "format": "fengyun-growth/1",
+  "kind": "bee",
+  "theme": "reading",
+  "transitions": [
+    {
+      "from": "bee-reading-s1",
+      "to": "bee-reading-s2",
+      "from_stage": 1,
+      "to_stage": 2,
+      "duration": 2.4,
+      "method": "named_layer_interpolation",
+      "unmatched_layers": "staggered_fade_in",
+      "root_anchor": null,
+      "from_package": "../stage_1/animation.json",
+      "to_package": "../stage_2/animation.json"
+    },
+    {
+      "from": "bee-reading-s2",
+      "to": "bee-reading-s3",
+      "from_stage": 2,
+      "to_stage": 3,
+      "duration": 2.4,
+      "method": "named_layer_interpolation",
+      "unmatched_layers": "staggered_fade_in",
+      "root_anchor": null,
+      "from_package": "../stage_2/animation.json",
+      "to_package": "../stage_3/animation.json"
+    },
+    {
+      "from": "bee-reading-s3",
+      "to": "bee-reading-s4",
+      "from_stage": 3,
+      "to_stage": 4,
+      "duration": 2.4,
+      "method": "named_layer_interpolation",
+      "unmatched_layers": "staggered_fade_in",
+      "root_anchor": null,
+      "from_package": "../stage_3/animation.json",
+      "to_package": "../stage_4/animation.json"
+    },
+    {
+      "from": "bee-reading-s4",
+      "to": "bee-reading-s5",
+      "from_stage": 4,
+      "to_stage": 5,
+      "duration": 2.4,
+      "method": "named_layer_interpolation",
+      "unmatched_layers": "staggered_fade_in",
+      "root_anchor": null,
+      "from_package": "../stage_4/animation.json",
+      "to_package": "../stage_5/animation.json"
+    }
+  ],
+  "note": "共同命名图层连续插值；不同拓扑的局部部件交叉淡化。不是整张图闪光后替换。对应两个阶段包和engine.js须一并部署。"
+}
