@@ -19,11 +19,10 @@ interface TeacherCode {
 interface SetupState {
   semester: XyRow | null;
   classes: XyRow[];
-  enrollments: XyRow[];
   teacherCode: TeacherCode | null;
 }
 
-const emptyState: SetupState = { semester: null, classes: [], enrollments: [], teacherCode: null };
+const emptyState: SetupState = { semester: null, classes: [], teacherCode: null };
 
 export function semesterDateError(name: string, startDate: string, endDate: string): string {
   if (!name.trim()) return '请填写学期名称';
@@ -61,21 +60,18 @@ export default function SchoolActivation() {
   const [savingSemester, setSavingSemester] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [selectedClass, setSelectedClass] = useState('');
 
   const load = useCallback(async () => {
     if (!schoolAdmin) return;
     setLoading(true);
     setError('');
     try {
-      const [semesters, classes, enrollments, teacherCode] = await Promise.all([
+      const [semesters, classes, teacherCode] = await Promise.all([
         xyList('xy_semester', [{ field: 'xy_sem_status', value: 'active' }]),
         xyList('xy_classroom', [{ field: 'xy_cls_status', value: 'active' }]),
-        xyList('xy_enrollment', [{ field: 'xy_enr_status', value: 'active' }]),
         loadTeacherCode(),
       ]);
-      setState({ semester: semesters[0] || null, classes, enrollments, teacherCode });
-      setSelectedClass((current) => current || (classes[0]?.pid ? String(classes[0].pid) : ''));
+      setState({ semester: semesters[0] || null, classes, teacherCode });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '启用状态加载失败');
     } finally {
@@ -88,7 +84,7 @@ export default function SchoolActivation() {
   }, [load]);
 
   const requiredSteps = useMemo(
-    () => [Boolean(state.semester), state.classes.length > 0, state.enrollments.length > 0],
+    () => [Boolean(state.semester), state.classes.length > 0],
     [state],
   );
   const completed = requiredSteps.filter(Boolean).length;
@@ -232,7 +228,7 @@ export default function SchoolActivation() {
               让学校可以开始评分
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              按顺序完成学期、班级和名册。学校教师码可随时生成，老师在微信小程序入校后再绑定班级。
+              完成学校级学期和班级准备。学校教师码可随时生成；名册、评分等教学工作由班主任和任课老师负责。
             </p>
 
             <div className="mt-7 rounded-2xl bg-emerald-900 p-6 text-white">
@@ -240,17 +236,17 @@ export default function SchoolActivation() {
                 <div>
                   <div className="text-sm text-emerald-100">必做进度</div>
                   <div className="mt-1 text-3xl font-semibold" data-testid="setup-progress">
-                    {completed}/3
+                    {completed}/2
                   </div>
                 </div>
                 <div className="text-right text-sm text-emerald-100">
-                  {completed === 3 ? '已具备基础评分条件' : `还差 ${3 - completed} 步`}
+                  {completed === 2 ? '学校级准备已完成' : `还差 ${2 - completed} 步`}
                 </div>
               </div>
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
                 <div
                   className="h-full rounded-full bg-lime-300 transition-all"
-                  style={{ width: `${(completed / 3) * 100}%` }}
+                  style={{ width: `${(completed / 2) * 100}%` }}
                 />
               </div>
             </div>
@@ -377,38 +373,6 @@ export default function SchoolActivation() {
                   </Link>,
                 )}
 
-                {stepCard(
-                  3,
-                  state.enrollments.length > 0,
-                  '3. 导入学生名册',
-                  state.enrollments.length > 0
-                    ? `已有 ${state.enrollments.length} 条在读班级关系。`
-                    : '在电脑端上传 .xlsx 或 UTF-8 .csv，先预览问题行，再确认写入。',
-                  state.classes.length ? (
-                    <div className="flex flex-wrap gap-3">
-                      <select
-                        aria-label="导入班级"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        value={selectedClass}
-                        onChange={(event) => setSelectedClass(event.target.value)}
-                      >
-                        {state.classes.map((item) => (
-                          <option key={String(item.pid)} value={String(item.pid)}>
-                            {String(item.xy_cls_alias || item.xy_cls_name)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
-                        onClick={() => navigate(`/xy/import/${selectedClass}`)}
-                      >
-                        导入这个班级的名册
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-slate-500">请先创建班级</span>
-                  ),
-                )}
               </div>
             )}
           </div>

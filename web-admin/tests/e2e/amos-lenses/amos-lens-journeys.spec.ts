@@ -279,8 +279,8 @@ test.describe('AMOS lens fault/filter/trace journeys', () => {
     { code: 'amos_inventory_lens', heading: 'AMOS 库存库龄 · 治理状态' },
   ];
 
-  for (const page of ERROR_PAGES) {
-    test(`query error: ${page.code} expresses the failure state`, async ({ page }) => {
+  for (const scenario of ERROR_PAGES) {
+    test(`query error: ${scenario.code} expresses the failure state`, async ({ page }) => {
       // Fault injection at the transport boundary: the dashboard must render
       // its governed failure state instead of a blank canvas or stale values.
       await page.route('**/api/meta/chart-data*', (route) => route.fulfill({
@@ -288,12 +288,12 @@ test.describe('AMOS lens fault/filter/trace journeys', () => {
         contentType: 'application/json',
         body: JSON.stringify({ code: '1', message: 'S12 fault injection' }),
       }));
-      await page.goto(`/dashboards/view/${page.code}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`/dashboards/view/${scenario.code}`, { waitUntil: 'domcontentloaded' });
       await expect(
-        page.getByRole('heading', { name: page.heading }),
-        `${page.code} shell still renders under query failure`,
+        page.getByRole('heading', { name: scenario.heading }),
+        `${scenario.code} shell still renders under query failure`,
       ).toBeVisible({ timeout: 20_000 });
-      await page.screenshot({ path: `test-results/artifacts/amos-lens-${page.code}-query-error.png` });
+      await page.screenshot({ path: `test-results/artifacts/amos-lens-${scenario.code}-query-error.png` });
     });
   }
 
