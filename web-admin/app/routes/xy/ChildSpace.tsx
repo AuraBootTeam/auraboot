@@ -22,9 +22,9 @@ import { PetAvatar, usePetVisual } from './PetAvatar';
  * server-side invariants (idempotency, balance, stock, unlock levels) stay
  * authoritative; this page only renders outcomes.
  *
- * Demo routing: /xy/child picks the first active enrollment when no student
- * pid is supplied so the sidebar menu entry works; /xy/child/:studentPid is
- * the family-entry shape.
+ * /xy/child picks the first student inside the operator's server-enforced
+ * classroom scope; /xy/child/:studentPid is accepted only when that student
+ * is present in the same scoped roster.
  */
 export default function ChildSpace() {
   const { isAuthenticated } = useAuth();
@@ -92,15 +92,39 @@ export default function ChildSpace() {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
-      if (params.studentPid) {
-        await loadAll(String(params.studentPid));
-      } else {
-        const enrs = await xyList('xy_enrollment', [{ field: 'xy_enr_status', value: 'active' }]);
-        if (cancelled) return;
-        setEnrollments(enrs);
-        if (enrs[0]) await loadAll(String(enrs[0].xy_enr_student));
-        else setLoading(false);
+      const scoped = await xyExec('xy:child_space_students');
+      if (cancelled) return;
+      if (!scoped.ok) {
+        setError(scoped.message || '无法加载可管理的同学');
+        setLoading(false);
+        return;
       }
+      const classrooms = Array.isArray(scoped.data.classrooms)
+        ? scoped.data.classrooms as XyRow[]
+        : [];
+      const enrs = classrooms.flatMap((classroom) => {
+        const students = Array.isArray(classroom.students) ? classroom.students as XyRow[] : [];
+        return students.map((row) => ({
+          pid: `${String(classroom.classPid)}:${String(row.pid)}`,
+          xy_enr_student: row.pid,
+          xy_enr_class: classroom.classPid,
+          xy_enr_no: row.xy_stu_name || row.xy_stu_code,
+          xy_enr_class_name: classroom.className,
+        }));
+      });
+      setEnrollments(enrs);
+      const requestedPid = params.studentPid ? String(params.studentPid) : '';
+      const selected = requestedPid
+        ? enrs.find((e) => String(e.xy_enr_student) === requestedPid)
+        : enrs[0];
+      if (requestedPid && !selected) {
+        setStudent(null);
+        setError('你只能管理自己班级的同学');
+        setLoading(false);
+        return;
+      }
+      if (selected) await loadAll(String(selected.xy_enr_student));
+      else setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -155,24 +179,29 @@ export default function ChildSpace() {
           <div className="text-text-2 text-sm">加载中…</div>
         ) : !student ? (
           <div className="text-text-2 rounded-card border border-[var(--color-border)] bg-[var(--color-panel)] p-6 text-sm" data-testid="child-space-empty">
-            没有找到同学档案。请从老师工作台的名册进入,或直接使用 /xy/child/:studentPid 链接。
+            {error || '当前没有可管理的同学。请先在班级名册中导入学生。'}
           </div>
         ) : (
           <>
-            {/* demo picker */}
+            {/* scoped student picker */}
             {enrollments.length > 0 && (
-              <div className="text-text-2 mb-4 text-xs">
-                演示选择:
-                {enrollments.slice(0, 8).map((e) => (
-                  <button
-                    key={String(e.pid)}
-                    className="accent mx-1 rounded-pill px-2 py-0.5"
-                    style={{ background: 'var(--color-accent-weak)', color: 'var(--color-accent)' }}
-                    onClick={() => navigate(`/xy/child/${String(e.xy_enr_student)}`)}
-                  >
-                    {String(e.xy_enr_no || '')}
-                  </button>
-                ))}
+              <div className="text-text-2 mb-4 flex items-center gap-2 text-xs">
+                <label htmlFor="child-space-student">选择同学:</label>
+                <select
+                  id="child-space-student"
+                  aria-label="选择同学"
+                  className="text-text h-9 min-w-56 rounded-[var(--radius-control)] border px-3 text-sm"
+                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-panel)' }}
+                  value={String(student.pid || '')}
+                  onChange={(event) => navigate(`/xy/child/${event.target.value}`)}
+                >
+                  {enrollments.map((enrollment) => (
+                    <option key={String(enrollment.pid)} value={String(enrollment.xy_enr_student)}>
+                      {String(enrollment.xy_enr_no || '')}
+                      {enrollment.xy_enr_class_name ? ` · ${String(enrollment.xy_enr_class_name)}` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
@@ -212,7 +241,7 @@ export default function ChildSpace() {
                         <button
                           className="rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold text-white"
                           style={{ background: 'var(--color-accent)' }}
-                          onClick={() => run(() => xyExec('xy:update_pi', { xy_pi_nickname: String(pet.xy_pi_nickname || '') }, petPid), '')}
+                          onClick={() => run(() => xyExec('xy_pet_instance:rename', { nickname: String(pet.xy_pi_nickname || '') }, petPid), '')}
                         >
                           保存昵称
                         </button>
