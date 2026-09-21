@@ -861,9 +861,25 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           headers.some((text) => /总用量|Total Qty/i.test(text)),
           `Waterfall should not expose duplicate total quantity: ${JSON.stringify(headers)}`,
         ).toBe(false);
-        await expect(factoredRow.locator('td, [role="cell"]').nth(yunhanColumn)).toContainText(
-          '0.0155',
-        );
+        // The set-count recompute is asynchronous: tier reprice -> adopted cost -> rollup land
+        // seconds apart, so poll the factored cell instead of a fixed 5s visibility window.
+        await expect
+          .poll(
+            async () => {
+              const text = await factoredRow
+                .locator('td, [role="cell"]')
+                .nth(yunhanColumn)
+                .textContent()
+                .catch(() => '');
+              return (text || '').trim();
+            },
+            {
+              timeout: 45_000,
+              message:
+                'yunhan after-factor cell should reach 0.0155 (tier2 0.0148 x factor 1.05) after the async recompute',
+            },
+          )
+          .toContainText('0.0155');
         await factoredRow.click();
         const recentCandidateAfterFactor = page.getByTestId(
           `review-drawer-candidate-${recentEvidenceId}`,
