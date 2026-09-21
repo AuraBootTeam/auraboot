@@ -4,6 +4,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useTenantTheme } from '~/contexts/TenantThemeContext';
 import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
 import { PetAvatar, usePetVisual } from './PetAvatar';
+import { FengyunMotionArtwork, motionPacketForAsset } from './FengyunMotion';
 
 /**
  * Fengyun class display (班级大屏) — read-only surface for the classroom screen:
@@ -55,7 +56,7 @@ export default function ClassDisplay() {
     setStudents(stus);
     const allPets = await xyList('xy_pet_instance');
     setPets(allPets.filter((p) => p.xy_pi_status === 'active' && stus.some((s) => String(s.pid) === String(p.xy_pi_student))));
-    // Class tree (SOT 03 §7): stage config lives on the bound play theme and the
+    // Treehouse home (SOT 03 §7): stage config lives on the bound play theme and the
     // reading is the class-TOTAL semester nectar. Broken config fails fast.
     const xpSum = stus.reduce((acc, s) => acc + Number(s.xy_stu_xp_total ?? 0), 0);
     setTotalXp(xpSum);
@@ -80,7 +81,7 @@ export default function ClassDisplay() {
       } catch {
         setTreeStage(null);
         setTreeNext(null);
-        setTreeError('班级树阶段定义配置有误,请在电脑端玩法包中修正');
+        setTreeError('树屋家园阶段定义配置有误,请在电脑端玩法包中修正');
       }
     } else {
       setTreeStage(null);
@@ -227,7 +228,7 @@ export default function ClassDisplay() {
           </div>
         </div>
 
-        {/* class tree (SOT 03 §7): grows with the class-total semester nectar */}
+        {/* treehouse home (SOT 03 §7): grows with the class-total semester nectar */}
         <div
           className="mt-8 flex items-center gap-6 rounded-card-lg border p-6"
           style={{ background: '#FFFFFFB5', borderColor: '#E1E8D2' }}
@@ -237,9 +238,19 @@ export default function ClassDisplay() {
             <div className="text-sm" style={{ color: '#8C3A36' }}>🌳 {treeError}</div>
           ) : treeStage ? (
             <>
-              <img src={treeStage.asset} alt={treeStage.name} className="h-40 w-40 shrink-0" />
+              {motionPacketForAsset(treeStage.asset) ? (
+                <FengyunMotionArtwork
+                  assetUrl={treeStage.asset}
+                  alt={treeStage.name}
+                  size={160}
+                  idleClip="ambient_idle"
+                  className="shrink-0"
+                />
+              ) : (
+                <img src={treeStage.asset} alt={treeStage.name} className="h-40 w-40 shrink-0" />
+              )}
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>🌳 班级大树 · 共同成长</div>
+                <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>🌳 树屋家园 · 共同成长</div>
                 <div className="mt-1 flex items-baseline gap-2">
                   <span className="text-2xl font-bold" style={{ color: '#213D32' }} data-testid="display-tree-stage">{treeStage.name}</span>
                   <span className="text-sm" style={{ color: '#8C9B79' }} data-testid="display-tree-total">🌼 {totalXp} 花蜜</span>
@@ -253,16 +264,16 @@ export default function ClassDisplay() {
                       />
                     </div>
                     <p className="mt-1.5 text-xs" style={{ color: '#91A17A' }}>
-                      再攒 {Math.max(0, treeNext.minXp - totalXp)} 花蜜,大树成长为「{treeNext.name}」
+                      再攒 {Math.max(0, treeNext.minXp - totalXp)} 花蜜,家园成长为「{treeNext.name}」
                     </p>
                   </>
                 ) : (
-                  <p className="mt-2 text-xs" style={{ color: '#91A17A' }}>全班花蜜已让大树挂满蜂蜜,继续加油!</p>
+                  <p className="mt-2 text-xs" style={{ color: '#91A17A' }}>全班花蜜已建成完整家园,继续加油!</p>
                 )}
               </div>
             </>
           ) : (
-            <div className="text-sm" style={{ color: '#8D9D7C' }}>🌳 班级树随全班花蜜一起成长</div>
+            <div className="text-sm" style={{ color: '#8D9D7C' }}>🌳 树屋家园随全班花蜜一起成长</div>
           )}
         </div>
 

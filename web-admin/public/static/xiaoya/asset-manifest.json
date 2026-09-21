@@ -1,0 +1,3935 @@
+{
+  "document_type": "delivered_asset_manifest",
+  "version": "1.0.0",
+  "language": "zh-CN",
+  "status": "文件已生成；静态结构/网页测试结果见tests；用户美术认可及微信真机待验",
+  "basis": [
+    {
+      "name": "edu-asset-brief-2026-09-21.md",
+      "derived_requirements": "原18个独立文件、五阶段、既有路径、单SVG≤80KB、素材清单与实际尺寸验收"
+    },
+    {
+      "name": "edu-asset-brief-2026-09-21-v1.1.md",
+      "derived_requirements": "真实SVG、512画布、同角色/同阶段皮肤一致性、固定树根基线、静态与终端验收分开"
+    },
+    {
+      "name": "蜜蜂树中队方案讨论 (1).docx 与本会话补充",
+      "derived_requirements": "七类主题蜜蜂、树屋家园、个人/集体成长及动画"
+    }
+  ],
+  "counts": {
+    "static_svg_files": 58,
+    "original_compatibility_static_files": 18,
+    "new_seven_theme_static_files": 35,
+    "new_home_static_files": 5,
+    "proposed_stage_animation_packages": 40,
+    "proposed_transition_sets": 8,
+    "bee_adjacent_transition_behaviors": 28,
+    "home_adjacent_transition_behaviors": 4,
+    "actual_svg_files_created_by_this_manifest": 58,
+    "actual_animation_packages_created_by_this_manifest": 40,
+    "actual_transition_sets_created": 8,
+    "motion_clip_definitions": 151
+  },
+  "static_requirements": {
+    "viewBox": "0 0 512 512",
+    "background": "transparent",
+    "svg_max_bytes": 80000,
+    "embedded_raster_allowed": false,
+    "scripts_or_external_dependencies_allowed": false,
+    "labels_and_ui_baked_into_asset": false
+  },
+  "preview_requirements": {
+    "bee_css_px": [
+      96,
+      170
+    ],
+    "tree_css_px": [
+      160
+    ],
+    "logo_css_px": [
+      24
+    ],
+    "backgrounds": [
+      "#FFFFFF",
+      "#EEF3E1"
+    ],
+    "home_expanded_view": "独立大尺寸评审；160px概览不承担全部家园细节"
+  },
+  "acceptance": [
+    "每种蜂五阶段同尺寸、同背景、不显示阶段文字；相邻阶段至少两个清晰差异，其中一个来自主体轮廓/比例或姿态，不只换色或小徽章。",
+    "保持脸型/眼睛画法/核心条纹与角色身份；同阶段换装共用身体、姿态、表情。",
+    "静态就能辨认阶段差异；动效进一步表现能力，不用光效掩盖静态相同。",
+    "树根基线、场地朝向和主要主干连续，不单独裁切缩放每个树阶段。",
+    "SVG须真实路径，可编辑源稿有完整分层和锚点。",
+    "每个动效包包含实际可运行数据、必要依赖、动作说明和接入示例；验证状态如实记录。",
+    "PC浏览器与微信开发者工具/真机测试分别记录；未实测不得写已兼容上线。"
+  ],
+  "assets": [
+    {
+      "asset_id": "legacy-bee-default-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-default-stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "default",
+      "stage": 1,
+      "original_stage_name": "小蜜蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-default-stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-default-stage_1.svg",
+          "bytes": 13316,
+          "sha256": "9f14a73e08cf3fbbd334a62b6ed58fda05587ebf392063c0af62ebea260c67a2"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-default-s1.json"
+    },
+    {
+      "asset_id": "legacy-bee-default-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-default-stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "default",
+      "stage": 2,
+      "original_stage_name": "采蜜蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-default-stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-default-stage_2.svg",
+          "bytes": 14719,
+          "sha256": "3bc5bc6ee07ca7a3f188dff8f661273c1d7d9cabd2ba23dc160f2e3a1845b47f"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-default-s2.json"
+    },
+    {
+      "asset_id": "legacy-bee-default-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-default-stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "default",
+      "stage": 3,
+      "original_stage_name": "勤劳蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-default-stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-default-stage_3.svg",
+          "bytes": 14744,
+          "sha256": "6b49020034d3850579ffd27f4dee273707e2f06f5af3b5ab5de11d0b7d214a4a"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-default-s3.json"
+    },
+    {
+      "asset_id": "legacy-bee-default-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-default-stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "default",
+      "stage": 4,
+      "original_stage_name": "花园蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-default-stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-default-stage_4.svg",
+          "bytes": 15627,
+          "sha256": "b8115ef5bfbfeca82e7c4ce5e8563ec072f2bc256d250c197bc0b3a5aea0e50c"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-default-s4.json"
+    },
+    {
+      "asset_id": "legacy-bee-default-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-default-stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "default",
+      "stage": 5,
+      "original_stage_name": "森林守护蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-default-stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-default-stage_5.svg",
+          "bytes": 14281,
+          "sha256": "c92d4609c92601cd15d8c4151f3d4842fe7b7dcdcab86397aa9867adecbdf270"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-default-s5.json"
+    },
+    {
+      "asset_id": "legacy-bee-forest-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-forest-stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "forest",
+      "stage": 1,
+      "original_stage_name": "小蜜蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-forest-stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-forest-stage_1.svg",
+          "bytes": 14288,
+          "sha256": "6a3df11609da939dfc9b9167f4e736cd73a143ad911a01e554c20051d91341fb"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-forest-s1.json"
+    },
+    {
+      "asset_id": "legacy-bee-forest-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-forest-stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "forest",
+      "stage": 2,
+      "original_stage_name": "采蜜蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-forest-stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-forest-stage_2.svg",
+          "bytes": 15818,
+          "sha256": "7c172e5e7ff85199d6c6c0cd990fc385b1df4d3dadf1a9a83ad3381acd82861b"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-forest-s2.json"
+    },
+    {
+      "asset_id": "legacy-bee-forest-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-forest-stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "forest",
+      "stage": 3,
+      "original_stage_name": "勤劳蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-forest-stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-forest-stage_3.svg",
+          "bytes": 15843,
+          "sha256": "819a4b78c40d19f7f02bc203cf65f4f768570f4621e156f8b5471170be014350"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-forest-s3.json"
+    },
+    {
+      "asset_id": "legacy-bee-forest-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-forest-stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "forest",
+      "stage": 4,
+      "original_stage_name": "花园蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-forest-stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-forest-stage_4.svg",
+          "bytes": 16726,
+          "sha256": "afae1b5eac16fb567b1af26de121f1420b2bebe4a6b6a317a4fd96a36a675d9d"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-forest-s4.json"
+    },
+    {
+      "asset_id": "legacy-bee-forest-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-forest-stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "bee",
+      "skin": "forest",
+      "stage": 5,
+      "original_stage_name": "森林守护蜂",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-forest-stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-forest-stage_5.svg",
+          "bytes": 15380,
+          "sha256": "e473ee2760d8960895c584bacc66811ea16e06bd7dcd84801a58c5412c9d8a82"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-forest-s5.json"
+    },
+    {
+      "asset_id": "legacy-tree-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-tree-stage-1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "tree",
+      "stage": 1,
+      "original_stage_name": "小树苗",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-tree-stage-1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-tree-stage-1.svg",
+          "bytes": 3514,
+          "sha256": "4bd0a9eff19f2e487f04d3b64c5eeca85edfbb05b9cc390ba72712f49257b8ea"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-tree-s1.json"
+    },
+    {
+      "asset_id": "legacy-tree-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-tree-stage-2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "tree",
+      "stage": 2,
+      "original_stage_name": "抽芽",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-tree-stage-2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-tree-stage-2.svg",
+          "bytes": 5429,
+          "sha256": "3356c365711c67c3ff337c3ef20503524f71e96c6e33843cf44ad9e4d5d1b488"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-tree-s2.json"
+    },
+    {
+      "asset_id": "legacy-tree-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-tree-stage-3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "tree",
+      "stage": 3,
+      "original_stage_name": "枝繁",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-tree-stage-3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-tree-stage-3.svg",
+          "bytes": 5425,
+          "sha256": "b5a78ac4e0666eae48bcc1e730e881e16a5e19df8e60f5e3a690ea559951ac35"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-tree-s3.json"
+    },
+    {
+      "asset_id": "legacy-tree-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-tree-stage-4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "tree",
+      "stage": 4,
+      "original_stage_name": "花开",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-tree-stage-4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-tree-stage-4.svg",
+          "bytes": 13241,
+          "sha256": "b21350dbe558858702fcba695937c70cd2cf0771fbc5769ccb8bdfd8d38cbfda"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-tree-s4.json"
+    },
+    {
+      "asset_id": "legacy-tree-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-tree-stage-5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "tree",
+      "stage": 5,
+      "original_stage_name": "蜜果累累",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-tree-stage-5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-tree-stage-5.svg",
+          "bytes": 14703,
+          "sha256": "21efba9d47a39ee8047b6c4b113bdb0821dcebfb73645892b57fffbb6f6ce087"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-tree-s5.json"
+    },
+    {
+      "asset_id": "legacy-bee-cover",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/bee-cover.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "generic",
+      "label": "小蜜蜂物种图鉴封面",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/bee-cover.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/bee-cover.svg",
+          "bytes": 15220,
+          "sha256": "5596d2065e931f8ea837ead95b26040a6003d7f61643c995a2445081fe37891b"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-bee-cover.json"
+    },
+    {
+      "asset_id": "legacy-badge-default",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/badge-default.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "generic",
+      "label": "勋章默认图",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/badge-default.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/badge-default.svg",
+          "bytes": 2073,
+          "sha256": "4020a5132bd51308589cdc23d1d0a441ff4df664fa84c0508a18072da006434f"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-badge-default.json"
+    },
+    {
+      "asset_id": "legacy-class-logo-default",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/class-logo-default.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "original_18",
+      "object": "generic",
+      "label": "默认班级Logo",
+      "path_status": "original_brief_fixed_path",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/class-logo-default.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/class-logo-default.svg",
+          "bytes": 515,
+          "sha256": "172fc90097fc2c3dfa0926213dc9afc18de75d9c3831265d328cffc11a99642c"
+        }
+      ],
+      "source_scene": "source/scenes/legacy-class-logo-default.json"
+    },
+    {
+      "asset_id": "bee-bluewing-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/bluewing/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/bluewing/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_1.svg",
+          "bytes": 14288,
+          "sha256": "7bb4648864072959fba1cff6713adf76228d39bedec5936595c05c0738fdee31"
+        }
+      ],
+      "source_scene": "source/scenes/bee-bluewing-s1.json"
+    },
+    {
+      "asset_id": "bee-bluewing-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/bluewing/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/bluewing/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_2.svg",
+          "bytes": 14418,
+          "sha256": "b25a2dacd0e1b3c254ead129e4440b3095f75eb6f6a4ac0079c8f82f0b5a21b9"
+        }
+      ],
+      "source_scene": "source/scenes/bee-bluewing-s2.json"
+    },
+    {
+      "asset_id": "bee-bluewing-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/bluewing/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/bluewing/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_3.svg",
+          "bytes": 15563,
+          "sha256": "146881cec1dfbe1d3dda98813a785097456d94de5297aae0451b45a8cb5cad9a"
+        }
+      ],
+      "source_scene": "source/scenes/bee-bluewing-s3.json"
+    },
+    {
+      "asset_id": "bee-bluewing-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/bluewing/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/bluewing/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_4.svg",
+          "bytes": 16285,
+          "sha256": "407ecb4ac7965dbdb08be45499fdadf90dc6402da3169bbc0f3ed75a8088d793"
+        }
+      ],
+      "source_scene": "source/scenes/bee-bluewing-s4.json"
+    },
+    {
+      "asset_id": "bee-bluewing-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/bluewing/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/bluewing/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_5.svg",
+          "bytes": 16284,
+          "sha256": "f4224ee5338ded35c1228217f53409b0550a58bcf10600f70ca949123cbaefed"
+        }
+      ],
+      "source_scene": "source/scenes/bee-bluewing-s5.json"
+    },
+    {
+      "asset_id": "bee-rainbow-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/rainbow/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/rainbow/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_1.svg",
+          "bytes": 14368,
+          "sha256": "11c4a43ed50ad4642731044645019fd9aa0d3287e76aacb687ab29ddc80577f4"
+        }
+      ],
+      "source_scene": "source/scenes/bee-rainbow-s1.json"
+    },
+    {
+      "asset_id": "bee-rainbow-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/rainbow/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/rainbow/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_2.svg",
+          "bytes": 14498,
+          "sha256": "1ad195827c3fac48b9580d5b6205ee2d91f62944294ef8d2d64eee404f6bfded"
+        }
+      ],
+      "source_scene": "source/scenes/bee-rainbow-s2.json"
+    },
+    {
+      "asset_id": "bee-rainbow-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/rainbow/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/rainbow/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_3.svg",
+          "bytes": 15169,
+          "sha256": "b30c3448b6d9fdaef1361340af4e24b9e65a16810c95bf943d3ae9df9ddc8a08"
+        }
+      ],
+      "source_scene": "source/scenes/bee-rainbow-s3.json"
+    },
+    {
+      "asset_id": "bee-rainbow-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/rainbow/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/rainbow/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_4.svg",
+          "bytes": 15424,
+          "sha256": "ea2168bc8df22a860c75cc6848276aa4550692d28b8a4573ce09faaaf74c91ed"
+        }
+      ],
+      "source_scene": "source/scenes/bee-rainbow-s4.json"
+    },
+    {
+      "asset_id": "bee-rainbow-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/rainbow/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/rainbow/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_5.svg",
+          "bytes": 15675,
+          "sha256": "104230fcb5e1082c1565babe19004ef9df08960ac6121a94114e70d021990c69"
+        }
+      ],
+      "source_scene": "source/scenes/bee-rainbow-s5.json"
+    },
+    {
+      "asset_id": "bee-reading-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/reading/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/reading/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_1.svg",
+          "bytes": 14069,
+          "sha256": "f90a8695fb004f733a8d41f676526f01db4d63e8a791fbb337131019b4696a85"
+        }
+      ],
+      "source_scene": "source/scenes/bee-reading-s1.json"
+    },
+    {
+      "asset_id": "bee-reading-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/reading/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/reading/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_2.svg",
+          "bytes": 14023,
+          "sha256": "4b10a8977c01d06cb594dccb7e4fce3da1e1019c42a60466feef10287c0c04e7"
+        }
+      ],
+      "source_scene": "source/scenes/bee-reading-s2.json"
+    },
+    {
+      "asset_id": "bee-reading-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/reading/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/reading/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_3.svg",
+          "bytes": 15848,
+          "sha256": "da75342d59dd21c909fcf0eec09f2e92aa8871ee7389ad81ee110bfe30590a19"
+        }
+      ],
+      "source_scene": "source/scenes/bee-reading-s3.json"
+    },
+    {
+      "asset_id": "bee-reading-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/reading/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/reading/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_4.svg",
+          "bytes": 14982,
+          "sha256": "7d12dbdf6559ec005eb2a49ba14c0a08e249523af63f5d648e0a4c0e02667566"
+        }
+      ],
+      "source_scene": "source/scenes/bee-reading-s4.json"
+    },
+    {
+      "asset_id": "bee-reading-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/reading/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/reading/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_5.svg",
+          "bytes": 14980,
+          "sha256": "f9a8bfa863a3bf6adc3bd5f1d71536e52e981059909acb920bbe9a640abd240c"
+        }
+      ],
+      "source_scene": "source/scenes/bee-reading-s5.json"
+    },
+    {
+      "asset_id": "bee-sports-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/sports/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/sports/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_1.svg",
+          "bytes": 14955,
+          "sha256": "832660eb472742dcf8fd75c53345e39483a23740e884713aab610fe83bfc8983"
+        }
+      ],
+      "source_scene": "source/scenes/bee-sports-s1.json"
+    },
+    {
+      "asset_id": "bee-sports-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/sports/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/sports/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_2.svg",
+          "bytes": 15089,
+          "sha256": "14a29ad96ca78229c59d4d9ada31a44427f224c035e915877d5a706ae5c047b3"
+        }
+      ],
+      "source_scene": "source/scenes/bee-sports-s2.json"
+    },
+    {
+      "asset_id": "bee-sports-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/sports/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/sports/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_3.svg",
+          "bytes": 15113,
+          "sha256": "a7491f921b36a27a5e34f8298b7e9832554e890b658024a966b007be37575846"
+        }
+      ],
+      "source_scene": "source/scenes/bee-sports-s3.json"
+    },
+    {
+      "asset_id": "bee-sports-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/sports/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/sports/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_4.svg",
+          "bytes": 15525,
+          "sha256": "eeecc194f854b2b5076780aebe60585c6fc9f2b57cb3d436153e4f585fc9d1bc"
+        }
+      ],
+      "source_scene": "source/scenes/bee-sports-s4.json"
+    },
+    {
+      "asset_id": "bee-sports-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/sports/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/sports/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_5.svg",
+          "bytes": 15553,
+          "sha256": "25d24043a927a12daeef0e98a2c9a6b545b0f39fe7f5b1a7197c0e194af22468"
+        }
+      ],
+      "source_scene": "source/scenes/bee-sports-s5.json"
+    },
+    {
+      "asset_id": "bee-courage-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/courage/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/courage/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_1.svg",
+          "bytes": 14286,
+          "sha256": "1916cd2895d9874111e023838a39b3a70838030b952038206cbcfad69fb7f769"
+        }
+      ],
+      "source_scene": "source/scenes/bee-courage-s1.json"
+    },
+    {
+      "asset_id": "bee-courage-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/courage/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/courage/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_2.svg",
+          "bytes": 14672,
+          "sha256": "50e5ac0963bf45c3c89de30f4ce8ec8231704a09651c103c3cb60bd1f5593e3c"
+        }
+      ],
+      "source_scene": "source/scenes/bee-courage-s2.json"
+    },
+    {
+      "asset_id": "bee-courage-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/courage/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/courage/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_3.svg",
+          "bytes": 14712,
+          "sha256": "9d5407f3f7e70363db0373fbd23627935e7e63056902f7c7dd1846ecfc7c3bbe"
+        }
+      ],
+      "source_scene": "source/scenes/bee-courage-s3.json"
+    },
+    {
+      "asset_id": "bee-courage-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/courage/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/courage/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_4.svg",
+          "bytes": 15473,
+          "sha256": "25a21a991d865d3175451a6a1fcbecea6e5e5f2f00c2fe7b3529653bcadba1a1"
+        }
+      ],
+      "source_scene": "source/scenes/bee-courage-s4.json"
+    },
+    {
+      "asset_id": "bee-courage-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/courage/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/courage/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_5.svg",
+          "bytes": 15341,
+          "sha256": "11dfadb7c87e1fb12c357194c89c3ed384d996f3e379baefe601e846da167526"
+        }
+      ],
+      "source_scene": "source/scenes/bee-courage-s5.json"
+    },
+    {
+      "asset_id": "bee-explorer-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/explorer/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/explorer/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_1.svg",
+          "bytes": 13876,
+          "sha256": "e7e2eb363a067c4465725cc8c6feac7b42dc2e56e5ca143939c876ca4bbcd5c5"
+        }
+      ],
+      "source_scene": "source/scenes/bee-explorer-s1.json"
+    },
+    {
+      "asset_id": "bee-explorer-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/explorer/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/explorer/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_2.svg",
+          "bytes": 14021,
+          "sha256": "de64b6634e74380ed4155564e9f8f43205cf7a86d4e9a4309800bf96dba68db4"
+        }
+      ],
+      "source_scene": "source/scenes/bee-explorer-s2.json"
+    },
+    {
+      "asset_id": "bee-explorer-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/explorer/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/explorer/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_3.svg",
+          "bytes": 15472,
+          "sha256": "aae30bf1b8a05aa1d1dd9b75bf1751befc45660b3eef1d76d8ced5df0a5c5e3a"
+        }
+      ],
+      "source_scene": "source/scenes/bee-explorer-s3.json"
+    },
+    {
+      "asset_id": "bee-explorer-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/explorer/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/explorer/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_4.svg",
+          "bytes": 14907,
+          "sha256": "ed432f16d67d3400f3f7173fabb816568ef80ecf3af6a174ad40841d96d7450d"
+        }
+      ],
+      "source_scene": "source/scenes/bee-explorer-s4.json"
+    },
+    {
+      "asset_id": "bee-explorer-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/explorer/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/explorer/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_5.svg",
+          "bytes": 14691,
+          "sha256": "bb98d18858d95c64c5b3a9a9a7a58076aead23219d5f7ac0bdff366ee0c04f22"
+        }
+      ],
+      "source_scene": "source/scenes/bee-explorer-s5.json"
+    },
+    {
+      "asset_id": "bee-guardian-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/guardian/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/guardian/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_1.svg",
+          "bytes": 14775,
+          "sha256": "9ac6e2f2f06bbc3fa9fe7b0db73e5f293fad2855ceabb2231d8d7d0689ff6ee9"
+        }
+      ],
+      "source_scene": "source/scenes/bee-guardian-s1.json"
+    },
+    {
+      "asset_id": "bee-guardian-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/guardian/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/guardian/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_2.svg",
+          "bytes": 15874,
+          "sha256": "7310d268522500b4a0ca3e13b3f0cc388a99ab7844951eaa47a9adc3e5b25f7b"
+        }
+      ],
+      "source_scene": "source/scenes/bee-guardian-s2.json"
+    },
+    {
+      "asset_id": "bee-guardian-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/guardian/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/guardian/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_3.svg",
+          "bytes": 15023,
+          "sha256": "49dfe344b686f35418ab6a9dbfe62fc76ed3e344208ccdc6e0da23968c3e013b"
+        }
+      ],
+      "source_scene": "source/scenes/bee-guardian-s3.json"
+    },
+    {
+      "asset_id": "bee-guardian-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/guardian/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/guardian/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_4.svg",
+          "bytes": 17179,
+          "sha256": "18b3a7512d80d632ff7719782b270f102dc413315c894c862464381e3d9026e8"
+        }
+      ],
+      "source_scene": "source/scenes/bee-guardian-s4.json"
+    },
+    {
+      "asset_id": "bee-guardian-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/themes/guardian/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_expansion",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/themes/guardian/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_5.svg",
+          "bytes": 16514,
+          "sha256": "849fa2e78dea0999f22012857a65ec97451bd457fc6a3c4613b732cb1a6d0e49"
+        }
+      ],
+      "source_scene": "source/scenes/bee-guardian-s5.json"
+    },
+    {
+      "asset_id": "home-s1",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/home/stage_1.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_expansion",
+      "object": "treehouse_home",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "note": "家园五个美术节点为制作分组建议；不自动改写原树阶段名称、阈值或周期规则。",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/home/stage_1.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/home/stage_1.svg",
+          "bytes": 3672,
+          "sha256": "8b42ef2e6ea3e272de3602d6b56f8691284ea06f31f5fb47c6cab18dcc3ded33"
+        }
+      ],
+      "source_scene": "source/scenes/home-s1.json"
+    },
+    {
+      "asset_id": "home-s2",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/home/stage_2.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_expansion",
+      "object": "treehouse_home",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "note": "家园五个美术节点为制作分组建议；不自动改写原树阶段名称、阈值或周期规则。",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/home/stage_2.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/home/stage_2.svg",
+          "bytes": 5587,
+          "sha256": "7cf9f9e21eb4570faf54d8eb4ad7d397b63643f59491feb2089e60ba14c9dc16"
+        }
+      ],
+      "source_scene": "source/scenes/home-s2.json"
+    },
+    {
+      "asset_id": "home-s3",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/home/stage_3.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_expansion",
+      "object": "treehouse_home",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "note": "家园五个美术节点为制作分组建议；不自动改写原树阶段名称、阈值或周期规则。",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/home/stage_3.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/home/stage_3.svg",
+          "bytes": 12388,
+          "sha256": "6ed7bed8123e6cb6aa94e737b6bef1d1111e3eb9d336c24848cf6a06b44716f3"
+        }
+      ],
+      "source_scene": "source/scenes/home-s3.json"
+    },
+    {
+      "asset_id": "home-s4",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/home/stage_4.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_expansion",
+      "object": "treehouse_home",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "note": "家园五个美术节点为制作分组建议；不自动改写原树阶段名称、阈值或周期规则。",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/home/stage_4.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/home/stage_4.svg",
+          "bytes": 18127,
+          "sha256": "fd98bd84dd7715d2c2ba4e16257b905011e54a7fde65b656a2e3da9c66723005"
+        }
+      ],
+      "source_scene": "source/scenes/home-s4.json"
+    },
+    {
+      "asset_id": "home-s5",
+      "kind": "static_svg",
+      "proposed_runtime_path": "/static/xiaoya/home/stage_5.svg",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_expansion",
+      "object": "treehouse_home",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "note": "家园五个美术节点为制作分组建议；不自动改写原树阶段名称、阈值或周期规则。",
+      "planning_kind": "static_svg",
+      "runtime_path": "/static/xiaoya/home/stage_5.svg",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/home/stage_5.svg",
+          "bytes": 29903,
+          "sha256": "f2d6218636036539ebd17ab05a4f6b3ddabfc0bfd4365563057cef7a2e0fe7ae"
+        }
+      ],
+      "source_scene": "source/scenes/home-s5.json"
+    },
+    {
+      "asset_id": "motion-bee-bluewing-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_1/animation.json",
+          "bytes": 41504,
+          "sha256": "cf6a6253ec8c12c6d0542a452d3b7dd8d4faf4c71c18fcf5685abf0fb5969f1f"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_1/preview.html",
+          "bytes": 55083,
+          "sha256": "dd4f67d9569637e1b35620f127a55bc95871525d1868638ca726ad26ea7a4915"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_1/README.md",
+          "bytes": 432,
+          "sha256": "36aa6d2b28f3bf6c1502e7cd6f887f2bbeba5cdb14f585191d2c59ec31ca76b4"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-bluewing-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_2/animation.json",
+          "bytes": 41336,
+          "sha256": "f57147f76e5a942c0092d91aa25a172c8f6ab5cc8d0480a920b5ecc57fdb1df3"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_2/preview.html",
+          "bytes": 54915,
+          "sha256": "057a76aa98913fbe60b06fe166097234b73244175d897bd1c4994e98d7026f3f"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_2/README.md",
+          "bytes": 432,
+          "sha256": "428c9bc7b2d1ebc0c713454a0dc2014fe6ebfe8423530a8b2625f397df27e219"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-bluewing-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_3/animation.json",
+          "bytes": 43210,
+          "sha256": "cc0ad4e2995d678de9c591cc402b8f20d798821b28fd453763a4d2ffb46974f3"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_3/preview.html",
+          "bytes": 56789,
+          "sha256": "2861643e88db25eac5924c3ae5d02eaffee7614976005c8349abd67a28fc1cad"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_3/README.md",
+          "bytes": 432,
+          "sha256": "5a5bd186bc08c736ceb01755f39c7e98c0d2796483bd317fbcd1c8885c4c8c94"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-bluewing-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_4/animation.json",
+          "bytes": 43904,
+          "sha256": "258a7de2be13293f16fe47c8e52fc6855dacb01cc99f8c2539ffcca908adc4d6"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_4/preview.html",
+          "bytes": 57483,
+          "sha256": "de0808a665fae75197f4c5a5ea8c1e2019509ef0db3b1e3f352be8e63aa2b81c"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_4/README.md",
+          "bytes": 432,
+          "sha256": "276e8bb616dd22669eacedce35b2741ecbe4ef1b2d17aa53e1242fa50588cc4c"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-bluewing-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_5/animation.json",
+          "bytes": 44450,
+          "sha256": "1f3ebe05c33804e4e577768b8c0798255e2a06292d6fe73ace073044728fb4ec"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_5/preview.html",
+          "bytes": 58029,
+          "sha256": "a275cfe955f31692c42ccb4a387ba4b446a3ab15a259e5c3b2a1736be662801f"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/stage_5/README.md",
+          "bytes": 432,
+          "sha256": "58b7c9a4cf383e0238834a2aecd02c86d893dd698c8913dc2a12a3c9d70ad466"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-bluewing",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/bluewing/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "bluewing",
+      "theme_name": "蓝翼蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/bluewing/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/growth/growth.json",
+          "bytes": 1718,
+          "sha256": "2ae3fa25203bc9047626ffed83ebcc2b2074f15299fc09867dc7feafa1b99b3d"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/growth/preview.html",
+          "bytes": 229383,
+          "sha256": "0d2ca98e1295a74029bad2e4cdb8072983ab523c5272284e2d555a23570588ce"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/bluewing/growth/README.md",
+          "bytes": 303,
+          "sha256": "b25702b8adb2e5786d28de2e7bce03f2eb3cdf5aa0e5e0c1aa731e42c5ebf1a9"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-rainbow-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_1/animation.json",
+          "bytes": 40763,
+          "sha256": "26b97e9f1199afa34aadb0a32f23aff1ef07e1a12a5d624b90ad463ca2576a43"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_1/preview.html",
+          "bytes": 54339,
+          "sha256": "0f34af87cdf40ba24626b063761f98791f03adde0fab4e020a71c6f68e1ff40a"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_1/README.md",
+          "bytes": 431,
+          "sha256": "8d2308ecdea1bc54d19e14b79a751bad512413d5c75e60685d09d79cc010118b"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-rainbow-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_2/animation.json",
+          "bytes": 40509,
+          "sha256": "48ae6749e1f1a7c7af4d735af096c5b13fd915b4b0ce381329106abc7f575d15"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_2/preview.html",
+          "bytes": 54085,
+          "sha256": "1c395b416d0515dcb61c776972efead0793b08560f8fa5189c0380ac1d0e01d7"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_2/README.md",
+          "bytes": 431,
+          "sha256": "3c72a260f267cc38d58514b0179d0b7ba3b84c82d59a372579d9be5ffd75697e"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-rainbow-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_3/animation.json",
+          "bytes": 42024,
+          "sha256": "b61c817b9d666ef85c712e916038c472bb6cf62ddd825e4ee22d6dc53017af80"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_3/preview.html",
+          "bytes": 55600,
+          "sha256": "2b7474c035ae7b4e453a69f7704e942126be9d48502493cfbb3516b124406e21"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_3/README.md",
+          "bytes": 431,
+          "sha256": "97e4a6365f876855573673008c9808406802b28f7d48364f8a035eb6bd81dbd8"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-rainbow-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_4/animation.json",
+          "bytes": 42235,
+          "sha256": "95fcb3c1b8b2db59517e3466f06c9f097efa90209a346d31851d9bf5fd438edc"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_4/preview.html",
+          "bytes": 55811,
+          "sha256": "74423a58fa8afc931159369d6e5ce449a8431f7cc0db335446a86ac62aecec95"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_4/README.md",
+          "bytes": 431,
+          "sha256": "838e57dc26cb8ee523b83d14550c58e723c366f90fbb84dcdfa02ddc6691fee0"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-rainbow-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_5/animation.json",
+          "bytes": 43059,
+          "sha256": "8fa28a89a1843428a9e11f847cf0a8e75c2c9c7dffbad5dedc489756c1822b34"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_5/preview.html",
+          "bytes": 56635,
+          "sha256": "92253efc28abe01500e5d433a23948d6e01d2dc99c99b84abd80d6b11d2293fe"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/stage_5/README.md",
+          "bytes": 431,
+          "sha256": "e65e60a307d5e2de808a9d1aed7b89033572819c01cf8959a1193c89a1ccaeb4"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-rainbow",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/rainbow/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "rainbow",
+      "theme_name": "彩虹蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/rainbow/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/growth/growth.json",
+          "bytes": 1709,
+          "sha256": "d48c726b36a7b2c71763067cee702ba2ca530d885f2bf4c4458c15b1252b5c3e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/growth/preview.html",
+          "bytes": 223553,
+          "sha256": "4f1872a1f4043d295ef46711900607d6cf4b2ea8f03372cc49741b5ad6803948"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/rainbow/growth/README.md",
+          "bytes": 302,
+          "sha256": "ada4f76945bd6871fc153b2524b75782fd99435a4ebe61425ffe50fea7991548"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-reading-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_1/animation.json",
+          "bytes": 40735,
+          "sha256": "6c6745dd5935122c005453158883952f3f68a28bc709033a7d0e78486bc39d5e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_1/preview.html",
+          "bytes": 54311,
+          "sha256": "eb53f02a8085c31e24c4ac97d174851caa9ca09d31ce7f940baf6ee2f07c6187"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_1/README.md",
+          "bytes": 431,
+          "sha256": "fcb3ff209d851b2b0f52523d094e886b3c298e82e446d1b33f345883132cd86c"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-reading-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_2/animation.json",
+          "bytes": 40198,
+          "sha256": "611e1d9b894edcca1dba2c74ed79effecb50a4a4c029ccba7ce1a56c5f9c306e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_2/preview.html",
+          "bytes": 53774,
+          "sha256": "a34a8447f2d1b5fc4479c81af7c0fc88cc47074e7d1403b248457533f62fe01c"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_2/README.md",
+          "bytes": 431,
+          "sha256": "8c7617184a22866f6f54da02db30071a5761b00442ab4bb9c336aff63e281445"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-reading-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_3/animation.json",
+          "bytes": 42755,
+          "sha256": "bb15f21d620ac146a0c7475798d00029de40597576abfe7d015de4d6423313a3"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_3/preview.html",
+          "bytes": 56331,
+          "sha256": "bcc38d6044ad1b1f066796d613dcad1dcdcc204cb920a86a1a9d2ec9c33563ff"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_3/README.md",
+          "bytes": 431,
+          "sha256": "a6c66062cfecedfc1611f25ae6d38c4755a09d2e3e9e35a3f704e7c53218cfe6"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-reading-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_4/animation.json",
+          "bytes": 41937,
+          "sha256": "1ef63044ff7f0fd77fb4cca9a12bbc8e0cdbb743b0049a950e4f63df803b5a6e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_4/preview.html",
+          "bytes": 55513,
+          "sha256": "601cbcc05f7ad50fc1d5610a1e9cce3eb02fa919a70b58ed2c4fdd3d283cff00"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_4/README.md",
+          "bytes": 431,
+          "sha256": "77719069f810e655bdccb94e2bda90be34f87e19373d9222d30012730e7b4ae4"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-reading-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_5/animation.json",
+          "bytes": 42483,
+          "sha256": "13db41f48985087336a9e129dd175749654d2beda0e4391e519b7d5adc45e5a8"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_5/preview.html",
+          "bytes": 56059,
+          "sha256": "d668145b7f9e05099b8cb864df4f5fb8e2d76b39d6bb9790f3247cf15f8c96fb"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/stage_5/README.md",
+          "bytes": 431,
+          "sha256": "d072e3e25c92074308da2ef438bdc30b573418c630ed76135cd78cf8b3f60a2e"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-reading",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/reading/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "reading",
+      "theme_name": "阅读蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/reading/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/growth/growth.json",
+          "bytes": 1709,
+          "sha256": "9eb42710442db83b9b5c303d58bdc5f1d16f775a8eb0fe596f5d7b51bdcd8324"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/growth/preview.html",
+          "bytes": 223071,
+          "sha256": "a093bc77261c57b3f4ff4a742a0a9a986261fc2c299124e7ee721cb607aa3674"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/reading/growth/README.md",
+          "bytes": 302,
+          "sha256": "96f308b1327e74c965d5c55d58096d0dbf862422fb9d1c472f39e198d1cdeb52"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-sports-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_1/animation.json",
+          "bytes": 43883,
+          "sha256": "9a9b72caacbb38cf2e857553fac1bc01a20a4f8e7a176d8e56f3e674bc52de44"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_1/preview.html",
+          "bytes": 57456,
+          "sha256": "26d92f89944dbe780a4537536d88083c3bcf72780c43443317659c8cb186f7ba"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_1/README.md",
+          "bytes": 430,
+          "sha256": "2344d344656832520cf7f259afe7e663c8c4ec011b6bb7eae8f352d6fa6fbf5e"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-sports-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_2/animation.json",
+          "bytes": 43794,
+          "sha256": "6f0f2fdd30c813b7f5d90fcd5d1a70a4ecb7dbde9a15b3a8b31064134f30f51e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_2/preview.html",
+          "bytes": 57367,
+          "sha256": "78c72dcd83f2b12342938b26a51cae4d17d9e407ac0026bfb81735c1dd327a78"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_2/README.md",
+          "bytes": 430,
+          "sha256": "b1d1035973c319c7fb28077e69988c150906d63fa2b6e161e890558553ee18ec"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-sports-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_3/animation.json",
+          "bytes": 44868,
+          "sha256": "8567b2fde950624b42ef7326b132f8518204d63329a074b6877d5cedae241692"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_3/preview.html",
+          "bytes": 58441,
+          "sha256": "95309895e2b10199aa5909bb03e608172720d4b5edcb39a894b32efead432f8a"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_3/README.md",
+          "bytes": 430,
+          "sha256": "3e8e948646ad06a969e6fd9aa01b7187b286aa8f51e015ed7d9bf64288350726"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-sports-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_4/animation.json",
+          "bytes": 45394,
+          "sha256": "bfb8e2bb858a38ba679ba7e4f4d3420d2a545311cc939f804d615298c7e09d74"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_4/preview.html",
+          "bytes": 58967,
+          "sha256": "02e388635d5b1e325c8211034357d5cf351739d7a80be81f5e75c81235b32b67"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_4/README.md",
+          "bytes": 430,
+          "sha256": "47749b56851da2f47a09fc426305ae92e6fe099522de36074d628a2d6e9baef5"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-sports-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_5/animation.json",
+          "bytes": 46039,
+          "sha256": "3b15069bbb0b347f2d8d7fecf67d62caf8747085692984d4613ed6e402768645"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_5/preview.html",
+          "bytes": 59612,
+          "sha256": "cdb0373060170c5a01c86fbfe51175fdf581b09a658c08999e964919b4a68848"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/stage_5/README.md",
+          "bytes": 430,
+          "sha256": "4eaea34288a211c4499b6a7c70fdba689fecff8d4eb7c5485b165adb4d519586"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-sports",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/sports/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "sports",
+      "theme_name": "运动蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/sports/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/growth/growth.json",
+          "bytes": 1700,
+          "sha256": "508b0929eadfc0a756c0c20e96cfd5453dcee5aec9402513c52ac0bc76a746cb"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/growth/preview.html",
+          "bytes": 238925,
+          "sha256": "40df49740022222fa79610ff80a00bcc4309840260cd3947b62ab8de48ce0aa9"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/sports/growth/README.md",
+          "bytes": 301,
+          "sha256": "e1c69738bdd1be64fdf59bcaf2e917fcc6155ce8ea96c865638bfa4bdb5341e4"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-courage-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_1/animation.json",
+          "bytes": 40541,
+          "sha256": "1b21c9f6c95bc0bce29dab22982e2baa1e11fba7a1e3dcf4789b9ddbdda489ee"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_1/preview.html",
+          "bytes": 54117,
+          "sha256": "5f94be5131eeb5a0d8eec781ae73e24953ed87d060a85bc690eeda98cfc4b6ee"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_1/README.md",
+          "bytes": 431,
+          "sha256": "ad811d06487269a66c1c790badd7d2636cdc749c2fc8fc0f06bcc598498f79a1"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-courage-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_2/animation.json",
+          "bytes": 41005,
+          "sha256": "f852418e6f2695b6bbcae32e03bc2911d42dc4eb972ab3abbeeac788e057f3cc"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_2/preview.html",
+          "bytes": 54581,
+          "sha256": "38031276c0f3695c15c47086b2252f4947d75179c5d4b966d11ace5c29835935"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_2/README.md",
+          "bytes": 431,
+          "sha256": "9326d9882de7274d62695d69be1f40ca1f068cb21114495660d721f85ae2c3f8"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-courage-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_3/animation.json",
+          "bytes": 41949,
+          "sha256": "01a1fe08a0e637a68161b6c10a7e600980fe4960c994f91eff56fda0b68ed620"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_3/preview.html",
+          "bytes": 55525,
+          "sha256": "46f0edc2eaac4625c30af3a297592a2ecfe02a15947625fd3544ad4d7fcdbd1e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_3/README.md",
+          "bytes": 431,
+          "sha256": "09e01d065dc0c1a30353ff2bebda2fe1406deec6c6baf355f17c66c51d50418e"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-courage-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_4/animation.json",
+          "bytes": 42666,
+          "sha256": "0792414e54a3df1399777244102331bc3dc0eed1366436a4a68e58a14d1cdf36"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_4/preview.html",
+          "bytes": 56242,
+          "sha256": "7f85922436d53b363424841aa6dd4f440c2b40118101f1c7c72abd547f919b6a"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_4/README.md",
+          "bytes": 431,
+          "sha256": "d6bc1564dc24e8ad6aea950080dc5e525d028ef4f86c52c546b0ce3888e87b09"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-courage-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_5/animation.json",
+          "bytes": 43259,
+          "sha256": "b3153227a9924d2ab969383f510c0f7cab95aa61d5a2958c3694a7729b4f1674"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_5/preview.html",
+          "bytes": 56835,
+          "sha256": "871967cf07aac31536d175cf571785964cb36a7fc8898a2cd66ed1d7fb6c0c81"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/stage_5/README.md",
+          "bytes": 431,
+          "sha256": "9124d0e553f69b126d9d1f0a0f5b55fc9f2b71e3ba16f5f56aa649363d92d694"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-courage",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/courage/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "courage",
+      "theme_name": "勇气蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/courage/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/growth/growth.json",
+          "bytes": 1709,
+          "sha256": "d4c1de4196932c8b9c1db55487466ccf8522e667627f1a7fa917871460b39fae"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/growth/preview.html",
+          "bytes": 224383,
+          "sha256": "72754722f7c2000edd8596f7075695a8df97adf74d6e053425c63fe777674402"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/courage/growth/README.md",
+          "bytes": 302,
+          "sha256": "03d3a40558a6a0821a02f5e403c949d7aa4fe8a16dd40d03e6f9d36f04134421"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-explorer-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_1/animation.json",
+          "bytes": 40162,
+          "sha256": "c170e11a68d8895a06be7fc5f6435e8f1963a9fa0847e045aa97f79def83e934"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_1/preview.html",
+          "bytes": 53741,
+          "sha256": "6b095a4a1d4018b9525b3bd078b118619496e6c2c3f5980ce5a4e1d781212856"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_1/README.md",
+          "bytes": 432,
+          "sha256": "2ccac674379e04e405eca7c6291161dfc7f8c63fb837a04d433c1508f21332a3"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-explorer-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_2/animation.json",
+          "bytes": 39950,
+          "sha256": "3ba5f2f6a17730a76dd9ae68dbffc52036768dbc29430ade3ca65a804f07dba8"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_2/preview.html",
+          "bytes": 53529,
+          "sha256": "bca4e5a6ad81ab45d566592799b5eed36c62b37647584d0e3ff3066b43412728"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_2/README.md",
+          "bytes": 432,
+          "sha256": "37eabd9ed156336b89158218a22a3939f93d6660688840bc02c451905680bde7"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-explorer-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_3/animation.json",
+          "bytes": 42200,
+          "sha256": "c548addee4666f4b9c07b159fdfbfcab2009424dcdb10bbecf686fae29dabf2a"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_3/preview.html",
+          "bytes": 55779,
+          "sha256": "1de735972c98afc6832cc40ded8f353d96450c022ffb0d45ce1434e9ef36b33c"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_3/README.md",
+          "bytes": 432,
+          "sha256": "5c7de8a11049f50f2f152de9e15a4ac69731f85ca4eb1abfcc74eb1fbcf50726"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-explorer-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_4/animation.json",
+          "bytes": 41899,
+          "sha256": "a2831c290e3e578fa481f6ed6dc527293adb69de77ee0e8aa32541c7f249ee18"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_4/preview.html",
+          "bytes": 55478,
+          "sha256": "895c525910eff92e19531b1e97d506e3246fe661103b4eba574ed4fca3955db7"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_4/README.md",
+          "bytes": 432,
+          "sha256": "6ac4933a5cc6dd2cf443813c5d926349fedb4b03bd4586b3fb38b18ff97a4e9c"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-explorer-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_5/animation.json",
+          "bytes": 41860,
+          "sha256": "d9e4e45270780ca4b7f8a09c746c6cca895990ea40a51ff7f7e2b08d78070a86"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_5/preview.html",
+          "bytes": 55439,
+          "sha256": "b93d35ca235e78a9dc350de0cd4eef030308a48a47e4a994a8b8173a5918e017"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/stage_5/README.md",
+          "bytes": 432,
+          "sha256": "7a477d78525d89e5017c11e39ef28ded28c8338e2bafe169b21e7d9ab5e50dc5"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-explorer",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/explorer/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "explorer",
+      "theme_name": "探索蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/explorer/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/growth/growth.json",
+          "bytes": 1718,
+          "sha256": "1de054960cd1222de70e6ca504a507f698d524dbf20676d4ab35b2f9182ef2c3"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/growth/preview.html",
+          "bytes": 221050,
+          "sha256": "459dcf717bd7a87f45c3ec2f15df123dd5f71f99a8e8ea2292b7dfe6685598cd"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/explorer/growth/README.md",
+          "bytes": 303,
+          "sha256": "222ee1ad8524057bf841996a0f2eeb035d47faebc0340d01dcc63e92fa873da5"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-guardian-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_1/animation.json",
+          "bytes": 41101,
+          "sha256": "a42b8cb62aba94e63226166c1497e32d354c61c654e9c9c3078f5724616e00d5"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_1/preview.html",
+          "bytes": 54680,
+          "sha256": "11ed696459eee62d35ae50231d324839fa743e6820442e0e1fa8f3c706696a88"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_1/README.md",
+          "bytes": 432,
+          "sha256": "28f413ebb87e90d84c5e92e17227259f907d9af7de6ab7592b0bf27e62b90a3f"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-guardian-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_2/animation.json",
+          "bytes": 41829,
+          "sha256": "a2a32f52c518f4b8fd5a3dd4255b85392c75acbbfdbbc9483e5dcf707d1fc42c"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_2/preview.html",
+          "bytes": 55408,
+          "sha256": "9866636b1cdc918fae754710da0ae24d96646ba1c841fa715d0ac7ccdeff1d2c"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_2/README.md",
+          "bytes": 432,
+          "sha256": "79c8b9387b46beb730c0d0d6f5058224edb40190aa4bf32fe5ac9355aa6128c0"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-guardian-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_3/animation.json",
+          "bytes": 41965,
+          "sha256": "ea3cf91f52c71e71602b689ddcec6bca156854ff93bbbfd14ad6b9e467804a8e"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_3/preview.html",
+          "bytes": 55544,
+          "sha256": "1d28f9a69829327665551f30fa4fd41a83dab79d25924356b542c3a7edb4b7db"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_3/README.md",
+          "bytes": 432,
+          "sha256": "2aa59f988e89243035ace5e658b2252f2a9080c4c72c51d9f6eb29cb7cf47703"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-guardian-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_4/animation.json",
+          "bytes": 44512,
+          "sha256": "267356ec2a322f0654f927a38e9ee56c30996e386337a8f3687fd63c235c9ef5"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_4/preview.html",
+          "bytes": 58091,
+          "sha256": "e2b5ec805d67814459e06334e632afdca541592eba2f91bbf19eacd803e9f57f"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_4/README.md",
+          "bytes": 432,
+          "sha256": "f9a3061464504890a5c52c643bffa25a225585adf060a85227daeccdcc1f79e1"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-bee-guardian-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "idle",
+        "greet",
+        "forage",
+        "theme_action"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_5/animation.json",
+          "bytes": 43378,
+          "sha256": "738dcbcec65653370ab3a86145920d4912dff179c34a99ba69fee1b4f36995bd"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_5/preview.html",
+          "bytes": 56957,
+          "sha256": "886461614793ce329551c0df8b7e213ca0228bf33d6f6a76906791c8b43a8e05"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/stage_5/README.md",
+          "bytes": 432,
+          "sha256": "cd7111ed2bf65ab6d39de74c6bf485daff7453408d28a1d23bdbfdfea5cbb4cc"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-bee-guardian",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/bees/guardian/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "seven_theme_animation",
+      "object": "bee",
+      "theme": "guardian",
+      "theme_name": "守护蜂",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。",
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/bees/guardian/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/growth/growth.json",
+          "bytes": 1718,
+          "sha256": "53d43ef44b58bf51dbbae8e9282276c8b37b4d69db6f0448c9df2e6755832a55"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/growth/preview.html",
+          "bytes": 227764,
+          "sha256": "d1e8b5ff1bfaedacfe3c3638e451ddc677acd3520401ce23c489659fbca58b0a"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/bees/guardian/growth/README.md",
+          "bytes": 303,
+          "sha256": "cc6089189969a9bbd16dbad9a81b62d249e7be1c29cb6edb6915eaecc6c8e847"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-home-s1",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/stage_1/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "stage": 1,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "ambient_idle",
+        "hive_feedback_where_applicable"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/home/stage_1/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "ambient_idle"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_1/animation.json",
+          "bytes": 4019,
+          "sha256": "e483387f91e720cff8f45a0d9cf88a18bfd547fd0be7a8da66451b985c0467cf"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_1/preview.html",
+          "bytes": 17574,
+          "sha256": "9c4a52a8ff8daeaf3972e6df90d2b98f95073f273efd092e8b3f994a4f30f15d"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_1/README.md",
+          "bytes": 403,
+          "sha256": "bdeda4850e1242b10abd4c045b51492fdf8f5f106744e66fdc662492c4f9495f"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-home-s2",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/stage_2/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "stage": 2,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "ambient_idle",
+        "hive_feedback_where_applicable"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/home/stage_2/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "ambient_idle"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_2/animation.json",
+          "bytes": 6038,
+          "sha256": "08ed715f909e5d7934786d701606be5e48caab454e0044daedbd68c1a126e9e2"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_2/preview.html",
+          "bytes": 19593,
+          "sha256": "39437efed206ddc6b59636bc810610caf2577e96ad4ab0be80f7799bfccfaee3"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_2/README.md",
+          "bytes": 403,
+          "sha256": "f3fe477988946172fe3e98fe53b77ca4e1f759e900b9bce14eb09460ff5f6334"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-home-s3",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/stage_3/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "stage": 3,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "ambient_idle",
+        "hive_feedback_where_applicable"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/home/stage_3/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "ambient_idle",
+        "hive_feedback"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_3/animation.json",
+          "bytes": 16453,
+          "sha256": "031376303b76604dd01c42b661e21d7f991dd3ae806cf1f5a60e0b267bb9f4e4"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_3/preview.html",
+          "bytes": 30008,
+          "sha256": "f53cd181673acb0c96c7bfdb9c1724ef0b19bb79c7ede459e97a2ab42e59f8fd"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_3/README.md",
+          "bytes": 418,
+          "sha256": "52e10814176505d74f657299c66a075c32f872fac091a6c6573b5512e7e028fc"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-home-s4",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/stage_4/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "stage": 4,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "ambient_idle",
+        "hive_feedback_where_applicable"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/home/stage_4/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "ambient_idle",
+        "hive_feedback",
+        "build"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_4/animation.json",
+          "bytes": 22738,
+          "sha256": "bd67e11934a8395705954e23bdd836b9c070235e8be7e859282ce55db9ab94ae"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_4/preview.html",
+          "bytes": 36293,
+          "sha256": "abd618c8c52be852c8a1ab6848beef2330eeb2573122e18eb57c7c19fdeef6b2"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_4/README.md",
+          "bytes": 425,
+          "sha256": "c9675665e482e1e86bc89b83c8255ddd5fe83f7941181da1831aaf84843d38ee"
+        }
+      ]
+    },
+    {
+      "asset_id": "motion-home-s5",
+      "kind": "animation_package",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/stage_5/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "stage": 5,
+      "path_status": "new_files_created_product_integration_pending",
+      "required_behaviors": [
+        "ambient_idle",
+        "hive_feedback_where_applicable"
+      ],
+      "note": "已交付真实路径+关键帧数据及独立可播放HTML；格式非Lottie。",
+      "planning_kind": "animation_package_plan",
+      "runtime_path": "/static/xiaoya/motion/home/stage_5/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "clips": [
+        "ambient_idle",
+        "hive_feedback",
+        "build",
+        "reading_unlock"
+      ],
+      "format": "fengyun-vector-motion/1",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_5/animation.json",
+          "bytes": 38247,
+          "sha256": "ebea0e245364d7670f043d0bcaa05e6855b95fbbc9f861ba60e6e5d45f798f10"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_5/preview.html",
+          "bytes": 51802,
+          "sha256": "fc5841292c5683aea8e860888b62c0a94e7f54bdc64969121c0303c6adb6f78f"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/stage_5/README.md",
+          "bytes": 441,
+          "sha256": "b5a8c93e8149bfd5efe3c4937d3b0ec1585e4e0850f598e29f79fd16f3ea1c0f"
+        }
+      ]
+    },
+    {
+      "asset_id": "growth-home",
+      "kind": "transition_set",
+      "proposed_runtime_path": "/static/xiaoya/motion/home/growth/",
+      "creation_status": "created",
+      "approval_status": "awaiting_user_art_review",
+      "integration_status": "web_local_validation_see_report; wechat_true_device_not_tested",
+      "scope": "treehouse_animation",
+      "object": "treehouse_home",
+      "path_status": "new_files_created_product_integration_pending",
+      "transitions": [
+        {
+          "from_stage": 1,
+          "to_stage": 2
+        },
+        {
+          "from_stage": 2,
+          "to_stage": 3
+        },
+        {
+          "from_stage": 3,
+          "to_stage": 4
+        },
+        {
+          "from_stage": 4,
+          "to_stage": 5
+        }
+      ],
+      "planning_kind": "transition_set_plan",
+      "runtime_path": "/static/xiaoya/motion/home/growth/",
+      "source_type": "AI-assisted editable Bezier reconstruction from accepted in-conversation concepts",
+      "license_note": "See docs/SOURCES.md and LICENSE; not a trademark or exclusive-rights clearance.",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/motion/home/growth/growth.json",
+          "bytes": 1763,
+          "sha256": "e841f00e4ee61dd3781ed0095d7f8a9217cc028e2f1247a6ff5b85f9239a94e6"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/growth/preview.html",
+          "bytes": 102363,
+          "sha256": "9240eb32ff01ed9817299c3ad26e199fd972f2b9ee67440cd5046f8498e9b1a5"
+        },
+        {
+          "path": "runtime/static/xiaoya/motion/home/growth/README.md",
+          "bytes": 295,
+          "sha256": "72902252e8beabdcd3583af26677a318374bce1c2d2b3ef58abf1c19319f168b"
+        }
+      ],
+      "note": "四段成长过渡和独立播放页已交付；不把它们当成新增静态等级。"
+    }
+  ],
+  "reference_scope_assumptions": [
+    "原18项兼容范围与新增七主题35项、树屋家园5项分目录，不擅自覆盖原树语义。58个静态文件是据此提出的完整包口径，不是原稿本来规定58项。",
+    "七主题各五个成长阶段，不自动乘上默认/森林两皮肤。旧默认/森林十个形象仍计入原18项。",
+    "动作数量、逻辑过渡数量与物理文件数量分开；40个阶段动效包和8个过渡集合是组织建议，不是48个现成动画文件。",
+    "升级阈值、计分、学期重置与季节规则没有在此变更。",
+    "最新可爱母版作为视觉参考；不以旧几何技术样稿或裁切海报充当正式矢量。"
+  ],
+  "scope": [
+    "已按原18项、七主题35项、家园5项分别生成，不改原18路径。",
+    "已生成40个原生Canvas阶段包和8个过渡集合；不额外乘森林皮肤。",
+    "已保留五阶段；静态形态、姿态与翼形有变化。美术喜好待用户评审。",
+    "不修改积分、阈值、学期重置或业务系统。"
+  ],
+  "format_decision": {
+    "motion": "fengyun-vector-motion/1",
+    "growth": "fengyun-growth/1",
+    "runtime": "/static/xiaoya/motion/engine.js",
+    "not_lottie_or_rive": true,
+    "reason": "交付完整无外部依赖的Canvas曲线、图层、关键帧数据和播放器；不是只有动画规划，未伪装为第三方动画格式。"
+  }
+}

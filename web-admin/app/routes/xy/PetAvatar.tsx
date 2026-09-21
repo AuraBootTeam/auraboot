@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
+import { FengyunMotionArtwork, motionPacketForAsset } from './FengyunMotion';
 
 /**
  * PetAvatar — companion artwork with the PRD 10 / FR-045 fallback chain:
@@ -80,12 +81,22 @@ export function PetAvatar({
       data-asset={assetUrl || 'fallback'}
     >
       {showImg ? (
-        <img
-          src={assetUrl as string}
-          alt="pet"
-          className="h-full w-full object-contain p-2"
-          onError={() => setBroken(true)}
-        />
+        motionPacketForAsset(assetUrl) ? (
+          <FengyunMotionArtwork
+            assetUrl={assetUrl}
+            alt="成长伙伴"
+            size={size}
+            clickClip="greet"
+            className="p-2"
+          />
+        ) : (
+          <img
+            src={assetUrl}
+            alt="成长伙伴"
+            className="h-full w-full object-contain p-2"
+            onError={() => setBroken(true)}
+          />
+        )
       ) : (
         <span style={{ fontSize: size * 0.52 }} role="img" aria-label="pet placeholder">
           {emoji}
@@ -94,6 +105,5 @@ export function PetAvatar({
     </div>
   );
 }
-
 
 

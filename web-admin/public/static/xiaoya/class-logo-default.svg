@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="小芽班级成长">
-  <rect x="5" y="5" width="25" height="25" rx="9" fill="#1f5c45"/>
-  <rect x="35" y="5" width="24" height="25" rx="12" fill="#8fc1a5"/>
-  <rect x="5" y="34" width="25" height="25" rx="18" fill="#4d8f6d"/>
-  <rect x="35" y="34" width="24" height="24" rx="5" fill="#c9e3d2"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs></defs><g id="logo" transform="translate(256 249) rotate(0) scale(1 1)"><path d="M0 -174 C-32 -115 -127 -26 -127 61 C-127 153 -47 188 10 181 C101 172 144 107 133 43 C126 -24 50 -124 0 -174Z" fill="#E6B951"/><path d="M-5 126 C-64 96 -84 32 -68 -23 C19 -4 62 57 -5 126Z" fill="#577D58"/><path d="M-5 126 Q-9 61 -56 -7" fill="none" stroke="#EEF0D6" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
