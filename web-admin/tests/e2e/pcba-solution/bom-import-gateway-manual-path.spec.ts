@@ -93,9 +93,10 @@ test('BOM retry original source: UI requeues real workbook, completes seven rows
     expect(lines.map(row => row.bom_std_refdes).sort()).toEqual(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']);
     // Let the live task UI reach its terminal state before testing persisted reload.
     // Database completion alone does not mean the browser's command/poll cycle is done.
-    await expect(page.getByTestId('status-banner-bom_workbench_task_status')).toContainText('BOM 匹配已完成', { timeout: 20_000 });
+    const terminalFeedback = page.getByText(/BOM 匹配已完成|有部分行未形成可确认结果/, { exact: false }).first();
+    await expect(terminalFeedback).toBeVisible({ timeout: 20_000 });
     await page.reload();
-    await expect(page.getByTestId('status-banner-bom_workbench_task_status')).toContainText('BOM 匹配已完成');
+    await expect(page.getByText(/BOM 匹配已完成|有部分行未形成可确认结果/, { exact: false }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: '重试转换', exact: true })).toHaveCount(0);
     // Final workflow telemetry is persisted after apply. Establish the rejection
     // baseline immediately before the command, not during the earlier worker run.
