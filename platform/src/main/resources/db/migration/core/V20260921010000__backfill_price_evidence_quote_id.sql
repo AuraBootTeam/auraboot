@@ -5,12 +5,21 @@
 -- AFTER Flyway on an upgraded deployment — so this migration provisions the identical
 -- column shape itself (ADD COLUMN IF NOT EXISTS) and backfills existing rows from their
 -- lines. Rows written later are anchored by PriceEvidenceWriter at write time.
+--
+-- Guarded: slot/vertical databases that never imported the quote product have no
+-- mt_qo_price_evidence_common table — the migration must be a no-op there, not a
+-- failed Flyway run that blocks every subsequent boot.
 
-ALTER TABLE mt_qo_price_evidence_common
-    ADD COLUMN IF NOT EXISTS qo_pe_quote_id VARCHAR(255);
+DO $$
+BEGIN
+  IF TO_REGCLASS('public.mt_qo_price_evidence_common') IS NOT NULL THEN
+    ALTER TABLE mt_qo_price_evidence_common
+        ADD COLUMN IF NOT EXISTS qo_pe_quote_id VARCHAR(255);
 
-UPDATE mt_qo_price_evidence_common e
-SET qo_pe_quote_id = l.qo_ql_quote_id
-FROM mt_qo_quote_line_common l
-WHERE e.qo_pe_quote_line_id = l.pid
-  AND (e.qo_pe_quote_id IS NULL OR e.qo_pe_quote_id = '');
+    UPDATE mt_qo_price_evidence_common e
+    SET qo_pe_quote_id = l.qo_ql_quote_id
+    FROM mt_qo_quote_line_common l
+    WHERE e.qo_pe_quote_line_id = l.pid
+      AND (e.qo_pe_quote_id IS NULL OR e.qo_pe_quote_id = '');
+  END IF;
+END $$;
