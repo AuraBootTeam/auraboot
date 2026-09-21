@@ -20,6 +20,7 @@ const PLATFORM_LAYOUT = webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformL
 export default [
   // API routes (always)
   route('/api/address-data', './routes/api.address-data.tsx'),
+  route('/api/xy/teacher-code', './routes/api.xy.teacher-code.tsx'),
   route('/_action/switch-space', './routes/api.switch-space.tsx'),
   route('/_action/switch-actor', './routes/api.switch-actor.tsx'),
 
@@ -45,6 +46,7 @@ export default [
   // Fengyun (edu) consumer surfaces — standalone shells without admin chrome.
   // Authenticated via the same session; see app/routes/xy/ for details.
   route('/xy/import/:classPid?', './routes/xy/RosterImport.tsx'),
+  route('/xy/setup', './routes/xy/SchoolActivation.tsx'),
   route('/xy/child/:studentPid?', './routes/xy/ChildSpace.tsx'),
   route('/xy/display/:classPid?', './routes/xy/ClassDisplay.tsx'),
 

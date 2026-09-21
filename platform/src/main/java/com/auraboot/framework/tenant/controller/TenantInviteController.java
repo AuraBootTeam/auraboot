@@ -59,6 +59,7 @@ public class TenantInviteController {
 
     @GetMapping("/current")
     @ResponseBody
+    @RequirePermission("org.tenant.invite.manage")
     public ApiResponse<Map<String, Object>> getCurrentInviteCode(@CurrentUserId Long userId) {
 
             Invitation invitation = tenantInviteService.getCurrentValidInviteCode(userId);
