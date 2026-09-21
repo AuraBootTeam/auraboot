@@ -25,6 +25,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
 import {
   readDataSourceState,
   useDataSourceSubscription,
@@ -62,6 +63,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const descriptionField: string | undefined = cfg.descriptionField;
   const categoryField: string | undefined = cfg.categoryField;
   const badgeField: string | undefined = cfg.badgeField;
+  const badgeDictCode: string | undefined = cfg.badgeDictCode;
   // Optional image per card (URL string field, e.g. a cover/asset column).
   // Missing or broken URLs degrade to a neutral placeholder tile, never a
   // broken-image icon.
@@ -78,6 +80,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // Action dispatch — mirror ToolbarBlockRenderer pattern
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { loaded: badgeDictLoaded, getDictLabel } = useDictCache({
+    dictCodes: badgeDictCode ? [badgeDictCode] : [],
+    token: token || undefined,
+  });
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || (schema as any).id || '';
@@ -185,7 +191,15 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const title = getLocalizedText(row[titleField], locale, t);
         const description = descriptionField ? getLocalizedText(row[descriptionField], locale, t) : undefined;
         const category = categoryField ? getLocalizedText(row[categoryField], locale, t) : undefined;
-        const badge = badgeField ? getLocalizedText(row[badgeField], locale, t) : undefined;
+        const rawBadge = badgeField ? row[badgeField] : undefined;
+        const badge =
+          rawBadge == null
+            ? undefined
+            : badgeDictCode
+              ? badgeDictLoaded
+                ? getDictLabel(badgeDictCode, String(rawBadge))
+                : undefined
+              : getLocalizedText(rawBadge, locale, t);
 
         return (
           <div

@@ -118,6 +118,21 @@ describe('TenantSelection product onboarding', () => {
     expect(screen.queryByText(/\{entityLabel\}/)).not.toBeInTheDocument();
   });
 
+  it('blocks an empty school name with a Chinese field-level error', async () => {
+    const user = userEvent.setup();
+    renderSelection({
+      spaces: [],
+      spacesStatus: 'loaded',
+      accessPolicy: selfServicePolicy,
+      accessPolicyStatus: 'loaded',
+    });
+
+    await user.click(await screen.findByRole('button', { name: /创建学校/ }));
+    await user.click(screen.getByRole('button', { name: '创建学校' }));
+
+    expect(screen.getByText('学校名称不能为空')).toBeVisible();
+  });
+
   it('keeps an existing school primary while retaining self-service alternatives', async () => {
     renderSelection({
       spaces: [
