@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="小蜜蜂 勤劳">
+  <ellipse cx="60" cy="100" rx="28.56" ry="5" fill="#DCE5CC"/>
+  <ellipse cx="50" cy="45.76" rx="11.347199999999999" ry="15.76" fill="#FFFFFF" opacity="0.85"/>
+  <ellipse cx="70" cy="45.76" rx="11.347199999999999" ry="15.76" fill="#FFFFFF" opacity="0.85"/>
+  <path d="M52 53.519999999999996 Q46 39.519999999999996 40 41.519999999999996" stroke="#3A3A2E" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M68 53.519999999999996 Q74 39.519999999999996 80 41.519999999999996" stroke="#3A3A2E" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <ellipse cx="66" cy="70" rx="25.2" ry="18.48" fill="#F6C445"/>
+  <rect x="62.52" y="51.519999999999996" width="7.056" height="36.96" rx="3.528" fill="#3A3A2E" transform="rotate(8 66 70)"/>
+  <rect x="73.86" y="52.2592" width="6.048" height="35.112" rx="3.024" fill="#3A3A2E" transform="rotate(8 66 70)"/>
+  <circle cx="36.8" cy="68" r="15.153599999999999" fill="#3A3A2E"/>
+  <circle cx="38.8" cy="65" r="3.696" fill="#FFFFFF"/>
+  <circle cx="39.8" cy="65" r="1.848" fill="#1E2A1B"/>
+  <path d="M20.016 72 L11.015999999999998 76 L20.016 79 Z" fill="#3A3A2E"/>
+  <path d="M33.8 78 Q39.8 83 44.8 78" stroke="#FFFFFF" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <rect x="87.2" y="66" width="11.76" height="10.08" rx="3" fill="#B8762A"/>
+  <rect x="86.2" y="64" width="13.44" height="4" rx="2" fill="#8A6B4F"/>
+  <path d="M28.799999999999997 45.519999999999996 q-4 6 0 9 q5 -2 3 -8 Z" fill="#7FB3D8"/>
+</svg>

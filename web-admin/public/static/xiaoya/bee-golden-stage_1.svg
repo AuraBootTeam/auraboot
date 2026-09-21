@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="小蜜蜂·金蜜皮肤 幼年">
+  <ellipse cx="60" cy="100" rx="21.08" ry="5" fill="#DCE5CC"/>
+  <ellipse cx="50" cy="53.68" rx="9.1296" ry="12.68" fill="#FDF3D8" opacity="0.85"/>
+  <ellipse cx="70" cy="53.68" rx="9.1296" ry="12.68" fill="#FDF3D8" opacity="0.85"/>
+  <path d="M52 58.36 Q46 44.36 40 46.36" stroke="#5C4308" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M68 58.36 Q74 44.36 80 46.36" stroke="#5C4308" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <ellipse cx="66" cy="70" rx="18.6" ry="13.64" fill="#E8A93E"/>
+  <rect x="61.86" y="56.36" width="5.208000000000001" height="27.28" rx="2.6040000000000005" fill="#5C4308" transform="rotate(8 66 70)"/>
+  <rect x="70.23" y="56.9056" width="4.464" height="25.916" rx="2.232" fill="#5C4308" transform="rotate(8 66 70)"/>
+  <circle cx="43.4" cy="68" r="11.1848" fill="#5C4308"/>
+  <circle cx="45.4" cy="65" r="2.728" fill="#FFFFFF"/>
+  <circle cx="46.4" cy="65" r="1.364" fill="#1E2A1B"/>
+  <path d="M30.488 72 L21.488 76 L30.488 79 Z" fill="#5C4308"/>
+  <path d="M40.4 78 Q46.4 83 51.4 78" stroke="#FFFFFF" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+</svg>
