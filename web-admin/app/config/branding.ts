@@ -35,7 +35,34 @@ export interface BrandingConfig {
    * admin login route. Branding-level flag — applies when commercial branding resolves.
    */
   loginWechatOnly?: boolean;
+  /**
+   * Optional product-specific copy and channel choice for the no-tenant
+   * onboarding page. Keeping this in signed deployment branding lets a
+   * vertical product say "school" while the platform default remains
+   * organization/workspace neutral.
+   */
+  tenantOnboarding?: TenantOnboardingBranding;
 }
+
+export type TenantJoinChannel = 'invite_code' | 'wechat_mini';
+
+export interface TenantOnboardingBranding {
+  entityLabel: string;
+  selectionTitle: string;
+  selectionLead: string;
+  createTitle: string;
+  createDescription: string;
+  createCta: string;
+  joinTitle: string;
+  joinDescription: string;
+  joinCta: string;
+  joinChannel: TenantJoinChannel;
+  miniProgramName?: string;
+  miniProgramQrUrl?: string;
+  joinSteps?: string[];
+}
+
+type TenantOnboardingDocument = TenantOnboardingBranding;
 
 export interface DeploymentBrandingDocument {
   schemaVersion: 1;
@@ -65,6 +92,7 @@ export interface DeploymentBrandingDocument {
    * admin login route. Branding-level flag — applies when commercial branding resolves.
    */
   loginWechatOnly?: boolean;
+  tenantOnboarding?: TenantOnboardingDocument;
 }
 
 export interface BuildIdentity {
@@ -122,6 +150,23 @@ const DEPLOYMENT_KEYS = new Set<keyof DeploymentBrandingDocument>([
   'loginHeroUrl',
   'loginFeatures',
   'loginWechatOnly',
+  'tenantOnboarding',
+]);
+
+const TENANT_ONBOARDING_KEYS = new Set<keyof TenantOnboardingDocument>([
+  'entityLabel',
+  'selectionTitle',
+  'selectionLead',
+  'createTitle',
+  'createDescription',
+  'createCta',
+  'joinTitle',
+  'joinDescription',
+  'joinCta',
+  'joinChannel',
+  'miniProgramName',
+  'miniProgramQrUrl',
+  'joinSteps',
 ]);
 
 const FIELD_LIMITS: Partial<Record<keyof DeploymentBrandingDocument, number>> = {
@@ -271,6 +316,91 @@ export function resolveCommercialBranding(
     loginFeatures: optionalTextList(document.loginFeatures, 'loginFeatures'),
     loginWechatOnly:
       document.loginWechatOnly === undefined ? undefined : Boolean(document.loginWechatOnly),
+    tenantOnboarding: resolveTenantOnboarding(document.tenantOnboarding),
+  };
+}
+
+function onboardingText(
+  value: unknown,
+  field: keyof TenantOnboardingDocument,
+  limit: number,
+): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Deployment branding tenantOnboarding.${field} must be a non-empty string.`);
+  }
+  const normalized = value.trim();
+  if (normalized.length > limit) {
+    throw new Error(
+      `Deployment branding tenantOnboarding.${field} must be at most ${limit} characters.`,
+    );
+  }
+  return normalized;
+}
+
+function resolveTenantOnboarding(value: unknown): TenantOnboardingBranding | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Deployment branding tenantOnboarding must be an object.');
+  }
+
+  const document = value as Record<string, unknown>;
+  const unknownKeys = Object.keys(document).filter(
+    (key) => !TENANT_ONBOARDING_KEYS.has(key as keyof TenantOnboardingDocument),
+  );
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `Deployment branding tenantOnboarding contains unsupported fields: ${unknownKeys.join(', ')}.`,
+    );
+  }
+
+  const joinChannel = document.joinChannel;
+  if (joinChannel !== 'invite_code' && joinChannel !== 'wechat_mini') {
+    throw new Error(
+      'Deployment branding tenantOnboarding.joinChannel must be invite_code or wechat_mini.',
+    );
+  }
+
+  let joinSteps: string[] | undefined;
+  if (document.joinSteps !== undefined) {
+    if (
+      !Array.isArray(document.joinSteps) ||
+      document.joinSteps.length < 2 ||
+      document.joinSteps.length > 4
+    ) {
+      throw new Error(
+        'Deployment branding tenantOnboarding.joinSteps must be an array of 2-4 strings.',
+      );
+    }
+    joinSteps = document.joinSteps.map((step) => onboardingText(step, 'joinSteps', 120));
+  }
+  if (joinChannel === 'wechat_mini' && !joinSteps) {
+    throw new Error(
+      'Deployment branding tenantOnboarding.joinSteps is required for the wechat_mini channel.',
+    );
+  }
+
+  let miniProgramQrUrl: string | undefined;
+  if (document.miniProgramQrUrl !== undefined) {
+    miniProgramQrUrl = safeUrl(document.miniProgramQrUrl, 'tenantOnboarding');
+  }
+
+  return {
+    entityLabel: onboardingText(document.entityLabel, 'entityLabel', 24),
+    selectionTitle: onboardingText(document.selectionTitle, 'selectionTitle', 80),
+    selectionLead: onboardingText(document.selectionLead, 'selectionLead', 160),
+    createTitle: onboardingText(document.createTitle, 'createTitle', 60),
+    createDescription: onboardingText(document.createDescription, 'createDescription', 180),
+    createCta: onboardingText(document.createCta, 'createCta', 40),
+    joinTitle: onboardingText(document.joinTitle, 'joinTitle', 60),
+    joinDescription: onboardingText(document.joinDescription, 'joinDescription', 180),
+    joinCta: onboardingText(document.joinCta, 'joinCta', 40),
+    joinChannel,
+    miniProgramName:
+      document.miniProgramName === undefined
+        ? undefined
+        : onboardingText(document.miniProgramName, 'miniProgramName', 40),
+    miniProgramQrUrl,
+    joinSteps,
   };
 }
 

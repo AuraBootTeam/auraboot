@@ -197,6 +197,46 @@ class DeploymentBrandingProviderTest {
     }
 
     @Test
+    void standardEditionAcceptsSharedDocumentWithSchoolOnboarding() throws IOException {
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
+        ObjectNode onboarding = document.putObject("tenantOnboarding");
+        onboarding.put("entityLabel", "学校");
+        onboarding.put("selectionTitle", "选择你的开始方式");
+        onboarding.put("selectionLead", "创建学校，或使用学校教师码加入已有学校");
+        onboarding.put("createTitle", "创建学校");
+        onboarding.put("createDescription", "适合学校管理员创建学校。");
+        onboarding.put("createCta", "开始创建");
+        onboarding.put("joinTitle", "使用学校教师码加入学校");
+        onboarding.put("joinDescription", "请前往微信小程序完成入校。");
+        onboarding.put("joinCta", "查看小程序入校步骤");
+        onboarding.put("joinChannel", "wechat_mini");
+        onboarding.put("miniProgramName", "蜂耘");
+        onboarding.put("miniProgramQrUrl", "https://northstar.example.com/mini-code.png");
+        onboarding.putArray("joinSteps").add("打开小程序并登录").add("输入学校教师码");
+        objectMapper.writeValue(config.toFile(), document);
+
+        BrandingIdentity identity = new DeploymentBrandingProvider(
+                environment("standard", config, "SO-2026-001"), objectMapper).current();
+
+        assertThat(identity.productName()).isEqualTo("Northstar");
+    }
+
+    @Test
+    void commercialBrandingRejectsInvalidSchoolOnboarding() throws IOException {
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.put("unknownField", true),
+                "unsupported fields", "unknownField");
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.put("miniProgramQrUrl", "javascript:alert(1)"),
+                "miniProgramQrUrl", "same-origin path or an HTTPS URL");
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.remove("joinSteps"),
+                "joinSteps", "required");
+    }
+
+    @Test
     void commercialBrandingRejectsInvalidLoginStoryFields() throws IOException {
         assertLoginStoryRejected(document -> document.put("loginBadge", 42),
                 "loginBadge", "must be a non-empty string");
@@ -223,6 +263,33 @@ class DeploymentBrandingProviderTest {
         ObjectMapper objectMapper = new ObjectMapper();
         ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
         mutation.accept(document);
+        objectMapper.writeValue(config.toFile(), document);
+
+        assertThatThrownBy(() -> new DeploymentBrandingProvider(
+                environment("standard", config, "SO-2026-001"), objectMapper))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(field)
+                .hasMessageContaining(message);
+    }
+
+    private void assertSchoolOnboardingRejected(Consumer<ObjectNode> mutation, String field,
+            String message) throws IOException {
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
+        ObjectNode onboarding = document.putObject("tenantOnboarding");
+        onboarding.put("entityLabel", "学校");
+        onboarding.put("selectionTitle", "选择你的开始方式");
+        onboarding.put("selectionLead", "创建学校，或使用学校教师码加入已有学校");
+        onboarding.put("createTitle", "创建学校");
+        onboarding.put("createDescription", "适合学校管理员创建学校。");
+        onboarding.put("createCta", "开始创建");
+        onboarding.put("joinTitle", "使用学校教师码加入学校");
+        onboarding.put("joinDescription", "请前往微信小程序完成入校。");
+        onboarding.put("joinCta", "查看小程序入校步骤");
+        onboarding.put("joinChannel", "wechat_mini");
+        onboarding.putArray("joinSteps").add("打开小程序并登录").add("输入学校教师码");
+        mutation.accept(onboarding);
         objectMapper.writeValue(config.toFile(), document);
 
         assertThatThrownBy(() -> new DeploymentBrandingProvider(

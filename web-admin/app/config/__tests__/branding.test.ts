@@ -103,6 +103,83 @@ describe('community branding contract', () => {
     expect(branding.loginWechatOnly).toBe(true);
   });
 
+  it('resolves a deployment-owned school onboarding flow', () => {
+    const branding = resolveCommercialBranding(
+      {
+        ...commercialDocument,
+        tenantOnboarding: {
+          entityLabel: '学校',
+          selectionTitle: '选择你的开始方式',
+          selectionLead: '创建学校，或使用学校教师码加入已有学校',
+          createTitle: '创建学校',
+          createDescription: '适合学校管理员，创建后自动获得学校管理权限。',
+          createCta: '开始创建',
+          joinTitle: '使用学校教师码加入学校',
+          joinDescription: '适合班主任和任课老师，请前往微信小程序完成入校。',
+          joinCta: '查看小程序入校步骤',
+          joinChannel: 'wechat_mini',
+          miniProgramName: '蜂耘',
+          joinSteps: ['打开微信小程序并登录', '输入学校教师码加入学校', '绑定已有班级或创建新班级'],
+        },
+      },
+      'SO-2026-001',
+    );
+
+    expect(branding.tenantOnboarding).toMatchObject({
+      entityLabel: '学校',
+      joinChannel: 'wechat_mini',
+      miniProgramName: '蜂耘',
+    });
+    expect(branding.tenantOnboarding?.joinSteps).toHaveLength(3);
+  });
+
+  it('rejects incomplete or unsafe school onboarding documents', () => {
+    const baseOnboarding = {
+      entityLabel: '学校',
+      selectionTitle: '选择你的开始方式',
+      selectionLead: '选择一条路径继续',
+      createTitle: '创建学校',
+      createDescription: '学校管理员自助创建学校',
+      createCta: '开始创建',
+      joinTitle: '加入学校',
+      joinDescription: '老师通过微信小程序加入学校',
+      joinCta: '查看步骤',
+      joinChannel: 'wechat_mini',
+      joinSteps: ['打开微信小程序', '输入学校教师码'],
+    } as const;
+
+    expect(() =>
+      resolveCommercialBranding(
+        {
+          ...commercialDocument,
+          tenantOnboarding: { ...baseOnboarding, joinSteps: undefined },
+        },
+        'SO-2026-001',
+      ),
+    ).toThrow(/joinSteps is required/);
+    expect(() =>
+      resolveCommercialBranding(
+        {
+          ...commercialDocument,
+          tenantOnboarding: { ...baseOnboarding, hiddenAdminBypass: true },
+        },
+        'SO-2026-001',
+      ),
+    ).toThrow(/unsupported fields: hiddenAdminBypass/);
+    expect(() =>
+      resolveCommercialBranding(
+        {
+          ...commercialDocument,
+          tenantOnboarding: {
+            ...baseOnboarding,
+            miniProgramQrUrl: 'javascript:alert(1)',
+          },
+        },
+        'SO-2026-001',
+      ),
+    ).toThrow(/same-origin path or an HTTPS URL/);
+  });
+
   it('treats any login story field as the deployment owning the brand panel', () => {
     const empty = {};
     expect(hasDeploymentLoginStory(empty)).toBe(false);

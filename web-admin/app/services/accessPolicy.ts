@@ -18,19 +18,30 @@ export const CLOSED_ACCESS_POLICY: AccessPolicy = {
   actorSwitchEnabled: false,
 };
 
-export async function fetchAccessPolicy(): Promise<AccessPolicy> {
+export interface AccessPolicyResult {
+  policy: AccessPolicy;
+  status: 'loaded' | 'unavailable';
+}
+
+export async function fetchAccessPolicyResult(): Promise<AccessPolicyResult> {
   try {
     const apiUrl =
       process.env.BFF_INTERNAL_URL || process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
     const response = await fetch(`${apiUrl}/api/auth/access-policy`, {
       signal: fetchTimeoutSignal(),
     });
-    if (!response.ok) return CLOSED_ACCESS_POLICY;
+    if (!response.ok) return { policy: CLOSED_ACCESS_POLICY, status: 'unavailable' };
     const result = await response.json();
-    return result?.data ? (result.data as AccessPolicy) : CLOSED_ACCESS_POLICY;
+    return result?.data
+      ? { policy: result.data as AccessPolicy, status: 'loaded' }
+      : { policy: CLOSED_ACCESS_POLICY, status: 'unavailable' };
   } catch {
-    return CLOSED_ACCESS_POLICY;
+    return { policy: CLOSED_ACCESS_POLICY, status: 'unavailable' };
   }
+}
+
+export async function fetchAccessPolicy(): Promise<AccessPolicy> {
+  return (await fetchAccessPolicyResult()).policy;
 }
 
 export function isPublicRegistrationOpen(policy: AccessPolicy): boolean {

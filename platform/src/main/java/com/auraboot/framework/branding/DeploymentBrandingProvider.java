@@ -49,7 +49,22 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "loginLead",
             "loginHeroUrl",
             "loginFeatures",
-            "loginWechatOnly");
+            "loginWechatOnly",
+            "tenantOnboarding");
+    private static final Set<String> TENANT_ONBOARDING_FIELDS = Set.of(
+            "entityLabel",
+            "selectionTitle",
+            "selectionLead",
+            "createTitle",
+            "createDescription",
+            "createCta",
+            "joinTitle",
+            "joinDescription",
+            "joinCta",
+            "joinChannel",
+            "miniProgramName",
+            "miniProgramQrUrl",
+            "joinSteps");
 
     private final BrandingIdentity identity;
 
@@ -140,6 +155,7 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             safeUrl(document, field);
         }
         validateLoginStoryFields(document);
+        validateTenantOnboarding(document);
     }
 
     /**
@@ -162,6 +178,121 @@ public class DeploymentBrandingProvider implements BrandingProvider {
         optionalTextListField(document, "loginFeatures", 4);
         // loginWechatOnly: web-admin coerces any present value through
         // Boolean(value), so any JSON value is contractually accepted here too.
+    }
+
+    /**
+     * Validates the product-specific tenant onboarding document consumed by
+     * Web Admin. The backend does not render these fields, but it deliberately
+     * validates the same shared deployment artifact instead of silently
+     * accepting configuration that the frontend would reject.
+     */
+    private static void validateTenantOnboarding(JsonNode document) {
+        JsonNode onboarding = document.get("tenantOnboarding");
+        if (onboarding == null || onboarding.isNull()) {
+            return;
+        }
+        if (!onboarding.isObject()) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding must be an object.");
+        }
+
+        Set<String> unknownFields = new HashSet<>();
+        onboarding.fieldNames().forEachRemaining(field -> {
+            if (!TENANT_ONBOARDING_FIELDS.contains(field)) {
+                unknownFields.add(field);
+            }
+        });
+        if (!unknownFields.isEmpty()) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding contains unsupported fields: "
+                            + unknownFields);
+        }
+
+        requiredNestedText(onboarding, "entityLabel", 24);
+        requiredNestedText(onboarding, "selectionTitle", 80);
+        requiredNestedText(onboarding, "selectionLead", 160);
+        requiredNestedText(onboarding, "createTitle", 60);
+        requiredNestedText(onboarding, "createDescription", 180);
+        requiredNestedText(onboarding, "createCta", 40);
+        requiredNestedText(onboarding, "joinTitle", 60);
+        requiredNestedText(onboarding, "joinDescription", 180);
+        requiredNestedText(onboarding, "joinCta", 40);
+
+        String joinChannel = requiredNestedText(onboarding, "joinChannel", 32);
+        if (!Set.of("invite_code", "wechat_mini").contains(joinChannel)) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding.joinChannel must be "
+                            + "invite_code or wechat_mini.");
+        }
+
+        optionalNestedText(onboarding, "miniProgramName", 40);
+        JsonNode qrUrl = onboarding.get("miniProgramQrUrl");
+        if (qrUrl != null && !qrUrl.isNull()) {
+            safeNestedUrl(onboarding, "miniProgramQrUrl");
+        }
+
+        JsonNode joinSteps = onboarding.get("joinSteps");
+        if (joinSteps != null && !joinSteps.isNull()) {
+            if (!joinSteps.isArray() || joinSteps.size() < 2 || joinSteps.size() > 4) {
+                throw new IllegalStateException(
+                        "Deployment branding tenantOnboarding.joinSteps must be an array "
+                                + "of 2-4 strings.");
+            }
+            for (JsonNode step : joinSteps) {
+                if (!step.isTextual() || !StringUtils.hasText(step.textValue())
+                        || step.textValue().trim().length() > 120) {
+                    throw new IllegalStateException(
+                            "Deployment branding tenantOnboarding.joinSteps must contain "
+                                    + "non-empty strings of at most 120 characters.");
+                }
+            }
+        } else if ("wechat_mini".equals(joinChannel)) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding.joinSteps is required for "
+                            + "the wechat_mini channel.");
+        }
+    }
+
+    private static String requiredNestedText(JsonNode document, String field, int maxLength) {
+        JsonNode value = document.get(field);
+        if (value == null || !value.isTextual() || !StringUtils.hasText(value.textValue())) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding." + field
+                            + " must be a non-empty string.");
+        }
+        String normalized = value.textValue().trim();
+        if (normalized.length() > maxLength) {
+            throw new IllegalStateException(
+                    "Deployment branding tenantOnboarding." + field + " must be at most "
+                            + maxLength + " characters.");
+        }
+        return normalized;
+    }
+
+    private static void optionalNestedText(JsonNode document, String field, int maxLength) {
+        JsonNode value = document.get(field);
+        if (value == null || value.isNull()) {
+            return;
+        }
+        requiredNestedText(document, field, maxLength);
+    }
+
+    private static void safeNestedUrl(JsonNode document, String field) {
+        String value = requiredNestedText(document, field, 2048);
+        if (value.startsWith("/") && !value.startsWith("//")) {
+            return;
+        }
+        try {
+            URI uri = URI.create(value);
+            if ("https".equalsIgnoreCase(uri.getScheme()) && StringUtils.hasText(uri.getHost())) {
+                return;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Fall through to the stable configuration error below.
+        }
+        throw new IllegalStateException(
+                "Deployment branding tenantOnboarding." + field
+                        + " must be a same-origin path or an HTTPS URL.");
     }
 
     private static void optionalTextField(JsonNode document, String field, int maxLength) {
