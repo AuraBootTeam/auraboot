@@ -1,5 +1,6 @@
 package com.auraboot.framework.tenant.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
@@ -44,11 +45,7 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
 
     @Override
     public String generateInviteCode(Long userId, Integer expiryDays) {
-        // 获取用户的租户ID
-        Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
-        if (tenantId == null) {
-            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
-        }
+        Long tenantId = requireCurrentTenantMembership(userId);
         
         // 计算过期时间
         Date expiredAt = null;
@@ -153,10 +150,7 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
     
     @Override
     public Invitation getCurrentValidInviteCode(Long userId) {
-        Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
-        if (tenantId == null) {
-            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
-        }
+        Long tenantId = requireCurrentTenantMembership(userId);
         // Invitations are tenant-scoped so authorized administrators see the same current code.
         return this.findValidInvitationByTenant(tenantId);
     }
@@ -173,7 +167,7 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
                 return false;
             }
             
-            Long tenantId = tenantMemberService.getTenantIdByUserId(userId);
+            Long tenantId = requireCurrentTenantMembership(userId);
             if (tenantId == null || !tenantId.equals(invitation.getTenantId())) {
                 log.warn("用户 {} 无权作废其他租户的邀请码 {}", userId, code);
                 return false;
@@ -295,5 +289,22 @@ public class TenantInviteServiceImpl  extends ServiceImpl<InvitationMapper, Invi
                 .orderByDesc("created_at")
                 .last("LIMIT 1");
         return getOne(wrapper);
+    }
+
+    /**
+     * Resolve invite management against the tenant carried by the authenticated
+     * request. A user may belong to several tenants, so reverse-looking up one
+     * tenant by user id is ambiguous and can target the wrong school.
+     */
+    private Long requireCurrentTenantMembership(Long userId) {
+        if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null) {
+            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+        if (member == null || !StatusConstants.ACTIVE.equalsIgnoreCase(member.getStatus())) {
+            throw new BusinessException("$i18n:tenant.member.not_in_tenant");
+        }
+        return tenantId;
     }
 }

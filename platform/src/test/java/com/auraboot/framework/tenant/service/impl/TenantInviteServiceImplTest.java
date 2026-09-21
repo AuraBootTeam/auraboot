@@ -1,5 +1,6 @@
 package com.auraboot.framework.tenant.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
@@ -9,6 +10,7 @@ import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +57,18 @@ class TenantInviteServiceImplTest {
         TenantServiceImplTest.injectField(service, "tenantMemberService", tenantMemberService);
         TenantServiceImplTest.injectField(service, "userService", userService);
         spyService = org.mockito.Mockito.spy(service);
+        MetaContext.setContext(99L, 7L, "user-7", "user@example.com");
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
+    }
+
+    private TenantMember activeMember() {
+        TenantMember member = new TenantMember();
+        member.setStatus(StatusConstants.ACTIVE);
+        return member;
     }
 
     private Invitation invitation(String code, String status, Instant expiredAt, boolean deleted, Long tenantId, Long inviter) {
@@ -72,14 +87,14 @@ class TenantInviteServiceImplTest {
     @Test
     @DisplayName("generateInviteCode throws when user has no tenant")
     void generateInviteCodeThrowsWhenNoTenant() {
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(null);
+        MetaContext.clear();
         assertThrows(BusinessException.class, () -> spyService.generateInviteCode(7L, 3));
     }
 
     @Test
     @DisplayName("generateInviteCode persists invitation with default expiry")
     void generateInviteCodeDefaultsExpiry() {
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(99L);
+        when(tenantMemberService.findByTenantIdAndUserId(99L, 7L)).thenReturn(activeMember());
         when(invitationMapper.findByInviteCode(anyString())).thenReturn(null);
         doReturn(true).when(spyService).save(any(Invitation.class));
 
@@ -93,13 +108,28 @@ class TenantInviteServiceImplTest {
     @Test
     @DisplayName("generateInviteCode honors expiryDays")
     void generateInviteCodeHonorsExpiry() {
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(99L);
+        when(tenantMemberService.findByTenantIdAndUserId(99L, 7L)).thenReturn(activeMember());
         when(invitationMapper.findByInviteCode(anyString())).thenReturn(null);
         doReturn(true).when(spyService).save(any(Invitation.class));
 
         String code = spyService.generateInviteCode(7L, 5);
 
         assertNotNull(code);
+    }
+
+    @Test
+    @DisplayName("generateInviteCode uses the authenticated tenant context for multi-tenant users")
+    void generateInviteCodeUsesCurrentTenantContext() {
+        when(tenantMemberService.findByTenantIdAndUserId(99L, 7L)).thenReturn(activeMember());
+        when(invitationMapper.findByInviteCode(anyString())).thenReturn(null);
+        doReturn(true).when(spyService).save(any(Invitation.class));
+
+        spyService.generateInviteCode(7L, 3);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Invitation.class);
+        verify(spyService).save(captor.capture());
+        assertEquals(99L, captor.getValue().getTenantId());
+        verifyNoInteractions(userService);
     }
 
     @Test
@@ -184,9 +214,10 @@ class TenantInviteServiceImplTest {
     @Test
     @DisplayName("revokeInviteCode false for another tenant")
     void revokeOtherTenant() {
+        MetaContext.setContext(2L, 7L, "user-7", "user@example.com");
         when(invitationMapper.findByInviteCode("c")).thenReturn(
                 invitation("c", StatusConstants.ACTIVE, Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L));
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(2L);
+        when(tenantMemberService.findByTenantIdAndUserId(2L, 7L)).thenReturn(activeMember());
         assertFalse(service.revokeInviteCode(7L, "c"));
     }
 
@@ -194,8 +225,9 @@ class TenantInviteServiceImplTest {
     @DisplayName("revokeInviteCode marks invitation as expired and saves")
     void revokeSucceeds() {
         Invitation inv = invitation("c", StatusConstants.ACTIVE, Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 7L);
+        MetaContext.setContext(1L, 7L, "user-7", "user@example.com");
         when(invitationMapper.findByInviteCode("c")).thenReturn(inv);
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(activeMember());
         doReturn(true).when(spyService).updateById(any(Invitation.class));
 
         assertTrue(spyService.revokeInviteCode(7L, "c"));
@@ -250,7 +282,8 @@ class TenantInviteServiceImplTest {
     void getCurrentValidInviteCodeIsTenantWide() {
         Invitation inv = invitation("school-code", StatusConstants.ACTIVE,
                 Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L);
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
+        MetaContext.setContext(1L, 7L, "user-7", "user@example.com");
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(activeMember());
         doReturn(inv).when(spyService).findValidInvitationByTenant(1L);
 
         assertEquals(inv, spyService.getCurrentValidInviteCode(7L));
@@ -261,8 +294,9 @@ class TenantInviteServiceImplTest {
     void revokeSameTenantCodeCreatedByAnotherManager() {
         Invitation inv = invitation("school-code", StatusConstants.ACTIVE,
                 Instant.now().plus(1, ChronoUnit.DAYS), false, 1L, 99L);
+        MetaContext.setContext(1L, 7L, "user-7", "user@example.com");
         when(invitationMapper.findByInviteCode("school-code")).thenReturn(inv);
-        when(tenantMemberService.getTenantIdByUserId(7L)).thenReturn(1L);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(activeMember());
         doReturn(true).when(spyService).updateById(any(Invitation.class));
 
         assertTrue(spyService.revokeInviteCode(7L, "school-code"));
