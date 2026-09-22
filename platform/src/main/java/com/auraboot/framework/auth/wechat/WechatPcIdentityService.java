@@ -5,8 +5,10 @@ import com.auraboot.framework.auth.mapper.AuthIdentityMapper;
 import com.auraboot.framework.auth.wechat.WechatPcClient.WxWebUser;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * PC website-app identity resolution and binding (provider wechat_web).
@@ -21,8 +24,8 @@ import java.time.Instant;
  * Same open-platform UnionID model as the mini program: an existing wechat_web
  * identity logs in; a unionid shared with a wechat_mini identity attaches the
  * web openid to the SAME platform user — the cross-device same-account promise.
- * Unbound scans are rejected with a bind-first hint (binding happens after an
- * authenticated password login).
+ * In self-service tenant mode, an unbound scan creates a tenantless account so
+ * the user can create a school. Other modes retain the bind-first behavior.
  */
 @Slf4j
 @Service
@@ -35,8 +38,10 @@ public class WechatPcIdentityService {
     private final UserMapper userMapper;
     private final WechatPcClient wechatPcClient;
     private final WechatPcProperties wechatPcProperties;
+    private final UserService userService;
+    private final SystemModeService systemModeService;
 
-    /** Resolve the platform user for a QR-scan callback code, or null when unbound. */
+    /** Resolve the platform user for a QR-scan callback code; self-provision when allowed. */
     @Transactional
     public User resolveLoginUser(String code) {
         WxWebUser wx = wechatPcClient.exchange(code);
@@ -54,7 +59,16 @@ public class WechatPcIdentityService {
                 return userMapper.selectById(byUnion.getUserId());
             }
         }
-        return null;
+        if (!systemModeService.isTenantSelfProvisioningAllowed()) {
+            return null;
+        }
+        // No membership or role is granted here. Tenant onboarding is a separate,
+        // authenticated step; a unique synthetic credential cannot be used to log in.
+        String email = "wx-web-" + UUID.randomUUID() + "@wx.wechat";
+        User user = userService.signUp(email, UUID.randomUUID() + "Aa1!", "微信用户", null);
+        create(user.getId(), wx);
+        log.info("WeChat web account self-provisioned: userId={}", user.getId());
+        return user;
     }
 
     /** Bind the web identity to an existing authenticated user (idempotent per openid). */
