@@ -229,7 +229,7 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
           auto_recompute_after_upload: true,
         }, targetRecordPid: created.quoteId, targetRecordId: created.quoteId, operationType: 'update' } },
       );
-      return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+      return { fileId, status: resp.status(), body: await resp.json().catch(() => ({})) };
     };
 
     const linePid = String(
@@ -249,16 +249,16 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
 
     // 上传命令异步返回；先等待本次附件落库。旧行本来就是 parsed，不能用它
     // 当作新上传的完成信号，也不能手动再执行 parse_gerber 来制造审计证据。
-    let gerberFileId = '';
+    const gerberFileId = reparse.fileId;
+    expect(gerberFileId).toMatch(/^[A-Za-z0-9]+$/);
     await expect.poll(async () => {
       const attachments = await queryDynamicRecords(page, 'qo_rfq_source_attachment_common', [
-        { fieldName: 'qo_rsa_filename', operator: 'EQ', value: 'q03-audit-package.zip' },
+        { fieldName: 'qo_rsa_file_id', operator: 'EQ', value: gerberFileId },
       ]);
-      gerberFileId = String(attachments.find((row) =>
-        String(row.qo_rsa_type) === 'gerber_package')?.qo_rsa_file_id ?? '');
-      return gerberFileId;
+      return attachments.some((row) =>
+        String(row.qo_rsa_type) === 'gerber_package'
+        && String(row.qo_rsa_file_id) === gerberFileId);
     }, { timeout: 90_000, intervals: [1000, 2000] }).toBeTruthy();
-    expect(gerberFileId).toMatch(/^[A-Za-z0-9]+$/);
 
     // 仅接受自动链对本次唯一文件写出的审计；历史行或显式手动解析都不能满足它。
     const auditCountForUpload = () => Number(execFileSync('psql', [
