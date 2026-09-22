@@ -42,12 +42,13 @@ class BindSchoolControllerTest {
         User user = new User();
         user.setId(11L);
         user.setPid("user-pid");
+        user.setNickName("已有展示名");
         user.setSecurityVersion(3);
         when(userService.findByPid("user-pid")).thenReturn(user);
         TenantMember member = new TenantMember();
         member.setId(33L);
-        when(tenantMemberService.findByTenantIdAndUserId(22L, 11L)).thenReturn(member);
-        when(jwtUtil.generateTokenWithTenantId(any(CustomUserDetails.class), eq("user-pid"), eq(22L), eq(33L), eq(3)))
+        lenient().when(tenantMemberService.findByTenantIdAndUserId(22L, 11L)).thenReturn(member);
+        lenient().when(jwtUtil.generateTokenWithTenantId(any(CustomUserDetails.class), eq("user-pid"), eq(22L), eq(33L), eq(3)))
                 .thenReturn("scoped-token");
     }
 
@@ -67,5 +68,39 @@ class BindSchoolControllerTest {
                 .when(sessionManagementService).createSession(11L, "scoped-token", null, "wechat-mini-bind-school");
         assertThrows(IllegalStateException.class,
                 () -> controller.bindSchool("Bearer old-token", new BindSchoolController.BindSchoolRequest("SCHOOL-CODE", null)));
+    }
+
+    @Test
+    void realNameUpdatesNonUniqueDisplayNameWithoutChangingLoginUsername() {
+        User user = userService.findByPid("user-pid");
+        user.setNickName("微信用户");
+        user.setUserName(null);
+
+        controller.bindSchool("Bearer old-token", new BindSchoolController.BindSchoolRequest("SCHOOL-CODE", "高"));
+
+        assertEquals("高", user.getNickName());
+        assertNull(user.getUserName(), "a real name must not become a globally unique login username");
+        verify(userService).update(user);
+
+        controller.bindSchool("Bearer old-token", new BindSchoolController.BindSchoolRequest("SCHOOL-CODE", "高"));
+        verify(userService, times(1)).update(user);
+    }
+
+    @Test
+    void existingCustomDisplayNameIsNotOverwrittenOnAnotherSchoolJoin() {
+        User user = userService.findByPid("user-pid");
+        user.setNickName("已有展示名");
+        controller.bindSchool("Bearer old-token", new BindSchoolController.BindSchoolRequest("SCHOOL-CODE", "另一姓名"));
+        assertEquals("已有展示名", user.getNickName());
+        verify(userService, never()).update(any(User.class));
+    }
+
+    @Test
+    void firstSchoolJoinRequiresRealNameBeforeCreatingMembership() {
+        User user = userService.findByPid("user-pid");
+        user.setNickName("微信用户");
+        assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                () -> controller.bindSchool("Bearer old-token", new BindSchoolController.BindSchoolRequest("SCHOOL-CODE", " ")));
+        verify(tenantMemberService, never()).addMember(anyLong(), anyLong(), anyString());
     }
 }
