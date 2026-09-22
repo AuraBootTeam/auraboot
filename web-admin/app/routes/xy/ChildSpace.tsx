@@ -41,6 +41,7 @@ export default function ChildSpace() {
   const [thresholds, setThresholds] = useState<number[]>([]);
   const [nickname, setNickname] = useState('');
   const [claimNickname, setClaimNickname] = useState('');
+  const [switchSpeciesPid, setSwitchSpeciesPid] = useState('');
   const [celebrate, setCelebrate] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -67,21 +68,25 @@ export default function ChildSpace() {
       setSkins(await xyList('xy_pet_skin', [{ field: 'xy_sk_species', value: String(active.xy_pi_species || '') }]));
       const own = await xyList('xy_skin_ownership', [{ field: 'xy_so_student', value: studentPid }]);
       setOwned(new Set(own.map((o) => String(o.xy_so_skin))));
+      setSwitchSpeciesPid('');
     } else {
       setSpecies(null);
       setSkins([]);
       setOwned(new Set());
-      setSpeciesList(await xyList('xy_pet_species', [{ field: 'xy_ps_status', value: 'published' }]));
     }
     if (stu.pid) {
       const enrolls = await xyList('xy_enrollment', [{ field: 'xy_enr_student', value: String(stu.pid) }]);
       const activeEnr = enrolls.find((e) => e.xy_enr_status === 'active');
       if (activeEnr) {
+        const cls = await xyGet('xy_classroom', String(activeEnr.xy_enr_class));
+        const published = await xyList('xy_pet_species', [{ field: 'xy_ps_status', value: 'published' }]);
+        setSpeciesList(published.filter((sp) => String(sp.xy_ps_theme) === String(cls?.xy_cls_theme)));
         setRewards(await xyList('xy_reward_sku', [
           { field: 'xy_rs_class', value: String(activeEnr.xy_enr_class) },
           { field: 'xy_rs_status', value: 'active' },
         ]));
       } else {
+        setSpeciesList([]);
         setRewards([]);
       }
     }
@@ -246,6 +251,23 @@ export default function ChildSpace() {
                           保存昵称
                         </button>
                       </div>
+                      {speciesList.some((sp) => String(sp.pid) !== String(species?.pid)) && (
+                        <div className="mt-4 rounded-card border p-3" style={{ borderColor: 'var(--color-border)', background: 'var(--color-subtle)' }} data-testid="switch-species-panel">
+                          <label htmlFor="switch-bee-species" className="text-text block text-sm font-semibold">切换蜂种</label>
+                          <p className="text-text-2 mt-1 text-xs">昵称、等级和成长记录保留；换蜂种后先穿该蜂种的默认外观，旧皮肤仍在收藏中。</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <select id="switch-bee-species" className="text-text h-9 rounded-[var(--radius-control)] border px-2 text-sm" style={{ borderColor: 'var(--color-border)', background: 'var(--color-panel)' }} value={switchSpeciesPid} onChange={(e) => setSwitchSpeciesPid(e.target.value)}>
+                              <option value="">选择新蜂种</option>
+                              {speciesList.filter((sp) => String(sp.pid) !== String(species?.pid)).map((sp) => (
+                                <option key={String(sp.pid)} value={String(sp.pid)}>{String(sp.xy_ps_name)}</option>
+                              ))}
+                            </select>
+                            <button type="button" disabled={!switchSpeciesPid} className="rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" style={{ background: 'var(--color-accent)' }} onClick={() => void run(() => xyExec('xy_pet_instance:switch_species', { species: switchSpeciesPid }, petPid), '蜂种已切换，成长记录仍在。')}>
+                              确认切换
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div data-testid="claim-panel">
@@ -266,7 +288,7 @@ export default function ChildSpace() {
                               }), `和 ${String(sp.xy_ps_name)} 成为伙伴啦!`);
                             }}
                           >
-                            <span className="text-xl">{SPECIES_EMOJI[String(sp.xy_ps_code)] || '🌱'}</span>
+                            <SpeciesCover url={String(sp.xy_ps_cover || '')} code={String(sp.xy_ps_code || '')} />
                             {String(sp.xy_ps_name)}
                           </button>
                         ))}
@@ -373,4 +395,12 @@ export default function ChildSpace() {
       )}
     </div>
   );
+}
+
+function SpeciesCover({ url, code }: { url: string; code: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [url]);
+  return url && !broken
+    ? <img src={url} alt="" className="h-10 w-10 object-contain" onError={() => setBroken(true)} />
+    : <span className="text-xl" aria-hidden="true">{SPECIES_EMOJI[code] || '🐝'}</span>;
 }

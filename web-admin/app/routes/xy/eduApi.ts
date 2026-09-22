@@ -65,8 +65,8 @@ export async function loadThresholds(): Promise<number[]> {
   return DEFAULT_XP_THRESHOLDS;
 }
 
-/** PRD 9.1 default level thresholds (fallback when no active growth plan). */
-export const DEFAULT_XP_THRESHOLDS = [0, 30, 80, 150, 250, 400, 600, 850, 1150, 1500];
+/** Bee-v1 fallback, aligned with the server's five-level plan. */
+export const DEFAULT_XP_THRESHOLDS = [0, 60, 180, 400, 800];
 
 export function levelFor(xp: number, thresholds: number[]): number {
   let level = 1;
@@ -76,20 +76,27 @@ export function levelFor(xp: number, thresholds: number[]): number {
   return level;
 }
 
-export function stageFor(level: number): 'stage_1' | 'stage_2' | 'stage_3' {
-  if (level >= 7) return 'stage_3';
-  if (level >= 4) return 'stage_2';
-  return 'stage_1';
+export function stageFor(level: number): 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' {
+  return `stage_${Math.max(1, Math.min(5, level))}` as 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5';
 }
 
 export const STAGE_LABEL: Record<string, string> = {
-  stage_1: '幼年',
-  stage_2: '少年',
-  stage_3: '成长',
+  stage_1: '小蜜蜂',
+  stage_2: '采蜜蜂',
+  stage_3: '勤劳蜂',
+  stage_4: '花园蜂',
+  stage_5: '森林守护蜂',
 };
 
 export const SPECIES_EMOJI: Record<string, string> = {
   bee: '🐝',
+  bluewing: '🐝',
+  rainbow: '🐝',
+  reading: '🐝',
+  sports: '🐝',
+  courage: '🐝',
+  explorer: '🐝',
+  guardian: '🐝',
   cat: '🐱',
   dog: '🐶',
   rabbit: '🐰',
