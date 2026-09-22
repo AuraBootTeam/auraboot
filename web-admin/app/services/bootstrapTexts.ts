@@ -59,6 +59,21 @@ const TEXTS = {
     'ja-JP': 'ホームに戻る',
     'ko-KR': '홈으로 돌아가기',
   },
+  schoolModeTitle: {
+    'zh-CN': '多校模式 · 自助建校',
+    'en-US': 'Multi-school mode · Self-service setup',
+    'ja-JP': '複数校モード · セルフサービス開設',
+    'ko-KR': '다중 학교 모드 · 셀프서비스 개설',
+  },
+  schoolModeBody: {
+    'zh-CN': '初始化后，未加入学校的微信用户可以自行创建学校；教师通过学校教师码加入已有学校。',
+    'en-US':
+      'After setup, WeChat users can create a school; teachers join an existing school with its teacher code.',
+    'ja-JP':
+      '初期化後、WeChat ユーザーは学校を作成でき、教師は学校教師コードで既存の学校に参加できます。',
+    'ko-KR':
+      '초기화 후 WeChat 사용자는 학교를 만들고 교사는 학교 교사 코드로 기존 학교에 참여할 수 있습니다.',
+  },
 } as const;
 
 type TextKey = keyof typeof TEXTS;
