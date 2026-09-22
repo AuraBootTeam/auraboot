@@ -19,19 +19,24 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-EDITION="oss"; ENTERPRISE_ROOT=""; PASS=(); PRE1900_CORE_COMPAT="${AURA_FLYWAY_PRE1900_CORE_COMPAT:-0}"
+EDITION="oss"; ENTERPRISE_ROOT=""; PASS=(); RELEASE_STATUS="installed"; PRE1900_CORE_COMPAT="${AURA_FLYWAY_PRE1900_CORE_COMPAT:-0}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --edition) EDITION="${2:?}"; shift 2 ;;
     --enterprise-root) ENTERPRISE_ROOT="${2:?}"; shift 2 ;;
     --pre1900-core-compat) PRE1900_CORE_COMPAT=1; shift ;;
-    --app-version|--build-version|--git-sha|--status) PASS+=("$1" "${2:?}"); shift 2 ;;
+    --app-version|--build-version|--git-sha) PASS+=("$1" "${2:?}"); shift 2 ;;
+    --status) RELEASE_STATUS="${2:?}"; PASS+=("$1" "$RELEASE_STATUS"); shift 2 ;;
     -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "[deploy-migrate] unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 [[ "$PRE1900_CORE_COMPAT" == 0 || "$PRE1900_CORE_COMPAT" == 1 ]] || {
   echo "[deploy-migrate] AURA_FLYWAY_PRE1900_CORE_COMPAT must be 0 or 1" >&2
+  exit 2
+}
+[[ "$RELEASE_STATUS" == installed || "$RELEASE_STATUS" == failed || "$RELEASE_STATUS" == rolled_back ]] || {
+  echo "[deploy-migrate] release status must be installed, failed, or rolled_back" >&2
   exit 2
 }
 ENT_ARGS=()
@@ -60,7 +65,7 @@ if [[ "$PRE1900_CORE_COMPAT" == 1 ]]; then
   }
   stage_root="$(mktemp -d)"
   trap 'rm -r "$stage_root"' EXIT
-  "$SCRIPT_DIR/stage-pre1900-core-migrations.sh" \
+  bash "$SCRIPT_DIR/stage-pre1900-core-migrations.sh" \
     --core-root "$(cd "$SCRIPT_DIR/../.." && pwd)" --out-dir "$stage_root/core"
   export AURA_FLYWAY_CORE_MIGRATION_DIR="$stage_root/core"
   export AURA_FLYWAY_OUT_OF_ORDER=1
