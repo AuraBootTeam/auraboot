@@ -1,9 +1,7 @@
 package com.auraboot.framework.auth.controller;
 
-import com.auraboot.framework.auth.dto.AuthenticationResponse;
-import com.auraboot.framework.auth.dto.FederatedLoginContext;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
-import com.auraboot.framework.auth.strategy.LoginCompletionHelper;
+import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
@@ -43,7 +41,7 @@ public class BindSchoolController {
     private final TenantMemberService tenantMemberService;
     private final UserRoleService userRoleService;
     private final UserService userService;
-    private final LoginCompletionHelper loginCompletionHelper;
+    private final SessionManagementService sessionManagementService;
     private final com.auraboot.framework.auth.util.JwtUtil jwtUtil;
 
     public record BindSchoolRequest(String inviteCode, String realName) {}
@@ -98,15 +96,17 @@ public class BindSchoolController {
             assigned.put(roleCode, ok);
         }
 
-        FederatedLoginContext federated = new FederatedLoginContext();
-        federated.setTenantId(invite.getTenantId());
-        int securityVersion = 0;
+        int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         String newJwt = jwtUtil.generateTokenWithTenantId(
                 new CustomUserDetails(
                         user.getEmail(), user.getPassword() != null ? user.getPassword() : "", user.getId(), user.getPid(),
                         List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("role_user")),
                         true, true, true, true),
                 user.getPid(), invite.getTenantId(), member != null ? member.getId() : null, securityVersion);
+        // JwtAuthenticationFilter requires a live session row for every bearer
+        // token. Do not hand a tenant-scoped JWT to the mini program unless its
+        // session was persisted; otherwise the next request is always a 401.
+        sessionManagementService.createSession(userId, newJwt, null, "wechat-mini-bind-school");
 
         Map<String, Object> out = new HashMap<>();
         out.put("jwt", newJwt);
