@@ -3,24 +3,31 @@ import { useNavigate, Link, useLoaderData, type LoaderFunctionArgs } from 'react
 import { Button } from '~/ui/ui/button';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 import { bootstrapT } from '~/services/bootstrapTexts';
+import { COMMUNITY_BRANDING } from '~/config/branding';
+import { useRootLoaderData } from '~/root-data';
+import { requiresSchoolSelfServiceMode, resolveBootstrapSystemMode } from './bootstrapMode';
 
 /**
  * Loader: fetch bootstrap status; UI branches between wizard and "already done" page.
  */
-export async function loader(_args: LoaderFunctionArgs): Promise<{ status: BootstrapStatus | null }> {
+export async function loader(
+  _args: LoaderFunctionArgs,
+): Promise<{ status: BootstrapStatus | null }> {
   const status = await fetchBootstrapStatus();
   return { status };
 }
 
 export default function SetupWizard() {
   const { status } = useLoaderData<typeof loader>();
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
+  const schoolSelfServiceMode = requiresSchoolSelfServiceMode(branding);
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     companyName: '',
     adminEmail: '',
     adminPassword: '',
     confirmPassword: '',
-    systemMode: 'single',
+    systemMode: schoolSelfServiceMode ? 'multi' : 'single',
   });
   const [phase, setPhase] = useState<'form' | 'progress' | 'done' | 'error'>('form');
   const [progress, setProgress] = useState({
@@ -52,10 +59,18 @@ export default function SetupWizard() {
 
   if (status?.initialized) {
     return (
-      <div data-testid="bootstrap-already-done" className="max-w-md mx-auto mt-20 p-6 bg-white border border-gray-200 rounded shadow">
-        <h1 className="text-xl font-semibold mb-2 text-gray-900">{bootstrapT('alreadyDoneTitle')}</h1>
-        <p className="text-gray-600 mb-4">{bootstrapT('alreadyDoneBody')}</p>
-        <Link to="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+      <div
+        data-testid="bootstrap-already-done"
+        className="mx-auto mt-20 max-w-md rounded border border-gray-200 bg-white p-6 shadow"
+      >
+        <h1 className="mb-2 text-xl font-semibold text-gray-900">
+          {bootstrapT('alreadyDoneTitle')}
+        </h1>
+        <p className="mb-4 text-gray-600">{bootstrapT('alreadyDoneBody')}</p>
+        <Link
+          to="/"
+          className="inline-block rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+        >
           {bootstrapT('alreadyDoneCta')}
         </Link>
       </div>
@@ -97,7 +112,7 @@ export default function SetupWizard() {
           companyName: formData.companyName || 'My Company',
           adminEmail: formData.adminEmail,
           adminPassword: formData.adminPassword,
-          systemMode: formData.systemMode,
+          systemMode: resolveBootstrapSystemMode(branding, formData.systemMode),
         }),
       });
       const result = await res.json();
@@ -189,60 +204,76 @@ export default function SetupWizard() {
                 />
               </div>
 
-              {/* Advanced Settings */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              {schoolSelfServiceMode && (
+                <div
+                  data-testid="school-bootstrap-mode"
+                  className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100"
                 >
-                  <span
-                    className={`transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                  <p className="font-semibold">{bootstrapT('schoolModeTitle')}</p>
+                  <p className="mt-1">{bootstrapT('schoolModeBody')}</p>
+                </div>
+              )}
+
+              {/* The generic platform can choose its mode; school onboarding requires multi. */}
+              {!schoolSelfServiceMode && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   >
-                    &#9654;
-                  </span>
-                  Advanced Settings
-                </button>
-                {showAdvanced && (
-                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50">
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      System Mode
-                    </label>
-                    <div className="space-y-2">
-                      {[
-                        {
-                          value: 'single',
-                          label: 'Single Tenant',
-                          desc: 'Internal use, one organization',
-                        },
-                        {
-                          value: 'multi',
-                          label: 'Multi Tenant',
-                          desc: 'SaaS platform, multiple organizations',
-                        },
-                        { value: 'hybrid', label: 'Hybrid', desc: 'Managed hosting + marketplace' },
-                      ].map((opt) => (
-                        <label key={opt.value} className="flex cursor-pointer items-start gap-3">
-                          <input
-                            type="radio"
-                            name="systemMode"
-                            value={opt.value}
-                            checked={formData.systemMode === opt.value}
-                            onChange={(e) => handleChange('systemMode', e.target.value)}
-                            className="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {opt.label}
+                    <span
+                      className={`transform transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                    >
+                      &#9654;
+                    </span>
+                    Advanced Settings
+                  </button>
+                  {showAdvanced && (
+                    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50">
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        System Mode
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          {
+                            value: 'single',
+                            label: 'Single Tenant',
+                            desc: 'Internal use, one organization',
+                          },
+                          {
+                            value: 'multi',
+                            label: 'Multi Tenant',
+                            desc: 'SaaS platform, multiple organizations',
+                          },
+                          {
+                            value: 'hybrid',
+                            label: 'Hybrid',
+                            desc: 'Managed hosting + marketplace',
+                          },
+                        ].map((opt) => (
+                          <label key={opt.value} className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="radio"
+                              name="systemMode"
+                              value={opt.value}
+                              checked={formData.systemMode === opt.value}
+                              onChange={(e) => handleChange('systemMode', e.target.value)}
+                              className="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {opt.label}
+                              </div>
+                              <div className="text-xs text-gray-400">{opt.desc}</div>
                             </div>
-                            <div className="text-xs text-gray-400">{opt.desc}</div>
-                          </div>
-                        </label>
-                      ))}
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Error */}
               {formError && (
