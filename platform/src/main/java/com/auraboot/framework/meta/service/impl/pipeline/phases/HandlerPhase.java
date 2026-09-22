@@ -587,6 +587,7 @@ public class HandlerPhase implements CommandPhase {
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
                             roleMapper, userRoleService, tenantMemberService, userService));
+            pluginSettings.put(CommandHandlerExtension.IDENTITY_DIRECTORY_ACCESSOR_KEY, identityDirectoryAccessor);
             if (biTemporalService != null) {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));

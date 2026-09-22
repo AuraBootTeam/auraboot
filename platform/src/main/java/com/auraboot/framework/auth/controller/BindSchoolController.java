@@ -74,9 +74,19 @@ public class BindSchoolController {
         if (user == null) throw new BusinessException(ResponseCode.BadParam, "账号不存在");
         Long userId = user.getId();
 
-        if (request.realName() != null && !request.realName().isBlank()
-                && ("微信用户".equals(user.getUserName()) || user.getUserName() == null)) {
-            user.setUserName(request.realName().trim());
+        // A teacher's real name is a non-unique display name, never a login
+        // identifier. Multiple teachers can have the same name across schools.
+        boolean needsName = user.getNickName() == null || user.getNickName().isBlank()
+                || "微信用户".equals(user.getNickName());
+        if (needsName && (request.realName() == null || request.realName().isBlank())) {
+            throw new BusinessException(ResponseCode.BadParam, "请填写真实姓名");
+        }
+        if (needsName) {
+            String realName = request.realName().trim();
+            if (realName.length() > 24) {
+                throw new BusinessException(ResponseCode.BadParam, "真实姓名不能超过24个字");
+            }
+            user.setNickName(realName);
             userService.update(user);
         }
 

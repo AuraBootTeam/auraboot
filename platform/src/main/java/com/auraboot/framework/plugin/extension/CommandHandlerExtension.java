@@ -59,6 +59,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
 
     String TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY = TenantRoleAssignmentAccessor.SETTINGS_KEY;
 
+    /** Server-owned directory for resolving the authenticated actor's display name. */
+    String IDENTITY_DIRECTORY_ACCESSOR_KEY = "__identityDirectoryAccessor";
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -234,6 +237,11 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public TenantRoleAssignmentAccessor tenantRoleAssignmentAccessor() {
             Object accessor = settings != null ? settings.get(TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY) : null;
             return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
+        }
+
+        public IdentityDirectoryAccessor identityDirectoryAccessor() {
+            Object accessor = settings != null ? settings.get(IDENTITY_DIRECTORY_ACCESSOR_KEY) : null;
+            return accessor instanceof IdentityDirectoryAccessor value ? value : null;
         }
 
         /**
