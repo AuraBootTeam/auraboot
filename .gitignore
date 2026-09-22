@@ -93,6 +93,7 @@ DerivedData/
 
 *.png
 !web-admin/public/*.png
+!web-admin/public/static/xiaoya/**/*.png
 !docs/assets/screenshots/*.png
 # Documentation evidence screenshots. Without these negations `*.png` above
 # swallows them silently: `git add` reports nothing and the reference in the

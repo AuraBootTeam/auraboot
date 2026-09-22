@@ -3945,6 +3945,220 @@
           "sha256": "a19e14b1efcc790826f67e8cf6e264e138a46141e7fcd67efddb09ea9f59beaf"
         }
       ]
+    },
+    {
+      "asset_id": "bee-theme-png-refresh",
+      "kind": "static_png",
+      "source_package": "蜜蜂35张逐级拆图",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_1.png",
+          "bytes": 206428,
+          "sha256": "d3a4dde3a18c35600c9406d93057228c16b76e9296886935422f1758556fa185"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_2.png",
+          "bytes": 241366,
+          "sha256": "091cebd2248d33dd1b83fbeefa9b08ba9b5e3f220a1e68382e545c566729d7fd"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_3.png",
+          "bytes": 382842,
+          "sha256": "dc21f747fd9681c020e76735dec3a225ad230f25fb87c42674534442f94cbcd8"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_4.png",
+          "bytes": 420933,
+          "sha256": "eefb45e0343940cb3f74e0b682c184f99dc418a9ff9fac8f5a051716c384cc9a"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/bluewing/stage_5.png",
+          "bytes": 544354,
+          "sha256": "0fe9c0e6b68df0a333dcc803d0ae629aa3feda00af525efb9f6a7249c129ec58"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_1.png",
+          "bytes": 175017,
+          "sha256": "45a00502f7eb0ec9b017d6efda00ffdbb58c474ccea5a3e84794830c9698cb14"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_2.png",
+          "bytes": 253900,
+          "sha256": "9078ab8e06eb75ac05f93436cf7b375d0559d59681e7183e2e2e9f7b2eb78186"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_3.png",
+          "bytes": 347927,
+          "sha256": "4181b1605bc7ca791704699205598ab0b39b946f3dfe4fa14de2a0e977facc7b"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_4.png",
+          "bytes": 406850,
+          "sha256": "0dd99a3ad4ea46a8ef39a22677216cb7f183782563065ef38e678e810e10cabc"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/rainbow/stage_5.png",
+          "bytes": 522932,
+          "sha256": "8559bb35103294e1b19f86db5ccc416a721316b557f5edfa31445f19036ecf13"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_1.png",
+          "bytes": 239931,
+          "sha256": "082077273a28320966961fdec764cf4545fe2f371872e66fbe8862a480ef978b"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_2.png",
+          "bytes": 352132,
+          "sha256": "0bdadffdad95aece333694602b7637ecf1de78c8bc8fcffd155ffa7dae8e023a"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_3.png",
+          "bytes": 398004,
+          "sha256": "6538aaefbdfd31c4b8a7144e4c21e3fef3dd20317af3dd3abbe0c90bf910146d"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_4.png",
+          "bytes": 414109,
+          "sha256": "6e006398fd2e4141482e9697d080cb0dc26f7c46151907c82610bdd2973e8abc"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/reading/stage_5.png",
+          "bytes": 478616,
+          "sha256": "5b2ae7041b6565de6bda434d048ecd4f4b3dc10760e7e4c84a64d4e3d2462ced"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_1.png",
+          "bytes": 216545,
+          "sha256": "671f21b2f97f27ab4b2a6c81849d28bc573383cadba8e5cae3f2de662a7f6b42"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_2.png",
+          "bytes": 332919,
+          "sha256": "3aacfbfd71ddac07ca9b8c9e21b3722f2fb50591481317fff2e960f453174b5c"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_3.png",
+          "bytes": 379657,
+          "sha256": "e897b2411fcfc2dcf2eb4c72e75be5a212514465d8bf97b3d5b38e9d96b011c0"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_4.png",
+          "bytes": 420257,
+          "sha256": "6c8d880d323677efad484f61652948c66c282d4bff0268916a02174de0fe1450"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/sports/stage_5.png",
+          "bytes": 514982,
+          "sha256": "68686a603088ac31cdc6914e3401d85dd7d1a5c0f8555dbc6ac37e3e3604b71b"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_1.png",
+          "bytes": 229741,
+          "sha256": "9cd7dfb14791c6bce6bb29dabf8da365811bd9f97b6619a5491cf45629afb310"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_2.png",
+          "bytes": 323693,
+          "sha256": "eaabc6c357091f6783ba9f418a234dda66ad6f1324f8035b4ae344ea9e220d35"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_3.png",
+          "bytes": 369429,
+          "sha256": "7f56074eea743c5a45c47ca8d9f011bb9a1a5a2e658e7211de82a26aa326d5d6"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_4.png",
+          "bytes": 499523,
+          "sha256": "cd2d51f467883e5faa5bc37abfc94b5b05f6e58ce3bf83e8742528b7acb349b8"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/courage/stage_5.png",
+          "bytes": 578428,
+          "sha256": "874072d5dadc271576b9d427370651bd209d7349ed9a5e80f53d9c75422733b3"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_1.png",
+          "bytes": 202211,
+          "sha256": "b576b33dafff09cae9d1fb1f2e8f196e613a9e7c85a3318354669cdfbe9aea19"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_2.png",
+          "bytes": 352776,
+          "sha256": "a5264e115c1efa756bf3ec6f88110260d3d7a2caa1a7dc5b337cdce7e3867dad"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_3.png",
+          "bytes": 419857,
+          "sha256": "d470ee1ec99535c01d7e995df694e8a4041180921f7a63ce1caec3c5d11830ec"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_4.png",
+          "bytes": 433053,
+          "sha256": "cfa8ad1433a9dbd76646949e169b910c90c9f4207a1c1cbcbdce8314bf2dede6"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/explorer/stage_5.png",
+          "bytes": 543261,
+          "sha256": "750a9eb6e4d6f0b6a5605f003c8c66f5c320ca1b459c29d3a5cc6b0be5c204dd"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_1.png",
+          "bytes": 242980,
+          "sha256": "fd17ed29be74e9a7faa93c76e317e47ad1a6bff8112125d8cbc4725628fcb7e4"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_2.png",
+          "bytes": 392174,
+          "sha256": "a70b606b73ba78a73199729b2945bfa65b43400bdb2dd83de53d4879f875386b"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_3.png",
+          "bytes": 470034,
+          "sha256": "9b0a7636c716f4b63ec81f9197b7f715e62c8927219b27d1812fb75f28b22071"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_4.png",
+          "bytes": 538316,
+          "sha256": "6d7319d7a62ac83c08dd34c1c2bae4a2b20f36790f6a3139ee6937378158184b"
+        },
+        {
+          "path": "runtime/static/xiaoya/themes/guardian/stage_5.png",
+          "bytes": 775686,
+          "sha256": "20a25ed1b152e025ef20f8b4faca3174e386819bd7a6e074c7fb232858def8be"
+        }
+      ]
+    },
+    {
+      "asset_id": "class-tree-png-refresh",
+      "kind": "static_png",
+      "source_package": "class-tree-five-separate",
+      "files": [
+        {
+          "path": "runtime/static/xiaoya/class-tree/stage_1.png",
+          "bytes": 1064947,
+          "sha256": "22f691e08c786a5676b8659ef1262d70c4b3386561d7c4e32384eebe8524c1f2"
+        },
+        {
+          "path": "runtime/static/xiaoya/class-tree/stage_2.png",
+          "bytes": 1470944,
+          "sha256": "4c2579af55202a02a9f435ee3c499f207be0ee860fd14725cd1476a8fa3f4b8e"
+        },
+        {
+          "path": "runtime/static/xiaoya/class-tree/stage_3.png",
+          "bytes": 2173745,
+          "sha256": "29462d6a12ae416fd5ba010c048224c5a095d3dfe2d99be8fd966dc918634310"
+        },
+        {
+          "path": "runtime/static/xiaoya/class-tree/stage_4.png",
+          "bytes": 2606177,
+          "sha256": "5ccb0ff68652ff35f387555155e705c89c170ec6e7b9e5b997fe83ed2b88d607"
+        },
+        {
+          "path": "runtime/static/xiaoya/class-tree/stage_5.png",
+          "bytes": 3400487,
+          "sha256": "916b275d50c7b020650b9cabf89b4528043c8dfbc90e00860bcf907ba3196552"
+        }
+      ]
     }
   ],
   "reference_scope_assumptions": [
@@ -3968,7 +4182,8 @@
     "reason": "交付完整无外部依赖的Canvas曲线、图层、关键帧数据和播放器；不是只有动画规划，未伪装为第三方动画格式。"
   },
   "integrated_updates": {
-    "bee_artwork": "fengyun-bees-v2",
-    "class_tree_and_home": "fengyun-class-tree-and-home/supplement-1"
+    "bee_artwork": "蜜蜂35张逐级拆图 (35 RGBA PNG)",
+    "class_tree_and_home": "fengyun-class-tree-and-home/supplement-1",
+    "class_tree_artwork": "class-tree-five-separate (5 RGBA PNG)"
   }
 }
