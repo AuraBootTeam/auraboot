@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
 import {
   xyList,
+  xyListChecked,
   xyGet,
   xyExec,
   loadThresholds,
@@ -35,12 +36,17 @@ export default function ChildSpace() {
   const [pet, setPet] = useState<XyRow | null>(null);
   const [species, setSpecies] = useState<XyRow | null>(null);
   const [speciesList, setSpeciesList] = useState<XyRow[]>([]);
+  const [catalogError, setCatalogError] = useState('');
   const [skins, setSkins] = useState<XyRow[]>([]);
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [rewards, setRewards] = useState<XyRow[]>([]);
   const [thresholds, setThresholds] = useState<number[]>([]);
   const [nickname, setNickname] = useState('');
   const [claimNickname, setClaimNickname] = useState('');
+  const [claimSpeciesPid, setClaimSpeciesPid] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [skinPreviews, setSkinPreviews] = useState<Record<string, string>>({});
   const [switchSpeciesPid, setSwitchSpeciesPid] = useState('');
   const [celebrate, setCelebrate] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -50,6 +56,8 @@ export default function ChildSpace() {
   const loadAll = useCallback(async (studentPid: string) => {
     setLoading(true);
     setError('');
+    setCatalogError('');
+    setClaimSpeciesPid('');
     const stu = await xyGet('xy_student', studentPid);
     if (!stu) {
       setStudent(null);
@@ -65,13 +73,25 @@ export default function ChildSpace() {
     if (active) {
       const sp = await xyGet('xy_pet_species', String(active.xy_pi_species || ''));
       setSpecies(sp);
-      setSkins(await xyList('xy_pet_skin', [{ field: 'xy_sk_species', value: String(active.xy_pi_species || '') }]));
+      const speciesSkins = await xyList('xy_pet_skin', [{ field: 'xy_sk_species', value: String(active.xy_pi_species || '') }]);
+      setSkins(speciesSkins);
+      const currentStage = String(stu.xy_stu_stage || 'stage_1');
+      const previewRows = await Promise.all(speciesSkins.map(async (skin) => {
+        const matching = await xyList('xy_skin_asset', [
+          { field: 'xy_sa_species', value: String(active.xy_pi_species || '') },
+          { field: 'xy_sa_skin', value: String(skin.pid || '') },
+          { field: 'xy_sa_stage', value: currentStage },
+        ]);
+        return [String(skin.pid || ''), String(matching[0]?.xy_sa_asset || '')] as const;
+      }));
+      setSkinPreviews(Object.fromEntries(previewRows));
       const own = await xyList('xy_skin_ownership', [{ field: 'xy_so_student', value: studentPid }]);
       setOwned(new Set(own.map((o) => String(o.xy_so_skin))));
       setSwitchSpeciesPid('');
     } else {
       setSpecies(null);
       setSkins([]);
+      setSkinPreviews({});
       setOwned(new Set());
     }
     if (stu.pid) {
@@ -79,8 +99,9 @@ export default function ChildSpace() {
       const activeEnr = enrolls.find((e) => e.xy_enr_status === 'active');
       if (activeEnr) {
         const cls = await xyGet('xy_classroom', String(activeEnr.xy_enr_class));
-        const published = await xyList('xy_pet_species', [{ field: 'xy_ps_status', value: 'published' }]);
-        setSpeciesList(published.filter((sp) => String(sp.xy_ps_theme) === String(cls?.xy_cls_theme)));
+        const published = await xyListChecked('xy_pet_species', [{ field: 'xy_ps_status', value: 'published' }]);
+        setCatalogError(published.error);
+        setSpeciesList(published.rows.filter((sp) => String(sp.xy_ps_theme) === String(cls?.xy_cls_theme)));
         setRewards(await xyList('xy_reward_sku', [
           { field: 'xy_rs_class', value: String(activeEnr.xy_enr_class) },
           { field: 'xy_rs_status', value: 'active' },
@@ -113,7 +134,8 @@ export default function ChildSpace() {
           pid: `${String(classroom.classPid)}:${String(row.pid)}`,
           xy_enr_student: row.pid,
           xy_enr_class: classroom.classPid,
-          xy_enr_no: row.xy_stu_name || row.xy_stu_code,
+          xy_enr_no: row.xy_stu_code,
+          xy_enr_student_name: row.xy_stu_name,
           xy_enr_class_name: classroom.className,
         }));
       });
@@ -160,6 +182,16 @@ export default function ChildSpace() {
   const speciesCode = String(species?.xy_ps_code || '');
   const coins = Number(student?.xy_stu_coin_balance ?? 0);
   const petPid = pet?.pid ? String(pet.pid) : '';
+  const claimSpecies = speciesList.find((item) => String(item.pid) === claimSpeciesPid);
+  const classes = Array.from(new Map(enrollments.map((enrollment) => [
+    String(enrollment.xy_enr_class),
+    { pid: String(enrollment.xy_enr_class), name: String(enrollment.xy_enr_class_name || '未命名班级') },
+  ])).values());
+  const visibleRoster = enrollments.filter((enrollment) => {
+    if (classFilter && String(enrollment.xy_enr_class) !== classFilter) return false;
+    const haystack = `${String(enrollment.xy_enr_student_name || '')} ${String(enrollment.xy_enr_no || '')}`;
+    return haystack.toLocaleLowerCase().includes(studentQuery.trim().toLocaleLowerCase());
+  });
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }} data-testid="child-space">
@@ -179,46 +211,62 @@ export default function ChildSpace() {
         </button>
       </div>
 
-      <div className="mx-auto max-w-3xl px-5 pb-24 pt-6">
+      <div className="mx-auto max-w-6xl px-5 pb-24 pt-8">
+        <div className="mb-6">
+          <p className="text-xs font-bold tracking-[0.18em] text-[#64846A]">家庭与伙伴 / 班级学生</p>
+          <h1 className="mt-2 text-3xl font-bold text-[#213D32]">孩子空间</h1>
+          <p className="mt-2 text-sm text-[#667A6B]">先选择本班同学，再认领蜜蜂、设置昵称或更换装扮。成长和评分记录不会因换蜂种而清零。</p>
+        </div>
         {loading ? (
-          <div className="text-text-2 text-sm">加载中…</div>
+          <div className="rounded-card-lg border border-[var(--color-border)] bg-[var(--color-panel)] p-8 text-sm text-[#667A6B]">正在加载同学与伙伴…</div>
         ) : !student ? (
           <div className="text-text-2 rounded-card border border-[var(--color-border)] bg-[var(--color-panel)] p-6 text-sm" data-testid="child-space-empty">
             {error || '当前没有可管理的同学。请先在班级名册中导入学生。'}
           </div>
         ) : (
           <>
-            {/* scoped student picker */}
-            {enrollments.length > 0 && (
-              <div className="text-text-2 mb-4 flex items-center gap-2 text-xs">
-                <label htmlFor="child-space-student">选择同学:</label>
-                <select
-                  id="child-space-student"
-                  aria-label="选择同学"
-                  className="text-text h-9 min-w-56 rounded-[var(--radius-control)] border px-3 text-sm"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-panel)' }}
-                  value={String(student.pid || '')}
-                  onChange={(event) => navigate(`/xy/child/${event.target.value}`)}
-                >
-                  {enrollments.map((enrollment) => (
-                    <option key={String(enrollment.pid)} value={String(enrollment.xy_enr_student)}>
-                      {String(enrollment.xy_enr_no || '')}
-                      {enrollment.xy_enr_class_name ? ` · ${String(enrollment.xy_enr_class_name)}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="grid items-start gap-5 lg:grid-cols-[268px_minmax(0,1fr)]">
+              <aside className="rounded-card-lg border border-[var(--color-border)] bg-[var(--color-panel)] p-4" aria-label="选择同学" data-testid="child-student-roster">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-base font-bold text-[#213D32]">选择同学</h2>
+                  <span className="text-xs text-[#789176]">{enrollments.length} 人</span>
+                </div>
+                {classes.length > 1 && (
+                  <select aria-label="筛选班级" className="mt-4 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-white px-3 py-2 text-sm" value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
+                    <option value="">全部班级</option>
+                    {classes.map((cls) => <option key={cls.pid} value={cls.pid}>{cls.name}</option>)}
+                  </select>
+                )}
+                <input aria-label="搜索同学" className="mt-3 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-white px-3 py-2 text-sm" placeholder="搜索姓名或学号" value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} />
+                <div className="mt-3 max-h-[620px] space-y-1 overflow-y-auto pr-1">
+                  {visibleRoster.map((enrollment) => {
+                    const active = String(enrollment.xy_enr_student) === String(student.pid);
+                    return (
+                      <button key={String(enrollment.pid)} type="button" className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${active ? 'bg-[#E8F2E5] font-bold text-[#255A43]' : 'text-[#405C4B] hover:bg-[#F1F6EC]'}`} aria-current={active ? 'true' : undefined} onClick={() => navigate(`/xy/child/${String(enrollment.xy_enr_student)}`)}>
+                        <span className="truncate">{String(enrollment.xy_enr_student_name || '未命名同学')}</span>
+                        <span className="ml-2 shrink-0 text-xs font-normal text-[#829581]">{String(enrollment.xy_enr_no || '')}</span>
+                      </button>
+                    );
+                  })}
+                  {visibleRoster.length === 0 && <p className="px-2 py-5 text-center text-sm text-[#789176]">没有匹配的同学</p>}
+                </div>
+              </aside>
+              <div className="min-w-0">
 
             {/* pet hero */}
             <div className="rounded-card-lg border p-6" style={{ background: 'var(--color-panel)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-pop)' }} data-testid="child-hero">
-              <div className="flex items-center gap-6">
-                <PetAvatar assetUrl={assetUrl} speciesCode={speciesCode} size={170} />
+              <div className="flex flex-col gap-6 sm:flex-row">
+                {pet ? <PetAvatar assetUrl={assetUrl} speciesCode={speciesCode} size={300} /> : (
+                  <div className="grid h-[300px] w-[300px] shrink-0 place-items-center rounded-[28px] bg-[#F1F6E9]">
+                    {claimSpecies ? <SpeciesCover url={String(claimSpecies.xy_ps_cover || '')} code={String(claimSpecies.xy_ps_code || '')} size={270} /> : <span className="text-8xl" aria-hidden="true">🐝</span>}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
-                  <div className="text-text-2 text-xs">你好,</div>
-                  <div className="text-text mb-1 text-2xl font-semibold">{nickname || String(student.xy_stu_name || '')}</div>
+                  <div className="text-text-2 text-xs">正在管理的同学 · {nickname || String(student.xy_stu_name || '')}</div>
                   {pet ? (
                     <>
+                      <h2 className="mt-1 text-3xl font-bold text-[#213D32]">{String(pet.xy_pi_nickname || '未命名伙伴')}</h2>
+                      <p className="mb-3 mt-1 text-sm font-semibold text-[#64846A]">{species ? String(species.xy_ps_name) : '成长伙伴'} · 一起采蜜成长</p>
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         <span className="rounded-pill px-3 py-1 text-xs font-semibold" style={{ background: 'var(--color-accent-weak)', color: 'var(--color-accent)' }}>
                           Lv.{level} {STAGE_LABEL[stage]}
@@ -226,7 +274,6 @@ export default function ChildSpace() {
                         <span className="rounded-pill px-3 py-1 text-xs font-semibold" style={{ background: '#DCEFB4', color: '#4C6B3C' }} data-testid="child-coins">
                           ⭐ 星币 {coins}
                         </span>
-                        <span className="text-text-2 text-xs">{String(pet.xy_pi_nickname || '未命名')} · {species ? String(species.xy_ps_name) : ''}</span>
                       </div>
                       <div className="mb-1 flex justify-between text-xs" style={{ color: 'var(--color-text-3)' }}>
                         <span>成长值 {xp}</span>
@@ -271,35 +318,43 @@ export default function ChildSpace() {
                     </>
                   ) : (
                     <div data-testid="claim-panel">
-                      <div className="text-text-2 mb-2 text-sm">还没有伙伴,选一只认领吧(认领不会清零已有成长):</div>
-                      <div className="mb-3 flex flex-wrap gap-2">
-                        {speciesList.map((sp) => (
-                          <button
-                            key={String(sp.pid)}
-                            className="flex items-center gap-2 rounded-[var(--radius-card)] border px-3 py-2 text-sm"
-                            style={{ borderColor: 'var(--color-border)', background: 'var(--color-subtle)' }}
-                            onClick={() => {
-                              const enr = enrollments.find((e) => String(e.xy_enr_student) === String(student.pid));
-                              void run(() => xyExec('xy_pet_instance:claim', {
-                                student: String(student.pid),
-                                class: String(enr?.xy_enr_class || ''),
-                                species: String(sp.pid),
-                                nickname: claimNickname || String(student.xy_stu_name || '') + '的伙伴',
-                              }), `和 ${String(sp.xy_ps_name)} 成为伙伴啦!`);
-                            }}
-                          >
-                            <SpeciesCover url={String(sp.xy_ps_cover || '')} code={String(sp.xy_ps_code || '')} />
-                            {String(sp.xy_ps_name)}
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        className="text-text h-9 w-56 rounded-[var(--radius-control)] border px-3 text-sm outline-none"
-                        style={{ borderColor: 'var(--color-border)' }}
-                        placeholder="给它起个名字(可选)"
-                        value={claimNickname}
-                        onChange={(e2) => setClaimNickname(e2.target.value)}
-                      />
+                      <h2 className="mb-2 text-2xl font-semibold text-[#213D32]">{nickname || String(student.xy_stu_name || '')}</h2>
+                      <p className="text-sm font-semibold text-[#335946]">还没有认领伙伴</p>
+                      <p className="mt-1 text-sm text-[#718673]">选择喜欢的蜂种，再给它起个名字；认领不会清零已有成长。</p>
+                      {catalogError ? (
+                        <div className="mt-4 rounded-xl border border-[#E4D9A9] bg-[#FFFBEA] px-4 py-3 text-sm text-[#765D2A]" role="alert" data-testid="claim-catalog-error">
+                          暂时无法读取蜂种目录：{catalogError}。请刷新页面或联系学校管理员。
+                        </div>
+                      ) : speciesList.length === 0 ? (
+                        <div className="mt-4 rounded-xl border border-[#E4D9A9] bg-[#FFFBEA] px-4 py-3 text-sm text-[#765D2A]" role="status" data-testid="claim-catalog-empty">
+                          本校尚未启用蜂种和阶段素材，请学校管理员完成蜂耘内容初始化后再认领。
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="选择蜂种">
+                            {speciesList.map((sp) => {
+                              const selected = String(sp.pid) === claimSpeciesPid;
+                              return (
+                                <button key={String(sp.pid)} type="button" aria-pressed={selected} className={`rounded-2xl border p-3 text-center transition ${selected ? 'border-[#35745B] bg-[#EAF4E8] shadow-sm' : 'border-[#E1E8D2] bg-white hover:border-[#8FC1A5]'}`} onClick={() => setClaimSpeciesPid(String(sp.pid))}>
+                                  <span className="mx-auto grid h-28 w-28 place-items-center"><SpeciesCover url={String(sp.xy_ps_cover || '')} code={String(sp.xy_ps_code || '')} size={108} /></span>
+                                  <span className="mt-1 block text-sm font-semibold text-[#213D32]">{String(sp.xy_ps_name)}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <label htmlFor="claim-bee-nickname" className="mt-4 block text-sm font-semibold text-[#335946]">伙伴昵称（选填）</label>
+                          <input id="claim-bee-nickname" className="mt-2 h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border)] bg-white px-3 text-sm outline-none focus:border-[#35745B]" placeholder="例如：小蜜糖" value={claimNickname} onChange={(event) => setClaimNickname(event.target.value)} />
+                          <button type="button" disabled={!claimSpeciesPid} className="mt-4 w-full rounded-[var(--radius-control)] bg-[#35745B] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40" onClick={() => {
+                            const enr = enrollments.find((item) => String(item.xy_enr_student) === String(student.pid));
+                            void run(() => xyExec('xy_pet_instance:claim', {
+                              student: String(student.pid),
+                              class: String(enr?.xy_enr_class || ''),
+                              species: claimSpeciesPid,
+                              nickname: claimNickname.trim() || `${String(student.xy_stu_name || '')}的伙伴`,
+                            }), `和 ${String(claimSpecies?.xy_ps_name || '新伙伴')} 成为伙伴啦!`);
+                          }}>确认认领{claimSpecies ? ` · ${String(claimSpecies.xy_ps_name)}` : ''}</button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -309,7 +364,8 @@ export default function ChildSpace() {
             {/* skins */}
             {pet && skins.length > 0 && (
               <div className="mt-5" data-testid="skin-shop">
-                <div className="text-text mb-2 text-sm font-semibold">皮肤收藏</div>
+                <div className="mb-1 text-lg font-bold text-[#213D32]">伙伴装扮</div>
+                <p className="mb-3 text-sm text-[#718673]">只显示当前蜂种可穿戴的皮肤；切换蜂种不会丢失已收藏皮肤。</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {skins.map((sk) => {
                     const skinPid = String(sk.pid);
@@ -319,6 +375,9 @@ export default function ChildSpace() {
                     const minLv = Number(sk.xy_sk_min_level ?? 1);
                     return (
                       <div key={skinPid} className="rounded-card border p-3" style={{ borderColor: worn ? 'var(--color-accent)' : 'var(--color-border)', background: 'var(--color-panel)' }}>
+                        <div className="grid h-36 place-items-center rounded-xl bg-[#F1F6E9]">
+                          <SpeciesCover url={skinPreviews[skinPid] || ''} code={speciesCode} size={132} />
+                        </div>
                         <div className="text-text text-sm font-semibold">{String(sk.xy_sk_name)}</div>
                         <div className="text-text-2 mt-1 text-xs">
                           {isOwned ? '已拥有' : `Lv.${minLv} 解锁 · ⭐ ${price}`}
@@ -380,6 +439,8 @@ export default function ChildSpace() {
                 {error}
               </div>
             )}
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -397,10 +458,10 @@ export default function ChildSpace() {
   );
 }
 
-function SpeciesCover({ url, code }: { url: string; code: string }) {
+function SpeciesCover({ url, code, size = 40 }: { url: string; code: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [url]);
   return url && !broken
-    ? <img src={url} alt="" className="h-10 w-10 object-contain" onError={() => setBroken(true)} />
-    : <span className="text-xl" aria-hidden="true">{SPECIES_EMOJI[code] || '🐝'}</span>;
+    ? <img src={url} alt="" style={{ width: size, height: size }} className="object-contain" onError={() => setBroken(true)} />
+    : <span style={{ fontSize: size * 0.65 }} aria-hidden="true">{SPECIES_EMOJI[code] || '🐝'}</span>;
 }

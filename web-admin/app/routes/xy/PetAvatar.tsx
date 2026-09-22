@@ -93,7 +93,7 @@ export function PetAvatar({
           <img
             src={assetUrl}
             alt="成长伙伴"
-            className="h-full w-full object-contain p-2"
+            className={assetUrl?.endsWith('.png') ? 'h-full w-full scale-[1.2] object-contain' : 'h-full w-full object-contain p-2'}
             onError={() => setBroken(true)}
           />
         )
@@ -105,5 +105,4 @@ export function PetAvatar({
     </div>
   );
 }
-
 

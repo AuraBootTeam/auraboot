@@ -14,14 +14,19 @@ export interface XyRow {
 }
 
 export async function xyList(modelCode: string, filters: Array<Record<string, unknown>> = [], pageSize = 200): Promise<XyRow[]> {
+  const result = await xyListChecked(modelCode, filters, pageSize);
+  return result.rows;
+}
+
+export async function xyListChecked(modelCode: string, filters: Array<Record<string, unknown>> = [], pageSize = 200): Promise<{ rows: XyRow[]; error: string }> {
   const qs = filters.length
     ? `&filters=${encodeURIComponent(JSON.stringify(filters.map((f) => ({ fieldName: f.field, operator: 'EQ', value: f.value }))))}`
     : '';
   const result = await get<{ records?: XyRow[] }>(
     `/api/dynamic/${modelCode}/list?pageNum=1&pageSize=${pageSize}${qs}`,
   );
-  if (!ResultHelper.isSuccess(result)) return [];
-  return result.data?.records ?? [];
+  if (!ResultHelper.isSuccess(result)) return { rows: [], error: String((result as { message?: string }).message || '内容读取失败') };
+  return { rows: result.data?.records ?? [], error: '' };
 }
 
 export async function xyGet(modelCode: string, pid: string): Promise<XyRow | null> {
