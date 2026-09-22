@@ -57,6 +57,8 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for the authenticated user's stable public PID. */
     String CURRENT_USER_PID_KEY = "__currentUserPid";
 
+    String TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY = TenantRoleAssignmentAccessor.SETTINGS_KEY;
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -226,6 +228,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public DataAccessor dataAccessor() {
             Object da = settings != null ? settings.get(DATA_ACCESSOR_KEY) : null;
             return da instanceof DataAccessor ? (DataAccessor) da : null;
+        }
+
+        /** Host-owned tenant-scoped role bridge; never supplied by command payloads. */
+        public TenantRoleAssignmentAccessor tenantRoleAssignmentAccessor() {
+            Object accessor = settings != null ? settings.get(TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY) : null;
+            return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
         }
 
         /**
