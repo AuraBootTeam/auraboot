@@ -44,7 +44,7 @@ export default function ClassDisplay() {
   const [error, setError] = useState('');
   const [selectedPid, setSelectedPid] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(8);
   const compact = pageSize === 6;
   const [imageBroken, setImageBroken] = useState(false);
   const copy = useCallback((key: string, fallback: string) => t(`xy.display.${key}`, undefined, fallback), [t]);
@@ -105,7 +105,7 @@ export default function ClassDisplay() {
 
   useEffect(() => { setImageBroken(false); }, [tree.current?.asset]);
   useEffect(() => {
-    const fitProjection = () => setPageSize(window.innerHeight < 900 ? 6 : 12);
+    const fitProjection = () => setPageSize(window.innerHeight < 900 ? 6 : 8);
     fitProjection();
     window.addEventListener('resize', fitProjection);
     return () => window.removeEventListener('resize', fitProjection);
@@ -196,7 +196,7 @@ export default function ClassDisplay() {
                   {totalPages > 1 && <><button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded-lg border border-[#D9E5D5] bg-white px-3 py-1.5 disabled:opacity-40">{copy('previous', '上一页')}</button><span>{page + 1}/{totalPages}</span><button type="button" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)} className="rounded-lg border border-[#D9E5D5] bg-white px-3 py-1.5 disabled:opacity-40">{copy('next', '下一页')}</button></>}
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" data-testid="display-pets">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" data-testid="display-pets">
                 {visibleStudents.map((student) => <StudentCard key={student.pid} student={student} onClick={() => setSelectedPid(student.pid)} />)}
               </div>
               {students.length === 0 && <p className="mt-5 rounded-2xl bg-[#F4F8EE] p-6 text-center text-[#718673]">{copy('emptyRoster', '班级尚无同学，请先导入班级名册。')}</p>}
@@ -213,9 +213,9 @@ function StudentCard({ student, onClick }: { student: DisplayStudent; onClick: (
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [student.asset]);
   return (
-    <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#E0EAD9] bg-[#FAFCF7] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[#9CBF93] hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#35745B]" data-testid={`display-student-${student.pid}`}>
-      <div className="mx-auto grid h-20 w-20 place-items-center">
-        {student.asset && !broken ? <img src={student.asset} alt={`${student.name}的${student.species}`} className="h-full w-full object-contain" onError={() => setBroken(true)} /> : <span className="text-5xl" role="img" aria-label="待认领伙伴">🐝</span>}
+    <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#E0EAD9] bg-[#FAFCF7] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#9CBF93] hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#35745B]" data-testid={`display-student-${student.pid}`}>
+      <div className="mx-auto grid h-40 w-40 place-items-center sm:h-44 sm:w-44">
+        {student.asset && !broken ? <img src={student.asset} alt={`${student.name}的${student.species}`} className={student.asset.endsWith('.png') ? 'h-full w-full scale-[1.2] object-contain' : 'h-full w-full object-contain'} onError={() => setBroken(true)} /> : <span className="text-6xl" role="img" aria-label="待认领伙伴">🐝</span>}
       </div>
       <strong className="mt-1 block truncate text-base">{student.name}</strong>
       <span className="block truncate text-xs text-[#658064]">{student.species ? `${student.nickname || '等待起昵称'} · ${student.species}` : '伙伴待认领'}</span>
@@ -240,7 +240,7 @@ function StudentDetails({ student, close, copy }: { student: DisplayStudent; clo
           <button type="button" onClick={close} className="rounded-full border border-[#D9E5D5] bg-white px-4 py-2 text-sm font-semibold" aria-label={copy('close', '关闭详情')}>{copy('close', '关闭')}</button>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-6 rounded-2xl bg-[#EEF5E9] p-4">
-          <div className="grid h-32 w-32 place-items-center">{student.asset && !broken ? <img src={student.asset} alt={`${student.species} ${student.stage}`} className="h-full w-full object-contain" onError={() => setBroken(true)} /> : <span className="text-6xl">🐝</span>}</div>
+          <div className="grid h-48 w-48 place-items-center sm:h-56 sm:w-56">{student.asset && !broken ? <img src={student.asset} alt={`${student.species} ${student.stage}`} className={student.asset.endsWith('.png') ? 'h-full w-full scale-[1.2] object-contain' : 'h-full w-full object-contain'} onError={() => setBroken(true)} /> : <span className="text-7xl">🐝</span>}</div>
           <div className="flex flex-1 flex-wrap gap-6"><div><span className="block text-xs text-[#718673]">{copy('level', '成长等级')}</span><strong className="text-3xl">Lv.{student.level || 1}</strong></div><div><span className="block text-xs text-[#718673]">{copy('nectar', '花蜜')}</span><strong className="text-3xl">{number(student.xp)}</strong></div><div><span className="block text-xs text-[#718673]">{copy('weeklyScore', '本周净积分')}</span><strong className="text-3xl">{student.weekScore > 0 ? '+' : ''}{student.weekScore}</strong></div></div>
         </div>
         <h3 className="mt-6 text-lg font-bold">{copy('publicRecords', '公开评分记录')}</h3>

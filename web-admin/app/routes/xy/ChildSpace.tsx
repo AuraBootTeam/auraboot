@@ -256,16 +256,17 @@ export default function ChildSpace() {
             {/* pet hero */}
             <div className="rounded-card-lg border p-6" style={{ background: 'var(--color-panel)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-pop)' }} data-testid="child-hero">
               <div className="flex flex-col gap-6 sm:flex-row">
-                {pet ? <PetAvatar assetUrl={assetUrl} speciesCode={speciesCode} size={170} /> : (
-                  <div className="grid h-[170px] w-[170px] shrink-0 place-items-center rounded-[28px] bg-[#F1F6E9]">
-                    {claimSpecies ? <SpeciesCover url={String(claimSpecies.xy_ps_cover || '')} code={String(claimSpecies.xy_ps_code || '')} size={142} /> : <span className="text-6xl" aria-hidden="true">🐝</span>}
+                {pet ? <PetAvatar assetUrl={assetUrl} speciesCode={speciesCode} size={300} /> : (
+                  <div className="grid h-[300px] w-[300px] shrink-0 place-items-center rounded-[28px] bg-[#F1F6E9]">
+                    {claimSpecies ? <SpeciesCover url={String(claimSpecies.xy_ps_cover || '')} code={String(claimSpecies.xy_ps_code || '')} size={270} /> : <span className="text-8xl" aria-hidden="true">🐝</span>}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="text-text-2 text-xs">正在管理的同学</div>
-                  <div className="text-text mb-1 text-2xl font-semibold">{nickname || String(student.xy_stu_name || '')}</div>
+                  <div className="text-text-2 text-xs">正在管理的同学 · {nickname || String(student.xy_stu_name || '')}</div>
                   {pet ? (
                     <>
+                      <h2 className="mt-1 text-3xl font-bold text-[#213D32]">{String(pet.xy_pi_nickname || '未命名伙伴')}</h2>
+                      <p className="mb-3 mt-1 text-sm font-semibold text-[#64846A]">{species ? String(species.xy_ps_name) : '成长伙伴'} · 一起采蜜成长</p>
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         <span className="rounded-pill px-3 py-1 text-xs font-semibold" style={{ background: 'var(--color-accent-weak)', color: 'var(--color-accent)' }}>
                           Lv.{level} {STAGE_LABEL[stage]}
@@ -273,7 +274,6 @@ export default function ChildSpace() {
                         <span className="rounded-pill px-3 py-1 text-xs font-semibold" style={{ background: '#DCEFB4', color: '#4C6B3C' }} data-testid="child-coins">
                           ⭐ 星币 {coins}
                         </span>
-                        <span className="text-text-2 text-xs">{String(pet.xy_pi_nickname || '未命名')} · {species ? String(species.xy_ps_name) : ''}</span>
                       </div>
                       <div className="mb-1 flex justify-between text-xs" style={{ color: 'var(--color-text-3)' }}>
                         <span>成长值 {xp}</span>
@@ -318,6 +318,7 @@ export default function ChildSpace() {
                     </>
                   ) : (
                     <div data-testid="claim-panel">
+                      <h2 className="mb-2 text-2xl font-semibold text-[#213D32]">{nickname || String(student.xy_stu_name || '')}</h2>
                       <p className="text-sm font-semibold text-[#335946]">还没有认领伙伴</p>
                       <p className="mt-1 text-sm text-[#718673]">选择喜欢的蜂种，再给它起个名字；认领不会清零已有成长。</p>
                       {catalogError ? (
@@ -335,7 +336,7 @@ export default function ChildSpace() {
                               const selected = String(sp.pid) === claimSpeciesPid;
                               return (
                                 <button key={String(sp.pid)} type="button" aria-pressed={selected} className={`rounded-2xl border p-3 text-center transition ${selected ? 'border-[#35745B] bg-[#EAF4E8] shadow-sm' : 'border-[#E1E8D2] bg-white hover:border-[#8FC1A5]'}`} onClick={() => setClaimSpeciesPid(String(sp.pid))}>
-                                  <span className="mx-auto grid h-20 w-20 place-items-center"><SpeciesCover url={String(sp.xy_ps_cover || '')} code={String(sp.xy_ps_code || '')} size={76} /></span>
+                                  <span className="mx-auto grid h-28 w-28 place-items-center"><SpeciesCover url={String(sp.xy_ps_cover || '')} code={String(sp.xy_ps_code || '')} size={108} /></span>
                                   <span className="mt-1 block text-sm font-semibold text-[#213D32]">{String(sp.xy_ps_name)}</span>
                                 </button>
                               );
@@ -374,8 +375,8 @@ export default function ChildSpace() {
                     const minLv = Number(sk.xy_sk_min_level ?? 1);
                     return (
                       <div key={skinPid} className="rounded-card border p-3" style={{ borderColor: worn ? 'var(--color-accent)' : 'var(--color-border)', background: 'var(--color-panel)' }}>
-                        <div className="grid h-24 place-items-center rounded-xl bg-[#F1F6E9]">
-                          <SpeciesCover url={skinPreviews[skinPid] || ''} code={speciesCode} size={88} />
+                        <div className="grid h-36 place-items-center rounded-xl bg-[#F1F6E9]">
+                          <SpeciesCover url={skinPreviews[skinPid] || ''} code={speciesCode} size={132} />
                         </div>
                         <div className="text-text text-sm font-semibold">{String(sk.xy_sk_name)}</div>
                         <div className="text-text-2 mt-1 text-xs">
