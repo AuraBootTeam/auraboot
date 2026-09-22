@@ -18,4 +18,9 @@ describe('motionPacketForAsset', () => {
     );
     expect(motionPacketForAsset(null)).toBeNull();
   });
+
+  it('keeps refreshed raster artwork on the static image path', () => {
+    expect(motionPacketForAsset('/static/xiaoya/themes/reading/stage_3.png')).toBeNull();
+    expect(motionPacketForAsset('/static/xiaoya/class-tree/stage_5.png')).toBeNull();
+  });
 });
