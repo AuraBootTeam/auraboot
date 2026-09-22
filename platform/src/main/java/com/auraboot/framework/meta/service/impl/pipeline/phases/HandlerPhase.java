@@ -42,6 +42,13 @@ import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
+import com.auraboot.framework.plugin.extension.TenantRoleAssignmentAccessor;
+import com.auraboot.framework.plugin.pf4j.TenantRoleAssignmentAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.IdentityDirectoryAccessorImpl;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
+import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.service.UserService;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -95,6 +102,12 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private RecordShareAccessor recordShareAccessor;
+
+    @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
+    @Autowired private RoleMapper roleMapper;
+    @Autowired private UserRoleService userRoleService;
+    @Autowired private TenantMemberService tenantMemberService;
+    @Autowired private UserService userService;
 
     @Override public String name() { return "handler"; }
 
@@ -571,6 +584,9 @@ public class HandlerPhase implements CommandPhase {
             }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+            pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
+                    new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
+                            roleMapper, userRoleService, tenantMemberService, userService));
             if (biTemporalService != null) {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));
