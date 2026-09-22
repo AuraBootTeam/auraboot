@@ -15,6 +15,8 @@ import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
@@ -78,6 +80,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private RecordShareAccessor recordShareAccessor;
     @Autowired(required = false)
     private PlatformTransactionManager platformTransactionManager;
+    @Autowired(required = false)
+    private ObjectProvider<AsyncTaskServiceImpl> asyncTaskServiceProvider;
+    @Autowired(required = false)
+    private CommandEffectExecutor commandEffectExecutor;
 
     @Autowired
     private com.auraboot.framework.tenant.service.TenantMemberService tenantMemberService;
@@ -108,6 +114,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         Long commandExpectedVersion = longValue(inputParams, "commandExpectedVersion");
         Map<String, Object> payload = mapValue(inputParams.get("payload"));
         Map<String, Object> handlerParams = mapValue(inputParams.get("handlerParams"));
+        long startedAt = System.nanoTime();
 
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
         if (pluginHandler.isEmpty()) {
@@ -161,6 +168,15 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                         commandExpectedVersion);
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+            // A command launched by an async handler may itself enqueue a follow-up
+            // command (for example, attachment upload -> Gerber parse). Resolve the
+            // task service lazily to avoid a bean cycle with its executor registry.
+            AsyncTaskServiceImpl asyncTaskService = asyncTaskServiceProvider == null
+                    ? null : asyncTaskServiceProvider.getIfAvailable();
+            if (asyncTaskService != null) {
+                pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
+                        new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
+            }
             if (platformTransactionManager != null) {
                 pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
                         new IndependentTransactionAccessorImpl(platformTransactionManager, dynamicDataService));
@@ -236,10 +252,15 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             JsonNode data = result == null
                     ? objectMapper.createObjectNode()
                     : objectMapper.valueToTree(result);
+            recordAsyncAudit(tenantId, userId, commandCode != null ? commandCode : handlerCode, payload,
+                    result instanceof Map<?, ?> ? mapValue(data) : Map.of(),
+                    true, null, startedAt);
             return AsyncTaskResult.ok(data);
         } catch (CommandHandlerInvocationException wrapped) {
             log.error("Async command handler {} failed", handlerCode, wrapped.getCause());
             Throwable cause = wrapped.getCause();
+            recordAsyncAudit(tenantId, userId, commandCode != null ? commandCode : handlerCode, payload,
+                    Map.of(), false, cause.getMessage(), startedAt);
             return failureResult(cause);
         } catch (Exception ex) {
             // Async-task boundary: any handler failure (CommandHandlerExtension.execute
@@ -247,12 +268,24 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             // not swallowed and not rethrown — so the task framework records FAILED with
             // the message. This is a terminal boundary catch, not a self-heal/fallback.
             log.error("Async command handler {} failed", handlerCode, ex);
+            recordAsyncAudit(tenantId, userId, commandCode != null ? commandCode : handlerCode, payload,
+                    Map.of(), false, ex.getMessage(), startedAt);
             return failureResult(ex);
         } finally {
             queryScope.close();
             MetaContext.clear();
             MetaContext.restore(previousContext);
         }
+    }
+
+    private void recordAsyncAudit(Long tenantId, Long userId, String commandCode,
+                                  Map<String, Object> payload, Map<String, Object> result,
+                                  boolean success, String error, long startedAt) {
+        if (commandEffectExecutor == null) return;
+        commandEffectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
+                payload, result, success, error,
+                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt),
+                "async_handler", Map.of());
     }
 
     private AsyncTaskResult failureResult(Throwable failure) {

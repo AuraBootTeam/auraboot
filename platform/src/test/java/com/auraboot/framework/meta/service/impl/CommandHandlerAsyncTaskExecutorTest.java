@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class CommandHandlerAsyncTaskExecutorTest {
 
@@ -161,6 +163,48 @@ class CommandHandlerAsyncTaskExecutorTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getData().get("importedRows").asInt()).isEqualTo(35924);
         assertThat(result.getData().get("success").asBoolean()).isTrue();
+    }
+
+    @Test
+    void async_handler_receives_follow_up_bridge_and_writes_execution_audit() throws Exception {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AsyncTaskServiceImpl> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(mock(AsyncTaskServiceImpl.class));
+        ReflectionTestUtils.setField(executor, "asyncTaskServiceProvider", provider);
+        CommandEffectExecutor effects = mock(CommandEffectExecutor.class);
+        ReflectionTestUtils.setField(executor, "commandEffectExecutor", effects);
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            CommandHandlerExtension.CommandContext context = inv.getArgument(0);
+            assertThat(context.asyncTaskAccessor()).isNotNull();
+            return Map.of("parsed", true);
+        });
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+
+        assertThat(executor.execute(params("bom:import_material_library"), noop).isSuccess()).isTrue();
+        verify(effects).saveAuditLog(eq(123L), eq("bom:import_material_library"),
+                org.mockito.ArgumentMatchers.isNull(), eq(45L),
+                org.mockito.ArgumentMatchers.argThat(payload -> "01KFILE".equals(payload.get("source_file_id"))),
+                eq(Map.of("parsed", true)), eq(true), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.anyLong(), eq("async_handler"), eq(Map.of()));
+    }
+
+    @Test
+    void failed_async_handler_writes_failure_audit() throws Exception {
+        CommandEffectExecutor effects = mock(CommandEffectExecutor.class);
+        ReflectionTestUtils.setField(executor, "commandEffectExecutor", effects);
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalStateException("parse failed"));
+        when(extensionRegistry.getCommandHandler("bom:import_material_library"))
+                .thenReturn(Optional.of(handler));
+
+        assertThat(executor.execute(params("bom:import_material_library"), noop).isSuccess()).isFalse();
+        verify(effects).saveAuditLog(eq(123L), eq("bom:import_material_library"),
+                org.mockito.ArgumentMatchers.isNull(), eq(45L),
+                org.mockito.ArgumentMatchers.anyMap(), eq(Map.of()), eq(false), eq("parse failed"),
+                org.mockito.ArgumentMatchers.anyLong(), eq("async_handler"), eq(Map.of()));
     }
 
     @Test
