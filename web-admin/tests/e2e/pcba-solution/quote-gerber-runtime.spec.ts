@@ -226,9 +226,10 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
           source_file_id: fileId,
           attachment_type: 'gerber_package',
           filename: name,
+          auto_recompute_after_upload: true,
         }, targetRecordPid: created.quoteId, targetRecordId: created.quoteId, operationType: 'update' } },
       );
-      return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+      return { fileId, status: resp.status(), body: await resp.json().catch(() => ({})) };
     };
 
     const linePid = String(
@@ -246,52 +247,42 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     expect(reparse.status, 're-parse upload accepted').toBe(200);
     expect(String(reparse.body.code)).toBe('0');
 
-    // 等待自动解析完成(经审计管线异步执行)
-    await expect
-      .poll(
-        async () =>
-          (await queryDynamicRecords(page, 'qo_quote_line_common', [
-            { fieldName: 'pid', operator: 'EQ', value: linePid },
-          ]))[0]?.qo_ql_gerber_parse_status,
-        { timeout: 90_000, intervals: [1000, 2000] },
-      )
-      .toBe('parsed');
+    // 上传命令异步返回；先等待本次附件落库。旧行本来就是 parsed，不能用它
+    // 当作新上传的完成信号，也不能手动再执行 parse_gerber 来制造审计证据。
+    const gerberFileId = reparse.fileId;
+    expect(gerberFileId).toMatch(/^[A-Za-z0-9]+$/);
+    await expect.poll(async () => {
+      const attachments = await queryDynamicRecords(page, 'qo_rfq_source_attachment_common', [
+        { fieldName: 'qo_rsa_file_id', operator: 'EQ', value: gerberFileId },
+      ]);
+      return attachments.some((row) =>
+        String(row.qo_rsa_type) === 'gerber_package'
+        && String(row.qo_rsa_file_id) === gerberFileId);
+    }, { timeout: 90_000, intervals: [1000, 2000] }).toBeTruthy();
 
-    // 显式命令执行:经产品命令 API 对同一行再执行 parse_gerber(自动链的解析证据 +
-    // 命令管线审计双层留痕)
-    const attachment = await queryDynamicRecords(page, 'qo_rfq_source_attachment_common', [
-      { fieldName: 'qo_rsa_filename', operator: 'EQ', value: 'q03-audit-package.zip' },
-    ]);
-    const gerberFileId = String(
-      [...attachment].reverse().find((row) => String(row.qo_rsa_type) === 'gerber_package')?.qo_rsa_file_id ?? '',
-    );
-    expect(gerberFileId, 'gerber archive attachment resolves').toBeTruthy();
-    const explicitParse = await page.request.post(
-      '/api/meta/commands/execute/qo_quote_line_common:parse_gerber',
-      { data: { payload: { gerber_archive_file_id: gerberFileId }, targetRecordPid: linePid, targetRecordId: linePid, operationType: 'update' } },
-    );
-    expect(explicitParse.ok(), 'explicit parse_gerber execution accepted').toBe(true);
-
-    // 审计断言:ab_command_audit_log 出现显式 parse_gerber 执行记录
-    const auditCount = Number(
-      execFileSync('psql', [
+    // 仅接受自动链对本次唯一文件写出的审计；历史行或显式手动解析都不能满足它。
+    const auditCountForUpload = () => Number(execFileSync('psql', [
         '-h', process.env.PG_HOST || '127.0.0.1',
         '-p', process.env.PG_PORT || '5432',
         '-U', process.env.PG_USER || 'auraboot',
         '-d', process.env.PG_DB || 'enterprise_105',
         '-tAc',
-        "SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND created_at > now() - interval '15 minutes'",
+        `SELECT count(*) FROM ab_command_audit_log WHERE command_code = 'qo_quote_line_common:parse_gerber' AND request_payload->>'gerber_archive_file_id' = '${gerberFileId}'`,
       ], {
         env: { ...process.env, PGPASSWORD: process.env.POSTGRES_PASSWORD || 'auraboot' },
         timeout: 30_000,
-      }).toString().trim(),
-    );
-    expect(
-      auditCount,
-      'parse_gerber executions are audited in ab_command_audit_log',
-    ).toBeGreaterThanOrEqual(1);
+      }).toString().trim());
+    await expect.poll(auditCountForUpload, {
+      message: 'automatic parse_gerber execution is audited for this upload',
+      timeout: 90_000,
+      intervals: [1000, 2000],
+    }).toBeGreaterThanOrEqual(1);
+    const parseStatus = (await queryDynamicRecords(page, 'qo_quote_line_common', [
+      { fieldName: 'pid', operator: 'EQ', value: linePid },
+    ]))[0]?.qo_ql_gerber_parse_status;
+    expect(parseStatus).toBe('parsed');
     await testInfo.attach('q03-04-audit-evidence', {
-      body: JSON.stringify({ linePid, parse_gerber_audit_rows: auditCount }),
+      body: JSON.stringify({ linePid, gerberFileId, parse_gerber_audit_rows: auditCountForUpload() }),
       contentType: 'application/json',
     });
   });

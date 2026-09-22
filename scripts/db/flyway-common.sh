@@ -30,6 +30,9 @@ PG_DB="${PG_DB:-${PGDATABASE:-}}"
 # containing this script (scripts/db/ -> repo root).
 AURA_CORE_ROOT="${AURA_CORE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CORE_MIGRATION_DIR="$AURA_CORE_ROOT/platform/src/main/resources/db/migration/core"
+if [[ -n "${AURA_FLYWAY_CORE_MIGRATION_DIR:-}" ]]; then
+  CORE_MIGRATION_DIR="$AURA_FLYWAY_CORE_MIGRATION_DIR"
+fi
 
 _require_db() {
   if [[ -z "$PG_DB" ]]; then
@@ -138,6 +141,9 @@ run_flyway() {
     "-validateMigrationNaming=true"
     "-cleanDisabled=true"
   )
+  if [[ "${AURA_FLYWAY_OUT_OF_ORDER:-}" == 1 ]]; then
+    args+=("-outOfOrder=true")
+  fi
   echo "[flyway] $cmd  db=$PG_DB  edition=$edition" >&2
   echo "[flyway] locations=$locations" >&2
   if [ "$cmd" = "migrate" ]; then
