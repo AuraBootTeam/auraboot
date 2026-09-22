@@ -1,336 +1,255 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
-import { useTenantTheme } from '~/contexts/TenantThemeContext';
-import { xyList, xyGet, SPECIES_EMOJI, type XyRow } from './eduApi';
-import { PetAvatar, usePetVisual } from './PetAvatar';
-import { FengyunMotionArtwork, motionPacketForAsset } from './FengyunMotion';
+import { useI18n } from '~/contexts/I18nContext';
+import { xyExec } from './eduApi';
 
-/**
- * Fengyun class display (班级大屏) — read-only surface for the classroom screen:
- * class card, class tree (SOT 03 §7), shared-goal progress, recent praise
- * ticker, deduction records and the companion parade. No student rows are
- * editable here. Negative records are shown since the PRD 8.3 / FR-039 口径变更
- * (deductions public with mandatory reason) — deduction batches render in their
- * own card, never mixed into praise.
- *
- * Auth: same session as the console (revocable read-only session tokens stay
- * out of V4 scope — recorded in the acceptance report).
- * Data freshness: platform data-sync SSE push (FR-036), with a 5s polling
- * safety net for dropped connections.
- */
+interface ScoreRecord { rule: string; score: number; occurredAt: string }
+interface DisplayStudent {
+  pid: string;
+  name: string;
+  xp: number;
+  level: number;
+  stage: string;
+  weekScore: number;
+  nickname: string;
+  species: string;
+  asset: string;
+  records: ScoreRecord[];
+}
+interface DisplaySnapshot {
+  classPid: string;
+  className: string;
+  slogan: string;
+  themePid: string;
+  treeStages: string;
+  semesterXp: number;
+  weekStart: string;
+  classes: Array<{ pid: string; name: string }>;
+  students: DisplayStudent[];
+}
+interface TreeStage { name: string; minXp: number; asset: string }
+
+const number = (value: number) => new Intl.NumberFormat('zh-CN').format(value);
+const dateTime = (raw: string) => raw.slice(0, 16).replace('T', ' ');
+
+/** Read-only 16:9 classroom projection; the plugin command owns scope and public-data filtering. */
 export default function ClassDisplay() {
-  const { isAuthenticated, user } = useAuth();
-  const tenantTheme = useTenantTheme();
-  const params = useParams();
+  const { isAuthenticated } = useAuth();
+  const { t } = useI18n();
+  const { classPid } = useParams();
   const navigate = useNavigate();
-  const [classroom, setClassroom] = useState<XyRow | null>(null);
-  const [students, setStudents] = useState<XyRow[]>([]);
-  const [pets, setPets] = useState<XyRow[]>([]);
-  const [goal, setGoal] = useState<XyRow | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [praise, setPraise] = useState<XyRow[]>([]);
-  const [deductions, setDeductions] = useState<XyRow[]>([]);
-  const [treeStage, setTreeStage] = useState<{ name: string; minXp: number; asset: string } | null>(null);
-  const [treeNext, setTreeNext] = useState<{ name: string; minXp: number } | null>(null);
-  const [treeError, setTreeError] = useState<string | null>(null);
-  const [totalXp, setTotalXp] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [snapshot, setSnapshot] = useState<DisplaySnapshot | null>(null);
+  const [stages, setStages] = useState<TreeStage[]>([]);
+  const [error, setError] = useState('');
+  const [selectedPid, setSelectedPid] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(12);
+  const compact = pageSize === 6;
+  const [imageBroken, setImageBroken] = useState(false);
+  const copy = useCallback((key: string, fallback: string) => t(`xy.display.${key}`, undefined, fallback), [t]);
 
-  const load = useCallback(async (classPid: string) => {
-    const cls = classPid ? await xyGet('xy_classroom', classPid) : (await xyList('xy_classroom'))[0] ?? null;
-    if (!cls) {
-      setLoaded(true);
+  const load = useCallback(async () => {
+    const result = await xyExec('xy:class_display_snapshot', classPid ? { classPid } : {});
+    if (!result.ok) { setError(result.message || '班级大屏暂时无法加载'); return; }
+    const data = result.data as unknown as DisplaySnapshot;
+    if (!data.classPid) {
+      setSnapshot(null);
+      setStages([]);
+      setError('暂无可展示的班级');
       return;
     }
-    setClassroom(cls);
-    const enrs = await xyList('xy_enrollment', [
-      { field: 'xy_enr_class', value: String(cls.pid) },
-      { field: 'xy_enr_status', value: 'active' },
-    ]);
-    const stus: XyRow[] = [];
-    for (const e of enrs) {
-      const s = await xyGet('xy_student', String(e.xy_enr_student));
-      if (s && s.xy_stu_status === 'active') stus.push(s);
-    }
-    setStudents(stus);
-    const allPets = await xyList('xy_pet_instance');
-    setPets(allPets.filter((p) => p.xy_pi_status === 'active' && stus.some((s) => String(s.pid) === String(p.xy_pi_student))));
-    // Treehouse home (SOT 03 §7): stage config lives on the bound play theme and the
-    // reading is the class-TOTAL semester nectar. Broken config fails fast.
-    const xpSum = stus.reduce((acc, s) => acc + Number(s.xy_stu_xp_total ?? 0), 0);
-    setTotalXp(xpSum);
-    const themePid = String(cls.xy_cls_theme || '');
-    if (themePid) {
-      try {
-        const themeRow = await xyGet('xy_play_theme', themePid);
-        const stages = JSON.parse(String(themeRow?.xy_pt_stages ?? '[]')) as
-          Array<{ level?: unknown; name?: unknown; minXp?: unknown; asset?: unknown }>;
-        const valid = Array.isArray(stages) && stages.length > 0
-          && stages.every((s) => s && typeof s.name === 'string' && s.name
-            && Number.isFinite(Number(s.minXp)) && typeof s.asset === 'string' && s.asset);
-        if (!valid) throw new Error('empty or malformed stages');
-        const sorted = [...stages]
-          .map((s) => ({ name: String(s.name), minXp: Number(s.minXp), asset: String(s.asset) }))
-          .sort((a, b) => a.minXp - b.minXp);
-        const cur = [...sorted].reverse().find((s) => xpSum >= s.minXp) ?? sorted[0];
-        const next = sorted.find((s) => s.minXp > cur.minXp) ?? null;
-        setTreeStage(cur);
-        setTreeNext(next);
-        setTreeError(null);
-      } catch {
-        setTreeStage(null);
-        setTreeNext(null);
-        setTreeError('树屋家园阶段定义配置有误,请在电脑端玩法包中修正');
-      }
-    } else {
-      setTreeStage(null);
-      setTreeNext(null);
-      setTreeError(null);
-    }
-    const goals = await xyList('xy_class_goal', [
-      { field: 'xy_cg_class', value: String(cls.pid) },
-      { field: 'xy_cg_status', value: 'active' },
-    ]);
-    const g = goals[0] ?? null;
-    setGoal(g);
-    if (g) {
-      const entries = await xyList('xy_ledger_entry', [
-        { field: 'xy_le_goal', value: String(g.pid) },
-        { field: 'xy_le_currency', value: 'energy' },
-      ]);
-      setProgress(entries.reduce((acc, e) => acc + Number(e.xy_le_amount ?? 0), 0));
-    }
-    setPraise(await xyList('xy_evaluation', [
-      { field: 'xy_ev_class', value: String(cls.pid) },
-      { field: 'xy_ev_status', value: 'effective' },
-      { field: 'xy_ev_visibility', value: 'public' },
-    ]));
-    setDeductions(await xyList('xy_evaluation', [
-      { field: 'xy_ev_class', value: String(cls.pid) },
-      { field: 'xy_ev_status', value: 'effective' },
-      { field: 'xy_ev_kind', value: 'deduct' },
-    ]));
-    setLoaded(true);
-  }, []);
+    setSnapshot(data);
+    setError('');
+    if (!data.themePid) { setStages([]); return; }
+    try {
+      const parsed = JSON.parse(String(data.treeStages || '[]')) as TreeStage[];
+      if (!Array.isArray(parsed) || parsed.length !== 5 || !parsed.every((stage) => stage.name && stage.asset && Number.isFinite(Number(stage.minXp)))) throw new Error('bad stages');
+      setStages([...parsed].sort((a, b) => Number(a.minXp) - Number(b.minXp)));
+    } catch { setStages([]); setError('班级大树的阶段配置有误'); }
+  }, [classPid]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const classPid = String(params.classPid || '');
-    load(classPid);
-
-    // FR-036: real-time push over the platform data-sync SSE channel. The screen
-    // subscribes to the models it renders, so any command touching them (evaluation
-    // submitted, ledger entry, goal update) delivers a named `data:changed` event
-    // and the data reloads within the push latency. Named events never reach
-    // `onmessage`, so both listeners must be explicit. A 5s poll stays as the
-    // safety net while EventSource re-establishes a dropped connection.
-    const models = [
-      'xy_classroom',
-      'xy_enrollment',
-      'xy_student',
-      'xy_pet_instance',
-      'xy_play_theme',
-      'xy_class_goal',
-      'xy_ledger_entry',
-      'xy_evaluation',
-    ];
+    void load();
+    const timer = window.setInterval(() => void load(), 30000);
     const es = new EventSource('/api/notifications/stream', { withCredentials: true });
     es.addEventListener('data-sync-connected', (event) => {
       try {
         const { connectionId } = JSON.parse(String((event as MessageEvent).data)) as { connectionId: number };
         void fetch('/api/data-sync/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ connectionId, modelCodes: models }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ connectionId, modelCodes: [
+            'xy_classroom', 'xy_student', 'xy_enrollment', 'xy_pet_instance',
+            'xy_evaluation', 'xy_evaluation_line', 'xy_play_theme',
+          ] }),
         });
-      } catch {
-        // Malformed handshake frame — the fallback poll keeps the screen correct.
-      }
+      } catch { /* the polling safety net remains active */ }
     });
-    es.addEventListener('data:changed', () => void load(classPid));
+    es.addEventListener('data:changed', () => void load());
+    return () => { window.clearInterval(timer); es.close(); };
+  }, [isAuthenticated, load]);
 
-    const timer = setInterval(() => load(classPid), 5000);
-    return () => {
-      es.close();
-      clearInterval(timer);
-    };
-  }, [isAuthenticated, params.classPid, load]);
+  const students = snapshot?.students ?? [];
+  const selected = students.find((student) => student.pid === selectedPid) ?? null;
+  const totalPages = Math.max(1, Math.ceil(students.length / pageSize));
+  const visibleStudents = students.slice(page * pageSize, (page + 1) * pageSize);
+  const tree = useMemo(() => {
+    const xp = snapshot?.semesterXp ?? 0;
+    const current = [...stages].reverse().find((stage) => xp >= Number(stage.minXp)) ?? stages[0];
+    const next = stages.find((stage) => Number(stage.minXp) > xp);
+    return { current, next, progress: current && next
+      ? Math.max(0, Math.min(100, ((xp - Number(current.minXp)) / (Number(next.minXp) - Number(current.minXp))) * 100))
+      : 100 };
+  }, [snapshot?.semesterXp, stages]);
+
+  useEffect(() => { setImageBroken(false); }, [tree.current?.asset]);
+  useEffect(() => {
+    const fitProjection = () => setPageSize(window.innerHeight < 900 ? 6 : 12);
+    fitProjection();
+    window.addEventListener('resize', fitProjection);
+    return () => window.removeEventListener('resize', fitProjection);
+  }, []);
+  useEffect(() => { setPage(0); setSelectedPid(''); }, [snapshot?.classPid]);
+  useEffect(() => { if (page >= totalPages) setPage(totalPages - 1); }, [page, totalPages]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-
-  const name = classroom ? String(classroom.xy_cls_alias || classroom.xy_cls_name || '') : '';
-  const target = goal ? Number(goal.xy_cg_target_energy ?? 0) : 0;
-  const pct = target > 0 ? Math.min(100, Math.round((progress / target) * 100)) : 0;
-
   return (
-    <div className="min-h-screen p-8" style={{ background: '#EEF3E1' }} data-testid="class-display">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>🐝 CLASS GROWTH · 共同目标</div>
-            <h1 className="mt-1 text-4xl font-bold tracking-tight" style={{ color: '#213D32' }} data-testid="display-title">
-              {loaded ? name || '班级大屏' : '加载中…'}
-            </h1>
-            {classroom && <p className="mt-1 text-sm" style={{ color: '#8C9B79' }}>{String(classroom.xy_cls_slogan || '')}</p>}
-            {tenantTheme?.brandName && (
-              <p className="mt-1 text-xs font-semibold tracking-wide" style={{ color: '#7C9271' }} data-testid="display-brand">{tenantTheme.brandName}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="rounded-pill px-3 py-1.5 text-xs" style={{ background: '#FFFFFF99', color: '#426B3E' }} data-testid="display-identity">
-              大屏账号:{user?.name || '未登录'}
-            </span>
-            <button className="rounded-pill px-3 py-1.5 text-xs" style={{ background: '#FFFFFF66', color: '#426B3E' }} onClick={() => navigate('/')}>
-              退出大屏
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-8 grid items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
-          {/* goal progress */}
-          <div className="rounded-card-lg border p-8" style={{ background: '#FFFFFFB5', borderColor: '#E1E8D2' }} data-testid="display-goal">
-            <div className="text-lg font-semibold" style={{ color: '#213D32' }}>
-              {goal ? String(goal.xy_cg_name) : '暂无进行中的目标'}
+    <main className="min-h-screen px-5 py-5 text-[#213D32] sm:px-8 lg:px-10" style={{ background: 'radial-gradient(circle at 8% 8%, #FDFCEB 0%, #F1F6E7 39%, #E8F0E3 100%)' }} data-testid="class-display">
+      <div className="mx-auto max-w-[1900px]">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#DCE8D4] pb-4">
+          <div className="flex items-center gap-4">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#E8B94A] text-2xl shadow-sm" aria-hidden="true">🐝</span>
+            <div>
+              <p className="text-xs font-bold tracking-[0.2em] text-[#698569]">{copy('eyebrow', '蜂耘 · 班级成长')}</p>
+              <h1 className="text-2xl font-black tracking-tight sm:text-3xl" data-testid="display-title">{snapshot?.className || copy('title', '班级大屏')}</h1>
             </div>
-            {goal && (
-              <>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-5xl font-bold" style={{ color: '#35745B' }} data-testid="display-progress">🍯{progress}</span>
-                  <span className="text-base" style={{ color: '#91A17A' }}>/ {target} 能量</span>
-                </div>
-                <div className="mt-4 h-3 overflow-hidden rounded-pill" style={{ background: '#E3EAD6' }}>
-                  <div className="h-full rounded-pill transition-all duration-700" style={{ width: `${pct}%`, background: '#93B275' }} />
-                </div>
-                <p className="mt-2 text-xs" style={{ color: '#91A17A' }}>每一次公开表扬都会为全班目标添一份能量(冲正已自动纠正)</p>
-              </>
-            )}
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {snapshot && snapshot.classes?.length > 1 && (
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                {copy('chooseClass', '展示班级')}
+                <select className="rounded-xl border border-[#D9E5D5] bg-white px-3 py-2" value={snapshot.classPid} onChange={(event) => navigate(`/xy/display/${event.target.value}`)}>
+                  {snapshot.classes.map((cls) => <option key={cls.pid} value={cls.pid}>{cls.name}</option>)}
+                </select>
+              </label>
+            )}
+            <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-[#547157]">{copy('weekRank', '本周积分榜')}</span>
+            <button type="button" className="rounded-full border border-[#D9E5D5] bg-white px-4 py-2 text-sm font-semibold" onClick={() => navigate('/')}>{copy('exit', '退出大屏')}</button>
+          </div>
+        </header>
 
-          {/* recent praise */}
-          <div className="rounded-card-lg border p-6" style={{ background: '#FFFFFFB5', borderColor: '#E1E8D2' }} data-testid="display-praise">
-            <div className="mb-3 text-sm font-semibold" style={{ color: '#213D32' }}>最近的表扬</div>
-            <div className="space-y-3">
-              {praise.slice(0, 6).map((p) => (
-                <div key={String(p.pid)} className="flex items-center gap-3 border-b pb-3 text-sm last:border-0 last:pb-0" style={{ borderColor: '#EEF1E6' }}>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: '#EEF3E4' }}>🌟</span>
-                  <div className="min-w-0">
-                    <div className="truncate font-medium" style={{ color: '#213D32' }}>
-                      {String(p.xy_ev_rule_name)} {p.xy_ev_target_type === 'class' ? '· 全班' : p.xy_ev_target_type === 'group' ? '· 小组' : ''} +{String(p.xy_ev_score)}
-                    </div>
-                    <div className="text-xs" style={{ color: '#9AA88C' }}>{String(p.xy_ev_target_count ?? '')} 位同学 · {String(p.xy_ev_occurred_at || '').slice(0, 16).replace('T', ' ')}</div>
+        {error && <div role="alert" className="mt-4 rounded-xl border border-[#E7BBB1] bg-[#FFF6F3] px-4 py-3 text-sm text-[#914B3F]">{error}</div>}
+        {!snapshot && !error && <div className="mt-12 text-center text-lg text-[#6B806C]">{copy('loading', '正在加载班级成长…')}</div>}
+        {snapshot && (
+          <>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <section className={`relative overflow-hidden rounded-[32px] border border-[#DFE9D6] bg-white/85 shadow-[0_18px_60px_-40px_#416747] ${compact ? 'min-h-[300px] p-4' : 'min-h-[340px] p-5 sm:p-6'}`} data-testid="display-tree">
+                <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#F7E6A0]/40" aria-hidden="true" />
+                <p className="relative text-xs font-bold tracking-[0.2em] text-[#6B896A]">{copy('treeLabel', '班级大树 · 集体成长')}</p>
+                <div className="relative flex h-full flex-col items-center gap-5 sm:flex-row">
+                  <div className={`grid shrink-0 place-items-center ${compact ? 'h-[210px] w-[210px]' : 'h-[230px] w-[230px] sm:h-[260px] sm:w-[260px]'}`} data-testid="display-tree-artwork">
+                    {tree.current?.asset && !imageBroken
+                      ? <img src={tree.current.asset} alt={`${tree.current.name}班级大树`} className="h-full w-full object-contain drop-shadow-[0_18px_14px_rgba(76,103,52,0.14)]" onError={() => setImageBroken(true)} />
+                      : <span className="text-8xl" role="img" aria-label="班级大树">🌱</span>}
+                  </div>
+                  <div className="min-w-0 flex-1 self-center">
+                    <p className="text-sm font-semibold text-[#789176]">{copy('semesterNectar', '本学期全班花蜜')}</p>
+                    <p className="mt-1 text-5xl font-black tabular-nums text-[#2B604A] sm:text-6xl" data-testid="display-tree-total">{number(snapshot.semesterXp)}</p>
+                    <h2 className="mt-4 text-2xl font-bold" data-testid="display-tree-stage">{tree.current?.name || copy('stagePending', '成长阶段待配置')}</h2>
+                    {tree.next ? (
+                      <>
+                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#E4EED8]" role="progressbar" aria-valuenow={Math.round(tree.progress)} aria-valuemin={0} aria-valuemax={100}>
+                          <div className="h-full rounded-full bg-[#8DB16C] transition-all duration-700" style={{ width: `${tree.progress}%` }} />
+                        </div>
+                        <p className="mt-2 text-sm font-medium text-[#658064]">{copy('nextStage', '距离下一阶段')}「{tree.next.name}」{copy('remaining', '还差')} {number(Number(tree.next.minXp) - snapshot.semesterXp)} {copy('nectar', '花蜜')}</p>
+                      </>
+                    ) : <p className="mt-3 text-sm text-[#658064]">{copy('maxStage', '已到当前最高阶段，继续一起成长。')}</p>}
                   </div>
                 </div>
-              ))}
-              {praise.length === 0 && <div className="text-sm" style={{ color: '#9AA88C' }}>还没有记录,今天也要加油哦</div>}
-            </div>
-          </div>
-        </div>
+              </section>
 
-        {/* treehouse home (SOT 03 §7): grows with the class-total semester nectar */}
-        <div
-          className="mt-8 flex items-center gap-6 rounded-card-lg border p-6"
-          style={{ background: '#FFFFFFB5', borderColor: '#E1E8D2' }}
-          data-testid="display-tree"
-        >
-          {treeError ? (
-            <div className="text-sm" style={{ color: '#8C3A36' }}>🌳 {treeError}</div>
-          ) : treeStage ? (
-            <>
-              {motionPacketForAsset(treeStage.asset) ? (
-                <FengyunMotionArtwork
-                  assetUrl={treeStage.asset}
-                  alt={treeStage.name}
-                  size={160}
-                  idleClip="ambient_idle"
-                  className="shrink-0"
-                />
-              ) : (
-                <img src={treeStage.asset} alt={treeStage.name} className="h-40 w-40 shrink-0" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold tracking-[2px]" style={{ color: '#7C9271' }}>🌳 树屋家园 · 共同成长</div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-bold" style={{ color: '#213D32' }} data-testid="display-tree-stage">{treeStage.name}</span>
-                  <span className="text-sm" style={{ color: '#8C9B79' }} data-testid="display-tree-total">🌼 {totalXp} 花蜜</span>
+              <section className={`rounded-[32px] border border-[#DFE9D6] bg-white/85 shadow-[0_18px_60px_-40px_#416747] ${compact ? 'p-4' : 'p-5 sm:p-6'}`} data-testid="display-ranking">
+                <div className="flex items-end justify-between gap-2">
+                  <div><p className="text-xs font-bold tracking-[0.2em] text-[#6B896A]">{copy('weekly', '本周成长')}</p><h2 className="mt-1 text-2xl font-black">{copy('rankTitle', '积分排行榜')}</h2></div>
+                  <span className="text-xs text-[#789176]">{snapshot.weekStart} {copy('since', '起 · 净积分')}</span>
                 </div>
-                {treeNext ? (
-                  <>
-                    <div className="mt-3 h-2.5 overflow-hidden rounded-pill" style={{ background: '#E3EAD6' }}>
-                      <div
-                        className="h-full rounded-pill transition-all duration-700"
-                        style={{ width: `${Math.min(100, Math.round(((totalXp - treeStage.minXp) / Math.max(1, treeNext.minXp - treeStage.minXp)) * 100))}%`, background: '#93B275' }}
-                      />
-                    </div>
-                    <p className="mt-1.5 text-xs" style={{ color: '#91A17A' }}>
-                      再攒 {Math.max(0, treeNext.minXp - totalXp)} 花蜜,家园成长为「{treeNext.name}」
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-xs" style={{ color: '#91A17A' }}>全班花蜜已建成完整家园,继续加油!</p>
-                )}
+                <div className={compact ? 'mt-2 space-y-0' : 'mt-3 space-y-1'}>
+                  {students.slice(0, 5).map((student, index) => (
+                    <button type="button" key={student.pid} className={`flex w-full items-center gap-3 rounded-2xl px-3 text-left transition hover:bg-[#EFF6E9] focus-visible:outline-2 focus-visible:outline-[#35745B] ${compact ? 'py-0' : 'py-1'}`} onClick={() => setSelectedPid(student.pid)} data-testid={`display-rank-${index + 1}`}>
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl text-base font-black ${index === 0 ? 'bg-[#FFE4A0] text-[#815D15]' : index === 1 ? 'bg-[#E8ECDF] text-[#5B6B58]' : index === 2 ? 'bg-[#F1E0CE] text-[#8C6746]' : 'bg-[#F0F5E9] text-[#688466]'}`}>{index + 1}</span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-base font-bold">{student.name}</span><span className="block truncate text-xs text-[#718673]">{student.nickname || student.species || copy('unclaimed', '伙伴待认领')}</span></span>
+                      <strong className="text-xl tabular-nums text-[#2F7053]">{student.weekScore > 0 ? '+' : ''}{student.weekScore}</strong>
+                    </button>
+                  ))}
+                  {students.length === 0 && <p className="rounded-2xl bg-[#F4F8EE] p-5 text-sm text-[#718673]">{copy('emptyRoster', '班级尚无同学，请先导入班级名册。')}</p>}
+                </div>
+                <p className={`${compact ? 'mt-1' : 'mt-3'} text-xs text-[#81957E]`}>{copy('rankingHint', '按本周有效评价的净积分排序；点击同学可看公开评分记录。')}</p>
+              </section>
+            </div>
+
+            <section className="mt-4 rounded-[32px] border border-[#DFE9D6] bg-white/75 p-5 sm:p-6" data-testid="display-students">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="text-xs font-bold tracking-[0.2em] text-[#6B896A]">{copy('companions', '伙伴图鉴')}</p><h2 className="mt-1 text-2xl font-black">{copy('classmates', '我们班的同学与蜜蜂')}</h2></div>
+                <div className="flex items-center gap-2 text-sm text-[#718673]">
+                  <span>{students.length} {copy('students', '位同学')}</span>
+                  {totalPages > 1 && <><button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded-lg border border-[#D9E5D5] bg-white px-3 py-1.5 disabled:opacity-40">{copy('previous', '上一页')}</button><span>{page + 1}/{totalPages}</span><button type="button" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)} className="rounded-lg border border-[#D9E5D5] bg-white px-3 py-1.5 disabled:opacity-40">{copy('next', '下一页')}</button></>}
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="text-sm" style={{ color: '#8D9D7C' }}>🌳 树屋家园随全班花蜜一起成长</div>
-          )}
-        </div>
-
-        {/* recent deductions (PRD 8.3 口径变更: 扣分记录大屏公开, reason 必填留痕) */}
-        {deductions.length > 0 && (
-          <div className="mt-8 rounded-card-lg border p-6" style={{ background: '#FFF9F5B5', borderColor: '#F0D2D0' }} data-testid="display-deduct">
-            <div className="mb-3 text-sm font-semibold" style={{ color: '#8C3A36' }}>扣分记录 · 共同改进</div>
-            <div className="space-y-3">
-              {deductions.slice(0, 6).map((d) => (
-                <div key={String(d.pid)} className="flex items-center gap-3 border-b pb-3 text-sm last:border-0 last:pb-0" style={{ borderColor: '#F6E8E6' }}>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: '#FBEFEE' }}>📝</span>
-                  <div className="min-w-0">
-                    <div className="truncate font-medium" style={{ color: '#213D32' }}>
-                      {String(d.xy_ev_rule_name)} {d.xy_ev_target_type === 'class' ? '· 全班' : d.xy_ev_target_type === 'group' ? '· 小组' : ''} {String(d.xy_ev_score)}
-                    </div>
-                    <div className="text-xs" style={{ color: '#B08583' }}>{String(d.xy_ev_reason || '')} · {String(d.xy_ev_target_count ?? '')} 位同学 · {String(d.xy_ev_occurred_at || '').slice(0, 16).replace('T', ' ')}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" data-testid="display-pets">
+                {visibleStudents.map((student) => <StudentCard key={student.pid} student={student} onClick={() => setSelectedPid(student.pid)} />)}
+              </div>
+              {students.length === 0 && <p className="mt-5 rounded-2xl bg-[#F4F8EE] p-6 text-center text-[#718673]">{copy('emptyRoster', '班级尚无同学，请先导入班级名册。')}</p>}
+            </section>
+          </>
         )}
-
-        {/* pet parade */}
-        <div className="mt-8 grid grid-cols-3 gap-4 sm:grid-cols-6" data-testid="display-pets">
-          {pets.map((p) => (
-            <ParadePet key={String(p.pid)} pet={p} />
-          ))}
-          {pets.length === 0 && (
-            <div className="col-span-full rounded-card border p-6 text-center text-sm" style={{ borderColor: '#E1E8D2', color: '#8D9D7C' }}>
-              伙伴们还在等小朋友认领~
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+      {selected && <StudentDetails student={selected} close={() => setSelectedPid('')} copy={copy} />}
+    </main>
   );
 }
 
-function ParadePet({ pet }: { pet: XyRow }) {
-  // Each parade pet resolves its own stage-aware asset (fallback chain inside).
-  const [student, setStudent] = useState<XyRow | null>(null);
-  const [species, setSpecies] = useState<XyRow | null>(null);
-  useEffect(() => {
-    (async () => {
-      setStudent(await xyGet('xy_student', String(pet.xy_pi_student)));
-      setSpecies(await xyGet('xy_pet_species', String(pet.xy_pi_species)));
-    })();
-  }, [pet.pid]);
-  const { assetUrl } = usePetVisual(student, pet);
+function StudentCard({ student, onClick }: { student: DisplayStudent; onClick: () => void }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [student.asset]);
   return (
-    <div className="rounded-card border p-3 text-center" style={{ background: '#FFFFFFB5', borderColor: '#E1E8D2' }}>
-      <div className="mx-auto w-fit">
-        <PetAvatar assetUrl={assetUrl} speciesCode={String(species?.xy_ps_code || '')} size={96} />
+    <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#E0EAD9] bg-[#FAFCF7] p-2.5 text-left transition hover:-translate-y-0.5 hover:border-[#9CBF93] hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#35745B]" data-testid={`display-student-${student.pid}`}>
+      <div className="mx-auto grid h-20 w-20 place-items-center">
+        {student.asset && !broken ? <img src={student.asset} alt={`${student.name}的${student.species}`} className="h-full w-full object-contain" onError={() => setBroken(true)} /> : <span className="text-5xl" role="img" aria-label="待认领伙伴">🐝</span>}
       </div>
-      <div className="mt-2 truncate text-xs font-semibold" style={{ color: '#213D32' }}>{String(pet.xy_pi_nickname || '待命名')}</div>
-      <div className="text-[11px]" style={{ color: '#8D9D7C' }}>Lv.{Number(student?.xy_stu_level ?? 1)} {SPECIES_EMOJI[String(species?.xy_ps_code)] || ''}</div>
+      <strong className="mt-1 block truncate text-base">{student.name}</strong>
+      <span className="block truncate text-xs text-[#658064]">{student.species ? `${student.nickname || '等待起昵称'} · ${student.species}` : '伙伴待认领'}</span>
+      <div className="mt-2 flex items-center justify-between gap-1 text-xs"><span className="rounded-full bg-[#E9F2DE] px-2 py-0.5 font-bold text-[#47704D]">Lv.{student.level || 1}</span><span className="font-semibold tabular-nums text-[#6F876A]">{student.xp} 花蜜</span></div>
+    </button>
+  );
+}
+
+function StudentDetails({ student, close, copy }: { student: DisplayStudent; close: () => void; copy: (key: string, fallback: string) => string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [student.asset]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [close]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#152D25]/65 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="display-detail-title" className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[30px] bg-[#FAFCF7] p-6 shadow-2xl sm:p-8" data-testid="display-student-detail">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-bold tracking-[0.2em] text-[#6B896A]">{copy('studentGrowth', '同学成长档案')}</p><h2 id="display-detail-title" className="mt-1 text-3xl font-black">{student.name}</h2><p className="mt-1 text-sm text-[#718673]">{student.nickname || copy('unclaimed', '伙伴待认领')} · {student.species}</p></div>
+          <button type="button" onClick={close} className="rounded-full border border-[#D9E5D5] bg-white px-4 py-2 text-sm font-semibold" aria-label={copy('close', '关闭详情')}>{copy('close', '关闭')}</button>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-6 rounded-2xl bg-[#EEF5E9] p-4">
+          <div className="grid h-32 w-32 place-items-center">{student.asset && !broken ? <img src={student.asset} alt={`${student.species} ${student.stage}`} className="h-full w-full object-contain" onError={() => setBroken(true)} /> : <span className="text-6xl">🐝</span>}</div>
+          <div className="flex flex-1 flex-wrap gap-6"><div><span className="block text-xs text-[#718673]">{copy('level', '成长等级')}</span><strong className="text-3xl">Lv.{student.level || 1}</strong></div><div><span className="block text-xs text-[#718673]">{copy('nectar', '花蜜')}</span><strong className="text-3xl">{number(student.xp)}</strong></div><div><span className="block text-xs text-[#718673]">{copy('weeklyScore', '本周净积分')}</span><strong className="text-3xl">{student.weekScore > 0 ? '+' : ''}{student.weekScore}</strong></div></div>
+        </div>
+        <h3 className="mt-6 text-lg font-bold">{copy('publicRecords', '公开评分记录')}</h3>
+        <p className="mt-1 text-xs text-[#718673]">{copy('recordPrivacy', '这里只显示公开记录；私密评价和扣分原因请老师在管理端查看。')}</p>
+        <div className="mt-3 divide-y divide-[#E2EBD9]">
+          {student.records.map((record, index) => <div key={`${record.occurredAt}-${index}`} className="flex items-center gap-3 py-3 text-sm"><span className="min-w-0 flex-1 font-semibold">{record.rule}</span><span className="text-[#718673]">{dateTime(record.occurredAt)}</span><strong className={record.score >= 0 ? 'text-[#35745B]' : 'text-[#995F56]'}>{record.score > 0 ? '+' : ''}{record.score}</strong></div>)}
+          {student.records.length === 0 && <p className="py-5 text-sm text-[#718673]">{copy('noPublicRecords', '暂无公开评分记录')}</p>}
+        </div>
+      </section>
     </div>
   );
 }
