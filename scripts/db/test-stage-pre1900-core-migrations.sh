@@ -7,6 +7,8 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -r "$tmp_dir"' EXIT
 
 bash "$script" --core-root "$repo_root" --out-dir "$tmp_dir/overlay" > "$tmp_dir/stage.log"
+bash "$script" --core-root "$repo_root" --out-dir "$tmp_dir/overlay-again" > "$tmp_dir/stage-again.log"
+cmp "$tmp_dir/overlay/sha256-manifest.txt" "$tmp_dir/overlay-again/sha256-manifest.txt"
 test -f "$tmp_dir/overlay/V20260705093000__sla_action_policy.sql"
 test -f "$tmp_dir/overlay/V20260921010000__backfill_price_evidence_quote_id.sql"
 

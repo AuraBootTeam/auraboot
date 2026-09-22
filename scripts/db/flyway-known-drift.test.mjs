@@ -13,7 +13,8 @@ const flywayCommon = resolve(repoRoot, 'scripts/db/flyway-common.sh');
  * Runs `run_flyway migrate oss` against stub `flyway`/`psql` binaries and returns the
  * sequence of flyway commands the script executed plus what the psql stub answered.
  */
-function runMigrate({ psqlRows, withPsqlStub = true, skipRepairEnv = false }) {
+function runMigrate({ psqlRows, withPsqlStub = true, skipRepairEnv = false,
+  coreOverlay = false, outOfOrder = false }) {
   const work = mkdtempSync(join(tmpdir(), 'flyway-known-drift-'));
   const bin = join(work, 'bin');
   mkdirSync(bin);
@@ -46,6 +47,14 @@ function runMigrate({ psqlRows, withPsqlStub = true, skipRepairEnv = false }) {
   if (skipRepairEnv) {
     env.AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR = '1';
   }
+  if (coreOverlay) {
+    const overlay = join(work, 'overlay');
+    mkdirSync(overlay);
+    env.AURA_FLYWAY_CORE_MIGRATION_DIR = overlay;
+  }
+  if (outOfOrder) {
+    env.AURA_FLYWAY_OUT_OF_ORDER = '1';
+  }
 
   // Absolute path: overriding PATH in the child env would otherwise break the
   // lookup of the shell itself.
@@ -55,12 +64,13 @@ function runMigrate({ psqlRows, withPsqlStub = true, skipRepairEnv = false }) {
     { env, encoding: 'utf8' },
   );
 
-  const commands = readFileSync(flywayLog, 'utf8').trim().length
-    ? readFileSync(flywayLog, 'utf8').trim().split('\n').map((line) => line.split(' ').pop())
+  const commandLines = readFileSync(flywayLog, 'utf8').trim().length
+    ? readFileSync(flywayLog, 'utf8').trim().split('\n')
     : [];
+  const commands = commandLines.map((line) => line.split(' ').pop());
 
   rmSync(work, { recursive: true, force: true });
-  return { status: result.status, stderr: result.stderr, commands };
+  return { status: result.status, stderr: result.stderr, commands, commandLines };
 }
 
 test('fresh database: no repair, migrate runs directly', () => {
@@ -117,4 +127,17 @@ test('missing psql binary: preflight skips instead of blocking migrate', () => {
   });
   assert.equal(status, 0);
   assert.deepEqual(commands, ['migrate']);
+});
+
+test('pre-1900 opt-in selects the staged core and out-of-order without repair', () => {
+  const { status, commands, commandLines } = runMigrate({
+    psqlRows: '20260919050000=-1983915974',
+    skipRepairEnv: true,
+    coreOverlay: true,
+    outOfOrder: true,
+  });
+  assert.equal(status, 0);
+  assert.deepEqual(commands, ['migrate']);
+  assert.match(commandLines[0], /-locations=filesystem:.*\/overlay/);
+  assert.match(commandLines[0], /-outOfOrder=true/);
 });

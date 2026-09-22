@@ -50,7 +50,7 @@ if [[ "$historical_count" != 83 || "$current_count" -lt 83 ]]; then
 fi
 cp "$current_dir"/V*.sql "$out_dir"/
 cp "$archive_dir/$historical_path"/V*.sql "$out_dir"/
-shasum -a 256 "$out_dir"/V*.sql > "$out_dir/sha256-manifest.txt"
+(cd "$out_dir" && shasum -a 256 V*.sql) > "$out_dir/sha256-manifest.txt"
 echo "Staged $(find "$out_dir" -maxdepth 1 -name 'V*.sql' -type f | wc -l | tr -d ' ') core migrations in $out_dir"
 echo "Pinned historical commit: $historical_commit ($historical_count exact source files)"
 echo "Use this directory as the core Flyway location with -outOfOrder=true; run plain validate after migrate."
