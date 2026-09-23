@@ -934,9 +934,13 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 .map(fc -> {
                     SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
-                    return fieldMap.get(fc).getColumnExpr() + " AS " + fc;
+                    return fieldMap.get(fc).getColumnExpr() + " AS " + quotedIdentifier(fc);
                 })
                 .collect(Collectors.toList());
+
+        if (selectColumns.isEmpty()) {
+            selectColumns = Collections.singletonList("*");
+        }
 
         String exportFromSql = query.getFromSql().trim();
         StringBuilder sql = new StringBuilder("SELECT ");

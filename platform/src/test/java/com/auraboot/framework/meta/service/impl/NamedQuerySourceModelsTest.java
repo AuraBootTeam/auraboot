@@ -162,6 +162,15 @@ class NamedQuerySourceModelsTest {
         }
     }
 
+    @Test void platformNamedQueryTableResolvesAsTenantScopedSystemSource() {
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        Map<String, String> resolved = resolve("public.ab_named_query");
+        String model = resolved.get("\"public\".\"ab_named_query\"");
+        assertNotNull(model);
+        assertTrue(model.startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
+        assertNotEquals(NamedQuerySourceModels.PLATFORM_REFERENCE_MARKER, model);
+    }
+
     @Test void productTablesRequireApplicationOwnedBypassConfiguration() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
         when(jdbc.queryForMap(anyString(), anyString())).thenReturn(

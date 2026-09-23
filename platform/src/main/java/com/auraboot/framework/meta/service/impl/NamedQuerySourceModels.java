@@ -48,6 +48,9 @@ public class NamedQuerySourceModels {
                     "\"public\".\"ab_file\"", "\"public\".\"ab_async_task\"",
                     "\"public\".\"ab_user_role\"", "\"public\".\"ab_role_permission\"",
                     "\"public\".\"ab_permission\"", "\"public\".\"ab_tenant_member\"");
+    /** Platform-owned tables that have no tenant model but must still receive a tenant scope. */
+    private static final Set<String> TENANT_SCOPED_PLATFORM_SOURCES =
+            Set.of("\"public\".\"ab_named_query\"");
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
@@ -119,6 +122,14 @@ public class NamedQuerySourceModels {
             // anchor (e.g. ab_user.pid = activity owner), which exposes no rows beyond that
             // anchor's scope. Mapping them to a reserved marker lets protection skip them.
             result.put(key, platformReferenceMarker(key));
+            return;
+        }
+        if (TENANT_SCOPED_PLATFORM_SOURCES.contains(key)) {
+            // Platform metadata such as ab_named_query is not represented by a tenant
+            // meta-model, but it does carry tenant_id. Reuse the scoped system marker so
+            // field protection always injects the current tenant instead of either
+            // rejecting the source or admitting it with the unscoped reference marker.
+            result.put(key, engineSourceMarker(key));
             return;
         }
         if (isBypassEngineSource(key)) {

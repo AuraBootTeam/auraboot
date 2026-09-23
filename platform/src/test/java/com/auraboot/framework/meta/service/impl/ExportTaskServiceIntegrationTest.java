@@ -19,6 +19,7 @@ import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,6 +100,9 @@ class ExportTaskServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private final AtomicInteger seq = new AtomicInteger();
     private User testUser;
@@ -374,6 +378,10 @@ class ExportTaskServiceIntegrationTest {
         task.setCreatedBy(testUser.getId());
         task.setCreatedAt(Instant.now());
         task.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS));
+        var metadata = objectMapper.createObjectNode();
+        metadata.set("request", objectMapper.valueToTree(
+                exportRequest(DataExportRequest.ExportFormat.EXCEL)));
+        task.setRequestParams(metadata);
         exportTaskMapper.insert(task);
 
         // Call processExportAsync directly — it will be dispatched to the thread pool
@@ -383,7 +391,8 @@ class ExportTaskServiceIntegrationTest {
         ExportTaskDTO dto = awaitTerminal(task.getPid(), 10_000);
         assertEquals(ExportTask.STATUS_FAILED, dto.getStatus());
         assertNotNull(dto.getErrorMessage());
-        assertTrue(dto.getErrorMessage().contains("Named query not found"));
+        assertTrue(dto.getErrorMessage().contains("Named query not found"),
+                "unexpected export failure: " + dto.getErrorMessage());
     }
 
     // ==================== getTaskStatus ====================
