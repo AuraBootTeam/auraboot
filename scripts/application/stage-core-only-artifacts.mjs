@@ -528,6 +528,8 @@ function main() {
     { type: 'config', id: 'platform-admin', version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },
+    { type: 'config', id: 'showcase', version: '1.0.0', path: showcase },
     ...(runtimeImage ? [{ type: 'oci', id: 'auraboot-runtime', version, path: runtimeImage }] : []),
   ];
   const catalog = {
