@@ -110,7 +110,6 @@
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
 | `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
-| `run-bpm-release-image-gate.sh` | 1 | 2026-09-14 | Build and verify the immutable BPM release image. |
 | `run-open-platform-slo-gate.sh` | 1 | 2026-09-14 | Run smoke or production-threshold k6 checks for the Open Platform. |
 | `run-open-platform-release-image-gate.sh` | 1 | 2026-09-14 | Linux x86_64 exact-ref release-image, two-domain protocol, production SLO, and Webhook drain gate (never pushes). |
 | `open-platform-release-image-contract.test.mjs` | 1 | 2026-09-14 | Self-test the Open Platform CI gate's immutable-ref, no-push, SLO, and drain invariants. |

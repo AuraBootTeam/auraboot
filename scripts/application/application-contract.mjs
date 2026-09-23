@@ -101,9 +101,18 @@ export function validateWebContribution(manifest) {
   const routeIds = manifest.routes.map((route) => route.id);
   const routePaths = manifest.routes.map((route) => route.path);
   const registrations = manifest.contributions.map((item) => `${item.kind}:${item.id}`);
+  const assetIds = manifest.assets.map((item) => item.id);
+  const assetMounts = manifest.assets.map((item) => item.mount);
   assertUnique(routeIds, 'web contribution routes');
   assertUnique(routePaths, 'web contribution route paths');
   assertUnique(registrations, 'web registry contributions');
+  assertUnique(assetIds, 'web contribution assets');
+  assertUnique(assetMounts, 'web contribution asset mounts');
+  for (const route of manifest.routes) {
+    if (route.kind === 'resource' && route.shell !== 'standalone') {
+      throw new Error(`web resource route ${route.id} must use the standalone shell`);
+    }
+  }
   return manifest;
 }
 
@@ -139,6 +148,22 @@ function assertWebGraphIntegrity(contributions) {
     contributions.flatMap((item) => item.contributions.map((entry) => `${entry.kind}:${entry.id}`)),
     'application registry owners',
   );
+  assertUnique(contributions.flatMap((item) => item.assets.map((asset) => asset.id)), 'application asset IDs');
+  const assetMounts = contributions.flatMap((item) => item.assets.map((asset) => ({
+    mount: asset.mount.replace(/\/$/, ''),
+    owner: item.package.name,
+  })));
+  for (let index = 0; index < assetMounts.length; index += 1) {
+    for (let candidateIndex = index + 1; candidateIndex < assetMounts.length; candidateIndex += 1) {
+      const first = assetMounts[index];
+      const second = assetMounts[candidateIndex];
+      if (first.mount === second.mount
+        || first.mount.startsWith(`${second.mount}/`)
+        || second.mount.startsWith(`${first.mount}/`)) {
+        throw new Error(`application asset mounts overlap: ${first.owner}:${first.mount}, ${second.owner}:${second.mount}`);
+      }
+    }
+  }
   for (const peer of ['react', 'reactDom', 'router', 'pluginSdk']) {
     const ranges = [...new Set(contributions.map((item) => item.peerDependencies[peer]))];
     if (ranges.length > 1) throw new Error(`web contribution peer ${peer} has incompatible ranges: ${ranges.join(', ')}`);
@@ -183,6 +208,8 @@ export function buildApplicationGraph(manifestInput, webContributionInputs = [],
         kind: 'route',
         id: route.id,
         owner: contribution.package.name,
+        surface: route.kind,
+        shell: route.shell,
         path: route.path,
         export: route.export,
         rendering: route.rendering,
@@ -196,6 +223,14 @@ export function buildApplicationGraph(manifestInput, webContributionInputs = [],
         export: entry.export,
         ...(entry.permission ? { permission: entry.permission } : {}),
         ...(entry.featureKey ? { featureKey: entry.featureKey } : {}),
+      })),
+      ...contribution.assets.map((asset) => ({
+        kind: 'asset',
+        id: asset.id,
+        owner: contribution.package.name,
+        source: asset.source,
+        mount: asset.mount,
+        cache: asset.cache,
       })),
     ]),
   ].map((node, order) => ({ ...node, order }));

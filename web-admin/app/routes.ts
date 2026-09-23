@@ -10,7 +10,11 @@ import { coreRoutes } from '../packages/core/route-manifest';
 const webRouteManifest = process.env.AURA_WEB_ROUTE_MANIFEST
   ? await import(/* @vite-ignore */ process.env.AURA_WEB_ROUTE_MANIFEST)
   : null;
-const ENTERPRISE_ROUTES: RouteConfigEntry[] = webRouteManifest?.ENTERPRISE_ROUTES ?? [];
+const APPLICATION_ROUTES: RouteConfigEntry[] = webRouteManifest?.APPLICATION_ROUTES
+  ?? webRouteManifest?.ENTERPRISE_ROUTES
+  ?? [];
+const RESOURCE_ROUTES: RouteConfigEntry[] = webRouteManifest?.RESOURCE_ROUTES ?? [];
+const STANDALONE_ROUTES: RouteConfigEntry[] = webRouteManifest?.STANDALONE_ROUTES ?? [];
 const PLATFORM_ROUTES: RouteConfigEntry[] = webRouteManifest?.PLATFORM_ROUTES ?? [];
 const PLATFORM_LAYOUT = webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformLayout.tsx';
 
@@ -20,9 +24,9 @@ const PLATFORM_LAYOUT = webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformL
 export default [
   // API routes (always)
   route('/api/address-data', './routes/api.address-data.tsx'),
-  // React Router owns this product action. Keep it outside /api, which the
-  // production BFF reserves for direct Spring Boot proxying.
-  route('/_action/xy/teacher-code', './routes/api.xy.teacher-code.tsx'),
+  // Product-owned resource routes stay outside /api, which the production BFF
+  // reserves for direct Spring Boot proxying.
+  ...RESOURCE_ROUTES,
   route('/_action/switch-space', './routes/api.switch-space.tsx'),
   route('/_action/switch-actor', './routes/api.switch-actor.tsx'),
 
@@ -45,12 +49,8 @@ export default [
     route('/tenant-selection', './tenant/TenantSelection.tsx'),
   ]),
 
-  // Fengyun (edu) consumer surfaces — standalone shells without admin chrome.
-  // Authenticated via the same session; see app/routes/xy/ for details.
-  route('/xy/import/:classPid?', './routes/xy/RosterImport.tsx'),
-  route('/xy/setup', './routes/xy/SchoolActivation.tsx'),
-  route('/xy/child/:studentPid?', './routes/xy/ChildSpace.tsx'),
-  route('/xy/display/:classPid?', './routes/xy/ClassDisplay.tsx'),
+  // Product-owned pages that intentionally render without the admin chrome.
+  ...STANDALONE_ROUTES,
 
   // Explicit admin namespace. During the compatibility window it redirects
   // /admin/* to the existing admin paths while the shell remains admin-scoped.
@@ -70,7 +70,7 @@ export default [
   // Main app layout — core routes in OSS plus optional typed private routes.
   layout('./routes/DefaultLayout.tsx', [
     index('./routes/_index.tsx'),
-    ...ENTERPRISE_ROUTES,
+    ...APPLICATION_ROUTES,
     ...(PLATFORM_ROUTES.length > 0 ? [layout(PLATFORM_LAYOUT, PLATFORM_ROUTES)] : []),
     ...coreRoutes(),
   ]),

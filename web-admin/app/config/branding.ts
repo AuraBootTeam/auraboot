@@ -48,6 +48,8 @@ export type TenantJoinChannel = 'invite_code' | 'wechat_mini';
 
 export interface TenantOnboardingBranding {
   entityLabel: string;
+  industryCode?: string;
+  postCreateRedirect?: string;
   selectionTitle: string;
   selectionLead: string;
   createTitle: string;
@@ -155,6 +157,8 @@ const DEPLOYMENT_KEYS = new Set<keyof DeploymentBrandingDocument>([
 
 const TENANT_ONBOARDING_KEYS = new Set<keyof TenantOnboardingDocument>([
   'entityLabel',
+  'industryCode',
+  'postCreateRedirect',
   'selectionTitle',
   'selectionLead',
   'createTitle',
@@ -384,8 +388,28 @@ function resolveTenantOnboarding(value: unknown): TenantOnboardingBranding | und
     miniProgramQrUrl = safeUrl(document.miniProgramQrUrl, 'tenantOnboarding');
   }
 
+  let postCreateRedirect: string | undefined;
+  if (document.postCreateRedirect !== undefined) {
+    const candidate = onboardingText(document.postCreateRedirect, 'postCreateRedirect', 160);
+    if (!/^\/(?!\/)[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$/.test(candidate)) {
+      throw new Error('Deployment branding tenantOnboarding.postCreateRedirect must be a same-origin path.');
+    }
+    postCreateRedirect = candidate;
+  }
+
+  let industryCode: string | undefined;
+  if (document.industryCode !== undefined) {
+    const candidate = onboardingText(document.industryCode, 'industryCode', 40);
+    if (!/^[a-z][a-z0-9_-]*$/.test(candidate)) {
+      throw new Error('Deployment branding tenantOnboarding.industryCode must be a lowercase code.');
+    }
+    industryCode = candidate;
+  }
+
   return {
     entityLabel: onboardingText(document.entityLabel, 'entityLabel', 24),
+    industryCode,
+    postCreateRedirect,
     selectionTitle: onboardingText(document.selectionTitle, 'selectionTitle', 80),
     selectionLead: onboardingText(document.selectionLead, 'selectionLead', 160),
     createTitle: onboardingText(document.createTitle, 'createTitle', 60),

@@ -237,9 +237,9 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void onboardingStage_reachesBindSchool_twoStepWechatLogin() throws Exception {
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/tenant/bind-school");
-        req.setServletPath("/api/tenant/bind-school");
+    void onboardingStage_reachesTenantInvitationAcceptance() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/tenant/invitations/accept");
+        req.setServletPath("/api/tenant/invitations/accept");
         req.addHeader("Authorization", "Bearer onboarding.token");
         CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
                 Collections.emptyList(), true, true, true, true);
@@ -255,7 +255,7 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         filter.doFilter(req, response, chain);
 
-        // SOT 05 two-step flow: binding the school IS the onboarding step.
+        // Accepting a tenant invitation is a valid onboarding completion step.
         verify(chain).doFilter(req, response);
         assertEquals(200, response.getStatus());
     }

@@ -1,7 +1,7 @@
 {
-  "version": "1.2",
-  "last_updated": "2026-05-10",
-  "_scope_note": "plugins[] lists distributable plugin packages that have plugin.json manifests and belong to the community source-available distribution. internal_test_plugins[] are tracked for automated test setup but excluded from default bootstrap and public demo/runtime profiles. tooling_dirs[] are directories under plugins/ that are not plugin packages.",
+  "version": "1.3",
+  "last_updated": "2026-09-23",
+  "_scope_note": "plugins[] lists publishable packages in this repository, not the core-only runtime. core_plugins[] are platform-owned; example_plugins[] are optional public examples; internal_test_plugins[] never ship. CRM, BPM, EDU, and other applications are composed from independent repositories.",
   "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
   "platform_modules": [
     "application",
@@ -20,7 +20,6 @@
     "command",
     "binding-rule",
     "plugin",
-    "bpm",
     "automation",
     "notification",
     "inbox",
@@ -46,6 +45,24 @@
     "showcase",
     "simple-inventory"
   ],
+  "core_plugins": [
+    "agent-control-plane",
+    "core-announcement",
+    "core-aurabot",
+    "core-meta",
+    "org-management",
+    "page-manager",
+    "platform-admin"
+  ],
+  "example_plugins": [
+    "asset-management",
+    "golden-path",
+    "hr-essentials",
+    "project-management",
+    "showcase",
+    "simple-inventory"
+  ],
+  "independent_applications": ["aura-bpm", "aura-crm", "aura-edu"],
   "internal_test_plugins": ["test-fixtures"],
   "tooling_dirs": ["acp-showcase", "cli", "schemas", "scripts"],
   "test_paths": [

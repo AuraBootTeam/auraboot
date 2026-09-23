@@ -13,6 +13,7 @@ import {
   sha256Path,
   validateLock,
   validateManifest,
+  validateWebContribution,
   verifyArtifacts,
 } from './application-contract.mjs';
 
@@ -82,10 +83,13 @@ function webContribution() {
       pluginSdk: '^1.0.0',
     },
     routes: [
-      { id: 'crm.home', path: '/crm', export: './routes/home', rendering: 'universal' },
+      { id: 'crm.home', kind: 'page', shell: 'application', path: '/crm', export: './routes/home', rendering: 'universal' },
     ],
     contributions: [
       { kind: 'widget', id: 'crm-health', export: './widgets/crm-health' },
+    ],
+    assets: [
+      { id: 'crm-sdk', source: './public/crm', mount: '/crm', cache: 'revalidate' },
     ],
   };
 }
@@ -139,7 +143,33 @@ describe('AuraBoot application contract', () => {
 
     assert.deepEqual(sourceGraph, artifactGraph);
     assert.equal(sourceGraph.nodes[0].kind, 'runtime');
-    assert.equal(sourceGraph.nodes.at(-1).id, 'crm-health');
+    assert.equal(sourceGraph.nodes.at(-1).id, 'crm-sdk');
+    assert.equal(sourceGraph.nodes.find((node) => node.id === 'crm.home')?.surface, 'page');
+    assert.equal(sourceGraph.nodes.find((node) => node.id === 'crm.home')?.shell, 'application');
+  });
+
+  it('rejects overlapping asset mounts across contribution owners', () => {
+    const inputManifest = manifest();
+    inputManifest.frontend.contributions.push({ package: '@auraboot/aura-edu-web', version: '1.0.0' });
+    const second = structuredClone(webContribution());
+    second.package.name = '@auraboot/aura-edu-web';
+    second.plugin.code = 'aura.edu';
+    second.routes = [];
+    second.contributions = [];
+    second.assets = [{ id: 'edu-static', source: './public/crm/edu', mount: '/crm/edu', cache: 'immutable' }];
+
+    assert.throws(
+      () => buildApplicationGraph(inputManifest, [webContribution(), second], { requireContributions: true }),
+      /asset mounts overlap/,
+    );
+  });
+
+  it('rejects ambiguous or escaping asset mount paths', () => {
+    for (const mount of ['/crm//sdk', '/crm/../sdk']) {
+      const contribution = structuredClone(webContribution());
+      contribution.assets[0].mount = mount;
+      assert.throws(() => validateWebContribution(contribution), /web contribution manifest is invalid/);
+    }
   });
 
   it('verifies staged artifact bytes and fails after checksum mutation', () => {
@@ -211,6 +241,8 @@ describe('AuraBoot application contract', () => {
     const duplicate = webContribution();
     duplicate.routes.push({
       id: 'crm.other',
+      kind: 'page',
+      shell: 'application',
       path: '/crm',
       export: './routes/other',
       rendering: 'universal',

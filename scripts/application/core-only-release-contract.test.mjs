@@ -5,6 +5,10 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
 const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-artifacts.mjs'), 'utf8');
+const sessionFacade = readFileSync(
+  resolve(root, 'packages/dsl-runtime/src/shared/services/session.ts'),
+  'utf8',
+);
 const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env.sh'), 'utf8');
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
@@ -21,6 +25,9 @@ test('core release stages a compiled Web shell and a self-contained deployment d
   assert.match(stage, /bin\/auraboot-core-env\.sh/);
   assert.match(stage, /bin\/application/);
   assert.match(stage, /web: \{ path: 'web', digest:/);
+  assert.match(stage, /type: 'config', id: 'core-decisionops'/);
+  assert.match(stage, /type: 'config', id: 'showcase'/);
+  assert.match(sessionFacade, /export \* from '~\/shared\/services\/session'/);
 });
 
 test('product release-image gate is CI-only, Docker-only and evidence-backed', () => {

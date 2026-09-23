@@ -30,7 +30,7 @@ public class Invitation {
     private String message;             // 邀请消息
     
     private String status;              // 状态：PENDING, ACCEPTED, REJECTED, EXPIRED
-    private String roleCodes;           // 入校时分配的角色码（逗号分隔，可空=普通成员）
+    private String roleCodes;           // 接受邀请时分配的角色码（逗号分隔，可空=普通成员）
 
 
     private Instant expiredAt;             // 过期时间
