@@ -238,6 +238,7 @@ LOCK_IDENTITY="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.
 APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).application.version)" "$PRODUCT_RELEASE/application.lock")"
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
+OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
 docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
@@ -247,7 +248,8 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e AURA_APPLICATION_ID="$AURA_PRODUCT_ID" -e AURA_APPLICATION_VERSION="$APP_VERSION" \
   -e AURA_APPLICATION_LOCK_IDENTITY="$LOCK_IDENTITY" -e AURA_APPLICATION_SOURCE_COMMIT="$PRODUCT_SHA" \
   -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" "$IMAGE_REF" \
-  --aura.persistence.tenant-bypass-table-prefixes=se_ >/dev/null || fail 'application image failed to start'
+  --aura.persistence.tenant-bypass-table-prefixes=se_ \
+  --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" >/dev/null || fail 'application image failed to start'
 APP_PORT="$(docker port "$APP_CONTAINER" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"
 for attempt in $(seq 1 90); do
   curl -fsS "http://127.0.0.1:$APP_PORT/actuator/health" | grep -q '"status":"UP"' && break
@@ -256,7 +258,7 @@ for attempt in $(seq 1 90); do
 done
 
 WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
-COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER=auraboot PGPASSWORD=auraboot_ci ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
+COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER=auraboot PGPASSWORD=auraboot_ci ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
 if [[ -n "$FIXTURE_REL" ]]; then
