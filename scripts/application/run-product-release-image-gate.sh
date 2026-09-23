@@ -236,7 +236,7 @@ docker run --rm --network "$NETWORK" \
 
 LOCK_IDENTITY="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).identity)" "$PRODUCT_RELEASE/application.lock")"
 APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).application.version)" "$PRODUCT_RELEASE/application.lock")"
-LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write(r.image.digest)" "$PRODUCT_RELEASE/release-receipt.json")"
+LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \

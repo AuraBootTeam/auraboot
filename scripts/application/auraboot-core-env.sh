@@ -82,7 +82,7 @@ start_backend() {
   application_version="$(node -e "const fs=require('node:fs'); const l=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.stdout.write(l.application.version)" "$ARTIFACT_ROOT/application.lock")"
   lock_identity="$(node -e "const fs=require('node:fs'); const l=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.stdout.write(l.identity)" "$ARTIFACT_ROOT/application.lock")"
   source_commit="$(node -e "const r=require(process.argv[1]); process.stdout.write(r.source.commit)" "$ARTIFACT_ROOT/release-receipt.json")"
-  image_digest="$(node -e "const r=require(process.argv[1]); process.stdout.write(r.image.digest)" "$ARTIFACT_ROOT/release-receipt.json")"
+  image_digest="$(node -e "const r=require(process.argv[1]); process.stdout.write((r.image&&r.image.digest)||'')" "$ARTIFACT_ROOT/release-receipt.json")"
   mkdir -p "$STATE_ROOT/empty-plugins"
   if [[ -f "$STATE_ROOT/runtime.pid" ]] && kill -0 "$(cat "$STATE_ROOT/runtime.pid")" 2>/dev/null; then
     echo 'backend runtime already active'; return
