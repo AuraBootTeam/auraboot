@@ -40,7 +40,7 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
         }
         // Two-step pure-wechat flow (SOT 05): an unknown WeChat self-provisions a
         // bare account (no tenant, no roles) and logs in; the app then dispatches
-        // by school-binding state (unbound -> bind-school page).
+        // by product-specific tenant-invitation state.
         User user = wechatMiniIdentityService.selfProvision(code);
         return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
     }

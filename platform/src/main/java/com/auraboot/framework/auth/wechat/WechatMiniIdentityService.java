@@ -18,8 +18,8 @@ import java.time.Instant;
 /**
  * WeChat mini-program identity binding: one openid (per app) to one platform
  * user. Two-step login (SOT 05): an unknown WeChat self-provisions a bare
- * account here; school binding happens later via the authenticated
- * bind-school flow.
+ * account here; tenant invitation acceptance happens later via the
+ * authenticated invitation flow.
  */
 @Slf4j
 @Service
@@ -73,7 +73,7 @@ public class WechatMiniIdentityService {
     /**
      * Pure-wechat login: an unknown WeChat account gets a bare platform account —
      * synthetic email, unusable random password, no tenant, no roles. The school
-     * binding happens later via the authenticated bind-school flow.
+     * tenant membership happens later via the authenticated invitation flow.
      */
     @Transactional
     public User selfProvision(String jsCode) {

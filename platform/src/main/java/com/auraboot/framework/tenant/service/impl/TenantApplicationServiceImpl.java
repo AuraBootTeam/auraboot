@@ -91,9 +91,8 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
     private com.auraboot.framework.plugin.service.BuiltinPluginImportService builtinPluginImportService;
 
     /**
-     * Roles bound to the tenant creator after bootstrap + plugin import, e.g.
-     * {@code aura.tenant.creator-roles=xy_school_admin} for a Xiaoya deployment
-     * ("the school founder is the school admin"). Comma-separated role codes; must
+     * Roles bound to the tenant creator after bootstrap + plugin import.
+     * Comma-separated role codes; must
      * reference roles seeded by the tenant template or the declared product plugins.
      */
     @Value("${aura.tenant.creator-roles:}")
@@ -241,7 +240,7 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             user.getId()
         );
 
-        // Bind the deployment-declared creator roles (e.g. xy_school_admin) after
+        // Bind the deployment-declared creator roles after
         // bootstrap + plugin import so the role definitions exist in the new tenant.
         if (tenantCreatorRoles != null && !tenantCreatorRoles.isBlank() && newMember != null) {
             for (String roleCode : tenantCreatorRoles.split(",")) {

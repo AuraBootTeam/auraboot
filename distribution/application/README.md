@@ -44,7 +44,9 @@ pnpm application compare-graphs \
 Release manifests and catalogs must not use `SNAPSHOT`, `latest`, workspace links, branch references, sibling source paths, or mutable artifact identities. `verify-artifacts` requires every lock entry to name a staged `localPath` and fails if any bytes do not match the locked digest.
 
 Every product npm package must contain `package/auraboot.contribution.json` conforming to
-`web-contribution.schema.json`. Route and registry entries name public package export paths; source-tree-relative
+`web-contribution.schema.json`. Routes declare whether they are rendered pages or resource/BFF handlers and whether
+they use the application shell or a standalone shell. Static assets declare an exact package-relative source,
+public mount, and cache policy. Route and registry entries name public package export paths; source-tree-relative
 imports and Web Shell internals are not part of the contract. Artifact mode reads this manifest from the locked,
 checksum-verified tarball. Source mode reads the same file from roots declared in a local-only source map:
 
@@ -56,8 +58,28 @@ checksum-verified tarball. Source mode reads the same file from roots declared i
 }
 ```
 
-The graph builder rejects duplicate route IDs, route paths, registry owners, plugin codes, activation cycles, and
-incompatible React/React DOM/router/Plugin SDK peer ranges. Client and SSR runs must produce the same graph digest.
+The graph builder rejects duplicate route IDs, route paths, registry owners, asset IDs, overlapping asset mounts,
+plugin codes, activation cycles, and incompatible React/React DOM/router/Plugin SDK peer ranges. Routes, registry
+entries, and asset mounts all participate in the graph digest. Materialize declared source assets without scanning
+or blindly copying a package `public/` directory:
+
+```bash
+pnpm application materialize-assets \
+  --manifest path/to/app.yaml \
+  --source-map path/to/source-map.json \
+  --target path/to/web-admin/public
+```
+
+Generate the React Router build input from the same contribution manifest instead of maintaining a second route list:
+
+```bash
+pnpm application emit-route-manifest \
+  --manifest path/to/app.yaml \
+  --source-map path/to/source-map.json \
+  --output path/to/generated-route-manifest.mjs
+```
+
+Client and SSR runs must produce the same graph digest.
 Source paths stay outside the graph identity and are never valid release inputs.
 
 ## Publishing the AuraBoot platform artifact set

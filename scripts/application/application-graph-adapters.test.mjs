@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
   buildArtifactApplicationGraph,
+  buildSourceRouteManifest,
   buildSourceApplicationGraph,
+  materializeSourceWebAssets,
 } from './application-graph-adapters.mjs';
 import { resolveApplication, sha256Path } from './application-contract.mjs';
 
@@ -43,8 +45,9 @@ function contribution() {
       router: '^7.0.0',
       pluginSdk: '^1.0.0',
     },
-    routes: [{ id: 'crm.home', path: '/crm', export: './routes/home', rendering: 'universal' }],
+    routes: [{ id: 'crm.home', kind: 'page', shell: 'application', path: '/crm', export: './routes/home', rendering: 'universal' }],
     contributions: [{ kind: 'block', id: 'crm-health', export: './blocks/crm-health' }],
+    assets: [{ id: 'crm-sdk', source: './public/crm', mount: '/crm', cache: 'revalidate' }],
   };
 }
 
@@ -66,6 +69,12 @@ describe('application graph adapters', () => {
     const sourcePackage = join(root, 'source/aura-crm-web');
     mkdirSync(sourcePackage, { recursive: true });
     writeFileSync(join(sourcePackage, 'auraboot.contribution.json'), `${JSON.stringify(contribution(), null, 2)}\n`);
+    mkdirSync(join(sourcePackage, 'routes'), { recursive: true });
+    writeFileSync(join(sourcePackage, 'routes/home'), 'export default function Home() {}\n');
+    mkdirSync(join(sourcePackage, 'blocks'), { recursive: true });
+    writeFileSync(join(sourcePackage, 'blocks/crm-health'), 'export const health = true;\n');
+    mkdirSync(join(sourcePackage, 'public/crm'), { recursive: true });
+    writeFileSync(join(sourcePackage, 'public/crm/sdk.js'), 'export const crm = true;\n');
     const sourceMapPath = join(root, 'source-map.json');
     writeFileSync(sourceMapPath, `${JSON.stringify({ packages: { '@auraboot/aura-crm-web': sourcePackage } })}\n`);
 
@@ -73,6 +82,12 @@ describe('application graph adapters', () => {
     const packedRoot = join(root, 'packed/package');
     mkdirSync(packedRoot, { recursive: true });
     writeFileSync(join(packedRoot, 'auraboot.contribution.json'), `${JSON.stringify(contribution(), null, 2)}\n`);
+    mkdirSync(join(packedRoot, 'routes'), { recursive: true });
+    writeFileSync(join(packedRoot, 'routes/home'), 'export default function Home() {}\n');
+    mkdirSync(join(packedRoot, 'blocks'), { recursive: true });
+    writeFileSync(join(packedRoot, 'blocks/crm-health'), 'export const health = true;\n');
+    mkdirSync(join(packedRoot, 'public/crm'), { recursive: true });
+    writeFileSync(join(packedRoot, 'public/crm/sdk.js'), 'export const crm = true;\n');
     const productTarball = join(artifactRoot, 'npm/aura-crm-web-1.0.0.tgz');
     mkdirSync(dirname(productTarball), { recursive: true });
     execFileSync('tar', ['-czf', productTarball, '-C', join(root, 'packed'), 'package']);
@@ -101,6 +116,40 @@ describe('application graph adapters', () => {
     const artifactGraph = buildArtifactApplicationGraph(manifest(), lock, artifactRoot);
     assert.deepEqual(sourceGraph, artifactGraph);
     assert.equal(sourceGraph.nodes.find((node) => node.kind === 'route')?.id, 'crm.home');
+    assert.equal(sourceGraph.nodes.find((node) => node.kind === 'asset')?.mount, '/crm');
+
+    assert.deepEqual(buildSourceRouteManifest(manifest(), sourceMapPath), {
+      APPLICATION_ROUTES: [{ path: '/crm', file: join(sourcePackage, 'routes/home') }],
+      STANDALONE_ROUTES: [],
+      RESOURCE_ROUTES: [],
+      PLATFORM_ROUTES: [],
+    });
+    assert.deepEqual(buildSourceRouteManifest(manifest(), sourceMapPath, dirname(sourcePackage)), {
+      APPLICATION_ROUTES: [{ path: '/crm', file: './aura-crm-web/routes/home' }],
+      STANDALONE_ROUTES: [],
+      RESOURCE_ROUTES: [],
+      PLATFORM_ROUTES: [],
+    });
+    assert.throws(
+      () => buildSourceRouteManifest(manifest(), sourceMapPath, join(root, 'unrelated-route-root')),
+      /route module escapes its root/,
+    );
+
+    const materializedRoot = join(root, 'materialized');
+    const materialized = materializeSourceWebAssets(manifest(), sourceMapPath, materializedRoot);
+    assert.deepEqual(materialized, [{ owner: '@auraboot/aura-crm-web', id: 'crm-sdk', source: './public/crm', mount: '/crm' }]);
+    assert.equal(readFileSync(join(materializedRoot, 'crm/sdk.js'), 'utf8'), 'export const crm = true;\n');
+    assert.throws(
+      () => materializeSourceWebAssets(manifest(), sourceMapPath, materializedRoot),
+      /asset mount already exists/,
+    );
+
+    const unsafeTarget = join(root, 'unsafe-materialized');
+    symlinkSync(join(sourcePackage, 'auraboot.contribution.json'), join(sourcePackage, 'public/crm/manifest-link'));
+    assert.throws(
+      () => materializeSourceWebAssets(manifest(), sourceMapPath, unsafeTarget),
+      /must not contain symbolic links/,
+    );
 
     writeFileSync(productTarball, 'mutated');
     assert.throws(

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "hardcodedWebRoutes": [
+    "/api/address-data",
+    "/_action/switch-space",
+    "/_action/switch-actor",
+    "/setup",
+    "/logout",
+    "/login",
+    "/admin-login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/login/social/:provider/callback",
+    "/tenant-selection",
+    "/admin",
+    "/admin/*",
+    "/share/:token"
+  ],
+  "bootstrapPermissionModules": [
+    null,
+    "acp",
+    "ai",
+    "audit",
+    "automation",
+    "billing",
+    "dashboard",
+    "data",
+    "decision",
+    "iot",
+    "meta",
+    "notification",
+    "org",
+    "party",
+    "report",
+    "sys",
+    "system"
+  ],
+  "publicFiles": [
+    "README.md",
+    "android-chrome-192x192.png",
+    "android-chrome-512x512.png",
+    "apple-touch-icon.png",
+    "avatar.jpeg",
+    "cookie-test.html",
+    "favicon-16x16.png",
+    "favicon-32x32.png",
+    "favicon.ico",
+    "intro.png",
+    "manifest.json",
+    "sw.js"
+  ],
+  "applicationOwnedPaths": {
+    "aura-bpm": [
+      "plugins/core-bpm",
+      "plugins/workflow-demo",
+      "web-admin/tests/e2e/bpm-designer"
+    ],
+    "aura-crm": [
+      "plugins/crm",
+      "web-admin/tests/e2e/crm"
+    ],
+    "aura-edu": [
+      "web-admin/app/routes/xy",
+      "web-admin/app/routes/api.xy.teacher-code.tsx",
+      "web-admin/public/static/xiaoya"
+    ]
+  }
+}

@@ -64,6 +64,8 @@ describe('TenantSelection product onboarding', () => {
       productName: '蜂耘',
       tenantOnboarding: {
         entityLabel: '学校',
+        industryCode: 'education',
+        postCreateRedirect: '/xy/setup',
         selectionTitle: '选择你的开始方式',
         selectionLead: '创建学校，或使用学校教师码加入已有学校',
         createTitle: '创建学校',

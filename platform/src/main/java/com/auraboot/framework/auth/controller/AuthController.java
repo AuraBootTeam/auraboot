@@ -37,7 +37,7 @@ public class AuthController {
     private final LoginRateLimiter loginRateLimiter;
     private final SessionRenewalService sessionRenewalService;
     private final WechatMiniIdentityService wechatMiniIdentityService;
-    private final com.auraboot.framework.auth.wechat.WechatJoinService wechatJoinService;
+    private final com.auraboot.framework.auth.wechat.WechatInvitationJoinService wechatInvitationJoinService;
 
     @Autowired
     private ApiRateLimiter apiRateLimiter;
@@ -130,17 +130,16 @@ public class AuthController {
     }
 
     /**
-     * Pure-wechat school join (FR-077/078): an unbound WeChat account plus a valid
-     * invitation code auto-provisions the platform user, joins the tenant, assigns
-     * the requested roles and returns a tenant-scoped session — no admin action.
+     * Accept a tenant invitation with an unbound WeChat account. Roles are read
+     * from the invitation and can never be supplied by the client.
      */
-    @PostMapping("/login/wechat-join")
+    @PostMapping("/login/wechat-invitation")
     @ResponseBody
-    public ApiResponse<AuthenticationResponse> loginByWechatJoin(
-            @RequestBody WechatJoinRequest request,
+    public ApiResponse<AuthenticationResponse> loginByWechatInvitation(
+            @RequestBody WechatInvitationJoinRequest request,
             HttpServletRequest httpRequest) {
         String ip = extractIp(httpRequest);
-        return ApiResponse.success(wechatJoinService.join(request, ip, httpRequest.getHeader("User-Agent")));
+        return ApiResponse.success(wechatInvitationJoinService.join(request, ip, httpRequest.getHeader("User-Agent")));
     }
 
     /**

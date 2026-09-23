@@ -63,6 +63,36 @@ test('core tenant and platform-admin configuration owns no BPM or CRM resources'
   assert.doesNotMatch(showcaseNamedQueries, /\bmt_crm_[a-z0-9_]+\b/i);
 });
 
+test('core-owned surfaces are explicit and contain no undeclared application surface', () => {
+  const ownership = JSON.parse(readFileSync(
+    resolve(ROOT, 'distribution/application/core-owned-surfaces.json'),
+    'utf8',
+  ));
+  const routesSource = readFileSync(resolve(ROOT, 'web-admin/app/routes.ts'), 'utf8');
+  const hardcodedRoutes = [...routesSource.matchAll(/\broute\('([^']+)'/g)].map((match) => match[1]);
+  assert.deepEqual(hardcodedRoutes, ownership.hardcodedWebRoutes);
+
+  const bootstrap = JSON.parse(readFileSync(
+    resolve(ROOT, 'platform/src/main/resources/tenant-templates/default-bootstrap.json'),
+    'utf8',
+  ));
+  const modules = [...new Set(bootstrap.permissions.map((permission) => permission.module ?? null))]
+    .sort((left, right) => String(left).localeCompare(String(right)));
+  assert.deepEqual(modules, [...ownership.bootstrapPermissionModules]
+    .sort((left, right) => String(left).localeCompare(String(right))));
+
+  const publicFiles = files(resolve(ROOT, 'web-admin/public'))
+    .map((path) => path.slice(resolve(ROOT, 'web-admin/public').length + 1))
+    .sort();
+  assert.deepEqual(publicFiles, [...ownership.publicFiles].sort());
+
+  for (const [owner, paths] of Object.entries(ownership.applicationOwnedPaths)) {
+    for (const relative of paths) {
+      assert.equal(existsSync(resolve(ROOT, relative)), false, `${relative} is owned by ${owner}, not core`);
+    }
+  }
+});
+
 test('core production graph contains no product tables or product-owned HTTP routes', () => {
   const java = joined(resolve(ROOT, 'platform/src/main/java'), (path) => path.endsWith('.java'));
   const web = joined(resolve(ROOT, 'web-admin/app'), (path) => /\.(?:ts|tsx)$/.test(path)
@@ -74,6 +104,9 @@ test('core production graph contains no product tables or product-owned HTTP rou
   assert.doesNotMatch(web, /["']\/api\/bpm(?:\/|["'])/i);
   assert.doesNotMatch(web, /["']\/api\/crm(?:\/|["'])/i);
   assert.doesNotMatch(web, /["']\/bpm\//i);
+  assert.doesNotMatch(web, /["']\/xy\//i);
+  assert.doesNotMatch(web, /\bxy_[a-z0-9_]+\b/i);
+  assert.doesNotMatch(java, /\b(?:BindSchool|WechatJoin|xy_[a-z0-9_]+)\b/i);
   assert.doesNotMatch(`${java}\n${web}`, /on_bpm_event|trigger-bpm-event|bpm-inline-approval|process-select/i);
 });
 

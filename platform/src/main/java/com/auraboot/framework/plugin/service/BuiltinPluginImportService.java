@@ -20,7 +20,7 @@ package com.auraboot.framework.plugin.service;
  * {@code aura.tenant.product-plugins} (comma-separated plugin source directories,
  * absolute or relative to the builtin plugins base directory). They are imported
  * for every new tenant after the core profile, in the declared order — this is how
- * a deployment ships a product (e.g. the Xiaoya edu plugins) into self-service
+ * a deployment ships application-owned plugins into self-service
  * created tenants without hardcoding it into the platform catalogue.
  *
  * <p>The first-install {@code /api/bootstrap/setup} path does not call this

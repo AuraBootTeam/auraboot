@@ -98,6 +98,12 @@ interface TenantSelectionResponse {
   needsApproval?: boolean;
 }
 
+export function safePostCreateRedirect(value: FormDataEntryValue | null): string {
+  if (typeof value !== 'string') return '/';
+  const candidate = value.trim();
+  return /^\/(?!\/)[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$/.test(candidate) ? candidate : '/';
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   const token = await getTokenFromRequest(request);
 
@@ -110,7 +116,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const formData = await request.formData();
   const action = formData.get('action');
-  const postCreateRedirect = formData.get('postCreateRedirect') === '/xy/setup' ? '/xy/setup' : '/';
+  const postCreateRedirect = safePostCreateRedirect(formData.get('postCreateRedirect'));
   const accessPolicyResult = await fetchAccessPolicyResult();
   const accessPolicy = accessPolicyResult.policy;
 
@@ -511,8 +517,8 @@ export default function TenantSelection() {
                   }}
                 >
                   <input type="hidden" name="action" value="create" />
-                  {onboarding?.entityLabel === '学校' && (
-                    <input type="hidden" name="postCreateRedirect" value="/xy/setup" />
+                  {onboarding?.postCreateRedirect && (
+                    <input type="hidden" name="postCreateRedirect" value={onboarding.postCreateRedirect} />
                   )}
                   <TenantFormFields
                     formData={formData}
@@ -522,7 +528,7 @@ export default function TenantSelection() {
                     showWebsite={false}
                     variant="selection"
                     entityLabel={onboarding?.entityLabel}
-                    fixedIndustry={onboarding ? 'education' : undefined}
+                    fixedIndustry={onboarding?.industryCode}
                   />
                   {onboarding && (
                     <div className="flex items-start gap-3 rounded-lg bg-blue-50 p-4 text-sm leading-6 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100">

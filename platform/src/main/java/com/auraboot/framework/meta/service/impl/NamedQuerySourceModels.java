@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.SecureSqlRewriter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -16,6 +17,8 @@ public class NamedQuerySourceModels {
     private final MetaModelMapper mapper;
     private final SecureSqlRewriter sql;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Value("${aura.persistence.tenant-bypass-table-prefixes:se_}")
+    private String tenantBypassTablePrefixes = "se_";
     private static final Pattern IDENTIFIER = Pattern.compile("\"(?:[^\"]|\"\")+\"|[A-Za-z_][A-Za-z0-9_$]*");
 
     /**
@@ -64,16 +67,15 @@ public class NamedQuerySourceModels {
     }
 
     /** True when the quoted identity's bare table name starts with an engine (bypass) prefix. */
-    static boolean isBypassEngineSource(String key) {
+    boolean isBypassEngineSource(String key) {
         String bare = key.trim().toLowerCase();
         int lastDot = bare.lastIndexOf('.');
         if (lastDot >= 0) bare = bare.substring(lastDot + 1);
         bare = bare.replace("\"", "");
-        // se_ is the SmartEngine table prefix configured via
-        // aura.persistence.tenant-bypass-table-prefixes on standalone applications.
-        // se_* = SmartEngine tables; ab_bpm_* = BPM product tables. Both live under
-        // the tenant-bypass prefixes on standalone applications.
-        return bare.startsWith("se_") || bare.startsWith("ab_bpm_");
+        return Arrays.stream(tenantBypassTablePrefixes.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .anyMatch(bare::startsWith);
     }
 
     record Sources(Map<String, String> models, Map<String, String> views) {

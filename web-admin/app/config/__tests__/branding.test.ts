@@ -109,6 +109,8 @@ describe('community branding contract', () => {
         ...commercialDocument,
         tenantOnboarding: {
           entityLabel: '学校',
+          industryCode: 'education',
+          postCreateRedirect: '/xy/setup',
           selectionTitle: '选择你的开始方式',
           selectionLead: '创建学校，或使用学校教师码加入已有学校',
           createTitle: '创建学校',
@@ -127,6 +129,8 @@ describe('community branding contract', () => {
 
     expect(branding.tenantOnboarding).toMatchObject({
       entityLabel: '学校',
+      industryCode: 'education',
+      postCreateRedirect: '/xy/setup',
       joinChannel: 'wechat_mini',
       miniProgramName: '蜂耘',
     });
@@ -157,6 +161,16 @@ describe('community branding contract', () => {
         'SO-2026-001',
       ),
     ).toThrow(/joinSteps is required/);
+
+    expect(() =>
+      resolveCommercialBranding(
+        {
+          ...commercialDocument,
+          tenantOnboarding: { ...baseOnboarding, postCreateRedirect: 'https://evil.example' },
+        },
+        'SO-2026-001',
+      ),
+    ).toThrow(/same-origin path/);
     expect(() =>
       resolveCommercialBranding(
         {

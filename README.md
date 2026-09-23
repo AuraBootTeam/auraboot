@@ -5,8 +5,6 @@
 
 <p align="center">
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.3-blue.svg" alt="License"></a>
-  <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend CI"></a>
-  <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml/badge.svg?branch=main" alt="Frontend CI"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
   <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
@@ -47,7 +45,7 @@ Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com
 - **Page** — DSL composition of blocks; business CRUD is contract-rendered, never hand-coded
 - **Command** — the only write path; multi-stage pipeline applies authz, entitlement, validation, state guard, audit, events, side effects
 - **Permission** — five layers: RBAC + ReBAC + organizational scope + ABAC + field-level
-- **Process** — BPMN 2.0 long-running orchestration where each task resolves back to a Command
+- **Process** — a typed integration contract for product-owned workflow applications, with each business mutation resolving back to a Command
 - **Plugin** — declared manifest of contributions; industry verticals ship as plugin packages with isolated resources and declared dependencies
 
 ## Product Preview
@@ -74,9 +72,8 @@ Define models, fields, commands, pages, and formulas in declarative JSON. A sing
 ### 20+ Stage Command Pipeline
 Every data operation flows through a unified pipeline: schema validation → permission check → state machine → field mapping → handler → side effects → webhooks → audit. Fully configurable per command through DSL.
 
-### 3 Visual Designers
-- **Page Designer** — Drag-and-drop page builder with 20+ block types (forms, tables, charts, dashboards)
-- **BPMN Designer** — Visual workflow editor with human tasks, SLA monitoring, and approval routing
+### Visual Designers
+- **Page Designer** — Visual DSL composition with forms, tables, charts, dashboards, and reusable blocks
 - **Automation Designer** — Event-driven automation rules with triggers, conditions, and actions
 
 ### AI-Assisted Workflows
@@ -86,11 +83,11 @@ Every data operation flows through a unified pipeline: schema validation → per
 - **RAG Knowledge Base** — Upload documents (PDF, DOCX, MD, CSV), vector-indexed for AI retrieval
 - **Multi-LLM** — OpenAI, Anthropic, Zhipu GLM, MiniMax, and more through a unified provider interface
 
-### BPM Workflow Engine
-SmartEngine-based BPMN 2.0 engine with visual process design, human task assignment, approval inbox, escalation rules, and SLA tracking.
+### Application Composition
+Independent products such as CRM, BPM, and EDU compose exact runtime, plugin, migration, configuration, typed Web-route, registry, and asset contributions through a versioned application manifest. Product source is not copied into this repository or loaded through an ad-hoc runtime micro-frontend.
 
 ### Plugin System
-PF4J-based plugin architecture. The OSS repo ships ~20 first-party plugins covering CRM, HR, BPM, asset management, AI / agent control plane, dashboards, and more. Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Install from a marketplace or build your own with the CLI.
+PF4J-based plugin architecture. The repository ships platform plugins plus clearly separated public examples such as asset management, HR essentials, project management, and inventory. Examples demonstrate the DSL and plugin SDK; they are not packaged business suites and are not part of the core-only runtime. Independent applications such as CRM, BPM, and EDU live in their own repositories.
 
 ### Multi-Tenant RBAC
 Row-level tenant isolation, role-based access control at resource/operation/data levels, and a complete permission system with menus, routes, and API-level enforcement.
@@ -122,7 +119,7 @@ Then open [http://localhost:3000](http://localhost:3000) and log in:
 | **Email** | `admin@auraboot.com` |
 | **Password** | `Test2026x` (change immediately on first login) |
 
-You should land on the platform with the official public CRM (`crm_lead_common`, `crm_account_common`, `crm_opportunity_common`, …) available from the main navigation.
+You should land on the platform showcase for the core model → page → command loop. CRM, BPM, EDU, and other applications are installed and released independently through the application-composition contract.
 
 If local PostgreSQL is already using port 5432, keep your local service running and start AuraBoot with a different host port:
 
@@ -208,7 +205,7 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 | Frontend | React 19, Tailwind CSS 4, React Router 7, Vite 6 |
 | Database | PostgreSQL 15+ (with pgvector) |
 | Cache | Redis 7+ |
-| BPM | SmartEngine 3.7 (BPMN 2.0) |
+| Application composition | Versioned manifests, immutable artifacts, typed Web contributions |
 | AI | Multi-provider LLM integration (OpenAI, Anthropic, Zhipu, etc.) |
 | Testing | JUnit 5, Playwright, JaCoCo |
 | Observability | OpenTelemetry, Sentry, structured logging |
@@ -219,18 +216,18 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend (React)                         │
-│  Page Designer │ BPMN Designer │ Automation Designer │ AuraBot  │
+│  Page Designer │ Automation Designer │ Plugin SDK │ AuraBot    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ BFF (Express)
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                     Spring Boot Backend                         │
 │                                                                 │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
-│  │  DSL Engine  │  │  AI Core     │  │  BPM Engine            │ │
-│  │  Model       │  │  AuraBot     │  │  SmartEngine (BPMN)    │ │
-│  │  Field       │  │  ACP         │  │  Human Tasks           │ │
-│  │  Command     │  │  ChatBI      │  │  SLA Monitoring        │ │
-│  │  Page        │  │  RAG / KB    │  │  Approval Inbox        │ │
+│  │  DSL Engine  │  │  AI Core     │  │  App Composition       │ │
+│  │  Model       │  │  AuraBot     │  │  Artifact Lock         │ │
+│  │  Field       │  │  ACP         │  │  Typed Web Routes      │ │
+│  │  Command     │  │  ChatBI      │  │  Assets / Config       │ │
+│  │  Page        │  │  RAG / KB    │  │  Plugin API            │ │
 │  │  Formula     │  │  Multi-LLM   │  │                        │ │
 │  └──────┬──────┘  └──────────────┘  └────────────────────────┘ │
 │         │                                                       │
@@ -262,11 +259,12 @@ auraboot/
 ├── web-admin/                # React frontend + BFF
 │   ├── app/                  #   Application source
 │   └── tests/                #   E2E and API tests
-├── plugins/                  # Plugin packages (~20 first-party in OSS repo)
-│   ├── crm/                  #   CRM plugin
-│   ├── sales/                #   Sales management
-│   ├── procurement/          #   Procurement
-│   └── ...
+├── plugins/                  # Platform plugins and public examples
+│   ├── core-meta/            #   Core platform metadata
+│   ├── platform-admin/       #   Core administration
+│   ├── showcase/             #   Platform capability showcase
+│   └── asset-management/     #   Public example (not core runtime)
+├── distribution/application/# Application schemas, resolver, and ownership contract
 ├── docs/                     # Code-coupled fixtures only; user docs at auraboot.com/docs
 ├── scripts/                  # Build, seed, and CI scripts
 ├── docker/                   # Docker configuration
@@ -290,7 +288,7 @@ docs. A high-level system overview lives in [`ARCHITECTURE.md`](ARCHITECTURE.md)
 | DSL Engine + Page Designer | ✓ | ✓ |
 | 20+ Stage Command Pipeline | ✓ | ✓ |
 | AI Copilot (AuraBot) | ✓ | ✓ |
-| BPM Workflow Engine | ✓ | ✓ |
+| Application Composition Contract | ✓ | ✓ |
 | Plugin System + CLI | ✓ | ✓ |
 | Multi-Tenant RBAC | ✓ | ✓ |
 | Agent Orchestration (ACP) | — | ✓ |

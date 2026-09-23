@@ -14,7 +14,9 @@ import {
 import {
   buildArtifactApplicationGraph,
   buildSourceApplicationGraph,
+  buildSourceRouteManifest,
   loadCatalogWebContributions,
+  materializeSourceWebAssets,
 } from './application-graph-adapters.mjs';
 
 function parseArgs(argv) {
@@ -29,6 +31,7 @@ function parseArgs(argv) {
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
     else if (argument === '--skip-image') options.skipImage = true;
     else if (argument === '--source-map') options.sourceMap = resolve(rest[++index]);
+    else if (argument === '--route-root') options.routeRoot = resolve(rest[++index]);
     else if (argument === '--source-graph') options.sourceGraph = resolve(rest[++index]);
     else if (argument === '--artifact-graph') options.artifactGraph = resolve(rest[++index]);
     else if (argument === '--target') options.target = rest[++index];
@@ -106,7 +109,32 @@ function main() {
     process.stdout.write(`equivalent application graphs: ${source.graphDigest}\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs [options]');
+  if (options.command === 'materialize-assets') {
+    const manifest = readStructuredFile(required(options, 'manifest'));
+    const materialized = materializeSourceWebAssets(
+      manifest,
+      required(options, 'sourceMap'),
+      required(options, 'target'),
+    );
+    process.stdout.write(`materialized ${materialized.length} web asset mounts\n`);
+    return;
+  }
+  if (options.command === 'emit-route-manifest') {
+    const routeManifest = buildSourceRouteManifest(
+      readStructuredFile(required(options, 'manifest')),
+      required(options, 'sourceMap'),
+      options.routeRoot,
+    );
+    const output = required(options, 'output');
+    mkdirSync(dirname(output), { recursive: true });
+    const moduleSource = Object.entries(routeManifest)
+      .map(([name, entries]) => `export const ${name} = ${JSON.stringify(entries, null, 2)};`)
+      .join('\n\n');
+    writeFileSync(output, `${moduleSource}\n`);
+    process.stdout.write(`emitted ${Object.values(routeManifest).flat().length} web routes\n`);
+    return;
+  }
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs|materialize-assets|emit-route-manifest [options]');
 }
 
 try {

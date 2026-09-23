@@ -93,6 +93,13 @@ class NamedQuerySourceModelsTest {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
         assertThrows(AccessDeniedException.class, () -> resolve("public.some_business_table"));
     }
+    @Test void applicationConfiguredBypassPrefixIsResolvedWithoutProductKnowledge() {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                resolver, "tenantBypassTablePrefixes", "se_,app_engine_");
+        when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
+        Map<String, String> resolved = resolve("public.app_engine_job");
+        assertEquals("engine.app_engine_job", resolved.get("\"public\".\"app_engine_job\""));
+    }
         @Test void platformSharedUserTableResolvesAsSystemSource() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of(model("users", "ab_user")));
         Map<String, String> resolved = resolve("public.ab_user");
@@ -155,16 +162,15 @@ class NamedQuerySourceModelsTest {
         }
     }
 
-    @Test void bpmProductTablesResolveAsSystemSources() {
-        // ab_bpm_* product tables (audit, process definition) sit under the
-        // tenant-bypass prefixes alongside se_* engine tables.
+    @Test void productTablesRequireApplicationOwnedBypassConfiguration() {
         when(mapper.findCurrentForTenant(42L)).thenReturn(List.of());
         when(jdbc.queryForMap(anyString(), anyString())).thenReturn(
                 Map.of("kind", "r", "tenant_column", true, "definition", ""));
-        for (String table : List.of("public.ab_bpm_audit_record", "public.ab_bpm_process_definition")) {
-            Map<String, String> resolved = resolve(table);
-            assertTrue(resolved.get("\"public\".\"" + table.substring("public.".length()) + "\"")
-                    .startsWith(NamedQuerySourceModels.ENGINE_SOURCE_MARKER_PREFIX));
-        }
+        assertThrows(AccessDeniedException.class, () -> resolve("public.product_engine_job"));
+
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                resolver, "tenantBypassTablePrefixes", "se_,product_engine_");
+        Map<String, String> resolved = resolve("public.product_engine_job");
+        assertEquals("engine.product_engine_job", resolved.get("\"public\".\"product_engine_job\""));
     }
 }
