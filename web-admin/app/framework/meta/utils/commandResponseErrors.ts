@@ -41,6 +41,22 @@ export function resolveCommandErrorMessage(
   if (conflictCode === 'CAS_VERSION_REQUIRED') {
     return 'This form is stale and cannot prove the record is unchanged. Refresh and try again.';
   }
+  // New rejection contract: `context` carries the bare i18n reason key (for
+  // example "annual_balance_not_found") instead of the legacy {messageKey,
+  // detail} object. Resolve it through the page locale catalog; when no entry
+  // exists the key itself is still more actionable than the generic envelope
+  // message ("Business error") that would otherwise surface.
+  const contextKey =
+    typeof body.context === 'string' && body.context.trim().length > 0
+      ? body.context.trim()
+      : undefined;
+  if (contextKey) {
+    const localized = translate ? translate(contextKey) : undefined;
+    if (localized && localized !== contextKey) {
+      return localized;
+    }
+    return contextKey;
+  }
   const resolved =
     firstNonBlankString(
       body.context?.detail,
