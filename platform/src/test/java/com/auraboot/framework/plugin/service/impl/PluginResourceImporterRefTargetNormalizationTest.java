@@ -63,6 +63,30 @@ class PluginResourceImporterRefTargetNormalizationTest {
     }
 
     @Test
+    @DisplayName("existing-table physical column mapping is persisted in the runtime extension")
+    void preservesPhysicalColumnMapping() {
+        FieldDefinitionDTO dto = new FieldDefinitionDTO();
+        dto.setCode("crm_ic_channel_type");
+        dto.setColumnName("channel_type");
+        dto.setDataType("string");
+
+        assertThat(buildFieldExtension(dto)).containsEntry("columnName", "channel_type");
+    }
+
+    @Test
+    @DisplayName("physical column mappings accept identifiers and reject SQL fragments")
+    void validatesPhysicalColumnMappingIdentifier() {
+        FieldDefinitionDTO dto = new FieldDefinitionDTO();
+        dto.setCode("crm_ic_channel_type");
+        dto.setDataType("string");
+        dto.setColumnName("channel_type");
+        assertThat(dto.isValid()).isTrue();
+
+        dto.setColumnName("channel_type; DROP TABLE ab_inbound_channel");
+        assertThat(dto.isValid()).isFalse();
+    }
+
+    @Test
     @DisplayName("field authorization metadata is persisted in the runtime extension")
     void preservesFieldAuthorizationMetadata() {
         FieldDefinitionDTO dto = new FieldDefinitionDTO();

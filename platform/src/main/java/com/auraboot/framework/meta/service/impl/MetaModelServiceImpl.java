@@ -1612,7 +1612,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .displayName((String) extensionMap.get("displayName"))
                 .description((String) extensionMap.get("description"))
                 .dataType(field.getDataType())
-                .columnName(generateColumnName(field.getCode()))
+                .columnName(resolveColumnName(field.getCode(), extensionMap))
                 .required(feature != null ? Boolean.TRUE.equals(feature.getRequired()) : false)
                 .primaryKey(Boolean.TRUE.equals(extensionMap.get("primaryKey")) || Boolean.TRUE.equals(extensionMap.get("isPrimaryKey")))
                 .unique(feature != null ? Boolean.TRUE.equals(feature.getUnique()) : false)
@@ -1718,6 +1718,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private String generateColumnName(String code) {
         // 简单的列名生成规则，将驼峰转换为下划线
         return code.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+    }
+
+    private String resolveColumnName(String fieldCode, Map<String, Object> extension) {
+        Object configured = extension.get("columnName");
+        if (configured instanceof String columnName && !columnName.isBlank()) {
+            return columnName;
+        }
+        return generateColumnName(fieldCode);
     }
     
     /**

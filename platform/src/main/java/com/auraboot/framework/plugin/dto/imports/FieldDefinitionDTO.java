@@ -28,6 +28,12 @@ public class FieldDefinitionDTO {
     private String code;
 
     /**
+     * Optional physical column name for an existing-table model. When absent,
+     * the platform derives the column from {@link #code}.
+     */
+    private String columnName;
+
+    /**
      * Display name.
      */
     private String displayName;
@@ -132,7 +138,9 @@ public class FieldDefinitionDTO {
      */
     public boolean isValid() {
         return code != null && !code.isBlank()
-                && dataType != null && !dataType.isBlank();
+                && dataType != null && !dataType.isBlank()
+                && (columnName == null || columnName.isBlank()
+                    || columnName.matches("[A-Za-z_][A-Za-z0-9_]*"));
     }
 
     /**
