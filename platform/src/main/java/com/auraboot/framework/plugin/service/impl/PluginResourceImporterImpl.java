@@ -596,6 +596,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         Map<String, Object> extension = dto.getExtension() != null ? new HashMap<>(dto.getExtension()) : new HashMap<>();
         extension.put("displayName", dto.getEffectiveDisplayName());
         extension.put("description", dto.getDescription());
+        if (dto.getColumnName() != null && !dto.getColumnName().isBlank()) {
+            extension.put("columnName", dto.getColumnName());
+        }
         if (dto.getFeature() != null) {
             extension.put("feature", dto.getFeature());
         }
