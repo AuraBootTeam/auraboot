@@ -41,8 +41,11 @@ import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.BackgroundDataAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.TenantProjectionAccessorImpl;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.framework.plugin.extension.TenantRoleAssignmentAccessor;
+import com.auraboot.framework.plugin.extension.TenantProjectionAccessor;
 import com.auraboot.framework.plugin.pf4j.TenantRoleAssignmentAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IdentityDirectoryAccessorImpl;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -584,6 +587,11 @@ public class HandlerPhase implements CommandPhase {
             }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+            if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
+                pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
+                        new TenantProjectionAccessorImpl(tenantId,
+                                new BackgroundDataAccessorImpl(dynamicDataService)));
+            }
             pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
                     new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
                             roleMapper, userRoleService, tenantMemberService, userService));
