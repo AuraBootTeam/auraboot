@@ -20,6 +20,7 @@ import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.FileAccessor;
+import com.auraboot.framework.plugin.extension.TenantProjectionAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -155,7 +156,37 @@ class HandlerPhaseTest {
         assertThat(handler.capturedContext.get().expectedVersion()).isEqualTo(5L);
         assertThat(handler.capturedContext.get().clientRequestId()).isEqualTo("client-request-1");
         assertThat(handler.capturedContext.get().independentTransactionAccessor()).isNotNull();
+        assertThat(handler.capturedContext.get().tenantProjectionAccessor()).isNull();
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
+    }
+
+    @Test
+    void execute_exposesTenantProjectionReaderOnlyForExplicitBooleanOptIn() throws Exception {
+        RecordingPluginHandler optedIn = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(optedIn));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+
+        CommandPipelineContext allowed = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM, true)
+        ));
+
+        phase.execute(allowed);
+
+        assertThat(optedIn.capturedContext.get().tenantProjectionAccessor()).isNotNull();
+
+        RecordingPluginHandler stringValue = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(stringValue));
+        CommandPipelineContext rejected = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM, "true")
+        ));
+
+        phase.execute(rejected);
+
+        assertThat(stringValue.capturedContext.get().tenantProjectionAccessor()).isNull();
     }
 
     @Test

@@ -10,6 +10,8 @@ import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
+import com.auraboot.framework.plugin.extension.TenantProjectionAccessor;
+import com.auraboot.framework.plugin.pf4j.BackgroundDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
@@ -19,6 +21,7 @@ import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.TenantProjectionAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -168,6 +171,11 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                         commandExpectedVersion);
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+            if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
+                pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
+                        new TenantProjectionAccessorImpl(tenantId,
+                                new BackgroundDataAccessorImpl(dynamicDataService)));
+            }
             // A command launched by an async handler may itself enqueue a follow-up
             // command (for example, attachment upload -> Gerber parse). Resolve the
             // task service lazily to avoid a bean cycle with its executor registry.

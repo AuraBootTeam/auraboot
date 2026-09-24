@@ -33,6 +33,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for DataAccessor in the settings map. */
     String DATA_ACCESSOR_KEY = "__dataAccessor";
 
+    /** Opt-in, read-only bridge for tenant-scoped sanitized projection commands. */
+    String TENANT_PROJECTION_ACCESSOR_KEY = TenantProjectionAccessor.SETTINGS_KEY;
+
     /** Well-known key for BiTemporalAccessor in the settings map. */
     String BI_TEMPORAL_ACCESSOR_KEY = "__biTemporalAccessor";
 
@@ -231,6 +234,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public DataAccessor dataAccessor() {
             Object da = settings != null ? settings.get(DATA_ACCESSOR_KEY) : null;
             return da instanceof DataAccessor ? (DataAccessor) da : null;
+        }
+
+        /** Returns the host-owned projection reader only for commands that explicitly opt in. */
+        public TenantProjectionAccessor tenantProjectionAccessor() {
+            Object accessor = settings != null ? settings.get(TENANT_PROJECTION_ACCESSOR_KEY) : null;
+            return accessor instanceof TenantProjectionAccessor value ? value : null;
         }
 
         /** Host-owned tenant-scoped role bridge; never supplied by command payloads. */
