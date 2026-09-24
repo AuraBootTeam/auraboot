@@ -18,6 +18,7 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserApplicationPreferenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Shared login-completion pipeline used by all AuthStrategy implementations.
@@ -50,6 +52,7 @@ public class LoginCompletionHelper {
     private final TenantService tenantService;
     private final SessionManagementService sessionManagementService;
     private final PasswordManagementService passwordManagementService;
+    private final UserApplicationPreferenceService userApplicationPreferenceService;
 
     @Autowired(required = false)
     private LoginApplicationChannelMapper loginApplicationChannelMapper;
@@ -85,14 +88,45 @@ public class LoginCompletionHelper {
                 user.isEnabled()
         );
 
-        // 2. Resolve tenant info and member ID
+        // 2. Resolve the application before tenant routing. Application-scoped preferences are
+        // intentionally available before a tenant has been selected.
+        String applicationCode = federatedContext == null || federatedContext.getApplicationCode() == null
+                ? "business-web"
+                : federatedContext.getApplicationCode();
+        String channelCode = federatedContext == null || federatedContext.getLoginChannelCode() == null
+                ? "default-business-web"
+                : federatedContext.getLoginChannelCode();
+        LoginContextRef loginContext = loginApplicationChannelMapper == null
+                ? null
+                : loginApplicationChannelMapper.resolveLoginContext(applicationCode, channelCode,
+                        federatedContext == null ? null : federatedContext.getTenantId());
+
+        // 3. Resolve tenant info and member ID. A stored tenant is only a routing hint: it must
+        // still be present in the user's current active memberships.
         Long tenantId = null;
         Long memberId = null;
         String tenantStatus = "none";
+        String nextAction = "BIND_SCHOOL";
         try {
-            tenantId = federatedContext != null && federatedContext.getTenantId() != null
-                    ? federatedContext.getTenantId()
-                    : tenantMemberService.getTenantIdByUserId(user.getId());
+            if (federatedContext != null && federatedContext.getTenantId() != null) {
+                tenantId = federatedContext.getTenantId();
+            } else if (loginContext == null) {
+                // Compatibility path for installations that have not configured login applications.
+                tenantId = tenantMemberService.getTenantIdByUserId(user.getId());
+            } else {
+                List<Long> activeTenantIds = tenantMemberService.getTenantIdsByUserId(user.getId());
+                if (activeTenantIds.size() == 1) {
+                    tenantId = activeTenantIds.getFirst();
+                } else if (activeTenantIds.size() > 1) {
+                    String recentTenantPid = getLastTenantPid(user.getId(), loginContext.getApplicationId());
+                    Tenant recentTenant = recentTenantPid == null ? null : tenantService.findByPid(recentTenantPid);
+                    if (recentTenant != null && activeTenantIds.contains(recentTenant.getId())) {
+                        tenantId = recentTenant.getId();
+                    } else {
+                        nextAction = "SELECT_SCHOOL";
+                    }
+                }
+            }
             if (tenantId != null) {
                 TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
                 if (tenantMember != null) {
@@ -100,6 +134,7 @@ public class LoginCompletionHelper {
                     tenantStatus = tenantMember.getStatus();
                     if ("active".equalsIgnoreCase(tenantStatus)) {
                         tenantStatus = "member";
+                        nextAction = "ENTER";
                     }
                 }
             }
@@ -126,19 +161,22 @@ public class LoginCompletionHelper {
         // Set memberId on userDetails for downstream use
         userDetails.setMemberId(memberId);
 
-        // 3. Generate JWT with security version and memberId
+        // Persist only a validated active tenant. Failure is non-fatal because this is a routing
+        // convenience, never part of the authorization decision.
+        if (tenantId != null && "ENTER".equals(nextAction) && loginContext != null) {
+            rememberLastTenant(user.getId(), loginContext.getApplicationId(), tenantId);
+        }
+
+        // 4. Generate JWT with security version and memberId
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         String jwt;
-        LoginContextRef loginContext = loginApplicationChannelMapper == null
-                ? null
-                : loginApplicationChannelMapper.resolveLoginContext(
-                        federatedContext == null || federatedContext.getApplicationCode() == null
-                                ? "business-web"
-                                : federatedContext.getApplicationCode(),
-                        federatedContext == null || federatedContext.getLoginChannelCode() == null
-                                ? "default-business-web"
-                                : federatedContext.getLoginChannelCode(),
-                        tenantId);
+        if (loginApplicationChannelMapper != null && tenantId != null) {
+            LoginContextRef tenantLoginContext = loginApplicationChannelMapper.resolveLoginContext(
+                    applicationCode, channelCode, tenantId);
+            if (tenantLoginContext != null) {
+                loginContext = tenantLoginContext;
+            }
+        }
         if (loginContext == null) {
             jwt = jwtUtil.generateTokenWithTenantId(
                     userDetails, user.getPid(), tenantId, memberId, securityVersion);
@@ -174,6 +212,7 @@ public class LoginCompletionHelper {
                 user.getNickName() != null ? user.getNickName() : user.getUserName(),
                 tenantId, tenantStatus
         );
+        response.setNextAction(nextAction);
 
         if (Boolean.TRUE.equals(user.getMustChangePassword())
                 || passwordManagementService.isPasswordExpired(user)) {
@@ -181,5 +220,27 @@ public class LoginCompletionHelper {
         }
 
         return response;
+    }
+
+    private String getLastTenantPid(Long userId, Long applicationId) {
+        try {
+            return userApplicationPreferenceService.getLastTenantPid(userId, applicationId);
+        } catch (RuntimeException e) {
+            log.warn("Could not read last-tenant preference for user {} application {}: {}",
+                    userId, applicationId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void rememberLastTenant(Long userId, Long applicationId, Long tenantId) {
+        try {
+            Tenant tenant = tenantService.getById(tenantId);
+            if (tenant != null && tenant.getPid() != null) {
+                userApplicationPreferenceService.setLastTenant(userId, applicationId, tenant.getPid());
+            }
+        } catch (RuntimeException e) {
+            log.warn("Could not persist last-tenant preference for user {} application {}: {}",
+                    userId, applicationId, e.getMessage());
+        }
     }
 }

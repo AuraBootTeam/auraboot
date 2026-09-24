@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.strategy;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.auth.dto.AuthStrategyRequest;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
+import com.auraboot.framework.auth.dto.FederatedLoginContext;
 import com.auraboot.framework.auth.strategy.LoginCompletionHelper;
 import com.auraboot.framework.auth.wechat.WechatMiniIdentityService;
 import com.auraboot.framework.common.constant.ResponseCode;
@@ -42,6 +43,9 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
         // bare account (no tenant, no roles) and logs in; the app then dispatches
         // by product-specific tenant-invitation state.
         User user = wechatMiniIdentityService.selfProvision(code);
-        return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
+        FederatedLoginContext context = new FederatedLoginContext();
+        context.setApplicationCode("business-mobile");
+        context.setLoginChannelCode("default-business-mobile");
+        return loginCompletionHelper.completeLogin(user, context, request.getIpAddress(), request.getUserAgent());
     }
 }

@@ -2,6 +2,7 @@ package com.auraboot.framework.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.rbac.service.UserRoleService;
@@ -9,8 +10,11 @@ import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantInviteService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.user.service.UserApplicationPreferenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +38,8 @@ class TenantInvitationAcceptanceControllerTest {
     @Mock UserService userService;
     @Mock SessionManagementService sessionManagementService;
     @Mock JwtUtil jwtUtil;
+    @Mock TenantService tenantService;
+    @Mock UserApplicationPreferenceService userApplicationPreferenceService;
     @InjectMocks TenantInvitationAcceptanceController controller;
 
     @BeforeEach
@@ -52,8 +58,9 @@ class TenantInvitationAcceptanceControllerTest {
         TenantMember member = new TenantMember();
         member.setId(33L);
         lenient().when(tenantMemberService.findByTenantIdAndUserId(22L, 11L)).thenReturn(member);
-        lenient().when(jwtUtil.generateTokenWithTenantId(any(CustomUserDetails.class), eq("user-pid"), eq(22L), eq(33L), eq(3)))
-                .thenReturn("scoped-token");
+        lenient().when(jwtUtil.generateTokenWithContext(any(CustomUserDetails.class), eq("user-pid"), any()))
+                .thenReturn("new-token");
+        lenient().when(jwtUtil.inheritSessionLifetime("new-token", "old-token")).thenReturn("scoped-token");
     }
 
     @Test
@@ -62,8 +69,9 @@ class TenantInvitationAcceptanceControllerTest {
         assertEquals("scoped-token", response.getData().get("jwt"));
         verify(sessionManagementService).createSession(11L, "scoped-token", null, "tenant-invitation-acceptance");
         ArgumentCaptor<CustomUserDetails> details = ArgumentCaptor.forClass(CustomUserDetails.class);
-        verify(jwtUtil).generateTokenWithTenantId(details.capture(), eq("user-pid"), eq(22L), eq(33L), eq(3));
+        verify(jwtUtil).generateTokenWithContext(details.capture(), eq("user-pid"), any());
         assertEquals("user-pid", details.getValue().getUserPid());
+        verify(sessionManagementService).revokeSessionByToken("old-token");
     }
 
     @Test
@@ -122,5 +130,24 @@ class TenantInvitationAcceptanceControllerTest {
                         TenantInvitationAcceptanceController.InvitationAcceptanceRequest.class)
                 .getAnnotation(PostMapping.class);
         assertEquals(Set.of("/invitations/accept", "/bind-school"), Set.of(mapping.value()));
+    }
+
+    @Test
+    void joinPreservesApplicationContextAndRemembersNewSchool() {
+        when(jwtUtil.extractApplicationId("old-token")).thenReturn(8L);
+        when(jwtUtil.extractLoginChannelId("old-token")).thenReturn(9L);
+        Tenant tenant = new Tenant();
+        tenant.setPid("school-public-pid");
+        tenant.setDisplayName("向阳小学");
+        when(tenantService.getById(22L)).thenReturn(tenant);
+
+        controller.acceptInvitation("Bearer old-token",
+                new TenantInvitationAcceptanceController.InvitationAcceptanceRequest("SCHOOL-CODE", null));
+
+        ArgumentCaptor<SessionTokenContext> context = ArgumentCaptor.forClass(SessionTokenContext.class);
+        verify(jwtUtil).generateTokenWithContext(any(CustomUserDetails.class), eq("user-pid"), context.capture());
+        assertEquals(8L, context.getValue().applicationId());
+        assertEquals(9L, context.getValue().loginChannelId());
+        verify(userApplicationPreferenceService).setLastTenant(11L, 8L, "school-public-pid");
     }
 }

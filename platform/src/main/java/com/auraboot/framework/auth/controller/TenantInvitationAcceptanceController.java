@@ -2,6 +2,9 @@ package com.auraboot.framework.auth.controller;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.constant.ResponseCode;
@@ -11,8 +14,11 @@ import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantInviteService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.service.TenantService;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.user.service.UserApplicationPreferenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +50,8 @@ public class TenantInvitationAcceptanceController {
     private final UserService userService;
     private final SessionManagementService sessionManagementService;
     private final com.auraboot.framework.auth.util.JwtUtil jwtUtil;
+    private final TenantService tenantService;
+    private final UserApplicationPreferenceService userApplicationPreferenceService;
 
     public record InvitationAcceptanceRequest(
             String inviteCode,
@@ -114,20 +122,45 @@ public class TenantInvitationAcceptanceController {
         }
 
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String newJwt = jwtUtil.generateTokenWithTenantId(
+        Long applicationId = jwtUtil.extractApplicationId(token);
+        Long loginChannelId = jwtUtil.extractLoginChannelId(token);
+        CustomUserDetails userDetails =
                 new CustomUserDetails(
                         user.getEmail(), user.getPassword() != null ? user.getPassword() : "", user.getId(), user.getPid(),
                         List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("role_user")),
-                        true, true, true, true),
-                user.getPid(), invite.getTenantId(), member != null ? member.getId() : null, securityVersion);
+                        true, true, true, true);
+        String newJwt = jwtUtil.generateTokenWithContext(
+                userDetails,
+                user.getPid(),
+                new SessionTokenContext(
+                        invite.getTenantId(),
+                        member != null ? member.getId() : null,
+                        applicationId,
+                        loginChannelId,
+                        ExecutionScope.TENANT,
+                        null,
+                        null,
+                        SessionStage.READY,
+                        1,
+                        securityVersion));
+        newJwt = jwtUtil.inheritSessionLifetime(newJwt, token);
+        Tenant tenant = tenantService.getById(invite.getTenantId());
+        if (applicationId != null && tenant != null && tenant.getPid() != null) {
+            userApplicationPreferenceService.setLastTenant(userId, applicationId, tenant.getPid());
+        }
+
         // JwtAuthenticationFilter requires a live session row for every bearer
-        // token. Do not hand a tenant-scoped JWT to the mini program unless its
-        // session was persisted; otherwise the next request is always a 401.
+        // token. Create the replacement before revoking only this device's old
+        // onboarding session; sessions on other devices remain untouched.
         sessionManagementService.createSession(userId, newJwt, null, "tenant-invitation-acceptance");
+        sessionManagementService.revokeSessionByToken(token);
 
         Map<String, Object> out = new HashMap<>();
         out.put("jwt", newJwt);
         out.put("tenantId", invite.getTenantId());
+        if (tenant != null) {
+            out.put("tenantName", tenant.getDisplayName());
+        }
         out.put("assigned", assigned);
         return ApiResponse.success(out);
     }
