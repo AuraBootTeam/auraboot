@@ -6,6 +6,7 @@ plugins {
     id 'jacoco'
     id 'checkstyle'
     id 'pmd'
+    id 'io.qameta.allure' version '2.12.0'
 }
 
 // Publish plain jar (not fat boot jar) for downstream modules
@@ -271,6 +272,7 @@ configurations {
 }
 
 dependencies {
+    testImplementation 'io.qameta.allure:allure-junit5:2.29.0'
     // Plugin API module
     implementation project(':platform-plugin-api')
 

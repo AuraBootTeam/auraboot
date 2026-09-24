@@ -223,13 +223,18 @@ export default defineConfig({
   timeout: process.env.E2E_COVERAGE === '1' ? 60000 : 15000,
 
   // Reporter configuration
-  reporter: process.env.CI || process.env.PW_RESULTS_JSON
-    ? [
+  reporter: [
+    ...(process.env.CI || process.env.PW_RESULTS_JSON
+      ? [
         ['list'],
         ['html', { open: 'never', outputFolder: reportDir }],
         ['json', { outputFile: resultsJson }],
       ]
-    : [['line']],
+      : [['line']]),
+    ...(process.env.AURA_ALLURE_RESULTS
+      ? [['allure-playwright', { resultsDir: process.env.AURA_ALLURE_RESULTS }]]
+      : []),
+  ],
 
   // Shared settings for all projects
   use: {
