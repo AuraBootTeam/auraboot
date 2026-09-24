@@ -219,3 +219,14 @@ SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
+
+# The test task remains the sole gate authority.  Allure is an additional
+# evidence format: copy results only after Gradle finishes and never mask its
+# exit status when report generation or copying fails.
+gradle_status=$?
+if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-results" ]]; then
+  mkdir -p "$AURA_ALLURE_RESULTS"
+  cp -a "$PROJECT_ROOT/platform/build/allure-results/." "$AURA_ALLURE_RESULTS/" || \
+    printf '[oss-backend-unit-ci] warning: unable to copy Allure results\n' >&2
+fi
+exit "$gradle_status"

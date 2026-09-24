@@ -222,6 +222,8 @@
     "@vitest/coverage-v8": "^4.1.8",
     "@vitest/ui": "^4.1.8",
     "adm-zip": "^0.6.1",
+    "allure": "3.18.0",
+    "allure-playwright": "3.10.2",
     "concurrently": "^9.2.1",
     "daisyui": "^5.0.2",
     "eruda": "^3.4.3",
