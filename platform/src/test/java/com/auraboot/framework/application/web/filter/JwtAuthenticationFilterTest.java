@@ -261,6 +261,29 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void onboardingStage_reachesLegacyBindSchoolCompatibilityRoute() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/tenant/bind-school");
+        req.setServletPath("/api/tenant/bind-school");
+        req.addHeader("Authorization", "Bearer onboarding.token");
+        CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("onboarding.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(jwtUtil.validateToken("onboarding.token", ud)).thenReturn(true);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("onboarding.token")).thenReturn(true);
+        when(jwtUtil.extractSessionStage("onboarding.token")).thenReturn("onboarding");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(req, response, chain);
+
+        verify(chain).doFilter(req, response);
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
     void validToken_putsTenantAndUserIntoMdc_andClearsAfter() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer valid.token");

@@ -1,5 +1,6 @@
 package com.auraboot.framework.auth.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
@@ -17,6 +18,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -102,5 +106,21 @@ class TenantInvitationAcceptanceControllerTest {
         assertThrows(com.auraboot.framework.exception.BusinessException.class,
                 () -> controller.acceptInvitation("Bearer old-token", new TenantInvitationAcceptanceController.InvitationAcceptanceRequest("SCHOOL-CODE", " ")));
         verify(tenantMemberService, never()).addMember(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void acceptsLegacyRealNamePayloadAndRoute() throws Exception {
+        var request = new ObjectMapper().readValue(
+                "{\"inviteCode\":\"SCHOOL-CODE\",\"realName\":\"高老师\"}",
+                TenantInvitationAcceptanceController.InvitationAcceptanceRequest.class);
+        assertEquals("高老师", request.displayName());
+        assertEquals("scoped-token", controller.acceptInvitation("Bearer old-token", request)
+                .getData().get("jwt"));
+
+        PostMapping mapping = TenantInvitationAcceptanceController.class
+                .getDeclaredMethod("acceptInvitation", String.class,
+                        TenantInvitationAcceptanceController.InvitationAcceptanceRequest.class)
+                .getAnnotation(PostMapping.class);
+        assertEquals(Set.of("/invitations/accept", "/bind-school"), Set.of(mapping.value()));
     }
 }

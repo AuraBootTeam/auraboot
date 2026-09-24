@@ -1,5 +1,6 @@
 package com.auraboot.framework.auth.controller;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -44,9 +45,11 @@ public class TenantInvitationAcceptanceController {
     private final SessionManagementService sessionManagementService;
     private final com.auraboot.framework.auth.util.JwtUtil jwtUtil;
 
-    public record InvitationAcceptanceRequest(String inviteCode, String displayName) {}
+    public record InvitationAcceptanceRequest(
+            String inviteCode,
+            @JsonAlias("realName") String displayName) {}
 
-    @PostMapping("/invitations/accept")
+    @PostMapping({"/invitations/accept", "/bind-school"})
     @Operation(summary = "Accept a tenant invitation for the authenticated account")
     public ApiResponse<Map<String, Object>> acceptInvitation(
             @RequestHeader(value = "Authorization", required = false) String authorization,
