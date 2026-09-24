@@ -14,6 +14,8 @@ public class AuthenticationResponse {
     @JsonSerialize(using = ToStringSerializer.class)
     private final Long tenantId;
     private final String tenantStatus;  // "member", "pending", "none"
+    /** ENTER, BIND_SCHOOL, or SELECT_SCHOOL. Clients should dispatch on this field. */
+    private String nextAction;
     private boolean mustChangePassword = false;
 
     // Social OAuth merge fields
@@ -31,6 +33,7 @@ public class AuthenticationResponse {
         this.username = username;
         this.tenantId = tenantId;
         this.tenantStatus = tenantStatus;
+        this.nextAction = tenantId == null ? "BIND_SCHOOL" : "ENTER";
     }
 
     public AuthenticationResponse(String jwt, Long userId, String userPid, String username) {
@@ -43,6 +46,7 @@ public class AuthenticationResponse {
     public static AuthenticationResponse mergeRequired(String mergeToken, String mergeProvider) {
         AuthenticationResponse response = new AuthenticationResponse(null, null, null, null, null, "none");
         response.setMergeRequired(true);
+        response.setNextAction(null);
         response.setMergeToken(mergeToken);
         response.setMergeProvider(mergeProvider);
         return response;

@@ -15,6 +15,7 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserApplicationPreferenceService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -49,6 +50,9 @@ class LoginCompletionHelperTest {
 
     @Mock
     private LoginApplicationChannelMapper loginApplicationChannelMapper;
+
+    @Mock
+    private UserApplicationPreferenceService userApplicationPreferenceService;
 
     @InjectMocks
     private LoginCompletionHelper helper;
@@ -270,9 +274,11 @@ class LoginCompletionHelperTest {
         loginContext.setApplicationId(601L);
         loginContext.setLoginChannelId(701L);
 
-        when(tenantMemberService.getTenantIdByUserId(13L)).thenReturn(401L);
+        when(tenantMemberService.getTenantIdsByUserId(13L)).thenReturn(java.util.List.of(401L));
         when(tenantMemberService.findByTenantIdAndUserId(401L, 13L)).thenReturn(member);
         when(tenantService.getById(401L)).thenReturn(tenantWithStatus("active"));
+        when(loginApplicationChannelMapper.resolveLoginContext(
+                "business-web", "default-business-web", null)).thenReturn(loginContext);
         when(loginApplicationChannelMapper.resolveLoginContext(
                 "business-web", "default-business-web", 401L)).thenReturn(loginContext);
         when(jwtUtil.generateTokenWithContext(any(), any(), any())).thenReturn("jwt-context");
@@ -294,6 +300,84 @@ class LoginCompletionHelperTest {
         assertThat(context.contextVersion()).isEqualTo(1);
         assertThat(context.securityVersion()).isEqualTo(7);
         verify(jwtUtil, never()).generateTokenWithTenantId(any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void completeLogin_multipleTenants_usesValidatedRecentTenantForApplication() {
+        ReflectionTestUtils.setField(helper, "loginApplicationChannelMapper", loginApplicationChannelMapper);
+        User user = buildUser(20L, "user-pid-020", null, false, false);
+        LoginContextRef context = new LoginContextRef();
+        context.setApplicationId(601L);
+        context.setLoginChannelId(701L);
+        Tenant recent = tenantWithStatus("active");
+        recent.setId(402L);
+        recent.setPid("tenant-pid-402");
+        TenantMember member = new TenantMember();
+        member.setId(502L);
+        member.setStatus("active");
+
+        when(loginApplicationChannelMapper.resolveLoginContext("business-web", "default-business-web", null))
+                .thenReturn(context);
+        when(loginApplicationChannelMapper.resolveLoginContext("business-web", "default-business-web", 402L))
+                .thenReturn(context);
+        when(tenantMemberService.getTenantIdsByUserId(20L)).thenReturn(java.util.List.of(401L, 402L));
+        when(userApplicationPreferenceService.getLastTenantPid(20L, 601L)).thenReturn("tenant-pid-402");
+        when(tenantService.findByPid("tenant-pid-402")).thenReturn(recent);
+        when(tenantMemberService.findByTenantIdAndUserId(402L, 20L)).thenReturn(member);
+        when(tenantService.getById(402L)).thenReturn(recent);
+        when(jwtUtil.generateTokenWithContext(any(), any(), any())).thenReturn("jwt-recent");
+
+        AuthenticationResponse result = helper.completeLogin(user, null, null);
+
+        assertThat(result.getTenantId()).isEqualTo(402L);
+        assertThat(result.getNextAction()).isEqualTo("ENTER");
+        verify(userApplicationPreferenceService).setLastTenant(20L, 601L, "tenant-pid-402");
+    }
+
+    @Test
+    void completeLogin_multipleTenantsWithStalePreference_requiresPrivateSelection() {
+        ReflectionTestUtils.setField(helper, "loginApplicationChannelMapper", loginApplicationChannelMapper);
+        User user = buildUser(21L, "user-pid-021", null, false, false);
+        LoginContextRef context = new LoginContextRef();
+        context.setApplicationId(602L);
+        context.setLoginChannelId(702L);
+        Tenant stale = tenantWithStatus("active");
+        stale.setId(999L);
+
+        when(loginApplicationChannelMapper.resolveLoginContext("business-web", "default-business-web", null))
+                .thenReturn(context);
+        when(tenantMemberService.getTenantIdsByUserId(21L)).thenReturn(java.util.List.of(401L, 402L));
+        when(userApplicationPreferenceService.getLastTenantPid(21L, 602L)).thenReturn("stale-tenant");
+        when(tenantService.findByPid("stale-tenant")).thenReturn(stale);
+        when(jwtUtil.generateTokenWithContext(any(), any(), any())).thenReturn("jwt-onboarding");
+
+        AuthenticationResponse result = helper.completeLogin(user, null, null);
+
+        assertThat(result.getTenantId()).isNull();
+        assertThat(result.getNextAction()).isEqualTo("SELECT_SCHOOL");
+        verify(userApplicationPreferenceService, never()).setLastTenant(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void completeLogin_applicationWithNoMembership_requiresSchoolBinding() {
+        ReflectionTestUtils.setField(helper, "loginApplicationChannelMapper", loginApplicationChannelMapper);
+        User user = buildUser(22L, "user-pid-022", null, false, false);
+        LoginContextRef context = new LoginContextRef();
+        context.setApplicationId(603L);
+        context.setLoginChannelId(703L);
+        when(loginApplicationChannelMapper.resolveLoginContext(
+                "business-web", "default-business-web", null)).thenReturn(context);
+        when(tenantMemberService.getTenantIdsByUserId(22L)).thenReturn(java.util.List.of());
+        when(jwtUtil.generateTokenWithContext(any(), any(), any())).thenReturn("jwt-bind-school");
+
+        AuthenticationResponse result = helper.completeLogin(user, null, null);
+
+        assertThat(result.getTenantId()).isNull();
+        assertThat(result.getNextAction()).isEqualTo("BIND_SCHOOL");
+        var tokenContext = org.mockito.ArgumentCaptor.forClass(SessionTokenContext.class);
+        verify(jwtUtil).generateTokenWithContext(any(), eq("user-pid-022"), tokenContext.capture());
+        assertThat(tokenContext.getValue().applicationId()).isEqualTo(603L);
+        assertThat(tokenContext.getValue().sessionStage()).isEqualTo(SessionStage.ONBOARDING);
     }
 
     // =========================================================

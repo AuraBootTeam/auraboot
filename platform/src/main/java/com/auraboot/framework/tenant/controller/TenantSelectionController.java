@@ -27,6 +27,7 @@ import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.user.service.UserApplicationPreferenceService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +68,7 @@ public class TenantSelectionController {
     private final I18nService i18nService;
     private final I18nLocaleResolver i18nLocaleResolver;
     private final SystemModeService systemModeService;
+    private final UserApplicationPreferenceService userApplicationPreferenceService;
 
     /**
      * List all spaces (tenants) the current user belongs to.
@@ -154,7 +156,7 @@ public class TenantSelectionController {
                 }
                 response = tenantApplicationService.joinTenantByInviteCode(request, user);
             }
-            case "select" -> response = selectSpace(request, user);
+            case "select" -> response = selectSpace(request, user, httpRequest);
             default -> throw new RootUnCheckedException(UnreachableCodePathException);
         }
 
@@ -163,7 +165,13 @@ public class TenantSelectionController {
             if (bearer == null || !bearer.startsWith("Bearer ")) {
                 throw new RootUnCheckedException(ResponseCode.Unauthorized, "Missing session token");
             }
-            response.setJwt(jwtUtil.inheritSessionLifetime(response.getJwt(), bearer.substring(7)));
+            String previousToken = bearer.substring(7);
+            response.setJwt(jwtUtil.inheritSessionLifetime(response.getJwt(), previousToken));
+            if ("select".equals(request.getAction())) {
+                sessionManagementService.createSession(user.getId(), response.getJwt(),
+                        httpRequest.getRemoteAddr(), "space-switch");
+                sessionManagementService.revokeSessionByToken(previousToken);
+            }
         }
         localizeResponse(response, httpRequest);
         return ApiResponse.success(response);
@@ -198,7 +206,8 @@ public class TenantSelectionController {
     /**
      * Select an existing space (tenant) — generates a new JWT with the selected tenantId.
      */
-    private TenantSelectionResponse selectSpace(TenantSelectionRequest request, User user) {
+    private TenantSelectionResponse selectSpace(
+            TenantSelectionRequest request, User user, HttpServletRequest httpRequest) {
         Long tenantId = request.getTenantId();
         if (tenantId == null) {
             throw new RootUnCheckedException(ResponseCode.BadParam, "tenantId is required for 'select' action");
@@ -233,14 +242,18 @@ public class TenantSelectionController {
                 Collections.singletonList(new SimpleGrantedAuthority("role_user")));
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
         boolean platformSpace = "System".equalsIgnoreCase(tenant.getName());
+        String bearer = httpRequest.getHeader("Authorization");
+        String currentToken = bearer != null && bearer.startsWith("Bearer ") ? bearer.substring(7) : null;
+        Long applicationId = currentToken == null ? null : jwtUtil.extractApplicationId(currentToken);
+        Long loginChannelId = currentToken == null ? null : jwtUtil.extractLoginChannelId(currentToken);
         String jwt = jwtUtil.generateTokenWithContext(
                 userDetails,
                 user.getPid(),
                 new SessionTokenContext(
                         tenantId,
                         member.getId(),
-                        null,
-                        null,
+                        applicationId,
+                        loginChannelId,
                         platformSpace ? ExecutionScope.PLATFORM : ExecutionScope.TENANT,
                         null,
                         null,
@@ -248,8 +261,9 @@ public class TenantSelectionController {
                         1,
                         securityVersion));
 
-        // Register new JWT in session store so JwtAuthenticationFilter.isSessionValid() passes
-        sessionManagementService.createSession(user.getId(), jwt, null, "space-switch");
+        if (applicationId != null && tenant.getPid() != null) {
+            userApplicationPreferenceService.setLastTenant(user.getId(), applicationId, tenant.getPid());
+        }
 
         TenantSelectionResponse response = new TenantSelectionResponse();
         response.setStatus("success");

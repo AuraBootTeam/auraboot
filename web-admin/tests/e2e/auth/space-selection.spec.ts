@@ -17,6 +17,8 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
 
@@ -206,5 +208,82 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     // Platform Console should be visible for admin user
     const platformConsole = page.locator('[data-testid="platform-console-link"]');
     await expect(platformConsole).toBeVisible();
+  });
+
+  test('left sidebar account menu switches to another private school and marks it current', async ({ page }) => {
+    const evidenceDir = resolve(
+      process.env.MULTI_SCHOOL_PC_EVIDENCE_DIR || 'test-results/multi-school-pc',
+    );
+    mkdirSync(evidenceDir, { recursive: true });
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: '工作台', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('本空间', { exact: true })).toBeVisible({ timeout: 15_000 });
+    const avatarButton = page.locator('[data-testid="user-menu"] button').first();
+    await expect(avatarButton).toBeVisible({ timeout: 15_000 });
+    const dropdown = page.locator('[data-testid="user-dropdown"]');
+    await page
+      .locator('header[data-hydrated="true"]')
+      .waitFor({ state: 'attached', timeout: 15_000 });
+    await expect
+      .poll(async () => {
+        if (await dropdown.isVisible().catch(() => false)) return true;
+        await avatarButton.click().catch(() => null);
+        return dropdown.isVisible().catch(() => false);
+      })
+      .toBe(true);
+    await expect(dropdown).toBeVisible();
+
+    const spacesResponse = await page.request.get('/api/tenant-selection/my-spaces');
+    expect(spacesResponse.ok()).toBeTruthy();
+    const spaces = (await spacesResponse.json()).data as Array<{
+      tenantId: string;
+      tenantDisplayName: string;
+      tenantName: string;
+      spaceType: string;
+    }>;
+    const businessSpaces = spaces.filter((space) => space.spaceType === 'business');
+    expect(businessSpaces.length).toBeGreaterThanOrEqual(2);
+
+    const currentButton = dropdown.locator('button[data-testid^="tenant-switch-"]').filter({
+      has: page.locator('span', { hasText: '✓' }),
+    });
+    await expect(currentButton).toHaveCount(1);
+    const currentTestId = await currentButton.getAttribute('data-testid');
+    const currentTenantId = currentTestId?.replace('tenant-switch-', '');
+    const target = businessSpaces.find((space) => String(space.tenantId) !== currentTenantId);
+    expect(target).toBeTruthy();
+
+    await dropdown.screenshot({ path: resolve(evidenceDir, 'pc-school-menu-before.png') });
+    const targetButton = dropdown.locator(`[data-testid="tenant-switch-${target!.tenantId}"]`);
+    await expect(targetButton).toBeVisible();
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      targetButton.click(),
+    ]);
+
+    const meResponse = await page.request.get('/api/auth/me');
+    expect(meResponse.ok()).toBeTruthy();
+    const me = (await meResponse.json()).data;
+    const activeTenantId = me?.user?.tenantId ?? me?.tenantId;
+    expect(String(activeTenantId)).toBe(String(target!.tenantId));
+
+    await expect(avatarButton).toBeVisible({ timeout: 15_000 });
+    await page
+      .locator('header[data-hydrated="true"]')
+      .waitFor({ state: 'attached', timeout: 15_000 });
+    await expect
+      .poll(async () => {
+        if (await dropdown.isVisible().catch(() => false)) return true;
+        await avatarButton.click().catch(() => null);
+        return dropdown.isVisible().catch(() => false);
+      })
+      .toBe(true);
+    await expect(dropdown).toBeVisible();
+    const switchedButton = dropdown.locator(`[data-testid="tenant-switch-${target!.tenantId}"]`);
+    await expect(switchedButton.locator('span', { hasText: '✓' })).toBeVisible();
+    await dropdown.screenshot({ path: resolve(evidenceDir, 'pc-school-menu-after.png') });
   });
 });
