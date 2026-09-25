@@ -28,7 +28,7 @@ export function auditComposition(packages) {
     visiting.delete(id); visited.add(id); dependencyOrder.push(id);
   }
   for (const id of [...byId.keys()].sort()) visit(id);
-  const versions = new Map(); const repeatables = new Map(); const owners = new Map();
+  const versions = new Map(); const repeatables = new Map(); const owners = new Map(); const lifecycles = new Map();
   for (const [id, entry] of byId) {
     for (const migration of entry.contract.migrations) {
       // Version identity is numeric, independent of description and package location.
@@ -48,7 +48,10 @@ export function auditComposition(packages) {
     for (const [name, object] of Object.entries(entry.contract.objects)) {
       const key = objectKey(name);
       requireThat(!owners.has(key) || owners.get(key) === object.owner, `conflicting object owner: ${key}`);
+      requireThat(!lifecycles.has(key) || lifecycles.get(key) === object.lifecycle,
+        `conflicting object lifecycle: ${key}`);
       owners.set(key, object.owner);
+      lifecycles.set(key, object.lifecycle);
       requireThat(byId.has(object.owner), `object owner package missing: ${key}:${object.owner}`);
     }
   }

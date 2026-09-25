@@ -60,7 +60,23 @@ test('foreign catalog seed requires the owning package declaration', () => {
   crm.contract.objects.core_record = crm.contract.objects.shared_catalog;
   delete crm.contract.objects.shared_catalog;
   crm.contract.migrations[0].statements[0].objects[1].name = 'core_record';
+  assert.throws(() => auditComposition([core, crm]), /conflicting object lifecycle/);
+  crm.contract.objects.core_record.lifecycle = core.contract.objects.core_record.lifecycle;
   assert.equal(auditComposition([core, crm]).verdict, 'PASS');
+});
+
+test('same-owner aliases cannot assign both Flyway and model-publish lifecycles', () => {
+  const core = packageFixture('core', '1'); const crm = packageFixture('crm', '2', ['core']);
+  crm.contract.objects['public.core_record'] = { owner: 'core', lifecycle: 'model-publish', evidence: 'fixture reference' };
+  crm.contract.migrations[0].statements[0].objects.push({ name: 'public.core_record', operation: 'reference' });
+  for (const packages of [[core, crm], [crm, core]]) {
+    assert.throws(() => auditComposition(packages), /conflicting object lifecycle: public.core_record/);
+  }
+  crm.contract.objects['public.core_record'].lifecycle = 'static-schema';
+  assert.equal(auditComposition([core, crm]).verdict, 'PASS');
+  core.contract.objects['public.core_record'] = { ...core.contract.objects.core_record, lifecycle: 'model-publish' };
+  core.contract.migrations[0].statements[0].objects.push({ name: 'public.core_record', operation: 'reference' });
+  assert.throws(() => auditComposition([core]), /conflicting object lifecycle/);
 });
 
 test('draft or changed SQL cannot enter a composition via a valid neighboring package', () => {
