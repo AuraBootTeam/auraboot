@@ -1,31 +1,30 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import Ajv from 'ajv';
-
+// Keep this consumer runnable from an archived checkout without node_modules.
 const digest = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-const sha = { type: 'string', pattern: '^sha256:[0-9a-f]{64}$' };
-const object = properties => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
-const timestamp = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$' };
-const ajv = new Ajv({ strict: true, allErrors: true });
+const text = pattern => value => typeof value === 'string' && pattern.test(value);
+const sha = text(/^sha256:[0-9a-f]{64}$/);
+const integer = (minimum, maximum = Number.MAX_SAFE_INTEGER) => value => Number.isSafeInteger(value) && value >= minimum && value <= maximum;
+const oneOf = (...values) => value => values.includes(value);
+const object = fields => value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && Object.keys(value).length === Object.keys(fields).length
+  && Object.entries(fields).every(([key, check]) => Object.hasOwn(value, key) && check(value[key]));
+const timestamp = text(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
 const context = {
-  deploymentId: { type: 'string', pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' },
-  generation: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
-  action: { enum: ['info', 'validate', 'migrate'] },
-  payloadSha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
-  database: object({ host: { type: 'string', pattern: '^[a-zA-Z0-9][a-zA-Z0-9.-]*$' },
-    port: { type: 'integer', minimum: 1, maximum: 65535 },
-    name: { type: 'string', pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' } }),
+  deploymentId: text(/^[0-9A-HJKMNP-TV-Z]{26}$/), generation: integer(1),
+  action: oneOf('info', 'validate', 'migrate'), payloadSha256: text(/^[0-9a-f]{64}$/),
+  database: object({ host: text(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/), port: integer(1, 65535),
+    name: text(/^[a-zA-Z_][a-zA-Z0-9_]*$/) }),
 };
-const expectedSchema = ajv.compile(object({ ...context, startedDigest: sha, resultDigest: sha }));
-const startedSchema = ajv.compile(object({ schemaVersion: { const: 1 }, kind: { const: 'migration-execution' },
-  ...context, state: { const: 'started' }, startedAt: timestamp }));
-const resultSchema = ajv.compile(object({ schemaVersion: { const: 1 }, kind: { const: 'migration-execution-result' },
-  startedDigest: sha, state: { enum: ['succeeded', 'failed'] },
-  exitCode: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-  failureKind: { enum: [null, 'engine-launch-failed', 'engine-signaled', 'engine-exit-nonzero'] }, completedAt: timestamp }));
+const expectedSchema = object({ ...context, startedDigest: sha, resultDigest: sha });
+const startedSchema = object({ schemaVersion: oneOf(1), kind: oneOf('migration-execution'),
+  ...context, state: oneOf('started'), startedAt: timestamp });
+const resultSchema = object({ schemaVersion: oneOf(1), kind: oneOf('migration-execution-result'),
+  startedDigest: sha, state: oneOf('succeeded', 'failed'), exitCode: integer(0),
+  failureKind: oneOf(null, 'engine-launch-failed', 'engine-signaled', 'engine-exit-nonzero'), completedAt: timestamp });
 function need(condition, message) { if (!condition) throw new Error(message); }
-function validate(schema, value, label) { need(schema(value), `${label} invalid: ${ajv.errorsText(schema.errors)}`); }
+function validate(schema, value, label) { need(schema(value), `${label} invalid`); }
 function parse(bytes, schema, label) {
   need(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= 16384, `${label} must be bytes (maximum 16 KiB)`);
   const value = JSON.parse(bytes.toString('utf8')); validate(schema, value, label); return value;
@@ -60,7 +59,7 @@ export function verifyMigrationExecution(startedBytes, resultBytes, expected) {
     startedAt: started.startedAt, completedAt: result.completedAt };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2);
   if (args.length !== 3) throw new Error('Usage: node migration-execution-verifier.mjs <started.json> <result.json> <expected-context.json>');
   const result = verifyMigrationExecution(readFileSync(args[0]), readFileSync(args[1]), JSON.parse(readFileSync(args[2], 'utf8')));

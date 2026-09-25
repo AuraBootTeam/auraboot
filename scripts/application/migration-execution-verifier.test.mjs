@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { mkdtempSync, copyFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { verifyMigrationExecution } from './migration-execution-verifier.mjs';
 
 const bytes = value => Buffer.from(JSON.stringify(value));
@@ -17,6 +21,25 @@ function fixture() {
 }
 const verify = f => verifyMigrationExecution(bytes(f.started), bytes(f.result), f.expected);
 const pinResult = f => { f.expected.resultDigest = digest(bytes(f.result)); };
+
+test('standalone CLI needs no installed packages and distinguishes success, failure and invalid context', () => {
+  const root = mkdtempSync(join(tmpdir(), 'migration-consumer-cli-'));
+  copyFileSync(new URL('./migration-execution-verifier.mjs', import.meta.url), join(root, 'verify.mjs'));
+  const f = fixture();
+  const run = () => {
+    for (const name of ['started', 'result', 'expected']) writeFileSync(join(root, `${name}.json`), bytes(f[name]));
+    return spawnSync(process.execPath, [join(root, 'verify.mjs'), ...['started', 'result', 'expected'].map(name => join(root, `${name}.json`))],
+      { encoding: 'utf8', timeout: 10000, env: {} });
+  };
+  let result = run(); assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).executionSucceeded, true);
+  Object.assign(f.result, { state: 'failed', exitCode: 1, failureKind: 'engine-exit-nonzero' }); pinResult(f);
+  result = run(); assert.equal(result.status, 1, result.stderr);
+  assert.equal(JSON.parse(result.stdout).executionSucceeded, false);
+  f.expected.generation++;
+  result = run(); assert.notEqual(result.status, 0); assert.match(result.stderr, /target context/);
+  assert.equal(result.stdout, '');
+});
 
 test('valid success and failure remain distinct; returned context is detached', () => {
   const f = fixture(); const success = verify(f);
