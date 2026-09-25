@@ -43,34 +43,8 @@ ENT_ARGS=()
 [[ -n "$ENTERPRISE_ROOT" ]] && ENT_ARGS=(--enterprise-root "$ENTERPRISE_ROOT")
 
 if [[ "$PRE1900_CORE_COMPAT" == 1 ]]; then
-  [[ "$EDITION" == enterprise ]] || {
-    echo "[deploy-migrate] pre-#1900 compatibility requires edition=enterprise" >&2
-    exit 2
-  }
-  [[ -n "${PG_DB:-${PGDATABASE:-}}" ]] || {
-    echo "[deploy-migrate] PG_DB is required for pre-#1900 compatibility" >&2
-    exit 2
-  }
-  command -v psql >/dev/null || exit 127
-  history_match="$(PGPASSWORD="${PG_PASSWORD:-${PGPASSWORD:-}}" psql -X -qAt -v ON_ERROR_STOP=1 \
-    -h "${PG_HOST:-${PGHOST:-localhost}}" -p "${PG_PORT:-${PGPORT:-5432}}" \
-    -U "${PG_USER:-${PGUSER:-auraboot}}" -d "${PG_DB:-${PGDATABASE:-}}" \
-    -c "SELECT count(*) FROM ab_flyway_schema_history WHERE version='20260705093000' AND checksum=633449782 AND success")" || {
-    echo "[deploy-migrate] cannot verify target Flyway history" >&2
-    exit 2
-  }
-  [[ "$history_match" == 1 ]] || {
-    echo "[deploy-migrate] target is not the audited pre-#1900 migration cohort" >&2
-    exit 2
-  }
-  stage_root="$(mktemp -d)"
-  trap 'rm -r "$stage_root"' EXIT
-  bash "$SCRIPT_DIR/stage-pre1900-core-migrations.sh" \
-    --core-root "$(cd "$SCRIPT_DIR/../.." && pwd)" --out-dir "$stage_root/core"
-  export AURA_FLYWAY_CORE_MIGRATION_DIR="$stage_root/core"
-  export AURA_FLYWAY_OUT_OF_ORDER=1
-  export AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR=1
-  echo "[deploy-migrate] pinned core overlay manifest sha256=$(shasum -a 256 "$stage_root/core/sha256-manifest.txt" | awk '{print $1}')"
+  echo "[deploy-migrate] pre-1900 compatibility is retired; a separately reviewed historical upgrade is required" >&2
+  exit 2
 fi
 
 echo "[deploy-migrate] 1/3 flywayMigrate (edition=$EDITION)"

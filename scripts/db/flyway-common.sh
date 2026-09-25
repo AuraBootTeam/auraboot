@@ -31,7 +31,8 @@ PG_DB="${PG_DB:-${PGDATABASE:-}}"
 AURA_CORE_ROOT="${AURA_CORE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 CORE_MIGRATION_DIR="$AURA_CORE_ROOT/platform/src/main/resources/db/migration/core"
 if [[ -n "${AURA_FLYWAY_CORE_MIGRATION_DIR:-}" ]]; then
-  CORE_MIGRATION_DIR="$AURA_FLYWAY_CORE_MIGRATION_DIR"
+  echo "[flyway-common] migration directory overlays are retired; use a reviewed release payload" >&2
+  exit 2
 fi
 
 _require_db() {
@@ -77,77 +78,35 @@ _build_locations() {
   printf '%s' "$locs"
 }
 
-# Known-drift checksum realignment policy (2026-09-19 quote/BOM fresh-runtime fixes).
-#
-# V20260919050000 / V20260919051000 (enterprise) and V20260919052000 (aura-crm,
-# layered via AURA_FLYWAY_EXTRA_LOCATIONS) were made fresh-safe in place AFTER
-# they had already shipped on main and been applied to long-lived databases.
-# Those databases record the ORIGINAL checksums, so a plain `flyway migrate`
-# would fail validation on upgrade. Policy: before `migrate`, run the official
-# `flyway repair` realignment ONLY when the history table records exactly the
-# known pre-change checksum below for one of these versions. Any other drift is
-# never repaired here — Flyway validation still fails loudly. Set
-# AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR=1 to disable the realignment.
-KNOWN_DRIFT_OLD_CHECKSUMS_20260919050000=-1983915974
-KNOWN_DRIFT_OLD_CHECKSUMS_20260919051000=-1381363862
-KNOWN_DRIFT_OLD_CHECKSUMS_20260919052000=450260653
-
-# _preflight_known_drift_repair <flyway args without command>
-# Inspects ab_flyway_schema_history and, when exactly a known pre-change
-# checksum is recorded for one of the versions above, runs `flyway repair`
-# with the same configuration the subsequent migrate would use.
-_preflight_known_drift_repair() {
-  if [ -n "${AURA_FLYWAY_SKIP_KNOWN_DRIFT_REPAIR:-}" ]; then
-    return 0
-  fi
-  command -v psql >/dev/null 2>&1 || return 0
-  local query_result
-  query_result="$(PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
-    -v ON_ERROR_STOP=1 -Atc \
-    "SELECT version || '=' || checksum FROM ab_flyway_schema_history
-      WHERE version IN ('20260919050000','20260919051000','20260919052000')" 2>/dev/null)" || return 0
-  [ -n "$query_result" ] || return 0
-
-  local version checksum var known needs_repair=0
-  while IFS='=' read -r version checksum; do
-    [ -n "$version" ] || continue
-    var="KNOWN_DRIFT_OLD_CHECKSUMS_${version}"
-    known="${!var:-}"
-    if [ -n "$known" ] && [ "$checksum" = "$known" ]; then
-      needs_repair=1
-    fi
-  done <<< "$query_result"
-
-  if [ "$needs_repair" -eq 1 ]; then
-    echo "[flyway] known-drift preflight: history records pre-2026-09-19 checksums for the" >&2
-    echo "[flyway] fresh-safe quote/BOM migrations; running official 'flyway repair' realignment first" >&2
-    flyway "$@" repair
-  fi
-}
-
 # run_flyway <flyway-command> <edition: oss|enterprise> [enterprise-root]
 run_flyway() {
   local cmd="$1" edition="${2:-oss}" ent_root="${3:-}"
+  case "$cmd" in
+    migrate|validate|info) ;;
+    *) echo "[flyway-common] only migrate, validate and info are permitted" >&2; return 2 ;;
+  esac
+  case "$edition" in
+    oss|enterprise) ;;
+    *) echo "[flyway-common] unknown edition" >&2; return 2 ;;
+  esac
+  if [[ "${AURA_FLYWAY_OUT_OF_ORDER:-0}" != 0 || "${AURA_FLYWAY_PRE1900_CORE_COMPAT:-0}" != 0 ]]; then
+    echo "[flyway-common] historical compatibility and out-of-order overrides are retired" >&2
+    return 2
+  fi
   _require_db
   local locations
   locations="$(_build_locations "$edition" "$ent_root")"
   local -a args=(
     "-url=jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
     "-user=$PG_USER"
-    "-password=$PG_PASSWORD"
     "-locations=$locations"
     "-table=ab_flyway_schema_history"
     "-baselineOnMigrate=false"
+    "-outOfOrder=false"
     "-validateMigrationNaming=true"
     "-cleanDisabled=true"
   )
-  if [[ "${AURA_FLYWAY_OUT_OF_ORDER:-}" == 1 ]]; then
-    args+=("-outOfOrder=true")
-  fi
   echo "[flyway] $cmd  db=$PG_DB  edition=$edition" >&2
   echo "[flyway] locations=$locations" >&2
-  if [ "$cmd" = "migrate" ]; then
-    _preflight_known_drift_repair "${args[@]}"
-  fi
-  flyway "${args[@]}" "$cmd"
+  FLYWAY_PASSWORD="$PG_PASSWORD" flyway "${args[@]}" "$cmd"
 }
