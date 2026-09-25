@@ -474,7 +474,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
                 backgroundComponentRegistry.register(pluginId);
                 applicationModuleRegistry.register(pluginId);
             } catch (RuntimeException e) {
-                log.error("Failed to register background components for plugin: {}", pluginId, e);
+                throw new IllegalStateException("Failed to register startup components for plugin: " + pluginId, e);
             }
         }
     }

@@ -81,6 +81,18 @@ public class AuraPluginManager extends SpringPluginManager {
                 .add(new DefaultPluginLoader(this));
     }
 
+    /** PF4J's default batch loader logs malformed plugins and continues; deployments must fail. */
+    @Override
+    public void loadPlugins() {
+        for (Path path : pluginRepository.getPluginPaths()) {
+            loadPluginFromPath(path);
+        }
+        resolvePlugins();
+        if (!getUnresolvedPlugins().isEmpty()) {
+            throw new IllegalStateException("Unresolved plugins prevent application startup");
+        }
+    }
+
     @PostConstruct
     public void init() {
         try {
@@ -90,16 +102,28 @@ public class AuraPluginManager extends SpringPluginManager {
                 log.info("Created plugins directory: {}", pluginsRoot);
             }
 
+            if (!Files.isDirectory(pluginsRoot) || !Files.isReadable(pluginsRoot)) {
+                throw new IllegalStateException("Plugin root must be a readable directory: " + pluginsRoot);
+            }
+
             // Load all plugins
             loadPlugins();
             log.info("Loaded {} plugins", getPlugins().size());
 
             // Start all plugins
             startPlugins();
+            for (PluginWrapper wrapper : getPlugins()) {
+                PluginState state = wrapper.getPluginState();
+                if (state != PluginState.STARTED && state != PluginState.DISABLED) {
+                    throw new IllegalStateException("Plugin did not start: " + wrapper.getPluginId()
+                            + " (" + state + ")", wrapper.getFailedException());
+                }
+            }
             log.info("Started {} plugins", getStartedPlugins().size());
 
         } catch (Exception e) {
-            log.error("Failed to initialize plugin manager", e);
+            cleanup();
+            throw new IllegalStateException("Failed to initialize plugin manager", e);
         }
     }
 
