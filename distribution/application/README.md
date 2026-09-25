@@ -279,3 +279,21 @@ success. Signals and launch failures produce failure evidence. These receipts do
 prove the runtime image digest, schema compatibility, publisher trust or release admission.
 The Linux migrator gate now checks the evidence on executed success/failure cases; that
 gate must run against the exact image before claiming this execution path verified.
+
+
+### Reading migration execution receipts
+
+`node scripts/application/migration-execution-verifier.mjs <started.json> <result.json> <expected-context.json>`
+validates bounded, versioned receipts and their exact byte digests. Expected context must supply
+`deploymentId`, `generation`, `action`, `payloadSha256`, `database` (`host`, `port`, `name`),
+`startedDigest`, and `resultDigest` from the controlling execution context. The result must link
+back to the pinned start bytes. Context mismatches and contradictory outcomes fail closed.
+The CLI exits 0 for a successful execution, 1 for a valid failure receipt, and nonzero for invalid
+input. Library consumers must inspect `executionSucceeded`; merely parsing a receipt is not success.
+
+These checks do not authenticate the evidence producer. Hashing arbitrary incoming receipts to
+populate their own expected digests provides no provenance. The image gate pins bytes read from
+its own isolated execution mount; formal publication still requires a trusted collector. Producer
+wall-clock timestamps are validated as timestamps, not used as trusted freshness or duration claims.
+A successful `info` or `validate` receipt does not prove that `migrate` ran. This module does not
+establish image digest, schema compatibility, release admission, or permission to bind a tenant.

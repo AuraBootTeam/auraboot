@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout } from 'node:timers/promises';
 import { inventoryPackage } from './schema-ownership-audit.mjs';
 import { stagePayload } from './migration-payload.mjs';
+import { verifyMigrationExecution } from './migration-execution-verifier.mjs';
 
 const PG_IMAGE = 'postgres@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636';
 const CASES = ['base-migrate', 'base-validate', 'base-info', 'repeat', 'repair-denied', 'digest-denied',
@@ -124,13 +125,13 @@ export async function runGate(options) {
       need(!text || output.includes(text), `${name}: expected failure reason missing`);
       if (expected === 0 || name === 'legacy-denied') {
         const startedBytes = readFileSync(join(executionRoot, 'run/started.json'));
-        const started = JSON.parse(startedBytes);
-        const outcome = JSON.parse(readFileSync(join(executionRoot, 'run/result.json')));
-        need(started.deploymentId === '01ARZ3NDEKTSV4RRFFQ69G5FAV' && started.generation === 1
-          && started.action === action && started.payloadSha256 === image.payloadSha256
-          && started.database.name === database && started.database.host === db, `${name}: execution context mismatch`);
-        need(outcome.startedDigest === `sha256:${hash(startedBytes)}` && outcome.exitCode === expected
-          && outcome.state === (expected === 0 ? 'succeeded' : 'failed'), `${name}: execution outcome mismatch`);
+        const resultBytes = readFileSync(join(executionRoot, 'run/result.json'));
+        const outcome = verifyMigrationExecution(startedBytes, resultBytes, {
+          deploymentId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', generation: 1,
+          action, payloadSha256: image.payloadSha256, database: { host: db, port: 5432, name: database },
+          startedDigest: `sha256:${hash(startedBytes)}`, resultDigest: `sha256:${hash(resultBytes)}`,
+        });
+        need(outcome.exitCode === expected && outcome.executionSucceeded === (expected === 0), `${name}: execution outcome mismatch`);
       }
 
       if (assertion) {
