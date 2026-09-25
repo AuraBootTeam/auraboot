@@ -12,6 +12,9 @@ import {
   sha256,
   sha256Path,
   validateLock,
+  validateLockForManifest,
+  canonicalJson,
+  lockIdentity,
   validateManifest,
   validateWebContribution,
   verifyArtifacts,
@@ -135,6 +138,84 @@ describe('AuraBoot application contract', () => {
     lock.artifacts[0].digest = digest('f');
 
     assert.throws(() => validateLock(lock), /identity mismatch/);
+  });
+
+  const reseal = (lock, graph = true) => {
+    if (graph) lock.composition.graphDigest = sha256(canonicalJson(lock.composition.nodes));
+    lock.identity = lockIdentity(lock);
+    return lock;
+  };
+
+  it('rejects an omitted artifact even when the outer identity is recomputed', () => {
+    const lock = resolveFixture();
+    lock.artifacts = lock.artifacts.filter((item) => item.type !== 'plugin');
+    assert.throws(() => validateLock(reseal(lock)), /missing artifacts/);
+  });
+  it('rejects an undeclared artifact even when rehashed', () => {
+    const lock = resolveFixture();
+    lock.artifacts.push({ ...lock.artifacts[0], id: 'undeclared' });
+    assert.throws(() => validateLock(reseal(lock)), /not declared/);
+  });
+  it('checks the embedded graph digest independently of the outer identity', () => {
+    const lock = resolveFixture();
+    lock.composition.graphDigest = digest('f');
+    assert.throws(() => validateLock(reseal(lock, false)), /graph digest mismatch/);
+  });
+  it('rejects duplicate nodes, noncontiguous order and unavailable web owners', () => {
+    const duplicate = resolveFixture();
+    duplicate.composition.nodes.push({ ...duplicate.composition.nodes[0], order: duplicate.composition.nodes.length });
+    assert.throws(() => validateLock(reseal(duplicate)), /duplicate owner IDs/);
+    const order = resolveFixture();
+    order.composition.nodes[0].order = 9;
+    assert.throws(() => validateLock(reseal(order)), /order must be contiguous/);
+    const owner = resolveFixture();
+    owner.composition.nodes.find((node) => node.kind === 'route').owner = 'missing';
+    assert.throws(() => validateLock(reseal(owner)), /unavailable web owner/);
+  });
+  it('rejects artifact and graph version drift including mutable versions', () => {
+    const lock = resolveFixture();
+    const artifact = lock.artifacts.find((item) => item.type === 'plugin');
+    artifact.version = '2.0.0';
+    assert.throws(() => validateLock(reseal(lock)), /version differs/);
+    lock.composition.nodes.find((node) => node.kind === 'plugin').version = 'latest';
+    artifact.version = 'latest';
+    assert.throws(() => validateLock(reseal(lock)), /mutable release version/);
+  });
+  it('uses an external identity to reject a self-consistent rewritten lock', () => {
+    const lock = resolveFixture();
+    const expectedIdentity = lock.identity;
+    lock.artifacts[0].digest = digest('f');
+    assert.throws(() => validateLock(reseal(lock), { expectedIdentity }), /externally expected identity/);
+  });
+  it('binds a lock to the source manifest and requires image inputs unless explicitly skipped', () => {
+    const lock = resolveFixture();
+    assert.equal(validateLockForManifest(lock, manifest()), lock);
+    const changed = manifest();
+    changed.app.id = 'another-app';
+    assert.throws(() => validateLockForManifest(lock, changed), /source manifest/);
+    const withoutImage = resolveApplication(manifest(), catalog(), { webContributions: [webContribution()], skipImage: true });
+    assert.throws(() => validateLockForManifest(withoutImage, manifest()), /artifact count/);
+    assert.equal(validateLockForManifest(withoutImage, manifest(), { skipImage: true }), withoutImage);
+  });
+
+  it('the CLI verifies external identity and source manifest before accepting a lock', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'application-lock-cli-'));
+    const lock = resolveFixture();
+    const lockPath = join(directory, 'lock.json');
+    const manifestPath = join(directory, 'app.json');
+    writeFileSync(lockPath, JSON.stringify(lock));
+    writeFileSync(manifestPath, JSON.stringify(manifest()));
+    const run = (...extra) => spawnSync(process.execPath, [
+      new URL('./application-cli.mjs', import.meta.url).pathname, 'verify-lock',
+      '--lock', lockPath, '--manifest', manifestPath, ...extra,
+    ], { encoding: 'utf8' });
+    assert.equal(run('--expected-identity', lock.identity).status, 0);
+    const wrong = run('--expected-identity', digest('f'));
+    assert.equal(wrong.status, 1);
+    assert.match(wrong.stderr, /externally expected identity/);
+    assert.equal(run('--expected-identity').status, 1);
+    writeFileSync(manifestPath, JSON.stringify({ ...manifest(), app: { ...manifest().app, id: 'different' } }));
+    assert.match(run().stderr, /source manifest/);
   });
 
   it('produces a deterministic typed composition graph', () => {
