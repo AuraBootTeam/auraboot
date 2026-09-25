@@ -226,13 +226,13 @@ export default defineConfig({
   reporter: [
     ...(process.env.CI || process.env.PW_RESULTS_JSON
       ? [
-        ['list'],
-        ['html', { open: 'never', outputFolder: reportDir }],
-        ['json', { outputFile: resultsJson }],
+        ['list'] as const,
+        ['html', { open: 'never', outputFolder: reportDir }] as const,
+        ['json', { outputFile: resultsJson }] as const,
       ]
-      : [['line']]),
+      : [['line'] as const]),
     ...(process.env.AURA_ALLURE_RESULTS
-      ? [['allure-playwright', { resultsDir: process.env.AURA_ALLURE_RESULTS }]]
+      ? [['allure-playwright', { resultsDir: process.env.AURA_ALLURE_RESULTS }] as const]
       : []),
   ],
 
