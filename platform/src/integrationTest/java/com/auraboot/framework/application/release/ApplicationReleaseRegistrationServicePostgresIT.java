@@ -132,8 +132,232 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 verifyDatabaseRoles(source, schema);
                 verifyPrivateLoginPool(source, schema);
                 verifyRegisteredDefinitionInspection(service, jdbc);
+                verifyBindingStorage(service, jdbc, source, application.id(), first.releaseId(),
+                        distinct.get(0).releaseId(), distinct.get(1).releaseId());
             }
         } finally { admin.execute("DROP SCHEMA " + schema + " CASCADE"); }
+    }
+    private void verifyBindingStorage(ApplicationReleaseRegistrationService service, JdbcTemplate jdbc,
+                                      DriverManagerDataSource source, long applicationId,
+                                      String first, String second, String third) throws Exception {
+        // This isolated registry schema supplies only the tenant identity FK boundary, not tenant bootstrap.
+        jdbc.execute("CREATE TABLE ab_tenant(id BIGINT PRIMARY KEY)");
+        jdbc.update("INSERT INTO ab_tenant VALUES (710),(711)");
+        try (var migration = getClass().getResourceAsStream("/db/migration/core/V20260926030000__tenant_application_binding_history.sql")) {
+            assertNotNull(migration);
+            new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source))
+                    .executeWithoutResult(status -> jdbc.execute(new String(readBytes(migration), StandardCharsets.UTF_8)));
+        }
+        String insert = "INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id) VALUES (?,?,?)";
+        jdbc.update(insert, 710L, applicationId, first);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
+        assertEquals("shadow", jdbc.queryForObject("SELECT status FROM ab_tenant_application_binding", String.class));
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(insert, 710L, applicationId, first));
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(insert, 999L, applicationId, first));
+        service.createApplication("binding-other", "Other binding app", "test:creator");
+        var other = service.register("binding-other", "build-1", content("b"), "test:publisher");
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(insert, 711L, applicationId, other.releaseId()));
+        String cas = "UPDATE ab_tenant_application_binding SET current_release_id=?,binding_version=binding_version+1 WHERE tenant_id=710 AND application_id=? AND binding_version=?";
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var left = workers.submit(() -> { assertTrue(start.await(10, TimeUnit.SECONDS)); return jdbc.update(cas, second, applicationId, 1L); });
+            var right = workers.submit(() -> { assertTrue(start.await(10, TimeUnit.SECONDS)); return jdbc.update(cas, third, applicationId, 1L); });
+            start.countDown();
+            assertEquals(1, left.get(15, TimeUnit.SECONDS) + right.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(2L, jdbc.queryForObject("SELECT binding_version FROM ab_tenant_application_binding", Long.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
+        assertEquals(first, jdbc.queryForObject("SELECT previous_release_id FROM ab_tenant_application_binding_history WHERE binding_version=2", String.class));
+        assertEquals(0, jdbc.update(cas, first, applicationId, 1L));
+        var tx = new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source));
+        tx.executeWithoutResult(status -> {
+            assertEquals(1, jdbc.update(cas, first, applicationId, 2L));
+            assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
+            status.setRollbackOnly();
+        });
+        assertEquals(2L, jdbc.queryForObject("SELECT binding_version FROM ab_tenant_application_binding", Long.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
+        for (String sql : List.of(
+                "UPDATE ab_tenant_application_binding SET binding_version=9",
+                "UPDATE ab_tenant_application_binding SET tenant_id=711,binding_version=3",
+                "UPDATE ab_tenant_application_binding SET binding_version=3",
+                "DELETE FROM ab_tenant_application_binding", "TRUNCATE ab_tenant_application_binding CASCADE",
+                "UPDATE ab_tenant_application_binding_history SET database_actor='forged'",
+                "DELETE FROM ab_tenant_application_binding_history", "TRUNCATE ab_tenant_application_binding_history",
+                "INSERT INTO ab_tenant_application_binding_history SELECT * FROM ab_tenant_application_binding_history")) {
+            assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.execute(sql), sql);
+        }
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history", Integer.class));
+        verifyShadowStore(jdbc, source, applicationId, first, second, third, other.releaseId());
+    }
+    private void verifyShadowStore(JdbcTemplate jdbc, DriverManagerDataSource source, long applicationId,
+                                   String first, String second, String third, String otherRelease) throws Exception {
+        var store = new TenantApplicationShadowBindingStore(jdbc);
+        java.util.function.Function<String, String> digest = release -> jdbc.queryForObject(
+                "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, release);
+        var initial = store.createShadow(711, applicationId, first, digest.apply(first));
+        assertEquals(initial, store.createShadow(711, applicationId, first, digest.apply(first)));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
+        assertThrows(IllegalArgumentException.class, () -> store.createShadow(711, applicationId, first, "sha256:" + "0".repeat(64)));
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, otherRelease, digest.apply(otherRelease)));
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, first, digest.apply(first)));
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            java.util.function.Function<String, Boolean> change = target -> {
+                try { store.compareAndSetShadow(initial, target, digest.apply(target)); return true; }
+                catch (TenantApplicationShadowBindingStore.BindingConflictException conflict) { return false; }
+            };
+            var left = workers.submit(() -> { assertTrue(start.await(10, TimeUnit.SECONDS)); return change.apply(second); });
+            var right = workers.submit(() -> { assertTrue(start.await(10, TimeUnit.SECONDS)); return change.apply(third); });
+            start.countDown(); assertNotEquals(left.get(15, TimeUnit.SECONDS), right.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(2L, jdbc.queryForObject("SELECT binding_version FROM ab_tenant_application_binding WHERE tenant_id=711", Long.class));
+        assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
+                () -> store.createShadow(711, applicationId, first, digest.apply(first)));
+        assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
+                () -> store.compareAndSetShadow(initial, second, digest.apply(second)));
+        String winner = jdbc.queryForObject("SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=711", String.class);
+        var current = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "shadow", 2);
+        var tx = new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source));
+        tx.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        tx.executeWithoutResult(status -> {
+            assertEquals(3, store.compareAndSetShadow(current, first, digest.apply(first)).version());
+            status.setRollbackOnly();
+        });
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
+        // A storage-level activation is only a fixture for the shadow API boundary, not admission proof.
+        jdbc.update("UPDATE ab_tenant_application_binding SET status='active',binding_version=3 WHERE tenant_id=711");
+        var active = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "active", 3);
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(active, first, digest.apply(first)));
+        var forgedShadow = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "shadow", 3);
+        assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
+                () -> store.compareAndSetShadow(forgedShadow, first, digest.apply(first)));
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
+        verifyShadowRoles(source, applicationId, first, second);
+        verifyShadowLoginPool(source, applicationId, first, second);
+    }
+    private void verifyShadowLoginPool(DriverManagerDataSource source, long applicationId, String first, String second) throws Exception {
+        var jdbc = new JdbcTemplate(source);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String runtime = "shadow_read_" + suffix;
+        String writer = "shadow_write_" + suffix;
+        String password = UUID.randomUUID().toString().replace("-", "");
+        var secret = java.nio.file.Files.createTempFile("shadow-pool-secret-", ".txt",
+                java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+        java.nio.file.Files.writeString(secret, password + "\n");
+        boolean runtimeCreated = false;
+        boolean writerCreated = false;
+        try {
+            try (var connection = source.getConnection(); var statement = connection.createStatement()) {
+                statement.execute("CREATE ROLE " + runtime + " NOLOGIN"); runtimeCreated = true;
+                statement.execute("CREATE ROLE " + writer + " LOGIN PASSWORD '" + password + "'"); writerCreated = true;
+            }
+            String schema = jdbc.queryForObject("SELECT current_schema()", String.class);
+            String owner = jdbc.queryForObject("SELECT current_user", String.class);
+            var process = new ProcessBuilder("node", "../scripts/application/shadow-binding-role-policy.mjs",
+                    schema, runtime, writer, owner).redirectErrorStream(true).start();
+            String policy = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertEquals(0, process.waitFor(), policy); jdbc.execute(policy);
+            jdbc.update("INSERT INTO ab_tenant VALUES (713)");
+            var environment = new org.springframework.mock.env.MockEnvironment()
+                    .withProperty("aura.binding.shadow.enabled", "true")
+                    .withProperty("aura.binding.shadow.jdbc-url", source.getUrl())
+                    .withProperty("aura.binding.shadow.username", writer)
+                    .withProperty("aura.binding.shadow.password-file", secret.toString())
+                    .withProperty("spring.datasource.username", runtime);
+            String firstDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, first);
+            String secondDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, second);
+            try (var disabled = new TenantApplicationShadowBindingService(new org.springframework.mock.env.MockEnvironment())) {
+                assertThrows(IllegalStateException.class, () -> disabled.createShadow(713, applicationId, first, firstDigest));
+            }
+            try (var service = new TenantApplicationShadowBindingService(environment)) {
+                var created = service.createShadow(713, applicationId, first, firstDigest);
+                assertEquals(2, service.compareAndSetShadow(created, second, secondDigest).version());
+                assertEquals(second, jdbc.queryForObject("SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=713", String.class));
+                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=713", Integer.class));
+            }
+            jdbc.execute("GRANT UPDATE(status) ON ab_tenant_application_binding TO " + writer);
+            var failure = assertThrows(IllegalStateException.class, () -> new TenantApplicationShadowBindingService(environment));
+            assertTrue(failure.getMessage().contains("column privileges"));
+            jdbc.execute("REVOKE UPDATE(status) ON ab_tenant_application_binding FROM " + writer);
+            jdbc.execute("ALTER TABLE ab_tenant_application_binding DISABLE ROW LEVEL SECURITY");
+            failure = assertThrows(IllegalStateException.class, () -> new TenantApplicationShadowBindingService(environment));
+            assertTrue(failure.getMessage().contains("row security"));
+            jdbc.execute("ALTER TABLE ab_tenant_application_binding ENABLE ROW LEVEL SECURITY");
+            jdbc.execute("ALTER POLICY binding_shadow_update ON ab_tenant_application_binding USING (true)");
+            failure = assertThrows(IllegalStateException.class, () -> new TenantApplicationShadowBindingService(environment));
+            assertTrue(failure.getMessage().contains("row security"));
+            jdbc.execute("ALTER POLICY binding_shadow_update ON ab_tenant_application_binding USING (status='shadow')");
+            jdbc.execute("ALTER ROLE " + writer + " CREATEDB");
+            failure = assertThrows(IllegalStateException.class, () -> new TenantApplicationShadowBindingService(environment));
+            assertTrue(failure.getMessage().contains("least-privilege"));
+            jdbc.execute("ALTER ROLE " + writer + " NOCREATEDB");
+            environment.setProperty("spring.datasource.username", writer);
+            assertThrows(IllegalArgumentException.class, () -> new TenantApplicationShadowBindingService(environment));
+        } finally {
+            java.nio.file.Files.deleteIfExists(secret);
+            if (writerCreated) { jdbc.execute("DROP OWNED BY " + writer); jdbc.execute("DROP ROLE " + writer); }
+            if (runtimeCreated) { jdbc.execute("DROP OWNED BY " + runtime); jdbc.execute("DROP ROLE " + runtime); }
+        }
+    }
+    private void verifyShadowRoles(DriverManagerDataSource source, long applicationId, String first, String second) throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String runtime = "binding_runtime_" + suffix;
+        String writer = "binding_shadow_" + suffix;
+        try (var connection = source.getConnection()) {
+            var ds = new org.springframework.jdbc.datasource.SingleConnectionDataSource(connection, true);
+            var manager = new DataSourceTransactionManager(ds);
+            var definition = new org.springframework.transaction.support.DefaultTransactionDefinition();
+            definition.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+            var transaction = manager.getTransaction(definition);
+            var jdbc = new JdbcTemplate(ds);
+            try {
+                String owner = jdbc.queryForObject("SELECT current_user", String.class);
+                String schema = jdbc.queryForObject("SELECT current_schema()", String.class);
+                jdbc.execute("CREATE ROLE " + runtime + " NOLOGIN");
+                jdbc.execute("CREATE ROLE " + writer + " NOLOGIN");
+                jdbc.update("INSERT INTO ab_tenant VALUES (712)");
+                jdbc.execute("GRANT UPDATE(status) ON ab_tenant_application_binding TO " + writer);
+                var process = new ProcessBuilder("node", "../scripts/application/shadow-binding-role-policy.mjs",
+                        schema, runtime, writer, owner).redirectErrorStream(true).start();
+                String policy = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                assertEquals(0, process.waitFor(), policy);
+                String body = policy.replace("\nBEGIN;\n", "\n").replace("\nCOMMIT;\n", "\n");
+                jdbc.execute(body);
+                var savepoint = connection.setSavepoint();
+                jdbc.execute("CREATE POLICY unexpected_permissive ON ab_tenant_application_binding USING (true)");
+                var failure = assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.execute(body));
+                assertTrue(failure.getMostSpecificCause().getMessage().contains("Unknown binding row policy"));
+                connection.rollback(savepoint); connection.releaseSavepoint(savepoint);
+                jdbc.execute("SET LOCAL ROLE " + runtime);
+                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding", Integer.class));
+                assertDenied(connection, jdbc, "UPDATE ab_tenant_application_binding SET binding_version=binding_version+1");
+                assertDenied(connection, jdbc, "DELETE FROM ab_tenant_application_binding_history");
+                jdbc.execute("RESET ROLE"); jdbc.execute("SET LOCAL ROLE " + writer);
+                var store = new TenantApplicationShadowBindingStore(jdbc);
+                String firstDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, first);
+                String secondDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, second);
+                var created = store.createShadow(712, applicationId, first, firstDigest);
+                assertEquals(created, store.createShadow(712, applicationId, first, firstDigest));
+                assertEquals(2, store.compareAndSetShadow(created, second, secondDigest).version());
+                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=712", Integer.class));
+                // No status predicate in the caller: row security still protects the active binding.
+                assertEquals(0, jdbc.update("UPDATE ab_tenant_application_binding SET current_release_id=?,binding_version=binding_version+1 WHERE tenant_id=711", first));
+                assertDenied(connection, jdbc, "UPDATE ab_tenant_application_binding SET status='active',binding_version=binding_version+1 WHERE tenant_id=712");
+                assertDenied(connection, jdbc, "ALTER TABLE ab_tenant_application_binding DISABLE ROW LEVEL SECURITY");
+                assertDenied(connection, jdbc, "TRUNCATE ab_tenant_application_binding_history");
+                savepoint = connection.setSavepoint();
+                failure = assertThrows(org.springframework.dao.DataAccessException.class,
+                        () -> jdbc.execute("INSERT INTO ab_tenant_application_binding_history SELECT * FROM ab_tenant_application_binding_history"));
+                assertTrue(failure.getMostSpecificCause().getMessage().contains("immutable transition projection"));
+                connection.rollback(savepoint); connection.releaseSavepoint(savepoint);
+                jdbc.execute("RESET ROLE");
+            } finally { manager.rollback(transaction); }
+        }
+    }
+    private static byte[] readBytes(java.io.InputStream stream) {
+        try { return stream.readAllBytes(); }
+        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
     public static class RegistryFixturePlugin extends org.pf4j.Plugin {
         public RegistryFixturePlugin(org.pf4j.PluginWrapper wrapper) { super(wrapper); }

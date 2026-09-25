@@ -297,3 +297,32 @@ its own isolated execution mount; formal publication still requires a trusted co
 wall-clock timestamps are validated as timestamps, not used as trusted freshness or duration claims.
 A successful `info` or `validate` receipt does not prove that `migrate` ran. This module does not
 establish image digest, schema compatibility, release admission, or permission to bind a tenant.
+
+
+### Shadow binding database policy
+
+`node scripts/application/shadow-binding-role-policy.mjs <schema> <runtime-role> <shadow-role> <owner-role>`
+emits transactional SQL for privileged review and application with `psql ON_ERROR_STOP=1`.
+The three existing roles must be distinct. Runtime and shadow accounts cannot own the tables,
+inherit or assume other roles, create schema objects, or hold administrative/bypass-RLS attributes.
+The policy resets table and column grants on the release directory and binding/history tables.
+Runtime is read-only. Shadow writes have restricted insert/update columns and row policies that
+exclude active bindings even when raw SQL omits a status predicate. History inserts remain limited
+by the migration-owned projection trigger; history update/delete/truncate privileges are withheld.
+Unknown binding row policies fail closed and require explicit reconciliation.
+
+The owner retains administrative access. This is a control-plane database account boundary, not
+per-request tenant authorization. Apply only after the binding migration. Account creation,
+credential delivery, private-pool verification, authenticated operators, and activation admission
+remain separate integration requirements. The policy does not grant activation authority.
+
+
+`TenantApplicationShadowBindingService` is disabled unless `aura.binding.shadow.enabled=true`.
+When enabled, `aura.binding.shadow.jdbc-url`, `.username`, and `.password-file` configure a private
+pool; `spring.datasource.username` identifies the distinct runtime account. Startup checks exact
+required table/column privileges, non-administrative role identity, no memberships/schema creation,
+and enabled binding RLS with the approved three policy definitions. Invalid configuration closes
+the new pool and fails startup. It never contributes a primary DataSource or falls back to the
+business connection. Shutdown closes only this owned pool. This does not expose a public binding
+API or grant activation. Privilege checks occur at pool initialization; operational policy changes
+remain controlled by the database owner, and credential rollout requires separate verification.

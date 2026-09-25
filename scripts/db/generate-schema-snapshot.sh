@@ -8,17 +8,19 @@
 #   scripts/db/generate-schema-snapshot.sh --edition oss
 #   scripts/db/generate-schema-snapshot.sh --edition enterprise --enterprise-root <enterprise-repo-root>
 #   scripts/db/generate-schema-snapshot.sh --edition oss --out /tmp/snap.sql   # custom output
+#   SNAPSHOT_DB=owned_snapshot scripts/db/generate-schema-snapshot.sh --edition oss --keep
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/db/flyway-common.sh
 source "$SCRIPT_DIR/flyway-common.sh"
 
-EDITION="oss"; ENTERPRISE_ROOT=""; OUT=""
+EDITION="oss"; ENTERPRISE_ROOT=""; OUT=""; KEEP=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --edition) EDITION="${2:?}"; shift 2 ;;
     --enterprise-root) ENTERPRISE_ROOT="${2:?}"; shift 2 ;;
     --out) OUT="${2:?}"; shift 2 ;;
+    --keep) KEEP=1; shift ;;
     -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "[snapshot] unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -33,13 +35,25 @@ if [[ -z "$OUT" ]]; then
 fi
 
 SNAP_DB="${SNAPSHOT_DB:-aura_schema_snapshot_$$}"
+if [[ ! "$SNAP_DB" =~ ^[a-z][a-z0-9_]{0,62}$ ]]; then
+  echo "[snapshot] invalid database identifier" >&2
+  exit 2
+fi
+CREATED=0
 _psql_admin() { PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d postgres "$@"; }
-cleanup() { _psql_admin -c "DROP DATABASE IF EXISTS $SNAP_DB WITH (FORCE);" >/dev/null 2>&1 || true; }
+cleanup() {
+  if [[ "$CREATED" == 1 && "$KEEP" == 0 ]]; then
+    _psql_admin -c "DROP DATABASE $SNAP_DB;" >/dev/null 2>&1 || true
+  elif [[ "$CREATED" == 1 ]]; then
+    echo "[snapshot] retained database $SNAP_DB" >&2
+  fi
+}
 trap cleanup EXIT
 
 echo "[snapshot] building '$EDITION' snapshot from fresh DB $SNAP_DB" >&2
-cleanup
-_psql_admin -c "CREATE DATABASE $SNAP_DB;" >/dev/null
+# A collision must fail without deleting or adopting another worktree's database.
+_psql_admin -v ON_ERROR_STOP=1 -c "CREATE DATABASE $SNAP_DB;" >/dev/null
+CREATED=1
 PG_DB="$SNAP_DB" run_flyway migrate "$EDITION" "$ENTERPRISE_ROOT" >&2
 
 mkdir -p "$(dirname "$OUT")"
