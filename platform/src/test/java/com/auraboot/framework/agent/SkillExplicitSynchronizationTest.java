@@ -1,7 +1,6 @@
 package com.auraboot.framework.agent;
 
 import com.auraboot.framework.agent.service.SkillAutoGenerator;
-import com.auraboot.framework.agent.service.SkillBootstrapRunner;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import org.junit.jupiter.api.Test;
@@ -11,30 +10,19 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
- * Integration tests for SkillBootstrapRunner and SkillAutoGenerator.
+ * Integration tests for explicit SkillAutoGenerator synchronization.
  * Verifies that built-in skills (dsl.command, dsl.query) are created
  * for active tenants and that syncSkills is idempotent.
  */
-class SkillBootstrapRunnerTest extends BaseIntegrationTest {
-
-    @Autowired
-    private SkillBootstrapRunner skillBootstrapRunner;
+class SkillExplicitSynchronizationTest extends BaseIntegrationTest {
 
     @Autowired
     private SkillAutoGenerator skillAutoGenerator;
 
     @Autowired
     private DynamicDataMapper dynamicDataMapper;
-
-    @Test
-    void run_completesWithoutException() {
-        // SkillBootstrapRunner.run() should never throw — it catches all exceptions
-        assertThatCode(() -> skillBootstrapRunner.run(null))
-                .doesNotThrowAnyException();
-    }
 
     @Test
     void syncSkills_createsBuiltinSkillsForTestTenant() {

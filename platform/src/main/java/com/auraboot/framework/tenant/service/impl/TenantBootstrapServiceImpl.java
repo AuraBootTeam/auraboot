@@ -77,6 +77,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     private final I18nResourceService i18nResourceService;
     private final I18nService i18nService;
     private final DynamicDataMapper dynamicDataMapper;
+    private final com.auraboot.framework.agent.service.SkillAutoGenerator skillAutoGenerator;
     
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -97,6 +98,9 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             validateTemplate(template);
             log.info("模板验证通过");
             
+            // Built-in skills belong to explicit tenant initialization, never application startup.
+            skillAutoGenerator.syncSkills(tenantId);
+
             // 3. 创建角色
             List<Role> roles = createRoles(tenantId, template.getRoles(), userId);
             log.info("角色创建完成: count={}", roles.size());
