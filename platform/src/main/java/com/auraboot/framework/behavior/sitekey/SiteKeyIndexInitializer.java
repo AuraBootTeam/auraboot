@@ -1,48 +1,24 @@
 package com.auraboot.framework.behavior.sitekey;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.IndexType;
+import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Converges the global {@code UNIQUE(site_key)} index on the dynamic {@code mt_behavior_site_key}
- * table (anonymous-telemetry SP2, Option A).
- *
- * <p>Why this exists: config-level {@code unique}/{@code searchable} is inert on {@code mt_}
- * dynamic tables in this platform version, and Flyway cannot reach a table the plugin import
- * creates at runtime. So this reuses the platform's own idempotent
- * {@link SchemaManagementService#createFieldIndex} — which produces a <b>column-level, global</b>
- * unique index (not the tenant-prefixed shape {@code MultiTenantIndexManager} would emit) with a
- * built-in {@code indexExists} short-circuit. The index is what makes the unauthenticated
- * {@code resolveTenant} hot path an index scan and enforces global key uniqueness as
- * defense-in-depth behind the handler's {@code existsAnyTenant} pre-check.
- *
- * <p>Dual trigger, both calling the same idempotent path:
- * <ul>
- *   <li><b>On {@code behavior} plugin import (after commit)</b> — the table has just been created
- *       by the import. This is the primary, lifecycle-tied trigger. It MUST run
- *       {@link TransactionPhase#AFTER_COMMIT}: the import publishes the event from inside its own
- *       (still-open) transaction, and {@code createFieldIndex} checks table existence on a separate
- *       connection that cannot see the uncommitted {@code CREATE TABLE} — a plain {@code @EventListener}
- *       fails with "Table does not exist" and the index never converges until the next restart
- *       (caught by SP4's real import golden; SP2's in-process IT could not exercise this path).
- *       {@code fallbackExecution = true} keeps it working if a future import path runs without a tx.</li>
- *   <li><b>On app-ready</b> — a one-time backstop for an already-imported deployment whose table
- *       predates this code and that ships without a re-import. Guarded by table existence so a
- *       truly fresh DB (plugin not yet imported) is skipped and left to the import trigger.</li>
- * </ul>
- *
- * <p>See {@code docs/backlog/2026-06-21-mt-dynamic-table-index-creation-analysis.md}.
+ * Publishes the global site-key unique index after explicit behavior plugin import.
+ * Application startup validates the existing index without modifying schema or tenant context.
+ * Missing or incompatible indexes require an explicit model publication before deployment.
  */
-@Slf4j
 @Component
 public class SiteKeyIndexInitializer {
 
@@ -53,18 +29,40 @@ public class SiteKeyIndexInitializer {
 
     private final SchemaManagementService schemaManagementService;
     private final JdbcTemplate jdbcTemplate;
+    private final TransactionTemplate publicationTransaction;
 
     public SiteKeyIndexInitializer(SchemaManagementService schemaManagementService,
-                                   JdbcTemplate jdbcTemplate) {
+                                   JdbcTemplate jdbcTemplate,
+                                   PlatformTransactionManager transactionManager) {
         this.schemaManagementService = schemaManagementService;
         this.jdbcTemplate = jdbcTemplate;
+        this.publicationTransaction = new TransactionTemplate(transactionManager);
+        this.publicationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @EventListener
     public void onPluginImportCompleted(PluginImportCompletedEvent event) {
-        if (PLUGIN.equals(event.getPluginCode())) {
-            ensureIndex();
+        if (!PLUGIN.equals(event.getPluginCode())) {
+            return;
         }
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            // afterCommit propagates failures to the importing TransactionTemplate; an
+            // AFTER_COMMIT event listener runs in afterCompletion and only logs failures.
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publishIndex();
+                }
+            });
+        } else {
+            publishIndex();
+        }
+    }
+
+    private void publishIndex() {
+        // Committed import resources may still be bound to this thread. The DDL and its
+        // postcondition need their own transaction, including a real commit or rollback.
+        publicationTransaction.executeWithoutResult(status -> ensureIndex());
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -72,48 +70,38 @@ public class SiteKeyIndexInitializer {
         if (!tableExists()) {
             return;
         }
-        // createFieldIndex → getModelDefinition logs the meta operation, which reads the current
-        // tenant id and fails on a bare startup thread ("Tenant context is required but not found").
-        // The index DDL itself is global (single column, no tenant prefix); borrow the model's
-        // owning tenant only to satisfy the logging path, then restore the previous context.
-        Long owningTenant = modelOwningTenant();
-        if (owningTenant == null) {
-            log.warn("site_key index backstop skipped: no owning tenant for model {} (leaving to import trigger)", MODEL);
-            return;
-        }
-        // The startup thread has no MetaContext (reading it throws "not initialized"), so there is
-        // no caller context to preserve — set the owning tenant, converge, then clear unconditionally.
-        try {
-            MetaContext.setCurrentTenantId(owningTenant);
-            ensureIndex();
-        } finally {
-            MetaContext.clear();
-        }
+        validateIndex();
     }
 
-    private Long modelOwningTenant() {
-        try {
-            return jdbcTemplate.queryForObject(
-                    "SELECT tenant_id FROM ab_meta_model WHERE code = ? ORDER BY id LIMIT 1",
-                    Long.class, MODEL);
-        } catch (RuntimeException e) {
-            return null;
+    private void validateIndex() {
+        Boolean valid = jdbcTemplate.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_index i
+                    JOIN pg_catalog.pg_attribute a
+                      ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+                    WHERE i.indrelid = to_regclass('public.mt_behavior_site_key')
+                      AND i.indisunique AND i.indisvalid AND i.indisready
+                      AND i.indnkeyatts = 1 AND i.indpred IS NULL AND i.indexprs IS NULL
+                      AND a.attname = 'site_key' AND NOT a.attisdropped
+                )
+                """, Boolean.class);
+        if (!Boolean.TRUE.equals(valid)) {
+            throw new IllegalStateException(
+                    "behavior_site_key requires a valid global UNIQUE(site_key) index; "
+                    + "publish the behavior model explicitly before starting the application");
         }
     }
 
     private void ensureIndex() {
-        try {
-            schemaManagementService.createFieldIndex(MODEL, FIELD, IndexType.UNIQUE);
-        } catch (RuntimeException e) {
-            // Index convergence must not break startup/import. createFieldIndex is idempotent
-            // (indexExists short-circuit), so this only surfaces a genuine DDL failure for ops —
-            // it does not retry or self-heal.
-            log.warn("site_key unique index convergence failed: {}", e.getMessage());
+        SchemaOperationResult result = schemaManagementService.createFieldIndex(MODEL, FIELD, IndexType.UNIQUE);
+        if (result == null || !Boolean.TRUE.equals(result.getSuccess())) {
+            throw new IllegalStateException("behavior_site_key index publication failed");
         }
+        validateIndex();
     }
 
     private boolean tableExists() {
-        String reg = jdbcTemplate.queryForObject("SELECT to_regclass('" + TABLE + "')", String.class);
+        String reg = jdbcTemplate.queryForObject("SELECT to_regclass('public." + TABLE + "')", String.class);
         return reg != null;
     }
 }
