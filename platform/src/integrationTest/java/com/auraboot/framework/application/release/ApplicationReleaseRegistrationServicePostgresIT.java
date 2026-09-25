@@ -326,10 +326,65 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             else assertEquals(scenario.equals("stopped") ? "required-capability-missing" : "platform-contract-not-registered",
                     result.path("findings").get(0).path("code").asText());
         }
+        verifyAttestedCapabilityCli(evidence, available, jarDigest);
         java.nio.file.Files.writeString(evidence.resolve("scope.json"), mapper.createObjectNode()
                 .put("applicationReleaseId", application.releaseId()).put("platformReleaseId", platform.releaseId())
                 .put("handlerGeneration", observation.handlerGeneration()).put("pluginAvailable", available)
                 .put("deploymentIdentityIsFixture", true).put("admissionVerified", false).toPrettyString());
+    }
+
+    private static void verifyAttestedCapabilityCli(java.nio.file.Path evidence, boolean available, String jarDigest) throws Exception {
+        var mapper = new ObjectMapper();
+        String scenario = available ? "observed" : "stopped";
+        var deployment = evidence.resolve(scenario + "-deployment.json");
+        var expected = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(
+                java.nio.file.Files.readString(evidence.resolve(scenario + "-expected.json")));
+        var keys = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        long now = java.time.Instant.now().getEpochSecond();
+        var fields = mapper.createObjectNode().put("schemaVersion", 1).put("keyId", "java-test-observer")
+                .put("deploymentDigest", expected.path("deploymentDigest").asText())
+                .put("deploymentId", expected.path("deploymentId").asText()).put("generation", 1)
+                .put("issuedAt", now - 1).put("expiresAt", now + 59);
+        var signature = java.security.Signature.getInstance("Ed25519");
+        signature.initSign(keys.getPrivate());
+        signature.update(("auraboot.deployment-capabilities.attestation.v1\n" + fields).getBytes(StandardCharsets.UTF_8));
+        var envelope = fields.deepCopy().put("signature", java.util.Base64.getEncoder().encodeToString(signature.sign()));
+        var envelopeFile = evidence.resolve("attestation.json");
+        java.nio.file.Files.writeString(envelopeFile, envelope.toString());
+        var policy = mapper.createObjectNode().put("schemaVersion", 1);
+        var key = policy.putArray("keys").addObject().put("keyId", "java-test-observer")
+                .put("publicKey", "-----BEGIN PUBLIC KEY-----\n"
+                        + java.util.Base64.getEncoder().encodeToString(keys.getPublic().getEncoded()) + "\n-----END PUBLIC KEY-----\n")
+                .put("revoked", false).put("maxAgeSeconds", 60);
+        key.putArray("deploymentIds").add(expected.path("deploymentId").asText());
+        key.putArray("platformReleaseDigests").add(expected.path("platformReleaseDigest").asText());
+        var policyFile = evidence.resolve("trust-policy.json");
+        var expectedFile = evidence.resolve("attested-expected.json");
+        java.nio.file.Files.writeString(policyFile, policy.toString());
+        expected.put("trustPolicyDigest", digestBytes(java.nio.file.Files.readAllBytes(policyFile)));
+        java.nio.file.Files.writeString(expectedFile, expected.toString());
+        var output = evidence.resolve("attested-result.json");
+        runNode(evidence, "attested", output, available ? 0 : 1,
+                "../scripts/application/deployment-observation-attestation.mjs", evidence.resolve("application.json").toString(),
+                evidence.resolve("platform.json").toString(), deployment.toString(), envelopeFile.toString(),
+                policyFile.toString(), expectedFile.toString());
+        var result = mapper.readTree(java.nio.file.Files.readString(output));
+        assertEquals(available, result.path("capabilitiesSatisfied").asBoolean());
+        assertEquals("java-test-observer", result.path("observationAttestation").path("keyId").asText());
+        assertFalse(result.has("admitted"));
+        if (available) assertEquals(jarDigest, result.path("resolved").get(0).path("providerDigests").get(0).asText());
+        else assertEquals("required-capability-missing", result.path("findings").get(0).path("code").asText());
+        key.put("revoked", true);
+        var revokedPolicy = evidence.resolve("revoked-policy.json");
+        var revokedExpected = evidence.resolve("revoked-expected.json");
+        java.nio.file.Files.writeString(revokedPolicy, policy.toString());
+        expected.put("trustPolicyDigest", digestBytes(java.nio.file.Files.readAllBytes(revokedPolicy)));
+        java.nio.file.Files.writeString(revokedExpected, expected.toString());
+        runNode(evidence, "revoked-attestation", evidence.resolve("revoked-result.json"), 1,
+                "../scripts/application/deployment-observation-attestation.mjs", evidence.resolve("application.json").toString(),
+                evidence.resolve("platform.json").toString(), deployment.toString(), envelopeFile.toString(),
+                revokedPolicy.toString(), revokedExpected.toString());
+        assertTrue(java.nio.file.Files.readString(evidence.resolve("revoked-attestation.stderr")).contains("not authorized"));
     }
 
     private static String digestBytes(byte[] bytes) throws Exception {

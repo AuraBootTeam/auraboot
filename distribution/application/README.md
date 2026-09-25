@@ -207,3 +207,47 @@ The table set is observed in one read-only catalog snapshot. The result retains
 both the registered contract artifact digest and the catalog snapshot identity.
 It does not attest which migrator ran, convert a contract digest into an installed
 provider digest, or grant deployment admission or tenant binding authority.
+
+
+### Authenticated deployment observations
+
+`deployment-observation-attestation.mjs` verifies an Ed25519 detached envelope before
+calling the registered capability verifier. Its CLI accepts application, platform,
+deployment, attestation, trust-policy and expected-identity JSON files in that order.
+`expected` must additionally include `trustPolicyDigest`. The CLI reads its own system
+clock at verification time and ignores any persisted `now` value. The library API requires
+a trusted Unix time `now` in seconds from its caller; never copy it from the sender.
+Obtain the policy pin and current deployment generation from the control plane. Pinning an obsolete policy does not prove current trust.
+
+The policy is `{schemaVersion: 1, keys: [...]}`. Each key has `keyId`, PEM `publicKey`,
+explicit `deploymentIds`, explicit `platformReleaseDigests`, boolean `revoked`, and
+positive `maxAgeSeconds`. No wildcard scopes or embedded envelope keys are accepted.
+The envelope signs a domain-separated, fixed-order encoding of schema version, key ID,
+raw deployment-byte digest, deployment ID, generation, issuedAt and expiresAt.
+Validity is half-open: issuedAt <= now < expiresAt; lifetime must fit the key policy.
+
+The exported `signDeploymentObservation` takes observation bytes, validity/key metadata
+and an Ed25519 private PEM. It performs no observation and issues no admission: the caller
+must collect runtime evidence first. Keep operational keys outside application source.
+The current tests use ephemeral keys; operational signer provisioning, policy distribution,
+trusted clock and binding-time generation/revocation checks remain integration work.
+
+
+Use `--target-context` when invoked inside a target-owned execution scope. This mode
+requires `AURA_DEPLOYMENT_ID` and canonical positive `AURA_DEPLOYMENT_GENERATION` from
+the protected executor and replaces the identity-file ID/generation with those values.
+Missing or invalid context fails without fallback. The Quote executor derives these
+values from the verified reservation owner while holding its shared guard through child
+execution. Environment variables alone are not authorization: direct CLI invocation does
+not prove a reservation lock, policy freshness, or actual observation. The release
+controller still needs to invoke this mode with trusted observation and policy inputs.
+
+
+The cross-repository process test is `scripts/application/deployment-target-attestation.it.mjs`.
+Run it with explicit absolute `AURA_QUOTE_SOURCE_ROOT` and `AURA_TEST_PYTHON` values:
+`node --test scripts/application/deployment-target-attestation.it.mjs`.
+It copies the current Quote executor into an owned temporary target, reserves generation 1,
+invokes the real signed verifier through that executor, finishes the fixture attempt, then
+proves generation 2 rejects the old signature and accepts a fresh one. Revocation and wrong
+reservation owners are negative cases. This uses synthetic capability declarations and
+in-memory test keys, not a production observation collector or SSH deployment.
