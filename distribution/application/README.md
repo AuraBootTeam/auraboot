@@ -109,3 +109,60 @@ Downstream applications consume only this directory (or the same bytes published
 immutable Maven, npm, migration/config, and OCI registries). A downstream release
 must never resolve an AuraBoot sibling checkout, Maven Local, `workspace:` link,
 `SNAPSHOT`, `latest`, or branch reference.
+
+## Deployment capability checks
+
+`application-release-requirements.schema.json` defines requirements pinned to an exact
+Application Release digest. `deployment-capabilities.schema.json` defines an observation
+of one deployment generation and exact Platform Release, including supported runtime,
+Plugin API and DSL contracts, application epochs, and Handler/Web/schema capabilities.
+Multiple supported contracts may refer to the same deployed platform; version ordering
+does not imply compatibility. Each resolved capability records all actual provider digests (`providerDigests`), including chained Handler providers.
+
+```bash
+node scripts/application/deployment-capability-verifier.mjs \
+  requirements.json deployment-capabilities.json expected-identities.json
+```
+
+The expected-identities object must contain externally pinned `requirementsDigest`,
+`deploymentDigest`, `applicationReleaseDigest`, `platformReleaseDigest`, `deploymentId`,
+and `generation`. The first two digests hash the exact input bytes (not normalized JSON).
+Do not derive the expected identities from the untrusted files being verified.
+The command exits 1 when capabilities are missing or incompatible and rejects malformed,
+duplicate, stale or identity-mismatched input. Its report uses `capabilitiesSatisfied`;
+it does not admit a release or authorize a tenant binding change.
+
+Current boundary: this checks declared requirements against a supplied observation.
+Requirement extraction from release resources, live runtime probes, trusted attestation,
+revocation, artifact availability, permission/data migration checks and atomic binding
+integration are not implemented by this command. An internally consistent forged pair
+of files is not trusted deployment evidence.
+
+### Requirements from a registered application release
+
+Use the exact `manifest_text` bytes returned by the registry and a digest pinned by
+an independent trusted caller. Every component must explicitly contain
+`compatibilityContract: { "schemaVersion": 1, "requiredCapabilities": [...] }`.
+An empty array declares no capability dependency; missing or unknown contracts fail.
+The release's `platformCompatibility` must contain the exact `runtime`, `pluginApi`
+and `dslSchema` requirements. Existing records without these declarations cannot
+use this mode; create a new release with explicit declarations instead of editing history.
+
+```bash
+node scripts/application/application-release-requirements.mjs \
+  registered-manifest.json sha256:<externally-pinned-release-digest> > requirements.json
+node scripts/application/deployment-capability-verifier.mjs --registered \
+  registered-manifest.json deployment-capabilities.json expected-identities.json
+```
+
+Registered mode derives all component requirements before verification. It rejects
+an expected requirements digest made from a reduced requirement set. The extraction
+command emits deterministic two-space JSON with a final newline; `requirementsDigest`
+must pin these bytes. Repeated requirements across components are unified; duplicate
+entries within one component are rejected. Contract versions for the same capability
+remain distinct and must all be satisfied.
+
+This verifies consistency with registered declarations. It does not inspect component
+resources to prove that declarations are complete, or establish trust in the publisher.
+The lower-level requirements-file mode remains available for diagnostics and is not
+proof of correspondence to a registered release. Neither mode authorizes binding.

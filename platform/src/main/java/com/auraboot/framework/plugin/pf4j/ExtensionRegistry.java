@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 public class ExtensionRegistry {
 
     private final AuraPluginManager pluginManager;
+    private final org.pf4j.PluginStateListener stateListener = event -> clearAllCaches();
+    private long commandCacheGeneration;
     private final ObjectProvider<CommandHandlerExtension> coreCommandHandlerProvider;
     private final ObjectProvider<ServiceTaskActionExtension> coreServiceTaskActionProvider;
 
@@ -36,6 +38,7 @@ public class ExtensionRegistry {
         this.pluginManager = pluginManager;
         this.coreCommandHandlerProvider = coreCommandHandlerProvider;
         this.coreServiceTaskActionProvider = coreServiceTaskActionProvider;
+        pluginManager.addPluginStateListener(stateListener);
     }
 
     // Extension caches by type
@@ -101,15 +104,30 @@ public class ExtensionRegistry {
      * @return list of command handlers
      */
     public List<CommandHandlerExtension> getAllCommandHandlers() {
-        if (allCommandHandlers == null) {
-            // Merge handlers from two sources:
-            // 1. PF4J plugin extensions (contributed by dynamically loaded plugins)
-            // 2. Core Spring beans (handlers baked into the platform, e.g. bpm:run-rule)
+        for (int attempt = 0; attempt < 3; attempt++) {
+            long generation;
+            synchronized (this) {
+                if (allCommandHandlers != null) return allCommandHandlers;
+                generation = commandCacheGeneration;
+            }
+            // Do not hold the registry monitor while calling the plugin manager: lifecycle
+            // callbacks may acquire this monitor to invalidate a concurrent discovery.
             List<CommandHandlerExtension> pluginHandlers = pluginManager.getExtensionsOfType(CommandHandlerExtension.class);
             List<CommandHandlerExtension> coreHandlers = coreCommandHandlerProvider.stream().toList();
-            allCommandHandlers = Stream.concat(pluginHandlers.stream(), coreHandlers.stream()).toList();
+            var discovered = Stream.concat(pluginHandlers.stream(), coreHandlers.stream()).toList();
+            synchronized (this) {
+                if (generation == commandCacheGeneration) {
+                    allCommandHandlers = discovered;
+                    return discovered;
+                }
+            }
         }
-        return allCommandHandlers;
+        throw new IllegalStateException("Plugin lifecycle changed repeatedly during handler discovery");
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void detachLifecycleListener() {
+        pluginManager.removePluginStateListener(stateListener);
     }
 
     /**
@@ -319,6 +337,11 @@ public class ExtensionRegistry {
                 id -> pluginManager.getExtensionsOfType(MenuProviderExtension.class, id));
     }
 
+    /** Local lifecycle generation; it is not a deployment generation or a binding lease. */
+    public synchronized long commandGeneration() {
+        return commandCacheGeneration;
+    }
+
     // ========== Cache Management ==========
 
     /**
@@ -330,7 +353,8 @@ public class ExtensionRegistry {
         log.info("Extension caches cleared; extension lists will reload on demand");
     }
 
-    private void clearAllCaches() {
+    private synchronized void clearAllCaches() {
+        commandCacheGeneration++;
         commandHandlers.clear();
         eventListeners.clear();
         dataProviders.clear();

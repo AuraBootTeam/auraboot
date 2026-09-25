@@ -310,4 +310,30 @@ class ExtensionRegistryTest {
         // No-op if absent — just exercises the path.
         assertThat(registry.getAllCommandHandlers()).isEmpty();
     }
+    @Test
+    void invalidationDuringDiscoveryCannotRepublishOldHandlers() {
+        var stale = new TestCmd("fixture:stale", 1);
+        var fresh = new TestCmd("fixture:fresh", 1);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenAnswer(invocation -> {
+            if (calls.getAndIncrement() == 0) {
+                registry.refreshAllCaches();
+                return List.of(stale);
+            }
+            return List.of(fresh);
+        });
+        assertThat(registry.getAllCommandHandlers()).containsExactly(fresh);
+        assertThat(registry.getCommandHandler("fixture:stale")).isEmpty();
+        assertThat(calls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void repeatedLifecycleDriftFailsInsteadOfReturningAnUnstableSnapshot() {
+        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenAnswer(invocation -> {
+            registry.refreshAllCaches();
+            return List.of(new TestCmd("fixture:unstable", 1));
+        });
+        org.assertj.core.api.Assertions.assertThatThrownBy(registry::getAllCommandHandlers)
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed repeatedly");
+    }
 }

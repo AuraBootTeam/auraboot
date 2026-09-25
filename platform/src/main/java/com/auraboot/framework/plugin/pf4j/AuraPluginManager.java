@@ -33,6 +33,9 @@ import java.util.Locale;
 public class AuraPluginManager extends SpringPluginManager {
 
     private final Path pluginsRoot;
+    private final Map<ClassLoader, LoadedPluginArtifact> loadedArtifacts = Collections.synchronizedMap(new WeakHashMap<>());
+
+    public record LoadedPluginArtifact(String pluginId, Path path, String digest) {}
 
     /**
      * Create the plugin manager with configured plugins directory.
@@ -71,14 +74,52 @@ public class AuraPluginManager extends SpringPluginManager {
 
                     @Override
                     public ClassLoader loadPlugin(Path pluginPath, PluginDescriptor pluginDescriptor) {
+                        Path artifact = pluginPath.toAbsolutePath().normalize();
+                        String digest = pluginArtifactDigest(artifact);
                         ClassLoader parent = Thread.currentThread().getContextClassLoader();
                         PluginClassLoader pluginClassLoader = new PluginClassLoader(
                                 AuraPluginManager.this, pluginDescriptor, parent);
                         pluginClassLoader.addFile(pluginPath.toFile());
+                        loadedArtifacts.put(pluginClassLoader,
+                                new LoadedPluginArtifact(pluginDescriptor.getPluginId(), artifact, digest));
                         return pluginClassLoader;
                     }
                 })
                 .add(new DefaultPluginLoader(this));
+    }
+
+    /**
+     * Observe the original JAR identity for a currently started implementation.
+     * The deployment must still make plugin artifacts read-only; this is a drift check,
+     * not an atomic proof against a malicious writer changing bytes during class loading.
+     */
+    public Optional<LoadedPluginArtifact> observeLoadedArtifact(Class<?> implementation) {
+        if (implementation == null) throw new IllegalArgumentException("Implementation class required");
+        var artifact = loadedArtifacts.get(implementation.getClassLoader());
+        if (artifact == null) return Optional.empty();
+        var wrapper = getPlugin(artifact.pluginId());
+        if (wrapper == null || wrapper.getPluginState() != PluginState.STARTED
+                || wrapper.getPluginClassLoader() != implementation.getClassLoader()) return Optional.empty();
+        if (!artifact.digest().equals(pluginArtifactDigest(artifact.path()))) {
+            throw new IllegalStateException("Loaded plugin artifact changed: " + artifact.pluginId());
+        }
+        return Optional.of(artifact);
+    }
+
+    private static String pluginArtifactDigest(Path path) {
+        if (!Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException("Plugin artifact must be a regular non-symlink JAR");
+        }
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (var input = new java.security.DigestInputStream(
+                    Files.newInputStream(path, java.nio.file.LinkOption.NOFOLLOW_LINKS), digest)) {
+                input.transferTo(java.io.OutputStream.nullOutputStream());
+            }
+            return "sha256:" + HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | java.security.NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("Cannot fingerprint plugin artifact", failure);
+        }
     }
 
     /** PF4J's default batch loader logs malformed plugins and continues; deployments must fail. */

@@ -125,8 +125,111 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 verifyHttpBoundary(service, jdbc);
                 verifyDatabaseRoles(source, schema);
                 verifyPrivateLoginPool(source, schema);
+                verifyRegisteredDefinitionInspection(service, jdbc);
             }
         } finally { admin.execute("DROP SCHEMA " + schema + " CASCADE"); }
+    }
+    public static class RegistryFixturePlugin extends org.pf4j.Plugin {
+        public RegistryFixturePlugin(org.pf4j.PluginWrapper wrapper) { super(wrapper); }
+    }
+    public static class RegistryFixtureHandler implements com.auraboot.framework.plugin.extension.CommandHandlerExtension {
+        public String getCommandType() { return "fixture:contract"; }
+        public java.util.Set<String> getSupportedContracts(String commandType) {
+            return supports(commandType) ? java.util.Set.of("contract-v1") : java.util.Set.of();
+        }
+        public Object execute(CommandContext context) { throw new AssertionError("Observation must not execute a command"); }
+    }
+    private static java.nio.file.Path writeRegistryFixtureJar(java.nio.file.Path root) throws Exception {
+        var manifest = new java.util.jar.Manifest();
+        var attributes = manifest.getMainAttributes();
+        attributes.put(java.util.jar.Attributes.Name.MANIFEST_VERSION, "1.0");
+        attributes.putValue("Plugin-Id", "registry-fixture");
+        attributes.putValue("Plugin-Version", "1.0.0");
+        attributes.putValue("Plugin-Class", RegistryFixturePlugin.class.getName());
+        var jar = root.resolve("registry-fixture.jar");
+        try (var output = new java.util.jar.JarOutputStream(java.nio.file.Files.newOutputStream(jar), manifest)) {
+            for (var entry : List.of(RegistryFixturePlugin.class, RegistryFixtureHandler.class)) {
+                String name = entry.getName().replace('.', '/') + ".class";
+                output.putNextEntry(new java.util.jar.JarEntry(name));
+                try (var input = entry.getClassLoader().getResourceAsStream(name)) {
+                    assertNotNull(input); input.transferTo(output);
+                }
+                output.closeEntry();
+            }
+            output.putNextEntry(new java.util.jar.JarEntry("META-INF/extensions.idx"));
+            output.write((RegistryFixtureHandler.class.getName() + "\n").getBytes(StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
+        return jar;
+    }
+    private static void verifyRegisteredDefinitionInspection(ApplicationReleaseRegistrationService service, JdbcTemplate jdbc) throws Exception {
+        var mapper = new ObjectMapper();
+        var contract = mapper.createObjectNode().put("schemaVersion", 1);
+        contract.putArray("requiredCapabilities").addObject().put("kind", "handler").put("key", "fixture:contract").put("contract", "contract-v1");
+        contract.withArray("requiredCapabilities").addObject().put("kind", "web").put("key", "fixture:page").put("contract", "page-v1");
+        String artifactDigest = "sha256:18fc4f981b31590710a71c38af3c72c13aa5a53d92eb72e96ec1be995e9645d5";
+        var content = new Content(1, "1.0", "sha256:" + "a".repeat(64),
+                mapper.createObjectNode().put("runtime", "v1").put("pluginApi", "v1").put("dslSchema", 1),
+                List.of(new Component("pinned-definition", "definition", "1.0.0", artifactDigest, contract)));
+        var registered = service.register("aura-edu", "pinned-inspection", content, "test:publisher");
+        var directory = java.nio.file.Files.createTempDirectory("registered-definition-it-");
+        var pluginRoot = java.nio.file.Files.createTempDirectory("registered-handler-it-");
+        try {
+            java.nio.file.Files.createDirectory(directory.resolve("a"));
+            java.nio.file.Files.writeString(directory.resolve("a/commands.json"), "[{\"code\":\"fixture:business\",\"handler\":\"fixture:contract\"}]");
+            java.nio.file.Files.writeString(directory.resolve("a.json"), "{}");
+            java.nio.file.Files.writeString(directory.resolve("plugin.json"), "{\"pluginId\":\"test.pinned\",\"version\":\"1.0.0\",\"resourceDirs\":{\"commands\":\"a/commands.json\"}}");
+            var jar = writeRegistryFixtureJar(pluginRoot);
+            String jarDigest = "sha256:" + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(java.nio.file.Files.readAllBytes(jar)));
+            var manager = new com.auraboot.framework.plugin.pf4j.AuraPluginManager(pluginRoot.toString());
+            var beans = new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+            var registry = new com.auraboot.framework.plugin.pf4j.ExtensionRegistry(manager,
+                    beans.getBeanProvider(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class),
+                    beans.getBeanProvider(com.auraboot.framework.plugin.extension.ServiceTaskActionExtension.class));
+            try {
+                manager.init();
+                assertSame(manager.getPlugin("registry-fixture").getPluginClassLoader(), registry.getCommandHandler("fixture:contract").orElseThrow().getClass().getClassLoader());
+                var inspector = new RegisteredDefinitionHandlerInspector(jdbc, mapper, new HandlerContractInspector(registry, manager));
+                var result = inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory);
+                assertEquals(registered.digest(), result.releaseDigest());
+                assertEquals(artifactDigest, result.handlerObservation().definitionDigest());
+                assertEquals("fixture:contract", result.handlerObservation().observation().dependencies().references().getFirst().handlerCode());
+                assertTrue(result.handlerObservation().observation().findings().isEmpty());
+                assertEquals(List.of(jarDigest), result.handlerObservation().observation().capabilities().getFirst().providerDigests());
+                assertEquals(org.pf4j.PluginState.STOPPED, manager.stopPlugin("registry-fixture"));
+                var stopped = inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory);
+                assertTrue(stopped.handlerObservation().observation().capabilities().isEmpty());
+                assertTrue(stopped.handlerObservation().observation().findings().stream().anyMatch(f -> f.contains("primary-handler-missing")));
+                assertEquals(org.pf4j.PluginState.STARTED, manager.startPlugin("registry-fixture"));
+                assertTrue(inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory).handlerObservation().observation().findings().isEmpty());
+                assertEquals(List.of(new RegisteredDefinitionHandlerInspector.Requirement("web", "fixture:page", "page-v1")), result.unobservedRequirements());
+                assertThrows(IllegalStateException.class, () -> inspector.inspect(registered.releaseId(), "sha256:" + "0".repeat(64), "pinned-definition", directory));
+                assertThrows(IllegalArgumentException.class, () -> inspector.inspect(registered.releaseId(), registered.digest(), "absent", directory));
+                java.nio.file.Files.writeString(directory.resolve("a/commands.json"), "[]");
+                assertThrows(IllegalArgumentException.class, () -> inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory));
+                var emptyContract = mapper.createObjectNode().put("schemaVersion", 1);
+                emptyContract.putArray("requiredCapabilities");
+                var emptyContent = new Content(1, "1.1", content.sourceLockIdentity(), content.platformCompatibility(),
+                        List.of(new Component("pinned-definition", "definition", "1.1.0",
+                                "sha256:74b5129b34e5f9964c4e144906250f96b88a545af0bac75e860f416e812be13d", emptyContract)));
+                var emptyRelease = service.register("aura-edu", "empty-definition-inspection", emptyContent, "test:publisher");
+                var emptyResult = inspector.inspect(emptyRelease.releaseId(), emptyRelease.digest(), "pinned-definition", directory);
+                assertTrue(emptyResult.handlerObservation().observation().findings().isEmpty());
+                assertTrue(emptyResult.handlerObservation().observation().dependencies().references().isEmpty());
+                assertTrue(emptyResult.unobservedRequirements().isEmpty());
+            } finally {
+                registry.detachLifecycleListener();
+                manager.cleanup();
+                manager.unloadPlugins();
+            }
+        } finally {
+            for (var ownedRoot : List.of(directory, pluginRoot)) {
+                try (var paths = java.nio.file.Files.walk(ownedRoot)) {
+                    for (var path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) java.nio.file.Files.delete(path);
+                }
+            }
+        }
     }
     private static void verifyPrivateLoginPool(DriverManagerDataSource source, String schema) throws Exception {
         var jdbc = new JdbcTemplate(source);

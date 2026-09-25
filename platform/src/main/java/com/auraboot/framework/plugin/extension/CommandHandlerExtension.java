@@ -98,6 +98,16 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     Object execute(CommandContext context) throws Exception;
 
     /**
+     * Immutable contract identifiers supported for this exact command type, including aliases.
+     * Empty means unknown and cannot satisfy release compatibility requirements.
+     * Declaring support must cover input/output and transactional side effects.
+     */
+    default Set<String> getSupportedContracts(String commandType) {
+        return Set.of();
+    }
+
+
+    /**
      * Check if this handler supports the given command type.
      *
      * @param commandType the command type to check

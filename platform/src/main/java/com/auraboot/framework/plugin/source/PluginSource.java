@@ -23,6 +23,9 @@ public interface PluginSource {
      */
     String getSourceId();
 
+    /** Whether malformed resource files must abort loading instead of producing a partial manifest. */
+    default boolean requiresCompleteResources() { return false; }
+
     /**
      * Check if a resource exists at the given path (relative to plugin root).
      */
