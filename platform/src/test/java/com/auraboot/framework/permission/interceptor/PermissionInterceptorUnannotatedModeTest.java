@@ -60,6 +60,13 @@ class PermissionInterceptorUnannotatedModeTest {
     static class Handlers {
         public void unannotated() {}
 
+        @com.auraboot.framework.permission.annotation.RequirePlatformAdmin
+        public void platformOnly() {}
+
+        @com.auraboot.framework.permission.annotation.RequirePlatformAdmin
+        @com.auraboot.framework.permission.annotation.RequirePermission("platform.release.manage")
+        public void platformAndPermission() {}
+
         @AuthenticatedAccess("operates only on the caller's own data")
         public void authenticatedOnly() {}
     }
@@ -98,5 +105,39 @@ class PermissionInterceptorUnannotatedModeTest {
     void denyAllowsAuthenticatedAccess() throws Exception {
         interceptor.setUnannotatedMode("deny");
         assertThat(interceptor.preHandle(request, response, hm("authenticatedOnly"))).isTrue();
+    }
+
+    private void authenticate() {
+        var details = new com.auraboot.framework.auth.dto.CustomUserDetails("publisher", "unused", 9L,
+                "test-pid", java.util.List.of(), true, true, true, true);
+        SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(details, null, java.util.List.of()));
+        MetaContext.setContext(7L, 9L, "test-pid", "publisher");
+    }
+
+    @Test void platformContractRejectsMissingIdentityAndRoleInEveryMode() throws Exception {
+        for (String mode : java.util.List.of("allow", "shadow", "deny")) {
+            interceptor.setUnannotatedMode(mode);
+            SecurityContextHolder.clearContext();
+            MetaContext.clear();
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, hm("platformOnly")))
+                    .isInstanceOf(AccessDeniedException.class);
+            authenticate();
+            org.mockito.Mockito.when(adminRoleChecker.hasRole(7L, 9L, "platform_admin")).thenReturn(false);
+            assertThatThrownBy(() -> interceptor.preHandle(request, response, hm("platformOnly")))
+                    .isInstanceOf(AccessDeniedException.class);
+            org.mockito.Mockito.when(adminRoleChecker.hasRole(7L, 9L, "platform_admin")).thenReturn(true);
+            assertThat(interceptor.preHandle(request, response, hm("platformOnly"))).isTrue();
+        }
+    }
+
+    @Test void platformContractDoesNotBypassAdditionalPermission() throws Exception {
+        interceptor.setUnannotatedMode("deny");
+        authenticate();
+        org.mockito.Mockito.when(adminRoleChecker.hasRole(7L, 9L, "platform_admin")).thenReturn(true);
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, hm("platformAndPermission")))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.when(userPermissionService.hasPermission(9L, "platform.release.manage")).thenReturn(true);
+        assertThat(interceptor.preHandle(request, response, hm("platformAndPermission"))).isTrue();
     }
 }

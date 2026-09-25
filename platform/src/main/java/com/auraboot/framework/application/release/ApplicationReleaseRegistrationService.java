@@ -6,7 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,19 +24,75 @@ public class ApplicationReleaseRegistrationService {
             "definition", "backend_plugin", "frontend_contribution", "asset", "migration");
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final TransactionTemplate transactions;
+    private com.zaxxer.hikari.HikariDataSource ownedPool;
 
     public ApplicationReleaseRegistrationService(JdbcTemplate jdbc, ObjectMapper mapper) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.transactions = new TransactionTemplate(new DataSourceTransactionManager(java.util.Objects.requireNonNull(jdbc.getDataSource())));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ApplicationReleaseRegistrationService(org.springframework.core.env.Environment environment, ObjectMapper mapper) {
+        this.mapper = mapper;
+        if (!environment.getProperty("aura.registry.registration.enabled", Boolean.class, false)) {
+            this.jdbc = null;
+            this.transactions = null;
+            return;
+        }
+        ownedPool = RegistryRegistrationConnection.open(environment);
+        this.jdbc = new JdbcTemplate(ownedPool);
+        this.transactions = new TransactionTemplate(new DataSourceTransactionManager(ownedPool));
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void close() {
+        if (ownedPool != null) ownedPool.close();
+    }
+
+    public static class RegistrationUnavailableException extends RuntimeException {
+        public RegistrationUnavailableException() { super("Registry registration connection is not enabled"); }
+    }
+
+    private void requireConnection() {
+        if (transactions == null) throw new RegistrationUnavailableException();
     }
 
     public record Component(String key, String type, String version, String digest, ObjectNode compatibilityContract) {}
     public record Content(int compatibilityEpoch, String displayVersion, String sourceLockIdentity,
                           ObjectNode platformCompatibility, List<Component> components) {}
-    public record Registration(String releaseId, long sequence, String digest, String manifestText) {}
+    public record Registration(String releaseId, long sequence, String digest, String manifestText, String registeredBy) {}
 
-    @Transactional
-    public Registration register(String applicationCode, String registrationKey, Content content) {
+    public record Application(long id, String code, String name, String createdBy) {}
+
+    public Application createApplication(String code, String name, String actor) {
+        requireConnection();
+        return transactions.execute(status -> createApplicationInTransaction(code, name, actor));
+    }
+
+    private Application createApplicationInTransaction(String code, String name, String actor) {
+        require(actor != null && actor.matches("(user|ci|system|test):[A-Za-z0-9._:-]{1,200}"), "Creation actor required");
+        require(code != null && code.matches("[a-z][a-z0-9-]{1,99}"), "Invalid application code");
+        require(name != null && !name.isBlank() && name.length() <= 200, "Application name required (maximum 200 characters)");
+        jdbc.update("INSERT INTO ab_application(code,name,created_by) VALUES (?,?,?) ON CONFLICT (code) DO NOTHING",
+                code, name, actor);
+        Application application = jdbc.queryForObject(
+                "SELECT id,code,name,created_by FROM ab_application WHERE code=?",
+                (row, index) -> new Application(row.getLong(1), row.getString(2), row.getString(3), row.getString(4)), code);
+        if (!name.equals(application.name())) {
+            throw new IllegalStateException("Application code already exists with a different name");
+        }
+        return application;
+    }
+
+    public Registration register(String applicationCode, String registrationKey, Content content, String actor) {
+        requireConnection();
+        return transactions.execute(status -> registerInTransaction(applicationCode, registrationKey, content, actor));
+    }
+
+    private Registration registerInTransaction(String applicationCode, String registrationKey, Content content, String actor) {
+        require(actor != null && actor.matches("(user|ci|system|test):[A-Za-z0-9._:-]{1,200}"), "Registration actor required");
         require(applicationCode != null && applicationCode.matches("[a-z][a-z0-9-]{1,99}"), "Invalid application code");
         require(registrationKey != null && registrationKey.matches("[A-Za-z0-9._:-]{1,128}"), "Invalid registration key");
         ObjectNode request = request(applicationCode, content);
@@ -46,13 +103,13 @@ public class ApplicationReleaseRegistrationService {
         long appId = applications.getFirst()[0];
         long sequence = applications.getFirst()[1];
         var previous = jdbc.query("""
-                SELECT release_id,release_sequence,digest,manifest_text,registration_request_digest
+                SELECT release_id,release_sequence,digest,manifest_text,registration_request_digest,registered_by
                 FROM ab_application_release WHERE application_id=? AND registration_key=?
                 """, (row, index) -> {
                     if (!requestDigest.equals(row.getString(5))) {
                         throw new IllegalStateException("Registration key was already used for different content");
                     }
-                    return new Registration(row.getString(1), row.getLong(2), row.getString(3), row.getString(4));
+                    return new Registration(row.getString(1), row.getLong(2), row.getString(3), row.getString(4), row.getString(6));
                 }, appId, registrationKey);
         if (!previous.isEmpty()) return previous.getFirst();
         String releaseId = UlidGenerator.generate();
@@ -61,11 +118,11 @@ public class ApplicationReleaseRegistrationService {
         String digest = digest(manifestText);
         jdbc.update("""
                 INSERT INTO ab_application_release(release_id,application_id,release_sequence,compatibility_epoch,
-                  source_lock_identity,manifest_text,digest,registration_key,registration_request_digest)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                  source_lock_identity,manifest_text,digest,registration_key,registration_request_digest,registered_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
                 """, releaseId, appId, sequence, content.compatibilityEpoch(), content.sourceLockIdentity(),
-                manifestText, digest, registrationKey, requestDigest);
-        return new Registration(releaseId, sequence, digest, manifestText);
+                manifestText, digest, registrationKey, requestDigest, actor);
+        return new Registration(releaseId, sequence, digest, manifestText, actor);
     }
 
     private ObjectNode request(String application, Content content) {
