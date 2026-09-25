@@ -102,7 +102,8 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
             new PathPatternParser().parse("/api/admin/infrastructure/**"),
             new PathPatternParser().parse("/api/admin/cloud-config/**"),
             new PathPatternParser().parse("/api/admin/bootstrap/**"),
-            new PathPatternParser().parse("/api/admin/application-releases/**")
+            new PathPatternParser().parse("/api/admin/application-releases/**"),
+            new PathPatternParser().parse("/api/admin/platform-releases/**")
     );
 
     private final AdminRoleChecker adminRoleChecker;

@@ -40,7 +40,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             for (String name : List.of("V20260925030000__immutable_application_release_registry.sql",
                     "V20260925040000__application_release_registration_keys.sql",
                     "V20260925040100__application_release_registration_actors.sql",
-                    "V20260925040200__application_creation_actors.sql")) {
+                    "V20260925040200__application_creation_actors.sql",
+                    "V20260926010000__immutable_platform_release_registry.sql")) {
                 try (var migration = getClass().getResourceAsStream("/db/migration/core/" + name)) {
                     assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
                 }
@@ -299,6 +300,20 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertEquals(1, jdbc.queryForObject(
                         "SELECT count(*) FROM ab_application_release_component WHERE release_id=?", Integer.class, registered.releaseId()));
             } finally { service.close(); }
+            var platform = new PlatformReleaseRegistrationService(environment, new ObjectMapper());
+            try {
+                var contracts = new ObjectMapper().createObjectNode();
+                contracts.putArray("runtime").add("runtime-v1");
+                contracts.putArray("pluginApi").add("api-v1");
+                contracts.putArray("dslSchema").add(4);
+                var artifact = new PlatformReleaseRegistrationService.Artifact("runtime", "core", "1.0.0",
+                        "artifact:core", "sha256:" + "a".repeat(64),
+                        new PlatformReleaseRegistrationService.Source("core", "a".repeat(40)));
+                var registered = platform.register("pool-platform", new PlatformReleaseRegistrationService.Content(
+                        "1.0.0", "sha256:" + "b".repeat(64), contracts, List.of(artifact)), "test:pool");
+                assertEquals("test:pool", jdbc.queryForObject("SELECT registered_by FROM ab_platform_release_registry WHERE release_id=?",
+                        String.class, registered.releaseId()));
+            } finally { platform.close(); }
             jdbc.execute("GRANT UPDATE(name) ON ab_application TO " + registrar);
             var columnFailure = assertThrows(IllegalStateException.class,
                     () -> new ApplicationReleaseRegistrationService(environment, new ObjectMapper()));
@@ -356,6 +371,9 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertDenied(connection, jdbc, "INSERT INTO ab_application(code,name,created_by) VALUES ('role-app','Role','test:role')");
                 assertDenied(connection, jdbc, "UPDATE ab_application SET name='Changed'");
                 assertDenied(connection, jdbc, "ALTER TABLE ab_application ADD COLUMN unwanted TEXT");
+                assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM ab_platform_release_registry", Integer.class));
+                assertDenied(connection, jdbc, "DELETE FROM ab_platform_release_registry");
+                assertDenied(connection, jdbc, "TRUNCATE ab_platform_release_registry");
                 jdbc.execute("RESET ROLE");
                 jdbc.execute("SET LOCAL ROLE " + registrar);
                 assertEquals(1, jdbc.update("INSERT INTO ab_application(code,name,created_by) VALUES ('role-app','Role','test:role')"));

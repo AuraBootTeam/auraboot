@@ -13,6 +13,10 @@ class RegistryRegistrationConfigurationTest {
         assertThrows(ApplicationReleaseRegistrationService.RegistrationUnavailableException.class,
                 () -> service.register("test-app", "key", null, "test:actor"));
         service.close();
+        var platform = new PlatformReleaseRegistrationService(new MockEnvironment(), new ObjectMapper());
+        assertThrows(ApplicationReleaseRegistrationService.RegistrationUnavailableException.class,
+                () -> platform.register("auraboot", null, "test:actor"));
+        platform.close();
     }
     @Test void enabledRegistrationRequiresExplicitCredentialsAndDistinctAccount() {
         var env = new MockEnvironment().withProperty("aura.registry.registration.enabled", "true");

@@ -46,7 +46,7 @@ final class RegistryRegistrationConnection {
                     FROM pg_roles r WHERE r.rolname=current_user
                     """, Boolean.class, username);
             if (!Boolean.TRUE.equals(safe)) throw new IllegalStateException("Registry account violates least-privilege preconditions");
-            for (String table : java.util.List.of("ab_application", "ab_application_release", "ab_application_release_component")) {
+            for (String table : java.util.List.of("ab_application", "ab_application_release", "ab_application_release_component", "ab_platform_release_registry")) {
                 Boolean allowed = jdbc.queryForObject("""
                         SELECT has_table_privilege(current_user, ?, 'SELECT')
                           AND has_table_privilege(current_user, ?, 'INSERT')
@@ -64,7 +64,7 @@ final class RegistryRegistrationConnection {
                     SELECT EXISTS (SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
                       JOIN pg_namespace n ON n.oid=c.relnamespace
                       WHERE n.nspname=current_schema() AND c.relname IN
-                        ('ab_application','ab_application_release','ab_application_release_component')
+                        ('ab_application','ab_application_release','ab_application_release_component','ab_platform_release_registry')
                       AND a.attnum>0 AND NOT a.attisdropped
                       AND NOT (c.relname='ab_application' AND a.attname='next_release_sequence')
                       AND has_column_privilege(current_user, c.oid, a.attnum, 'UPDATE'))

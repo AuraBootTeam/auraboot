@@ -10,7 +10,7 @@ export function registryRolePolicy({ schema, runtimeRole, registrarRole, ownerRo
     }
   }
   if (new Set([runtimeRole, registrarRole, ownerRole]).size !== 3) throw new Error('Three distinct database roles required');
-  const tables = ['ab_application', 'ab_application_release', 'ab_application_release_component'];
+  const tables = ['ab_application', 'ab_application_release', 'ab_application_release_component', 'ab_platform_release_registry'];
   const qualified = tables.map(name => `"${schema}"."${name}"`);
   return `-- Generated Registry policy; apply with psql ON_ERROR_STOP=1 as a privileged operator.
 -- Existing runtime/registrar memberships are rejected, never silently changed.
@@ -30,7 +30,7 @@ BEGIN
       RAISE EXCEPTION 'Registry account must not create schema objects: %', role_name;
     END IF;
   END LOOP;
-  FOREACH table_name IN ARRAY ARRAY['ab_application','ab_application_release','ab_application_release_component'] LOOP
+  FOREACH table_name IN ARRAY ARRAY['ab_application','ab_application_release','ab_application_release_component','ab_platform_release_registry'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         JOIN pg_roles r ON r.oid=c.relowner WHERE n.nspname='${schema}' AND c.relname=table_name
         AND c.relkind='r' AND r.rolname='${ownerRole}') THEN
