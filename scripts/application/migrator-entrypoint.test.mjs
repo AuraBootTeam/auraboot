@@ -30,7 +30,7 @@ test('valid actions use one fixed history and packaged locations without secret 
     assert.equal(invocation.executable, '/flyway/flyway');
     assert.equal(invocation.args.at(-1), action);
     for (const flag of ['-table=ab_flyway_schema_history', '-baselineOnMigrate=false', '-cleanDisabled=true',
-      '-outOfOrder=false', '-validateOnMigrate=true', '-placeholderReplacement=false', '-configFiles=/dev/null']) {
+      '-outOfOrder=false', '-validateOnMigrate=true', '-placeholderReplacement=false', `-configFiles=${input.home}/flyway.conf`]) {
       assert.ok(invocation.args.includes(flag), flag);
     }
     assert.ok(invocation.args.includes(`-locations=filesystem:${input.root}/packages/core/sql`));

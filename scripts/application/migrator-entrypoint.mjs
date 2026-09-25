@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -22,7 +22,7 @@ export function migrationInvocation({ action, root, digest, host, port, database
   const locations = receipt.dependencyOrder.map((id) => `filesystem:${join(resolve(root), 'packages', id, 'sql')}`).join(',');
   return {
     executable: '/flyway/flyway',
-    args: ['-configFiles=/dev/null',
+    args: [`-configFiles=${join(home, 'flyway.conf')}`,
       `-url=jdbc:postgresql://${host}:${Number(port)}/${database}?sslmode=${sslMode}`,
       `-locations=${locations}`, '-table=ab_flyway_schema_history', '-schemas=public', '-defaultSchema=public',
       '-createSchemas=false', '-cleanDisabled=true', '-baselineOnMigrate=false', '-outOfOrder=false',
@@ -43,6 +43,7 @@ export function main(args, environment) {
   need(typeof passwordFile === 'string' && passwordFile.startsWith('/'), 'absolute database password file required');
   const password = readFileSync(passwordFile, 'utf8').replace(/\r?\n$/, '');
   const home = mkdtempSync(join(tmpdir(), 'aura-migrator-'));
+  writeFileSync(join(home, 'flyway.conf'), '', { flag: 'wx', mode: 0o600 });
   const invocation = migrationInvocation({ action: args[0], root: '/opt/aura/migrations', digest: baked,
     host: environment.AURA_DB_HOST, port: environment.AURA_DB_PORT, database: environment.AURA_DB_NAME,
     user: environment.AURA_DB_USER, password, sslMode: environment.AURA_DB_SSL_MODE, home });
