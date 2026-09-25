@@ -15,7 +15,9 @@ pnpm application resolve \
   --output path/to/application.lock
 
 pnpm application verify-lock \
-  --lock path/to/application.lock
+  --lock path/to/application.lock \
+  --manifest path/to/app.yaml \
+  --expected-identity sha256:<externally-locked-digest>
 
 pnpm application verify-artifacts \
   --lock path/to/application.lock \
@@ -42,6 +44,11 @@ pnpm application compare-graphs \
 ```
 
 Release manifests and catalogs must not use `SNAPSHOT`, `latest`, workspace links, branch references, sibling source paths, or mutable artifact identities. `verify-artifacts` requires every lock entry to name a staged `localPath` and fails if any bytes do not match the locked digest.
+
+`verify-lock` 检查外层与组成图摘要、连续节点顺序、节点唯一性、前端owner及图/制品清单的一一对应。
+`--manifest` 将lock绑定到声明内容和完整依赖分母；默认要求镜像，开发期明确省略镜像时使用
+`--skip-image`。`--expected-identity` 必须取自可信Freeze/发布记录，不能临时从待验证lock抄取。
+未提供这两个参数时只验证lock自身一致性；通过不代表发布准入、制品字节可信或租户可以绑定。
 
 Every product npm package must contain `package/auraboot.contribution.json` conforming to
 `web-contribution.schema.json`. Routes declare whether they are rendered pages or resource/BFF handlers and whether
