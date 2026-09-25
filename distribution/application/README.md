@@ -163,7 +163,11 @@ an expected requirements digest made from a reduced requirement set. The extract
 command emits deterministic two-space JSON with a final newline; `requirementsDigest`
 must pin these bytes. Repeated requirements across components are unified; duplicate
 entries within one component are rejected. Contract versions for the same capability
-remain distinct and must all be satisfied.
+remain distinct and must all be satisfied. Every provider digest in every observed capability,
+including capabilities not required by this application, must appear in the pinned platform
+artifact or application component inventory. An unregistered chain member produces
+`provider-artifact-not-registered` and prevents a successful decision. Inventory membership
+does not prove provider loading, artifact type suitability, or publisher trust.
 
 This verifies consistency with registered declarations. It does not inspect component
 resources to prove that declarations are complete, or establish trust in the publisher.

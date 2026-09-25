@@ -110,6 +110,20 @@ export function verifyRegisteredDeploymentCapabilities(manifestBytes, platformBy
       }
     }
   }
+  // Membership is necessary provenance, not proof that a provider was loaded or trusted.
+  const application = JSON.parse(manifestBytes.toString());
+  const registeredDigests = new Set([
+    ...platform.artifacts.map(artifact => artifact.digest),
+    ...application.components.map(component => component.digest),
+  ]);
+  for (const capability of deployment.capabilities) {
+    for (const providerDigest of capability.providerDigests) {
+      if (!registeredDigests.has(providerDigest)) {
+        result.findings.push({ code: 'provider-artifact-not-registered', kind: capability.kind,
+          key: capability.key, contract: capability.contract, providerDigest });
+      }
+    }
+  }
   result.capabilitiesSatisfied = result.findings.length === 0;
   return result;
 }

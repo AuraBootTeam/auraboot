@@ -15,6 +15,10 @@ export type WebContributionKind =
   | 'asset'
   | 'i18n'
 
+export type WebContractRequirement =
+  | { mode: 'exact'; kind: WebContributionKind; key: string; contract: string }
+  | { mode: 'component-loader' | 'service'; key: string; contract: string }
+
 type WebContributionRegistration =
   | RendererRegistration
   | ComponentLoaderRegistration
@@ -142,6 +146,42 @@ export class ContributionRegistry {
       key,
     })
     this.emit()
+  }
+
+  /** Observe a nonempty requirement set at one registry generation, without asserting artifact provenance. */
+  observeContracts(requirements: readonly WebContractRequirement[]) {
+    if (!Array.isArray(requirements) || requirements.length === 0) {
+      throw new Error('[ContributionRegistry] Nonempty web contract requirements required')
+    }
+    const identities = new Set<string>()
+    const frozen = requirements.map(requirement => {
+      if (!requirement || typeof requirement.key !== 'string' || !requirement.key.trim()
+        || typeof requirement.contract !== 'string' || !requirement.contract.trim()
+        || !['exact', 'component-loader', 'service'].includes(requirement.mode)) {
+        throw new Error('[ContributionRegistry] Invalid web contract requirement')
+      }
+      if (requirement.mode === 'exact' && !['renderer', 'component-loader', 'page-runtime-hook', 'service-provider', 'asset', 'i18n'].includes(requirement.kind)) {
+        throw new Error('[ContributionRegistry] Invalid exact contribution kind')
+      }
+      const identity = JSON.stringify([requirement.mode, requirement.mode === 'exact' ? requirement.kind : null, requirement.key, requirement.contract])
+      if (identities.has(identity)) throw new Error('[ContributionRegistry] Duplicate web contract requirement')
+      identities.add(identity)
+      return { ...requirement }
+    })
+    const generation = this.version
+    const observations = frozen.map(requirement => ({
+      requirement,
+      observation: requirement.mode === 'service'
+        ? this.observeServiceContract(requirement.key, requirement.contract)
+        : requirement.mode === 'component-loader'
+          ? this.observeComponentLoaderContract(requirement.key, requirement.contract)
+          : this.observeContract(requirement.kind, requirement.key, requirement.contract),
+    }))
+    const findings = observations.flatMap(({ requirement, observation }) =>
+      observation.findings.map(code => ({ requirement, code })),
+    )
+    const stable = generation === this.version && observations.every(item => item.observation.generation === generation)
+    return { generation, stable, observations, findings, supported: stable && observations.every(item => item.observation.supported) }
   }
 
   /** Inspect an exact registry key, not a manifest claim or component-loader alias. */

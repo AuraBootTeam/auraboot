@@ -14,7 +14,8 @@ import { PluginLoader, type LoaderOptions } from './plugins/loader.js'
 import { SlotRegistry } from './extensions/slot-registry.js'
 import { WidgetRegistry, ColumnRendererRegistry } from './widgets/widget-registry.js'
 import { DataSourceRegistry } from './data-source/registry.js'
-import { ContributionRegistry } from './extensions/contribution-registry.js'
+import { ContributionRegistry, type WebContractRequirement } from './extensions/contribution-registry.js'
+import { observeBuiltWebContracts } from './web-build-identity.js'
 import { initBlockRegistry } from '~/ui/schema-renderer/BlockRegistry'
 import { initViewRegistry } from '~/ui/schema-renderer/ViewRegistry'
 
@@ -26,6 +27,7 @@ export interface Kernel {
   columnRegistry: ColumnRendererRegistry
   dataSourceRegistry: DataSourceRegistry
   contributionRegistry: ContributionRegistry
+  observeWebContracts: (requirements: readonly WebContractRequirement[], expectedCompositionKey: string) => ReturnType<typeof observeBuiltWebContracts>
 }
 
 export interface KernelOptions {
@@ -73,6 +75,7 @@ export function createKernel(opts: KernelOptions = {}): Kernel {
     columnRegistry,
     dataSourceRegistry,
     contributionRegistry,
+    observeWebContracts: (requirements, expectedCompositionKey) => observeBuiltWebContracts(contributionRegistry, requirements, expectedCompositionKey),
   }
 }
 

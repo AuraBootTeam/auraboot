@@ -83,3 +83,38 @@ test('registry changes during service observation invalidate the combined result
   assert.equal(observation.supported, false);
   assert.ok(observation.findings.includes('web-registry-changed'));
 });
+
+ test('batch observes exact keys, selected aliases and full service chains without claiming provenance', () => {
+  const registry = new ContributionRegistry();
+  registry.register('renderer', 'fixture.view', { id: 'view', component: null, supportedContracts: ['v1'] });
+  registry.register('component-loader', 'fixture.loader', { id: 'loader', aliases: ['alias'], load: () => { throw Error('must not load'); }, supportedContracts: ['v1'] });
+  registry.register('service-provider', 'fixture.primary', { id: 'service', token: 'lookup', provider: {}, supportedContracts: ['v1'] });
+  const requirements = [{ mode: 'exact', kind: 'renderer', key: 'view', contract: 'v1' },
+    { mode: 'component-loader', key: 'alias', contract: 'v1' }, { mode: 'service', key: 'lookup', contract: 'v1' }];
+  const good = registry.observeContracts(requirements);
+  assert.equal(good.supported, true); assert.equal(good.stable, true); assert.equal(good.observations.length, 3);
+  assert.deepEqual(good.findings, []); assert.equal(good.observations[1].observation.registrationId, 'loader');
+  assert.equal('providerDigests' in good, false);
+  registry.register('service-provider', 'fixture.decorator', { id: 'bad', token: 'lookup', mode: 'decorator', provider: {}, supportedContracts: ['v2'] });
+  const denied = registry.observeContracts(requirements);
+  assert.equal(denied.supported, false); assert.equal(denied.stable, true);
+  assert.equal(denied.findings[0].code, 'lookup:decorator:bad:web-contract-unavailable');
+  for (const invalid of [[], [requirements[0], requirements[0]], [{ mode: 'unknown', key: 'view', contract: 'v1' }], [{ mode: 'exact', kind: 'unknown', key: 'view', contract: 'v1' }]]) {
+    assert.throws(() => registry.observeContracts(invalid));
+  }
+});
+ test('batch rejects mixed generations even when each individual observation succeeds', () => {
+  class ChangingRegistry extends ContributionRegistry {
+    observeContract(kind, key, contract) {
+      const result = super.observeContract(kind, key, contract);
+      if (key === 'first') this.removeByPlugin('fixture.first');
+      return result;
+    }
+  }
+  const registry = new ChangingRegistry();
+  registry.register('renderer', 'fixture.first', { id: 'first', component: null, supportedContracts: ['v1'] });
+  registry.register('renderer', 'fixture.second', { id: 'second', component: null, supportedContracts: ['v1'] });
+  const result = registry.observeContracts(['first', 'second'].map(key => ({ mode: 'exact', kind: 'renderer', key, contract: 'v1' })));
+  assert.ok(result.observations.every(item => item.observation.supported));
+  assert.equal(result.stable, false); assert.equal(result.supported, false);
+});

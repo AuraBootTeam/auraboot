@@ -100,6 +100,10 @@ test('registered CLI emits the complete decision and returns failure for missing
       return spawnSync(process.execPath, ['scripts/application/deployment-capability-verifier.mjs', '--registered', join(dir, 'manifest.json'), join(dir, 'platform.json'), join(dir, 'deployment.json'), join(dir, 'expected.json')], { encoding: 'utf8' });
     }
     const good = run(); assert.equal(good.status, 0, good.stderr); assert.equal(JSON.parse(good.stdout).capabilitiesSatisfied, true);
+    deployment.capabilities[0].providerDigests.push(`sha256:${'c'.repeat(64)}`);
+    const unknown = run(); assert.equal(unknown.status, 1, unknown.stderr);
+    assert.equal(JSON.parse(unknown.stdout).findings[0].code, 'provider-artifact-not-registered');
+    deployment.capabilities[0].providerDigests.pop();
     deployment.capabilities.pop();
     const denied = run(); assert.equal(denied.status, 1, denied.stderr); assert.deepEqual(JSON.parse(denied.stdout).findings, [{ code: 'required-capability-missing', ...web }]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -135,4 +139,40 @@ test('registered CLI emits the complete decision and returns failure for missing
     p => { p.artifacts[0].source.commit = 'main'; }, p => { p.extra = true; }]) {
     const platform = platformFixture(); mutate(platform); assert.throws(() => verify(platform));
   }
+});
+
+
+test('registered mode requires every provider, including unused capabilities, in the pinned artifact inventory', () => {
+  const app = fixture();
+  const appDigest = `sha256:${'b'.repeat(64)}`;
+  const unknownDigest = `sha256:${'c'.repeat(64)}`;
+  app.components[0].digest = appDigest;
+  const manifest = Buffer.from(JSON.stringify(app));
+  const platform = Buffer.from(JSON.stringify(platformFixture()));
+  const requirements = extractApplicationReleaseRequirements(manifest, hash(manifest));
+  const deployment = { schemaVersion: 1, deploymentId: id, generation: 1,
+    platformRelease: { releaseId: id, digest: hash(platform) },
+    platformContracts: { runtime: ['v1'], pluginApi: ['v1'], dslSchema: [1] },
+    supportedApplications: [{ application: 'aura-edu', compatibilityEpochs: [1] }],
+    capabilities: [handler, web].map(item => ({ ...item, providerDigests: [digest, appDigest] })) };
+  function verify() {
+    const dep = Buffer.from(JSON.stringify(deployment));
+    return verifyRegisteredDeploymentCapabilities(manifest, platform, dep, {
+      requirementsDigest: hash(Buffer.from(`${JSON.stringify(requirements, null, 2)}\n`)),
+      deploymentDigest: hash(dep), applicationReleaseDigest: hash(manifest),
+      platformReleaseDigest: hash(platform), deploymentId: id, generation: 1 });
+  }
+  const valid = verify();
+  assert.equal(valid.capabilitiesSatisfied, true);
+  assert.deepEqual(valid.resolved[0].providerDigests, [digest, appDigest]);
+  // An extra decorator cannot borrow the registered primary provider's provenance.
+  deployment.capabilities[0].providerDigests.push(unknownDigest);
+  assert.equal(verify().capabilitiesSatisfied, false);
+  assert.deepEqual(verify().findings, [{ code: 'provider-artifact-not-registered', ...handler, providerDigest: unknownDigest }]);
+  deployment.capabilities[0].providerDigests.pop();
+  deployment.capabilities.push({ kind: 'handler', key: 'unused', contract: 'v1', providerDigests: [unknownDigest] });
+  const unused = verify();
+  assert.equal(unused.capabilitiesSatisfied, false);
+  assert.deepEqual(unused.findings, [{ code: 'provider-artifact-not-registered', kind: 'handler', key: 'unused', contract: 'v1', providerDigest: unknownDigest }]);
+  assert.equal('admitted' in unused, false);
 });
