@@ -24,6 +24,8 @@ public class HandlerContractInspector {
     public record Capability(String kind, String key, String contract, List<String> providerDigests) {}
     public record ArtifactObservation(Observation contractObservation, long handlerGeneration, Capability capability) {}
     public record Requirement(String key, String contract) {}
+
+    long currentGeneration() { return registry.commandGeneration(); }
     public record DefinitionArtifactObservation(String definitionDigest, DefinitionObservation observation) {}
 
     public DefinitionArtifactObservation observeDefinitionArtifact(java.nio.file.Path directory, String expectedDigest,

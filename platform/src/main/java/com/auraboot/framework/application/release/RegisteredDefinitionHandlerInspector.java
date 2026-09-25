@@ -31,10 +31,55 @@ public class RegisteredDefinitionHandlerInspector {
                          HandlerContractInspector.DefinitionArtifactObservation handlerObservation,
                          List<Requirement> unobservedRequirements) {}
 
+    public record UnobservedComponent(String key, String type, String digest) {}
+    public record Finding(String componentKey, String code) {}
+    public record ReleaseObservation(String releaseId, String releaseDigest, long handlerGeneration,
+                                     List<Result> definitions, List<UnobservedComponent> unobservedComponents,
+                                     List<Finding> findings) {}
+
+    public ReleaseObservation inspectRelease(String releaseId, String expectedReleaseDigest,
+                                              java.util.Map<String, Path> definitionArtifacts) throws IOException {
+        if (definitionArtifacts == null) throw new IllegalArgumentException("Explicit definition artifact map required");
+        var artifacts = java.util.Map.copyOf(definitionArtifacts);
+        long generation = handlers.currentGeneration();
+        var release = loadRelease(releaseId, expectedReleaseDigest);
+        var keys = new HashSet<String>();
+        var definitionKeys = new HashSet<String>();
+        var unobserved = new ArrayList<UnobservedComponent>();
+        var findings = new ArrayList<Finding>();
+        for (var component : release.path("components")) {
+            String key = component.path("key").asText();
+            if (key.isBlank() || !keys.add(key)) throw new IllegalStateException("Invalid or duplicate registered component key");
+            if ("definition".equals(component.path("type").asText())) definitionKeys.add(key);
+            else {
+                unobserved.add(new UnobservedComponent(key, component.path("type").asText(), component.path("digest").asText()));
+                findings.add(new Finding(key, "component-type-unobserved"));
+            }
+        }
+        if (!definitionKeys.equals(artifacts.keySet())) throw new IllegalArgumentException("Definition artifacts must exactly match registered definition components");
+        var definitions = new ArrayList<Result>();
+        for (var key : definitionKeys.stream().sorted().toList()) {
+            var result = inspectComponent(releaseId, expectedReleaseDigest, release, key, artifacts.get(key));
+            definitions.add(result);
+            var observation = result.handlerObservation().observation();
+            if (observation.handlerGeneration() != generation) findings.add(new Finding(key, "release-handler-generation-changed"));
+            observation.findings().forEach(finding -> findings.add(new Finding(key, finding)));
+            result.unobservedRequirements().forEach(requirement -> findings.add(new Finding(key,
+                    "capability-unobserved:" + requirement.kind() + ":" + requirement.key() + ":" + requirement.contract())));
+        }
+        if (handlers.currentGeneration() != generation) findings.add(new Finding(null, "release-handler-generation-changed"));
+        return new ReleaseObservation(releaseId, expectedReleaseDigest, generation,
+                List.copyOf(definitions), List.copyOf(unobserved), List.copyOf(findings));
+    }
+
     public Result inspect(String releaseId, String expectedReleaseDigest, String componentKey, Path artifactDirectory) throws IOException {
+        if (componentKey == null || componentKey.isBlank()) throw new IllegalArgumentException("Registered component required");
+        return inspectComponent(releaseId, expectedReleaseDigest, loadRelease(releaseId, expectedReleaseDigest), componentKey, artifactDirectory);
+    }
+
+    private JsonNode loadRelease(String releaseId, String expectedReleaseDigest) throws IOException {
         if (releaseId == null || !releaseId.matches("[0-9A-HJKMNP-TV-Z]{26}")
-                || expectedReleaseDigest == null || !expectedReleaseDigest.matches("sha256:[0-9a-f]{64}")
-                || componentKey == null || componentKey.isBlank()) throw new IllegalArgumentException("Exact registered release and component required");
+                || expectedReleaseDigest == null || !expectedReleaseDigest.matches("sha256:[0-9a-f]{64}")) throw new IllegalArgumentException("Exact registered release required");
         var row = jdbc.queryForObject("SELECT manifest_text,digest FROM ab_application_release WHERE release_id=?",
                 (result, index) -> new String[]{result.getString(1), result.getString(2)}, releaseId);
         if (row == null || !expectedReleaseDigest.equals(row[1]) || !expectedReleaseDigest.equals(hash(row[0]))) {
@@ -44,6 +89,11 @@ public class RegisteredDefinitionHandlerInspector {
         if (!releaseId.equals(release.path("releaseId").asText()) || !release.path("components").isArray()) {
             throw new IllegalStateException("Registered release identity or components invalid");
         }
+        return release;
+    }
+
+    private Result inspectComponent(String releaseId, String expectedReleaseDigest, JsonNode release,
+                                    String componentKey, Path artifactDirectory) throws IOException {
         JsonNode selected = null;
         for (var component : release.path("components")) {
             if (componentKey.equals(component.path("key").asText())) {

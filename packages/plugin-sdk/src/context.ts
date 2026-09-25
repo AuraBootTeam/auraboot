@@ -16,6 +16,8 @@ import type { NavigationResource } from '@auraboot/nav-model'
 export type PropsSchema = Record<string, unknown>
 
 export interface ContributionMetadata {
+  /** Exact behavioral contracts supported by this registration; omitted means unknown. */
+  supportedContracts?: readonly string[]
   /** Stable ID within the contribution kind. */
   id: string
   /** Optional item-level entitlement gate. */

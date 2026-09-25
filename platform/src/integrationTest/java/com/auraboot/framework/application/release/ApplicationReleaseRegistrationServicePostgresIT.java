@@ -197,9 +197,35 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertEquals("fixture:contract", result.handlerObservation().observation().dependencies().references().getFirst().handlerCode());
                 assertTrue(result.handlerObservation().observation().findings().isEmpty());
                 assertEquals(List.of(jarDigest), result.handlerObservation().observation().capabilities().getFirst().providerDigests());
+                var handlerOnly = contract.deepCopy();
+                handlerOnly.withArray("requiredCapabilities").remove(1);
+                var firstDefinition = new Component("definition-a", "definition", "1.0.0", artifactDigest, handlerOnly);
+                var secondDefinition = new Component("definition-b", "definition", "1.0.0", artifactDigest, handlerOnly);
+                var aggregateContent = new Content(1, "aggregate", content.sourceLockIdentity(), content.platformCompatibility(),
+                        List.of(firstDefinition, secondDefinition));
+                var aggregateRelease = service.register("aura-edu", "aggregate-inspection", aggregateContent, "test:publisher");
+                var artifactMap = java.util.Map.of("definition-a", directory, "definition-b", directory);
+                var aggregate = inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), artifactMap);
+                assertEquals(List.of("definition-a", "definition-b"), aggregate.definitions().stream().map(RegisteredDefinitionHandlerInspector.Result::componentKey).toList());
+                assertTrue(aggregate.findings().isEmpty());
+                assertTrue(aggregate.unobservedComponents().isEmpty());
+                assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory)));
+                assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory, "definition-b", directory, "extra", directory)));
+                var withAsset = service.register("aura-edu", "aggregate-unobserved", new Content(1, "aggregate-asset", content.sourceLockIdentity(), content.platformCompatibility(),
+                        List.of(firstDefinition, secondDefinition, new Component("asset-c", "asset", "1.0.0", "sha256:" + "e".repeat(64), handlerOnly))), "test:publisher");
+                var partial = inspector.inspectRelease(withAsset.releaseId(), withAsset.digest(), artifactMap);
+                assertEquals("asset-c", partial.unobservedComponents().getFirst().key());
+                assertEquals(List.of(new RegisteredDefinitionHandlerInspector.Finding("asset-c", "component-type-unobserved")), partial.findings());
+                var webPending = inspector.inspectRelease(registered.releaseId(), registered.digest(), java.util.Map.of("pinned-definition", directory));
+                assertEquals(List.of(new RegisteredDefinitionHandlerInspector.Finding("pinned-definition", "capability-unobserved:web:fixture:page:page-v1")), webPending.findings());
+
                 assertEquals(org.pf4j.PluginState.STOPPED, manager.stopPlugin("registry-fixture"));
                 var stopped = inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory);
                 assertTrue(stopped.handlerObservation().observation().capabilities().isEmpty());
+                var stoppedAggregate = inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), artifactMap);
+                assertEquals(2, stoppedAggregate.findings().size());
+                assertTrue(stoppedAggregate.findings().stream().allMatch(f -> f.code().contains("primary-handler-missing")));
+
                 assertTrue(stopped.handlerObservation().observation().findings().stream().anyMatch(f -> f.contains("primary-handler-missing")));
                 assertEquals(org.pf4j.PluginState.STARTED, manager.startPlugin("registry-fixture"));
                 assertTrue(inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory).handlerObservation().observation().findings().isEmpty());
