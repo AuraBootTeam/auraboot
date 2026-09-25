@@ -1,37 +1,15 @@
 package com.auraboot.framework.meta.service.impl;
 
-import com.auraboot.framework.meta.mapper.AsyncTaskMapper;
 import org.junit.jupiter.api.Test;
-
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.notNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AssignableTypeFilter;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AsyncTaskStartupRecoveryRunnerTest {
-
-    @Test
-    void marksRunningTasksFailedOnStartup() {
-        AsyncTaskMapper mapper = mock(AsyncTaskMapper.class);
-        when(mapper.markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"))).thenReturn(2);
-
-        new AsyncTaskStartupRecoveryRunner(mapper).run();
-
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mapper);
-        order.verify(mapper).requeueResumableTasksOnStartup();
-        order.verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
-    }
-
-    @Test
-    void doesNotFailStartupWhenNoRunningTasksRemain() {
-        AsyncTaskMapper mapper = mock(AsyncTaskMapper.class);
-        when(mapper.markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"))).thenReturn(0);
-
-        new AsyncTaskStartupRecoveryRunner(mapper).run();
-
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mapper);
-        order.verify(mapper).requeueResumableTasksOnStartup();
-        order.verify(mapper).markRunningTasksFailedOnStartup(notNull(), contains("Application restarted"));
+    @Test void taskRecoveryDoesNotRegisterAStartupWriter() {
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AssignableTypeFilter(ApplicationRunner.class));
+        assertTrue(scanner.findCandidateComponents("com.auraboot.framework.meta.service.impl").isEmpty());
     }
 }

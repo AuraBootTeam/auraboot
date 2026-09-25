@@ -31,14 +31,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Real-stack coverage IT for {@link AsyncTaskServiceImpl} — read/cancel/delete lifecycle over a
  * directly-seeded task (getTask, listTasks with/without filters, cancelTask + its
  * not-cancellable guard, deleteTask) + submitTask executor-validation. Dedicated synthetic tenant.
- * (executeTaskAsync, which runs a registered executor on a pool thread, is out of scope.)
+ * A fixture executor also covers submission through the real async proxy and fenced completion.
  */
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@org.springframework.context.annotation.Import(AsyncTaskServiceImplCoverageIT.ExecutorFixture.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("AsyncTaskServiceImpl Coverage IT — task read/cancel/delete lifecycle")
 class AsyncTaskServiceImplCoverageIT {
+
+    @org.springframework.boot.test.context.TestConfiguration
+    static class ExecutorFixture {
+        @org.springframework.context.annotation.Bean
+        com.auraboot.framework.meta.service.AsyncTaskExecutor leaseFixtureExecutor() {
+            return new com.auraboot.framework.meta.service.AsyncTaskExecutor() {
+                public String getTaskType() { return "lease-fixture"; }
+                public com.auraboot.framework.meta.service.AsyncTaskResult execute(
+                        com.fasterxml.jackson.databind.JsonNode input, ProgressCallback callback) {
+                    callback.report(50, "fixture progress");
+                    return com.auraboot.framework.meta.service.AsyncTaskResult.ok(
+                            com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("value", 42));
+                }
+            };
+        }
+    }
+
+    @Test
+    void submittedTaskCompletesThroughRealProxyAndFencedMapper() {
+        AsyncTaskSubmitRequest request = new AsyncTaskSubmitRequest();
+        request.setTaskType("lease-fixture");
+        request.setTaskName("execution lease integration");
+        AsyncTaskDTO submitted = asyncTaskService.submitTask(request, TENANT_ID, USER_ID);
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+            AsyncTask task = asyncTaskMapper.findByTaskCode(submitted.getTaskCode());
+            assertEquals(AsyncTask.STATUS_COMPLETED, task.getStatus());
+            assertEquals(100, task.getProgress());
+            assertEquals(42, task.getResultData().get("value").asInt());
+            org.junit.jupiter.api.Assertions.assertNull(task.getExecutionToken());
+            org.junit.jupiter.api.Assertions.assertNull(task.getLeaseUntil());
+        });
+    }
 
     private static final long TENANT_ID = 991_000_001L;
     private static final long USER_ID = 991_000_002L;
