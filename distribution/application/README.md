@@ -251,3 +251,31 @@ invokes the real signed verifier through that executor, finishes the fixture att
 proves generation 2 rejects the old signature and accepts a fresh one. Revocation and wrong
 reservation owners are negative cases. This uses synthetic capability declarations and
 in-memory test keys, not a production observation collector or SSH deployment.
+
+
+`RegisteredDefinitionHandlerInspector.inspectRelease` exposes a release-level
+`capabilities` collection. Consumers must use it instead of flattening diagnostic
+per-component observations. The collection is deterministic, deduplicated and immutable;
+any release finding (including unobserved components, Web/schema requirements, registry
+generation changes or conflicting provider provenance) leaves it empty. Successful
+per-component observations remain diagnostic evidence, not authorization to publish a
+partial aggregate as a fully inspected release.
+
+
+### Migration execution evidence
+
+The migrator entrypoint now requires `AURA_DEPLOYMENT_ID`, canonical positive
+`AURA_DEPLOYMENT_GENERATION`, and an absolute `AURA_MIGRATION_EVIDENCE_DIR` whose parent
+exists and is writable by the container user. Supply a fresh directory for each action;
+existing directories are rejected before Flyway starts. Mount evidence outside ephemeral
+container storage when retention is required. The target executor must supply the current
+reserved deployment context; environment values alone do not authenticate it.
+
+`started.json` records the action, verified payload SHA-256, target host/port/database,
+deployment identity and generation. `result.json` binds its exact bytes by digest and
+records success or failure, exit code and completion time. Both files are create-only and
+exclude user/password/exception text. A missing result means incomplete execution, never
+success. Signals and launch failures produce failure evidence. These receipts do not
+prove the runtime image digest, schema compatibility, publisher trust or release admission.
+The Linux migrator gate now checks the evidence on executed success/failure cases; that
+gate must run against the exact image before claiming this execution path verified.

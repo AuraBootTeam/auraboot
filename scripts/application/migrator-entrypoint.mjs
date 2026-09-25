@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -35,6 +36,35 @@ export function migrationInvocation({ action, root, digest, host, port, database
   };
 }
 
+export function beginMigrationEvidence(directory, identity) {
+  need(typeof directory === 'string' && directory.startsWith('/'), 'absolute migration evidence directory required');
+  need(identity && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(identity.deploymentId ?? '')
+    && Number.isSafeInteger(identity.generation) && identity.generation > 0, 'explicit deployment identity and generation required');
+  need(ACTIONS.has(identity.action) && /^[0-9a-f]{64}$/.test(identity.payloadSha256 ?? ''), 'exact migration action and payload required');
+  need(typeof identity.database === 'string' && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identity.database)
+    && typeof identity.host === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(identity.host)
+    && Number.isInteger(identity.port) && identity.port > 0 && identity.port <= 65535, 'exact migration database target required');
+  const started = { schemaVersion: 1, kind: 'migration-execution', deploymentId: identity.deploymentId,
+    generation: identity.generation, action: identity.action, payloadSha256: identity.payloadSha256,
+    database: { host: identity.host, port: identity.port, name: identity.database },
+    state: 'started', startedAt: new Date().toISOString() };
+  const bytes = Buffer.from(`${JSON.stringify(started, null, 2)}\n`);
+  // Reserve a fresh evidence namespace before starting the migration engine.
+  mkdirSync(directory, { mode: 0o755 });
+  writeFileSync(join(directory, 'started.json'), bytes, { flag: 'wx', mode: 0o444 });
+  return { directory, startedDigest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
+}
+
+export function finishMigrationEvidence(evidence, result) {
+  const exitCode = !result.error && !result.signal && Number.isInteger(result.status) && result.status >= 0 ? result.status : 1;
+  const receipt = { schemaVersion: 1, kind: 'migration-execution-result', startedDigest: evidence.startedDigest,
+    state: !result.error && exitCode === 0 ? 'succeeded' : 'failed', exitCode: result.error ? 1 : exitCode,
+    failureKind: result.error ? 'engine-launch-failed' : result.signal ? 'engine-signaled' : exitCode ? 'engine-exit-nonzero' : null,
+    completedAt: new Date().toISOString() };
+  writeFileSync(join(evidence.directory, 'result.json'), `${JSON.stringify(receipt, null, 2)}\n`, { flag: 'wx', mode: 0o444 });
+  return receipt.exitCode;
+}
+
 export function main(args, environment) {
   need(args.length === 1 && ACTIONS.has(args[0]), 'usage: migrator info|validate|migrate');
   const baked = readFileSync('/opt/aura/payload.sha256', 'utf8').trim();
@@ -47,12 +77,17 @@ export function main(args, environment) {
   const invocation = migrationInvocation({ action: args[0], root: '/opt/aura/migrations', digest: baked,
     host: environment.AURA_DB_HOST, port: environment.AURA_DB_PORT, database: environment.AURA_DB_NAME,
     user: environment.AURA_DB_USER, password, sslMode: environment.AURA_DB_SSL_MODE, home });
+  need(/^[1-9][0-9]*$/.test(environment.AURA_DEPLOYMENT_GENERATION ?? ''), 'canonical deployment generation required');
+  const evidence = beginMigrationEvidence(environment.AURA_MIGRATION_EVIDENCE_DIR, {
+    deploymentId: environment.AURA_DEPLOYMENT_ID, generation: Number(environment.AURA_DEPLOYMENT_GENERATION),
+    action: args[0], payloadSha256: baked, host: environment.AURA_DB_HOST,
+    port: Number(environment.AURA_DB_PORT), database: environment.AURA_DB_NAME,
+  });
   const result = spawnSync(invocation.executable, invocation.args, {
     cwd: invocation.cwd, env: invocation.env, stdio: ['ignore', 'inherit', 'inherit'],
   });
-  if (result.error) throw new Error('Flyway runtime could not be launched');
-  // A signal or missing exit status must never appear as successful migration.
-  return Number.isInteger(result.status) ? result.status : 1;
+  // Launch failures and signals are failures with immutable evidence, never success.
+  return finishMigrationEvidence(evidence, result);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

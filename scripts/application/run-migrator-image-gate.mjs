@@ -2,7 +2,7 @@
 /** Linux-only synthetic migrator lifecycle gate. Retains all containers and evidence. */
 import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,11 +114,25 @@ export async function runGate(options) {
     const scenario = (name, version, action, database = 'rf_migrator', expected = 0, text = '', assertion) => {
       const image = summary.images[`v${version}`];
       const env = join(root, `${name}.env`);
-      writeFileSync(env, `AURA_DB_HOST=${db}\nAURA_DB_PORT=5432\nAURA_DB_NAME=${database}\nAURA_DB_USER=rf_migrator\nAURA_DB_SSL_MODE=disable\nAURA_DB_PASSWORD_FILE=/run/db-password\nAURA_MIGRATION_PAYLOAD_SHA256=${name === 'digest-denied' ? 'invalid' : image.payloadSha256}\n`, { mode: 0o600 });
+      const executionRoot = join(root, `${name}-execution`);
+      mkdirSync(executionRoot); chmodSync(executionRoot, 0o777); // Owned mount for the unprivileged container; contains no credentials.
+      writeFileSync(env, `AURA_DEPLOYMENT_ID=01ARZ3NDEKTSV4RRFFQ69G5FAV\nAURA_DEPLOYMENT_GENERATION=1\nAURA_MIGRATION_EVIDENCE_DIR=/evidence/run\nAURA_DB_HOST=${db}\nAURA_DB_PORT=5432\nAURA_DB_NAME=${database}\nAURA_DB_USER=rf_migrator\nAURA_DB_SSL_MODE=disable\nAURA_DB_PASSWORD_FILE=/run/db-password\nAURA_MIGRATION_PAYLOAD_SHA256=${name === 'digest-denied' ? 'invalid' : image.payloadSha256}\n`, { mode: 0o600 });
       const output = command(name, 'docker', ['run', '--name', `${prefix}-${name}`, '--network', network, '--read-only',
         '--tmpfs', '/tmp:rw,nosuid,size=128m', '--memory', '512m', '--cpus', '1', '--env-file', env,
+        '--mount', `type=bind,src=${executionRoot},dst=/evidence`,
         '--mount', `type=bind,src=${join(privateState, 'db-password')},dst=/run/db-password,readonly`, image.image, action], expected);
       need(!text || output.includes(text), `${name}: expected failure reason missing`);
+      if (expected === 0 || name === 'legacy-denied') {
+        const startedBytes = readFileSync(join(executionRoot, 'run/started.json'));
+        const started = JSON.parse(startedBytes);
+        const outcome = JSON.parse(readFileSync(join(executionRoot, 'run/result.json')));
+        need(started.deploymentId === '01ARZ3NDEKTSV4RRFFQ69G5FAV' && started.generation === 1
+          && started.action === action && started.payloadSha256 === image.payloadSha256
+          && started.database.name === database && started.database.host === db, `${name}: execution context mismatch`);
+        need(outcome.startedDigest === `sha256:${hash(startedBytes)}` && outcome.exitCode === expected
+          && outcome.state === (expected === 0 ? 'succeeded' : 'failed'), `${name}: execution outcome mismatch`);
+      }
+
       if (assertion) {
         const actual = sql(database, assertion.query); writeFileSync(join(root, `${name}.db.txt`), `${actual}\n`);
         need(actual === assertion.expected, `${name}: database assertion failed`);

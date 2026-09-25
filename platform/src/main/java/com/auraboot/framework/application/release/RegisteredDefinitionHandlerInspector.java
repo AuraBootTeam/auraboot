@@ -35,7 +35,7 @@ public class RegisteredDefinitionHandlerInspector {
     public record Finding(String componentKey, String code) {}
     public record ReleaseObservation(String releaseId, String releaseDigest, long handlerGeneration,
                                      List<Result> definitions, List<UnobservedComponent> unobservedComponents,
-                                     List<Finding> findings) {}
+                                     List<Finding> findings, List<HandlerContractInspector.Capability> capabilities) {}
 
     public ReleaseObservation inspectRelease(String releaseId, String expectedReleaseDigest,
                                               java.util.Map<String, Path> definitionArtifacts) throws IOException {
@@ -67,9 +67,20 @@ public class RegisteredDefinitionHandlerInspector {
             result.unobservedRequirements().forEach(requirement -> findings.add(new Finding(key,
                     "capability-unobserved:" + requirement.kind() + ":" + requirement.key() + ":" + requirement.contract())));
         }
+        var capabilities = new java.util.TreeMap<String, HandlerContractInspector.Capability>();
+        for (var definition : definitions) {
+            for (var capability : definition.handlerObservation().observation().capabilities()) {
+                String identity = mapper.writeValueAsString(List.of(capability.kind(), capability.key(), capability.contract()));
+                var previous = capabilities.putIfAbsent(identity, capability);
+                if (previous != null && !previous.equals(capability)) {
+                    findings.add(new Finding(definition.componentKey(), "release-handler-provider-conflict"));
+                }
+            }
+        }
         if (handlers.currentGeneration() != generation) findings.add(new Finding(null, "release-handler-generation-changed"));
         return new ReleaseObservation(releaseId, expectedReleaseDigest, generation,
-                List.copyOf(definitions), List.copyOf(unobserved), List.copyOf(findings));
+                List.copyOf(definitions), List.copyOf(unobserved), List.copyOf(findings),
+                findings.isEmpty() ? List.copyOf(capabilities.values()) : List.of());
     }
 
     public Result inspect(String releaseId, String expectedReleaseDigest, String componentKey, Path artifactDirectory) throws IOException {

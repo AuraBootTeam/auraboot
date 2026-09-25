@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { inventoryPackage } from './schema-ownership-audit.mjs';
 import { stagePayload } from './migration-payload.mjs';
-import { main, migrationInvocation } from './migrator-entrypoint.mjs';
+import { main, migrationInvocation, beginMigrationEvidence, finishMigrationEvidence } from './migrator-entrypoint.mjs';
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'migrator-source-'));
@@ -61,5 +61,36 @@ test('payload drift and connection option injection are rejected', () => {
     { port: '5432 -cleanDisabled=false' }, { port: 65536 }, { user: 'bad\nuser' },
     { password: '' }, { sslMode: 'prefer' }, { home: 'relative' }]) {
     assert.throws(() => migrationInvocation({ ...input, ...override }));
+  }
+});
+
+
+test('migration evidence binds the target and preserves failure without exposing credentials', () => {
+  const input = fixture();
+  for (const result of [{ status: 0 }, { status: 9 }, { status: null, signal: 'SIGTERM' }, { status: 0, signal: 'SIGTERM' }, { status: null, error: new Error('fixture-secret') }]) {
+    const directory = join(mkdtempSync(join(tmpdir(), 'migration-evidence-')), 'execution');
+    const identity = { deploymentId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', generation: 2, action: input.action,
+      payloadSha256: input.digest, host: input.host, port: Number(input.port), database: input.database, password: input.password };
+    const evidence = beginMigrationEvidence(directory, identity);
+    const started = JSON.parse(readFileSync(join(directory, 'started.json')));
+    assert.equal(started.deploymentId, identity.deploymentId); assert.equal(started.generation, 2);
+    assert.equal(started.payloadSha256, input.digest); assert.equal(started.database.name, input.database);
+    assert.throws(() => beginMigrationEvidence(directory, identity), /EEXIST/);
+    const status = finishMigrationEvidence(evidence, result);
+    const raw = readFileSync(join(directory, 'result.json'), 'utf8');
+    const receipt = JSON.parse(raw);
+    assert.equal(receipt.startedDigest, evidence.startedDigest);
+    assert.equal(receipt.state, result.status === 0 && !result.signal ? 'succeeded' : 'failed');
+    assert.equal(status, result.status === 0 && !result.signal ? 0 : result.status === 9 ? 9 : 1);
+    assert.equal(raw.includes(input.password), false); assert.equal(JSON.stringify(started).includes(input.password), false);
+    assert.throws(() => finishMigrationEvidence(evidence, { status: 0 }), /EEXIST/);
+  }
+});
+
+test('missing deployment context cannot reserve an execution receipt', () => {
+  const directory = join(mkdtempSync(join(tmpdir(), 'migration-evidence-')), 'execution');
+  for (const identity of [{}, { deploymentId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', generation: true },
+    { deploymentId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', generation: 9007199254740992 }]) {
+    assert.throws(() => beginMigrationEvidence(directory, identity), /deployment identity/);
   }
 });

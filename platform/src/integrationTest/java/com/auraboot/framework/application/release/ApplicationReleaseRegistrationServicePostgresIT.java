@@ -215,6 +215,9 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertEquals(List.of("definition-a", "definition-b"), aggregate.definitions().stream().map(RegisteredDefinitionHandlerInspector.Result::componentKey).toList());
                 assertTrue(aggregate.findings().isEmpty());
                 assertTrue(aggregate.unobservedComponents().isEmpty());
+                assertEquals(1, aggregate.capabilities().size());
+                assertEquals(List.of(jarDigest), aggregate.capabilities().getFirst().providerDigests());
+                assertThrows(UnsupportedOperationException.class, () -> aggregate.capabilities().clear());
                 verifyRegisteredCapabilityCli(jdbc, aggregateRelease, aggregate, jarDigest, true);
                 assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory)));
                 assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory, "definition-b", directory, "extra", directory)));
@@ -222,9 +225,27 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                         List.of(firstDefinition, secondDefinition, new Component("asset-c", "asset", "1.0.0", "sha256:" + "e".repeat(64), handlerOnly))), "test:publisher");
                 var partial = inspector.inspectRelease(withAsset.releaseId(), withAsset.digest(), artifactMap);
                 assertEquals("asset-c", partial.unobservedComponents().getFirst().key());
+                assertTrue(partial.capabilities().isEmpty());
                 assertEquals(List.of(new RegisteredDefinitionHandlerInspector.Finding("asset-c", "component-type-unobserved")), partial.findings());
                 var webPending = inspector.inspectRelease(registered.releaseId(), registered.digest(), java.util.Map.of("pinned-definition", directory));
                 assertEquals(List.of(new RegisteredDefinitionHandlerInspector.Finding("pinned-definition", "capability-unobserved:web:fixture:page:page-v1")), webPending.findings());
+                assertTrue(webPending.capabilities().isEmpty());
+                var changingHandlers = new HandlerContractInspector(registry, manager) {
+                    private boolean changed;
+                    @Override public DefinitionArtifactObservation observeDefinitionArtifact(java.nio.file.Path path,
+                            String digest, List<Requirement> requirements) throws java.io.IOException {
+                        var observed = super.observeDefinitionArtifact(path, digest, requirements);
+                        if (!changed) { changed = true; manager.stopPlugin("registry-fixture"); }
+                        return observed;
+                    }
+                };
+                var mixed = new RegisteredDefinitionHandlerInspector(jdbc, mapper, changingHandlers)
+                        .inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), artifactMap);
+                assertFalse(mixed.definitions().getFirst().handlerObservation().observation().capabilities().isEmpty());
+                assertTrue(mixed.findings().stream().anyMatch(f -> f.code().equals("release-handler-generation-changed")));
+                assertTrue(mixed.capabilities().isEmpty());
+                verifyRegisteredCapabilityCli(jdbc, aggregateRelease, mixed, jarDigest, false);
+                assertEquals(org.pf4j.PluginState.STARTED, manager.startPlugin("registry-fixture"));
 
                 assertEquals(org.pf4j.PluginState.STOPPED, manager.stopPlugin("registry-fixture"));
                 var stopped = inspector.inspect(registered.releaseId(), registered.digest(), "pinned-definition", directory);
@@ -294,9 +315,7 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         deployment.putObject("platformRelease").put("releaseId", platform.releaseId()).put("digest", platform.digest());
         deployment.set("platformContracts", contracts.deepCopy());
         deployment.putArray("supportedApplications").addObject().put("application", "aura-edu").putArray("compatibilityEpochs").add(1);
-        var capabilities = observation.definitions().stream()
-                .flatMap(result -> result.handlerObservation().observation().capabilities().stream()).distinct().toList();
-        deployment.set("capabilities", mapper.valueToTree(capabilities));
+        deployment.set("capabilities", mapper.valueToTree(observation.capabilities()));
         var expected = mapper.createObjectNode().put("applicationReleaseDigest", application.digest())
                 .put("platformReleaseDigest", platform.digest()).put("requirementsDigest", digestBytes(java.nio.file.Files.readAllBytes(reqFile)))
                 .put("deploymentId", "01ARZ3NDEKTSV4RRFFQ69G5FAV").put("generation", 1);
