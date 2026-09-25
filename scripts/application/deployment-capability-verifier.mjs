@@ -8,6 +8,23 @@ const ajv = new Ajv({ allErrors: true, strict: true });
 const compile = name => ajv.compile(JSON.parse(readFileSync(new URL(`../../distribution/application/${name}.schema.json`, import.meta.url), 'utf8')));
 const requirementsSchema = compile('application-release-requirements');
 const capabilitiesSchema = compile('deployment-capabilities');
+const lockSchema = JSON.parse(readFileSync(new URL('../../distribution/application/application-lock.schema.json', import.meta.url), 'utf8'));
+const platformArtifacts = structuredClone(lockSchema.properties.artifacts);
+delete platformArtifacts.items.properties.localPath;
+const platformSchema = ajv.compile({
+  type: 'object', additionalProperties: false,
+  required: ['schemaVersion', 'releaseId', 'platform', 'version', 'sourceLockIdentity', 'platformContracts', 'artifacts'],
+  definitions: lockSchema.definitions,
+  properties: {
+    schemaVersion: { const: 1 },
+    releaseId: { type: 'string', pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' },
+    platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,99}$' },
+    version: { type: 'string', minLength: 1 },
+    sourceLockIdentity: { $ref: '#/definitions/digest' },
+    platformContracts: { $ref: 'https://auraboot.com/schemas/deployment-capabilities.schema.json#/properties/platformContracts' },
+    artifacts: platformArtifacts,
+  },
+});
 const sha256 = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const identity = capability => JSON.stringify([capability.kind, capability.key, capability.contract]);
 function validate(schema, value, label) {
@@ -66,18 +83,45 @@ export function verifyDeploymentCapabilities(requirementsBytes, deploymentBytes,
 }
 
 /** Registered mode derives the entire declared requirement set before checking capabilities. */
-export function verifyRegisteredDeploymentCapabilities(manifestBytes, deploymentBytes, expected) {
+export function verifyRegisteredDeploymentCapabilities(manifestBytes, platformBytes, deploymentBytes, expected) {
+  if (!Buffer.isBuffer(platformBytes) || !/^sha256:[0-9a-f]{64}$/.test(expected?.platformReleaseDigest ?? '')
+      || sha256(platformBytes) !== expected.platformReleaseDigest) throw new Error('Platform release bytes differ from externally pinned digest');
+  const platform = JSON.parse(platformBytes.toString());
+  validate(platformSchema, platform, 'Platform release');
+  const immutable = value => value.trim() && !/(snapshot|latest|workspace|branch)/i.test(value);
+  if (!immutable(platform.version)) throw new Error('Immutable platform version required');
+  unique(platform.artifacts.map(item => JSON.stringify([item.type, item.id])), 'Platform artifacts');
+  for (const artifact of platform.artifacts) {
+    if (!artifact.id.trim() || !immutable(artifact.version) || !artifact.source.repository.trim()
+        || !/^(maven|npm|oci|artifact):.+/s.test(artifact.uri)) throw new Error('Invalid platform artifact identity');
+  }
+  for (const dimension of ['runtime', 'pluginApi']) {
+    if (platform.platformContracts[dimension].some(value => !value.trim())) throw new Error('Blank platform contract');
+  }
   const requirements = extractApplicationReleaseRequirements(manifestBytes, expected?.applicationReleaseDigest);
   const bytes = Buffer.from(`${JSON.stringify(requirements, null, 2)}\n`);
-  return verifyDeploymentCapabilities(bytes, deploymentBytes, expected);
+  const result = verifyDeploymentCapabilities(bytes, deploymentBytes, expected);
+  if (result.platformRelease.releaseId !== platform.releaseId) throw new Error('Registered platform release ID mismatch');
+  const deployment = JSON.parse(deploymentBytes.toString());
+  for (const dimension of ['runtime', 'pluginApi', 'dslSchema']) {
+    for (const contract of deployment.platformContracts[dimension]) {
+      if (!platform.platformContracts[dimension].includes(contract)) {
+        result.findings.push({ code: 'platform-contract-not-registered', dimension, contract });
+      }
+    }
+  }
+  result.capabilitiesSatisfied = result.findings.length === 0;
+  return result;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const registered = process.argv[2] === '--registered';
   const args = process.argv.slice(registered ? 3 : 2);
-  if (args.length !== 3) throw new Error('Usage: node deployment-capability-verifier.mjs [--registered] <requirements-or-registered-manifest.json> <capabilities.json> <expected-identities.json>');
-  const verify = registered ? verifyRegisteredDeploymentCapabilities : verifyDeploymentCapabilities;
-  const result = verify(readFileSync(args[0]), readFileSync(args[1]), JSON.parse(readFileSync(args[2], 'utf8')));
+  if (args.length !== (registered ? 4 : 3)) throw new Error('Usage: node deployment-capability-verifier.mjs [--registered <application-manifest.json> <platform-manifest.json> | <requirements.json>] <capabilities.json> <expected-identities.json>');
+  const expected = JSON.parse(readFileSync(args.at(-1), 'utf8'));
+  const result = registered
+    ? verifyRegisteredDeploymentCapabilities(readFileSync(args[0]), readFileSync(args[1]), readFileSync(args[2]), expected)
+    : verifyDeploymentCapabilities(readFileSync(args[0]), readFileSync(args[1]), expected);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (!result.capabilitiesSatisfied) process.exitCode = 1;
 }

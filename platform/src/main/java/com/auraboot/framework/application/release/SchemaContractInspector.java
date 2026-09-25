@@ -21,6 +21,34 @@ public class SchemaContractInspector {
     public record Contract(String schema, String table, List<Column> columns, List<Constraint> constraints) {}
     public record Observation(boolean satisfied, List<String> findings) {}
 
+    public record BatchObservation(String catalogSnapshot, java.util.Map<String, Observation> observations, boolean satisfied) {}
+
+    /** One read-only MVCC snapshot for all named contracts; not a deployment generation. */
+    public BatchObservation inspectAll(java.util.Map<String, Contract> contracts) {
+        if (contracts == null || contracts.isEmpty()) throw new IllegalArgumentException("Explicit nonempty schema contract set required");
+        var frozen = new java.util.TreeMap<String, Contract>();
+        contracts.forEach((key, contract) -> {
+            if (key == null || key.isBlank() || contract == null || contract.columns() == null || contract.constraints() == null) {
+                throw new IllegalArgumentException("Named schema contracts required");
+            }
+            frozen.put(key, new Contract(contract.schema(), contract.table(), List.copyOf(contract.columns()), List.copyOf(contract.constraints())));
+        });
+        var manager = new org.springframework.jdbc.datasource.DataSourceTransactionManager(
+                java.util.Objects.requireNonNull(jdbc.getDataSource()));
+        manager.setEnforceReadOnly(true);
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(manager);
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        transaction.setReadOnly(true);
+        return transaction.execute(status -> {
+            String snapshot = jdbc.queryForObject("SELECT pg_current_snapshot()::text", String.class);
+            var observations = new java.util.LinkedHashMap<String, Observation>();
+            frozen.forEach((key, contract) -> observations.put(key, inspect(contract)));
+            return new BatchObservation(snapshot, java.util.Collections.unmodifiableMap(observations),
+                    observations.values().stream().allMatch(Observation::satisfied));
+        });
+    }
+
     public Observation inspect(Contract contract) {
         if (contract == null || contract.schema() == null || contract.schema().isBlank()
                 || contract.table() == null || contract.table().isBlank()

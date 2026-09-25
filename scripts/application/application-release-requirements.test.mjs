@@ -15,6 +15,12 @@ function fixture() {
       compatibilityContract: { schemaVersion: 1, requiredCapabilities: [requirement] } })) };
 }
 function extract(value) { const bytes = Buffer.from(JSON.stringify(value)); return extractApplicationReleaseRequirements(bytes, hash(bytes)); }
+function platformFixture() {
+  return { schemaVersion: 1, releaseId: id, platform: 'auraboot', version: '1.0.0', sourceLockIdentity: digest,
+    platformContracts: { runtime: ['v1'], pluginApi: ['v1'], dslSchema: [1] },
+    artifacts: [{ type: 'runtime', id: 'core', version: '1.0.0', uri: 'artifact:core', digest,
+      source: { repository: 'core', commit: 'a'.repeat(40) } }] };
+}
 test('extracts every component requirement with exact registered release identity', () => {
   const value = fixture(); const result = extract(value);
   assert.deepEqual(result.requiredCapabilities, [handler, web]);
@@ -53,14 +59,15 @@ test('requires externally pinned raw bytes before extracting any requirement', (
 });
 test('feeds the capability verifier and missing component requirement blocks compatibility', () => {
   const manifest = Buffer.from(JSON.stringify(fixture()));
+  const platform = Buffer.from(JSON.stringify(platformFixture()));
   const requirements = extractApplicationReleaseRequirements(manifest, hash(manifest));
-  const deployment = { schemaVersion: 1, deploymentId: id, generation: 1, platformRelease: { releaseId: id, digest },
+  const deployment = { schemaVersion: 1, deploymentId: id, generation: 1, platformRelease: { releaseId: id, digest: hash(platform) },
     platformContracts: { runtime: ['v1'], pluginApi: ['v1'], dslSchema: [1] }, supportedApplications: [{ application: 'aura-edu', compatibilityEpochs: [1] }],
     capabilities: [handler, web].map(item => ({ ...item, providerDigests: [digest] })) };
   function verify() {
     const req = Buffer.from(`${JSON.stringify(requirements, null, 2)}\n`), dep = Buffer.from(JSON.stringify(deployment));
-    return verifyRegisteredDeploymentCapabilities(manifest, dep, { requirementsDigest: hash(req), deploymentDigest: hash(dep), applicationReleaseDigest: requirements.applicationRelease.digest,
-      platformReleaseDigest: digest, deploymentId: id, generation: 1 });
+    return verifyRegisteredDeploymentCapabilities(manifest, platform, dep, { requirementsDigest: hash(req), deploymentDigest: hash(dep), applicationReleaseDigest: requirements.applicationRelease.digest,
+      platformReleaseDigest: hash(platform), deploymentId: id, generation: 1 });
   }
   assert.equal(verify().capabilitiesSatisfied, true);
   deployment.capabilities.pop();
@@ -77,21 +84,55 @@ test('registered CLI emits the complete decision and returns failure for missing
   const dir = mkdtempSync(join(tmpdir(), 'registered-requirements-'));
   try {
     const manifest = Buffer.from(JSON.stringify(fixture()));
+    const platform = Buffer.from(JSON.stringify(platformFixture()));
+    writeFileSync(join(dir, 'platform.json'), platform);
     writeFileSync(join(dir, 'manifest.json'), manifest);
     const compiler = spawnSync(process.execPath, ['scripts/application/application-release-requirements.mjs', join(dir, 'manifest.json'), hash(manifest)], { encoding: 'utf8' });
     assert.equal(compiler.status, 0, compiler.stderr);
     assert.deepEqual(JSON.parse(compiler.stdout).requiredCapabilities, [handler, web]);
-    const deployment = { schemaVersion: 1, deploymentId: id, generation: 1, platformRelease: { releaseId: id, digest },
+    const deployment = { schemaVersion: 1, deploymentId: id, generation: 1, platformRelease: { releaseId: id, digest: hash(platform) },
       platformContracts: { runtime: ['v1'], pluginApi: ['v1'], dslSchema: [1] }, supportedApplications: [{ application: 'aura-edu', compatibilityEpochs: [1] }],
       capabilities: [handler, web].map(item => ({ ...item, providerDigests: [digest] })) };
     function run() {
       const bytes = JSON.stringify(deployment);
       writeFileSync(join(dir, 'deployment.json'), bytes);
-      writeFileSync(join(dir, 'expected.json'), JSON.stringify({ requirementsDigest: hash(compiler.stdout), deploymentDigest: hash(bytes), applicationReleaseDigest: hash(manifest), platformReleaseDigest: digest, deploymentId: id, generation: 1 }));
-      return spawnSync(process.execPath, ['scripts/application/deployment-capability-verifier.mjs', '--registered', join(dir, 'manifest.json'), join(dir, 'deployment.json'), join(dir, 'expected.json')], { encoding: 'utf8' });
+      writeFileSync(join(dir, 'expected.json'), JSON.stringify({ requirementsDigest: hash(compiler.stdout), deploymentDigest: hash(bytes), applicationReleaseDigest: hash(manifest), platformReleaseDigest: hash(platform), deploymentId: id, generation: 1 }));
+      return spawnSync(process.execPath, ['scripts/application/deployment-capability-verifier.mjs', '--registered', join(dir, 'manifest.json'), join(dir, 'platform.json'), join(dir, 'deployment.json'), join(dir, 'expected.json')], { encoding: 'utf8' });
     }
     const good = run(); assert.equal(good.status, 0, good.stderr); assert.equal(JSON.parse(good.stdout).capabilitiesSatisfied, true);
     deployment.capabilities.pop();
     const denied = run(); assert.equal(denied.status, 1, denied.stderr); assert.deepEqual(JSON.parse(denied.stdout).findings, [{ code: 'required-capability-missing', ...web }]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+ test('registered mode binds platform bytes, ID, schema and every declared contract dimension', () => {
+  const manifest = Buffer.from(JSON.stringify(fixture()));
+  const requirements = extractApplicationReleaseRequirements(manifest, hash(manifest));
+  function verify(platform, mutate = () => {}, pin) {
+    const bytes = Buffer.from(JSON.stringify(platform));
+    const deployment = { schemaVersion: 1, deploymentId: id, generation: 1,
+      platformRelease: { releaseId: id, digest: hash(bytes) },
+      platformContracts: { runtime: ['v1'], pluginApi: ['v1'], dslSchema: [1] },
+      supportedApplications: [{ application: 'aura-edu', compatibilityEpochs: [1] }],
+      capabilities: [handler, web].map(item => ({ ...item, providerDigests: [digest] })) };
+    mutate(deployment);
+    const dep = Buffer.from(JSON.stringify(deployment));
+    return verifyRegisteredDeploymentCapabilities(manifest, bytes, dep, {
+      requirementsDigest: hash(Buffer.from(`${JSON.stringify(requirements, null, 2)}\n`)),
+      deploymentDigest: hash(dep), applicationReleaseDigest: hash(manifest), platformReleaseDigest: pin ?? hash(bytes), deploymentId: id, generation: 1 });
+  }
+  assert.equal(verify(platformFixture()).capabilitiesSatisfied, true);
+  assert.throws(() => verify(platformFixture(), () => {}, digest), /pinned digest/);
+  assert.throws(() => verify(platformFixture(), d => { d.platformRelease.releaseId = '01ARZ3NDEKTSV4RRFFQ69G5FAW'; }), /release ID mismatch/);
+  for (const dimension of ['runtime', 'pluginApi', 'dslSchema']) {
+    const extra = dimension === 'dslSchema' ? 2 : 'v2';
+    const result = verify(platformFixture(), d => d.platformContracts[dimension].push(extra));
+    assert.equal(result.capabilitiesSatisfied, false);
+    assert.deepEqual(result.findings, [{ code: 'platform-contract-not-registered', dimension, contract: extra }]);
+  }
+  for (const mutate of [p => { p.artifacts = []; }, p => { p.artifacts.push(p.artifacts[0]); },
+    p => { p.artifacts[0].localPath = '/tmp/core'; }, p => { p.version = 'latest'; },
+    p => { p.artifacts[0].source.commit = 'main'; }, p => { p.extra = true; }]) {
+    const platform = platformFixture(); mutate(platform); assert.throws(() => verify(platform));
+  }
 });

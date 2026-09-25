@@ -41,9 +41,14 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                     "V20260925040000__application_release_registration_keys.sql",
                     "V20260925040100__application_release_registration_actors.sql",
                     "V20260925040200__application_creation_actors.sql",
-                    "V20260926010000__immutable_platform_release_registry.sql")) {
+                    "V20260926010000__immutable_platform_release_registry.sql",
+                    "V20260926020000__platform_artifact_coordinate_guard.sql")) {
                 try (var migration = getClass().getResourceAsStream("/db/migration/core/" + name)) {
-                    assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
+                    assertNotNull(migration);
+                    String sql = new String(migration.readAllBytes(), StandardCharsets.UTF_8);
+                    new org.springframework.transaction.support.TransactionTemplate(
+                            new org.springframework.jdbc.datasource.DataSourceTransactionManager(source))
+                            .executeWithoutResult(status -> jdbc.execute(sql));
                 }
             }
             jdbc.update("INSERT INTO ab_application(code,name) VALUES ('historical-app','Historical')");
@@ -210,6 +215,7 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertEquals(List.of("definition-a", "definition-b"), aggregate.definitions().stream().map(RegisteredDefinitionHandlerInspector.Result::componentKey).toList());
                 assertTrue(aggregate.findings().isEmpty());
                 assertTrue(aggregate.unobservedComponents().isEmpty());
+                verifyRegisteredCapabilityCli(jdbc, aggregateRelease, aggregate, jarDigest, true);
                 assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory)));
                 assertThrows(IllegalArgumentException.class, () -> inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), java.util.Map.of("definition-a", directory, "definition-b", directory, "extra", directory)));
                 var withAsset = service.register("aura-edu", "aggregate-unobserved", new Content(1, "aggregate-asset", content.sourceLockIdentity(), content.platformCompatibility(),
@@ -225,6 +231,7 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertTrue(stopped.handlerObservation().observation().capabilities().isEmpty());
                 var stoppedAggregate = inspector.inspectRelease(aggregateRelease.releaseId(), aggregateRelease.digest(), artifactMap);
                 assertEquals(2, stoppedAggregate.findings().size());
+                verifyRegisteredCapabilityCli(jdbc, aggregateRelease, stoppedAggregate, jarDigest, false);
                 assertTrue(stoppedAggregate.findings().stream().allMatch(f -> f.code().contains("primary-handler-missing")));
 
                 assertTrue(stopped.handlerObservation().observation().findings().stream().anyMatch(f -> f.contains("primary-handler-missing")));
@@ -258,6 +265,88 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             }
         }
     }
+    private static void verifyRegisteredCapabilityCli(JdbcTemplate jdbc, Registration application,
+            RegisteredDefinitionHandlerInspector.ReleaseObservation observation, String jarDigest, boolean available) throws Exception {
+        var mapper = new ObjectMapper();
+        var contracts = mapper.createObjectNode();
+        contracts.putArray("runtime").add("v1"); contracts.putArray("pluginApi").add("v1"); contracts.putArray("dslSchema").add(1);
+        var platformService = new PlatformReleaseRegistrationService(jdbc, mapper);
+        var platform = platformService.register("observed-platform", new PlatformReleaseRegistrationService.Content(
+                "1.0.0", "sha256:" + "a".repeat(64), contracts,
+                List.of(new PlatformReleaseRegistrationService.Artifact("plugin", "registry-fixture", "1.0.0",
+                        "artifact:registry-fixture/1.0.0", jarDigest,
+                        new PlatformReleaseRegistrationService.Source("core", "a".repeat(40))))), "test:observation");
+        var evidence = java.nio.file.Path.of(required("AURA_EVIDENCE_ROOT"), "migrator-runtime",
+                "registered-capability-chain-" + UUID.randomUUID());
+        java.nio.file.Files.createDirectories(evidence);
+        var appFile = evidence.resolve("application.json");
+        var platformFile = evidence.resolve("platform.json");
+        // Re-read the database's exact raw bytes; do not reconstruct a manifest from DTOs.
+        java.nio.file.Files.writeString(appFile, jdbc.queryForObject(
+                "SELECT manifest_text FROM ab_application_release WHERE release_id=?", String.class, application.releaseId()));
+        java.nio.file.Files.writeString(platformFile, jdbc.queryForObject(
+                "SELECT manifest_text FROM ab_platform_release_registry WHERE release_id=?", String.class, platform.releaseId()));
+        var reqFile = evidence.resolve("requirements.json");
+        runNode(evidence, "extract", reqFile, 0, "../scripts/application/application-release-requirements.mjs",
+                appFile.toString(), application.digest());
+        var deployment = mapper.createObjectNode().put("schemaVersion", 1)
+                .put("deploymentId", "01ARZ3NDEKTSV4RRFFQ69G5FAV").put("generation", 1);
+        deployment.putObject("platformRelease").put("releaseId", platform.releaseId()).put("digest", platform.digest());
+        deployment.set("platformContracts", contracts.deepCopy());
+        deployment.putArray("supportedApplications").addObject().put("application", "aura-edu").putArray("compatibilityEpochs").add(1);
+        var capabilities = observation.definitions().stream()
+                .flatMap(result -> result.handlerObservation().observation().capabilities().stream()).distinct().toList();
+        deployment.set("capabilities", mapper.valueToTree(capabilities));
+        var expected = mapper.createObjectNode().put("applicationReleaseDigest", application.digest())
+                .put("platformReleaseDigest", platform.digest()).put("requirementsDigest", digestBytes(java.nio.file.Files.readAllBytes(reqFile)))
+                .put("deploymentId", "01ARZ3NDEKTSV4RRFFQ69G5FAV").put("generation", 1);
+        for (String scenario : available ? List.of("observed", "wrong-platform", "extra-contract") : List.of("stopped")) {
+            var candidate = deployment.deepCopy();
+            if (scenario.equals("wrong-platform")) ((com.fasterxml.jackson.databind.node.ObjectNode) candidate.path("platformRelease"))
+                    .put("releaseId", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            if (scenario.equals("extra-contract")) ((com.fasterxml.jackson.databind.node.ObjectNode) candidate.path("platformContracts"))
+                    .withArray("runtime").add("undeclared-v2");
+            var depFile = evidence.resolve(scenario + "-deployment.json");
+            var pinFile = evidence.resolve(scenario + "-expected.json");
+            var output = evidence.resolve(scenario + "-result.json");
+            java.nio.file.Files.writeString(depFile, candidate.toString());
+            expected.put("deploymentDigest", digestBytes(java.nio.file.Files.readAllBytes(depFile)));
+            java.nio.file.Files.writeString(pinFile, expected.toString());
+            runNode(evidence, scenario, output, scenario.equals("observed") ? 0 : 1,
+                    "../scripts/application/deployment-capability-verifier.mjs", "--registered", appFile.toString(),
+                    platformFile.toString(), depFile.toString(), pinFile.toString());
+            if (scenario.equals("wrong-platform")) {
+                assertTrue(java.nio.file.Files.readString(evidence.resolve(scenario + ".stderr")).contains("release ID mismatch"));
+                continue;
+            }
+            var result = mapper.readTree(java.nio.file.Files.readString(output));
+            assertEquals(scenario.equals("observed"), result.path("capabilitiesSatisfied").asBoolean());
+            assertFalse(result.has("admitted"));
+            if (scenario.equals("observed")) assertEquals(jarDigest, result.path("resolved").get(0).path("providerDigests").get(0).asText());
+            else assertEquals(scenario.equals("stopped") ? "required-capability-missing" : "platform-contract-not-registered",
+                    result.path("findings").get(0).path("code").asText());
+        }
+        java.nio.file.Files.writeString(evidence.resolve("scope.json"), mapper.createObjectNode()
+                .put("applicationReleaseId", application.releaseId()).put("platformReleaseId", platform.releaseId())
+                .put("handlerGeneration", observation.handlerGeneration()).put("pluginAvailable", available)
+                .put("deploymentIdentityIsFixture", true).put("admissionVerified", false).toPrettyString());
+    }
+
+    private static String digestBytes(byte[] bytes) throws Exception {
+        return "sha256:" + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    }
+
+    private static void runNode(java.nio.file.Path evidence, String name, java.nio.file.Path output,
+            int expectedExit, String... args) throws Exception {
+        var command = new java.util.ArrayList<String>(); command.add("node"); command.addAll(List.of(args));
+        var process = new ProcessBuilder(command).redirectOutput(output.toFile())
+                .redirectError(evidence.resolve(name + ".stderr").toFile()).start();
+        if (!process.waitFor(20, TimeUnit.SECONDS)) {
+            process.destroyForcibly(); fail("Owned Node verifier timed out: " + name);
+        }
+        assertEquals(expectedExit, process.exitValue(), () -> "Node verifier exit mismatch: " + name + "; evidence=" + evidence);
+    }
+
     private static void verifyPrivateLoginPool(DriverManagerDataSource source, String schema) throws Exception {
         var jdbc = new JdbcTemplate(source);
         String suffix = UUID.randomUUID().toString().replace("-", "");
@@ -313,6 +402,15 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                         "1.0.0", "sha256:" + "b".repeat(64), contracts, List.of(artifact)), "test:pool");
                 assertEquals("test:pool", jdbc.queryForObject("SELECT registered_by FROM ab_platform_release_registry WHERE release_id=?",
                         String.class, registered.releaseId()));
+                var conflict = new PlatformReleaseRegistrationService.Artifact("runtime", "core", "1.0.0",
+                        "artifact:core", "sha256:" + "c".repeat(64), artifact.source());
+                assertThrows(PlatformReleaseRegistrationService.ArtifactCoordinateConflictException.class,
+                        () -> platform.register("pool-platform", new PlatformReleaseRegistrationService.Content(
+                                "2.0.0", "sha256:" + "b".repeat(64), contracts, List.of(conflict)), "test:conflict"));
+                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code='pool-platform'", Integer.class));
+                platform.register("pool-platform", new PlatformReleaseRegistrationService.Content(
+                        "2.0.0", "sha256:" + "b".repeat(64), contracts, List.of(artifact)), "test:reuse");
+                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code='pool-platform'", Integer.class));
             } finally { platform.close(); }
             jdbc.execute("GRANT UPDATE(name) ON ab_application TO " + registrar);
             var columnFailure = assertThrows(IllegalStateException.class,

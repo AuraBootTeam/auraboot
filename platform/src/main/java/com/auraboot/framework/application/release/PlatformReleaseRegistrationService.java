@@ -103,10 +103,27 @@ public class PlatformReleaseRegistrationService {
             request.put("releaseId", id);
             String raw = canonical(request).toString();
             String digest = digest(raw);
-            jdbc.update("INSERT INTO ab_platform_release_registry(release_id,platform_code,version,source_lock_identity,manifest_text,digest,registered_by) VALUES (?,?,?,?,?,?,?)",
-                    id, platform, content.version(), content.sourceLockIdentity(), raw, digest, actor);
+            try {
+                jdbc.update("INSERT INTO ab_platform_release_registry(release_id,platform_code,version,source_lock_identity,manifest_text,digest,registered_by) VALUES (?,?,?,?,?,?,?)",
+                        id, platform, content.version(), content.sourceLockIdentity(), raw, digest, actor);
+            } catch (org.springframework.dao.DataIntegrityViolationException failure) {
+                Throwable cause = failure.getMostSpecificCause();
+                if (cause instanceof org.postgresql.util.PSQLException postgres
+                        && "23514".equals(postgres.getSQLState())
+                        && postgres.getServerErrorMessage() != null
+                        && "platform_artifact_coordinate_immutable".equals(postgres.getServerErrorMessage().getConstraint())) {
+                    throw new ArtifactCoordinateConflictException();
+                }
+                throw failure;
+            }
             return new Registration(id, platform, content.version(), digest, raw, actor);
         });
+    }
+
+    public static final class ArtifactCoordinateConflictException extends IllegalStateException {
+        public ArtifactCoordinateConflictException() {
+            super("Platform artifact coordinate already registered with different content");
+        }
     }
 
     private static void validateContent(Content content) {

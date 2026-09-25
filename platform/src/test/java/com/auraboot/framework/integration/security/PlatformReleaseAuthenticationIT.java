@@ -122,6 +122,14 @@ class PlatformReleaseAuthenticationIT extends BaseIntegrationTest {
             mvc.perform(post(uri).header("Authorization", "Bearer " + token)
                     .contentType("application/json").accept("application/json").content(payload))
                     .andExpect(jsonPath("$.code").value("409"));
+            jdbc.update("UPDATE ab_role SET status='active' WHERE id=?", roleId);
+            roles.invalidateAll();
+            clearIdentity();
+            String coordinateConflict = payload.replaceFirst("1\\.0\\.0", "2.0.0").replace("b".repeat(64), "e".repeat(64));
+            mvc.perform(post(uri).header("Authorization", "Bearer " + token)
+                    .contentType("application/json").accept("application/json").content(coordinateConflict))
+                    .andExpect(jsonPath("$.code").value("409"))
+                    .andExpect(jsonPath("$.message").value("Platform artifact coordinate already registered with different content"));
         } finally {
             roles.invalidateAll();
             clearIdentity();

@@ -72,7 +72,48 @@ class PlatformReleaseRegistryPostgresIT {
             assertEquals(1, db.queryForObject("SELECT count(*) FROM ab_platform_release_registry", Integer.class));
             insert(db, NEXT_ID, "2.0.0", next, hash(next));
             assertEquals(2, db.queryForObject("SELECT count(*) FROM ab_platform_release_registry", Integer.class));
+            try (var sql = getClass().getResourceAsStream("/db/migration/core/V20260926020000__platform_artifact_coordinate_guard.sql")) {
+                assertNotNull(sql);
+                // The migration lock and historical check are one transaction, as with Flyway.
+                var tx = new org.springframework.transaction.support.TransactionTemplate(
+                        new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
+                String migration = new String(sql.readAllBytes(), StandardCharsets.UTF_8);
+                tx.executeWithoutResult(status -> db.execute(migration));
+            }
             verifyService(db);
+            verifyCoordinates(db);
+        } finally {
+            admin.execute("DROP SCHEMA " + schema + " CASCADE");
+        }
+    }
+
+    @Test void migrationRejectsHistoricalCoordinateConflictWithoutRewritingContent() throws Exception {
+        assertEquals("crm-release-foundation", required("AURA_RUNTIME_NAME"));
+        String database = required("POSTGRES_DB");
+        assertEquals("auracrm_" + required("AURA_WORKSPACE_SLOT"), database);
+        String url = "jdbc:postgresql://" + required("POSTGRES_HOST") + ":" + required("POSTGRES_PORT") + "/" + database;
+        var admin = jdbc(url);
+        String schema = "platform_conflict_it_" + UUID.randomUUID().toString().replace("-", "");
+        admin.execute("CREATE SCHEMA " + schema);
+        try {
+            var db = jdbc(url + "?currentSchema=" + schema);
+            try (var sql = PlatformReleaseRegistryPostgresIT.class.getResourceAsStream("/db/migration/core/V20260926010000__immutable_platform_release_registry.sql")) {
+                assertNotNull(sql); db.execute(new String(sql.readAllBytes(), StandardCharsets.UTF_8));
+            }
+            String one = manifest(ID, "1.0.0").toString();
+            var changed = manifest(NEXT_ID, "2.0.0");
+            ((ObjectNode) changed.path("artifacts").get(0)).put("version", "1.0.0").put("digest", "sha256:" + "b".repeat(64));
+            String two = changed.toString();
+            insert(db, ID, "1.0.0", one, hash(one)); insert(db, NEXT_ID, "2.0.0", two, hash(two));
+            try (var sql = PlatformReleaseRegistryPostgresIT.class.getResourceAsStream("/db/migration/core/V20260926020000__platform_artifact_coordinate_guard.sql")) {
+                assertNotNull(sql);
+                String migration = new String(sql.readAllBytes(), StandardCharsets.UTF_8);
+                var tx = new org.springframework.transaction.support.TransactionTemplate(
+                        new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
+                assertThrows(DataAccessException.class, () -> tx.executeWithoutResult(status -> db.execute(migration)));
+            }
+            assertEquals(List.of(one, two), db.queryForList("SELECT manifest_text FROM ab_platform_release_registry ORDER BY version", String.class));
+            assertEquals(0, db.queryForObject("SELECT count(*) FROM pg_trigger WHERE tgrelid='ab_platform_release_registry'::regclass AND tgname='trg_platform_registry_coordinates'", Integer.class));
         } finally {
             admin.execute("DROP SCHEMA " + schema + " CASCADE");
         }
@@ -104,6 +145,67 @@ class PlatformReleaseRegistryPostgresIT {
         assertThrows(IllegalArgumentException.class, () -> service.register("service-platform", duplicate, "test:invalid"));
         assertThrows(IllegalArgumentException.class, () -> service.register("service-platform", content, "forged"));
         assertEquals(1, db.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code='service-platform'", Integer.class));
+    }
+
+    private static void verifyCoordinates(JdbcTemplate db) throws Exception {
+        var service = new PlatformReleaseRegistrationService(db, JSON);
+        var contracts = (ObjectNode) manifest(ID, "1.0.0").path("platformContracts");
+        var source = new PlatformReleaseRegistrationService.Source("core", "a".repeat(40));
+        var original = new PlatformReleaseRegistrationService.Artifact("runtime", "core", "1.0.0", "artifact:core", PIN, source);
+        var changed = new PlatformReleaseRegistrationService.Artifact("runtime", "core", "1.0.0", "artifact:core", "sha256:" + "b".repeat(64), source);
+        service.register("coordinate-test", new PlatformReleaseRegistrationService.Content("1.0.0", PIN, contracts, List.of(original)), "test:coordinate");
+        service.register("coordinate-test", new PlatformReleaseRegistrationService.Content("2.0.0", PIN, contracts, List.of(original)), "test:reuse");
+        assertThrows(PlatformReleaseRegistrationService.ArtifactCoordinateConflictException.class, () -> service.register("coordinate-test",
+                new PlatformReleaseRegistrationService.Content("3.0.0", PIN, contracts, List.of(changed)), "test:conflict"));
+        assertEquals(2, db.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code='coordinate-test'", Integer.class));
+        service.register("another-platform", new PlatformReleaseRegistrationService.Content("1.0.0", PIN, contracts, List.of(changed)), "test:scope");
+        var tx = new org.springframework.transaction.support.TransactionTemplate(
+                new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
+        tx.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        assertThrows(DataAccessException.class, () -> tx.executeWithoutResult(status -> service.register("snapshot-test",
+                new PlatformReleaseRegistrationService.Content("1.0.0", PIN, contracts, List.of(original)), "test:snapshot")));
+
+        try (var first = db.getDataSource().getConnection();
+             var second = db.getDataSource().getConnection();
+             var workers = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            first.setAutoCommit(false);
+            first.setTransactionIsolation(java.sql.Connection.TRANSACTION_READ_COMMITTED);
+            int secondPid;
+            try (var statement = second.createStatement(); var rows = statement.executeQuery("SELECT pg_backend_pid()")) {
+                assertTrue(rows.next()); secondPid = rows.getInt(1);
+            }
+            var one = manifest(com.auraboot.framework.common.util.UlidGenerator.generate(), "1.0.0").put("platform", "coordinate-race");
+            var two = manifest(com.auraboot.framework.common.util.UlidGenerator.generate(), "2.0.0").put("platform", "coordinate-race");
+            ((ObjectNode) two.path("artifacts").get(0)).put("version", "1.0.0").put("digest", "sha256:" + "b".repeat(64));
+            try {
+                insertConnection(first, one);
+                var waiting = workers.submit(() -> assertThrows(java.sql.SQLException.class, () -> insertConnection(second, two)));
+                long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+                boolean blocked = false;
+                while (System.nanoTime() < deadline) {
+                    blocked = Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted)", Boolean.class, secondPid));
+                    if (blocked) break;
+                    Thread.sleep(10);
+                }
+                assertTrue(blocked, "Second registration must wait on the platform lock");
+                first.commit();
+                assertEquals("23514", waiting.get(5, java.util.concurrent.TimeUnit.SECONDS).getSQLState());
+                assertEquals(1, db.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code='coordinate-race'", Integer.class));
+            } finally {
+                first.rollback();
+            }
+        }
+    }
+
+    private static void insertConnection(java.sql.Connection connection, ObjectNode manifest) throws Exception {
+        String raw = manifest.toString();
+        try (var statement = connection.prepareStatement("INSERT INTO ab_platform_release_registry(release_id,platform_code,version,source_lock_identity,manifest_text,digest,registered_by) VALUES (?,?,?,?,?,?,?)")) {
+            statement.setString(1, manifest.path("releaseId").asText());
+            statement.setString(2, manifest.path("platform").asText());
+            statement.setString(3, manifest.path("version").asText());
+            statement.setString(4, PIN); statement.setString(5, raw); statement.setString(6, hash(raw));
+            statement.setString(7, "test:concurrent"); statement.executeUpdate();
+        }
     }
 
     private static ObjectNode manifest(String id, String version) {

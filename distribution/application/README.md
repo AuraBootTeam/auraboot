@@ -152,10 +152,13 @@ use this mode; create a new release with explicit declarations instead of editin
 node scripts/application/application-release-requirements.mjs \
   registered-manifest.json sha256:<externally-pinned-release-digest> > requirements.json
 node scripts/application/deployment-capability-verifier.mjs --registered \
-  registered-manifest.json deployment-capabilities.json expected-identities.json
+  registered-manifest.json registered-platform-manifest.json deployment-capabilities.json expected-identities.json
 ```
 
-Registered mode derives all component requirements before verification. It rejects
+Registered mode requires both registered manifests and derives all component requirements before verification.
+The platform manifest bytes must match the independently pinned `platformReleaseDigest`;
+its release ID must match the deployment observation. Every observed platform contract must
+be declared by that exact registered platform. Missing platform bytes fail closed. It rejects
 an expected requirements digest made from a reduced requirement set. The extraction
 command emits deterministic two-space JSON with a final newline; `requirementsDigest`
 must pin these bytes. Repeated requirements across components are unified; duplicate
@@ -166,3 +169,37 @@ This verifies consistency with registered declarations. It does not inspect comp
 resources to prove that declarations are complete, or establish trust in the publisher.
 The lower-level requirements-file mode remains available for diagnostics and is not
 proof of correspondence to a registered release. Neither mode authorizes binding.
+
+### Registered schema contract observation
+
+`RegisteredSchemaContractInspector` consumes a config artifact explicitly selected
+by ID from an exact registered Platform Release. Supply the release ID, independently
+pinned release digest, artifact ID, and original contract bytes. The inspector checks
+the stored manifest bytes and the artifact digest before decoding or querying catalogs.
+Contract documents are limited to 1 MiB and use this shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "key": "orders-schema",
+  "contract": "v1",
+  "tables": {
+    "orders": {
+      "schema": "public",
+      "table": "orders",
+      "columns": [
+        { "name": "amount", "type": "integer", "nullable": false,
+          "defaultExpression": null, "identity": "", "generated": "" }
+      ],
+      "constraints": []
+    }
+  }
+}
+```
+
+All record fields are explicit, including nullable `defaultExpression`. Unknown
+fields, duplicate JSON keys, missing fields and scalar coercion are rejected.
+The table set is observed in one read-only catalog snapshot. The result retains
+both the registered contract artifact digest and the catalog snapshot identity.
+It does not attest which migrator ran, convert a contract digest into an installed
+provider digest, or grant deployment admission or tenant binding authority.
