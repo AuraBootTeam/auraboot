@@ -99,17 +99,7 @@ public final class ApplicationReleaseControlService {
         require(applicationCode != null && applicationCode.matches("[a-z][a-z0-9-]{1,99}"), "Invalid application code");
         validateActor(actor, operationId);
         return transactions.execute(status -> audited(actor, operationId, () -> {
-            var targets = jdbc.query("""
-                    SELECT a.id,t.release_id,r.digest,r.compatibility_epoch
-                    FROM ab_application a
-                    JOIN ab_application_channel_target t ON t.application_id=a.id AND t.channel='stable'
-                    JOIN ab_application_release r ON r.application_id=a.id AND r.release_id=t.release_id
-                    JOIN ab_application_release_publication p ON p.application_id=a.id AND p.release_id=t.release_id
-                    WHERE a.code=? FOR SHARE OF t,r,p
-                    """, (row, index) -> new Release(row.getLong(1), row.getString(2), row.getString(3), row.getInt(4)),
-                    applicationCode);
-            require(targets.size() == 1, "Published stable release is required");
-            var target = targets.getFirst();
+            var target = publishedStable(applicationCode);
             jdbc.update("""
                     INSERT INTO ab_tenant_application_binding
                         (tenant_id,application_id,current_release_id,status)
@@ -120,6 +110,38 @@ public final class ApplicationReleaseControlService {
                 throw new IllegalStateException("Tenant already has a different application binding");
             }
             return binding;
+        }));
+    }
+
+    /** Package-local CAS invoked after the controller proves an exact stable shadow match. */
+    Binding activateStableShadow(long tenantId, String applicationCode, String expectedReleaseId,
+                                 Long expectedVersion, String actor, String operationId) {
+        require(tenantId > 0, "Positive tenant ID required");
+        validate(applicationCode, expectedReleaseId, actor, operationId);
+        require(expectedVersion != null && expectedVersion > 0, "Positive expected binding version required");
+        return transactions.execute(status -> audited(actor, operationId, () -> {
+            var target = publishedStable(applicationCode);
+            require(target.releaseId().equals(expectedReleaseId), "Expected release is no longer published stable");
+            var replay = bindingActivationByOperation(tenantId, target.applicationId(), operationId);
+            if (!replay.isEmpty()) {
+                var previous = replay.getFirst();
+                if (!previous.previousReleaseId().equals(expectedReleaseId)
+                        || !"shadow".equals(previous.previousStatus())
+                        || !previous.binding().releaseId().equals(expectedReleaseId)
+                        || !"active".equals(previous.binding().status())
+                        || previous.binding().version() != expectedVersion + 1) {
+                    throw new IllegalStateException("Binding operation was already used for a different activation");
+                }
+                return previous.binding();
+            }
+            int changed = jdbc.update("""
+                    UPDATE ab_tenant_application_binding
+                    SET status='active',binding_version=binding_version+1
+                    WHERE tenant_id=? AND application_id=? AND current_release_id=?
+                      AND status='shadow' AND binding_version=?
+                    """, tenantId, target.applicationId(), expectedReleaseId, expectedVersion);
+            if (changed != 1) throw new IllegalStateException("Tenant binding version or shadow state conflict");
+            return readBinding(tenantId, target.applicationId());
         }));
     }
 
@@ -139,6 +161,7 @@ public final class ApplicationReleaseControlService {
     }
 
     private record Release(long applicationId, String releaseId, String digest, int compatibilityEpoch) {}
+    private record BindingActivation(Binding binding, String previousReleaseId, String previousStatus) {}
 
     private Release release(String applicationCode, String releaseId) {
         var releases = jdbc.query("""
@@ -149,6 +172,20 @@ public final class ApplicationReleaseControlService {
                 applicationCode, releaseId);
         require(releases.size() == 1, "Registered application release is required");
         return releases.getFirst();
+    }
+
+    private Release publishedStable(String applicationCode) {
+        var targets = jdbc.query("""
+                SELECT a.id,t.release_id,r.digest,r.compatibility_epoch
+                FROM ab_application a
+                JOIN ab_application_channel_target t ON t.application_id=a.id AND t.channel='stable'
+                JOIN ab_application_release r ON r.application_id=a.id AND r.release_id=t.release_id
+                JOIN ab_application_release_publication p ON p.application_id=a.id AND p.release_id=t.release_id
+                WHERE a.code=? FOR SHARE OF t,r,p
+                """, (row, index) -> new Release(row.getLong(1), row.getString(2), row.getString(3), row.getInt(4)),
+                applicationCode);
+        require(targets.size() == 1, "Published stable release is required");
+        return targets.getFirst();
     }
 
     private ChannelTarget readStable(long applicationId) {
@@ -173,6 +210,21 @@ public final class ApplicationReleaseControlService {
                 FROM ab_application_channel_target_history WHERE operation_id=?
                 """, (row, index) -> new ChannelTarget(row.getLong(1), row.getString(2), row.getString(3),
                         row.getLong(4), row.getString(5), row.getString(6)), operationId);
+    }
+
+    private java.util.List<BindingActivation> bindingActivationByOperation(
+            long tenantId, long applicationId, String operationId) {
+        return jdbc.query("""
+                SELECT h.tenant_id,h.application_id,h.current_release_id,r.digest,r.compatibility_epoch,
+                       h.status,h.binding_version,h.previous_release_id,h.previous_status
+                FROM ab_tenant_application_binding_history h
+                JOIN ab_application_release r
+                  ON r.application_id=h.application_id AND r.release_id=h.current_release_id
+                WHERE h.tenant_id=? AND h.application_id=? AND h.operation_id=?
+                """, (row, index) -> new BindingActivation(
+                        new Binding(row.getLong(1), row.getLong(2), row.getString(3), row.getString(4),
+                                row.getInt(5), row.getString(6), row.getLong(7)),
+                        row.getString(8), row.getString(9)), tenantId, applicationId, operationId);
     }
 
     private Binding readBinding(long tenantId, long applicationId) {

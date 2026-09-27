@@ -27,6 +27,7 @@ public class ApplicationReleaseController {
     public record CreateApplicationRequest(String code, String name) {}
     public record PublishRequest(String operationId) {}
     public record StableRequest(String releaseId, Long expectedVersion, String operationId) {}
+    public record ActivateTenantBindingRequest(String expectedReleaseId, Long expectedVersion, String operationId) {}
 
     @PostMapping
     public ApiResponse<ApplicationReleaseRegistrationService.Application> createApplication(
@@ -70,6 +71,19 @@ public class ApplicationReleaseController {
     public ApiResponse<DefinitionShadowComparisonService.Report> definitionShadowReport(
             @PathVariable String applicationCode, @RequestParam long tenantId) {
         return ApiResponse.success(shadowComparison.comparePublishedStable(tenantId, applicationCode));
+    }
+
+    @PostMapping("/{applicationCode}/tenant-bindings/{tenantId}/activation")
+    public ApiResponse<ApplicationReleaseControlService.Binding> activateTenantBinding(
+            @PathVariable String applicationCode, @PathVariable long tenantId,
+            @RequestBody ActivateTenantBindingRequest request) {
+        var report = shadowComparison.comparePublishedStable(tenantId, applicationCode);
+        if (report.classification() != DefinitionShadowComparisonService.Classification.EXACT_MATCH
+                || !report.releaseId().equals(request.expectedReleaseId())) {
+            throw new IllegalStateException("Exact stable definition shadow match is required");
+        }
+        return ApiResponse.success(control.activateStableShadow(tenantId, applicationCode,
+                request.expectedReleaseId(), request.expectedVersion(), actor(), request.operationId()));
     }
 
     private static String actor() {
