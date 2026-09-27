@@ -2271,6 +2271,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             PluginResource resource = resourceImporter.importDashboard(dto, pluginPid, importId, tenantId,
                     request.getConflictStrategy());
             if (resource != null) {
+                captureImportSnapshot(resource, dto);
                 saveOrUpdatePluginResource(resource, tenantId);
                 result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
                 if (resource.getResourcePid() != null) {
