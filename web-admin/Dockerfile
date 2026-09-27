@@ -109,7 +109,7 @@ USER appuser
 
 # 1. Workspace manifests + lockfile (so `pnpm install --prod` resolves the
 #    same dependency graph used at build time).
-COPY --chown=appuser:appuser package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=appuser:appuser package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY --chown=appuser:appuser packages ./packages
 COPY --chown=appuser:appuser web-admin/package.json ./web-admin/package.json
 COPY --chown=appuser:appuser web-admin/packages ./web-admin/packages
