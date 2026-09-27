@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -15,6 +15,7 @@ import {
   validateLockForManifest,
   canonicalJson,
   lockIdentity,
+  retainApplicationDefinitions,
   validateManifest,
   validateWebContribution,
   verifyArtifacts,
@@ -287,6 +288,57 @@ describe('AuraBoot application contract', () => {
 
     writeFileSync(join(artifactRoot, lock.artifacts[0].localPath), 'mutated');
     assert.throws(() => verifyArtifacts(lock, { artifactRoot }), /checksum mismatch/);
+  });
+
+  it('atomically retains only verified config artifacts by lock identity', (context) => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'aura-application-retain-source-'));
+    const definitionStore = mkdtempSync(join(tmpdir(), 'aura-application-retain-store-'));
+    context.after(() => {
+      rmSync(artifactRoot, { recursive: true, force: true });
+      rmSync(definitionStore, { recursive: true, force: true });
+    });
+    const input = catalog();
+    for (const [index, artifact] of input.artifacts.entries()) {
+      artifact.localPath = `${artifact.type}/${index}`;
+      const path = join(artifactRoot, artifact.localPath);
+      if (artifact.type === 'config') {
+        mkdirSync(path, { recursive: true });
+        writeFileSync(join(path, 'plugin.json'), JSON.stringify({
+          pluginId: `fixture.${artifact.id}`,
+          namespace: artifact.id,
+          version: artifact.version,
+        }));
+        artifact.digest = sha256Path(path);
+      } else {
+        mkdirSync(dirname(path), { recursive: true });
+        const bytes = Buffer.from(`${artifact.type}:${artifact.id}@${artifact.version}`);
+        writeFileSync(path, bytes);
+        artifact.digest = sha256(bytes);
+      }
+    }
+    const lock = resolveFixture(manifest(), input);
+    writeFileSync(join(artifactRoot, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
+
+    const destination = retainApplicationDefinitions(lock, { artifactRoot, definitionStore });
+    assert.equal(destination, join(definitionStore, lock.identity.slice('sha256:'.length)));
+    assert.equal(JSON.parse(readFileSync(join(destination, 'application.lock'), 'utf8')).identity, lock.identity);
+    for (const artifact of lock.artifacts.filter((item) => item.type === 'config')) {
+      assert.equal(sha256Path(join(destination, artifact.localPath)), artifact.digest);
+    }
+    assert.equal(existsSync(join(destination, lock.artifacts.find((item) => item.type === 'runtime').localPath)), false);
+    assert.equal(retainApplicationDefinitions(lock, { artifactRoot, definitionStore }), destination);
+
+    const cliStore = mkdtempSync(join(tmpdir(), 'aura-application-retain-cli-'));
+    context.after(() => rmSync(cliStore, { recursive: true, force: true }));
+    const cli = new URL('./application-cli.mjs', import.meta.url);
+    const cliRun = spawnSync(process.execPath, [cli.pathname, 'retain-definitions',
+      '--lock', join(artifactRoot, 'application.lock'), '--artifact-root', artifactRoot,
+      '--definition-store', cliStore], { encoding: 'utf8' });
+    assert.equal(cliRun.status, 0, cliRun.stderr);
+    assert.match(cliRun.stdout, /retained application definitions/);
+
+    writeFileSync(join(artifactRoot, lock.artifacts.find((item) => item.type === 'runtime').localPath), 'mutated');
+    assert.throws(() => retainApplicationDefinitions(lock, { artifactRoot, definitionStore }), /checksum mismatch/);
   });
 
   it('ships a dependency-free release verifier that detects checksum mutation', () => {

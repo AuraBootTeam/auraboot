@@ -23,6 +23,11 @@ pnpm application verify-artifacts \
   --lock path/to/application.lock \
   --artifact-root path/to/staged-distribution
 
+pnpm application retain-definitions \
+  --lock path/to/application.lock \
+  --artifact-root path/to/staged-distribution \
+  --definition-store /var/lib/auraboot/application-definitions
+
 pnpm application graph \
   --manifest path/to/app.yaml \
   --lock path/to/application.lock \
@@ -44,6 +49,12 @@ pnpm application compare-graphs \
 ```
 
 Release manifests and catalogs must not use `SNAPSHOT`, `latest`, workspace links, branch references, sibling source paths, or mutable artifact identities. `verify-artifacts` requires every lock entry to name a staged `localPath` and fails if any bytes do not match the locked digest.
+
+`retain-definitions` first verifies the complete staged release, then atomically retains only `application.lock` and
+its checksum-verified `config` artifacts under `<definition-store>/<lock-identity-without-prefix>/`. Configure the
+Runtime with `aura.application.definition-store` pointing at that parent directory. Repeating the command verifies
+the existing immutable entry; it never overwrites a different or damaged entry. Retention policy must keep every
+lock identity still referenced by a tenant binding.
 
 Publish a product-generated `release-registration.json` through the controlled API sequence:
 
