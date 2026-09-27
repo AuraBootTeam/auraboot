@@ -44,7 +44,9 @@ final class ShadowBindingConnection {
                 FROM pg_roles r WHERE r.rolname=current_user
                 """, Boolean.class, username);
         require(Boolean.TRUE.equals(safe), "Shadow binding account violates least-privilege preconditions");
-        for (String table : java.util.List.of("ab_application_release", "ab_tenant_application_binding", "ab_tenant_application_binding_history")) {
+        for (String table : java.util.List.of(
+                "ab_application_release", "ab_tenant_application_binding", "ab_tenant_application_binding_history",
+                "ab_application", "ab_application_channel_target", "ab_application_release_publication")) {
             Boolean allowed = jdbc.queryForObject("""
                     SELECT has_table_privilege(current_user,c.oid,'SELECT')
                       AND has_table_privilege(current_user,c.oid,'INSERT') = (c.relname='ab_tenant_application_binding_history')
@@ -65,7 +67,8 @@ final class ShadowBindingConnection {
                   AND NOT has_column_privilege(current_user,c.oid,a.attnum,'REFERENCES'))
                 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname=current_schema() AND c.relname IN
-                  ('ab_application_release','ab_tenant_application_binding','ab_tenant_application_binding_history')
+                  ('ab_application_release','ab_tenant_application_binding','ab_tenant_application_binding_history',
+                   'ab_application','ab_application_channel_target','ab_application_release_publication')
                   AND a.attnum>0 AND NOT a.attisdropped
                 """, Boolean.class);
         require(Boolean.TRUE.equals(columns), "Shadow binding column privileges are incomplete or excessive");

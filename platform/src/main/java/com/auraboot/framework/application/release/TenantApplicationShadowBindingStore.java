@@ -34,17 +34,50 @@ public final class TenantApplicationShadowBindingStore {
 
     public Binding createShadow(long tenantId, long applicationId, String releaseId, String releaseDigest, AuditContext audit) {
         validate(tenantId, applicationId, releaseId, releaseDigest);
+        return audited(audit, () -> createShadow(tenantId, applicationId, releaseId, releaseDigest));
+    }
+
+    public Binding createPublishedStableShadow(long tenantId, String applicationCode,
+                                                String expectedReleaseId, String expectedReleaseDigest,
+                                                AuditContext audit) {
+        require(tenantId > 0, "Positive tenant ID required");
+        require(applicationCode != null && applicationCode.matches("[a-z][a-z0-9-]{1,99}"),
+                "Invalid application code");
+        validateRelease(expectedReleaseId, expectedReleaseDigest);
         return audited(audit, () -> {
-            requireRelease(applicationId, releaseId, releaseDigest);
-            jdbc.update("""
-                    INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id)
-                    VALUES (?,?,?) ON CONFLICT (tenant_id,application_id) DO NOTHING
-                    """, tenantId, applicationId, releaseId);
-            var current = read(tenantId, applicationId);
-            if (!current.releaseId().equals(releaseId) || !current.releaseDigest().equals(releaseDigest)
-                    || !current.status().equals("shadow") || current.version() != 1) throw new BindingConflictException();
-            return current;
+            var targets = jdbc.query("""
+                    SELECT a.id,t.release_id,r.digest
+                    FROM ab_application a
+                    JOIN ab_application_channel_target t
+                      ON t.application_id=a.id AND t.channel='stable'
+                    JOIN ab_application_release r
+                      ON r.application_id=a.id AND r.release_id=t.release_id
+                    JOIN ab_application_release_publication p
+                      ON p.application_id=a.id AND p.release_id=t.release_id
+                    WHERE a.code=?
+                    """, (row, index) -> new StableTarget(
+                            row.getLong(1), row.getString(2), row.getString(3)), applicationCode);
+            require(targets.size() == 1, "Published stable release is required");
+            StableTarget target = targets.getFirst();
+            require(target.releaseId().equals(expectedReleaseId)
+                            && target.releaseDigest().equals(expectedReleaseDigest),
+                    "Expected release is no longer published stable");
+            return createShadow(tenantId, target.applicationId(), target.releaseId(), target.releaseDigest());
         });
+    }
+
+    private record StableTarget(long applicationId, String releaseId, String releaseDigest) {}
+
+    private Binding createShadow(long tenantId, long applicationId, String releaseId, String releaseDigest) {
+        requireRelease(applicationId, releaseId, releaseDigest);
+        jdbc.update("""
+                INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id)
+                VALUES (?,?,?) ON CONFLICT (tenant_id,application_id) DO NOTHING
+                """, tenantId, applicationId, releaseId);
+        var current = read(tenantId, applicationId);
+        if (!current.releaseId().equals(releaseId) || !current.releaseDigest().equals(releaseDigest)
+                || !current.status().equals("shadow") || current.version() != 1) throw new BindingConflictException();
+        return current;
     }
 
     public Binding compareAndSetShadow(Binding expected, String targetReleaseId, String targetDigest, AuditContext audit) {
@@ -102,6 +135,9 @@ public final class TenantApplicationShadowBindingStore {
 
     private static void validate(long tenantId, long applicationId, String releaseId, String digest) {
         require(tenantId > 0 && applicationId > 0, "Positive tenant and application IDs required");
+        validateRelease(releaseId, digest);
+    }
+    private static void validateRelease(String releaseId, String digest) {
         require(releaseId != null && releaseId.matches("[0-9A-HJKMNP-TV-Z]{26}"), "Exact release ID required");
         require(digest != null && digest.matches("sha256:[0-9a-f]{64}"), "Exact release digest required");
     }

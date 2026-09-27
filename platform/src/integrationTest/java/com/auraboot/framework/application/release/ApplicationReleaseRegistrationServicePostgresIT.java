@@ -368,7 +368,17 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertThrows(IllegalStateException.class, () -> disabled.createShadow(713, applicationId, first, firstDigest, bindingAudit()));
             }
             try (var service = new TenantApplicationShadowBindingService(environment)) {
-                var created = service.createShadow(713, applicationId, first, firstDigest, bindingAudit());
+                assertThrows(IllegalArgumentException.class, () -> service.createPublishedStableShadow(
+                        713, "aura-edu", second, secondDigest, bindingAudit()));
+                String prepareOperation = bindingAudit().operationId();
+                var created = service.createPublishedStableShadow(
+                        713, "aura-edu", first, firstDigest,
+                        new TenantApplicationShadowBindingStore.AuditContext("test:shadow-prepare", prepareOperation));
+                assertEquals(created, service.createPublishedStableShadow(
+                        713, "aura-edu", first, firstDigest,
+                        new TenantApplicationShadowBindingStore.AuditContext("test:shadow-prepare-retry", prepareOperation)));
+                assertEquals(1, jdbc.queryForObject(
+                        "SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=713", Integer.class));
                 assertEquals(2, service.compareAndSetShadow(created, second, secondDigest, bindingAudit()).version());
                 assertEquals(second, jdbc.queryForObject("SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=713", String.class));
                 assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=713", Integer.class));
@@ -908,7 +918,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         var interceptor = new com.auraboot.framework.application.security.AdminRoleInterceptor(roles, mapper, audit, summarizer, null);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
                 .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc),
-                        org.mockito.Mockito.mock(DefinitionShadowComparisonService.class)))
+                        org.mockito.Mockito.mock(DefinitionShadowComparisonService.class),
+                        org.mockito.Mockito.mock(TenantApplicationShadowBindingService.class)))
                 .addInterceptors(interceptor).build();
         String uri = "/api/admin/application-releases/aura-edu";
         var body = mapper.valueToTree(new ApplicationReleaseController.RegisterRequest("http-registration", content("b")));
