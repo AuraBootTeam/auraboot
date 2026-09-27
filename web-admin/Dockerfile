@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g pnpm@9
 
 # 1. Workspace manifests + lockfile (cache-friendly layer).
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
 # 2. Workspace package manifests so pnpm can resolve `workspace:*` links
 #    without copying the full source yet (still cache-friendly).
