@@ -188,15 +188,15 @@ Once the stack is running, verify all services are healthy:
 | Service | URL | Expected |
 |---------|-----|---------|
 | Frontend | http://localhost:3000 | Login page |
-| Backend health | http://localhost:6443/actuator/health | `{"status":"UP"}` |
-| Backend API | http://localhost:6443/api/meta/models | JSON response |
+| Backend health | `docker compose exec backend wget -qO- http://localhost:6443/actuator/health` | `{"status":"UP"}` |
+| Backend API | http://localhost:3000/api/meta/models (via the frontend BFF) | JSON response |
 | MinIO console | http://localhost:9001 | MinIO web UI (if enabled) |
 | Prometheus | http://localhost:9090 | Prometheus UI (if enabled) |
 | Grafana | http://localhost:3001 | Grafana dashboards (if enabled) |
 
 Quick health check via curl:
 ```bash
-curl -s http://localhost:6443/actuator/health | jq .status
+docker compose exec backend wget -qO- http://localhost:6443/actuator/health | jq .status
 # Expected: "UP"
 ```
 
@@ -301,9 +301,10 @@ docker compose logs frontend
 # Look for "SPRING_BOOT_URL" configuration and connection errors
 ```
 
-Verify the backend is running:
+Verify the backend is running (6443 is not published to the host; run the
+check inside the backend container):
 ```bash
-curl -s http://localhost:6443/actuator/health
+docker compose exec backend wget -qO- http://localhost:6443/actuator/health
 ```
 
 ### Database connection refused
