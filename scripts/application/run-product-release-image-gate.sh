@@ -349,6 +349,8 @@ WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));
 COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER="$RUNTIME_DB_ROLE" PGPASSWORD="$RUNTIME_DB_PASSWORD" ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
+RELEASE_ID=''
+RELEASE_BINDING_COUNT=0
 if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
   [[ -f "$STATE_ROOT/release-id" ]] || fail 'product lifecycle did not record the exact Release ID'
   RELEASE_ID="$(cat "$STATE_ROOT/release-id")"
@@ -357,6 +359,7 @@ if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
     "select r.source_lock_identity,(select count(*) from ab_tenant_application_binding b where b.current_release_id=r.release_id and b.status='active') from ab_application_release r where r.release_id='$RELEASE_ID'")"
   [[ "$RELEASE_BINDING" == "$LOCK_IDENTITY|1" ]] \
     || fail "image/Release/binding identity mismatch: release=$RELEASE_ID result=${RELEASE_BINDING:-missing}"
+  RELEASE_BINDING_COUNT=1
 fi
 if [[ -n "$FIXTURE_REL" ]]; then
   info "injecting exact-commit acceptance fixture $FIXTURE_REL ($FIXTURE_DIGEST)"
@@ -424,10 +427,13 @@ cp "$PRODUCT_RELEASE/release-receipt.json" "$ARTIFACTS/product-build-receipt.jso
 cp "$PRODUCT_RELEASE/application.lock" "$ARTIFACTS/application.lock"
 cp "$PRODUCT_RELEASE/artifact-catalog.json" "$ARTIFACTS/artifact-catalog.json"
 cp "$PRODUCT_RELEASE/sbom.cdx.json" "$ARTIFACTS/sbom.cdx.json"
-python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" "$PUBLISH_REGISTRY" <<'PY'
+if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
+  cp "$STATE_ROOT/release-control-receipt.json" "$ARTIFACTS/release-control-receipt.json"
+fi
+python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" "$PUBLISH_REGISTRY" "$EXPECT_RELEASE_REGISTRATION" "$RELEASE_ID" "$RELEASE_BINDING_COUNT" <<'PY'
 import datetime, json, sys
 from hashlib import sha256
-path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port, publish_registry = sys.argv[1:]
+path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port, publish_registry, expect_release, release_id, binding_count = sys.argv[1:]
 def digest(relative_path):
     with open(f"{evidence_root}/{relative_path}", "rb") as stream:
         return "sha256:" + sha256(stream.read()).hexdigest()
@@ -456,6 +462,14 @@ receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "screenshotManifest": "e2e/screenshot-manifest.json",
            "logsRoot": "logs",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+receipt["applicationRelease"] = {"required": expect_release == "1"}
+if expect_release == "1":
+    receipt["applicationRelease"].update({
+        "releaseId": release_id,
+        "sourceLockIdentity": lock,
+        "activeBindingCount": int(binding_count),
+        "registrationReceipt": {"path": "release-control-receipt.json",
+                                "digest": digest("release-control-receipt.json")}})
 if fixture_path:
     receipt["acceptanceFixture"] = {"sourcePath": fixture_path,
                                     "sourceCommit": source,
