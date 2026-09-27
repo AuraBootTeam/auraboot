@@ -128,12 +128,12 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertThrows(IllegalArgumentException.class, () -> service.register("missing-app", "build-1", content("b"), "test:publisher"));
                 assertThrows(IllegalArgumentException.class, () -> service.register("aura-edu", "", content("b"), "test:publisher"));
                 assertEquals(6L, jdbc.queryForObject("SELECT next_release_sequence FROM ab_application", Long.class));
-                verifyHttpBoundary(service, jdbc);
                 verifyDatabaseRoles(source, schema);
                 verifyPrivateLoginPool(source, schema);
-                verifyRegisteredDefinitionInspection(service, jdbc);
                 verifyBindingStorage(service, jdbc, source, application.id(), first.releaseId(),
                         distinct.get(0).releaseId(), distinct.get(1).releaseId());
+                verifyHttpBoundary(service, jdbc);
+                verifyRegisteredDefinitionInspection(service, jdbc);
             }
         } finally { admin.execute("DROP SCHEMA " + schema + " CASCADE"); }
     }
@@ -875,11 +875,15 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         var summarizer = org.mockito.Mockito.mock(com.auraboot.framework.application.security.RequestBodySummarizer.class);
         var interceptor = new com.auraboot.framework.application.security.AdminRoleInterceptor(roles, mapper, audit, summarizer, null);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
-                .standaloneSetup(new ApplicationReleaseController(service)).addInterceptors(interceptor).build();
+                .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc)))
+                .addInterceptors(interceptor).build();
         String uri = "/api/admin/application-releases/aura-edu";
         var body = mapper.valueToTree(new ApplicationReleaseController.RegisterRequest("http-registration", content("b")));
         ((com.fasterxml.jackson.databind.node.ObjectNode) body).put("actor", "user:forged");
         String payload = body.toString();
+        int releaseCountBefore = jdbc.queryForObject("SELECT count(*) FROM ab_application_release", Integer.class);
+        long releaseSequence = jdbc.queryForObject(
+                "SELECT next_release_sequence FROM ab_application WHERE code='aura-edu'", Long.class);
         try {
             com.auraboot.framework.application.tenant.MetaContext.clear();
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(uri)
@@ -890,12 +894,14 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(uri)
                     .contentType("application/json").accept("application/json").content(payload))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("409"));
-            assertEquals(5, jdbc.queryForObject("SELECT count(*) FROM ab_application_release", Integer.class));
+            assertEquals(releaseCountBefore,
+                    jdbc.queryForObject("SELECT count(*) FROM ab_application_release", Integer.class));
             org.mockito.Mockito.when(roles.hasRole(7L, 9L, "platform_admin")).thenReturn(true);
             for (int attempt = 0; attempt < 2; attempt++) {
                 mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(uri)
                         .contentType("application/json").accept("application/json").content(payload))
-                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.sequence").value(6))
+                        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.sequence")
+                                .value(releaseSequence))
                         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.registeredBy").value("user:7:9"));
             }
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(uri)
@@ -906,17 +912,45 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                     .contentType("application/json").accept("application/json").content(mapper.writeValueAsString(
                             new ApplicationReleaseController.RegisterRequest("", content("b")))))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("400"));
-            assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM ab_application_release", Integer.class));
+            assertEquals(releaseCountBefore + 1,
+                    jdbc.queryForObject("SELECT count(*) FROM ab_application_release", Integer.class));
             assertEquals("user:7:9", jdbc.queryForObject(
                     "SELECT registered_by FROM ab_application_release WHERE registration_key='http-registration'", String.class));
-            assertEquals(7L, jdbc.queryForObject("SELECT next_release_sequence FROM ab_application", Long.class));
+            assertEquals(releaseSequence + 1,
+                    jdbc.queryForObject("SELECT next_release_sequence FROM ab_application WHERE code='aura-edu'", Long.class));
+            String registeredRelease = jdbc.queryForObject(
+                    "SELECT release_id FROM ab_application_release WHERE registration_key='http-registration'", String.class);
+            String publicationOperation = com.auraboot.framework.common.util.UlidGenerator.generate();
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                            uri + "/" + registeredRelease + "/publication")
+                    .contentType("application/json").accept("application/json").content(mapper.writeValueAsString(
+                            new ApplicationReleaseController.PublishRequest(publicationOperation))))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.releaseId")
+                            .value(registeredRelease))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.publishedBy")
+                            .value("user:7:9"));
+            Long stableVersion = jdbc.queryForObject("""
+                    SELECT target_version FROM ab_application_channel_target t
+                    JOIN ab_application a ON a.id=t.application_id WHERE a.code='aura-edu' AND t.channel='stable'
+                    """, Long.class);
+            String stableOperation = com.auraboot.framework.common.util.UlidGenerator.generate();
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(uri + "/channels/stable")
+                    .contentType("application/json").accept("application/json").content(mapper.writeValueAsString(
+                            new ApplicationReleaseController.StableRequest(
+                                    registeredRelease, stableVersion, stableOperation))))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.releaseId")
+                            .value(registeredRelease))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.version")
+                            .value(stableVersion + 1));
             String createUri = "/api/admin/application-releases";
             String createPayload = mapper.writeValueAsString(new ApplicationReleaseController.CreateApplicationRequest("http-app", "HTTP App"));
+            int applicationCountBefore = jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class);
             org.mockito.Mockito.when(roles.hasRole(7L, 9L, "platform_admin")).thenReturn(false);
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(createUri)
                     .contentType("application/json").accept("application/json").content(createPayload))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("409"));
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class));
+            assertEquals(applicationCountBefore,
+                    jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class));
             org.mockito.Mockito.when(roles.hasRole(7L, 9L, "platform_admin")).thenReturn(true);
             for (int attempt = 0; attempt < 2; attempt++) {
                 mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(createUri)
@@ -924,7 +958,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.code").value("http-app"))
                         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.createdBy").value("user:7:9"));
             }
-            assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class));
+            assertEquals(applicationCountBefore + 1,
+                    jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class));
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(createUri + "/http-app")
                     .contentType("application/json").accept("application/json").content(payload))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.sequence").value(1))

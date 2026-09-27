@@ -11,14 +11,19 @@ import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 @RequestMapping("/api/admin/application-releases")
 public class ApplicationReleaseController {
     private final ApplicationReleaseRegistrationService service;
+    private final ApplicationReleaseControlService control;
 
-    public ApplicationReleaseController(ApplicationReleaseRegistrationService service) {
+    public ApplicationReleaseController(ApplicationReleaseRegistrationService service,
+                                        ApplicationReleaseControlService control) {
         this.service = service;
+        this.control = control;
     }
 
     public record RegisterRequest(String registrationKey, ApplicationReleaseRegistrationService.Content content) {}
 
     public record CreateApplicationRequest(String code, String name) {}
+    public record PublishRequest(String operationId) {}
+    public record StableRequest(String releaseId, Long expectedVersion, String operationId) {}
 
     @PostMapping
     public ApiResponse<ApplicationReleaseRegistrationService.Application> createApplication(
@@ -42,6 +47,27 @@ public class ApplicationReleaseController {
         }
         return ApiResponse.success(service.register(applicationCode, request.registrationKey(), request.content(),
                 "user:" + tenantId + ":" + userId));
+    }
+
+    @PostMapping("/{applicationCode}/{releaseId}/publication")
+    public ApiResponse<ApplicationReleaseControlService.Publication> publish(
+            @PathVariable String applicationCode, @PathVariable String releaseId,
+            @RequestBody PublishRequest request) {
+        return ApiResponse.success(control.publish(applicationCode, releaseId, actor(), request.operationId()));
+    }
+
+    @PostMapping("/{applicationCode}/channels/stable")
+    public ApiResponse<ApplicationReleaseControlService.ChannelTarget> promoteStable(
+            @PathVariable String applicationCode, @RequestBody StableRequest request) {
+        return ApiResponse.success(control.promoteStable(applicationCode, request.releaseId(),
+                request.expectedVersion(), actor(), request.operationId()));
+    }
+
+    private static String actor() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null) throw new IllegalArgumentException("Authenticated control actor required");
+        return "user:" + tenantId + ":" + userId;
     }
 
     @ExceptionHandler(ApplicationReleaseRegistrationService.RegistrationUnavailableException.class)

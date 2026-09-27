@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.application.release.ApplicationReleaseControlService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.ValidationException;
@@ -71,6 +72,7 @@ class TenantApplicationServiceImplTest {
     @Mock private TenantBootstrapService tenantBootstrapService;
     @Mock private BuiltinPluginImportService builtinPluginImportService;
     @Mock private SystemModeService systemModeService;
+    @Mock private ApplicationReleaseControlService applicationReleaseControlService;
 
     @InjectMocks
     private TenantApplicationServiceImpl service;
@@ -187,6 +189,10 @@ class TenantApplicationServiceImplTest {
         // now mints a member-scoped token. Stale 4-arg stub left this call unmatched.
         when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), any(), anyInt()))
                 .thenReturn("jwt-token");
+        when(applicationReleaseControlService.bindStable(eq(99L), eq("aura-edu"), eq("user:id:7"), anyString()))
+                .thenReturn(new ApplicationReleaseControlService.Binding(
+                        99L, 3L, "01K6R0YEXAMPLE000000000000", "sha256:" + "a".repeat(64), 1, "active", 1));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
 
         TenantSelectionRequest req = new TenantSelectionRequest();
         req.setTenantName("acme");
@@ -197,6 +203,8 @@ class TenantApplicationServiceImplTest {
         assertEquals(99L, resp.getTenantId());
         assertEquals("jwt-token", resp.getJwt());
         verify(tenantMemberService).addMember(7L, 99L, StatusConstants.ACTIVE);
+        verify(applicationReleaseControlService).bindStable(
+                eq(99L), eq("aura-edu"), eq("user:id:7"), anyString());
         verify(builtinPluginImportService).importForTenant(99L, 7L);
         verify(sessionManagementService).createSession(eq(7L), eq("jwt-token"), any(), any());
     }

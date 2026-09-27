@@ -128,6 +128,14 @@ automatic upgrades, approval workflows, revocation, and retirement are separate 
 concerns. The channel history is an immutable audit projection, not a deployment state
 machine.
 
+Platform-admin callers publish and move `stable` through the application-release admin
+API with a caller-generated ULID operation ID. A product deployment opts new tenants into
+binding by setting `aura.application.default-code` to the registered application code.
+Tenant creation then resolves and writes the exact stable release in the same transaction.
+The legacy built-in plugin import still runs after binding until the shared Definition
+Resolver has passed shadow comparison; configuring a default application does not yet mean
+that per-tenant definitions have been removed.
+
 ## Deployment capability checks
 
 `application-release-requirements.schema.json` defines requirements pinned to an exact
