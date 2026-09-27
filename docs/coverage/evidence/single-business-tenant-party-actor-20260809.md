@@ -220,7 +220,7 @@ Controlled mutation: temporarily make application/channel capability intersectio
   by hand; `scripts/db/check-schema-drift.sh --edition oss` passed against a fresh PostgreSQL 17.6
   database.
 - Fresh verification runtime: `pr1006-oss-auth-20260822-s87`, slot 87, database `auraboot_87`,
-  source root `/Users/ghj/work/auraboot/.worktrees/auraboot-single-business-tenant-party-actor-20260809`.
+  source root: the feature worktree created for this validation.
 - The 20 affected Auth/Party backend test classes executed 162 tests with 162 passed, 0 failed and
   0 skipped. The batch includes `PartyActorPersistenceIntegrationTest` against the fresh PostgreSQL
   database.

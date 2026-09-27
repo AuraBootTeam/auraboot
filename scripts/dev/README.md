@@ -64,10 +64,10 @@ Daily bugfix environments are registered globally under the mono-repo root,
 outside any one worktree:
 
 ```text
-/Users/ghj/work/auraboot/.aura/env-registry.json
-/Users/ghj/work/auraboot/.aura/envs/<slug>/manifest.json
-/Users/ghj/work/auraboot/.aura/envs/<slug>/exports.env
-/Users/ghj/work/auraboot/.aura/envs/<slug>/auth/
+~/work/auraboot/.aura/env-registry.json
+~/work/auraboot/.aura/envs/<slug>/manifest.json
+~/work/auraboot/.aura/envs/<slug>/exports.env
+~/work/auraboot/.aura/envs/<slug>/auth/
 ```
 
 `env-registry.json` is the source of truth for slug, worktree, branch,
@@ -84,7 +84,7 @@ PW_E2E_RUN_ROOT=test-results/runs/<slug>/<date>
 PW_ARTIFACT_DIR=$PW_E2E_RUN_ROOT/artifacts
 PW_REPORT_DIR=$PW_E2E_RUN_ROOT/html-report
 PW_RESULTS_JSON=$PW_E2E_RUN_ROOT/results.json
-PW_STORAGE_DIR=/Users/ghj/work/auraboot/.aura/envs/<slug>/auth
+PW_STORAGE_DIR=~/work/auraboot/.aura/envs/<slug>/auth
 PW_ADMIN_STORAGE_STATE=$PW_STORAGE_DIR/admin.json
 PW_OPERATOR_STORAGE_STATE=$PW_STORAGE_DIR/operator.json
 PW_VIEWER_STORAGE_STATE=$PW_STORAGE_DIR/viewer.json

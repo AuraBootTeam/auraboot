@@ -47,14 +47,14 @@ class LlmProviderAccessorImplTest {
         LlmProviderAccessorImpl accessor = new LlmProviderAccessorImpl(factory, new ObjectMapper(), 7L);
         AiProviderAccessor.ChatResponse response = accessor.chat(new AiProviderAccessor.ChatRequest(
                 "bom_conversion",
-                "jiejia-bom-normalizer-prod",
+                "acme-bom-normalizer-prod",
                 "qianwen",
                 "",
                 "Return JSON only.",
                 List.of(AiProviderAccessor.Message.user("Raw row")),
                 1024,
                 Map.of(
-                        "source", "jiejia",
+                        "source", "acme",
                         "responseFormat", "json_object",
                         "thinkingEnabled", false,
                         "temperature", 0)

@@ -37,7 +37,7 @@ type CommandResult = { code: string; recordId: string };
 const NAV_TIMEOUT = 15_000;
 const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
   ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
-  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
+  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/home/local-oss-dev/work/auraboot/auraboot-enterprise/plugins');
 
 const REQUIRED_PLUGINS = [
   'product-catalog',

@@ -7,7 +7,7 @@ import { validateQuoteWorkbook } from './quote-workbook-assertions';
 test.describe('PCBA quote Excel download', () => {
   test.describe.configure({ timeout: 90_000 });
 
-  test('downloads the Jiejia 3-sheet workbook from the quote detail page', async ({
+  test('downloads the Acme 3-sheet workbook from the quote detail page', async ({
     page,
   }, testInfo) => {
     const created = await seedDownloadableQuote(page);

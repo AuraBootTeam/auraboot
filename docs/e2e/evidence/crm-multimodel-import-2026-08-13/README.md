@@ -7,7 +7,7 @@
 - Playwright specs: `crm-multimodel-import-cordys-parity.spec.ts`, `crm-import-provider-failure.golden.spec.ts`, and `crm-import-provider-lifecycle.golden.spec.ts`
 - Final runs: adoption `9 passed`; recovery/lifecycle `10 + 1 + 1 passed`; Chromium, one worker, retry=0, trace enabled
 - Large-row result: 2,000 Lead rows created in `58.1s`, below the fixed `180s` budget
-- Full final-code Playwright traces: retained outside Git at `/Users/ghj/work/auraboot/.workspace/evidence/crm-multimodel-import-20260813-s143/artifacts-final/`; this directory keeps the reviewed screenshots and manifest without adding large trace ZIPs to clone history.
+- Full final-code Playwright traces: retained outside Git in a local evidence workspace; this directory keeps the reviewed screenshots and manifest without adding large trace ZIPs to clone history.
 - Adoption manifest: `12 pass / 0 partial / 0 gap / 0 untested`
 - Recovery/scale manifest: `14 pass / 1 deferred / 5 untested` out of 20 (`70%` pass)
 

@@ -90,7 +90,7 @@ if [[ "${PLUGIN_COUNT}" -lt 1 ]]; then
   echo "             - ./plugins:/app/plugins:ro"
   echo ""
   echo "  2. Restart the backend with the override:"
-  echo "       cd /Users/ghj/work/auraboot/auraboot"
+  echo "       cd /home/local-oss-dev/work/auraboot/auraboot"
   echo "       docker compose -f docker-compose.yml -f docker-compose.e2e.override.yml \\"
   echo "         --profile full up -d backend"
   echo ""

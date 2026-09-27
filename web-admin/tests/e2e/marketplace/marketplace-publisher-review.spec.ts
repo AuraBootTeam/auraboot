@@ -21,7 +21,7 @@ test.describe.configure({ timeout: 60000 });
 
 const ENTERPRISE_PLUGIN_ROOT =
   process.env.AURABOOT_ENTERPRISE_PLUGIN_ROOT ||
-  '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
+  '/home/local-oss-dev/work/auraboot/auraboot-enterprise/plugins';
 const MARKETPLACE_PLUGIN_DIR = `${ENTERPRISE_PLUGIN_ROOT}/marketplace-server`;
 
 function isRecord(value: unknown): value is JsonRecord {

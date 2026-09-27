@@ -490,7 +490,7 @@ npx playwright show-report
 Page Designer 回归不要再手写长文件列表，统一使用 `package.json` 中的专用脚本：
 
 ```bash
-cd /Users/ghj/work/auraboot/auraboot/web-admin
+cd /home/local-oss-dev/work/auraboot/auraboot/web-admin
 
 pnpm test:page-designer          # 完整 page-designer 回归集
 pnpm test:page-designer:smoke    # 入口、属性面板、组件库基础行为

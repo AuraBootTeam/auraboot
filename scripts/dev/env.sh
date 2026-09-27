@@ -186,8 +186,6 @@ resolve_enterprise_root() {
         echo "$registered_enterprise_root"
     elif [ -d "$PROJECT_ROOT/../auraboot-enterprise" ]; then
         cd "$PROJECT_ROOT/../auraboot-enterprise" && pwd
-    elif [ -d "/Users/ghj/work/auraboot/auraboot-enterprise" ]; then
-        echo "/Users/ghj/work/auraboot/auraboot-enterprise"
     else
         echo ""
     fi
