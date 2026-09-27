@@ -291,12 +291,23 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
                 "INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id,status) VALUES (715,?,?,'active')",
                 applicationId, first));
-        // Stable publication is now the admission proof for explicit shadow activation.
-        tx.executeWithoutResult(status -> {
-            jdbc.queryForObject("SELECT set_config('aura.binding.actor','test:activation-fixture',true)", String.class);
-            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, bindingAudit().operationId());
-            jdbc.update("UPDATE ab_tenant_application_binding SET status='active',binding_version=3 WHERE tenant_id=711");
-        });
+        String activationOperation = bindingAudit().operationId();
+        var activated = control.activateStableShadow(
+                711, "aura-edu", winner, 2L, "test:activation", activationOperation);
+        assertEquals("active", activated.status());
+        assertEquals(3L, activated.version());
+        assertEquals(activated, control.activateStableShadow(
+                711, "aura-edu", winner, 2L, "test:activation-retry", activationOperation));
+        assertEquals("test:activation", jdbc.queryForObject("""
+                SELECT business_actor FROM ab_tenant_application_binding_history
+                WHERE tenant_id=711 AND binding_version=3
+                """, String.class));
+        assertEquals(activationOperation, jdbc.queryForObject("""
+                SELECT operation_id FROM ab_tenant_application_binding_history
+                WHERE tenant_id=711 AND binding_version=3
+                """, String.class));
+        assertThrows(IllegalStateException.class, () -> control.activateStableShadow(
+                711, "aura-edu", winner, 2L, "test:stale-activation", bindingAudit().operationId()));
         var active = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "active", 3);
         assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(active, first, digest.apply(first), bindingAudit()));
         var forgedShadow = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "shadow", 3);
@@ -896,7 +907,8 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         var summarizer = org.mockito.Mockito.mock(com.auraboot.framework.application.security.RequestBodySummarizer.class);
         var interceptor = new com.auraboot.framework.application.security.AdminRoleInterceptor(roles, mapper, audit, summarizer, null);
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
-                .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc)))
+                .standaloneSetup(new ApplicationReleaseController(service, new ApplicationReleaseControlService(jdbc),
+                        org.mockito.Mockito.mock(DefinitionShadowComparisonService.class)))
                 .addInterceptors(interceptor).build();
         String uri = "/api/admin/application-releases/aura-edu";
         var body = mapper.valueToTree(new ApplicationReleaseController.RegisterRequest("http-registration", content("b")));
