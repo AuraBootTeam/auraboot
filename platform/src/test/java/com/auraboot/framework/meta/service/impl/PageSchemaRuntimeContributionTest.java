@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.authoring.workspace.AuthoringRuntimePageMaterializer;
+import com.auraboot.framework.application.release.PageDefinitionShadowReadService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.contribution.PageSchemaContribution;
 import com.auraboot.framework.meta.contribution.PageSchemaContributionComposer;
 import com.auraboot.framework.meta.contribution.PageSchemaContributionKind;
@@ -14,9 +16,11 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,6 +49,7 @@ class PageSchemaRuntimeContributionTest {
     private final PageSchemaContributionComposer composer = spy(new PageSchemaContributionComposer());
     @SuppressWarnings("unchecked")
     private final ObjectProvider<PageSchemaContributionProvider> providerObject = mock(ObjectProvider.class);
+    private final PageDefinitionShadowReadService shadowReadService = mock(PageDefinitionShadowReadService.class);
 
     private PageSchemaServiceImpl service;
     private PageSchema entity;
@@ -54,13 +59,18 @@ class PageSchemaRuntimeContributionTest {
     void setUp() {
         service = new PageSchemaServiceImpl(mapper, converter, permissionService, metaModelMapper,
                 eventPublisher, metaModelService, defaultBlockGenerator, objectMapper, materializer,
-                composer, providerObject);
+                composer, providerObject, shadowReadService);
         entity = new PageSchema();
         PageSchemaDTO baseline = new PageSchemaDTO();
         materialized = pageWithSlot();
         when(mapper.selectPublishedByPid("page-pid")).thenReturn(entity);
         when(converter.toDTO(entity)).thenReturn(baseline);
         when(materializer.materialize(baseline)).thenReturn(materialized);
+    }
+
+    @AfterEach
+    void clearTenantContext() {
+        MetaContext.clear();
     }
 
     @Test
@@ -105,6 +115,39 @@ class PageSchemaRuntimeContributionTest {
         assertThat(result.getBlocks()).extracting(block -> String.valueOf(((Map<?, ?>) block).get("id")))
                 .containsExactly("detail-tabs", "base-only");
         verifyNoInteractions(materializer, providerObject);
+    }
+
+    @Test
+    void pageKeyRuntimeReadComparesTheLegacyBaselineBeforeMaterialization() {
+        PageSchemaDTO baseline = new PageSchemaDTO();
+        when(mapper.selectByPageKey("edu_home")).thenReturn(entity);
+        when(converter.toDTO(entity)).thenReturn(baseline);
+        when(materializer.materialize(baseline)).thenReturn(materialized);
+        when(providerObject.getIfAvailable(any())).thenReturn(PageSchemaContributionProvider.none());
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "pageDefinitionShadowEnabled", true);
+        MetaContext.setCurrentTenantId(42L);
+
+        PageSchemaDTO result = service.findByPageKey("edu_home");
+
+        assertThat(result).isSameAs(materialized);
+        verify(shadowReadService).compare(42L, "aura-edu", "edu_home", baseline);
+    }
+
+    @Test
+    void pageKeyRuntimeReadDoesNotQueryShadowStateUntilExplicitlyEnabled() {
+        PageSchemaDTO baseline = new PageSchemaDTO();
+        when(mapper.selectByPageKey("edu_home")).thenReturn(entity);
+        when(converter.toDTO(entity)).thenReturn(baseline);
+        when(materializer.materialize(baseline)).thenReturn(materialized);
+        when(providerObject.getIfAvailable(any())).thenReturn(PageSchemaContributionProvider.none());
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        MetaContext.setCurrentTenantId(42L);
+
+        PageSchemaDTO result = service.findByPageKey("edu_home");
+
+        assertThat(result).isSameAs(materialized);
+        verifyNoInteractions(shadowReadService);
     }
 
     private PageSchemaDTO pageWithSlot() {

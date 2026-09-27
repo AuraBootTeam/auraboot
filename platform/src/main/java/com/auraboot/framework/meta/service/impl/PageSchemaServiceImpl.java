@@ -1,5 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.release.PageDefinitionShadowReadService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.workspace.AuthoringRuntimePageMaterializer;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -58,6 +61,13 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final AuthoringRuntimePageMaterializer authoringRuntimePageMaterializer;
     private final PageSchemaContributionComposer pageSchemaContributionComposer;
     private final ObjectProvider<PageSchemaContributionProvider> pageSchemaContributionProvider;
+    private final PageDefinitionShadowReadService pageDefinitionShadowReadService;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-shadow.page-enabled:false}")
+    private boolean pageDefinitionShadowEnabled;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -418,8 +428,14 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "页面键不能为空");
         }
 
-        // 直接通过 page_key 查询
-        return toRuntimeDTO(pageSchemaMapper.selectByPageKey(pageKey));
+        PageSchema pageSchema = pageSchemaMapper.selectByPageKey(pageKey);
+        PageSchemaDTO baseline = pageSchema == null ? null : pageSchemaConverter.toDTO(pageSchema);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (pageDefinitionShadowEnabled && tenantId != null && StringUtils.hasText(defaultApplicationCode)) {
+            pageDefinitionShadowReadService.compare(
+                    tenantId, defaultApplicationCode.trim(), pageKey, baseline);
+        }
+        return toRuntimeDTO(baseline);
     }
 
     @Override
@@ -444,7 +460,13 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         if (pageSchema == null) {
             return null;
         }
-        PageSchemaDTO baseline = pageSchemaConverter.toDTO(pageSchema);
+        return toRuntimeDTO(pageSchemaConverter.toDTO(pageSchema));
+    }
+
+    private PageSchemaDTO toRuntimeDTO(PageSchemaDTO baseline) {
+        if (baseline == null) {
+            return null;
+        }
         PageSchemaDTO materialized = authoringRuntimePageMaterializer.materialize(baseline);
         PageSchemaContributionProvider provider = pageSchemaContributionProvider
                 .getIfAvailable(PageSchemaContributionProvider::none);
