@@ -26,6 +26,48 @@ each before upgrading.
 
 ---
 
+## [1.0.0] - 2026-09-27
+
+First stable line. `VERSION` has read 1.0.0 since the multi-repo release
+versioning change (2026-06-18); this entry documents what shipped from
+`main` under that version. Strict semver applies from here on.
+
+### Highlights
+- WeChat login family: mini-program channel, PC QR login, two-step
+  pure-WeChat mode, school-join endpoint, and branded onboarding/auth story.
+- Open platform versioned facade with a Linux release gate.
+- Tenant-bound RBAC: application-scoped tenant preference, tenant-bound
+  projection reader, and tenant-bound role assignment exposed to trusted
+  plugins.
+- Record-scoped quote collaboration and collaborate-only sharing.
+
+### Added
+- Deployment-declared creator roles bound at tenant creation; product
+  plugin seeding into new tenants.
+- Class-display live updates over data-sync SSE.
+- `AURA_FLYWAY_EXTRA_LOCATIONS` support for additional Flyway locations.
+- Allure adapters for Gradle and Playwright reporting.
+
+### Changed
+- In plugin compositions, host-owned routes win over duplicate plugin
+  route mappings.
+- Plugin `CommandCompletedEvent` is forwarded into plugin module contexts.
+- Meta rendering: semantic status pills and actionable table empty states.
+
+## [0.1.0-beta.3] - 2026-05-18
+
+### Highlights
+- AI provider accessor exposed to plugins.
+- Marketplace paid install workflow.
+- Dev pipeline packet import endpoint.
+
+### Added
+- Mobile showcase UX profile config and import support.
+- IM mobile AI member/group contracts and handoff events.
+- SoD entity and record-share pid aliases preserved.
+
+---
+
 ## [0.1.0-beta.2] - 2026-05-11
 
 Follow-up beta focused on public release health, reproducible quickstart
@@ -166,6 +208,9 @@ release is about. Then the structured sections.
 ### Contributors
 First-time contributors this release: @user1, @user2. Thanks!
 
+[1.0.0]: https://github.com/AuraBootTeam/auraboot/releases/tag/v1.0.0
+[0.1.0-beta.3]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.3
+[0.1.0-beta.2]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.1
 -->
 

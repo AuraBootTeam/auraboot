@@ -29,8 +29,8 @@
 #   APK_MIRROR=mirrors.aliyun.com  NPM_REGISTRY=https://registry.npmmirror.com
 #   PLATFORM=linux/amd64              # target arch of the host
 #   ICP_COMPLIANCE_ENABLED=1          # show the temporary ICP review profile
-#   ICP_SITE_TITLE=个人技术
-#   ICP_RECORD_NUMBER=浙ICP备2023054087号
+#   ICP_SITE_TITLE=your-site-name
+#   ICP_RECORD_NUMBER=your-icp-record-number
 #
 # Host prereqs: docker + docker compose, python3 + curl (for bootstrap).
 # Build-host prereqs: docker buildx, JDK 21 + gradle (bundled wrapper), and

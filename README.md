@@ -202,7 +202,7 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 |---|---|
 | Language | Java 21, TypeScript |
 | Backend | Spring Boot 3.5, MyBatis-Plus, PF4J |
-| Frontend | React 19, Tailwind CSS 4, React Router 7, Vite 6 |
+| Frontend | React 19, Tailwind CSS 4, React Router 7, Vite 8 |
 | Database | PostgreSQL 15+ (with pgvector) |
 | Cache | Redis 7+ |
 | Application composition | Versioned manifests, immutable artifacts, typed Web contributions |
