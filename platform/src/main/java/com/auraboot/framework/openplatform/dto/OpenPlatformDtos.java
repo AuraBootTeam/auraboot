@@ -32,8 +32,21 @@ public final class OpenPlatformDtos {
     }
 
     public record ApplicationView(String pid, String name, String description, String status,
-                                  Instant createdAt, List<InstallationView> installations) {
+                                  Instant createdAt, String accessRole, ApplicationPermissions permissions,
+                                  List<ApplicationMemberView> members,
+                                  List<InstallationView> installations) {
     }
+
+    public record OpenPlatformAccessView(boolean platformAdmin, boolean canCreateApplications) { }
+
+    public record ApplicationPermissions(boolean manageMembers, boolean disableApplication,
+                                         boolean manageRuntime, boolean readOperations) { }
+
+    public record ApplicationMemberView(String userPid, String displayName, String email,
+                                        String role, Instant createdAt) { }
+
+    public record UpsertApplicationMemberRequest(
+            @NotBlank @Pattern(regexp = "owner|maintainer|viewer") String role) { }
 
     public record InstallationView(String pid, String environment, String status,
                                    Set<String> scopes, Integer rateLimitPerMinute, Instant installedAt) {

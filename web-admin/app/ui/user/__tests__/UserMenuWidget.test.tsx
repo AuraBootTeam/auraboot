@@ -66,13 +66,13 @@ describe('UserMenuWidget', () => {
     expect(dropdown.querySelector('a[href="/logout"]')).not.toBeNull();
     expect(screen.getByText('Admin User')).toBeInTheDocument();
     expect(screen.getByText('admin@auraboot.com')).toBeInTheDocument();
-    expect(screen.queryByTestId('open-platform-link')).toBeNull();
+    expect(screen.getByTestId('open-platform-link')).toHaveAttribute('href', '/settings/api-docs');
   });
 
-  it('exposes Open Platform only to connector managers', () => {
+  it('exposes Open Platform to authenticated collaborators without a global admin grant', () => {
     rootLoaderData.value = {
       ...authedRootData,
-      permissions: { permissionCodes: ['sys.connector.update'] },
+      permissions: { permissionCodes: [] },
     };
     render(
       <MemoryRouter>
@@ -81,10 +81,7 @@ describe('UserMenuWidget', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'User avatar' }));
-    expect(screen.getByTestId('open-platform-link')).toHaveAttribute(
-      'href',
-      '/settings/api-docs',
-    );
+    expect(screen.getByTestId('open-platform-link')).toHaveAttribute('href', '/settings/api-docs');
   });
 
   it('renders nothing for anonymous visitors', () => {

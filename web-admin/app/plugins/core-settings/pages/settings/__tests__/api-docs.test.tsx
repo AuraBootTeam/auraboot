@@ -12,6 +12,13 @@ vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ t: translate }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showToast }) }));
+vi.mock('~/ui/smart/picker/MemberPicker', () => ({
+  MemberPicker: ({ onChange }: { onChange?: (value: string) => void }) => (
+    <button type="button" onClick={() => onChange?.('member-2')}>
+      Select collaborator
+    </button>
+  ),
+}));
 
 const capability = {
   code: 'open.whoami',
@@ -33,6 +40,8 @@ describe('OpenPlatformPage', () => {
       'fetch',
       vi.fn((url: string) => {
         if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: true, canCreateApplications: true });
         return response([]);
       }),
     );
@@ -74,6 +83,8 @@ describe('OpenPlatformPage', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: true, canCreateApplications: true });
         if (url.endsWith('/applications'))
           return response([
             {
@@ -81,6 +92,14 @@ describe('OpenPlatformPage', () => {
               name: 'ERP Bridge',
               status: 'active',
               createdAt: '2026-09-14T00:00:00Z',
+              accessRole: 'owner',
+              permissions: {
+                manageMembers: true,
+                disableApplication: true,
+                manageRuntime: true,
+                readOperations: true,
+              },
+              members: [],
               installations: [installation],
             },
           ]);
@@ -120,6 +139,8 @@ describe('OpenPlatformPage', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: true, canCreateApplications: true });
         if (url.endsWith('/applications') && !init?.method)
           return response([
             {
@@ -127,6 +148,14 @@ describe('OpenPlatformPage', () => {
               name: 'Warehouse Connector',
               status: 'active',
               createdAt: '2026-09-14T00:00:00Z',
+              accessRole: 'owner',
+              permissions: {
+                manageMembers: true,
+                disableApplication: true,
+                manageRuntime: true,
+                readOperations: true,
+              },
+              members: [],
               installations: [],
             },
           ]);
@@ -171,6 +200,8 @@ describe('OpenPlatformPage', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: true, canCreateApplications: true });
         if (url.endsWith('/applications'))
           return response([
             {
@@ -178,6 +209,14 @@ describe('OpenPlatformPage', () => {
               name: 'ERP Ops',
               status: 'active',
               createdAt: '2026-09-14T00:00:00Z',
+              accessRole: 'owner',
+              permissions: {
+                manageMembers: true,
+                disableApplication: true,
+                manageRuntime: true,
+                readOperations: true,
+              },
+              members: [],
               installations: [installation],
             },
           ]);
@@ -261,5 +300,113 @@ describe('OpenPlatformPage', () => {
     const rotateButtons = screen.getAllByRole('button', { name: 'Rotate' });
     await user.click(rotateButtons[rotateButtons.length - 1]);
     expect(await screen.findByText('secret-new')).toBeVisible();
+  });
+
+  it('projects viewer access as operations-only and hides administrator actions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: false, canCreateApplications: false });
+        if (url.endsWith('/applications'))
+          return response([
+            {
+              pid: 'app-viewer',
+              name: 'Shared ERP Bridge',
+              status: 'active',
+              createdAt: '2026-09-14T00:00:00Z',
+              accessRole: 'viewer',
+              permissions: {
+                manageMembers: false,
+                disableApplication: false,
+                manageRuntime: false,
+                readOperations: true,
+              },
+              members: [
+                {
+                  userPid: 'viewer-1',
+                  displayName: 'Read Only Partner',
+                  role: 'viewer',
+                  createdAt: '2026-09-14T00:00:00Z',
+                },
+              ],
+              installations: [
+                {
+                  pid: 'inst-viewer',
+                  environment: 'production',
+                  status: 'active',
+                  scopes: ['openapi.profile.read'],
+                  rateLimitPerMinute: 600,
+                  installedAt: '2026-09-14T00:00:00Z',
+                },
+              ],
+            },
+          ]);
+        return response([]);
+      }),
+    );
+
+    render(<OpenPlatformPage />);
+    expect(await screen.findByText('Shared ERP Bridge')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Operations' })).toBeVisible();
+    expect(screen.queryByTestId('open-platform-create-app')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add installation' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'View credentials' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manage members' })).not.toBeInTheDocument();
+  });
+
+  it('lets an owner add a tenant member with an explicit application role', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.endsWith('/capabilities')) return response([capability]);
+        if (url.endsWith('/access'))
+          return response({ platformAdmin: false, canCreateApplications: false });
+        if (url.endsWith('/applications'))
+          return response([
+            {
+              pid: 'app-owner',
+              name: 'Owned Bridge',
+              status: 'active',
+              createdAt: '2026-09-14T00:00:00Z',
+              accessRole: 'owner',
+              permissions: {
+                manageMembers: true,
+                disableApplication: true,
+                manageRuntime: true,
+                readOperations: true,
+              },
+              members: [
+                {
+                  userPid: 'owner-1',
+                  displayName: 'Application Owner',
+                  role: 'owner',
+                  createdAt: '2026-09-14T00:00:00Z',
+                },
+              ],
+              installations: [],
+            },
+          ]);
+        return response({});
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(<OpenPlatformPage />);
+    await user.click(await screen.findByRole('button', { name: 'Manage members' }));
+    await user.click(screen.getByRole('button', { name: 'Select collaborator' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Role' }), 'maintainer');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/open-platform/applications/app-owner/members/member-2',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ role: 'maintainer' }),
+        }),
+      ),
+    );
   });
 });

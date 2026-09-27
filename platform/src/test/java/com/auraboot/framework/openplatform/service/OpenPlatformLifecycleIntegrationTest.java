@@ -2,21 +2,33 @@ package com.auraboot.framework.openplatform.service;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CreateApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpsertApplicationMemberRequest;
 import com.auraboot.framework.openplatform.mapper.OpenPlatformAuthMapper;
 import com.auraboot.framework.webhook.dto.WebhookCreateRequest;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.auraboot.framework.webhook.service.WebhookService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,6 +45,170 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WebhookService webhookService;
     @Autowired private WebhookDispatcher webhookDispatcher;
+    @Autowired private UserService userService;
+    @Autowired private TenantMemberService tenantMemberService;
+
+    @BeforeEach
+    void grantOpenPlatformAdministration() {
+        grantCommittedPermissionToTestRole("sys.connector.update", "system", "connector", "update",
+                "Manage Open Platform");
+    }
+
+    @Test
+    void applicationRolesAuthorizeCollaborationAndProtectTheLastOwner() throws Exception {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Collaboration fixture", "role boundary verification"));
+        User maintainer = createTenantUser("maintainer");
+        User viewer = createTenantUser("viewer");
+        User outsider = createTenantUser("outsider");
+        User nonTenantUser = userService.signUp(
+                "non-tenant." + UniqueIdGenerator.generate().toLowerCase() + "@example.invalid",
+                "test-password-123");
+        TenantMember maintainerMembership = tenantMemberService.findByTenantIdAndUserId(
+                getTestTenant().getId(), maintainer.getId());
+        TenantMember viewerMembership = tenantMemberService.findByTenantIdAndUserId(
+                getTestTenant().getId(), viewer.getId());
+
+        managementService.upsertMember(application.pid(), maintainer.getPid(),
+                new UpsertApplicationMemberRequest("maintainer"));
+        managementService.upsertMember(application.pid(), viewer.getPid(),
+                new UpsertApplicationMemberRequest("viewer"));
+        managementService.upsertMember(application.pid(), maintainer.getPid(),
+                new UpsertApplicationMemberRequest("viewer"));
+        managementService.upsertMember(application.pid(), maintainer.getPid(),
+                new UpsertApplicationMemberRequest("maintainer"));
+
+        switchActor(maintainer, maintainerMembership);
+        assertEquals(1, managementService.listApplications().size());
+        var installation = managementService.install(application.pid(),
+                new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600));
+        managementService.createCredential(installation.pid());
+
+        switchActor(viewer, viewerMembership);
+        assertEquals(1, managementService.listApplications().size());
+        assertEquals(0, managementService.getOperationsOverview(installation.pid(), 24).totalCalls());
+        assertThrows(AccessDeniedException.class,
+                () -> managementService.createCredential(installation.pid()));
+
+        TenantMember outsiderMembership = tenantMemberService.findByTenantIdAndUserId(
+                getTestTenant().getId(), outsider.getId());
+        switchActor(outsider, outsiderMembership);
+        assertTrue(managementService.listApplications().isEmpty());
+        assertThrows(AccessDeniedException.class, () -> managementService.install(application.pid(),
+                new InstallApplicationRequest("staging", Set.of("openapi.profile.read"), 600)));
+
+        applyTestMetaContext();
+        assertThrows(IllegalArgumentException.class, () -> managementService.upsertMember(
+                application.pid(), nonTenantUser.getPid(), new UpsertApplicationMemberRequest("viewer")));
+        assertThrows(IllegalStateException.class, () -> managementService.upsertMember(
+                application.pid(), getTestUser().getPid(), new UpsertApplicationMemberRequest("viewer")));
+        assertThrows(IllegalStateException.class,
+                () -> managementService.removeMember(application.pid(), getTestUser().getPid()));
+        assertEquals(2, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_external_application_member_audit audit
+                JOIN ab_external_application app ON app.id = audit.application_id
+                WHERE app.pid = ? AND audit.action = 'add' AND audit.target_user_pid <> ?
+                """, Integer.class, application.pid(), getTestUser().getPid()));
+        assertEquals(2, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_external_application_member_audit audit
+                JOIN ab_external_application app ON app.id = audit.application_id
+                WHERE app.pid = ? AND audit.action = 'update' AND audit.target_user_pid = ?
+                """, Integer.class, application.pid(), maintainer.getPid()));
+    }
+
+    @Test
+    void platformAdministratorOverridesApplicationMembership() throws Exception {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Administrator override", "global administration boundary"));
+        User replacementOwner = createTenantUser("replacement-owner");
+        managementService.upsertMember(application.pid(), replacementOwner.getPid(),
+                new UpsertApplicationMemberRequest("owner"));
+        managementService.removeMember(application.pid(), getTestUser().getPid());
+
+        assertEquals(1, managementService.listApplications().size());
+        assertEquals("owner", managementService.listApplications().getFirst().accessRole());
+        assertTrue(managementService.getAccess().platformAdmin());
+        assertTrue(managementService.getAccess().canCreateApplications());
+        assertEquals("production", managementService.install(application.pid(),
+                new InstallApplicationRequest("production", Set.of("openapi.profile.read"), 600)).environment());
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_external_application_member_audit audit
+                JOIN ab_external_application app ON app.id = audit.application_id
+                WHERE app.pid = ? AND audit.action = 'remove' AND audit.target_user_pid = ?
+                """, Integer.class, application.pid(), getTestUser().getPid()));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentOwnerRemovalCannotLeaveApplicationOwnerless() throws Exception {
+        var application = managementService.createApplication(
+                new CreateApplicationRequest("Concurrent owner guard", "serialized owner removal"));
+        String secondOwnerPid = "concurrent-owner-" + UniqueIdGenerator.generate().toLowerCase();
+        Long applicationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ab_external_application WHERE pid = ?", Long.class, application.pid());
+        jdbcTemplate.update("""
+                INSERT INTO ab_external_application_member
+                    (tenant_id, application_id, user_pid, role, created_by_pid, updated_by_pid)
+                VALUES (?, ?, ?, 'owner', ?, ?)
+                """, getTestTenant().getId(), applicationId, secondOwnerPid,
+                getTestUser().getPid(), getTestUser().getPid());
+        TenantMember administratorMembership = tenantMemberService.findByTenantIdAndUserId(
+                getTestTenant().getId(), getTestUser().getId());
+        var start = new CountDownLatch(1);
+
+        try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                var first = executor.submit(() -> removeOwnerAsAdministrator(
+                        application.pid(), getTestUser().getPid(), administratorMembership, start));
+                var second = executor.submit(() -> removeOwnerAsAdministrator(
+                        application.pid(), secondOwnerPid, administratorMembership, start));
+                start.countDown();
+
+                assertEquals(1, java.util.stream.Stream.of(first.get(), second.get())
+                        .filter(Boolean.TRUE::equals).count());
+            }
+            assertEquals(1, jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM ab_external_application_member member
+                    JOIN ab_external_application app ON app.id = member.application_id
+                    WHERE app.pid = ? AND member.role = 'owner'
+                    """, Integer.class, application.pid()));
+        } finally {
+            jdbcTemplate.update("DELETE FROM ab_external_application_member_audit WHERE application_id = ?",
+                    applicationId);
+            jdbcTemplate.update("DELETE FROM ab_external_application_member WHERE application_id = ?",
+                    applicationId);
+            jdbcTemplate.update("DELETE FROM ab_external_application WHERE id = ?", applicationId);
+        }
+    }
+
+    private boolean removeOwnerAsAdministrator(String applicationPid, String ownerPid,
+                                               TenantMember administratorMembership,
+                                               CountDownLatch start) throws InterruptedException {
+        start.await();
+        MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(),
+                getTestUser().getPid(), getTestUser().getUserName());
+        MetaContext.setMemberId(administratorMembership.getId());
+        try {
+            managementService.removeMember(applicationPid, ownerPid);
+            return true;
+        } catch (IllegalStateException expected) {
+            return false;
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    private User createTenantUser(String label) throws Exception {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        User user = userService.signUp(label + "." + suffix + "@example.invalid", "test-password-123");
+        tenantMemberService.addMember(user.getId(), getTestTenant().getId(), "active");
+        return user;
+    }
+
+    private void switchActor(User user, TenantMember member) {
+        MetaContext.setContext(getTestTenant().getId(), user.getId(), user.getPid(), user.getUserName());
+        MetaContext.setMemberId(member.getId());
+    }
 
     @Test
     void credentialScopeAndInstallationLifecycleRevokeTokensImmediately() {
