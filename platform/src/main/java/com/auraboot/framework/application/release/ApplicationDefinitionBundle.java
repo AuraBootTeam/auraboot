@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public final class ApplicationDefinitionBundle {
     private final ObjectMapper mapper;
     private final ConcurrentHashMap<String, PluginManifestExtended> cache = new ConcurrentHashMap<>();
 
+    @Autowired
     public ApplicationDefinitionBundle(Environment environment, ObjectMapper mapper) {
         this(Path.of(environment.getProperty("aura.application.bundle-root", "/opt/auraboot")), mapper);
     }
