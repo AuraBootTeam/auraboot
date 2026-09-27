@@ -16,6 +16,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,6 +45,15 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Resource
     private PermissionMapper permissionMapper;
+
+    @Resource
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
     
     @Override
     public List<Menu> getUserMenuTree(Long userId, Long tenantId) {
@@ -56,10 +66,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         List<Menu> allMenus = visibleInCurrentEnvironment(
                 baseMapper.findVisibleDirectoriesAndMenus());
         
+        Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
+        List<Menu> releaseMenus = releaseMenuTree(tenantId, userPermissionCodes);
         if (allMenus.isEmpty()) {
-            return Collections.emptyList();
+            return releaseMenus;
         }
-        
+
         // 2. 批量评估菜单可见性
         List<Long> menuIds = allMenus.stream()
                 .map(Menu::getId)
@@ -68,8 +80,6 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         Map<Long, Boolean> visibilityMap = subjectPermissionService
                 .batchEvaluateVisibility("menu", menuIds, userId);
 
-        Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
-        
         // 3. 过滤出可见且满足 permission_code 的菜单
         List<Menu> visibleMenus = allMenus.stream()
                 .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))
@@ -77,7 +87,9 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
                 .collect(Collectors.toList());
         
         // 4. 构建树结构，并移除权限过滤后没有任何可见子项的空目录
-        return pruneEmptyDirectories(buildMenuTree(visibleMenus));
+        List<Menu> result = new ArrayList<>(pruneEmptyDirectories(buildMenuTree(visibleMenus)));
+        result.addAll(releaseMenus);
+        return result;
     }
     
     @Override
@@ -128,7 +140,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     @Override
     public List<Menu> getAllMenuTree() {
         List<Menu> menuList = visibleInCurrentEnvironment(baseMapper.findAllActiveMenus());
-        return buildMenuTree(menuList);
+        List<Menu> result = new ArrayList<>(buildMenuTree(menuList));
+        if (releaseReadsEnabled(MetaContext.getCurrentTenantId())) {
+            result.addAll(applicationRuntimeDefinitionCatalog.menuTree(
+                    MetaContext.getCurrentTenantId(), defaultApplicationCode.trim()));
+        }
+        return result;
     }
     
     @Override
@@ -191,6 +208,32 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
             }
         }
         return pruned;
+    }
+
+    private List<Menu> releaseMenuTree(Long tenantId, Set<String> permissionCodes) {
+        if (!releaseReadsEnabled(tenantId)) return List.of();
+        return filterReleaseMenus(applicationRuntimeDefinitionCatalog.menuTree(
+                tenantId, defaultApplicationCode.trim()), permissionCodes);
+    }
+
+    private List<Menu> filterReleaseMenus(List<Menu> menus, Set<String> permissionCodes) {
+        List<Menu> result = new ArrayList<>();
+        for (Menu menu : menus) {
+            if (menu.getChildren() != null) {
+                menu.setChildren(filterReleaseMenus(menu.getChildren(), permissionCodes));
+            }
+            if (!Boolean.FALSE.equals(menu.getVisible()) && isAllowedByPermissionCode(menu, permissionCodes)
+                    && (!Integer.valueOf(0).equals(menu.getType())
+                        || (menu.getChildren() != null && !menu.getChildren().isEmpty()))) {
+                result.add(menu);
+            }
+        }
+        return result;
+    }
+
+    private boolean releaseReadsEnabled(Long tenantId) {
+        return tenantId != null && applicationRuntimePrimaryEnabled
+                && defaultApplicationCode != null && !defaultApplicationCode.isBlank();
     }
     
     @Override

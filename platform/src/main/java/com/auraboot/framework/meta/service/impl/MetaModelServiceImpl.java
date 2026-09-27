@@ -45,6 +45,7 @@ import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 
@@ -57,6 +58,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -97,6 +99,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
     private final MetaDefinitionCacheService metaDefinitionCacheService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
 
     @Autowired
     @Lazy
@@ -151,9 +160,22 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     public Optional<ModelDefinition> getModelDefinition(String modelCode) {
         validateModelCode(modelCode);
+        Optional<ModelDefinition> releaseModel = releaseModel(modelCode);
+        if (releaseModel.isPresent()) {
+            return releaseModel;
+        }
         return metaDefinitionCacheService.getModelDefinition(
                 modelCode,
                 () -> loadModelDefinition(modelCode));
+    }
+
+    private Optional<ModelDefinition> releaseModel(String modelCode) {
+        if (!applicationRuntimePrimaryEnabled || !StringUtils.hasText(defaultApplicationCode)
+                || !MetaContext.exists() || MetaContext.getCurrentTenantId() == null) {
+            return Optional.empty();
+        }
+        return applicationRuntimeDefinitionCatalog.findModel(
+                MetaContext.getCurrentTenantId(), defaultApplicationCode.trim(), modelCode);
     }
 
     private Optional<ModelDefinition> loadModelDefinition(String modelCode) {
