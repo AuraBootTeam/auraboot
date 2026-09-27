@@ -1,6 +1,17 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import Ajv from 'ajv';
 import YAML from 'yaml';
@@ -318,6 +329,73 @@ export function verifyArtifacts(lockInput, { artifactRoot }) {
   }
   assertNoMigrationCollisions(lock.artifacts, { artifactRoot: root });
   return lock;
+}
+
+function verifyRetainedDefinitions(lockIdentityValue, bundleRoot) {
+  const lock = validateLock(JSON.parse(readFileSync(resolve(bundleRoot, 'application.lock'), 'utf8')), {
+    expectedIdentity: lockIdentityValue,
+  });
+  const definitions = lock.artifacts.filter((artifact) => artifact.type === 'config');
+  if (definitions.length === 0) throw new Error('application lock has no config definition artifacts');
+  for (const artifact of definitions) {
+    const path = resolve(bundleRoot, artifact.localPath);
+    if (relative(bundleRoot, path).startsWith('..')) {
+      throw new Error(`definition artifact ${artifact.id} escapes the retained bundle`);
+    }
+    if (sha256Path(path) !== artifact.digest) {
+      throw new Error(`retained definition artifact ${artifact.id} checksum mismatch`);
+    }
+  }
+  return { lock, definitions };
+}
+
+/** Retain only immutable definition inputs under a content-addressed lock identity. */
+export function retainApplicationDefinitions(lockInput, { artifactRoot, definitionStore }) {
+  const lock = verifyArtifacts(lockInput, { artifactRoot });
+  const definitions = lock.artifacts.filter((artifact) => artifact.type === 'config');
+  if (definitions.length === 0) throw new Error('application lock has no config definition artifacts');
+  const store = resolve(definitionStore);
+  if (existsSync(store) && lstatSync(store).isSymbolicLink()) {
+    throw new Error('definition store must not be a symbolic link');
+  }
+  mkdirSync(store, { recursive: true, mode: 0o750 });
+  const identity = lock.identity.slice('sha256:'.length);
+  const destination = resolve(store, identity);
+  if (relative(store, destination).startsWith('..')) throw new Error('definition identity escapes the store');
+  if (existsSync(destination)) {
+    const destinationStat = lstatSync(destination);
+    if (destinationStat.isSymbolicLink() || !destinationStat.isDirectory()) {
+      throw new Error('retained definition entry must be a non-symlink directory');
+    }
+    verifyRetainedDefinitions(lock.identity, destination);
+    return destination;
+  }
+
+  const temporary = mkdtempSync(join(store, `.${identity}.tmp-`));
+  try {
+    writeFileSync(resolve(temporary, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`, { mode: 0o640 });
+    for (const artifact of definitions) {
+      const source = resolve(artifactRoot, artifact.localPath);
+      const target = resolve(temporary, artifact.localPath);
+      if (relative(temporary, target).startsWith('..')) {
+        throw new Error(`definition artifact ${artifact.id} escapes the retained bundle`);
+      }
+      mkdirSync(dirname(target), { recursive: true, mode: 0o750 });
+      cpSync(source, target, { recursive: true, errorOnExist: true, force: false });
+    }
+    verifyRetainedDefinitions(lock.identity, temporary);
+    try {
+      renameSync(temporary, destination);
+    } catch (error) {
+      if (!['EEXIST', 'ENOTEMPTY'].includes(error.code) || !existsSync(destination)) throw error;
+      verifyRetainedDefinitions(lock.identity, destination);
+      rmSync(temporary, { recursive: true, force: true });
+    }
+    return destination;
+  } catch (error) {
+    rmSync(temporary, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 export function assertNoMigrationCollisions(artifacts, { artifactRoot }) {

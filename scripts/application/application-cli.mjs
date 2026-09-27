@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import {
   buildApplicationGraph,
   readStructuredFile,
+  retainApplicationDefinitions,
   resolveApplication,
   verifyArtifacts,
   validateLock,
@@ -35,6 +36,7 @@ function parseArgs(argv) {
     else if (argument === '--lock') options.lock = resolve(rest[++index]);
     else if (argument === '--output') options.output = resolve(rest[++index]);
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
+    else if (argument === '--definition-store') options.definitionStore = resolve(rest[++index]);
     else if (argument === '--skip-image') options.skipImage = true;
     else if (argument === '--source-map') options.sourceMap = resolve(rest[++index]);
     else if (argument === '--route-root') options.routeRoot = resolve(rest[++index]);
@@ -104,6 +106,15 @@ async function main() {
     const lock = readStructuredFile(required(options, 'lock'));
     verifyArtifacts(lock, { artifactRoot: required(options, 'artifactRoot') });
     process.stdout.write(`verified ${lock.artifacts.length} staged artifacts: ${lock.identity}\n`);
+    return;
+  }
+  if (options.command === 'retain-definitions') {
+    const lock = readStructuredFile(required(options, 'lock'));
+    const destination = retainApplicationDefinitions(lock, {
+      artifactRoot: required(options, 'artifactRoot'),
+      definitionStore: required(options, 'definitionStore'),
+    });
+    process.stdout.write(`retained application definitions: ${destination}\n`);
     return;
   }
   if (options.command === 'graph') {
@@ -183,7 +194,7 @@ async function main() {
     process.stdout.write(`release receipt: ${options.receipt}\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs|materialize-assets|emit-route-manifest|publish-release [options]');
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|retain-definitions|graph|compare-graphs|materialize-assets|emit-route-manifest|publish-release [options]');
 }
 
 try {

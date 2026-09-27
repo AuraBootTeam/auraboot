@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -24,15 +25,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public final class ApplicationDefinitionBundle {
     private final Path root;
+    private final Path definitionStore;
     private final ObjectMapper mapper;
     private final ConcurrentHashMap<String, PluginManifestExtended> cache = new ConcurrentHashMap<>();
 
     public ApplicationDefinitionBundle(Environment environment, ObjectMapper mapper) {
-        this(Path.of(environment.getProperty("aura.application.bundle-root", "/opt/auraboot")), mapper);
+        this(Path.of(environment.getProperty("aura.application.bundle-root", "/opt/auraboot")),
+                optionalPath(environment.getProperty("aura.application.definition-store")), mapper);
     }
 
     ApplicationDefinitionBundle(Path root, ObjectMapper mapper) {
+        this(root, null, mapper);
+    }
+
+    ApplicationDefinitionBundle(Path root, Path definitionStore, ObjectMapper mapper) {
         this.root = root.toAbsolutePath().normalize();
+        this.definitionStore = definitionStore == null ? null : definitionStore.toAbsolutePath().normalize();
         this.mapper = mapper;
     }
 
@@ -55,7 +63,8 @@ public final class ApplicationDefinitionBundle {
     private PluginManifestExtended loadUncached(String applicationCode, String lockIdentity,
                                                 ApplicationDefinitionMapper.ComponentRow component) {
         try {
-            Path lockPath = inside(root.resolve("application.lock"));
+            Path bundleRoot = bundleRoot(lockIdentity);
+            Path lockPath = inside(bundleRoot, bundleRoot.resolve("application.lock"));
             JsonNode lock = mapper.readTree(Files.readAllBytes(lockPath));
             require(lock.path("schemaVersion").asInt() == 1, "Application lock schemaVersion must be one");
             require(applicationCode.equals(lock.path("application").path("id").asText()),
@@ -75,7 +84,7 @@ public final class ApplicationDefinitionBundle {
             require(matches.size() == 1, "Definition component is not uniquely pinned by the application lock");
             String localPath = matches.getFirst().path("localPath").asText();
             require(!localPath.isBlank(), "Definition component localPath is required");
-            Path componentRoot = inside(root.resolve(localPath));
+            Path componentRoot = inside(bundleRoot, bundleRoot.resolve(localPath));
             PinnedPluginSource source = PinnedPluginSource.capture(componentRoot, component.componentDigest);
             PluginManifestExtended manifest = new PluginDirectoryLoader().loadFromSource(source);
             require(manifest.getPluginId() != null && !manifest.getPluginId().isBlank()
@@ -87,6 +96,19 @@ public final class ApplicationDefinitionBundle {
         } catch (IOException failure) {
             throw new IllegalStateException("Application definition bundle cannot be read", failure);
         }
+    }
+
+    private Path bundleRoot(String lockIdentity) throws IOException {
+        if (definitionStore != null) {
+            Path candidate = definitionStore.resolve(lockIdentity.substring("sha256:".length())).normalize();
+            require(candidate.startsWith(definitionStore), "Definition lock identity escapes the store");
+            if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
+                require(Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS),
+                        "Retained definition bundle must be a non-symlink directory");
+                return inside(definitionStore, candidate);
+            }
+        }
+        return root;
     }
 
     private String computedLockIdentity(JsonNode lock) {
@@ -117,13 +139,18 @@ public final class ApplicationDefinitionBundle {
         return value;
     }
 
-    private Path inside(Path candidate) throws IOException {
+    private Path inside(Path boundary, Path candidate) throws IOException {
+        Path normalizedBoundary = boundary.toAbsolutePath().normalize();
         Path normalized = candidate.toAbsolutePath().normalize();
-        require(normalized.startsWith(root), "Definition artifact path escapes the application bundle");
-        Path realRoot = root.toRealPath();
+        require(normalized.startsWith(normalizedBoundary), "Definition artifact path escapes the application bundle");
+        Path realRoot = normalizedBoundary.toRealPath();
         Path real = normalized.toRealPath();
         require(real.startsWith(realRoot), "Definition artifact resolves outside the application bundle");
         return real;
+    }
+
+    private static Path optionalPath(String value) {
+        return value == null || value.isBlank() ? null : Path.of(value);
     }
 
     private static void require(boolean valid, String message) {

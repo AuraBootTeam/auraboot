@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,7 +35,7 @@ class ApplicationDefinitionBundleTest {
         String digest = directoryDigest(componentRoot);
         String lockIdentity = writeLock("config/edu-core", digest);
 
-        var manifest = new ApplicationDefinitionBundle(root, new ObjectMapper())
+        var manifest = new ApplicationDefinitionBundle(root, root.resolve("empty-retained-store"), new ObjectMapper())
                 .load("aura-edu", lockIdentity, component("edu-core", digest));
 
         assertEquals("com.auraboot.edu", manifest.getPluginId());
@@ -74,7 +75,53 @@ class ApplicationDefinitionBundleTest {
                 .load("aura-edu", lockIdentity, component("edu-core", digest)));
     }
 
+    @Test
+    void resolvesAnOlderReleaseFromTheContentAddressedDefinitionStore() throws Exception {
+        Path current = root.resolve("current");
+        Path retained = root.resolve("retained");
+        Path stagedOld = root.resolve("staged-old");
+        Files.createDirectories(current.resolve("config/edu-core"));
+        Files.createDirectories(stagedOld.resolve("config/edu-core"));
+        Files.writeString(current.resolve("config/edu-core/plugin.json"),
+                "{\"pluginId\":\"com.auraboot.edu\",\"namespace\":\"edu\",\"version\":\"2.0.0\"}");
+        String currentDigest = directoryDigest(current.resolve("config/edu-core"));
+        writeLock(current, "config/edu-core", currentDigest);
+        Files.writeString(stagedOld.resolve("config/edu-core/plugin.json"),
+                "{\"pluginId\":\"com.auraboot.edu\",\"namespace\":\"edu\",\"version\":\"1.2.3\"}");
+        String oldDigest = directoryDigest(stagedOld.resolve("config/edu-core"));
+        String oldIdentity = writeLock(stagedOld, "config/edu-core", oldDigest);
+        Path retainedOld = retained.resolve(oldIdentity.substring("sha256:".length()));
+        Files.createDirectories(retained);
+        Files.move(stagedOld, retainedOld, StandardCopyOption.ATOMIC_MOVE);
+
+        var manifest = new ApplicationDefinitionBundle(current, retained, new ObjectMapper())
+                .load("aura-edu", oldIdentity, component("edu-core", oldDigest));
+
+        assertEquals("1.2.3", manifest.getVersion());
+    }
+
+    @Test
+    void rejectsASymlinkAtAContentAddressedStoreEntry() throws Exception {
+        Path current = root.resolve("current");
+        Path retained = root.resolve("retained");
+        Files.createDirectories(current.resolve("config/edu-core"));
+        Files.createDirectories(retained);
+        Files.writeString(current.resolve("config/edu-core/plugin.json"),
+                "{\"pluginId\":\"com.auraboot.edu\",\"namespace\":\"edu\",\"version\":\"1.2.3\"}");
+        String digest = directoryDigest(current.resolve("config/edu-core"));
+        String identity = writeLock(current, "config/edu-core", digest);
+        Files.createSymbolicLink(retained.resolve(identity.substring("sha256:".length())), current);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new ApplicationDefinitionBundle(current, retained, new ObjectMapper())
+                        .load("aura-edu", identity, component("edu-core", digest)));
+    }
+
     private String writeLock(String localPath, String digest) throws Exception {
+        return writeLock(root, localPath, digest);
+    }
+
+    private static String writeLock(Path bundleRoot, String localPath, String digest) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode lock = (ObjectNode) mapper.readTree("""
                 {"schemaVersion":1,"application":{"id":"aura-edu"},
@@ -82,7 +129,7 @@ class ApplicationDefinitionBundleTest {
                 """.formatted(digest, localPath));
         String identity = hash(mapper.writeValueAsBytes(canonical(mapper, lock)));
         lock.put("identity", identity);
-        mapper.writeValue(root.resolve("application.lock").toFile(), lock);
+        mapper.writeValue(bundleRoot.resolve("application.lock").toFile(), lock);
         return identity;
     }
 
