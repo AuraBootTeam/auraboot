@@ -134,6 +134,11 @@ docker run --rm --network "$NET" -v "$STAGE/platform/src/main/resources/db/migra
   > "$ARTIFACTS/logs/flyway.log" 2>&1 || fail "Flyway migration failed"
 
 PROTOCOL_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+# AURA_PLUGINS_DIR is the PF4J jar-plugin root and must NOT share
+# AURA_BUILTIN_PLUGINS_DIR: the baked /app/plugins tree holds the DSL
+# builtin-import plugins (plugin.json + config/, no PF4J descriptor), and
+# since #2037 AuraPluginManager fails fast on undescribed paths instead of
+# skipping them. The image pre-creates the empty jar root /app/pf4j-plugins.
 docker run -d --name "$APP" --network "$NET" \
   -v "$STAGE/plugins":/plugins:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=test \
@@ -141,6 +146,7 @@ docker run -d --name "$APP" --network "$NET" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=open_platform_ci \
   -e REDIS_HOST="$REDIS" -e REDIS_PORT=6379 \
   -e AURA_BUILTIN_PLUGINS_DIR=/app/plugins \
+  -e AURA_PLUGINS_DIR=/app/pf4j-plugins \
   -e OPEN_PLATFORM_PROTOCOL_SIGNING_KEY="$PROTOCOL_KEY" "$IMAGE" >/dev/null
 for attempt in $(seq 1 90); do
   HEALTH="$(docker exec "$APP" wget -q -O - http://localhost:6443/actuator/health 2>/dev/null || true)"
