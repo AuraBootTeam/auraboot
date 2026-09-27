@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import org.springframework.web.bind.annotation.*;
 import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 
 /** Platform-admin release registration, publication and exact-match tenant binding control. */
 @RequirePlatformAdmin
@@ -92,6 +94,7 @@ public class ApplicationReleaseController {
     }
 
     @PostMapping("/{applicationCode}/tenant-bindings/{tenantId}/activation")
+    @RequirePermission(MetaPermission.APPLICATION_BINDING_ACTIVATE)
     public ApiResponse<ApplicationReleaseControlService.Binding> activateTenantBinding(
             @PathVariable String applicationCode, @PathVariable long tenantId,
             @RequestBody ActivateTenantBindingRequest request) {

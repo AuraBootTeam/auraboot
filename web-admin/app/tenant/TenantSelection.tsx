@@ -137,6 +137,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const requestData: any = { action };
 
   if (action === 'create') {
+    requestData.clientRequestId = formData.get('clientRequestId');
     requestData.tenantName = formData.get('tenantName');
     requestData.displayName = formData.get('displayName');
     requestData.industry = formData.get('industry');
@@ -228,6 +229,9 @@ export default function TenantSelection() {
   const allowTenantSelfService = canSelfProvisionTenant(accessPolicy);
   const dataUnavailable = accessPolicyStatus === 'unavailable' || spacesStatus === 'unavailable';
   const isSubmitting = navigation.state === 'submitting';
+  const createRequestId = useRef(
+    `tenant-create-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`,
+  );
 
   const createTitle =
     onboarding?.createTitle ?? t('tenant.select.create.title', undefined, '创建新租户');
@@ -517,6 +521,7 @@ export default function TenantSelection() {
                   }}
                 >
                   <input type="hidden" name="action" value="create" />
+                  <input type="hidden" name="clientRequestId" value={createRequestId.current} />
                   {onboarding?.postCreateRedirect && (
                     <input type="hidden" name="postCreateRedirect" value={onboarding.postCreateRedirect} />
                   )}

@@ -24,6 +24,9 @@ package com.auraboot.framework.permission.constants;
  */
 public final class MetaPermission {
 
+    /** Dedicated authority for switching a tenant from shadow to active Application Release. */
+    public static final String APPLICATION_BINDING_ACTIVATE = "platform.application_binding.activate";
+
     // ==================== SYSTEM permissions ====================
 
     /**

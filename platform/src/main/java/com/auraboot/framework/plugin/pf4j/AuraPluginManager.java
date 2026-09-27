@@ -106,6 +106,25 @@ public class AuraPluginManager extends SpringPluginManager {
         return Optional.of(artifact);
     }
 
+    /** Observe a started plugin by its declared immutable release component id. */
+    public Optional<LoadedPluginArtifact> observeLoadedPlugin(String pluginId) {
+        if (pluginId == null || pluginId.isBlank()) {
+            throw new IllegalArgumentException("Plugin id required");
+        }
+        PluginWrapper wrapper = getPlugin(pluginId);
+        if (wrapper == null || wrapper.getPluginState() != PluginState.STARTED) {
+            return Optional.empty();
+        }
+        LoadedPluginArtifact artifact = loadedArtifacts.get(wrapper.getPluginClassLoader());
+        if (artifact == null || !pluginId.equals(artifact.pluginId())) {
+            return Optional.empty();
+        }
+        if (!artifact.digest().equals(pluginArtifactDigest(artifact.path()))) {
+            throw new IllegalStateException("Loaded plugin artifact changed: " + pluginId);
+        }
+        return Optional.of(artifact);
+    }
+
     private static String pluginArtifactDigest(Path path) {
         if (!Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Plugin artifact must be a regular non-symlink JAR");
