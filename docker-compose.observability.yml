@@ -216,7 +216,6 @@ services:
 volumes:
   observability_postgres_data:
   prometheus_data:
-volumes:
   grafana_data:
   postgres_data:
   observability_canary_data:
