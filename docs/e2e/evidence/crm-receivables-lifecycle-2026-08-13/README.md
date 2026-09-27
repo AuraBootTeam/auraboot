@@ -7,7 +7,7 @@
 - Sales PF4J JAR SHA-256 prefix: `7ef24fef749c`
 - Playwright spec: `web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts`
 - Final verdict: `1 passed` in `1.0m`, Chromium, one worker, retry=0, trace enabled, `--no-deps`
-- Full Playwright trace: retained outside Git at `/Users/ghj/work/auraboot/.workspace/evidence/crm-receivables-lifecycle-2026-08-13/trace.zip`; the repository keeps the reviewed screenshots and manifest without adding an 88 MB binary to clone history.
+- Full Playwright trace: retained outside Git in a local evidence workspace; the repository keeps the reviewed screenshots and manifest without adding an 88 MB binary to clone history.
 - Focused manifest: `22 pass / 4 untested / 0 fail / 0 skipped`; Sales full inventory is `54 pass / 84 untested` across 94 commands and 44 pages.
 
 The user journey creates fresh CRM and Sales records, then drives every new receivables state through real pages:

@@ -92,10 +92,7 @@
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
-| `dev/enterprise-env-export.sh` | 0 | 2026-05-09 | enterprise-env-export.sh — env contract for the enterprise overlay |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
-| `dev/rebuild-ent-backend.sh` | 1 | 2026-09-14 | Rebuild the Enterprise backend against an explicit OSS checkout. |
-| `dev/rotate-license-keypair.sh` | 0 | 2026-05-09 | Rotate the AuraBoot commercial-license signing keypair. |
 | `dev/run-agent-runtime-backend-gate.sh` | 0 | 2026-07-23 | Focused backend gate for the generic agent runtime architecture. |
 | `dev/xxl-job-true-stack-smoke.sh` | 0 | 2026-06-07 |  |
 | `digital-employee-golden-run.sh` | 0 | 2026-07-23 | digital-employee-golden-run.sh — self-contained browser golden for the digital |
@@ -188,7 +185,6 @@
 | `dev/maven-local-export.sh` | 1 | 2026-05-12 | Sourceable helper for per-worktree Maven local publishing. |
 | `dev/plugin-runtime-import-guard.mjs` | 4 | 2026-07-17 | Guard a hybrid/config plugin import against the classic source/config/runtime/schema drift: |
 | `dev/prepare-bugfix-demo.sh` | 2 | 2026-05-22 | Prepare a running daily bugfix environment for OSS demo debugging. |
-| `dev/purge-private-pem-from-history.sh` | 1 | 2026-05-09 | Purge platform/src/main/resources/license/private.pem from the entire git |
 | `dev/r2-env-export.sh` | 8 | 2026-05-22 | r2-env-export.sh — single-line `source` to set up the env for an |
 | `dev/resolve-plugin-backends.mjs` | 3 | 2026-08-24 | Resolve requested plugin backends across the OSS root and explicit fallback roots for deterministic PF4J staging. |
 | `dev/run-agent-runtime-full-gate-docker.sh` | 2 | 2026-05-21 | Fresh isolated Docker gate for the canonical agent runtime chain. |
