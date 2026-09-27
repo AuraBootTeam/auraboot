@@ -65,6 +65,8 @@ case "$PUBLISH_REGISTRY" in
   0|1) ;;
   *) fatal 'AURA_RELEASE_PUBLISH_REGISTRY must be 0 or 1' ;;
 esac
+PLAYWRIGHT_DOWNLOAD_HOST="${AURA_PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.npmmirror.com/binaries/playwright}"
+[[ "$PLAYWRIGHT_DOWNLOAD_HOST" == https://* ]] || fatal 'AURA_PLAYWRIGHT_DOWNLOAD_HOST must use HTTPS'
 if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
   : "${AURA_RELEASE_REGISTRY:?AURA_RELEASE_REGISTRY is required when remote publication is enabled}"
   : "${AURA_RELEASE_REGISTRY_USERNAME:?AURA_RELEASE_REGISTRY_USERNAME is required when remote publication is enabled}"
@@ -373,6 +375,8 @@ env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$A
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
 
 env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
+PLAYWRIGHT_DOWNLOAD_HOST="$PLAYWRIGHT_DOWNLOAD_HOST" pnpm --dir "$PRODUCT_ROOT" exec playwright install chromium \
+  >"$ARTIFACTS/logs/playwright-install.log" 2>&1 || fatal 'locked Playwright Chromium is unavailable'
 env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_WEBSERVER=1 \
   PW_ARTIFACT_DIR="$ARTIFACTS/e2e/artifacts" PW_RESULTS_JSON="$ARTIFACTS/e2e/results.json" \
   pnpm --dir "$PRODUCT_ROOT" exec playwright test --config playwright.release.config.ts \

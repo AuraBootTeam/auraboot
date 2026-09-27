@@ -71,6 +71,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /docker rm -f "\$BUILD_PG_CONTAINER"/);
   assert.match(productImageGate, /docker logs "\$APP_CONTAINER" >"\$ARTIFACTS\/logs\/application-final\.log"/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
+  assert.match(productImageGate, /PLAYWRIGHT_DOWNLOAD_HOST="\$PLAYWRIGHT_DOWNLOAD_HOST" pnpm --dir "\$PRODUCT_ROOT" exec playwright install chromium/);
+  assert.match(productImageGate, /AURA_PLAYWRIGHT_DOWNLOAD_HOST must use HTTPS/);
   assert.match(productImageGate, /release-image-receipt\.json/);
   assert.match(productImageGate, /docker cp "\$PAYLOAD_CONTAINER:\/opt\/auraboot\/\." "\$IMAGE_PAYLOAD_ROOT\/"/);
   assert.match(productImageGate, /diff -qr "\$PRODUCT_RELEASE\/\$payload_directory" "\$IMAGE_PAYLOAD_ROOT\/\$payload_directory"/);
