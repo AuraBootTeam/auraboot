@@ -34,6 +34,7 @@ public interface ApplicationDefinitionMapper {
             JOIN ab_application_release_publication p ON p.application_id=a.id AND p.release_id=t.release_id
             WHERE a.code=#{applicationCode}
             """)
+    @InterceptorIgnore(tenantLine = "true")
     ReleaseRow findPublishedStableRelease(@Param("applicationCode") String applicationCode);
 
     @Select("""
@@ -42,6 +43,7 @@ public interface ApplicationDefinitionMapper {
             WHERE release_id=#{releaseId} AND component_type='definition'
             ORDER BY component_key
             """)
+    @InterceptorIgnore(tenantLine = "true")
     List<ComponentRow> findDefinitionComponents(@Param("releaseId") String releaseId);
 
     @Select("""
