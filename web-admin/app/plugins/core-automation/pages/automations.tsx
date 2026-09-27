@@ -6,29 +6,26 @@ import {
   automationService,
   type Automation,
 } from '~/framework/smart/automation/services/automationService';
-import { getTokenFromRequest } from '~/shared/services/session';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 interface LoaderData {
   automations: Automation[];
-  token: string | null;
   error?: string;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs): Promise<LoaderData> => {
   try {
-    const token = await getTokenFromRequest(request);
     const automations = await automationService.list(undefined, request);
-    return { automations, token };
+    return { automations };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load automations';
-    return { automations: [], token: null, error: message };
+    return { automations: [], error: message };
   }
 };
 
 export default function AutomationsPage() {
   const st = useSmartText();
-  const { automations, token, error } = useLoaderData<LoaderData>();
+  const { automations, error } = useLoaderData<LoaderData>();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,7 +33,7 @@ export default function AutomationsPage() {
         <h1 className="mb-6 text-2xl font-bold text-gray-900">
           {st('$i18n:automation.page.title') || 'Automation Management'}
         </h1>
-        <AutomationList initialAutomations={automations} token={token} serverError={error} />
+        <AutomationList initialAutomations={automations} token={null} serverError={error} />
       </div>
     </div>
   );

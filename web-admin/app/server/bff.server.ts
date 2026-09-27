@@ -18,6 +18,9 @@ import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { resolveDeploymentBranding } from '~/config/branding.server';
+import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
+import { handleLegacySessionMigration } from './auth/legacy-session-migration';
+import { handleSocialSessionExchange } from './auth/social-session-exchange';
 
 // ============================================================
 // CRITICAL: Bypass system proxy for ALL axios requests in BFF.
@@ -210,12 +213,35 @@ async function commitLoginSession(
   res.setHeader('Set-Cookie', await commitUserSession(request, token, remember));
 }
 
+// Ambient cookie authentication makes every mutation CSRF-sensitive. Browser
+// writes must come from this BFF origin; explicit bearer SDK/SSR clients remain
+// supported by the middleware.
+app.use('/api', enforceCsrfProtection);
+
+// One-release bridge for users who signed in before cookie-only auth. The
+// browser submits the old token once, the BFF verifies it against the backend,
+// commits the httpOnly session, and the client deletes every legacy auth key.
+app.post('/api/auth/session-migrate', async (req, res, next) => {
+  return handleLegacySessionMigration(req, res, next, {
+    backendUrl: SPRING_BOOT_URL,
+    commitSession: commitLoginSession,
+  });
+});
+
+const socialSessionExchange = (req: express.Request, res: express.Response, next: express.NextFunction) =>
+  handleSocialSessionExchange(req, res, next, {
+    backendUrl: SPRING_BOOT_URL,
+    commitSession: commitLoginSession,
+  });
+
+// OAuth exchange results can contain a JWT. Terminate those responses at the
+// BFF, set the httpOnly cookie, and return only a non-secret completion signal.
+app.post('/api/auth/login/social/:provider/callback', socialSessionExchange);
+app.post('/api/auth/login/social/confirm-merge', socialSessionExchange);
+
 // Cookie-authenticated renewal belongs to the BFF; JWTs never reach browser JS.
 app.post('/api/auth/session-renew', async (req, res, next) => {
-  const origin = req.get('origin');
-  if (!origin || !(origin === `${req.protocol}://${req.get('host')}`
-    || CREDENTIAL_ALLOWED_ORIGIN_HEADERS.has(origin)
-    || (config.server.env === 'development' && DEV_ALLOWED_ORIGIN_HEADERS.has(origin)))) {
+  if (!hasSameOrigin(req)) {
     return res.status(403).json({ renewed: false });
   }
   try {
@@ -235,17 +261,6 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
   try {
     const redirectTo = safeLoginRedirect(req.body?.redirectTo);
     const remember = req.body?.remember === 'on';
-    const intent = String(req.body?.intent || '');
-
-    if (intent === 'social-callback') {
-      const token = String(req.body?.token || '');
-      if (!token) {
-        return res.redirect(303, buildLoginFailureRedirect(redirectTo, { error: 'missingToken' }));
-      }
-      await commitLoginSession(req, res, token, true);
-      return res.redirect(302, redirectTo);
-    }
-
     const channelCode = String(req.body?.channelCode || 'email_password');
     let authPath: string;
     let authPayload: Record<string, string>;

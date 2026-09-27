@@ -34,35 +34,34 @@ function routeArgs(params: Record<string, string>) {
 
 describe('dynamic record route params', () => {
   it('loads the standard edit route when the manifest supplies recordId', async () => {
-    await expect(
-      editLoader(routeArgs({ pageKey: 'sla_config', recordId: RECORD_PID })),
-    ).resolves.toMatchObject({
+    const result = await editLoader(routeArgs({ pageKey: 'sla_config', recordId: RECORD_PID }));
+    expect(result).toMatchObject({
       tableName: 'sla_config',
       recordPid: RECORD_PID,
-      token: 'test-token',
     });
+    expect(result).not.toHaveProperty('token');
     expect(getTokenFromRequest).toHaveBeenCalled();
   });
 
   it('loads the standard view route when the manifest supplies recordId', async () => {
-    await expect(
-      viewLoader(routeArgs({ pageKey: 'sla_config', recordId: RECORD_PID })),
-    ).resolves.toMatchObject({
+    const result = await viewLoader(routeArgs({ pageKey: 'sla_config', recordId: RECORD_PID }));
+    expect(result).toMatchObject({
       tableName: 'sla_config',
       recordPid: RECORD_PID,
-      token: 'test-token',
     });
+    expect(result).not.toHaveProperty('token');
   });
 
   it('loads custom edit routes when the manifest supplies recordId', async () => {
-    await expect(
-      customEditLoader(routeArgs({ pageKey: 'sla_config_custom', recordId: RECORD_PID })),
-    ).resolves.toMatchObject({
+    const result = await customEditLoader(
+      routeArgs({ pageKey: 'sla_config_custom', recordId: RECORD_PID }),
+    );
+    expect(result).toMatchObject({
       pageKey: 'sla_config_custom',
       tableName: 'sla_config',
       recordPid: RECORD_PID,
-      token: 'test-token',
     });
+    expect(result).not.toHaveProperty('token');
     expect(fetchResult).toHaveBeenCalledWith(
       '/api/pages/key/sla_config_custom',
       expect.objectContaining({ method: 'get', token: 'test-token' }),

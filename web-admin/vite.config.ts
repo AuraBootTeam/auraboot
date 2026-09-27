@@ -189,6 +189,9 @@ export default defineConfig({
       '/api/notifications/stream': {
         target: bffProxyTarget,
         changeOrigin: true,
+        // Preserve the browser-facing origin for BFF CSRF validation even
+        // though changeOrigin rewrites Host to the internal BFF target.
+        xfwd: true,
         secure: false,
         configure: (proxy, _options) => {
           console.log(`🔔 Proxying SSE /api/notifications/stream to BFF server`);
@@ -205,6 +208,7 @@ export default defineConfig({
       '^/api/': {
         target: bffProxyTarget,
         changeOrigin: true,
+        xfwd: true,
         secure: false,
         configure: (_proxy, _options) => {
           console.log(

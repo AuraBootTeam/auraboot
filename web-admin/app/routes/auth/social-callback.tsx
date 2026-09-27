@@ -20,6 +20,7 @@ import { consumeOAuthState, loginOAuthStateKey } from '~/auth/oauth-state';
 
 interface AuthResponse {
   jwt: string | null;
+  sessionEstablished?: boolean;
   userPid: string | null;
   username: string | null;
   tenantId: number | null;
@@ -127,30 +128,9 @@ export default function SocialCallback() {
         return;
       }
 
-      if (data.jwt) {
-        // Success — store token and redirect
-        // Use form POST to create session via Remix action
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = '/login';
-
-        const fields: Record<string, string> = {
-          intent: 'social-callback',
-          token: data.jwt,
-          redirectTo: data.tenantId ? '/' : '/tenant-selection',
-        };
-
-        for (const [key, value] of Object.entries(fields)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
+      if (data.sessionEstablished) {
         setState('success');
+        window.location.replace(data.tenantId ? '/' : '/tenant-selection');
         return;
       }
 
@@ -193,30 +173,11 @@ export default function SocialCallback() {
         return;
       }
 
-      if (result.data?.jwt) {
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = '/login';
-
-        const fields: Record<string, string> = {
-          intent: 'social-callback',
-          token: result.data.jwt,
-          redirectTo: result.data.tenantId ? '/' : '/tenant-selection',
-        };
-
-        for (const [key, value] of Object.entries(fields)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
+      if (result.data?.sessionEstablished) {
         setState('success');
+        window.location.replace(result.data.tenantId ? '/' : '/tenant-selection');
       } else {
-        setMergeError('No token received after merge');
+        setMergeError('Session was not established after merge');
         setMerging(false);
       }
     } catch (err) {

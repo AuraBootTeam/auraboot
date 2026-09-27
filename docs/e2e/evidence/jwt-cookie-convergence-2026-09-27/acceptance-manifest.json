@@ -1,0 +1,155 @@
+{
+  "run": {
+    "id": "jwt-cookie-convergence-2026-09-27",
+    "target": "Web Admin JWT convergence to a server-owned httpOnly session cookie",
+    "sot": "docs/system-reference/2026-09-27-jwt-cookie-convergence-testing-gate-acceptance-report.md",
+    "runtime": "jwt-cookie-verify / slot 143 / PostgreSQL auraboot_143",
+    "claim_level": "targeted-tested",
+    "fix_rounds": 2
+  },
+  "verdict": { "pass": 15, "untested": 0, "fail": 0, "skipped": 0 },
+  "groups": [
+    {
+      "id": "browser-session",
+      "title": "Cookie-only browser authentication lifecycle",
+      "rows": [
+        {
+          "id": "JWT-COOKIE-01",
+          "action": "Sign in through the real login form and reload an authenticated page",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "e2e",
+          "evidence": ["web-admin/tests/e2e/auth/cookie-convergence.spec.ts"],
+          "assertion": "The browser receives an httpOnly SameSite=Lax __session cookie, remains signed in after reload, and has no JWT material in localStorage or sessionStorage",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-COOKIE-02",
+          "action": "Renew and end the server-owned session",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "e2e",
+          "evidence": ["web-admin/tests/e2e/auth/cookie-convergence.spec.ts", "web-admin/tests/e2e/auth/logout.spec.ts", "web-admin/tests/e2e/auth/session-lifetime.spec.ts"],
+          "assertion": "Renewal returns no-store without exposing a JWT; logout removes the cookie and protected routes require login",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-COOKIE-03",
+          "action": "Migrate a valid pre-cookie browser JWT exactly once",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "e2e",
+          "evidence": ["web-admin/tests/e2e/auth/cookie-convergence.spec.ts", "web-admin/app/auth/__tests__/legacy-session-migration.test.ts", "web-admin/app/server/auth/__tests__/legacy-session-migration.test.ts"],
+          "assertion": "The BFF validates the bearer token, sets __session, and deletes all legacy auth keys without placing the token in a URL or response body",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-COOKIE-04",
+          "action": "Handle invalid and temporarily unexchangeable legacy JWTs",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/auth/__tests__/legacy-session-migration.test.ts", "web-admin/app/server/auth/__tests__/legacy-session-migration.test.ts"],
+          "assertion": "Invalid tokens are deleted after rejection, while transient network failures preserve the token for a later retry",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-COOKIE-05",
+          "action": "Terminate social-login JWT exchange at the BFF",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "e2e",
+          "evidence": ["web-admin/tests/e2e/auth/social-oauth-callback.spec.ts", "web-admin/app/server/auth/__tests__/social-session-exchange.test.ts"],
+          "assertion": "The social callback sets an httpOnly session and browser-visible JSON contains no JWT, including an unexpected upstream error envelope",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "browser-token-removal",
+      "title": "Removal of browser-readable JWT paths",
+      "rows": [
+        {
+          "id": "JWT-CLIENT-01",
+          "action": "Create browser HTTP request context",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/shared/services/http-client/__tests__/RequestContext.test.ts", "web-admin/app/shared/services/http-client/__tests__/HttpClient.test.ts"],
+          "assertion": "CSR context never reads storage or returns a token, and fetch relies on same-origin credentials without Authorization",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-CLIENT-02",
+          "action": "Download commands and Gerber artifacts through cookie authentication",
+          "surface": "component", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/framework/meta/utils/__tests__/commandDownload.test.ts", "web-admin/app/framework/meta/rendering/blocks/__tests__/GerberViewerBlockRenderer.test.tsx"],
+          "assertion": "Direct fetch call sites send credentials and do not obtain JWTs from browser storage",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-CLIENT-03",
+          "action": "Serialize authenticated loader and AuthContext data to the browser",
+          "surface": "route", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/routes/__tests__/dynamic-record-route-params.test.ts", "web-admin/app/shared/services/__tests__/userService.test.ts"],
+          "assertion": "Route data and user serialization omit the JWT; AuthContext exposes token as null",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-CLIENT-04",
+          "action": "Sweep production browser code for legacy token storage access",
+          "surface": "static", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "static",
+          "evidence": ["web-admin/app/auth/legacy-session-migration.ts"],
+          "assertion": "No localStorage/sessionStorage JWT access remains outside the one-release migration boundary",
+          "verdict": "pass", "verdict_by": "static-sweep"
+        }
+      ]
+    },
+    {
+      "id": "security-boundaries",
+      "title": "Cookie-authentication security boundaries",
+      "rows": [
+        {
+          "id": "JWT-SEC-01",
+          "action": "Reject cross-origin cookie-authenticated mutations",
+          "surface": "middleware", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "e2e",
+          "evidence": ["web-admin/app/server/middlewares/__tests__/CsrfProtection.test.ts", "web-admin/tests/e2e/auth/cookie-convergence.spec.ts"],
+          "assertion": "Exact same-origin writes pass through forwarded proxy headers and a hostile Origin receives 403",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-SEC-02",
+          "action": "Preserve explicit bearer API clients without weakening cookie CSRF checks",
+          "surface": "middleware", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/server/middlewares/__tests__/CsrfProtection.test.ts"],
+          "assertion": "Safe methods and explicit Authorization clients bypass ambient-cookie Origin enforcement; cookie mutations do not",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-SEC-03",
+          "action": "Audit SSE and WebSocket connection URLs for token query parameters",
+          "surface": "static", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "static",
+          "evidence": ["web-admin/app"],
+          "assertion": "No token, access_token, or jwt query construction exists in production Web Admin code",
+          "verdict": "pass", "verdict_by": "static-sweep"
+        },
+        {
+          "id": "JWT-SEC-04",
+          "action": "Log proxied authentication traffic without token material",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/server/services/__tests__/BffProxyService.test.ts", "/tmp/aura-jwt-cookie-verify-bff.log (PID 30464)"],
+          "assertion": "Authorization is fully redacted and response previews replace JWT values with [REDACTED] while forwarded bytes remain unchanged",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-SEC-05",
+          "action": "Preserve full proxied response bytes while sanitizing diagnostics",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/server/services/__tests__/BffProxyService.test.ts"],
+          "assertion": "Log redaction does not truncate or rewrite the response delivered to the caller",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        },
+        {
+          "id": "JWT-SEC-06",
+          "action": "Keep the migration exchange same-origin and non-cacheable",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit",
+          "evidence": ["web-admin/app/server/auth/__tests__/legacy-session-migration.test.ts"],
+          "assertion": "Cross-origin migration is rejected and a successful exchange returns 204 with Cache-Control: no-store",
+          "verdict": "pass", "verdict_by": "spec-assert"
+        }
+      ]
+    }
+  ],
+  "residualGaps": [
+    "The full OSS Playwright matrix was not run; verification is limited to the authentication/session denominator in this manifest.",
+    "Legacy browser-token migration is intentionally a one-release compatibility bridge and must be removed in a later release after the migration window closes."
+  ]
+}

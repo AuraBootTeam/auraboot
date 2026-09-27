@@ -174,7 +174,7 @@ describe('fetchUserInfo', () => {
     getTokenMock.mockResolvedValue(TOKEN);
 
     const userData = {
-      user: { id: 42, name: 'Alice' },
+      user: { id: 42, name: 'Alice', jwt: 'must-not-reach-browser' },
       permissions: { roles: [], permissions: [] },
       preferences: null,
     };

@@ -21,7 +21,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   try {
     const token = await getTokenFromRequest(request);
     const accessError = await resolveDynamicPageAccessError(request, token, pageKey);
-    return { tableName: pageKey, recordPid, token, accessError };
+    return { tableName: pageKey, recordPid, accessError };
   } catch (error) {
     console.error('Failed to load edit page:', error);
     if (error instanceof Response) {
@@ -32,11 +32,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicFormEdit() {
-  const { tableName, recordPid, token, accessError } = useLoaderData<typeof loader>();
+  const { tableName, recordPid, accessError } = useLoaderData<typeof loader>();
   if (accessError) {
     return <DynamicPageUnavailable message={accessError} />;
   }
   return (
-    <DynamicPageRenderer tableName={tableName} pageType="form" token={token} recordPid={recordPid} />
+    <DynamicPageRenderer tableName={tableName} pageType="form" recordPid={recordPid} />
   );
 }

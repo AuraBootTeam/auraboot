@@ -28,6 +28,7 @@ import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
 import { loginOAuthStateKey } from './oauth-state';
+import { migrateLegacyBrowserSession } from './legacy-session-migration';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
@@ -120,22 +121,6 @@ function isMobileDevice(userAgent: string): boolean {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
-  const intent = formData.get('intent') as string;
-
-  // Handle social OAuth callback — token already obtained by callback page
-  if (intent === 'social-callback') {
-    const token = formData.get('token') as string;
-    const redirectTo = safeRedirect(formData.get('redirectTo'), '/');
-    if (!token) {
-      return data({ errors: { general: 'Missing token' } }, { status: 400 });
-    }
-    return createUserSession({
-      request,
-      token,
-      remember: true,
-      redirectTo,
-    });
-  }
 
   const channelCode = (formData.get('channelCode') as string) || 'email_password';
   const authKind = formData.get('authKind') as string | null;
@@ -440,11 +425,26 @@ export default function LoginPage() {
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const legacyMigrationAttemptedRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [remember, setRemember] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (legacyMigrationAttemptedRef.current) return;
+    legacyMigrationAttemptedRef.current = true;
+    let cancelled = false;
+    migrateLegacyBrowserSession().then((migrated) => {
+      if (!cancelled && migrated) {
+        window.location.replace(safeRedirect(redirectTo, '/'));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [redirectTo]);
 
   // Determine which tab channels and social channels are available
   const tabOptions = channelOptions.filter((option) => option.kind !== 'oauth');

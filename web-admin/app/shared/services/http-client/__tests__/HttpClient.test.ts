@@ -32,8 +32,6 @@ describe('HttpClient integration', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    // Set up sessionStorage for CSR token (key must match AuthConstant.JWT_TOKEN_KEY)
-    window.sessionStorage.setItem('jwtToken', 'test-token');
   });
 
   afterEach(() => {
@@ -163,13 +161,14 @@ describe('HttpClient integration', () => {
       expect(JSON.parse(init.body).clientRequestId).toBe('external-retry-1');
     });
 
-    it('should include auth header for protected routes', async () => {
+    it('should use the httpOnly cookie without exposing an auth header for protected routes', async () => {
       mockFetchSuccess();
 
       await fetchResult('/api/user/current');
 
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect((init.headers as Record<string, string>)['Authorization']).toMatch(/^Bearer /);
+      expect((init.headers as Record<string, string>)['Authorization']).toBeUndefined();
+      expect(init.credentials).toBe('include');
     });
 
     it('should not include auth header for public routes', async () => {
