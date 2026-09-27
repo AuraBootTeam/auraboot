@@ -74,7 +74,7 @@ if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
     || fatal 'release registry password file must be a readable regular non-symlink file'
 fi
 
-for command_name in curl docker git node openssl pnpm python3 sha256sum tar; do need "$command_name"; done
+for command_name in cmp curl diff docker git node openssl pnpm python3 sha256sum tar; do need "$command_name"; done
 [[ "$(uname -s)" == Linux ]] || fatal 'release images must be built on the admitted Linux CI host'
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
@@ -256,9 +256,18 @@ docker create --name "$PAYLOAD_CONTAINER" "$IMAGE_REF" >/dev/null \
 docker cp "$PAYLOAD_CONTAINER:/opt/auraboot/." "$IMAGE_PAYLOAD_ROOT/" \
   >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image payload could not be extracted'
 docker rm "$PAYLOAD_CONTAINER" >/dev/null
-node "$IMAGE_PAYLOAD_ROOT/bin/application/application-artifact-verifier.mjs" \
-  --lock "$IMAGE_PAYLOAD_ROOT/application.lock" --artifact-root "$IMAGE_PAYLOAD_ROOT" \
-  >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image payload does not match application.lock'
+RUNTIME_LOCAL_PATH="$(node -e "const fs=require('node:fs');const l=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));const a=l.artifacts.find(x=>x.type==='runtime');if(!a)process.exit(2);process.stdout.write(a.localPath)" "$PRODUCT_RELEASE/application.lock")" \
+  || fatal 'application.lock has no runtime artifact'
+cmp "$PRODUCT_RELEASE/$RUNTIME_LOCAL_PATH" "$IMAGE_PAYLOAD_ROOT/runtime/application.jar" \
+  >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image runtime differs from the locked release payload'
+for payload_directory in plugins config migrations web bin; do
+  diff -qr "$PRODUCT_RELEASE/$payload_directory" "$IMAGE_PAYLOAD_ROOT/$payload_directory" \
+    >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail "release image $payload_directory differs from the locked release payload"
+done
+for payload_file in app.yaml application.lock artifact-catalog.json release-registration.json sbom.cdx.json; do
+  cmp "$PRODUCT_RELEASE/$payload_file" "$IMAGE_PAYLOAD_ROOT/$payload_file" \
+    >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail "release image $payload_file differs from the locked release payload"
+done
 
 docker run -d --name "$PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_ci \
