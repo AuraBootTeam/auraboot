@@ -3,7 +3,6 @@ package com.auraboot.framework.application.release;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Objects;
@@ -17,9 +16,11 @@ public final class ApplicationReleaseControlService {
     public ApplicationReleaseControlService(JdbcTemplate jdbc) {
         this.jdbc = Objects.requireNonNull(jdbc);
         var manager = new DataSourceTransactionManager(Objects.requireNonNull(jdbc.getDataSource()));
-        manager.setValidateExistingTransaction(true);
         transactions = new TransactionTemplate(manager);
-        transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        // Keep the database default for standalone control calls and inherit an existing
+        // transaction when binding is part of tenant creation. Declaring an isolation level
+        // here makes Spring reject participation in an outer transaction whose definition
+        // did not explicitly name that same isolation level.
     }
 
     public record Publication(long applicationId, String releaseId, String publishedBy, String operationId) {}
@@ -32,6 +33,14 @@ public final class ApplicationReleaseControlService {
         validate(applicationCode, releaseId, actor, operationId);
         return transactions.execute(status -> {
             var release = release(applicationCode, releaseId);
+            var replay = publicationByOperation(operationId);
+            if (!replay.isEmpty()) {
+                var previous = replay.getFirst();
+                if (previous.applicationId() != release.applicationId() || !previous.releaseId().equals(releaseId)) {
+                    throw new IllegalStateException("Publication operation was already used for a different release");
+                }
+                return previous;
+            }
             jdbc.update("""
                     INSERT INTO ab_application_release_publication
                         (release_id,application_id,published_by,operation_id)
@@ -50,6 +59,14 @@ public final class ApplicationReleaseControlService {
         validate(applicationCode, releaseId, actor, operationId);
         return transactions.execute(status -> {
             var release = release(applicationCode, releaseId);
+            var replay = channelTargetByOperation(operationId);
+            if (!replay.isEmpty()) {
+                var previous = replay.getFirst();
+                if (previous.applicationId() != release.applicationId() || !previous.releaseId().equals(releaseId)) {
+                    throw new IllegalStateException("Stable operation was already used for a different release");
+                }
+                return previous;
+            }
             require(jdbc.queryForObject("""
                     SELECT count(*) FROM ab_application_release_publication
                     WHERE application_id=? AND release_id=?
@@ -140,6 +157,22 @@ public final class ApplicationReleaseControlService {
                 FROM ab_application_channel_target WHERE application_id=? AND channel='stable'
                 """, (row, index) -> new ChannelTarget(row.getLong(1), row.getString(2), row.getString(3),
                         row.getLong(4), row.getString(5), row.getString(6)), applicationId);
+    }
+
+    private java.util.List<Publication> publicationByOperation(String operationId) {
+        return jdbc.query("""
+                SELECT application_id,release_id,published_by,operation_id
+                FROM ab_application_release_publication WHERE operation_id=?
+                """, (row, index) -> new Publication(row.getLong(1), row.getString(2), row.getString(3), row.getString(4)),
+                operationId);
+    }
+
+    private java.util.List<ChannelTarget> channelTargetByOperation(String operationId) {
+        return jdbc.query("""
+                SELECT application_id,channel,release_id,target_version,changed_by,operation_id
+                FROM ab_application_channel_target_history WHERE operation_id=?
+                """, (row, index) -> new ChannelTarget(row.getLong(1), row.getString(2), row.getString(3),
+                        row.getLong(4), row.getString(5), row.getString(6)), operationId);
     }
 
     private Binding readBinding(long tenantId, long applicationId) {

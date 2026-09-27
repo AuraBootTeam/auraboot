@@ -253,6 +253,7 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         String publishOperation = bindingAudit().operationId();
         var publication = control.publish("aura-edu", winner, "ci:edu-release", publishOperation);
         assertEquals(winner, publication.releaseId());
+        assertEquals(publication, control.publish("aura-edu", winner, "ci:retry", publishOperation));
         assertEquals(publication, control.publish("aura-edu", winner, "ci:retry", bindingAudit().operationId()));
         assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
                 "UPDATE ab_application_release_publication SET published_by='test:forged' WHERE release_id=?", winner));
@@ -265,6 +266,18 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_application_channel_target_history", Integer.class));
         assertEquals(stable, control.promoteStable(
                 "aura-edu", winner, null, "ci:retry", bindingAudit().operationId()));
+        var tenantCreationTransaction = new org.springframework.transaction.support.TransactionTemplate(
+                new DataSourceTransactionManager(source));
+        tenantCreationTransaction.executeWithoutResult(status -> {
+            var joined = control.bindStable(
+                    715, "aura-edu", "user:transactional-founder", bindingAudit().operationId());
+            assertEquals(winner, joined.releaseId());
+            status.setRollbackOnly();
+        });
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM ab_tenant_application_binding WHERE tenant_id=715", Integer.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=715", Integer.class));
         String bindOperation = bindingAudit().operationId();
         var bound = control.bindStable(714, "aura-edu", "user:school-founder", bindOperation);
         assertEquals("active", bound.status());
@@ -290,11 +303,19 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
                 () -> store.compareAndSetShadow(forgedShadow, first, digest.apply(first), bindingAudit()));
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
+        assertThrows(IllegalStateException.class,
+                () -> control.publish("aura-edu", first, "ci:edu-release", publishOperation));
         control.publish("aura-edu", first, "ci:edu-release", bindingAudit().operationId());
         assertThrows(IllegalStateException.class, () -> control.promoteStable(
                 "aura-edu", first, 2L, "ci:edu-release", bindingAudit().operationId()));
-        assertEquals(2L, control.promoteStable(
-                "aura-edu", first, 1L, "ci:edu-release", bindingAudit().operationId()).version());
+        String stableUpdateOperation = bindingAudit().operationId();
+        var updatedStable = control.promoteStable(
+                "aura-edu", first, 1L, "ci:edu-release", stableUpdateOperation);
+        assertEquals(2L, updatedStable.version());
+        assertEquals(updatedStable, control.promoteStable(
+                "aura-edu", first, 1L, "ci:retry", stableUpdateOperation));
+        assertThrows(IllegalStateException.class, () -> control.promoteStable(
+                "aura-edu", winner, 2L, "ci:edu-release", stableUpdateOperation));
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_application_channel_target_history", Integer.class));
         assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
                 "UPDATE ab_application_channel_target_history SET changed_by='test:forged'"));
