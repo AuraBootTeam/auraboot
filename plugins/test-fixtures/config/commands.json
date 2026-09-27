@@ -743,5 +743,41 @@
     "permissions": [
       "e2et.order.manage"
     ]
+  },
+  {
+    "code": "e2et_crm_opp.create",
+    "displayName:zh-CN": "新建记录",
+    "displayName:en": "Create Record",
+    "description": "Create a stage-rail fixture opportunity (required name and stage)",
+    "type": "create",
+    "modelCode": "e2et_crm_opp",
+    "inputFields": [
+      "e2et_crm_opp_name",
+      "e2et_crm_opp_stage",
+      "e2et_crm_opp_amount"
+    ],
+    "execution": {
+      "permissions": [
+        "e2et.order.manage"
+      ]
+    }
+  },
+  {
+    "code": "e2et_crm_opp.update",
+    "displayName:zh-CN": "更新记录",
+    "displayName:en": "Update Record",
+    "description": "Update a stage-rail fixture opportunity (stage transition persists)",
+    "type": "update",
+    "modelCode": "e2et_crm_opp",
+    "inputFields": [
+      "e2et_crm_opp_name",
+      "e2et_crm_opp_stage",
+      "e2et_crm_opp_amount"
+    ],
+    "execution": {
+      "permissions": [
+        "e2et.order.manage"
+      ]
+    }
   }
 ]
