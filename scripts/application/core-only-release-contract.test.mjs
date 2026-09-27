@@ -67,6 +67,8 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /docker logs "\$APP_CONTAINER" >"\$ARTIFACTS\/logs\/application-final\.log"/);
   assert.match(productImageGate, /playwright test --config playwright\.release\.config\.ts/);
   assert.match(productImageGate, /release-image-receipt\.json/);
+  assert.match(productImageGate, /application-artifact-verifier\.mjs --lock \/opt\/auraboot\/application\.lock --artifact-root \/opt\/auraboot/);
+  assert.doesNotMatch(productImageGate, /config\/\$AURA_PRODUCT_MIGRATION_OWNER/);
   assert.match(productImageGate, /git -C "\$PRODUCT_ROOT" archive "\$PRODUCT_SHA" "\$FIXTURE_REL"/);
   assert.match(productImageGate, /release acceptance fixture must be a tracked directory at the exact product commit/);
   assert.match(productImageGate, /AURA_RELEASE_FIXTURE_SOURCE_ROOT="\$PRODUCT_ROOT\/\$FIXTURE_REL"/);
