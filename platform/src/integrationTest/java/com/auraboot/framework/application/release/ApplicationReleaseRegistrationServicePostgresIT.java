@@ -873,8 +873,21 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertTrue(membershipFailure.getMostSpecificCause().getMessage().contains("no inherited or assumable roles"));
                 connection.rollback(membershipSavepoint);
                 connection.releaseSavepoint(membershipSavepoint);
+                // Model the mutable side of the stable-target join with ab_application: the
+                // runtime may lock that row, while release rows remain strictly read-only.
+                jdbc.execute("GRANT UPDATE(next_release_sequence) ON ab_application TO " + runtime);
                 jdbc.execute("SET LOCAL ROLE " + runtime);
                 assertTrue(jdbc.queryForObject("SELECT count(*) FROM ab_application", Integer.class) > 0);
+                // Immutable release/publication rows are read-only for the runtime account. The
+                // stable lookup may lock the mutable channel target, but must never require UPDATE
+                // on immutable registry tables merely because they participate in the join.
+                assertDoesNotThrow(() -> jdbc.query("""
+                        SELECT a.id,r.release_id,r.digest,r.compatibility_epoch
+                        FROM ab_application a
+                        JOIN ab_application_release r ON r.application_id=a.id
+                        WHERE false FOR SHARE OF a
+                        """, (row, index) -> row.getLong(1)));
+                assertDenied(connection, jdbc, "SELECT release_id FROM ab_application_release WHERE false FOR SHARE");
                 assertDenied(connection, jdbc, "INSERT INTO ab_application(code,name,created_by) VALUES ('role-app','Role','test:role')");
                 assertDenied(connection, jdbc, "UPDATE ab_application SET name='Changed'");
                 assertDenied(connection, jdbc, "ALTER TABLE ab_application ADD COLUMN unwanted TEXT");
