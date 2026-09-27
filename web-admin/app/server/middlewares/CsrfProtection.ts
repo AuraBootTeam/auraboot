@@ -15,7 +15,16 @@ export function requestOrigin(req: Request): string | null {
 export function hasSameOrigin(req: Request): boolean {
   const origin = req.get('origin');
   const expected = requestOrigin(req);
-  return Boolean(origin && expected && origin === expected);
+  if (!expected) return false;
+  if (origin) return origin === expected;
+
+  const referer = req.get('referer');
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === expected;
+  } catch {
+    return false;
+  }
 }
 
 async function hasCookieSession(req: Request): Promise<boolean> {

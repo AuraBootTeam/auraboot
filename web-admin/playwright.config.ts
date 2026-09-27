@@ -322,6 +322,9 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              // APIRequestContext omits browser navigation metadata; preserve
+              // the exact same-origin Referer contract for cookie-auth writes.
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },
           {
@@ -335,6 +338,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
             },
@@ -351,6 +355,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },
           {
@@ -363,6 +368,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
             },

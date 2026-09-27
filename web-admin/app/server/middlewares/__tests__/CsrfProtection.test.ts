@@ -64,6 +64,27 @@ describe('BFF CSRF protection', () => {
     ).toBe(false);
   });
 
+  it('uses an exact Referer origin only when Origin is absent', () => {
+    const withHeaders = (headers: Record<string, string>) => request({
+      headers,
+      get: vi.fn((name: string) => headers[name.toLowerCase()]) as unknown as Request['get'],
+    });
+
+    expect(hasSameOrigin(withHeaders({
+      host: 'app.example.com',
+      referer: 'https://app.example.com/settings/profile',
+    }))).toBe(true);
+    expect(hasSameOrigin(withHeaders({
+      host: 'app.example.com',
+      referer: 'https://evil.example.com/app',
+    }))).toBe(false);
+    expect(hasSameOrigin(withHeaders({
+      host: 'app.example.com',
+      origin: 'https://evil.example.com',
+      referer: 'https://app.example.com/',
+    }))).toBe(false);
+  });
+
   it('rejects a cross-origin mutation authenticated by the session cookie', async () => {
     vi.mocked(sessionStorage.getSession).mockResolvedValue({
       get: vi.fn(() => 'server-owned-jwt'),

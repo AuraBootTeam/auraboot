@@ -3,9 +3,16 @@
     "id": "jwt-cookie-convergence-2026-09-27",
     "target": "Web Admin JWT convergence to a server-owned httpOnly session cookie",
     "sot": "docs/system-reference/2026-09-27-jwt-cookie-convergence-testing-gate-acceptance-report.md",
-    "runtime": "jwt-cookie-verify / slot 143 / PostgreSQL auraboot_143",
+    "runtime": "jwt-cookie-full-verify / slot 144 / PostgreSQL auraboot_144",
     "claim_level": "targeted-tested",
-    "fix_rounds": 2
+    "fix_rounds": 3,
+    "execution_ledger": {
+      "unit_component": { "files": 11, "passed": 100, "failed": 0 },
+      "final_smoke": { "collected": 31, "passed": 31, "failed": 0, "skipped": 0, "did_not_run": 0 },
+      "full_regular_initial": { "collected": 1182, "passed": 366, "failed": 393, "skipped": 80, "did_not_run": 343 },
+      "full_regular_post_fix_diagnostic": { "collected": 1182, "executed": 1135, "passed": 710, "failed": 123, "skipped": 302, "did_not_run": 47, "intentional_stop": true },
+      "full_deep": { "did_not_run": true, "reason": "blocking regular project remained red" }
+    }
   },
   "verdict": { "pass": 15, "untested": 0, "fail": 0, "skipped": 0 },
   "groups": [
@@ -149,7 +156,8 @@
     }
   ],
   "residualGaps": [
-    "The full OSS Playwright matrix was not run; verification is limited to the authentication/session denominator in this manifest.",
+    "The full OSS regular project was run and is not green; the post-fix diagnostic showed the JWT CSRF cluster removed but exposed independent-application tests in the OSS denominator and other pre-existing baseline failures.",
+    "The OSS deep project was not run because the blocking regular project remained red.",
     "Legacy browser-token migration is intentionally a one-release compatibility bridge and must be removed in a later release after the migration window closes."
   ]
 }
