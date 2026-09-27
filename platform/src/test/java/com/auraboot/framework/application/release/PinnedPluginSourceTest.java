@@ -77,6 +77,22 @@ class PinnedPluginSourceTest {
                     () -> new PluginDirectoryLoader().loadFromSource(source));
         }
     }
+    @Test void strictSourceValidatesButDoesNotDeserializeDefaultBootstrapData() throws Exception {
+        fixture();
+        Files.writeString(root.resolve("default-bootstrap.json"), "{\"records\":[]}");
+        Files.writeString(root.resolve("plugin.json"), """
+                {"pluginId":"test.pinned","version":"1.0.0","resourceDirs":{
+                  "commands":"a/commands.json","defaultBootstrap":"default-bootstrap.json"
+                }}
+                """);
+        var source = new com.auraboot.framework.plugin.source.FileSystemPluginSource(root) {
+            @Override public boolean requiresCompleteResources() { return true; }
+        };
+
+        var manifest = new PluginDirectoryLoader().loadFromSource(source);
+
+        assertEquals("fixture:contract", manifest.getCommands().getFirst().getHandler());
+    }
     @Test void strictSourceRetainsExplicitEmptyCommandsAndRejectsNullList() throws Exception {
         fixture();
         var source = new com.auraboot.framework.plugin.source.FileSystemPluginSource(root) {
