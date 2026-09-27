@@ -18,3 +18,8 @@ include 'platform-storage-s3'
 include 'platform-storage-oss'
 include 'platform-mq-kafka'
 include 'platform-mq-rabbitmq'
+
+// Optional XXL-JOB scheduler engine. Never a dependency of the root project:
+// xxl-job-core is GPL-3.0 and must stay out of the default bootJar. Opt in
+// with -PwithSchedulerXxl=true (see platform/platform-scheduler-xxl/README.md).
+include 'platform-scheduler-xxl'
