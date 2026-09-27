@@ -38,6 +38,13 @@ services:
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_NAME: auraboot-observability-acceptance
       MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
+      # PF4J's deployment root must stay separate from the mounted configuration
+      # source tree. Since #2037 the plugin manager fails closed on paths no
+      # descriptor finder recognizes, and ./plugins is a configuration-form
+      # source tree (no deployable JAR/plugin.properties), consumed only by
+      # scripts/import-plugins.sh over the API. Deployment plugins stay empty
+      # in this acceptance app by design.
+      AURA_PLUGINS_DIR: /app/runtime-plugins
     depends_on:
       observability-postgres:
         condition: service_healthy
@@ -45,6 +52,7 @@ services:
         condition: service_started
     volumes:
       - ./plugins:/app/plugins:ro
+      - runtime_plugins:/app/runtime-plugins
     restart: unless-stopped
 
   prometheus:
@@ -208,8 +216,10 @@ services:
 volumes:
   observability_postgres_data:
   prometheus_data:
+volumes:
   grafana_data:
   postgres_data:
   observability_canary_data:
   loki_data:
   tempo_data:
+  runtime_plugins:
