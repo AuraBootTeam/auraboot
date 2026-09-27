@@ -67,8 +67,8 @@ The frontend BFF reads these values at process startup:
 
 ```dotenv
 ICP_COMPLIANCE_ENABLED=1
-ICP_SITE_TITLE=个人技术
-ICP_RECORD_NUMBER=浙ICP备2023054087号
+ICP_SITE_TITLE=your-site-name
+ICP_RECORD_NUMBER=your-icp-record-number
 ```
 
 After a host has received a frontend image containing runtime-config support, switch the
@@ -77,8 +77,8 @@ profile without building or uploading another image:
 ```bash
 HOST=root@1.2.3.4 PUBLIC_URL=https://example.com \
 ICP_COMPLIANCE_ENABLED=1 \
-ICP_SITE_TITLE=个人技术 \
-ICP_RECORD_NUMBER=浙ICP备2023054087号 \
+ICP_SITE_TITLE=your-site-name \
+ICP_RECORD_NUMBER=your-icp-record-number \
 STEP=config scripts/deploy/oss-remote/deploy.sh
 ```
 
