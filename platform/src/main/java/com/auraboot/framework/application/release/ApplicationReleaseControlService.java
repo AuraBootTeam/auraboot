@@ -181,7 +181,7 @@ public final class ApplicationReleaseControlService {
                 JOIN ab_application_channel_target t ON t.application_id=a.id AND t.channel='stable'
                 JOIN ab_application_release r ON r.application_id=a.id AND r.release_id=t.release_id
                 JOIN ab_application_release_publication p ON p.application_id=a.id AND p.release_id=t.release_id
-                WHERE a.code=? FOR SHARE OF t,r,p
+                WHERE a.code=? FOR SHARE OF t
                 """, (row, index) -> new Release(row.getLong(1), row.getString(2), row.getString(3), row.getInt(4)),
                 applicationCode);
         require(targets.size() == 1, "Published stable release is required");
