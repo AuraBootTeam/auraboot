@@ -382,6 +382,16 @@ business connection. Shutdown closes only this owned pool. This does not expose 
 API or grant activation. Privilege checks occur at pool initialization; operational policy changes
 remain controlled by the database owner, and credential rollout requires separate verification.
 
+Live page-definition comparison is separately disabled by default. Set
+`aura.application.definition-shadow.page-enabled=true` together with
+`aura.application.default-code=<application-code>` only while sampling tenants whose binding status
+is `shadow`. A page-key lookup then compares the unmaterialized legacy page with the same globally
+unique page key in the tenant's exact bound Release. The request still returns the legacy page.
+Outcomes are counted in `auraboot.application.definition.shadow.read.total` with `resource_type=page`
+and an `exact_match`, `drifted`, `missing`, `error`, or `skipped` verdict; drift, missing data, and
+errors also emit structured warnings. Active bindings and pages outside the application Release are
+skipped. Disable the switch after the bounded migration observation window.
+
 
 Shadow writes require `AuditContext(actor, operationId)`. The trusted caller supplies an actor in
 `user:`, `ci:`, `system:`, or `test:` form and a ULID operation identity. The store installs this

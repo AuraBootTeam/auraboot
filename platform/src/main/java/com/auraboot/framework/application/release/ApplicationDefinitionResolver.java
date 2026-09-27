@@ -57,6 +57,24 @@ public final class ApplicationDefinitionResolver {
         return matches.getFirst();
     }
 
+    /** Resolves a globally unique resource key from the tenant's exact bound release. */
+    public ResolvedDefinition findUnique(long tenantId, String applicationCode, ResourceType type,
+                                         String code, Long environmentId) {
+        require(tenantId > 0, "Positive tenant ID required");
+        if (environmentId != null) require(environmentId > 0, "Positive environment ID required");
+        require(type != null && code != null && !code.isBlank(), "Resource type and code required");
+        ReleaseDefinitions release = boundRelease(tenantId, applicationCode);
+        var matches = new ArrayList<ResolvedDefinition>();
+        for (ComponentDefinitions component : release.components()) {
+            JsonNode definition = resources(component.manifest(), type).get(code);
+            if (definition != null) matches.add(new ResolvedDefinition(release.release(), component.componentKey(),
+                    component.componentDigest(), type, component.manifest().getNamespace(), code,
+                    environmentId, definition));
+        }
+        require(matches.size() <= 1, "Definition key is ambiguous in the bound application release");
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
     public ReleaseDefinitions boundRelease(long tenantId, String applicationCode) {
         return load(requireRelease(definitions.findBoundRelease(tenantId, applicationCode),
                 "Tenant application binding is required"));
