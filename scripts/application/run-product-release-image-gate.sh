@@ -246,7 +246,7 @@ IMAGE_ID="$(docker image inspect "$IMAGE_REF" --format '{{.Id}}')"
 [[ "$IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'loaded image lacks an immutable image ID'
 
 docker run --rm --entrypoint sh "$IMAGE_REF" -ec \
-  "test -f /opt/auraboot/runtime/application.jar && test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json && test -x /opt/auraboot/bin/$AURA_PRODUCT_ID-env.sh && test -f /opt/auraboot/bin/application/application-artifact-verifier.mjs && test -d /opt/auraboot/plugins && test -d /opt/auraboot/config/core-meta && test -d /opt/auraboot/config/$AURA_PRODUCT_MIGRATION_OWNER && test -d /opt/auraboot/migrations/core && test -d /opt/auraboot/migrations/$AURA_PRODUCT_MIGRATION_OWNER && test -d /opt/auraboot/web" \
+  "test -f /opt/auraboot/runtime/application.jar && test -f /opt/auraboot/application.lock && test -f /opt/auraboot/artifact-catalog.json && test -x /opt/auraboot/bin/$AURA_PRODUCT_ID-env.sh && test -f /opt/auraboot/bin/application/application-artifact-verifier.mjs && test -d /opt/auraboot/plugins && test -d /opt/auraboot/config/core-meta && test -d /opt/auraboot/config && test -d /opt/auraboot/migrations/core && test -d /opt/auraboot/migrations/$AURA_PRODUCT_MIGRATION_OWNER && test -d /opt/auraboot/web && node /opt/auraboot/bin/application/application-artifact-verifier.mjs --lock /opt/auraboot/application.lock --artifact-root /opt/auraboot" \
   >"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image payload is incomplete'
 
 docker run -d --name "$PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
