@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import {
@@ -19,6 +19,7 @@ import {
   loadCatalogWebContributions,
   materializeSourceWebAssets,
 } from './application-graph-adapters.mjs';
+import { publishApplicationRelease } from './application-release-control.mjs';
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -41,6 +42,24 @@ function parseArgs(argv) {
     else if (argument === '--artifact-graph') options.artifactGraph = resolve(rest[++index]);
     else if (argument === '--target') options.target = rest[++index];
     else if (argument === '--mode') options.mode = rest[++index];
+    else if (argument === '--base-url') options.baseUrl = rest[++index];
+    else if (argument === '--application-code') options.applicationCode = rest[++index];
+    else if (argument === '--application-name') options.applicationName = rest[++index];
+    else if (argument === '--registration') options.registration = resolve(rest[++index]);
+    else if (argument === '--receipt') options.receipt = resolve(rest[++index]);
+    else if (argument === '--token-file') options.tokenFile = resolve(rest[++index]);
+    else if (argument === '--expected-stable-version') {
+      options.expectedStableVersion = Number(rest[++index]);
+      if (!Number.isSafeInteger(options.expectedStableVersion) || options.expectedStableVersion <= 0) {
+        throw new Error('--expected-stable-version requires a positive integer');
+      }
+    }
+    else if (argument === '--timeout-ms') {
+      options.timeoutMs = Number(rest[++index]);
+      if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs <= 0) {
+        throw new Error('--timeout-ms requires a positive integer');
+      }
+    }
     else throw new Error(`Unknown argument: ${argument}`);
   }
   return options;
@@ -51,7 +70,7 @@ function required(options, key) {
   return options[key];
 }
 
-function main() {
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.command === 'validate') {
     const manifest = validateManifest(readStructuredFile(required(options, 'manifest')));
@@ -143,11 +162,32 @@ function main() {
     process.stdout.write(`emitted ${Object.values(routeManifest).flat().length} web routes\n`);
     return;
   }
-  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs|materialize-assets|emit-route-manifest [options]');
+  if (options.command === 'publish-release') {
+    let token = process.env.AURA_RELEASE_TOKEN?.trim();
+    if (options.tokenFile) {
+      const mode = statSync(options.tokenFile).mode & 0o777;
+      if ((mode & 0o077) !== 0) throw new Error('--token-file must not grant group or other permissions');
+      token = readFileSync(options.tokenFile, 'utf8').trim();
+    }
+    const receipt = await publishApplicationRelease({
+      applicationCode: required(options, 'applicationCode'),
+      applicationName: options.applicationName,
+      baseUrl: required(options, 'baseUrl'),
+      expectedStableVersion: options.expectedStableVersion,
+      receiptPath: required(options, 'receipt'),
+      registrationPath: required(options, 'registration'),
+      timeoutMs: options.timeoutMs,
+      token,
+    });
+    process.stdout.write(`published ${receipt.applicationCode} release ${receipt.registration.releaseId} to stable version ${receipt.stable.version}\n`);
+    process.stdout.write(`release receipt: ${options.receipt}\n`);
+    return;
+  }
+  throw new Error('Usage: application-cli.mjs validate|resolve|verify-lock|verify-artifacts|graph|compare-graphs|materialize-assets|emit-route-manifest|publish-release [options]');
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   process.stderr.write(`application contract failed: ${error.message}\n`);
   process.exitCode = 1;
