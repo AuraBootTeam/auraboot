@@ -5,6 +5,16 @@
 The fastest way to run the full AuraBoot platform is with Docker Compose.
 Only PostgreSQL is required — Redis and MinIO are optional.
 
+### Databases
+
+PostgreSQL 15+ is the supported database and ships preconfigured. The
+platform's datasource is standard JDBC (`DATABASE_URL`), so other databases
+are technically reachable, but **no additional JDBC drivers are bundled**:
+`mysql-connector-j`, for example, is GPL-licensed and deliberately excluded
+from the distribution. To run against MySQL you must provide the connector
+jar on the backend classpath yourself (e.g. via your own image build or
+`loader.path`).
+
 ```bash
 # Clone the repository
 git clone https://github.com/AuraBootTeam/auraboot.git
