@@ -7,7 +7,7 @@ const rootLoaderData = vi.hoisted(() => ({
     icpCompliance: {
       enabled: false,
       siteTitle: '个人技术',
-      recordNumber: '浙ICP备2023054087号',
+      recordNumber: '浙ICP备XXXXXXX号',
       siteDisplayName: 'AuraBoot',
     },
   },
@@ -22,7 +22,7 @@ describe('IcpComplianceFooter', () => {
     rootLoaderData.value.icpCompliance = {
       enabled: false,
       siteTitle: '个人技术',
-      recordNumber: '浙ICP备2023054087号',
+      recordNumber: '浙ICP备XXXXXXX号',
       siteDisplayName: 'AuraBoot',
     };
   });
@@ -37,13 +37,13 @@ describe('IcpComplianceFooter', () => {
     rootLoaderData.value.icpCompliance = {
       enabled: true,
       siteTitle: '个人技术',
-      recordNumber: '浙ICP备2023054087号',
+      recordNumber: '浙ICP备XXXXXXX号',
       siteDisplayName: 'AuraBoot 个人技术',
     };
 
     render(<IcpComplianceFooter />);
 
-    expect(screen.getByTestId('icp-record-link')).toHaveTextContent('浙ICP备2023054087号');
+    expect(screen.getByTestId('icp-record-link')).toHaveTextContent('浙ICP备XXXXXXX号');
     expect(screen.getByTestId('icp-record-link')).toHaveAttribute(
       'href',
       'https://beian.miit.gov.cn/',

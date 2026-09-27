@@ -61,7 +61,7 @@ const NAV_TIMEOUT = 15_000;
 const PASSWORD = 'Test2026x';
 const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
   ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
-  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
+  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/home/local-oss-dev/work/auraboot/auraboot-enterprise/plugins');
 
 const BACKEND_PLUGIN_JARS = [
   'pcba-solution/backend/build/libs/pcba-solution-plugin-1.1.0.jar',

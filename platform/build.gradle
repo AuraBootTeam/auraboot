@@ -562,7 +562,7 @@ test {
     // to 1.47 so the shaded HTTP client does not send v1.32 requests that
     // Docker Desktop now rejects with HTTP 400.
     // Callers should also set DOCKER_HOST to the real daemon socket, e.g.
-    // DOCKER_HOST=unix:///Users/me/.docker/run/docker.sock
+    // DOCKER_HOST=unix:///home/<user>/.docker/run/docker.sock
 
     // ─── Parallel execution ───
     // Integration tests share a real PostgreSQL connection pool.

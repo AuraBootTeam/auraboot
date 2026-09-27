@@ -881,7 +881,7 @@ export function createCorrectedBomWorkbook(filePath: string): string {
   // header on row 4 (index 3), data from row 5. Non-standard uploads are now rejected.
   // Material code -> mpn, 用量 -> qty, 规格描述 -> description via the handler's aliases.
   const worksheet = XLSXUtils.aoa_to_sheet([
-    ['捷嘉智造工业互联网(深圳)有限公司', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Acme PCB Manufacturing Co., Ltd.', '', '', '', '', '', '', '', '', '', '', ''],
     ['型号: E2E', '', '', '', '', '', '', '', '', '', '', ''],
     ['发行日期: 2026-01-01', '', '', '', '', '', '', '', 'PCBA 编码: E2E', '', '', ''],
     [

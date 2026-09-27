@@ -32,7 +32,7 @@ function findSampleBom(): string | undefined {
     process.env.QUOTE_BOM_SAMPLES_DIR,
     path.resolve(HERE, '../../../../../' + rel),  // <ws>/auraboot/web-admin/tests/e2e/pcba-solution → <ws>
     path.resolve(HERE, '../../../../../../' + rel),
-    '/Users/ghj/work/auraboot/' + rel,
+    '/home/local-oss-dev/work/auraboot/' + rel,
   ].filter(Boolean) as string[];
   for (const root of candidates) {
     if (!fs.existsSync(root)) continue;

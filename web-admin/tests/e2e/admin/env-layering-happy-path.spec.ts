@@ -20,7 +20,7 @@
  *     once a PageSchema seeding helper exists.
  *
  * @since env-layering PoC
- * @see /Users/ghj/.claude/plans/auraboot-dsl-environment-ux-contract.md
+ * @see /home/local-oss-dev/.claude/plans/auraboot-dsl-environment-ux-contract.md
  */
 
 import { test, expect, type Page } from '../../fixtures';

@@ -7,7 +7,7 @@
 #
 # Usage: scripts/oss-backend-nightly-coverage.sh [repo-root]
 # Crontab example (02:30 nightly, log under outputs/):
-#   30 2 * * * /Users/ghj/work/auraboot/auraboot/scripts/oss-backend-nightly-coverage.sh >> /Users/ghj/work/auraboot/outputs/nightly-coverage.log 2>&1
+#   30 2 * * * /home/local-oss-dev/work/auraboot/auraboot/scripts/oss-backend-nightly-coverage.sh >> /home/local-oss-dev/work/auraboot/outputs/nightly-coverage.log 2>&1
 
 set -uo pipefail
 

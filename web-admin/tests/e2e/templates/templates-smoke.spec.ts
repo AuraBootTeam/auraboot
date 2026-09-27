@@ -17,7 +17,7 @@
  *
  * Prerequisites:
  * - All template plugins must be imported:
- *   `/Users/ghj/work/auraboot/auraboot/scripts/import-templates.sh`
+ *   `/home/local-oss-dev/work/auraboot/auraboot/scripts/import-templates.sh`
  * - User is logged in as admin@auraboot.com
  *
  * @since GAP-080 (2026-03-17)

@@ -25,7 +25,7 @@
  *
  * Prerequisites:
  *   - HR Essentials template imported
- *     (`/Users/ghj/work/auraboot/auraboot/scripts/import-templates.sh`)
+ *     (`/home/local-oss-dev/work/auraboot/auraboot/scripts/import-templates.sh`)
  *   - At least 1 thr_employee record exists (created in beforeAll)
  *
  * @since 10.2.0

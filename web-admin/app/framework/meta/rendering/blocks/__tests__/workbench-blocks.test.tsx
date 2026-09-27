@@ -556,7 +556,7 @@ describe('MetricStripBlockRenderer', () => {
         summary: {
           feeAmount: 0,
           ruleFile:
-            'Jiejia-PCBA-process-fee-pricing-rule-V1.3-20260126-updated-copy-with-a-very-long-name.xls',
+            'Acme-PCBA-process-fee-pricing-rule-V1.3-20260126-updated-copy-with-a-very-long-name.xls',
           importedAt: '2026-06-15 10:23:03.589449+00',
         },
       },
@@ -1653,7 +1653,7 @@ describe('CandidateListBlockRenderer', () => {
             pid: 'RAW-1',
             bom_raw_row_no: 11,
             bom_raw_extra_columns_json:
-              '{"__parse_evidence":{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","composition":{"match":"Description + Value + Footprint"},"llm":{"confidence":0.88}}}',
+              '{"__parse_evidence":{"profileCode":"ACME_WB_FLEX_MAIN_V1","composition":{"match":"Description + Value + Footprint"},"llm":{"confidence":0.88}}}',
           },
         ],
         candidates: [
@@ -1967,7 +1967,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     bom_std_profile_score: 96,
     bom_std_llm_mode: 'field_parse',
     bom_std_llm_translation_policy: 'none',
-    bom_std_parse_json: '{"profileCode":"JIEJIA_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
+    bom_std_parse_json: '{"profileCode":"ACME_WB_FLEX_MAIN_V1","llm":{"mode":"field_parse"}}',
   };
 
   function makeReviewDrawerRuntime(
@@ -1982,7 +1982,7 @@ describe('ReviewDrawerBlockRenderer', () => {
             bom_raw_row_no: 11,
             bom_raw_extra_columns_json: JSON.stringify({
               __parse_evidence: {
-                profileCode: 'JIEJIA_WB_FLEX_MAIN_V1',
+                profileCode: 'ACME_WB_FLEX_MAIN_V1',
                 composition: {
                   matchRule: 'Description + Value + Footprint',
                 },
@@ -2243,7 +2243,7 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer-tab-source')).toBeInTheDocument();
     expect(screen.getByTestId('review-drawer-tab-candidates')).toBeInTheDocument();
     expect(screen.getByTestId('review-drawer-parse-summary')).toHaveTextContent(
-      'JIEJIA_WB_FLEX_MAIN_V1',
+      'ACME_WB_FLEX_MAIN_V1',
     );
     expect(screen.getByTestId('review-drawer-parse-summary')).toHaveTextContent(
       'Description + Value + Footprint',

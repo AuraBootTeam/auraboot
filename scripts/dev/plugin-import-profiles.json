@@ -71,7 +71,7 @@
     "pcba-solution",
     "pcba-industry",
     "pcba-procurement",
-    "jiejia-integration",
+    "customer-pcba-integration",
     "bom-standardization",
     "pcba-sales",
     "pcba-quote",
@@ -117,9 +117,9 @@
     "production",
     "maintenance",
     "logistics",
-    "jiejia-integration",
-    "jiejia-ai-bom-quote",
-    "jiejia-portal",
+    "customer-pcba-integration",
+    "customer-pcba-ai-bom-quote",
+    "customer-pcba-portal",
     "tax-compliance",
     "pcba-base",
     "pcba-industry",
@@ -139,6 +139,6 @@
     "d7-knowledge-wiki",
     "dev-pipeline",
     "growth",
-    "jiejia-solution"
+    "customer-pcba-solution"
   ]
 }

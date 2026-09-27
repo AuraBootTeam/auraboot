@@ -36,7 +36,7 @@ test.describe.configure({ mode: 'serial' });
 
 const ENTERPRISE_PLUGIN_ROOT =
   process.env.AURA_ENTERPRISE_PROJECT_ROOT ||
-  '/Users/ghj/work/auraboot/auraboot-enterprise';
+  '/home/local-oss-dev/work/auraboot/auraboot-enterprise';
 
 test.skip(
   !existsSync(`${ENTERPRISE_PLUGIN_ROOT}/plugins/acp-showcase/plugin.json`),

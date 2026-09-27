@@ -58,7 +58,7 @@ APK_MIRROR="${APK_MIRROR:-}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 ICP_COMPLIANCE_ENABLED="${ICP_COMPLIANCE_ENABLED:-0}"
 ICP_SITE_TITLE="${ICP_SITE_TITLE:-个人技术}"
-ICP_RECORD_NUMBER="${ICP_RECORD_NUMBER:-浙ICP备2023054087号}"
+ICP_RECORD_NUMBER="${ICP_RECORD_NUMBER:-}"
 STEP="${STEP:-all}"
 SSH=(ssh -o BatchMode=yes "$HOST")
 BE_IMG="auraboot-oss/backend:$TAG"; FE_IMG="auraboot-oss/frontend:$TAG"

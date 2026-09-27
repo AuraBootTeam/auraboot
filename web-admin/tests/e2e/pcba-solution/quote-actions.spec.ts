@@ -30,7 +30,7 @@ function sampleRoot(): string | undefined {
   for (const r of [
     process.env.QUOTE_BOM_SAMPLES_DIR,
     path.resolve(HERE, '../../../../../' + rel),
-    '/Users/ghj/work/auraboot/' + rel,
+    '/home/local-oss-dev/work/auraboot/' + rel,
   ].filter(Boolean) as string[]) {
     if (fs.existsSync(r)) return r;
   }
