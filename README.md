@@ -293,7 +293,7 @@ docs. A high-level system overview lives in [`ARCHITECTURE.md`](ARCHITECTURE.md)
 | Multi-Tenant RBAC | ✓ | ✓ |
 | Agent Orchestration (ACP) | — | ✓ |
 | IM (Real-time Messaging) | — | ✓ |
-| CRM / ERP Plugin Suite | — | ✓ |
+| CRM / ERP application suite | — | ✓ |
 | Mobile Apps (iOS + Android) | — | ✓ |
 | Priority Support + SLA | — | ✓ |
 
