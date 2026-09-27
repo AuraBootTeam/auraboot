@@ -102,7 +102,8 @@ public class SavedViewOverlayPolicy {
 
         SchemaFacts facts = schemaFacts(page);
         Meta storedMeta = effective.getMeta();
-        if (storedMeta == null || !StringUtils.hasText(storedMeta.getBasePagePid())) {
+        if (storedMeta == null || (!StringUtils.hasText(storedMeta.getBasePageKey())
+                && !StringUtils.hasText(storedMeta.getBasePagePid()))) {
             Set<String> reasons = new LinkedHashSet<>();
             List<String> stalePaths = new ArrayList<>();
             restoreMandatoryVisibility(effective, facts, reasons, stalePaths);
@@ -116,7 +117,7 @@ public class SavedViewOverlayPolicy {
 
         Set<String> reasons = new LinkedHashSet<>();
         List<String> stalePaths = new ArrayList<>();
-        if (!storedMeta.getBasePagePid().equals(page.getPid())) {
+        if (!samePageIdentity(storedMeta, page)) {
             reasons.add(REASON_PAGE_IDENTITY_CHANGED);
         }
 
@@ -398,6 +399,7 @@ public class SavedViewOverlayPolicy {
         meta.setOverlayReasonCodes(List.of());
         meta.setOverlayStalePaths(List.of());
         meta.setBasePagePid(page.getPid());
+        meta.setBasePageKey(page.getPageKey());
         meta.setBaseReleasePid(runtime == null ? null : runtime.releasePid());
         meta.setBaseChannelVersion(runtime == null ? 0L : runtime.channelVersion());
         meta.setBaseSnapshotChecksum(runtimeChecksum(page));
@@ -421,8 +423,17 @@ public class SavedViewOverlayPolicy {
         if (runtime != null && StringUtils.hasText(runtime.snapshotChecksum())) {
             return runtime.snapshotChecksum();
         }
-        return "page-schema:" + page.getPid() + ":"
+        String identity = StringUtils.hasText(page.getPid()) ? page.getPid() : page.getPageKey();
+        return "page-schema:" + identity + ":"
                 + (page.getRowVersion() == null ? page.getVersion() : page.getRowVersion());
+    }
+
+    private boolean samePageIdentity(Meta storedMeta, PageSchemaDTO page) {
+        if (StringUtils.hasText(storedMeta.getBasePageKey())) {
+            return storedMeta.getBasePageKey().equals(page.getPageKey());
+        }
+        return StringUtils.hasText(storedMeta.getBasePagePid())
+                && storedMeta.getBasePagePid().equals(page.getPid());
     }
 
     private SchemaFacts schemaFacts(PageSchemaDTO page) {

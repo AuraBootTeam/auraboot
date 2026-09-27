@@ -347,6 +347,8 @@ public class ViewConfig {
         private List<String> overlayStalePaths;
         /** Page identity against which this overlay was last saved. */
         private String basePagePid;
+        /** Stable page key used when an immutable Application Release has no tenant-local PID. */
+        private String basePageKey;
         /** Immutable authoring release identity, null for legacy PageSchema baselines. */
         private String baseReleasePid;
         /** Active channel version observed when the overlay was saved. */

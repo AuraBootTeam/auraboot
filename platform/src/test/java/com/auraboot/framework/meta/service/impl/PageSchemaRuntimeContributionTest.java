@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.authoring.workspace.AuthoringRuntimePageMaterializer;
+import com.auraboot.framework.application.release.ApplicationPageDefinitionReadService;
 import com.auraboot.framework.application.release.PageDefinitionShadowReadService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.contribution.PageSchemaContribution;
@@ -50,6 +51,8 @@ class PageSchemaRuntimeContributionTest {
     @SuppressWarnings("unchecked")
     private final ObjectProvider<PageSchemaContributionProvider> providerObject = mock(ObjectProvider.class);
     private final PageDefinitionShadowReadService shadowReadService = mock(PageDefinitionShadowReadService.class);
+    private final ApplicationPageDefinitionReadService primaryReadService =
+            mock(ApplicationPageDefinitionReadService.class);
 
     private PageSchemaServiceImpl service;
     private PageSchema entity;
@@ -59,7 +62,7 @@ class PageSchemaRuntimeContributionTest {
     void setUp() {
         service = new PageSchemaServiceImpl(mapper, converter, permissionService, metaModelMapper,
                 eventPublisher, metaModelService, defaultBlockGenerator, objectMapper, materializer,
-                composer, providerObject, shadowReadService);
+                composer, providerObject, shadowReadService, primaryReadService);
         entity = new PageSchema();
         PageSchemaDTO baseline = new PageSchemaDTO();
         materialized = pageWithSlot();
@@ -148,6 +151,44 @@ class PageSchemaRuntimeContributionTest {
 
         assertThat(result).isSameAs(materialized);
         verifyNoInteractions(shadowReadService);
+    }
+
+    @Test
+    void activeReleasePageBecomesPrimaryWithoutAuthoringMaterialization() {
+        PageSchemaDTO releasePage = pageWithSlot();
+        when(mapper.selectByPageKey("opportunity-detail")).thenReturn(entity);
+        when(converter.toDTO(entity)).thenReturn(new PageSchemaDTO());
+        when(primaryReadService.resolve(42L, "aura-edu", "opportunity-detail", entity))
+                .thenReturn(new ApplicationPageDefinitionReadService.Resolution(
+                        ApplicationPageDefinitionReadService.Source.APPLICATION_RELEASE, releasePage));
+        when(providerObject.getIfAvailable(any())).thenReturn(PageSchemaContributionProvider.none());
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "pageDefinitionPrimaryEnabled", true);
+        MetaContext.setCurrentTenantId(42L);
+
+        PageSchemaDTO result = service.findByPageKey("opportunity-detail");
+
+        assertThat(result).isSameAs(releasePage);
+        verify(primaryReadService).resolve(42L, "aura-edu", "opportunity-detail", entity);
+        verifyNoInteractions(materializer, shadowReadService);
+    }
+
+    @Test
+    void activeReleasePageDoesNotRequireALegacyPageRow() {
+        PageSchemaDTO releasePage = pageWithSlot();
+        when(primaryReadService.resolve(42L, "aura-edu", "opportunity-detail", null))
+                .thenReturn(new ApplicationPageDefinitionReadService.Resolution(
+                        ApplicationPageDefinitionReadService.Source.APPLICATION_RELEASE, releasePage));
+        when(providerObject.getIfAvailable(any())).thenReturn(PageSchemaContributionProvider.none());
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "pageDefinitionPrimaryEnabled", true);
+        MetaContext.setCurrentTenantId(42L);
+
+        PageSchemaDTO result = service.findByPageKey("opportunity-detail");
+
+        assertThat(result).isSameAs(releasePage);
+        verify(primaryReadService).resolve(42L, "aura-edu", "opportunity-detail", null);
+        verifyNoInteractions(converter, materializer, shadowReadService);
     }
 
     private PageSchemaDTO pageWithSlot() {

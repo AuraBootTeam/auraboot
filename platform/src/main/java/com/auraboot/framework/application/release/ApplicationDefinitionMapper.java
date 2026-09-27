@@ -54,6 +54,14 @@ public interface ApplicationDefinitionMapper {
     PluginRecord findTenantPlugin(@Param("tenantId") long tenantId, @Param("pluginId") String pluginId);
 
     @Select("""
+            SELECT * FROM ab_plugin
+            WHERE tenant_id=#{tenantId} AND pid=#{pluginPid} AND deleted_flag=false
+            """)
+    @InterceptorIgnore(tenantLine = "true")
+    PluginRecord findTenantPluginByPid(@Param("tenantId") long tenantId,
+                                       @Param("pluginPid") String pluginPid);
+
+    @Select("""
             SELECT * FROM ab_plugin_resource
             WHERE tenant_id=#{tenantId} AND plugin_pid=#{pluginPid}
               AND resource_type IN ('model','field','command','permission','menu','page')

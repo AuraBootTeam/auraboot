@@ -89,6 +89,9 @@ class ApplicationDefinitionMapperPostgresIT {
 
             var plugin = mapper.findTenantPlugin(42L, "com.auraboot.edu");
             assertThat(plugin.getPid()).isEqualTo("01K60000000000000000000001");
+            assertThat(mapper.findTenantPluginByPid(42L, plugin.getPid()).getPluginId())
+                    .isEqualTo("com.auraboot.edu");
+            assertThat(mapper.findTenantPluginByPid(43L, plugin.getPid())).isNull();
             assertThat(mapper.findTenantPlugin(43L, "com.auraboot.edu")).isNull();
             assertThat(mapper.findComparableResources(42L, plugin.getPid())).singleElement()
                     .satisfies(resource -> {

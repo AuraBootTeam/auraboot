@@ -25,6 +25,12 @@ public final class ApplicationDefinitionResolver {
     public record ResolvedDefinition(ReleaseSelection release, String componentKey, String componentDigest,
                                      ResourceType resourceType, String namespace, String code,
                                      Long environmentId, JsonNode definition) {}
+    public record UniqueDefinitionLookup(ReleaseDefinitions release, ResolvedDefinition definition) {
+        public boolean containsPlugin(String pluginId) {
+            return pluginId != null && release.components().stream()
+                    .anyMatch(component -> pluginId.equals(component.manifest().getPluginId()));
+        }
+    }
 
     private final ApplicationDefinitionMapper definitions;
     private final ApplicationDefinitionBundle bundle;
@@ -60,6 +66,12 @@ public final class ApplicationDefinitionResolver {
     /** Resolves a globally unique resource key from the tenant's exact bound release. */
     public ResolvedDefinition findUnique(long tenantId, String applicationCode, ResourceType type,
                                          String code, Long environmentId) {
+        return lookupUnique(tenantId, applicationCode, type, code, environmentId).definition();
+    }
+
+    /** Resolves a unique key and retains the exact Release used to decide absence and ownership. */
+    public UniqueDefinitionLookup lookupUnique(long tenantId, String applicationCode, ResourceType type,
+                                               String code, Long environmentId) {
         require(tenantId > 0, "Positive tenant ID required");
         if (environmentId != null) require(environmentId > 0, "Positive environment ID required");
         require(type != null && code != null && !code.isBlank(), "Resource type and code required");
@@ -72,7 +84,7 @@ public final class ApplicationDefinitionResolver {
                     environmentId, definition));
         }
         require(matches.size() <= 1, "Definition key is ambiguous in the bound application release");
-        return matches.isEmpty() ? null : matches.getFirst();
+        return new UniqueDefinitionLookup(release, matches.isEmpty() ? null : matches.getFirst());
     }
 
     public ReleaseDefinitions boundRelease(long tenantId, String applicationCode) {

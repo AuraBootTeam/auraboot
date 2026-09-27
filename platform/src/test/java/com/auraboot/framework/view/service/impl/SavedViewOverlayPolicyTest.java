@@ -52,6 +52,7 @@ class SavedViewOverlayPolicyTest {
 
         assertThat(stamped.getMeta().getOverlayStatus()).isEqualTo("CURRENT");
         assertThat(stamped.getMeta().getBasePagePid()).isEqualTo("page-orders");
+        assertThat(stamped.getMeta().getBasePageKey()).isEqualTo("orders");
         assertThat(stamped.getMeta().getBaseReleasePid()).isEqualTo("release-1");
         assertThat(stamped.getMeta().getBaseChannelVersion()).isEqualTo(4);
         assertThat(stamped.getMeta().getBaseFieldCodes())
@@ -147,6 +148,27 @@ class SavedViewOverlayPolicyTest {
         assertThat(replayed.getMeta().getOverlayReasonCodes())
                 .containsExactly("BASE_RELEASE_CHANGED");
         assertThat(replayed.getMeta().getOverlayStalePaths()).isEmpty();
+    }
+
+    @Test
+    void applicationReleasePageUsesPageKeyLineageWithoutASyntheticPid() {
+        PageSchemaDTO first = page("release-1", 1, "checksum-1", true, true);
+        first.setPid(null);
+        when(pageSchemaService.findByPageKey("orders")).thenReturn(first);
+
+        ViewConfig stored = policy.validateAndStamp("orders", new ViewConfig());
+
+        assertThat(stored.getMeta().getBasePagePid()).isNull();
+        assertThat(stored.getMeta().getBasePageKey()).isEqualTo("orders");
+
+        PageSchemaDTO upgraded = page("release-2", 2, "checksum-2", true, true);
+        upgraded.setPid(null);
+        when(pageSchemaService.findByPageKey("orders")).thenReturn(upgraded);
+        ViewConfig replayed = policy.replay("orders", stored);
+
+        assertThat(replayed.getMeta().getOverlayStatus()).isEqualTo("REBASED");
+        assertThat(replayed.getMeta().getOverlayReasonCodes())
+                .containsExactly("BASE_RELEASE_CHANGED");
     }
 
     @Test
