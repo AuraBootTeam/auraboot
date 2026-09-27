@@ -40,7 +40,7 @@ Not in the community edition. AuraBoot relies on `pgvector` for the RAG knowledg
 
 ### Q. Where is my data stored?
 
-In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `meta_*` tables; business data lives in tables created when plugins are installed (e.g. `mt_crm_lead_common` from the CRM plugin).
+In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `meta_*` tables; business data lives in tables created when applications and plugins are installed (e.g. `mt_crm_lead_common` from the CRM application — a separate repository, installed through the application-composition contract rather than shipped in this repo).
 
 Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented on [the documentation site](https://docs.auraboot.com).
 
