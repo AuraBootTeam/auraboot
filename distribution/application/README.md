@@ -392,6 +392,15 @@ and an `exact_match`, `drifted`, `missing`, `error`, or `skipped` verdict; drift
 errors also emit structured warnings. Active bindings and pages outside the application Release are
 skipped. Disable the switch after the bounded migration observation window.
 
+Application Release page primary reads are also disabled by default. After shadow comparison has
+proved an existing tenant exact, set `aura.application.definition-read.page-primary-enabled=true`.
+For an `active` binding, application-owned page keys then resolve from the tenant's exact immutable
+Release and carry `APPLICATION_RELEASE` runtime identity; no tenant-local page PID is synthesized.
+`shadow` bindings, platform pages, and pages owned by unrelated plugins keep their existing read
+path. If a legacy page belongs to a plugin contained in the active Release but that Release omits
+the page key, the request fails explicitly instead of falling back to the tenant copy. Saved-view
+lineage uses the stable page key for Release pages while retaining legacy PID compatibility.
+
 
 Shadow writes require `AuditContext(actor, operationId)`. The trusted caller supplies an actor in
 `user:`, `ci:`, `system:`, or `test:` form and a ULID operation identity. The store installs this

@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.release.ApplicationPageDefinitionReadService;
 import com.auraboot.framework.application.release.PageDefinitionShadowReadService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.workspace.AuthoringRuntimePageMaterializer;
@@ -62,12 +63,16 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final PageSchemaContributionComposer pageSchemaContributionComposer;
     private final ObjectProvider<PageSchemaContributionProvider> pageSchemaContributionProvider;
     private final PageDefinitionShadowReadService pageDefinitionShadowReadService;
+    private final ApplicationPageDefinitionReadService applicationPageDefinitionReadService;
 
     @Value("${aura.application.default-code:}")
     private String defaultApplicationCode;
 
     @Value("${aura.application.definition-shadow.page-enabled:false}")
     private boolean pageDefinitionShadowEnabled;
+
+    @Value("${aura.application.definition-read.page-primary-enabled:false}")
+    private boolean pageDefinitionPrimaryEnabled;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -431,6 +436,13 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         PageSchema pageSchema = pageSchemaMapper.selectByPageKey(pageKey);
         PageSchemaDTO baseline = pageSchema == null ? null : pageSchemaConverter.toDTO(pageSchema);
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (pageDefinitionPrimaryEnabled && tenantId != null && StringUtils.hasText(defaultApplicationCode)) {
+            var resolution = applicationPageDefinitionReadService.resolve(
+                    tenantId, defaultApplicationCode.trim(), pageKey, pageSchema);
+            if (resolution.isReleasePrimary()) {
+                return composeRuntimeDTO(resolution.page());
+            }
+        }
         if (pageDefinitionShadowEnabled && tenantId != null && StringUtils.hasText(defaultApplicationCode)) {
             pageDefinitionShadowReadService.compare(
                     tenantId, defaultApplicationCode.trim(), pageKey, baseline);
@@ -468,6 +480,10 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             return null;
         }
         PageSchemaDTO materialized = authoringRuntimePageMaterializer.materialize(baseline);
+        return composeRuntimeDTO(materialized);
+    }
+
+    private PageSchemaDTO composeRuntimeDTO(PageSchemaDTO materialized) {
         PageSchemaContributionProvider provider = pageSchemaContributionProvider
                 .getIfAvailable(PageSchemaContributionProvider::none);
         PageSchemaDTO composed = pageSchemaContributionComposer.compose(
