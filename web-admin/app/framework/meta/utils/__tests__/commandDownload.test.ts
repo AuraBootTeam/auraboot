@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { downloadWithAuth, resolveCommandFileDownload } from '../commandDownload';
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -28,8 +27,8 @@ describe('explicit command file downloads', () => {
       ),
     ).toBe('/api/file/download/file-b');
   });
-  it('sends authentication and downloads the server-named file bytes', async () => {
-    localStorage.setItem(JWT_TOKEN_KEY, 'unit-token');
+  it('uses the httpOnly session cookie and downloads the server-named file bytes', async () => {
+    localStorage.setItem('jwtToken', 'legacy-token-that-must-not-be-read');
     const blob = new Blob(['xlsx-fixture']);
     const fetchMock = vi
       .fn()
@@ -50,8 +49,7 @@ describe('explicit command file downloads', () => {
     await downloadWithAuth('/api/file/download/file-1');
     expect(fetchMock).toHaveBeenCalledWith('/api/file/download/file-1', {
       method: 'GET',
-      credentials: 'include',
-      headers: { Authorization: 'Bearer unit-token' },
+      credentials: 'same-origin',
     });
     expect(create).toHaveBeenCalledWith(blob);
     expect(downloaded).toBe('报价.xlsx');

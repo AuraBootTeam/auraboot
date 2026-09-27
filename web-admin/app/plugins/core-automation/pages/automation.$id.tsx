@@ -9,7 +9,6 @@ import React, { Suspense } from 'react';
 import type { LoaderFunctionArgs } from 'react-router';
 import { automationService } from '~/framework/smart/automation/services/automationService';
 import type { Automation } from '~/framework/smart/automation/services/automationService';
-import { getTokenFromRequest } from '~/shared/services/session';
 import { RouteLoadingFallback } from '~/ui/RouteLoadingFallback';
 
 const AutomationEditPageImpl = React.lazy(
@@ -18,7 +17,6 @@ const AutomationEditPageImpl = React.lazy(
 
 interface LoaderData {
   automation: Automation | null;
-  token: string | null;
   isNew: boolean;
   error?: string;
 }
@@ -28,15 +26,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs): Promise<L
   const isNew = id === 'new';
 
   try {
-    const token = await getTokenFromRequest(request);
     if (isNew) {
-      return { automation: null, token, isNew };
+      return { automation: null, isNew };
     }
     const automation = await automationService.get(id, request);
-    return { automation, token, isNew };
+    return { automation, isNew };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load automation';
-    return { automation: null, token: null, isNew, error: message };
+    return { automation: null, isNew, error: message };
   }
 };
 

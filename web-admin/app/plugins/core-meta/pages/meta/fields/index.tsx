@@ -1,7 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { useLoaderData } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
-import { getTokenFromRequest } from '~/shared/services/session';
 import { ListPageContent } from '~/framework/meta/rendering/pages/ListPageContent';
 import { useSchemaLoader } from '~/framework/meta/hooks/useSchemaLoader';
 import { useBatchResourceOwners } from '~/hooks/useResourceOwner';
@@ -13,19 +10,14 @@ import {
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const token = await getTokenFromRequest(request);
-  return { token };
-};
+export const loader = async () => ({});
 
 export default function FieldLibraryPage() {
-  const { token } = useLoaderData<typeof loader>();
   const [records, setRecords] = useState<MetaFieldDTO[]>([]);
   const { schema, loading, error } = useSchemaLoader({
     pageKey: 'meta_fields_admin',
     // ships without a DSL page; a missing schema is the normal case, not an error
     optional: true,
-    token: token ?? undefined,
   });
 
   const resourceRefs = useMemo(
@@ -71,7 +63,6 @@ export default function FieldLibraryPage() {
       <ListPageContent
         schema={schema}
         tableName="meta_fields_admin"
-        token={token}
         listExtensions={listExtensions}
       />
     </FieldListSchemaProvider>

@@ -19,7 +19,6 @@ import {
   useLoaderData,
   type LoaderFunctionArgs,
 } from 'react-router';
-import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
@@ -43,24 +42,15 @@ interface PageInfo {
 
 interface LoaderData {
   path: string;
-  token: string | null;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
-  const path = url.pathname;
-
-  try {
-    const token = await getTokenFromRequest(request);
-    return { path, token };
-  } catch (error) {
-    console.error('Failed to get token:', error);
-    return { path, token: null };
-  }
+  return { path: url.pathname };
 };
 
 export default function CatchAllRoute() {
-  const { path: _path, token } = useLoaderData<LoaderData>();
+  const { path: _path } = useLoaderData<LoaderData>();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -76,12 +66,6 @@ export default function CatchAllRoute() {
 
   useEffect(() => {
     const fetchMenuAndPageInfo = async () => {
-      if (!token) {
-        setError('Please login first');
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
@@ -90,7 +74,6 @@ export default function CatchAllRoute() {
         const menuResult = await fetchResult<MenuInfo>('/api/menu/by-path', {
           method: 'get',
           params: { path: location.pathname },
-          token,
         });
 
         if (!ResultHelper.isSuccess(menuResult)) {
@@ -141,7 +124,6 @@ export default function CatchAllRoute() {
           // Prefer pageKey lookup via /api/pages/key/{pageKey}
           const pageResult = await fetchResult<PageInfo>(`/api/pages/key/${pageKey}`, {
             method: 'get',
-            token,
           });
 
           if (ResultHelper.isSuccess(pageResult) && pageResult.data) {
@@ -153,7 +135,6 @@ export default function CatchAllRoute() {
         if (!pageInfo && pagePid) {
           const pageResult = await fetchResult<PageInfo>(`/api/pages/runtime/${pagePid}`, {
             method: 'get',
-            token,
           });
 
           if (ResultHelper.isSuccess(pageResult) && pageResult.data) {
@@ -208,7 +189,7 @@ export default function CatchAllRoute() {
     };
 
     fetchMenuAndPageInfo();
-  }, [location.pathname, token, navigate]);
+  }, [location.pathname, navigate]);
 
   if (loading || redirecting) {
     return (
@@ -229,7 +210,6 @@ export default function CatchAllRoute() {
         tableName={renderPage.tableName}
         pageKey={renderPage.pageKey}
         pageType={renderPage.pageType}
-        token={token}
       />
     );
   }

@@ -40,7 +40,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     }
 
     const tableName = pageResult.data.modelCode || pageKey;
-    return { pageKey, recordPid, tableName, token };
+    return { pageKey, recordPid, tableName };
   } catch (error) {
     if (error instanceof Response) {
       throw error;
@@ -51,13 +51,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function CustomFormEditPage() {
-  const { pageKey, recordPid, tableName, token } = useLoaderData<typeof loader>();
+  const { pageKey, recordPid, tableName } = useLoaderData<typeof loader>();
   return (
     <DynamicPageRenderer
       tableName={tableName}
       pageType="form"
       pageKey={pageKey}
-      token={token}
       recordPid={recordPid}
     />
   );

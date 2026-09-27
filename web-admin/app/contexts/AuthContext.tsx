@@ -154,7 +154,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })),
           }
         : null,
-      token: data?.user?.jwt ?? null,
+      // Browser code authenticates with the httpOnly session cookie. Never
+      // project a backend JWT into context, loader data, or component props.
+      token: null,
       isAuthenticated: !!data?.user,
       hasPermission,
       hasRole,

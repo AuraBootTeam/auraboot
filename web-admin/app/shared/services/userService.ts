@@ -23,6 +23,11 @@ export class UserInfoUnavailableError extends Error {
   }
 }
 
+function withoutBrowserJwt(user: User): User {
+  const { jwt: _jwt, ...safeUser } = user;
+  return safeUser as User;
+}
+
 /**
  * 从后端API获取用户完整信息（包括权限）
  *
@@ -62,7 +67,7 @@ export async function fetchUserInfo(request: Request): Promise<{
     }
 
     return {
-      user: result.data.user,
+      user: withoutBrowserJwt(result.data.user),
       permissions: result.data.permissions || {
         roles: [],
         permissions: [],

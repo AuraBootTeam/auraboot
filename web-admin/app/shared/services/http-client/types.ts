@@ -23,7 +23,7 @@ export interface RequestContext {
   /**
    * Authentication token (if available)
    * - SSR: extracted from session cookie via React Router Request
-   * - CSR: read from browser storage (sessionStorage/localStorage)
+   * - CSR: always undefined; the browser sends the httpOnly cookie
    * - undefined: no token available (public route or unauthenticated)
    */
   token?: string;

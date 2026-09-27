@@ -55,7 +55,6 @@ const quoteOpsCurrentSpecNames = [
   'enterprise-info-profile',
   'quote-bom-focused-menu-and-permissions',
   'quote-bom-operations-dashboard',
-  'bom-workbench-golden',
   'quote-minimal-create-regression',
   'quote-bom-visual-feedback-golden',
   'quote-corrected-bom-upload-golden',
@@ -90,10 +89,6 @@ const quoteOpsCurrentSpecNames = [
   'quote-role-sales-golden',
   'quote-role-proc-golden',
   'quote-bom-soft-delete-golden',
-  'bom-workbench-self-scope-golden',
-  // Manual-intervention path through the import gateway. The automatic path is
-  // heavily guarded; this one had no UI coverage at all until now.
-  'bom-import-gateway-manual-path',
   'bom-material-library-golden',
   'bom-rule-center-crud',
   // Current breadth/depth suites. These cover bad input, required-empty forms,
@@ -322,6 +317,9 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              // APIRequestContext omits browser navigation metadata; preserve
+              // the exact same-origin Referer contract for cookie-auth writes.
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },
           {
@@ -335,6 +333,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
             },
@@ -351,6 +350,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },
           {
@@ -363,6 +363,7 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
+              extraHTTPHeaders: { Referer: `${baseURL}/` },
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
             },

@@ -1,5 +1,4 @@
 import React from 'react';
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -790,30 +789,9 @@ function shouldFetchAuthenticatedBoardImage(sourceUrl: string): boolean {
   }
 }
 
-function browserJwtToken(): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  try {
-    return (
-      window.sessionStorage.getItem(JWT_TOKEN_KEY) ||
-      window.localStorage.getItem(JWT_TOKEN_KEY) ||
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
-}
-
 function authenticatedBoardImageInit(): RequestInit {
-  const token = browserJwtToken();
   return {
-    credentials: 'include',
-    ...(token
-      ? {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      : {}),
+    credentials: 'same-origin',
   };
 }
 

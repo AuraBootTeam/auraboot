@@ -107,6 +107,32 @@ describe('BffProxyService', () => {
     }
   });
 
+  it('redacts JWT material from response previews and authorization headers', () => {
+    vi.stubEnv('BFF_VERBOSE_LOGGING', 'true');
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const { response } = createResponseRecorder();
+    const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signature';
+    const payload = Buffer.from(JSON.stringify({ data: { jwt: token, refreshToken: token } }));
+    const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined as never);
+
+    try {
+      (service as any).forwardResponse(
+        { status: 200, headers: { 'content-type': 'application/json' }, data: payload },
+        response,
+        false,
+      );
+
+      const renderedLog = log.mock.calls.flat().map(String).join(' ');
+      expect(renderedLog).toContain('[REDACTED]');
+      expect(renderedLog).not.toContain(token);
+      expect((service as any).sanitizeHeadersForLogging({ Authorization: `Bearer ${token}` }))
+        .toEqual({ Authorization: 'Bearer [REDACTED]' });
+      expect(response.body).toEqual(payload);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('retains timeout request identity and duration in actual structured logger output', async () => {
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
     const { response } = createResponseRecorder();

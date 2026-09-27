@@ -4,7 +4,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 import { GerberViewerBlockRenderer } from '../GerberViewerBlockRenderer';
 
@@ -341,7 +340,7 @@ describe('GerberViewerBlockRenderer', () => {
 
   it('normalizes stored file pid SVG URLs and loads them through authenticated fetch', async () => {
     const { createObjectURL, fetchMock, objectUrl } = stubBoardImageFetch();
-    window.sessionStorage.setItem(JWT_TOKEN_KEY, 'viewer-token');
+    window.sessionStorage.setItem('jwtToken', 'legacy-token-that-must-not-be-read');
     const runtime = makeRuntime();
     const block: BlockConfig = {
       id: 'gerber',
@@ -358,10 +357,7 @@ describe('GerberViewerBlockRenderer', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK', {
-        credentials: 'include',
-        headers: {
-          Authorization: 'Bearer viewer-token',
-        },
+        credentials: 'same-origin',
       });
     });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -579,7 +575,7 @@ describe('GerberViewerBlockRenderer', () => {
 
   it('hydrates a partial selected line from the bound data source before authenticated SVG download', async () => {
     const { fetchMock, objectUrl } = stubBoardImageFetch();
-    window.sessionStorage.setItem(JWT_TOKEN_KEY, 'viewer-token');
+    window.sessionStorage.setItem('jwtToken', 'legacy-token-that-must-not-be-read');
     const runtime = makeRuntime({
       data: {
         lines: [
@@ -645,10 +641,7 @@ describe('GerberViewerBlockRenderer', () => {
     );
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/file/download/01KV22CQ7PKX3W50Y7MM575ACK', {
-        credentials: 'include',
-        headers: {
-          Authorization: 'Bearer viewer-token',
-        },
+        credentials: 'same-origin',
       });
     });
     expect(screen.queryByTestId('gerber-svg-unavailable')).toBeNull();

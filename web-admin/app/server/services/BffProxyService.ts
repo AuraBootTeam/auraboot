@@ -624,9 +624,7 @@ export class BffProxyService {
         hasAuthHeader = true;
         if (typeof value === 'string') {
           sanitized[key] = value;
-          logger.debug(
-            `[BFF] Using Authorization header from frontend: ${value.substring(0, 30)}...`,
-          );
+          logger.debug('[BFF] Using an explicit Authorization header from the client');
         }
         return;
       }
@@ -663,7 +661,7 @@ export class BffProxyService {
       const token = await this.extractToken(req);
       if (token) {
         sanitized['Authorization'] = `Bearer ${token}`;
-        logger.debug(`[BFF] Extracted JWT token from session: ${token.substring(0, 20)}...`);
+        logger.debug('[BFF] Added session authentication to the backend request');
       } else {
         logger.warn(
           '[BFF] No Authorization header from frontend and failed to extract token from session',
@@ -740,9 +738,7 @@ export class BffProxyService {
         // 验证token格式
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
-          logger.debug(
-            `🔑 Valid JWT token extracted for ${requestUrl} (${token.substring(0, 20)}...)`,
-          );
+          logger.debug(`🔑 Valid session token extracted for ${requestUrl}`);
           return token;
         } else {
           logger.warn(
@@ -867,11 +863,23 @@ export class BffProxyService {
       preview = String(data);
     }
 
+    preview = this.redactSecretsForLogging(preview);
+
     if (preview.length <= maxLength) {
       return preview;
     }
 
     return preview.substring(0, maxLength) + '...';
+  }
+
+  private redactSecretsForLogging(value: string): string {
+    return value
+      .replace(
+        /(\"(?:jwt|jwtToken|refreshToken|accessToken|access_token|token|authorization)\"\s*:\s*\")[^\"]*(\")/gi,
+        '$1[REDACTED]$2',
+      )
+      .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+      .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED_JWT]');
   }
 
   /**
@@ -1152,15 +1160,8 @@ export class BffProxyService {
       const lowerKey = key.toLowerCase();
 
       if (lowerKey === 'authorization') {
-        // 只显示token类型和前几个字符
         const authValue = String(value);
-        if (authValue.startsWith('Bearer ')) {
-          const token = authValue.substring(7);
-          sanitized[key] =
-            `Bearer ${token.substring(0, 10)}...${token.substring(token.length - 4)}`;
-        } else {
-          sanitized[key] = '[REDACTED]';
-        }
+        sanitized[key] = authValue.startsWith('Bearer ') ? 'Bearer [REDACTED]' : '[REDACTED]';
       } else if (lowerKey === 'cookie') {
         sanitized[key] = '[REDACTED]';
       } else {

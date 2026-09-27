@@ -72,13 +72,15 @@ const defaultForm: ConnectorFormData = {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-const authHeaders = () => ({
+const jsonHeaders = () => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${localStorage.getItem('jwt')}`,
 });
 
 async function fetchConnectors(): Promise<ApiConnector[]> {
-  const res = await fetch('/api/connectors', { headers: authHeaders() });
+  const res = await fetch('/api/connectors', {
+    headers: jsonHeaders(),
+    credentials: 'same-origin',
+  });
   if (!res.ok) throw new Error(`Failed to fetch connectors: ${res.status}`);
   const json = await res.json();
   return json.data ?? [];
@@ -109,7 +111,12 @@ async function saveConnector(form: ConnectorFormData, pid?: string): Promise<Api
   };
   const method = pid ? 'put' : 'post';
   const url = pid ? `/api/connectors/${pid}` : '/api/connectors';
-  const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(payload) });
+  const res = await fetch(url, {
+    method,
+    headers: jsonHeaders(),
+    credentials: 'same-origin',
+    body: JSON.stringify(payload),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message ?? `Failed to save connector: ${res.status}`);
@@ -119,7 +126,11 @@ async function saveConnector(form: ConnectorFormData, pid?: string): Promise<Api
 }
 
 async function deleteConnector(pid: string): Promise<void> {
-  const res = await fetch(`/api/connectors/${pid}`, { method: 'delete', headers: authHeaders() });
+  const res = await fetch(`/api/connectors/${pid}`, {
+    method: 'delete',
+    headers: jsonHeaders(),
+    credentials: 'same-origin',
+  });
   if (!res.ok) throw new Error(`Failed to delete connector: ${res.status}`);
 }
 
@@ -127,7 +138,8 @@ async function testConnector(pid: string): Promise<{ success: boolean; durationM
   const start = Date.now();
   const res = await fetch(`/api/connectors/${pid}/test`, {
     method: 'post',
-    headers: authHeaders(),
+    headers: jsonHeaders(),
+    credentials: 'same-origin',
   });
   const durationMs = Date.now() - start;
   return { success: res.ok, durationMs };

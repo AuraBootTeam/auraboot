@@ -14,7 +14,6 @@ import type { FlowData } from '~/plugins/core-designer/components/flow-designer-
 
 interface LoaderData {
   automation: Automation | null;
-  token: string | null;
   isNew: boolean;
   error?: string;
 }
@@ -206,7 +205,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { automation, token, isNew, error } = useLoaderData<LoaderData>();
+  const { automation, isNew, error } = useLoaderData<LoaderData>();
   const debugMode = searchParams.get('debug') === 'true';
 
   // G5 runtime overlay: when the URL carries `?logId=<n>` (e.g. opened from a run
@@ -224,8 +223,9 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
     }
 
     let cancelled = false;
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch(`/api/automations/${encodeURIComponent(id)}/logs?limit=50`, { headers })
+    fetch(`/api/automations/${encodeURIComponent(id)}/logs?limit=50`, {
+      credentials: 'same-origin',
+    })
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`Failed to load automation log (${response.status})`);
@@ -245,7 +245,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
     return () => {
       cancelled = true;
     };
-  }, [isNew, id, logIdParam, token]);
+  }, [isNew, id, logIdParam]);
 
   const handleSave = async (saveData: {
     name: string;
@@ -254,12 +254,12 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
   }) => {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
     if (isNew) {
       const response = await fetch('/api/automations', {
         method: 'post',
+        credentials: 'same-origin',
         headers,
         body: JSON.stringify({
           name: saveData.name,
@@ -273,6 +273,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
     } else {
       const response = await fetch(`/api/automations/${id}`, {
         method: 'put',
+        credentials: 'same-origin',
         headers,
         body: JSON.stringify({
           name: saveData.name,

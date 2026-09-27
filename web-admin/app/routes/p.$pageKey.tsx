@@ -13,7 +13,6 @@ import { resolveDynamicPageAccessError } from '~/shared/services/dynamic-page-ac
 
 type LoaderData = {
   tableName: string;
-  token: string | null;
   accessError: string | null;
 };
 
@@ -26,7 +25,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   try {
     const token = await getTokenFromRequest(request);
     const accessError = await resolveDynamicPageAccessError(request, token, pageKey);
-    return { tableName: pageKey, token, accessError } satisfies LoaderData;
+    return { tableName: pageKey, accessError } satisfies LoaderData;
   } catch (error) {
     console.error('Failed to load dynamic page:', error);
     if (error instanceof Response) {
@@ -37,9 +36,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicTableList() {
-  const { tableName, token, accessError } = useLoaderData<typeof loader>();
+  const { tableName, accessError } = useLoaderData<typeof loader>();
   if (accessError) {
     return <DynamicPageUnavailable message={accessError} />;
   }
-  return <DynamicPageRenderer tableName={tableName} pageType="list" token={token} />;
+  return <DynamicPageRenderer tableName={tableName} pageType="list" />;
 }

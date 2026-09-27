@@ -1,5 +1,3 @@
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
-
 function filenameFromContentDisposition(header: string | null): string | undefined {
   if (!header) return undefined;
   const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
@@ -19,16 +17,9 @@ function filenameFromContentDisposition(header: string | null): string | undefin
 export async function downloadWithAuth(url: string): Promise<void> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-  const headers: Record<string, string> = {};
-  const token = window.localStorage?.getItem(JWT_TOKEN_KEY);
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const response = await fetch(url, {
     method: 'GET',
-    headers,
-    credentials: 'include',
+    credentials: 'same-origin',
   });
   if (!response.ok) {
     throw new Error(`Download failed: ${response.status} ${response.statusText}`);

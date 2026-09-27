@@ -25,7 +25,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   try {
     const token = await getTokenFromRequest(request);
     const accessError = await resolveDynamicPageAccessError(request, token, pageKey);
-    return { tableName: pageKey, recordPid, token, accessError };
+    return { tableName: pageKey, recordPid, accessError };
   } catch (error) {
     console.error('Failed to load record:', error);
     if (error instanceof Response) {
@@ -36,7 +36,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicDetailView() {
-  const { tableName, recordPid, token, accessError } = useLoaderData<typeof loader>();
+  const { tableName, recordPid, accessError } = useLoaderData<typeof loader>();
   if (accessError) {
     return <DynamicPageUnavailable message={accessError} />;
   }
@@ -44,7 +44,6 @@ export default function DynamicDetailView() {
     <DynamicPageRenderer
       tableName={tableName}
       pageType="detail"
-      token={token}
       recordPid={recordPid}
     />
   );

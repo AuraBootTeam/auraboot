@@ -49,6 +49,7 @@
 | `check-hand-written-page-matrix.mjs` | 0 | 2026-07-24 | Gate: no new hand-written page-coverage matrices — the denominator is generated. |
 | `check-i18n-hardcoded.mjs` | 0 | 2026-06-20 | check-i18n-hardcoded.mjs — i18n hardcoded-Chinese gate (ratchet). |
 | `check-jsonb-typehandler.sh` | 3 | 2026-06-11 | check-jsonb-typehandler.sh — guard against the recurring "varchar→jsonb on insert/update" bug. |
+| `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
@@ -196,12 +197,12 @@
 | `dev/test-dev-env-scripts.sh` | 1 | 2026-05-22 | Smoke tests for scripts/dev environment helpers. |
 | `dev/test-gradle-guard.sh` | 1 | 2026-05-12 | Smoke test for platform/build.gradle multi-worktree Maven publish guard. |
 | `dev/verify-quickstart.sh` | 1 | 2026-05-17 | verify-quickstart.sh — pre-launch sanity check for the README quickstart. |
-| `docker-cleanup-batch-up.sh` | 1 | 2026-05-09 | Bring up the cleanup-batch isolated stack on shifted ports (postgres 6533 / |
 | `docker-ga-e2e-bootstrap.sh` | 6 | 2026-05-20 | Bootstrap the GA-E2E docker stack for OSS Playwright runs. |
 | `docker-ga-e2e-down.sh` | 2 | 2026-05-26 | GA Follow-up E2E stack teardown — thin wrapper over stop-isolated. |
 | `docker-ga-e2e-logs.sh` | 1 | 2026-04-25 | Tail logs from the GA Follow-up E2E stack. |
 | `docker-ga-e2e-up.sh` | 9 | 2026-06-07 | GA Follow-up E2E stack — thin wrapper over the converged isolated stack. |
 | `env/reset-and-init.sh` | 50 | 2026-05-17 |  |
+| `extract-changelog-release.mjs` | 3 | 2026-09-27 | Extract one release section from CHANGELOG.md for publishing. |
 | `faq-loop-golden-run.sh` | 3 | 2026-07-23 | faq-loop-golden-run.sh — one-click, self-contained golden for the conversation → FAQ loop. |
 | `ga-e2e-prepare-deps.sh` | 3 | 2026-05-17 | Prepare pnpm dependencies for the GA Docker E2E frontend/runner containers. |
 | `ga-showcase-e2e.sh` | 3 | 2026-05-10 | Run the GA community showcase E2E gate with isolated Playwright storage. |
