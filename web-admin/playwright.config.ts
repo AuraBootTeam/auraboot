@@ -118,6 +118,9 @@ const quoteOpsCurrentSpecNames = [
   'quote-customer-transfer-owner-golden',
   // B01-01 customer detail related-projects tab.
   'quote-customer-projects-tab-golden',
+  // X01 real-login session renewal chain (was maintained but never selected —
+  // the 2026-09-27 structure gate flagged it as an orphan).
+  'session-real-entry',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,

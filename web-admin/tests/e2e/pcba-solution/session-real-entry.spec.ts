@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures';
 import { loginViaUI } from '../../helpers/auth-fixtures';
+import { BASE_URL } from '../../helpers/environments';
 import { openPgClient } from './quote-e2e-helpers';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@auraboot.com';
@@ -36,7 +37,10 @@ test.describe('X01 session real-entry', () => {
     await page.goto('/');
     await expect(page.locator('main')).toBeVisible({ timeout: 30_000 });
 
-    const renew = await page.request.post('/api/auth/session-renew', { headers: { origin: 'http://127.0.0.1:5255' } });
+    // The BFF's dev-mode origin allowlist is derived from the running web
+    // port, so send the origin we are actually serving instead of a
+    // lane-pinned port.
+    const renew = await page.request.post('/api/auth/session-renew', { headers: { origin: BASE_URL } });
     expect(renew.status(), 'session-renew endpoint answers through the BFF chain').toBe(200);
     const body = await renew.json();
     expect(body?.renewed, 'fresh session is outside the renewal window: renewal must not fire unconditionally').toBe(false);
