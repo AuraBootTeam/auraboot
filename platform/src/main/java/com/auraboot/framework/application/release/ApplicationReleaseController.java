@@ -12,11 +12,14 @@ import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 public class ApplicationReleaseController {
     private final ApplicationReleaseRegistrationService service;
     private final ApplicationReleaseControlService control;
+    private final DefinitionShadowComparisonService shadowComparison;
 
     public ApplicationReleaseController(ApplicationReleaseRegistrationService service,
-                                        ApplicationReleaseControlService control) {
+                                        ApplicationReleaseControlService control,
+                                        DefinitionShadowComparisonService shadowComparison) {
         this.service = service;
         this.control = control;
+        this.shadowComparison = shadowComparison;
     }
 
     public record RegisterRequest(String registrationKey, ApplicationReleaseRegistrationService.Content content) {}
@@ -61,6 +64,12 @@ public class ApplicationReleaseController {
             @PathVariable String applicationCode, @RequestBody StableRequest request) {
         return ApiResponse.success(control.promoteStable(applicationCode, request.releaseId(),
                 request.expectedVersion(), actor(), request.operationId()));
+    }
+
+    @GetMapping("/{applicationCode}/definition-shadow-report")
+    public ApiResponse<DefinitionShadowComparisonService.Report> definitionShadowReport(
+            @PathVariable String applicationCode, @RequestParam long tenantId) {
+        return ApiResponse.success(shadowComparison.comparePublishedStable(tenantId, applicationCode));
     }
 
     private static String actor() {
