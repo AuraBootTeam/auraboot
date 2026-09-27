@@ -21,6 +21,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Loads definition bytes only from the immutable application bundle selected by a release. */
 @Service
@@ -29,6 +30,8 @@ public final class ApplicationDefinitionBundle {
     private final Path definitionStore;
     private final ObjectMapper mapper;
     private final ConcurrentHashMap<String, PluginManifestExtended> cache = new ConcurrentHashMap<>();
+    private final AtomicLong cacheHits = new AtomicLong();
+    private final AtomicLong cacheMisses = new AtomicLong();
 
     @Autowired
     public ApplicationDefinitionBundle(Environment environment, ObjectMapper mapper) {
@@ -59,7 +62,21 @@ public final class ApplicationDefinitionBundle {
                 "Exact definition component required");
         String cacheKey = lockIdentity + ":" + component.componentKey + ":"
                 + component.componentVersion + ":" + component.componentDigest;
+        PluginManifestExtended cached = cache.get(cacheKey);
+        if (cached != null) {
+            cacheHits.incrementAndGet();
+            return cached;
+        }
+        cacheMisses.incrementAndGet();
         return cache.computeIfAbsent(cacheKey, ignored -> loadUncached(applicationCode, lockIdentity, component));
+    }
+
+    long cacheHitCount() {
+        return cacheHits.get();
+    }
+
+    long cacheMissCount() {
+        return cacheMisses.get();
     }
 
     private PluginManifestExtended loadUncached(String applicationCode, String lockIdentity,

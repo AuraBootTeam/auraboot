@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +54,24 @@ class ApplicationPageDefinitionReadServiceTest {
         assertThat(page.getRuntime().channelVersion()).isEqualTo(bound.bindingVersion);
         assertThat(page.getRuntime().snapshotChecksum()).matches("sha256:[0-9a-f]{64}");
         assertThat(page.getRuntime().cacheKey()).contains("sha256:" + "c".repeat(64));
+    }
+
+    @Test
+    void measuresThreeRegistryQueriesPerPrimaryReadWhileBundleLoadingRemainsCacheable() {
+        var component = ApplicationDefinitionResolverTest.component("edu-core");
+        var bundle = mock(ApplicationDefinitionBundle.class);
+        when(definitions.findDefinitionComponents(bound.releaseId)).thenReturn(List.of(component));
+        when(bundle.load(bound.code, bound.sourceLockIdentity, component))
+                .thenReturn(pageManifest("edu", "edu_home"));
+        var measuredResolver = new ApplicationDefinitionResolver(definitions, bundle, mapper);
+        var measured = new ApplicationPageDefinitionReadService(definitions, measuredResolver, mapper);
+
+        measured.resolve(42L, "aura-edu", "edu_home", null);
+        measured.resolve(42L, "aura-edu", "edu_home", null);
+
+        verify(definitions, times(4)).findBoundRelease(42L, "aura-edu");
+        verify(definitions, times(2)).findDefinitionComponents(bound.releaseId);
+        verify(bundle, times(2)).load(bound.code, bound.sourceLockIdentity, component);
     }
 
     @Test
@@ -148,5 +167,17 @@ class ApplicationPageDefinitionReadServiceTest {
                 .recordSource(Map.of("endpoint", "/api/edu/{recordPid}"))
                 .extension(Map.of("owner", "edu"))
                 .build();
+    }
+
+    private static PluginManifestExtended pageManifest(String namespace, String pageKey) {
+        var manifest = new PluginManifestExtended();
+        manifest.setPluginId("com.auraboot." + namespace);
+        manifest.setNamespace(namespace);
+        manifest.setVersion("1.2.3");
+        manifest.setPages(List.of(com.auraboot.framework.plugin.dto.imports.PageSchemaDTO.builder()
+                .pageKey(pageKey).name(pageKey).kind("list")
+                .layout(Map.of("mode", "standard"))
+                .blocks(List.of(Map.of("id", "table"))).build()));
+        return manifest;
     }
 }

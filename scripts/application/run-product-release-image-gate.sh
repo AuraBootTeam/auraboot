@@ -48,6 +48,11 @@ wait_for_final_postgres() {
 : "${AURA_PRODUCT_IMAGE_LAYOUT:?AURA_PRODUCT_IMAGE_LAYOUT is required}"
 : "${AURA_PRODUCT_LIFECYCLE:?AURA_PRODUCT_LIFECYCLE is required}"
 : "${AURA_RELEASE_SCREENSHOT_IDS:?AURA_RELEASE_SCREENSHOT_IDS is required}"
+EXPECT_RELEASE_REGISTRATION="${AURA_PRODUCT_EXPECTS_RELEASE_REGISTRATION:-0}"
+case "$EXPECT_RELEASE_REGISTRATION" in
+  0|1) ;;
+  *) fatal 'AURA_PRODUCT_EXPECTS_RELEASE_REGISTRATION must be 0 or 1' ;;
+esac
 PUBLISH_REGISTRY="${AURA_RELEASE_PUBLISH_REGISTRY:-0}"
 case "$PUBLISH_REGISTRY" in
   0|1) ;;
@@ -81,6 +86,23 @@ done
 CORE_SHA="$(git -C "$CORE_ROOT" rev-parse HEAD)"
 PRODUCT_SHA="$(git -C "$PRODUCT_ROOT" rev-parse HEAD)"
 [[ "$CORE_SHA" =~ ^[0-9a-f]{40}$ && "$PRODUCT_SHA" =~ ^[0-9a-f]{40}$ ]] || fatal 'checkout HEAD is not immutable'
+
+RUNTIME_ARGS=()
+RUNTIME_ARGS_REL="${AURA_PRODUCT_RUNTIME_ARGS_FILE:-}"
+if [[ -n "$RUNTIME_ARGS_REL" ]]; then
+  [[ "$RUNTIME_ARGS_REL" != /* && "$RUNTIME_ARGS_REL" =~ ^[A-Za-z0-9._/-]+$ ]] \
+    || fatal 'product runtime args file must be repository-relative'
+  [[ "/$RUNTIME_ARGS_REL/" != *'/../'* && "/$RUNTIME_ARGS_REL/" != *'/./'* ]] \
+    || fatal 'product runtime args file contains an unsafe path component'
+  [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$RUNTIME_ARGS_REL" 2>/dev/null || true)" == blob ]] \
+    || fatal 'product runtime args file must be tracked at the exact product commit'
+  while IFS= read -r runtime_arg || [[ -n "$runtime_arg" ]]; do
+    [[ -n "$runtime_arg" && "$runtime_arg" != \#* ]] || continue
+    [[ "$runtime_arg" =~ ^--[a-z0-9.-]+=[A-Za-z0-9._/:=-]+$ ]] \
+      || fatal "invalid product runtime argument: $runtime_arg"
+    RUNTIME_ARGS+=("$runtime_arg")
+  done <"$PRODUCT_ROOT/$RUNTIME_ARGS_REL"
+fi
 
 FIXTURE_REL="${AURA_PRODUCT_RELEASE_FIXTURE:-}"
 FIXTURE_CONTAINER_ROOT=''
@@ -239,7 +261,11 @@ APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.pa
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
+REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
+umask 077
+printf '%s\n' auraboot_ci >"$REGISTRATION_PASSWORD_FILE"
 docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
+  -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
   -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=auraboot_ci \
@@ -247,9 +273,14 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e JWT_SECRET="$JWT_SECRET" -e JAVA_TOOL_OPTIONS=-Daura.plugins.dir=/opt/auraboot/plugins \
   -e AURA_APPLICATION_ID="$AURA_PRODUCT_ID" -e AURA_APPLICATION_VERSION="$APP_VERSION" \
   -e AURA_APPLICATION_LOCK_IDENTITY="$LOCK_IDENTITY" -e AURA_APPLICATION_SOURCE_COMMIT="$PRODUCT_SHA" \
-  -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" "$IMAGE_REF" \
+  -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" \
+  -e AURA_REGISTRY_REGISTRATION_JDBC_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
+  -e AURA_REGISTRY_REGISTRATION_USERNAME=auraboot \
+  -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
+  "$IMAGE_REF" \
   --aura.persistence.tenant-bypass-table-prefixes=se_ \
-  --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" >/dev/null || fail 'application image failed to start'
+  --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
+  "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
 APP_PORT="$(docker port "$APP_CONTAINER" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"
 for attempt in $(seq 1 90); do
   curl -fsS "http://127.0.0.1:$APP_PORT/actuator/health" | grep -q '"status":"UP"' && break
@@ -261,6 +292,15 @@ WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));
 COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER=auraboot PGPASSWORD=auraboot_ci ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
+if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
+  [[ -f "$STATE_ROOT/release-id" ]] || fail 'product lifecycle did not record the exact Release ID'
+  RELEASE_ID="$(cat "$STATE_ROOT/release-id")"
+  [[ "$RELEASE_ID" =~ ^[0-9A-HJKMNP-TV-Z]{26}$ ]] || fail 'product lifecycle recorded an invalid Release ID'
+  RELEASE_BINDING="$(docker exec "$PG_CONTAINER" psql -U auraboot -d aura_product_ci -tAX -F '|' -c \
+    "select r.source_lock_identity,(select count(*) from ab_tenant_application_binding b where b.current_release_id=r.release_id and b.status='active') from ab_application_release r where r.release_id='$RELEASE_ID'")"
+  [[ "$RELEASE_BINDING" == "$LOCK_IDENTITY|1" ]] \
+    || fail "image/Release/binding identity mismatch: release=$RELEASE_ID result=${RELEASE_BINDING:-missing}"
+fi
 if [[ -n "$FIXTURE_REL" ]]; then
   info "injecting exact-commit acceptance fixture $FIXTURE_REL ($FIXTURE_DIGEST)"
   docker exec "$APP_CONTAINER" mkdir -p /tmp/aura-release-fixtures

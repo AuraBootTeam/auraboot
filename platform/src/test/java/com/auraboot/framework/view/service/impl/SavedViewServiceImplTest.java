@@ -1190,8 +1190,10 @@ class SavedViewServiceImplTest {
 
     @Test
     void create_withNonExistentPageKey_throwsValidationError() {
-        // Arrange: pageSchemaMapper returns null → page does not exist
-        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(null);
+        when(savedViewOverlayPolicy.validateAndStamp(eq("crm/leads"), any()))
+                .thenThrow(new ValidationException(
+                        com.auraboot.framework.common.constant.ResponseCode.CommonValidationFailed,
+                        "view.overlay.base-page-unavailable"));
 
         SavedViewCreateRequest req = createReq("personal", null);
 
@@ -1199,18 +1201,12 @@ class SavedViewServiceImplTest {
         ValidationException ex = assertThrows(ValidationException.class,
                 () -> service.create(req));
 
-        assertTrue(ex.getMessage().contains("[S-SAVED-VIEW]"),
-                "Error must carry the [S-SAVED-VIEW] error code prefix");
-        assertTrue(ex.getMessage().contains("crm/leads"),
-                "Error must name the offending pageKey");
+        assertTrue(ex.getMessage().contains("view.overlay.base-page-unavailable"));
         verify(savedViewMapper, never()).insertSavedView(any());
     }
 
     @Test
     void create_withValidPageKey_succeeds() {
-        // Arrange: pageSchemaMapper returns a real page → validation passes
-        PageSchema existingPage = new PageSchema();
-        when(pageSchemaMapper.selectAnyByPageKey("crm/leads")).thenReturn(existingPage);
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
 

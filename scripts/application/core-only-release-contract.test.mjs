@@ -79,6 +79,11 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /"lifecycle": "ephemeral-ci"/);
   assert.match(productImageGate, /create-release-screenshot-manifest\.mjs/);
   assert.match(productImageGate, /AURA_RELEASE_SCREENSHOT_IDS/);
+  assert.match(productImageGate, /product runtime args file must be tracked at the exact product commit/);
+  assert.match(productImageGate, /invalid product runtime argument/);
+  assert.match(productImageGate, /AURA_REGISTRY_REGISTRATION_JDBC_URL/);
+  assert.match(productImageGate, /image\/Release\/binding identity mismatch/);
+  assert.match(productImageGate, /source_lock_identity/);
   assert.doesNotMatch(productImageGate, /\bcontainer\s+(?:build|run|image)/);
 });
 
