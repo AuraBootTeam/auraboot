@@ -26,7 +26,13 @@ const commit = (character) => character.repeat(40);
 function manifest() {
   return {
     schemaVersion: 1,
-    app: { id: 'aura-crm', name: 'Aura CRM', version: '1.0.0', defaultRoute: '/crm' },
+    app: {
+      id: 'aura-crm',
+      name: 'Aura CRM',
+      version: '1.0.0',
+      compatibilityEpoch: 1,
+      defaultRoute: '/crm',
+    },
     platform: {
       runtime: '1.3.0',
       baseImage: { id: 'auraboot-runtime', version: '1.3.0' },
@@ -116,6 +122,13 @@ describe('AuraBoot application contract', () => {
     const input = manifest();
     input.platform.runtime = '1.3.0-SNAPSHOT';
 
+    assert.throws(() => validateManifest(input), /application manifest is invalid/);
+  });
+
+  it('accepts a positive application compatibility epoch and rejects zero', () => {
+    assert.equal(validateManifest(manifest()).app.compatibilityEpoch, 1);
+    const input = manifest();
+    input.app.compatibilityEpoch = 0;
     assert.throws(() => validateManifest(input), /application manifest is invalid/);
   });
 
