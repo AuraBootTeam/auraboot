@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         "com.auraboot.framework.**.mapper",
         // Leaf is 'dao', not 'mapper' — not covered by **.mapper above.
         "com.auraboot.framework.*.dao",
+        // application.release holds its mapper at the package root (not in a
+        // nested .mapper package), so the recursive patterns above miss it.
+        "com.auraboot.framework.application.release",
         // Non-framework packages — must be listed explicitly.
         "com.auraboot.module.*.mapper",
         "com.auraboot.module.meta.excel.mapper"})
