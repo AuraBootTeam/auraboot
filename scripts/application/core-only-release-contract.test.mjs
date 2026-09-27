@@ -53,6 +53,7 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /fresh database migration failed/);
   assert.match(productImageGate, /CI=1 pnpm --dir "\$CORE_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /core-pnpm-install\.log/);
+  assert.match(productImageGate, /NPM_CONFIG_REGISTRY=https:\/\/registry\.npmjs\.org AURA_OCI_BUILDER=docker/);
   assert.match(productImageGate, /CI=1 pnpm --dir "\$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /product-pnpm-install\.log/);
   assert.match(productImageGate, /POSTGRES_DB=aura_product_build_ci/);
