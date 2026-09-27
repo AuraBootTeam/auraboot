@@ -104,6 +104,10 @@ public class UserPermissionServiceImpl implements UserPermissionService {
                     .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             codes.addAll(applicationRuntimeDefinitionCatalog.permissionsForRoles(
                     tenantId, defaultApplicationCode.trim(), roleCodes));
+            if (roleCodes.contains("tenant_admin")) {
+                codes.addAll(applicationRuntimeDefinitionCatalog.permissionCodes(
+                        tenantId, defaultApplicationCode.trim()));
+            }
         }
         return Collections.unmodifiableSet(codes);
     }

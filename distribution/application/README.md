@@ -401,6 +401,17 @@ path. If a legacy page belongs to a plugin contained in the active Release but t
 the page key, the request fails explicitly instead of falling back to the tenant copy. Saved-view
 lineage uses the stable page key for Release pages while retaining legacy PID compatibility.
 
+The broader zero-import runtime path is separately gated by
+`aura.application.definition-read.runtime-primary-enabled=true`. For an active binding, models,
+menus, roles, commands, command binding rules, and their permission codes then resolve from the
+tenant's exact immutable Release without tenant-local definition rows. Command execution first
+honors a legacy tenant-local command when present, then executes the released command when the
+local cache has no match. Release roles receive only their declared permissions. A member with the
+built-in `tenant_admin` role receives the Release's explicit permissions, permissions referenced by
+roles or commands, and the standard `read`, `create`, `update`, `delete`, `export`, and `import`
+permissions generated for each released model. This preserves the authority that legacy config
+import assigned to `tenant_admin` while removing the import requirement.
+
 
 Shadow writes require `AuditContext(actor, operationId)`. The trusted caller supplies an actor in
 `user:`, `ci:`, `system:`, or `test:` form and a ULID operation identity. The store installs this

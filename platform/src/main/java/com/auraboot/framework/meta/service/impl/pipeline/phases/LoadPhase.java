@@ -3,8 +3,11 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.constant.Status;
+import com.auraboot.framework.meta.dto.BindingRuleDTO;
+import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.impl.CommandMetadataCacheService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -31,6 +34,7 @@ import java.util.stream.Collectors;
 public class LoadPhase implements CommandPhase {
 
     private final CommandMetadataCacheService commandMetadataCache;
+    private final CommandService commandService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -41,8 +45,15 @@ public class LoadPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         CommandDefinition command = commandMetadataCache.findCurrentCommandByCode(ctx.getCommandCode());
+        List<BindingRule> allRules;
         if (command == null) {
-            throw new BusinessException(ResponseCode.BadParam, "Command not found: " + ctx.getCommandCode());
+            CommandDefinitionDTO releaseCommand = commandService.findByCode(ctx.getCommandCode());
+            command = fromDto(releaseCommand);
+            allRules = releaseCommand.getBindingRules() == null
+                    ? List.of()
+                    : releaseCommand.getBindingRules().stream().map(this::fromDto).toList();
+        } else {
+            allRules = commandMetadataCache.findBindingRulesByCommandId(command.getId());
         }
         if (!Status.PUBLISHED.getCode().equals(command.getStatus())) {
             throw new BusinessException(ResponseCode.BadParam, "Command is not published: " + ctx.getCommandCode());
@@ -65,11 +76,48 @@ public class LoadPhase implements CommandPhase {
         ctx.setLockTimeoutMs(resolveLockTimeout(ctx.getExecConfig()));
 
         // Batch-load binding rules
-        List<BindingRule> allRules = commandMetadataCache.findBindingRulesByCommandId(command.getId());
         Map<String, List<BindingRule>> rulesByType = allRules.stream()
                 .filter(r -> r.getEnabled() != null && r.getEnabled())
                 .collect(Collectors.groupingBy(BindingRule::getRuleType));
         ctx.setRulesByType(rulesByType);
+    }
+
+    private CommandDefinition fromDto(CommandDefinitionDTO source) {
+        CommandDefinition command = new CommandDefinition();
+        command.setId(source.getId());
+        command.setPid(source.getPid());
+        command.setTenantId(source.getTenantId());
+        command.setCode(source.getCode());
+        command.setDisplayName(source.getDisplayName());
+        command.setDescription(source.getDescription());
+        command.setModelCode(source.getModelCode());
+        command.setInputSchema(source.getInputSchema());
+        command.setTargetModels(source.getTargetModels());
+        command.setExecutionConfig(source.getExecutionConfig());
+        command.setCmdRiskLevel(source.getCmdRiskLevel());
+        command.setVersion(source.getVersion());
+        command.setSemver(source.getSemver());
+        command.setIsCurrent(source.getIsCurrent());
+        command.setStatus(source.getStatus());
+        return command;
+    }
+
+    private BindingRule fromDto(BindingRuleDTO source) {
+        BindingRule rule = new BindingRule();
+        rule.setId(source.getId());
+        rule.setPid(source.getPid());
+        rule.setCommandId(source.getCommandId());
+        rule.setRuleType(source.getRuleType());
+        rule.setExpression(source.getExpression());
+        rule.setTargetModel(source.getTargetModel());
+        rule.setTargetField(source.getTargetField());
+        rule.setSourceField(source.getSourceField());
+        rule.setHandlerClass(source.getHandlerClass());
+        rule.setEventType(source.getEventType());
+        rule.setConfig(source.getConfig());
+        rule.setSequence(source.getSequence());
+        rule.setEnabled(source.getEnabled());
+        return rule;
     }
 
     private Map<String, Object> parseExecutionConfig(CommandDefinition command) {

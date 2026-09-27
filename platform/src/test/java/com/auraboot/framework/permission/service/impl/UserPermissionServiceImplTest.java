@@ -98,6 +98,21 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
+    void tenantAdminIncludesEveryPermissionDeclaredByTheBoundRelease() {
+        com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
+        role.setCode("tenant_admin");
+        when(roleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(role));
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
+        when(permissionSnapshotCache.resolvePermissionCodes(100L, Set.of())).thenReturn(Set.of());
+        when(applicationRuntimeDefinitionCatalog.permissionCodes(100L, "aura-edu"))
+                .thenReturn(Set.of("model.xy_reward_sku.read"));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+
+        assertThat(service.hasPermission(1L, "model.xy_reward_sku.read")).isTrue();
+    }
+
+    @Test
     void unknownPermissionCodeFailsClosedWithoutLoadingUserSnapshot() {
         when(permissionSnapshotCache.resolvePermissionId(100L, "missing.code")).thenReturn(null);
 

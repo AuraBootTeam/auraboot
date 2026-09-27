@@ -100,13 +100,13 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    void defaultTemplateGrantsTenantInviteManagePermission() {
+    void defaultTemplateGrantsTenantMembershipManagementPermissions() {
         TenantBootstrapTemplate template = tenantBootstrapService.loadTemplate("default-bootstrap");
 
         Set<String> permissionCodes = template.getPermissions().stream()
             .map(PermissionTemplate::getCode)
             .collect(Collectors.toSet());
-        assertThat(permissionCodes).contains("org.tenant.invite.manage");
+        assertThat(permissionCodes).contains("admin_tenant_member", "org.tenant.invite.manage");
 
         RolePermissionBinding tenantAdminBinding = template.getRolePermissionBindings().stream()
             .filter(binding -> "tenant_admin".equals(binding.getRoleCode()))
