@@ -37,7 +37,13 @@ class ScheduledTaskXxlMetadataTest {
 
     @Test
     void schema_containsExternalSchedulerMetadataColumns() throws Exception {
-        String schema = Files.readString(Path.of("src/main/resources/db/snapshots/schema-current.sql"));
+        // Tests may run with this module's directory as the working directory;
+        // the schema snapshot lives in the root platform sourceset.
+        Path schemaPath = Path.of("../src/main/resources/db/snapshots/schema-current.sql");
+        if (!Files.exists(schemaPath)) {
+            schemaPath = Path.of("src/main/resources/db/snapshots/schema-current.sql");
+        }
+        String schema = Files.readString(schemaPath);
 
         assertThat(schema).contains("scheduler_type");
         assertThat(schema).contains("external_job_id");
