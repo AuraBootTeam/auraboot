@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,12 @@ class UserPermissionServiceImplTest {
 
     @Mock
     private PermissionSnapshotCache permissionSnapshotCache;
+
+    @Mock
+    private com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+
+    @Mock
+    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
 
     @InjectMocks
     private UserPermissionServiceImpl service;
@@ -73,6 +80,21 @@ class UserPermissionServiceImplTest {
                 .thenReturn(Set.of(50L));
 
         assertThat(service.hasPermission(1L, "model.user.read")).isTrue();
+    }
+
+    @Test
+    void permissionCodeResolutionIncludesBoundReleaseRoleDeclarations() {
+        com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
+        role.setCode("xy_school_admin");
+        when(roleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(role));
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of());
+        when(permissionSnapshotCache.resolvePermissionCodes(100L, Set.of())).thenReturn(Set.of());
+        when(applicationRuntimeDefinitionCatalog.permissionsForRoles(
+                100L, "aura-edu", Set.of("xy_school_admin"))).thenReturn(Set.of("xy.school.manage"));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+
+        assertThat(service.hasPermission(1L, "xy.school.manage")).isTrue();
     }
 
     @Test

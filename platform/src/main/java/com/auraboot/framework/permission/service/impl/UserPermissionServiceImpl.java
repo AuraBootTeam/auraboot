@@ -6,6 +6,7 @@ import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.*;
 
@@ -37,6 +38,14 @@ import java.util.*;
 @RequiredArgsConstructor
 public class UserPermissionServiceImpl implements UserPermissionService {
     private final PermissionSnapshotCache permissionSnapshotCache;
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+    private final com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
     
     /**
      * Get user's permission IDs (with cache)
@@ -85,8 +94,18 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         if (!MetaContext.exists()) {
             return Collections.emptySet();
         }
-        return permissionSnapshotCache.resolvePermissionCodes(
-                MetaContext.getCurrentTenantId(), getUserPermissionIds(userId));
+        Long tenantId = MetaContext.getCurrentTenantId();
+        LinkedHashSet<String> codes = new LinkedHashSet<>(permissionSnapshotCache.resolvePermissionCodes(
+                tenantId, getUserPermissionIds(userId)));
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (releaseReadsEnabled() && memberId != null) {
+            Set<String> roleCodes = roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
+                    .map(com.auraboot.framework.rbac.entity.Role::getCode)
+                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            codes.addAll(applicationRuntimeDefinitionCatalog.permissionsForRoles(
+                    tenantId, defaultApplicationCode.trim(), roleCodes));
+        }
+        return Collections.unmodifiableSet(codes);
     }
     
     /**
@@ -205,6 +224,9 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         if (!MetaContext.exists()) {
             return false;
         }
+        if (releaseReadsEnabled() && getUserPermissionCodes(userId).contains(permissionCode)) {
+            return true;
+        }
         Long permissionId = permissionSnapshotCache.resolvePermissionId(
                 MetaContext.getCurrentTenantId(), permissionCode);
         if (permissionId == null) {
@@ -292,5 +314,11 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         }
         
         return false;
+    }
+
+    private boolean releaseReadsEnabled() {
+        return applicationRuntimePrimaryEnabled && defaultApplicationCode != null
+                && !defaultApplicationCode.isBlank() && MetaContext.exists()
+                && MetaContext.getCurrentTenantId() != null;
     }
 }

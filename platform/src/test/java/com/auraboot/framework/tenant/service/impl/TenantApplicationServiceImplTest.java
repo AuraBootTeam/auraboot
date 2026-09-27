@@ -73,6 +73,7 @@ class TenantApplicationServiceImplTest {
     @Mock private BuiltinPluginImportService builtinPluginImportService;
     @Mock private SystemModeService systemModeService;
     @Mock private ApplicationReleaseControlService applicationReleaseControlService;
+    @Mock private com.auraboot.framework.application.release.ApplicationReleaseTenantInitializer applicationReleaseTenantInitializer;
 
     @InjectMocks
     private TenantApplicationServiceImpl service;
@@ -207,6 +208,33 @@ class TenantApplicationServiceImplTest {
                 eq(99L), eq("aura-edu"), eq("user:id:7"), anyString());
         verify(builtinPluginImportService).importForTenant(99L, 7L);
         verify(sessionManagementService).createSession(eq(7L), eq("jwt-token"), any(), any());
+    }
+
+    @Test
+    @DisplayName("createTenantForUser initializes bound Release state without importing plugins")
+    void createForUserZeroImport() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        when(tenantService.findByName("acme")).thenReturn(null);
+        when(tenantService.createTenant(any(Tenant.class))).thenReturn(tenant(99L, "acme"));
+        when(tenantBootstrapService.bootstrapTenant(99L, 7L))
+                .thenReturn(TenantBootstrapService.BootstrapResult.success(3, 5, 10, 100));
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(null);
+        when(jwtUtil.generateTokenWithTenantId(any(), anyString(), anyLong(), any(), anyInt()))
+                .thenReturn("jwt-token");
+        when(applicationReleaseControlService.bindStable(eq(99L), eq("aura-edu"), eq("user:id:7"), anyString()))
+                .thenReturn(new ApplicationReleaseControlService.Binding(
+                        99L, 3L, "01K6R0YEXAMPLE000000000000", "sha256:" + "a".repeat(64), 1, "active", 1));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "tenantZeroImportEnabled", true);
+
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("acme");
+        req.setDisplayName("Acme Inc");
+        TenantSelectionResponse response = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(StatusConstants.SUCCESS, response.getStatus());
+        verify(applicationReleaseTenantInitializer).initialize(99L, "aura-edu");
+        verify(builtinPluginImportService, never()).importForTenant(anyLong(), anyLong());
     }
 
     @Test

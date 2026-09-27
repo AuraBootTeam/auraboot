@@ -95,14 +95,16 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
     @Autowired
     private ApplicationReleaseControlService applicationReleaseControlService;
 
+    @Autowired
+    private com.auraboot.framework.application.release.ApplicationReleaseTenantInitializer applicationReleaseTenantInitializer;
+
     @Value("${aura.application.default-code:}")
     private String defaultApplicationCode;
 
-    /**
-     * Roles bound to the tenant creator after bootstrap + plugin import.
-     * Comma-separated role codes; must
-     * reference roles seeded by the tenant template or the declared product plugins.
-     */
+    @Value("${aura.application.tenant-zero-import-enabled:false}")
+    private boolean tenantZeroImportEnabled;
+
+    /** Roles bound after tenant state initialization; comma-separated stable role codes. */
     @Value("${aura.tenant.creator-roles:}")
     private String tenantCreatorRoles;
     
@@ -242,24 +244,25 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
             throw e;
         }
 
-        // Bind the exact stable application release first. Legacy per-tenant import remains
-        // until the shared Definition Resolver has passed shadow comparison.
-        if (defaultApplicationCode != null && !defaultApplicationCode.isBlank()) {
+        // Bind the exact stable application release before projecting tenant-owned state.
+        boolean applicationBound = defaultApplicationCode != null && !defaultApplicationCode.isBlank();
+        if (applicationBound) {
             var binding = applicationReleaseControlService.bindStable(
                     createdTenant.getId(), defaultApplicationCode.trim(),
                     "user:id:" + user.getId(), UlidGenerator.generate());
             log.info("Bound tenant {} to application {} release {}",
                     createdTenant.getId(), defaultApplicationCode.trim(), binding.releaseId());
+            if (tenantZeroImportEnabled) {
+                applicationReleaseTenantInitializer.initialize(
+                        createdTenant.getId(), defaultApplicationCode.trim());
+            }
         }
 
-        // Import built-in plugins
-        builtinPluginImportService.importForTenant(
-            createdTenant.getId(),
-            user.getId()
-        );
+        if (!tenantZeroImportEnabled || !applicationBound) {
+            builtinPluginImportService.importForTenant(createdTenant.getId(), user.getId());
+        }
 
-        // Bind the deployment-declared creator roles after
-        // bootstrap + plugin import so the role definitions exist in the new tenant.
+        // Bind the deployment-declared creator roles after tenant-owned role state exists.
         if (tenantCreatorRoles != null && !tenantCreatorRoles.isBlank() && newMember != null) {
             for (String roleCode : tenantCreatorRoles.split(",")) {
                 String trimmed = roleCode.trim();

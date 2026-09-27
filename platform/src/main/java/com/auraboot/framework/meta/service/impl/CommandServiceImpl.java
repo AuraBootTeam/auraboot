@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -41,6 +42,13 @@ public class CommandServiceImpl implements CommandService {
     private final CommandDefinitionMapper commandDefinitionMapper;
     private final BindingRuleMapper bindingRuleMapper;
     private final CommandMetadataCacheService commandMetadataCache;
+    private final com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
+
+    @Value("${aura.application.definition-read.runtime-primary-enabled:false}")
+    private boolean applicationRuntimePrimaryEnabled;
 
     @Override
     @Transactional
@@ -138,6 +146,10 @@ public class CommandServiceImpl implements CommandService {
 
     @Override
     public CommandDefinitionDTO findByCode(String code) {
+        CommandDefinitionDTO releaseCommand = releaseCommand(code);
+        if (releaseCommand != null) {
+            return releaseCommand;
+        }
         // tenant_id is automatically added by TenantLineInnerInterceptor
         CommandDefinition entity = commandDefinitionMapper.findCurrentByCode(code);
         if (entity == null) {
@@ -150,6 +162,10 @@ public class CommandServiceImpl implements CommandService {
 
     @Override
     public List<CommandDefinitionDTO> listByModelCode(String modelCode) {
+        List<CommandDefinitionDTO> releaseCommands = releaseCommands(modelCode);
+        if (!releaseCommands.isEmpty()) {
+            return releaseCommands;
+        }
         // tenant_id is automatically added by TenantLineInnerInterceptor
         List<CommandDefinition> entities = commandDefinitionMapper.findByModelCode(modelCode);
         return entities.stream().map(this::toDTO).collect(Collectors.toList());
@@ -159,7 +175,36 @@ public class CommandServiceImpl implements CommandService {
     public List<CommandDefinitionDTO> listAll() {
         // tenant_id is automatically added by TenantLineInnerInterceptor
         List<CommandDefinition> entities = commandDefinitionMapper.findAllCurrent();
-        return entities.stream().map(this::toDTO).collect(Collectors.toList());
+        List<CommandDefinitionDTO> result = new java.util.ArrayList<>(
+                entities.stream().map(this::toDTO).collect(Collectors.toList()));
+        Map<String, CommandDefinitionDTO> byCode = result.stream().collect(Collectors.toMap(
+                CommandDefinitionDTO::getCode, command -> command, (left, right) -> left, LinkedHashMap::new));
+        for (CommandDefinitionDTO command : releaseCommands(null)) {
+            byCode.put(command.getCode(), command);
+        }
+        return List.copyOf(byCode.values());
+    }
+
+    private CommandDefinitionDTO releaseCommand(String code) {
+        if (!releaseReadsEnabled()) return null;
+        return applicationRuntimeDefinitionCatalog.findCommand(
+                MetaContext.getCurrentTenantId(), defaultApplicationCode.trim(), code).orElse(null);
+    }
+
+    private List<CommandDefinitionDTO> releaseCommands(String modelCode) {
+        if (!releaseReadsEnabled()) return List.of();
+        if (modelCode == null) {
+            return applicationRuntimeDefinitionCatalog.allCommands(
+                    MetaContext.getCurrentTenantId(), defaultApplicationCode.trim());
+        }
+        return applicationRuntimeDefinitionCatalog.commandsForModel(
+                MetaContext.getCurrentTenantId(), defaultApplicationCode.trim(), modelCode);
+    }
+
+    private boolean releaseReadsEnabled() {
+        return applicationRuntimePrimaryEnabled && defaultApplicationCode != null
+                && !defaultApplicationCode.isBlank() && MetaContext.exists()
+                && MetaContext.getCurrentTenantId() != null;
     }
 
     @Override
