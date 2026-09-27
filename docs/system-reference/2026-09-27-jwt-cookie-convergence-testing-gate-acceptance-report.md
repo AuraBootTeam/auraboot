@@ -68,12 +68,12 @@ callback run exposed stale test interception assumptions (query parameters were 
 old route glob/body assertion); the test was aligned with the actual callback protocol and then
 passed 3/3. Neither result is hidden or counted as a final product pass.
 
-The repository-wide structural test-system gate was also invoked on the rebased head. It passed
-command reachability, manifest freshness, derived-field writers, and the hand-written page matrix,
-but failed on three pre-existing stale QuoteOps registry names plus unrelated scripts README
-inventory drift (`check-license-boundary.sh`, `extract-changelog-release.mjs`, and the missing
-`docker-cleanup-batch-up.sh`). Those files are outside this JWT change and were not folded into this
-PR.
+The repository-wide structural test-system gate initially exposed three stale QuoteOps registry
+names plus scripts README inventory drift (`check-license-boundary.sh`,
+`extract-changelog-release.mjs`, and the missing `docker-cleanup-batch-up.sh`). The follow-up commit
+removed the three nonexistent spec names, registered the two real scripts, and removed the dead
+script row. The final `./scripts/check-test-system.sh` run passed every structural sub-gate; its
+command-reachability messages are explicitly baselined warnings rather than failures.
 
 The completed full regular run used the same clean database and collected all 1182 cases. Its 393
 failures include genuine pre-existing product/test-contract failures and serial cascades. The
