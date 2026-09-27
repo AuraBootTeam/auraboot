@@ -5,7 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import org.springframework.web.bind.annotation.*;
 import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 
-/** Platform-admin content registration. Registration does not grant publication qualification. */
+/** Platform-admin release registration, publication and exact-match tenant binding control. */
 @RequirePlatformAdmin
 @RestController
 @RequestMapping("/api/admin/application-releases")
@@ -13,13 +13,16 @@ public class ApplicationReleaseController {
     private final ApplicationReleaseRegistrationService service;
     private final ApplicationReleaseControlService control;
     private final DefinitionShadowComparisonService shadowComparison;
+    private final TenantApplicationShadowBindingService shadowBindings;
 
     public ApplicationReleaseController(ApplicationReleaseRegistrationService service,
                                         ApplicationReleaseControlService control,
-                                        DefinitionShadowComparisonService shadowComparison) {
+                                        DefinitionShadowComparisonService shadowComparison,
+                                        TenantApplicationShadowBindingService shadowBindings) {
         this.service = service;
         this.control = control;
         this.shadowComparison = shadowComparison;
+        this.shadowBindings = shadowBindings;
     }
 
     public record RegisterRequest(String registrationKey, ApplicationReleaseRegistrationService.Content content) {}
@@ -27,6 +30,7 @@ public class ApplicationReleaseController {
     public record CreateApplicationRequest(String code, String name) {}
     public record PublishRequest(String operationId) {}
     public record StableRequest(String releaseId, Long expectedVersion, String operationId) {}
+    public record PrepareTenantBindingRequest(String expectedReleaseId, String operationId) {}
     public record ActivateTenantBindingRequest(String expectedReleaseId, Long expectedVersion, String operationId) {}
 
     @PostMapping
@@ -73,6 +77,20 @@ public class ApplicationReleaseController {
         return ApiResponse.success(shadowComparison.comparePublishedStable(tenantId, applicationCode));
     }
 
+    @PostMapping("/{applicationCode}/tenant-bindings/{tenantId}/shadow")
+    public ApiResponse<TenantApplicationShadowBindingStore.Binding> prepareTenantBinding(
+            @PathVariable String applicationCode, @PathVariable long tenantId,
+            @RequestBody PrepareTenantBindingRequest request) {
+        var report = shadowComparison.comparePublishedStable(tenantId, applicationCode);
+        if (report.classification() != DefinitionShadowComparisonService.Classification.EXACT_MATCH
+                || !report.releaseId().equals(request.expectedReleaseId())) {
+            throw new IllegalStateException("Exact stable definition shadow match is required");
+        }
+        return ApiResponse.success(shadowBindings.createPublishedStableShadow(
+                tenantId, applicationCode, report.releaseId(), report.releaseDigest(),
+                new TenantApplicationShadowBindingStore.AuditContext(actor(), request.operationId())));
+    }
+
     @PostMapping("/{applicationCode}/tenant-bindings/{tenantId}/activation")
     public ApiResponse<ApplicationReleaseControlService.Binding> activateTenantBinding(
             @PathVariable String applicationCode, @PathVariable long tenantId,
@@ -96,6 +114,11 @@ public class ApplicationReleaseController {
     @ExceptionHandler(ApplicationReleaseRegistrationService.RegistrationUnavailableException.class)
     public ApiResponse<Void> registrationUnavailable() {
         return ApiResponse.error(503, "Registry registration connection is not enabled", null);
+    }
+
+    @ExceptionHandler(TenantApplicationShadowBindingService.ShadowBindingUnavailableException.class)
+    public ApiResponse<Void> shadowBindingUnavailable() {
+        return ApiResponse.error(503, "Shadow binding connection is not enabled", null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

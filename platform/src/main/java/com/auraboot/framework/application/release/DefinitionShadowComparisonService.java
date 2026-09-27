@@ -95,6 +95,27 @@ public final class DefinitionShadowComparisonService {
                     }
                 }
             }
+            if (component.manifest().getDashboards() != null) {
+                for (var dashboard : component.manifest().getDashboards()) {
+                    compared++;
+                    String identity = "page:" + dashboard.getCode();
+                    require(expectedIdentities.add(identity), "Duplicate page or dashboard definition identity");
+                    PluginResource legacy = actual.get(identity);
+                    String expectedDigest = digest(mapper.valueToTree(dashboard));
+                    if (legacy == null || legacy.getImportSnapshot() == null) {
+                        differences.add(new Difference(component.componentKey(), "page", dashboard.getCode(),
+                                "resource-missing", expectedDigest, null));
+                        continue;
+                    }
+                    String actualDigest = digest(mapper.valueToTree(legacy.getImportSnapshot()));
+                    if (Boolean.TRUE.equals(legacy.getUserModified()) || !expectedDigest.equals(actualDigest)) {
+                        differences.add(new Difference(component.componentKey(), "page", dashboard.getCode(),
+                                Boolean.TRUE.equals(legacy.getUserModified())
+                                        ? "tenant-modified" : "definition-digest-mismatch",
+                                expectedDigest, actualDigest));
+                    }
+                }
+            }
             actual.entrySet().stream().filter(entry -> !expectedIdentities.contains(entry.getKey())).forEach(entry -> {
                 PluginResource legacy = entry.getValue();
                 differences.add(new Difference(component.componentKey(), legacy.getResourceType(), legacy.getResourceCode(),

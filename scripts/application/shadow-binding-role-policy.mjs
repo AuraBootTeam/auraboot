@@ -7,7 +7,14 @@ export function shadowBindingRolePolicy({ schema, runtimeRole, shadowRole, owner
         || (key !== 'schema' && value === 'public')) throw new Error('Explicit safe schema and role identifiers required');
   }
   if (new Set([runtimeRole, shadowRole, ownerRole]).size !== 3) throw new Error('Three distinct roles required');
-  const tables = ['ab_application_release', 'ab_tenant_application_binding', 'ab_tenant_application_binding_history'];
+  const tables = [
+    'ab_application_release',
+    'ab_tenant_application_binding',
+    'ab_tenant_application_binding_history',
+    'ab_application',
+    'ab_application_channel_target',
+    'ab_application_release_publication',
+  ];
   const names = tables.map(name => `"${schema}"."${name}"`);
   return `-- Shadow writer cannot activate or update an active binding, including through raw SQL.
 BEGIN;

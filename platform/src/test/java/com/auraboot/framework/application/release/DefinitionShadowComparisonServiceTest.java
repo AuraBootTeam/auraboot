@@ -2,6 +2,7 @@ package com.auraboot.framework.application.release;
 
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
+import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,32 @@ class DefinitionShadowComparisonServiceTest {
         when(definitions.findComparableResources(42L, plugin.getPid())).thenReturn(List.of());
         assertEquals(DefinitionShadowComparisonService.Classification.MISSING,
                 comparison.comparePublishedStable(42L, "aura-edu").classification());
+    }
+
+    @Test
+    void comparesFirstClassDashboardsThroughTheirLegacyPageResourceRecords() {
+        var release = resolver.publishedStableRelease("aura-edu");
+        var dashboard = DashboardDefinitionDTO.builder()
+                .code("edu_overview")
+                .title("Education overview")
+                .widgets(List.of(Map.of("id", "summary")))
+                .build();
+        release.components().getFirst().manifest().setDashboards(List.of(dashboard));
+        var dashboardResource = PluginResource.builder()
+                .pluginPid(plugin.getPid())
+                .resourceType("page")
+                .resourceCode("edu_overview")
+                .importSnapshot(objectMapper.convertValue(dashboard, Map.class))
+                .userModified(false)
+                .build();
+        when(definitions.findComparableResources(42L, plugin.getPid()))
+                .thenReturn(List.of(resource(false), dashboardResource));
+
+        var report = comparison.comparePublishedStable(42L, "aura-edu");
+
+        assertEquals(DefinitionShadowComparisonService.Classification.EXACT_MATCH, report.classification());
+        assertEquals(2, report.comparedResources());
+        assertTrue(report.differences().isEmpty());
     }
 
     private PluginResource resource(boolean modified) {

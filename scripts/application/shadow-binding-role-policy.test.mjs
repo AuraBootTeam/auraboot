@@ -10,5 +10,10 @@ test('unsafe or overlapping role inputs cannot generate executable SQL', () => {
   }
   assert.throws(() => shadowBindingRolePolicy({ ...input, shadowRole: input.ownerRole }));
   assert.throws(() => shadowBindingRolePolicy({ ...input, runtimeRole: 'public' }));
-  assert.match(shadowBindingRolePolicy(input), /COMMIT;\n$/);
+  const policy = shadowBindingRolePolicy(input);
+  assert.match(policy, /COMMIT;\n$/);
+  for (const table of ['ab_application', 'ab_application_channel_target',
+    'ab_application_release', 'ab_application_release_publication']) {
+    assert.match(policy, new RegExp(`GRANT SELECT ON TABLE [^;]*"${table}"`));
+  }
 });
