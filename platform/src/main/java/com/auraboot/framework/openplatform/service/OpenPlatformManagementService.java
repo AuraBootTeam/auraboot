@@ -1,7 +1,9 @@
 package com.auraboot.framework.openplatform.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.ApplicationView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.ApplicationMemberView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.ApplicationPermissions;
@@ -138,7 +140,8 @@ public class OpenPlatformManagementService {
         }
         if (OpenPlatformApplicationRole.OWNER.storageValue().equals(previous.getRole())
                 && memberMapper.countOwners(tenantId, application.getId()) <= 1) {
-            throw new IllegalStateException("An application must keep at least one owner");
+            throw new BusinessException(ResponseCode.BadParam,
+                    "An application must keep at least one owner");
         }
         if (memberMapper.deleteMember(tenantId, application.getId(), userPid) != 1) {
             throw new IllegalStateException("Application member could not be removed");
@@ -422,7 +425,8 @@ public class OpenPlatformManagementService {
         if (previous != null && OpenPlatformApplicationRole.OWNER.storageValue().equals(previous.getRole())
                 && nextRole != OpenPlatformApplicationRole.OWNER
                 && memberMapper.countOwners(tenantId, applicationId) <= 1) {
-            throw new IllegalStateException("An application must keep at least one owner");
+            throw new BusinessException(ResponseCode.BadParam,
+                    "An application must keep at least one owner");
         }
     }
 

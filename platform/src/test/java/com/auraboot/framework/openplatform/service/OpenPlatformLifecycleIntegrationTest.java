@@ -3,6 +3,7 @@ package com.auraboot.framework.openplatform.service;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CreateApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
@@ -100,9 +101,9 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         applyTestMetaContext();
         assertThrows(IllegalArgumentException.class, () -> managementService.upsertMember(
                 application.pid(), nonTenantUser.getPid(), new UpsertApplicationMemberRequest("viewer")));
-        assertThrows(IllegalStateException.class, () -> managementService.upsertMember(
+        assertThrows(BusinessException.class, () -> managementService.upsertMember(
                 application.pid(), getTestUser().getPid(), new UpsertApplicationMemberRequest("viewer")));
-        assertThrows(IllegalStateException.class,
+        assertThrows(BusinessException.class,
                 () -> managementService.removeMember(application.pid(), getTestUser().getPid()));
         assertEquals(2, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM ab_external_application_member_audit audit
@@ -191,7 +192,7 @@ class OpenPlatformLifecycleIntegrationTest extends BaseIntegrationTest {
         try {
             managementService.removeMember(applicationPid, ownerPid);
             return true;
-        } catch (IllegalStateException expected) {
+        } catch (BusinessException expected) {
             return false;
         } finally {
             MetaContext.clear();
