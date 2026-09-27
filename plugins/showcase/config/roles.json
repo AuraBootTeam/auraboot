@@ -6,7 +6,8 @@
     "description": "Full access to all Showcase modules",
     "permissions": [
       "sc.showcase.manage",
-      "sc.showcase.read"
+      "sc.showcase.read",
+      "meta.command.execute"
     ]
   }
 ]
