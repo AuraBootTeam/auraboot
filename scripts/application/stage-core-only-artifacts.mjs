@@ -232,6 +232,7 @@ function packWebShell(repoRoot, destination, version) {
       'application-artifact-verifier.mjs',
       'application-contract.mjs',
       'application-graph-adapters.mjs',
+      'application-release-control.mjs',
     ]) {
       copyArtifact(
         resolve(repoRoot, 'scripts/application', file),
