@@ -53,6 +53,13 @@ case "$EXPECT_RELEASE_REGISTRATION" in
   0|1) ;;
   *) fatal 'AURA_PRODUCT_EXPECTS_RELEASE_REGISTRATION must be 0 or 1' ;;
 esac
+PRODUCT_PNPM_ENV=()
+if [[ -n "${AURA_PRODUCT_PNPM_AUTO_INSTALL_PEERS:-}" ]]; then
+  case "$AURA_PRODUCT_PNPM_AUTO_INSTALL_PEERS" in
+    true|false) PRODUCT_PNPM_ENV=("NPM_CONFIG_AUTO_INSTALL_PEERS=$AURA_PRODUCT_PNPM_AUTO_INSTALL_PEERS") ;;
+    *) fatal 'AURA_PRODUCT_PNPM_AUTO_INSTALL_PEERS must be true or false' ;;
+  esac
+fi
 PUBLISH_REGISTRY="${AURA_RELEASE_PUBLISH_REGISTRY:-0}"
 case "$PUBLISH_REGISTRY" in
   0|1) ;;
@@ -181,7 +188,7 @@ NPM_CONFIG_REGISTRY=https://registry.npmjs.org AURA_OCI_BUILDER=docker \
   || fail 'AuraBoot artifact build failed; see logs/core-artifacts.log'
 
 info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
-CI=1 pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
+env CI=1 "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/product-pnpm-install.log" 2>&1 \
   || fatal 'product artifact build dependencies unavailable'
 create_isolated_network
@@ -318,7 +325,7 @@ mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$ARTIFACTS/logs/web.log" 2>&1 || fail 'release Web BFF failed to start'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
 
-pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
+env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
 env "${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT" PW_SKIP_WEBSERVER=1 \
   PW_ARTIFACT_DIR="$ARTIFACTS/e2e/artifacts" PW_RESULTS_JSON="$ARTIFACTS/e2e/results.json" \
   pnpm --dir "$PRODUCT_ROOT" exec playwright test --config playwright.release.config.ts \

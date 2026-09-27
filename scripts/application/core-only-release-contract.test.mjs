@@ -54,8 +54,9 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /CI=1 pnpm --dir "\$CORE_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /core-pnpm-install\.log/);
   assert.match(productImageGate, /NPM_CONFIG_REGISTRY=https:\/\/registry\.npmjs\.org AURA_OCI_BUILDER=docker/);
-  assert.match(productImageGate, /CI=1 pnpm --dir "\$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /product-pnpm-install\.log/);
+  assert.match(productImageGate, /AURA_PRODUCT_PNPM_AUTO_INSTALL_PEERS must be true or false/);
+  assert.match(productImageGate, /env CI=1 "\$\{PRODUCT_PNPM_ENV\[@\]\}" pnpm --dir "\$PRODUCT_ROOT" install/);
   assert.match(productImageGate, /POSTGRES_DB=aura_product_build_ci/);
   assert.match(productImageGate, /product-test-flyway\.log/);
   assert.match(productImageGate, /PostgreSQL init process complete; ready for start up\./);
