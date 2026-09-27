@@ -9,6 +9,7 @@ import {
   resolveApplication,
   verifyArtifacts,
   validateLock,
+  validateLockForManifest,
   validateManifest,
 } from './application-contract.mjs';
 import {
@@ -26,6 +27,10 @@ function parseArgs(argv) {
     const argument = rest[index];
     if (argument === '--manifest') options.manifest = resolve(rest[++index]);
     else if (argument === '--catalog') options.catalog = resolve(rest[++index]);
+    else if (argument === '--expected-identity') {
+      options.expectedIdentity = rest[++index];
+      if (!/^sha256:[0-9a-f]{64}$/.test(options.expectedIdentity ?? '')) throw new Error('--expected-identity requires a SHA256 identity');
+    }
     else if (argument === '--lock') options.lock = resolve(rest[++index]);
     else if (argument === '--output') options.output = resolve(rest[++index]);
     else if (argument === '--artifact-root') options.artifactRoot = resolve(rest[++index]);
@@ -68,7 +73,11 @@ function main() {
     return;
   }
   if (options.command === 'verify-lock') {
-    const lock = validateLock(readStructuredFile(required(options, 'lock')));
+    const input = readStructuredFile(required(options, 'lock'));
+    const validation = { expectedIdentity: options.expectedIdentity, skipImage: options.skipImage === true };
+    const lock = options.manifest
+      ? validateLockForManifest(input, readStructuredFile(options.manifest), validation)
+      : validateLock(input, validation);
     process.stdout.write(`valid application lock: ${lock.identity}\n`);
     return;
   }

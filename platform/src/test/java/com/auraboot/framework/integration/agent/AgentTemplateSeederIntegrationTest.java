@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies that AgentTemplateSeeder correctly seeds built-in skills, agent profile templates,
  * and agent identity (SYSTEM_AGENT user binding).
- * Seeder runs at application startup (PlatformSeedRunner); tests only validate presence.
+ * Each test invokes the explicit seeder; application startup does not create these records.
  */
 class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
 

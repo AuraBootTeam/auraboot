@@ -197,6 +197,239 @@ $$;
 
 
 --
+-- Name: ab_application_channel_history_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_channel_history_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' OR pg_trigger_depth() <> 2 THEN
+        RAISE EXCEPTION 'Application channel history is an immutable projection';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_channel_project_history(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_channel_project_history() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    INSERT INTO ab_application_channel_target_history
+        (application_id,channel,target_version,previous_release_id,release_id,changed_at,changed_by,operation_id)
+    VALUES (NEW.application_id,NEW.channel,NEW.target_version,
+        CASE WHEN TG_OP = 'UPDATE' THEN OLD.release_id END,
+        NEW.release_id,NEW.updated_at,NEW.updated_by,NEW.operation_id);
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_channel_target_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_channel_target_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP IN ('DELETE', 'TRUNCATE') THEN
+        RAISE EXCEPTION 'Application channel target removal is not supported';
+    END IF;
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.target_version <> 1 THEN
+            RAISE EXCEPTION 'Application channel target must start at version one';
+        END IF;
+    ELSE
+        IF NEW.application_id IS DISTINCT FROM OLD.application_id OR NEW.channel IS DISTINCT FROM OLD.channel THEN
+            RAISE EXCEPTION 'Application channel identity is immutable';
+        END IF;
+        IF NEW.target_version <> OLD.target_version + 1 OR NEW.release_id = OLD.release_id THEN
+            RAISE EXCEPTION 'Application channel update requires a new release and next target version';
+        END IF;
+    END IF;
+    NEW.updated_at := clock_timestamp();
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_component_guard_insert(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_component_guard_insert() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF pg_trigger_depth() <> 2 THEN
+        RAISE EXCEPTION 'Release components must be projected from the immutable manifest';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_guard_identity(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_guard_identity() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.next_release_sequence <> 1 THEN RAISE EXCEPTION 'New application sequence must start at one'; END IF;
+        RETURN NEW;
+    END IF;
+    IF NEW.code IS DISTINCT FROM OLD.code OR NEW.id IS DISTINCT FROM OLD.id
+       OR (NEW.next_release_sequence IS DISTINCT FROM OLD.next_release_sequence AND pg_trigger_depth() < 2) THEN
+        RAISE EXCEPTION 'Application identity and release sequence are registry-controlled';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_publication_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_publication_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'Application publication is immutable';
+END $$;
+
+
+--
+-- Name: ab_application_release_prepare(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_release_prepare() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+DECLARE
+    body JSONB := NEW.manifest_text::jsonb;
+    application_code TEXT;
+BEGIN
+    UPDATE ab_application SET next_release_sequence = next_release_sequence + 1
+      WHERE id = NEW.application_id AND next_release_sequence = NEW.release_sequence
+      RETURNING code INTO application_code;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Application release sequence conflict'; END IF;
+    IF body->>'schemaVersion' IS DISTINCT FROM '1'
+       OR body->>'application' IS DISTINCT FROM application_code
+       OR body->>'releaseId' IS DISTINCT FROM NEW.release_id
+       OR body->>'releaseSequence' IS DISTINCT FROM NEW.release_sequence::text
+       OR body->>'compatibilityEpoch' IS DISTINCT FROM NEW.compatibility_epoch::text
+       OR body->>'sourceLockIdentity' IS DISTINCT FROM NEW.source_lock_identity
+       OR jsonb_typeof(body->'platformCompatibility') IS DISTINCT FROM 'object'
+       OR jsonb_typeof(body->'components') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'Application release manifest identity or shape mismatch';
+    END IF;
+    IF jsonb_array_length(body->'components') = 0 THEN
+        RAISE EXCEPTION 'Application release requires components';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_release_project(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_release_project() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM jsonb_array_elements(NEW.manifest->'components') AS item
+        JOIN ab_application_release_component component
+          ON component.component_key = item->>'key'
+         AND component.component_type = item->>'type'
+         AND component.component_version = item->>'version'
+        JOIN ab_application_release release ON release.release_id = component.release_id
+        WHERE release.application_id = NEW.application_id
+          AND component.component_digest IS DISTINCT FROM item->>'digest'
+    ) THEN
+        RAISE EXCEPTION 'Application component coordinate cannot change its digest';
+    END IF;
+    INSERT INTO ab_application_release_component
+        (release_id, component_key, component_type, component_version, component_digest, compatibility_contract)
+    SELECT NEW.release_id, item->>'key', item->>'type', item->>'version', item->>'digest',
+           COALESCE(item->'compatibilityContract', '{}'::jsonb)
+      FROM jsonb_array_elements(NEW.manifest->'components') AS item;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_application_release_reject_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_release_reject_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'Application release content is immutable: %', TG_TABLE_NAME;
+END $$;
+
+
+--
+-- Name: ab_application_release_require_actor(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_release_require_actor() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.registration_key IS NULL OR NEW.registration_request_digest IS NULL OR NEW.registered_by IS NULL THEN
+        RAISE EXCEPTION 'Application release registration key, request digest and actor are required';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: ab_application_require_creator(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_application_require_creator() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.created_by IS NULL THEN
+        RAISE EXCEPTION 'Application creator is required';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: ab_assert_stable_published_release(bigint, character varying); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_assert_stable_published_release(target_application_id bigint, target_release_id character varying) RETURNS void
+    LANGUAGE plpgsql STABLE
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM ab_application_channel_target
+        WHERE application_id = target_application_id AND channel = 'stable' AND release_id = target_release_id
+    ) THEN
+        RAISE EXCEPTION 'Active tenant binding requires the exact published stable release';
+    END IF;
+END $$;
+
+
+--
 -- Name: ab_authoring_guard_release_update(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -309,6 +542,130 @@ COMMENT ON FUNCTION public.ab_page_schema_apply_ownership_default() IS 'Derives 
 
 
 --
+-- Name: ab_platform_registry_guard_coordinates(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_platform_registry_guard_coordinates() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    -- The query after this lock must see the transaction that released it.
+    -- Refuse snapshot isolation; callers must retry the entire registration at READ COMMITTED.
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
+        RAISE EXCEPTION 'Platform registration requires READ COMMITTED isolation';
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended('platform-artifacts:' || NEW.platform_code, 0));
+    IF EXISTS (
+        SELECT 1 FROM ab_platform_release_registry release,
+             LATERAL jsonb_array_elements(release.manifest->'artifacts') existing,
+             LATERAL jsonb_array_elements(NEW.manifest_text::jsonb->'artifacts') incoming
+        WHERE release.platform_code = NEW.platform_code
+          AND existing->>'type' = incoming->>'type'
+          AND existing->>'id' = incoming->>'id'
+          AND existing->>'version' = incoming->>'version'
+          AND existing->>'digest' IS DISTINCT FROM incoming->>'digest'
+    ) THEN
+        RAISE EXCEPTION USING ERRCODE = '23514',
+            MESSAGE = 'Platform artifact coordinate cannot change its digest',
+            CONSTRAINT = 'platform_artifact_coordinate_immutable';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_platform_registry_reject_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_platform_registry_reject_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'Platform release registration is immutable';
+END $$;
+
+
+--
+-- Name: ab_platform_registry_validate(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_platform_registry_validate() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+    body JSONB := NEW.manifest_text::jsonb;
+    artifact JSONB;
+    dimension TEXT;
+    contracts JSONB;
+BEGIN
+    IF jsonb_typeof(body) IS DISTINCT FROM 'object'
+       OR body->'schemaVersion' IS DISTINCT FROM '1'::jsonb
+       OR body->>'releaseId' IS DISTINCT FROM NEW.release_id
+       OR body->>'platform' IS DISTINCT FROM NEW.platform_code
+       OR body->>'version' IS DISTINCT FROM NEW.version
+       OR body->>'sourceLockIdentity' IS DISTINCT FROM NEW.source_lock_identity
+       OR jsonb_typeof(body->'platformContracts') IS DISTINCT FROM 'object'
+       OR jsonb_typeof(body->'artifacts') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'Platform manifest identity or shape mismatch';
+    END IF;
+    IF EXISTS (SELECT 1 FROM unnest(ARRAY['releaseId','platform','version','sourceLockIdentity']) name
+                WHERE jsonb_typeof(body->name) IS DISTINCT FROM 'string') THEN
+        RAISE EXCEPTION 'Platform identity fields must be strings';
+    END IF;
+    IF (body - ARRAY['schemaVersion','releaseId','platform','version','sourceLockIdentity','platformContracts','artifacts']) <> '{}'::jsonb
+       OR ((body->'platformContracts') - ARRAY['runtime','pluginApi','dslSchema']) <> '{}'::jsonb THEN
+        RAISE EXCEPTION 'Unknown platform manifest fields';
+    END IF;
+    FOREACH dimension IN ARRAY ARRAY['runtime','pluginApi','dslSchema'] LOOP
+        contracts := body->'platformContracts'->dimension;
+        IF jsonb_typeof(contracts) IS DISTINCT FROM 'array' THEN
+            RAISE EXCEPTION 'Explicit platform contract arrays required';
+        END IF;
+        IF jsonb_array_length(contracts) = 0 OR EXISTS (
+            SELECT 1 FROM jsonb_array_elements(contracts) item
+             WHERE CASE WHEN dimension = 'dslSchema'
+                 THEN jsonb_typeof(item) <> 'number' OR NOT (item::text ~ '^[1-9][0-9]*$')
+                 ELSE jsonb_typeof(item) <> 'string' OR length(btrim(item #>> '{}')) NOT BETWEEN 1 AND 200 END
+        ) OR (SELECT count(*) <> count(DISTINCT item) FROM jsonb_array_elements(contracts) item) THEN
+            RAISE EXCEPTION 'Invalid or duplicate platform contracts';
+        END IF;
+    END LOOP;
+    IF jsonb_array_length(body->'artifacts') = 0 THEN
+        RAISE EXCEPTION 'Platform artifacts required';
+    END IF;
+    FOR artifact IN SELECT value FROM jsonb_array_elements(body->'artifacts') LOOP
+        IF EXISTS (SELECT 1 FROM unnest(ARRAY['type','id','version','digest','uri']) name
+                    WHERE jsonb_typeof(artifact->name) IS DISTINCT FROM 'string')
+           OR EXISTS (SELECT 1 FROM unnest(ARRAY['repository','commit']) name
+                    WHERE jsonb_typeof(artifact->'source'->name) IS DISTINCT FROM 'string') THEN
+            RAISE EXCEPTION 'Platform artifact identity fields must be strings';
+        END IF;
+        IF jsonb_typeof(artifact) IS DISTINCT FROM 'object'
+           OR NOT COALESCE(artifact->>'type' IN ('runtime','maven','npm','plugin','config','migration','oci'), false)
+           OR NOT COALESCE(length(btrim(artifact->>'id')) > 0, false)
+           OR NOT COALESCE(length(btrim(artifact->>'version')) > 0 AND artifact->>'version' !~* '(snapshot|latest|workspace|branch)', false)
+           OR NOT COALESCE(artifact->>'digest' ~ '^sha256:[0-9a-f]{64}$', false)
+           OR NOT COALESCE(artifact->>'uri' ~ '^(maven|npm|oci|artifact):.', false)
+           OR jsonb_typeof(artifact->'source') IS DISTINCT FROM 'object'
+           OR NOT COALESCE(length(btrim(artifact->'source'->>'repository')) > 0, false)
+           OR NOT COALESCE(artifact->'source'->>'commit' ~ '^[0-9a-f]{40}$', false) THEN
+            RAISE EXCEPTION 'Invalid platform artifact';
+        END IF;
+        IF (artifact - ARRAY['type','id','version','digest','uri','source']) <> '{}'::jsonb
+           OR ((artifact->'source') - ARRAY['repository','commit']) <> '{}'::jsonb THEN
+            RAISE EXCEPTION 'Unknown platform artifact fields';
+        END IF;
+    END LOOP;
+    IF EXISTS (SELECT 1 FROM jsonb_array_elements(body->'artifacts') item
+               GROUP BY item->>'type', item->>'id' HAVING count(*) > 1) THEN
+        RAISE EXCEPTION 'Duplicate platform artifact coordinate';
+    END IF;
+    RETURN NEW;
+END $_$;
+
+
+--
 -- Name: ab_publish_initial_agent_release(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -384,6 +741,90 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+
+--
+-- Name: ab_tenant_binding_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_tenant_binding_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    IF TG_OP IN ('DELETE', 'TRUNCATE') THEN
+        RAISE EXCEPTION 'Tenant binding removal requires a future reference-aware retirement protocol';
+    END IF;
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.binding_version <> 1 OR NEW.status NOT IN ('shadow', 'active') THEN
+            RAISE EXCEPTION 'Tenant binding must start at version one';
+        END IF;
+        IF NEW.status = 'active' THEN
+            PERFORM ab_assert_stable_published_release(NEW.application_id, NEW.current_release_id);
+        END IF;
+        NEW.created_at := clock_timestamp();
+    ELSE
+        IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id OR NEW.application_id IS DISTINCT FROM OLD.application_id
+           OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+            RAISE EXCEPTION 'Tenant binding identity is immutable';
+        END IF;
+        IF NEW.binding_version <> OLD.binding_version + 1 THEN
+            RAISE EXCEPTION 'Tenant binding version must advance by one';
+        END IF;
+        IF NEW.current_release_id = OLD.current_release_id AND NEW.status = OLD.status THEN
+            RAISE EXCEPTION 'Tenant binding transition must change its release or status';
+        END IF;
+        IF NEW.status = 'active'
+           AND (OLD.status IS DISTINCT FROM 'active' OR NEW.current_release_id IS DISTINCT FROM OLD.current_release_id) THEN
+            PERFORM ab_assert_stable_published_release(NEW.application_id, NEW.current_release_id);
+        END IF;
+    END IF;
+    NEW.updated_at := clock_timestamp();
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_tenant_binding_history_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_tenant_binding_history_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' OR pg_trigger_depth() <> 2 THEN
+        RAISE EXCEPTION 'Tenant binding history is an immutable transition projection';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_tenant_binding_project_history(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_tenant_binding_project_history() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', '$user', 'public'
+    AS $_$
+DECLARE
+    actor TEXT := current_setting('aura.binding.actor', true);
+    operation TEXT := current_setting('aura.binding.operation', true);
+BEGIN
+    IF actor IS NULL OR actor !~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'
+       OR operation IS NULL OR operation !~ '^[0-9A-HJKMNP-TV-Z]{26}$' THEN
+        RAISE EXCEPTION 'Binding transition requires business actor and operation identity';
+    END IF;
+    INSERT INTO ab_tenant_application_binding_history
+        (tenant_id, application_id, binding_version, previous_release_id, previous_status,
+         current_release_id, status, changed_at, database_actor, business_actor, operation_id)
+    VALUES (NEW.tenant_id, NEW.application_id, NEW.binding_version,
+        CASE WHEN TG_OP = 'UPDATE' THEN OLD.current_release_id END,
+        CASE WHEN TG_OP = 'UPDATE' THEN OLD.status END,
+        NEW.current_release_id, NEW.status, NEW.updated_at, current_user, actor, operation);
+    RETURN NEW;
+END $_$;
 
 
 --
@@ -3258,6 +3699,24 @@ ALTER TABLE public.ab_api_connector ALTER COLUMN id ADD GENERATED BY DEFAULT AS 
 
 
 --
+-- Name: ab_application; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application (
+    id bigint NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    next_release_sequence bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    created_by text,
+    CONSTRAINT ab_application_code_check CHECK ((code ~ '^[a-z][a-z0-9-]{1,99}$'::text)),
+    CONSTRAINT ab_application_creator_format CHECK (((created_by IS NULL) OR (created_by ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text))),
+    CONSTRAINT ab_application_name_check CHECK ((length(btrim(name)) > 0)),
+    CONSTRAINT ab_application_next_release_sequence_check CHECK ((next_release_sequence > 0))
+);
+
+
+--
 -- Name: ab_application_access_token; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3299,6 +3758,60 @@ ALTER TABLE public.ab_application_access_token ALTER COLUMN id ADD GENERATED BY 
 
 
 --
+-- Name: ab_application_channel_target; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application_channel_target (
+    application_id bigint NOT NULL,
+    channel text NOT NULL,
+    release_id character varying(26) NOT NULL,
+    target_version bigint DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    updated_by text NOT NULL,
+    operation_id character varying(26) NOT NULL,
+    CONSTRAINT ab_application_channel_target_channel_check CHECK ((channel = 'stable'::text)),
+    CONSTRAINT ab_application_channel_target_operation_id_check CHECK (((operation_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_application_channel_target_target_version_check CHECK ((target_version > 0)),
+    CONSTRAINT ab_application_channel_target_updated_by_check CHECK ((updated_by ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text))
+);
+
+
+--
+-- Name: TABLE ab_application_channel_target; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_application_channel_target IS 'Exact stable release selected by the control plane; request handling resolves tenant binding instead';
+
+
+--
+-- Name: ab_application_channel_target_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application_channel_target_history (
+    application_id bigint NOT NULL,
+    channel text NOT NULL,
+    target_version bigint NOT NULL,
+    previous_release_id character varying(26),
+    release_id character varying(26) NOT NULL,
+    changed_at timestamp with time zone NOT NULL,
+    changed_by text NOT NULL,
+    operation_id character varying(26) NOT NULL,
+    CONSTRAINT ab_application_channel_target_history_changed_by_check CHECK ((changed_by ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text)),
+    CONSTRAINT ab_application_channel_target_history_channel_check CHECK ((channel = 'stable'::text)),
+    CONSTRAINT ab_application_channel_target_history_check CHECK ((((target_version = 1) AND (previous_release_id IS NULL)) OR ((target_version > 1) AND (previous_release_id IS NOT NULL)))),
+    CONSTRAINT ab_application_channel_target_history_operation_id_check CHECK (((operation_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_application_channel_target_history_target_version_check CHECK ((target_version > 0))
+);
+
+
+--
+-- Name: TABLE ab_application_channel_target_history; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_application_channel_target_history IS 'Immutable audit projection for stable target changes; it is not a rollout workflow';
+
+
+--
 -- Name: ab_application_credential; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3331,6 +3844,20 @@ COMMENT ON TABLE public.ab_application_credential IS 'Hashed client credentials 
 
 ALTER TABLE public.ab_application_credential ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME public.ab_application_credential_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: ab_application_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ab_application ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.ab_application_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -3379,6 +3906,82 @@ ALTER TABLE public.ab_application_installation ALTER COLUMN id ADD GENERATED BY 
     NO MAXVALUE
     CACHE 1
 );
+
+
+--
+-- Name: ab_application_release; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application_release (
+    release_id character varying(26) NOT NULL,
+    application_id bigint NOT NULL,
+    release_sequence bigint NOT NULL,
+    compatibility_epoch integer NOT NULL,
+    source_lock_identity text NOT NULL,
+    manifest_text text NOT NULL,
+    manifest jsonb GENERATED ALWAYS AS ((manifest_text)::jsonb) STORED,
+    digest text NOT NULL,
+    registered_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    registration_key text,
+    registration_request_digest text,
+    registered_by text,
+    CONSTRAINT ab_application_release_actor_format CHECK (((registered_by IS NULL) OR (registered_by ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text))),
+    CONSTRAINT ab_application_release_check CHECK ((digest = ('sha256:'::text || encode(sha256(convert_to(manifest_text, 'UTF8'::name)), 'hex'::text)))),
+    CONSTRAINT ab_application_release_compatibility_epoch_check CHECK ((compatibility_epoch > 0)),
+    CONSTRAINT ab_application_release_manifest_check CHECK ((jsonb_typeof(manifest) = 'object'::text)),
+    CONSTRAINT ab_application_release_release_id_check CHECK (((release_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_application_release_release_sequence_check CHECK ((release_sequence > 0)),
+    CONSTRAINT ab_application_release_source_lock_identity_check CHECK ((source_lock_identity ~ '^sha256:[0-9a-f]{64}$'::text)),
+    CONSTRAINT chk_application_registration_key CHECK ((((registration_key IS NULL) AND (registration_request_digest IS NULL)) OR ((registration_key IS NOT NULL) AND (registration_request_digest IS NOT NULL) AND (registration_key ~ '^[A-Za-z0-9._:-]{1,128}$'::text) AND (registration_request_digest ~ '^sha256:[0-9a-f]{64}$'::text))))
+);
+
+
+--
+-- Name: TABLE ab_application_release; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_application_release IS 'Immutable registered content only. Admission/revocation and target deployment compatibility are separate authorities.';
+
+
+--
+-- Name: ab_application_release_component; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application_release_component (
+    release_id character varying(26) NOT NULL,
+    component_key text NOT NULL,
+    component_type text NOT NULL,
+    component_version text NOT NULL,
+    component_digest text NOT NULL,
+    compatibility_contract jsonb NOT NULL,
+    CONSTRAINT ab_application_release_component_compatibility_contract_check CHECK ((jsonb_typeof(compatibility_contract) = 'object'::text)),
+    CONSTRAINT ab_application_release_component_component_digest_check CHECK ((component_digest ~ '^sha256:[0-9a-f]{64}$'::text)),
+    CONSTRAINT ab_application_release_component_component_key_check CHECK ((length(btrim(component_key)) > 0)),
+    CONSTRAINT ab_application_release_component_component_type_check CHECK ((component_type = ANY (ARRAY['definition'::text, 'backend_plugin'::text, 'frontend_contribution'::text, 'asset'::text, 'migration'::text]))),
+    CONSTRAINT ab_application_release_component_component_version_check CHECK (((length(btrim(component_version)) > 0) AND (component_version !~* '(snapshot|latest|workspace|branch)'::text)))
+);
+
+
+--
+-- Name: ab_application_release_publication; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_application_release_publication (
+    release_id character varying(26) NOT NULL,
+    application_id bigint NOT NULL,
+    published_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    published_by text NOT NULL,
+    operation_id character varying(26) NOT NULL,
+    CONSTRAINT ab_application_release_publication_operation_id_check CHECK (((operation_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_application_release_publication_published_by_check CHECK ((published_by ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text))
+);
+
+
+--
+-- Name: TABLE ab_application_release_publication; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_application_release_publication IS 'Immutable first-closure publication fact; revocation and retirement are future separate authorities';
 
 
 --
@@ -3483,7 +4086,9 @@ CREATE TABLE public.ab_async_task (
     started_at timestamp with time zone,
     completed_at timestamp with time zone,
     cancelled_at timestamp with time zone,
-    timeout_seconds integer DEFAULT 3600
+    timeout_seconds integer DEFAULT 3600,
+    execution_token character varying(36),
+    lease_until timestamp with time zone
 );
 
 
@@ -13019,6 +13624,37 @@ ALTER SEQUENCE public.ab_platform_release_id_seq OWNED BY public.ab_platform_rel
 
 
 --
+-- Name: ab_platform_release_registry; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_platform_release_registry (
+    release_id character varying(26) NOT NULL,
+    platform_code text NOT NULL,
+    version text NOT NULL,
+    source_lock_identity text NOT NULL,
+    manifest_text text NOT NULL,
+    manifest jsonb GENERATED ALWAYS AS ((manifest_text)::jsonb) STORED,
+    digest text NOT NULL,
+    registered_by text NOT NULL,
+    registered_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT ab_platform_release_registry_check CHECK ((digest = ('sha256:'::text || encode(sha256(convert_to(manifest_text, 'UTF8'::name)), 'hex'::text)))),
+    CONSTRAINT ab_platform_release_registry_manifest_text_check CHECK ((manifest_text IS JSON OBJECT WITH UNIQUE KEYS)),
+    CONSTRAINT ab_platform_release_registry_platform_code_check CHECK ((platform_code ~ '^[a-z][a-z0-9-]{1,99}$'::text)),
+    CONSTRAINT ab_platform_release_registry_registered_by_check CHECK ((length(btrim(registered_by)) > 0)),
+    CONSTRAINT ab_platform_release_registry_release_id_check CHECK (((release_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_platform_release_registry_source_lock_identity_check CHECK ((source_lock_identity ~ '^sha256:[0-9a-f]{64}$'::text)),
+    CONSTRAINT ab_platform_release_registry_version_check CHECK (((length(btrim(version)) > 0) AND (version !~* '(snapshot|latest|workspace|branch)'::text)))
+);
+
+
+--
+-- Name: TABLE ab_platform_release_registry; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_platform_release_registry IS 'Registered immutable platform bytes, not admission, deployment observation or tenant binding authority.';
+
+
+--
 -- Name: ab_plugin; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15607,6 +16243,76 @@ CREATE TABLE public.ab_tenant (
 --
 
 COMMENT ON TABLE public.ab_tenant IS '租户表';
+
+
+--
+-- Name: ab_tenant_application_binding; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_tenant_application_binding (
+    tenant_id bigint NOT NULL,
+    application_id bigint NOT NULL,
+    current_release_id character varying(26) NOT NULL,
+    status text DEFAULT 'shadow'::text NOT NULL,
+    binding_version bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT ab_tenant_application_binding_binding_version_check CHECK ((binding_version > 0)),
+    CONSTRAINT ab_tenant_application_binding_status_check CHECK ((status = ANY (ARRAY['shadow'::text, 'active'::text])))
+);
+
+
+--
+-- Name: TABLE ab_tenant_application_binding; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_tenant_application_binding IS 'Exact tenant release pointer; updates require control-plane admission and version CAS';
+
+
+--
+-- Name: ab_tenant_application_binding_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_tenant_application_binding_history (
+    tenant_id bigint NOT NULL,
+    application_id bigint NOT NULL,
+    binding_version bigint NOT NULL,
+    previous_release_id character varying(26),
+    previous_status text,
+    current_release_id character varying(26) NOT NULL,
+    status text NOT NULL,
+    changed_at timestamp with time zone NOT NULL,
+    database_actor text NOT NULL,
+    business_actor text,
+    operation_id character varying(26),
+    CONSTRAINT ab_tenant_application_binding_history_binding_version_check CHECK ((binding_version > 0)),
+    CONSTRAINT ab_tenant_application_binding_history_business_actor_check CHECK ((business_actor ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text)),
+    CONSTRAINT ab_tenant_application_binding_history_check CHECK ((((binding_version = 1) AND (previous_release_id IS NULL) AND (previous_status IS NULL)) OR ((binding_version > 1) AND (previous_release_id IS NOT NULL) AND (previous_status IS NOT NULL)))),
+    CONSTRAINT ab_tenant_application_binding_history_operation_id_check CHECK (((operation_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
+    CONSTRAINT ab_tenant_application_binding_history_previous_status_check CHECK ((previous_status = ANY (ARRAY['shadow'::text, 'active'::text]))),
+    CONSTRAINT ab_tenant_application_binding_history_status_check CHECK ((status = ANY (ARRAY['shadow'::text, 'active'::text])))
+);
+
+
+--
+-- Name: COLUMN ab_tenant_application_binding_history.database_actor; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_tenant_application_binding_history.database_actor IS 'Database principal only; does not identify the authenticated business operator';
+
+
+--
+-- Name: COLUMN ab_tenant_application_binding_history.business_actor; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_tenant_application_binding_history.business_actor IS 'Operator asserted by the trusted control connection; legacy unknown values remain null';
+
+
+--
+-- Name: COLUMN ab_tenant_application_binding_history.operation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_tenant_application_binding_history.operation_id IS 'Control-plane operation identity, unique per tenant and application';
 
 
 --
@@ -18489,6 +19195,46 @@ ALTER TABLE ONLY public.ab_application_access_token
 
 
 --
+-- Name: ab_application_channel_target_history ab_application_channel_target_history_operation_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target_history
+    ADD CONSTRAINT ab_application_channel_target_history_operation_id_key UNIQUE (operation_id);
+
+
+--
+-- Name: ab_application_channel_target_history ab_application_channel_target_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target_history
+    ADD CONSTRAINT ab_application_channel_target_history_pkey PRIMARY KEY (application_id, channel, target_version);
+
+
+--
+-- Name: ab_application_channel_target ab_application_channel_target_operation_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target
+    ADD CONSTRAINT ab_application_channel_target_operation_id_key UNIQUE (operation_id);
+
+
+--
+-- Name: ab_application_channel_target ab_application_channel_target_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target
+    ADD CONSTRAINT ab_application_channel_target_pkey PRIMARY KEY (application_id, channel);
+
+
+--
+-- Name: ab_application ab_application_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application
+    ADD CONSTRAINT ab_application_code_key UNIQUE (code);
+
+
+--
 -- Name: ab_application_credential ab_application_credential_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -18526,6 +19272,70 @@ ALTER TABLE ONLY public.ab_application_installation
 
 ALTER TABLE ONLY public.ab_application_installation
     ADD CONSTRAINT ab_application_installation_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_application ab_application_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application
+    ADD CONSTRAINT ab_application_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_application_release ab_application_release_application_id_release_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release
+    ADD CONSTRAINT ab_application_release_application_id_release_id_key UNIQUE (application_id, release_id);
+
+
+--
+-- Name: ab_application_release ab_application_release_application_id_release_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release
+    ADD CONSTRAINT ab_application_release_application_id_release_sequence_key UNIQUE (application_id, release_sequence);
+
+
+--
+-- Name: ab_application_release_component ab_application_release_component_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_component
+    ADD CONSTRAINT ab_application_release_component_pkey PRIMARY KEY (release_id, component_key);
+
+
+--
+-- Name: ab_application_release ab_application_release_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release
+    ADD CONSTRAINT ab_application_release_pkey PRIMARY KEY (release_id);
+
+
+--
+-- Name: ab_application_release_publication ab_application_release_publicatio_application_id_release_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_publication
+    ADD CONSTRAINT ab_application_release_publicatio_application_id_release_id_key UNIQUE (application_id, release_id);
+
+
+--
+-- Name: ab_application_release_publication ab_application_release_publication_operation_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_publication
+    ADD CONSTRAINT ab_application_release_publication_operation_id_key UNIQUE (operation_id);
+
+
+--
+-- Name: ab_application_release_publication ab_application_release_publication_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_publication
+    ADD CONSTRAINT ab_application_release_publication_pkey PRIMARY KEY (release_id);
 
 
 --
@@ -21217,6 +22027,22 @@ ALTER TABLE ONLY public.ab_platform_release
 
 
 --
+-- Name: ab_platform_release_registry ab_platform_release_registry_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_platform_release_registry
+    ADD CONSTRAINT ab_platform_release_registry_pkey PRIMARY KEY (release_id);
+
+
+--
+-- Name: ab_platform_release_registry ab_platform_release_registry_platform_code_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_platform_release_registry
+    ADD CONSTRAINT ab_platform_release_registry_platform_code_version_key UNIQUE (platform_code, version);
+
+
+--
 -- Name: ab_plugin_feature ab_plugin_feature_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -21873,6 +22699,22 @@ ALTER TABLE ONLY public.ab_team
 
 
 --
+-- Name: ab_tenant_application_binding_history ab_tenant_application_binding_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT ab_tenant_application_binding_history_pkey PRIMARY KEY (tenant_id, application_id, binding_version);
+
+
+--
+-- Name: ab_tenant_application_binding ab_tenant_application_binding_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding
+    ADD CONSTRAINT ab_tenant_application_binding_pkey PRIMARY KEY (tenant_id, application_id);
+
+
+--
 -- Name: ab_tenant_entitlement ab_tenant_entitlement_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22473,6 +23315,14 @@ ALTER TABLE ONLY public.ab_application_installation
 
 
 --
+-- Name: ab_application_release uq_application_registration_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release
+    ADD CONSTRAINT uq_application_registration_key UNIQUE (application_id, registration_key);
+
+
+--
 -- Name: ab_application_scope_grant uq_application_scope_grant; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22998,6 +23848,14 @@ ALTER TABLE ONLY public.ab_subject_permission
 
 ALTER TABLE ONLY public.ab_tenant_entitlement
     ADD CONSTRAINT uq_te_tenant_plugin_source_plan UNIQUE (tenant_id, plugin_id, entitlement_source, plan_pid);
+
+
+--
+-- Name: ab_tenant_application_binding_history uq_tenant_binding_operation; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT uq_tenant_binding_operation UNIQUE (tenant_id, application_id, operation_id);
 
 
 --
@@ -24630,6 +25488,13 @@ CREATE INDEX idx_apv_outbox_pending ON public.ab_agent_approval_notification_out
 --
 
 CREATE INDEX idx_async_task_created ON public.ab_async_task USING btree (tenant_id, created_at DESC);
+
+
+--
+-- Name: idx_async_task_running_lease; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_async_task_running_lease ON public.ab_async_task USING btree (lease_until) WHERE ((status)::text = 'running'::text);
 
 
 --
@@ -28945,6 +29810,13 @@ CREATE UNIQUE INDEX ux_meta_model_current ON public.ab_meta_model USING btree (t
 
 
 --
+-- Name: ab_application_release ab_application_release_require_actor; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_application_release_require_actor BEFORE INSERT ON public.ab_application_release FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_require_actor();
+
+
+--
 -- Name: ab_agent_definition trg_agent_definition_initial_release; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -28956,6 +29828,125 @@ CREATE TRIGGER trg_agent_definition_initial_release AFTER INSERT ON public.ab_ag
 --
 
 CREATE TRIGGER trg_agent_release_immutable BEFORE DELETE OR UPDATE ON public.ab_agent_release FOR EACH ROW EXECUTE FUNCTION public.ab_guard_immutable_agent_release();
+
+
+--
+-- Name: ab_application_channel_target_history trg_application_channel_history_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_channel_history_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_application_channel_target_history FOR EACH ROW EXECUTE FUNCTION public.ab_application_channel_history_guard();
+
+
+--
+-- Name: ab_application_channel_target_history trg_application_channel_history_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_channel_history_no_truncate BEFORE TRUNCATE ON public.ab_application_channel_target_history FOR EACH STATEMENT EXECUTE FUNCTION public.ab_application_channel_history_guard();
+
+
+--
+-- Name: ab_application_channel_target trg_application_channel_project_history; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_channel_project_history AFTER INSERT OR UPDATE ON public.ab_application_channel_target FOR EACH ROW EXECUTE FUNCTION public.ab_application_channel_project_history();
+
+
+--
+-- Name: ab_application_channel_target trg_application_channel_target_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_channel_target_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_application_channel_target FOR EACH ROW EXECUTE FUNCTION public.ab_application_channel_target_guard();
+
+
+--
+-- Name: ab_application_channel_target trg_application_channel_target_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_channel_target_no_truncate BEFORE TRUNCATE ON public.ab_application_channel_target FOR EACH STATEMENT EXECUTE FUNCTION public.ab_application_channel_target_guard();
+
+
+--
+-- Name: ab_application_release_component trg_application_component_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_component_immutable BEFORE DELETE OR UPDATE ON public.ab_application_release_component FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_reject_mutation();
+
+
+--
+-- Name: ab_application_release_component trg_application_component_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_component_no_truncate BEFORE TRUNCATE ON public.ab_application_release_component FOR EACH STATEMENT EXECUTE FUNCTION public.ab_application_release_reject_mutation();
+
+
+--
+-- Name: ab_application_release_component trg_application_component_project_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_component_project_only BEFORE INSERT ON public.ab_application_release_component FOR EACH ROW EXECUTE FUNCTION public.ab_application_component_guard_insert();
+
+
+--
+-- Name: ab_application trg_application_creation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_creation_immutable BEFORE UPDATE OF created_by, created_at ON public.ab_application FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_reject_mutation();
+
+
+--
+-- Name: ab_application trg_application_identity; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_identity BEFORE INSERT OR UPDATE ON public.ab_application FOR EACH ROW EXECUTE FUNCTION public.ab_application_guard_identity();
+
+
+--
+-- Name: ab_application_release_publication trg_application_publication_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_publication_immutable BEFORE DELETE OR UPDATE ON public.ab_application_release_publication FOR EACH ROW EXECUTE FUNCTION public.ab_application_publication_immutable();
+
+
+--
+-- Name: ab_application_release_publication trg_application_publication_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_publication_no_truncate BEFORE TRUNCATE ON public.ab_application_release_publication FOR EACH STATEMENT EXECUTE FUNCTION public.ab_application_publication_immutable();
+
+
+--
+-- Name: ab_application_release trg_application_release_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_release_immutable BEFORE DELETE OR UPDATE ON public.ab_application_release FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_reject_mutation();
+
+
+--
+-- Name: ab_application_release trg_application_release_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_release_no_truncate BEFORE TRUNCATE ON public.ab_application_release FOR EACH STATEMENT EXECUTE FUNCTION public.ab_application_release_reject_mutation();
+
+
+--
+-- Name: ab_application_release trg_application_release_prepare; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_release_prepare BEFORE INSERT ON public.ab_application_release FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_prepare();
+
+
+--
+-- Name: ab_application_release trg_application_release_project; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_release_project AFTER INSERT ON public.ab_application_release FOR EACH ROW EXECUTE FUNCTION public.ab_application_release_project();
+
+
+--
+-- Name: ab_application trg_application_require_creator; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_application_require_creator BEFORE INSERT ON public.ab_application FOR EACH ROW EXECUTE FUNCTION public.ab_application_require_creator();
 
 
 --
@@ -29036,10 +30027,73 @@ CREATE TRIGGER trg_page_schema_ownership_default BEFORE INSERT OR UPDATE OF is_t
 
 
 --
+-- Name: ab_platform_release_registry trg_platform_registry_coordinates; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_platform_registry_coordinates BEFORE INSERT ON public.ab_platform_release_registry FOR EACH ROW EXECUTE FUNCTION public.ab_platform_registry_guard_coordinates();
+
+
+--
+-- Name: ab_platform_release_registry trg_platform_registry_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_platform_registry_immutable BEFORE DELETE OR UPDATE ON public.ab_platform_release_registry FOR EACH ROW EXECUTE FUNCTION public.ab_platform_registry_reject_mutation();
+
+
+--
+-- Name: ab_platform_release_registry trg_platform_registry_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_platform_registry_no_truncate BEFORE TRUNCATE ON public.ab_platform_release_registry FOR EACH STATEMENT EXECUTE FUNCTION public.ab_platform_registry_reject_mutation();
+
+
+--
+-- Name: ab_platform_release_registry trg_platform_registry_validate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_platform_registry_validate BEFORE INSERT ON public.ab_platform_release_registry FOR EACH ROW EXECUTE FUNCTION public.ab_platform_registry_validate();
+
+
+--
 -- Name: ab_promotion_drift_event trg_promotion_drift_event_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_tenant_application_binding trg_tenant_binding_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tenant_binding_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_tenant_application_binding FOR EACH ROW EXECUTE FUNCTION public.ab_tenant_binding_guard();
+
+
+--
+-- Name: ab_tenant_application_binding_history trg_tenant_binding_history_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tenant_binding_history_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_tenant_application_binding_history FOR EACH ROW EXECUTE FUNCTION public.ab_tenant_binding_history_guard();
+
+
+--
+-- Name: ab_tenant_application_binding_history trg_tenant_binding_history_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tenant_binding_history_no_truncate BEFORE TRUNCATE ON public.ab_tenant_application_binding_history FOR EACH STATEMENT EXECUTE FUNCTION public.ab_tenant_binding_history_guard();
+
+
+--
+-- Name: ab_tenant_application_binding trg_tenant_binding_no_truncate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tenant_binding_no_truncate BEFORE TRUNCATE ON public.ab_tenant_application_binding FOR EACH STATEMENT EXECUTE FUNCTION public.ab_tenant_binding_guard();
+
+
+--
+-- Name: ab_tenant_application_binding trg_tenant_binding_project_history; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tenant_binding_project_history AFTER INSERT OR UPDATE ON public.ab_tenant_application_binding FOR EACH ROW EXECUTE FUNCTION public.ab_tenant_binding_project_history();
 
 
 --
@@ -29067,11 +30121,75 @@ ALTER TABLE ONLY public.ab_application_access_token
 
 
 --
+-- Name: ab_application_channel_target ab_application_channel_target_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target
+    ADD CONSTRAINT ab_application_channel_target_application_id_fkey FOREIGN KEY (application_id) REFERENCES public.ab_application(id);
+
+
+--
+-- Name: ab_application_channel_target_history ab_application_channel_target_application_id_previous_rele_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target_history
+    ADD CONSTRAINT ab_application_channel_target_application_id_previous_rele_fkey FOREIGN KEY (application_id, previous_release_id) REFERENCES public.ab_application_release_publication(application_id, release_id);
+
+
+--
+-- Name: ab_application_channel_target ab_application_channel_target_application_id_release_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target
+    ADD CONSTRAINT ab_application_channel_target_application_id_release_id_fkey FOREIGN KEY (application_id, release_id) REFERENCES public.ab_application_release_publication(application_id, release_id);
+
+
+--
+-- Name: ab_application_channel_target_history ab_application_channel_target_hi_application_id_release_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target_history
+    ADD CONSTRAINT ab_application_channel_target_hi_application_id_release_id_fkey FOREIGN KEY (application_id, release_id) REFERENCES public.ab_application_release_publication(application_id, release_id);
+
+
+--
+-- Name: ab_application_channel_target_history ab_application_channel_target_histo_application_id_channel_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_channel_target_history
+    ADD CONSTRAINT ab_application_channel_target_histo_application_id_channel_fkey FOREIGN KEY (application_id, channel) REFERENCES public.ab_application_channel_target(application_id, channel);
+
+
+--
 -- Name: ab_application_installation ab_application_installation_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ab_application_installation
     ADD CONSTRAINT ab_application_installation_application_id_fkey FOREIGN KEY (application_id) REFERENCES public.ab_external_application(id);
+
+
+--
+-- Name: ab_application_release ab_application_release_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release
+    ADD CONSTRAINT ab_application_release_application_id_fkey FOREIGN KEY (application_id) REFERENCES public.ab_application(id);
+
+
+--
+-- Name: ab_application_release_component ab_application_release_component_release_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_component
+    ADD CONSTRAINT ab_application_release_component_release_id_fkey FOREIGN KEY (release_id) REFERENCES public.ab_application_release(release_id);
+
+
+--
+-- Name: ab_application_release_publication ab_application_release_publicati_application_id_release_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_application_release_publication
+    ADD CONSTRAINT ab_application_release_publicati_application_id_release_id_fkey FOREIGN KEY (application_id, release_id) REFERENCES public.ab_application_release(application_id, release_id);
 
 
 --
@@ -29288,6 +30406,54 @@ ALTER TABLE ONLY public.ab_report_schedule
 
 ALTER TABLE ONLY public.ab_sod_violation_log
     ADD CONSTRAINT ab_sod_violation_log_rule_id_fkey FOREIGN KEY (rule_id) REFERENCES public.ab_sod_rule(id);
+
+
+--
+-- Name: ab_tenant_application_binding_history ab_tenant_application_bindin_application_id_current_relea_fkey1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT ab_tenant_application_bindin_application_id_current_relea_fkey1 FOREIGN KEY (application_id, current_release_id) REFERENCES public.ab_application_release(application_id, release_id);
+
+
+--
+-- Name: ab_tenant_application_binding ab_tenant_application_binding_application_id_current_relea_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding
+    ADD CONSTRAINT ab_tenant_application_binding_application_id_current_relea_fkey FOREIGN KEY (application_id, current_release_id) REFERENCES public.ab_application_release(application_id, release_id);
+
+
+--
+-- Name: ab_tenant_application_binding ab_tenant_application_binding_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding
+    ADD CONSTRAINT ab_tenant_application_binding_application_id_fkey FOREIGN KEY (application_id) REFERENCES public.ab_application(id);
+
+
+--
+-- Name: ab_tenant_application_binding_history ab_tenant_application_binding_application_id_previous_rele_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT ab_tenant_application_binding_application_id_previous_rele_fkey FOREIGN KEY (application_id, previous_release_id) REFERENCES public.ab_application_release(application_id, release_id);
+
+
+--
+-- Name: ab_tenant_application_binding_history ab_tenant_application_binding_his_tenant_id_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT ab_tenant_application_binding_his_tenant_id_application_id_fkey FOREIGN KEY (tenant_id, application_id) REFERENCES public.ab_tenant_application_binding(tenant_id, application_id);
+
+
+--
+-- Name: ab_tenant_application_binding ab_tenant_application_binding_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding
+    ADD CONSTRAINT ab_tenant_application_binding_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.ab_tenant(id);
 
 
 --

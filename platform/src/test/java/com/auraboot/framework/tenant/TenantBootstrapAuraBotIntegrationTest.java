@@ -49,6 +49,20 @@ class TenantBootstrapAuraBotIntegrationTest extends BaseIntegrationTest {
     // -----------------------------------------------------------------------
 
     @Test
+    @DisplayName("explicit bootstrap creates exactly the two tenant DSL skills")
+    void bootstrapCreatesBuiltinSkillsWithoutApplicationRestart() {
+        var rows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT skill_code, execution_mode FROM ab_agent_skill "
+                + "WHERE tenant_id = #{params.tenantId} AND skill_code IN ('dsl.command','dsl.query') "
+                + "AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                Map.of("tenantId", testTenant.getId()));
+        assertThat(rows).hasSize(2);
+        assertThat(rows.stream().map(row -> row.get("skill_code")).toList())
+                .containsExactlyInAnyOrder("dsl.command", "dsl.query");
+        assertThat(rows).allMatch(row -> "dsl_dispatch".equals(row.get("execution_mode")));
+    }
+
+    @Test
     @DisplayName("bootstrapped tenant has an active AuraBot agent")
     void existingTenant_hasAuraBotAgent() {
         Long tenantId = testTenant.getId();

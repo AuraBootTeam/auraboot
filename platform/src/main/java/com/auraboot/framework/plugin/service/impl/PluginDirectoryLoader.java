@@ -583,6 +583,22 @@ public class PluginDirectoryLoader {
 
     private void loadResourcesFromSource(PluginSource source, PluginManifestExtended manifest,
                                           Map<String, String> resourceDirs) throws IOException {
+        if (source.requiresCompleteResources()) {
+            Set<String> supported = Set.of("models", "fields", "modelFieldBindings", "bindings", "dicts", "commands",
+                    "bindingRules", "menus", "permissions", "roles", "fieldMasks", "capabilities", "pages",
+                    "pageContributions", "i18n", "namedQueries", "agentDefinitions", "savedViews",
+                    "notificationTemplates", "dashboards", "decisionDefinitions", "conditionFragments",
+                    "eventPolicies", "automations", "semantic");
+            if (resourceDirs.containsKey("bindings") && resourceDirs.containsKey("modelFieldBindings")) {
+                throw new IOException("Ambiguous binding resource declarations");
+            }
+            for (var entry : resourceDirs.entrySet()) {
+                if (!supported.contains(entry.getKey())) throw new IOException("Unsupported required resource type: " + entry.getKey());
+                if (entry.getValue() == null || entry.getValue().isBlank() || !source.exists(entry.getValue())) {
+                    throw new IOException("Required resource path missing: " + entry.getKey());
+                }
+            }
+        }
         loadSourceResource(source, resourceDirs, "models", ModelDefinitionDTO.class,
                 manifest::getModels, manifest::setModels);
         loadSourceResource(source, resourceDirs, "fields", FieldDefinitionDTO.class,
@@ -691,7 +707,8 @@ public class PluginDirectoryLoader {
                                          ListGetter<T> getter, ListSetter<T> setter) throws IOException {
         if (!resourceDirs.containsKey(key)) return;
         List<T> items = loadResourceListFromSource(source, resourceDirs.get(key), clazz);
-        if (!items.isEmpty()) {
+        if (items == null) throw new IOException("Null resource list: " + key);
+        if (!items.isEmpty() || source.requiresCompleteResources()) {
             setter.set(mergeList(getter.get(), items));
         }
     }
@@ -706,7 +723,7 @@ public class PluginDirectoryLoader {
             return objectMapper.readValue(json, listType);
         }
 
-        if (source.exists(relativeDir + ".json") && relativeDir.endsWith(".json")) {
+        if (source.exists(relativeDir) && relativeDir.endsWith(".json")) {
             String json = source.readString(relativeDir);
             JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
             return objectMapper.readValue(json, listType);
@@ -721,7 +738,10 @@ public class PluginDirectoryLoader {
             try {
                 String json = source.readString(filePath);
                 var node = objectMapper.readTree(json);
-                if (node == null || node.isNull()) continue;
+                if (node == null || node.isNull()) {
+                    if (source.requiresCompleteResources()) throw new IOException("Null resource is not a complete definition: " + filePath);
+                    continue;
+                }
                 if (node.isArray()) {
                     JavaType listType = objectMapper.getTypeFactory().constructCollectionType(List.class, clazz);
                     result.addAll(objectMapper.convertValue(node, listType));
@@ -729,6 +749,7 @@ public class PluginDirectoryLoader {
                     result.add(objectMapper.convertValue(node, clazz));
                 }
             } catch (Exception e) {
+                if (source.requiresCompleteResources()) throw new IOException("Invalid required resource: " + filePath, e);
                 // Per-file resilience (see parseResourceFile): skip a malformed file rather than failing
                 // the whole plugin, but log at ERROR so the drop is visible/diagnosable.
                 log.error("Failed to load resource from source {}/{} — skipping this file: {}",

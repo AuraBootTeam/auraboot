@@ -6,16 +6,18 @@
 # Usage:
 #   scripts/db/check-schema-drift.sh --edition oss
 #   scripts/db/check-schema-drift.sh --edition enterprise --enterprise-root <enterprise-repo-root>
+#   SNAPSHOT_DB=owned_drift scripts/db/check-schema-drift.sh --edition oss --keep
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/db/flyway-common.sh
 source "$SCRIPT_DIR/flyway-common.sh"
 
-EDITION="oss"; ENTERPRISE_ROOT=""
+EDITION="oss"; ENTERPRISE_ROOT=""; KEEP=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --edition) EDITION="${2:?}"; shift 2 ;;
     --enterprise-root) ENTERPRISE_ROOT="${2:?}"; shift 2 ;;
+    --keep) KEEP=1; shift ;;
     -h|--help) sed -n '2,9p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "[drift] unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -35,8 +37,10 @@ TMP="$(mktemp)"
 COMMITTED_NORM="$(mktemp)"
 TMP_NORM="$(mktemp)"
 trap 'rm -f "$TMP" "$COMMITTED_NORM" "$TMP_NORM"' EXIT
-"$SCRIPT_DIR/generate-schema-snapshot.sh" --edition "$EDITION" \
-  ${ENTERPRISE_ROOT:+--enterprise-root "$ENTERPRISE_ROOT"} --out "$TMP" >&2
+GENERATOR_ARGS=(--edition "$EDITION" --out "$TMP")
+if [[ -n "$ENTERPRISE_ROOT" ]]; then GENERATOR_ARGS+=(--enterprise-root "$ENTERPRISE_ROOT"); fi
+if [[ "$KEEP" == 1 ]]; then GENERATOR_ARGS+=(--keep); fi
+"$SCRIPT_DIR/generate-schema-snapshot.sh" "${GENERATOR_ARGS[@]}" >&2
 
 perl -0pe 's/\n+\z/\n/' "$COMMITTED" > "$COMMITTED_NORM"
 perl -0pe 's/\n+\z/\n/' "$TMP" > "$TMP_NORM"

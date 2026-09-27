@@ -67,6 +67,29 @@ class PluginManagerServiceImplTest {
         MetaContext.clear();
     }
 
+    @Test
+    void startupComponentRegistrationFailureIsNotSwallowed() {
+        var plugin = org.mockito.Mockito.mock(org.pf4j.PluginWrapper.class);
+        when(plugin.getPluginId()).thenReturn("fixture");
+        when(auraPluginManager.getStartedPlugins()).thenReturn(List.of(plugin));
+        org.mockito.Mockito.doThrow(new IllegalStateException("registration failure"))
+                .when(backgroundComponentRegistry).register("fixture");
+        assertThatThrownBy(service::registerStartedPluginBackgroundComponents)
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("fixture");
+        org.mockito.Mockito.verifyNoInteractions(pluginRecordMapper, applicationModuleRegistry);
+    }
+
+    @Test
+    void startupRegistersBackgroundAndModuleWithoutDatabaseMutation() {
+        var plugin = org.mockito.Mockito.mock(org.pf4j.PluginWrapper.class);
+        when(plugin.getPluginId()).thenReturn("fixture");
+        when(auraPluginManager.getStartedPlugins()).thenReturn(List.of(plugin));
+        service.registerStartedPluginBackgroundComponents();
+        verify(backgroundComponentRegistry).register("fixture");
+        verify(applicationModuleRegistry).register("fixture");
+        org.mockito.Mockito.verifyNoInteractions(pluginRecordMapper);
+    }
+
     private PluginManifest validManifest() {
         return PluginManifest.builder()
                 .pluginId("com.example.p")

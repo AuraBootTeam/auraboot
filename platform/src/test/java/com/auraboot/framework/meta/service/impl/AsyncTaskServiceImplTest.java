@@ -46,6 +46,7 @@ class AsyncTaskServiceImplTest {
     void setUp() {
         asyncTaskMapper = mock(AsyncTaskMapper.class);
         when(asyncTaskMapper.claimPending(any(), any(), any())).thenReturn(1);
+        when(asyncTaskMapper.finishOwned(any())).thenReturn(1);
         executor = mock(AsyncTaskExecutor.class);
         when(executor.getTaskType()).thenReturn("command-handler");
 
@@ -157,6 +158,62 @@ class AsyncTaskServiceImplTest {
         assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_PENDING);
         assertThat(task.getRetryCount()).isEqualTo(1);
         verify(selfProxy, times(1)).executeTaskAsync(1L, 123L);
+    }
+
+    @Test
+    void staleRetryCannotRedispatchAfterLeaseLoss() {
+        AsyncTask task = executableTask();
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        when(executor.execute(any(), any())).thenReturn(AsyncTaskResult.retryableFailure("temporary"));
+        when(asyncTaskMapper.finishOwned(any())).thenReturn(0);
+        service.executeTaskAsync(1L, 123L);
+        verify(selfProxy, never()).executeTaskAsync(anyLong(), anyLong());
+        verify(asyncTaskMapper, never()).updateById(any(AsyncTask.class));
+    }
+
+    @Test
+    void completionCarriesClaimTokenAndCannotUseUnfencedUpdate() {
+        AsyncTask task = executableTask();
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        when(executor.execute(any(), any())).thenReturn(AsyncTaskResult.nonRetryableFailure("failure"));
+        service.executeTaskAsync(1L, 123L);
+        assertThat(task.getExecutionToken()).isNotBlank();
+        verify(asyncTaskMapper).claimPending(eq(1L), eq(123L), eq(task.getExecutionToken()));
+        verify(asyncTaskMapper).finishOwned(task);
+        verify(asyncTaskMapper, never()).updateById(any(AsyncTask.class));
+    }
+
+    @Test
+    void lostLeaseInterruptsWorkerAndFinishedWorkerIsRemovedFromRenewal() throws Exception {
+        AsyncTask task = executableTask();
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var interrupted = new java.util.concurrent.CountDownLatch(1);
+        when(executor.execute(any(), any())).thenAnswer(invocation -> {
+            started.countDown();
+            try {
+                new java.util.concurrent.CountDownLatch(1).await();
+                throw new AssertionError("worker should be interrupted");
+            } catch (InterruptedException expected) {
+                interrupted.countDown();
+                Thread.currentThread().interrupt();
+                return AsyncTaskResult.nonRetryableFailure("lease lost");
+            }
+        });
+        Thread worker = new Thread(() -> service.executeTaskAsync(1L, 123L));
+        worker.start();
+        try {
+            assertThat(started.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            service.renewExecutionLeases();
+            assertThat(interrupted.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            worker.join(5000);
+            assertThat(worker.isAlive()).isFalse();
+            service.renewExecutionLeases();
+            verify(asyncTaskMapper, times(1)).renewLease(eq(1L), eq(123L), eq(task.getExecutionToken()));
+        } finally {
+            worker.interrupt();
+            worker.join(5000);
+        }
     }
 
     private AsyncTask executableTask() {

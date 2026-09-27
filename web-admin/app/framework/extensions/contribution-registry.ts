@@ -15,6 +15,10 @@ export type WebContributionKind =
   | 'asset'
   | 'i18n'
 
+export type WebContractRequirement =
+  | { mode: 'exact'; kind: WebContributionKind; key: string; contract: string }
+  | { mode: 'component-loader' | 'service'; key: string; contract: string }
+
 type WebContributionRegistration =
   | RendererRegistration
   | ComponentLoaderRegistration
@@ -27,6 +31,7 @@ interface StoredContribution<T extends WebContributionRegistration> {
   kind: WebContributionKind
   plugin: string
   registration: T
+  supportedContracts: readonly string[]
 }
 
 export interface ContributionDiagnostic {
@@ -99,6 +104,13 @@ export class ContributionRegistry {
     plugin: string,
     registration: T,
   ): void {
+    if (registration.supportedContracts !== undefined && !Array.isArray(registration.supportedContracts)) {
+      throw new Error('[ContributionRegistry] Invalid supported contract list')
+    }
+    const contracts = [...(registration.supportedContracts ?? [])]
+    if (contracts.some(contract => typeof contract !== 'string' || !contract.trim()) || new Set(contracts).size !== contracts.length) {
+      throw new Error('[ContributionRegistry] Invalid or duplicate supported contract')
+    }
     const key = contributionKey(kind, registration)
     if (registration.featureKey && !this.hasFeature(registration.featureKey)) {
       this.diagnostics.push({
@@ -123,7 +135,7 @@ export class ContributionRegistry {
         `[ContributionRegistry] ${kind} '${key}' from '${plugin}' conflicts with '${previous.plugin}'`,
       )
     }
-    kindEntries.set(key, { kind, plugin, registration })
+    kindEntries.set(key, { kind, plugin, registration, supportedContracts: Object.freeze(contracts) })
     this.diagnostics.push({
       kind,
       id: registration.id,
@@ -134,6 +146,93 @@ export class ContributionRegistry {
       key,
     })
     this.emit()
+  }
+
+  /** Observe a nonempty requirement set at one registry generation, without asserting artifact provenance. */
+  observeContracts(requirements: readonly WebContractRequirement[]) {
+    if (!Array.isArray(requirements) || requirements.length === 0) {
+      throw new Error('[ContributionRegistry] Nonempty web contract requirements required')
+    }
+    const identities = new Set<string>()
+    const frozen = requirements.map(requirement => {
+      if (!requirement || typeof requirement.key !== 'string' || !requirement.key.trim()
+        || typeof requirement.contract !== 'string' || !requirement.contract.trim()
+        || !['exact', 'component-loader', 'service'].includes(requirement.mode)) {
+        throw new Error('[ContributionRegistry] Invalid web contract requirement')
+      }
+      if (requirement.mode === 'exact' && !['renderer', 'component-loader', 'page-runtime-hook', 'service-provider', 'asset', 'i18n'].includes(requirement.kind)) {
+        throw new Error('[ContributionRegistry] Invalid exact contribution kind')
+      }
+      const identity = JSON.stringify([requirement.mode, requirement.mode === 'exact' ? requirement.kind : null, requirement.key, requirement.contract])
+      if (identities.has(identity)) throw new Error('[ContributionRegistry] Duplicate web contract requirement')
+      identities.add(identity)
+      return { ...requirement }
+    })
+    const generation = this.version
+    const observations = frozen.map(requirement => ({
+      requirement,
+      observation: requirement.mode === 'service'
+        ? this.observeServiceContract(requirement.key, requirement.contract)
+        : requirement.mode === 'component-loader'
+          ? this.observeComponentLoaderContract(requirement.key, requirement.contract)
+          : this.observeContract(requirement.kind, requirement.key, requirement.contract),
+    }))
+    const findings = observations.flatMap(({ requirement, observation }) =>
+      observation.findings.map(code => ({ requirement, code })),
+    )
+    const stable = generation === this.version && observations.every(item => item.observation.generation === generation)
+    return { generation, stable, observations, findings, supported: stable && observations.every(item => item.observation.supported) }
+  }
+
+  /** Inspect an exact registry key, not a manifest claim or component-loader alias. */
+  observeContract(kind: WebContributionKind, key: string, requiredContract: string) {
+    if (!key.trim() || !requiredContract.trim()) {
+      throw new Error('[ContributionRegistry] Exact key and contract required')
+    }
+    const generation = this.version
+    const entry = this.get(kind, key)
+    const findings: string[] = []
+    if (!entry) findings.push('web-contribution-unavailable')
+    else if (!entry.supportedContracts.includes(requiredContract)) findings.push('web-contract-unavailable')
+    return {
+      kind,
+      key,
+      requiredContract,
+      generation,
+      plugin: entry?.plugin ?? null,
+      registrationId: entry?.registration.id ?? null,
+      supported: findings.length === 0,
+      findings,
+    }
+  }
+
+  /** Observe the selected loader using the same direct/alias resolution as consumers. */
+  observeComponentLoaderContract(id: string, requiredContract: string) {
+    if (!id.trim() || !requiredContract.trim()) throw new Error('[ContributionRegistry] Exact key and contract required')
+    const generation = this.version
+    const selected = this.getComponentLoader(id)
+    const observation = this.observeContract('component-loader', selected?.id ?? id, requiredContract)
+    const findings = [...observation.findings]
+    if (generation !== this.version) findings.push('web-registry-changed')
+    return { ...observation, requestedKey: id, generation, supported: findings.length === 0, findings }
+  }
+
+  /** A service contract must hold across its primary and every active decorator. */
+  observeServiceContract(token: string, requiredContract: string) {
+    if (!token.trim() || !requiredContract.trim()) throw new Error('[ContributionRegistry] Exact token and contract required')
+    const generation = this.version
+    const primary = this.observeContract('service-provider', `${token}:primary`, requiredContract)
+    const decorators = this.getServiceDecorators(token).map(registration =>
+      this.observeContract('service-provider', `${token}:decorator:${registration.id}`, requiredContract),
+    )
+    const observations = [primary, ...decorators]
+    const findings = observations.flatMap(observation =>
+      observation.findings.map(finding => `${observation.key}:${finding}`),
+    )
+    if (generation !== this.version || observations.some(observation => observation.generation !== generation)) {
+      findings.push('web-registry-changed')
+    }
+    return { token, requiredContract, generation, observations, supported: findings.length === 0, findings }
   }
 
   getComponentLoader(id: string): ComponentLoaderRegistration | undefined {

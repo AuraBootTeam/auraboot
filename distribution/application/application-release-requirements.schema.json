@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auraboot.com/schemas/application-release-requirements.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "applicationRelease",
+    "platformContracts",
+    "requiredCapabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "applicationRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "digest",
+        "application",
+        "compatibilityEpoch"
+      ],
+      "properties": {
+        "releaseId": {
+          "type": "string",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "application": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,99}$"
+        },
+        "compatibilityEpoch": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "platformContracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime",
+        "pluginApi",
+        "dslSchema"
+      ],
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "pluginApi": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "dslSchema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "key",
+          "contract"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "handler",
+              "web",
+              "schema"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "contract": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      }
+    }
+  }
+}

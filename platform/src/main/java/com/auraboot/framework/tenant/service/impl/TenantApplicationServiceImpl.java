@@ -24,6 +24,8 @@ import com.auraboot.framework.tenant.dto.TenantResponse;
 import com.auraboot.framework.tenant.dto.TenantSelectionRequest;
 import com.auraboot.framework.tenant.dto.TenantSelectionResponse;
 import com.auraboot.framework.tenant.service.TenantApplicationService;
+import com.auraboot.framework.application.release.ApplicationReleaseControlService;
+import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.tenant.service.TenantBootstrapService;
 import com.auraboot.framework.tenant.service.TenantInviteService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
@@ -89,6 +91,12 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
 
     @Autowired
     private com.auraboot.framework.plugin.service.BuiltinPluginImportService builtinPluginImportService;
+
+    @Autowired
+    private ApplicationReleaseControlService applicationReleaseControlService;
+
+    @Value("${aura.application.default-code:}")
+    private String defaultApplicationCode;
 
     /**
      * Roles bound to the tenant creator after bootstrap + plugin import.
@@ -232,6 +240,16 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         } catch (Exception e) {
             log.error("租户初始化失败，回滚事务", e);
             throw e;
+        }
+
+        // Bind the exact stable application release first. Legacy per-tenant import remains
+        // until the shared Definition Resolver has passed shadow comparison.
+        if (defaultApplicationCode != null && !defaultApplicationCode.isBlank()) {
+            var binding = applicationReleaseControlService.bindStable(
+                    createdTenant.getId(), defaultApplicationCode.trim(),
+                    "user:id:" + user.getId(), UlidGenerator.generate());
+            log.info("Bound tenant {} to application {} release {}",
+                    createdTenant.getId(), defaultApplicationCode.trim(), binding.releaseId());
         }
 
         // Import built-in plugins

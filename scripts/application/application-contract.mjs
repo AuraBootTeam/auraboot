@@ -86,13 +86,60 @@ export function validateManifest(manifest) {
   return manifest;
 }
 
-export function validateLock(lock) {
+export function validateLock(lock, { expectedIdentity } = {}) {
   assertSchema(validateLockSchema, lock, 'application lock');
   assertUnique(lock.artifacts.map((artifact) => `${artifact.type}:${artifact.id}`), 'artifacts');
-  const expectedIdentity = lockIdentity(lock);
-  if (lock.identity !== expectedIdentity) {
-    throw new Error(`application lock identity mismatch: expected ${expectedIdentity}, received ${lock.identity}`);
+  const computedIdentity = lockIdentity(lock);
+  if (lock.identity !== computedIdentity) {
+    throw new Error(`application lock identity mismatch: expected ${computedIdentity}, received ${lock.identity}`);
   }
+  if (expectedIdentity !== undefined && lock.identity !== expectedIdentity) {
+    throw new Error('application lock does not match the externally expected identity');
+  }
+  const { nodes, graphDigest } = lock.composition;
+  if (graphDigest !== sha256(canonicalJson(nodes))) throw new Error('application graph digest mismatch');
+  assertUnique(nodes.map((node) => `${node.kind}:${node.id}`), 'composition nodes');
+  const types = { runtime: 'runtime', image: 'oci', api: 'maven', web: 'npm', plugin: 'plugin', migration: 'migration', config: 'config' };
+  const expected = new Map();
+  const webOwners = new Set(nodes.filter((node) => node.kind === 'web').map((node) => node.id));
+  nodes.forEach((node, index) => {
+    if (node.order !== index) throw new Error('application graph order must be contiguous and match array order');
+    if (types[node.kind]) {
+      if (!['migration', 'config'].includes(node.kind) && !node.version) {
+        throw new Error(`application graph node ${node.kind}:${node.id} requires a version`);
+      }
+      expected.set(`${types[node.kind]}:${node.id}`, node);
+    } else if (!node.owner || !webOwners.has(node.owner)) {
+      throw new Error(`application graph node ${node.kind}:${node.id} has an unavailable web owner`);
+    }
+  });
+  for (const artifact of lock.artifacts) {
+    const key = `${artifact.type}:${artifact.id}`;
+    const node = expected.get(key);
+    if (!node) throw new Error(`artifact ${key} is not declared by the application graph`);
+    if (node.version !== undefined && node.version !== artifact.version) {
+      throw new Error(`artifact ${key} version differs from the application graph`);
+    }
+    if (/snapshot|latest|workspace|branch/i.test(artifact.version)) {
+      throw new Error(`artifact ${key} uses a mutable release version`);
+    }
+    expected.delete(key);
+  }
+  if (expected.size) throw new Error(`application graph is missing artifacts: ${[...expected.keys()].join(', ')}`);
+  return lock;
+}
+
+/** Bind a structurally valid lock to the caller's authoritative source declaration. */
+export function validateLockForManifest(lockInput, manifestInput, { skipImage = false, expectedIdentity } = {}) {
+  const lock = validateLock(lockInput, { expectedIdentity });
+  const manifest = validateManifest(manifestInput);
+  if (lock.manifestDigest !== sha256(canonicalJson(manifest))
+      || lock.application.id !== manifest.app.id || lock.application.version !== manifest.app.version) {
+    throw new Error('application lock does not match the source manifest');
+  }
+  const required = requirements(manifest, { skipImage });
+  if (required.length !== lock.artifacts.length) throw new Error('application manifest artifact count mismatch');
+  for (const requirement of required) resolveRequirement(requirement, { artifacts: lock.artifacts });
   return lock;
 }
 

@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.annotation.RequirePlatformAdmin;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.enums.RoleCodes;
@@ -117,10 +118,22 @@ public class PermissionInterceptor implements HandlerInterceptor {
                             HttpServletResponse response, 
                             Object handler) throws Exception {
         
+        boolean platformAdminContract = handler instanceof HandlerMethod method
+                && (method.hasMethodAnnotation(RequirePlatformAdmin.class)
+                    || method.getBeanType().isAnnotationPresent(RequirePlatformAdmin.class));
+        if (platformAdminContract) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated() || !MetaContext.exists()
+                    || !adminRoleChecker.hasRole(MetaContext.getCurrentTenantId(),
+                            MetaContext.getCurrentUserId(), RoleCodes.PLATFORM_ADMIN)) {
+                throw new AccessDeniedException("platform_admin required");
+            }
+        }
+
         // 1. Extract @RequirePermission annotation
         RequirePermission annotation = extractAnnotation(handler);
         if (annotation == null) {
-            return handleUnannotated(request, handler);
+            return platformAdminContract || handleUnannotated(request, handler);
         }
 
         String permissionTemplate = annotation.value();

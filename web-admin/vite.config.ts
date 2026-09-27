@@ -126,7 +126,15 @@ const e2eCoveragePlugin = e2eCoverageEnabled
     }) as unknown as Plugin)
   : null;
 
+const webCompositionKey = process.env.AURA_COMPOSITION_KEY;
+if (webCompositionKey !== undefined && !/^sha256:[0-9a-f]{64}$/.test(webCompositionKey)) {
+  throw new Error('AURA_COMPOSITION_KEY must be an exact SHA-256 identity');
+}
+
 export default defineConfig({
+  define: {
+    __AURA_WEB_COMPOSITION_KEY__: JSON.stringify(webCompositionKey ?? null),
+  },
   // node_modules is shared across AuraBoot worktrees, so keeping Vite's
   // optimizer cache there can mix stale React chunks between runtimes.
   cacheDir: viteCacheDir,

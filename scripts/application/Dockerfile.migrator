@@ -1,0 +1,15 @@
+# Build on Linux CI from an exact Core checkout and a reviewed, staged payload.
+# No package-manager resolution or migration execution occurs during image build.
+FROM node@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS node_runtime
+FROM flyway/flyway@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb
+USER root
+COPY --from=node_runtime /usr/local/bin/node /usr/local/bin/node
+COPY scripts/application/migration-ownership.mjs scripts/application/schema-ownership-audit.mjs scripts/application/migration-composition-audit.mjs scripts/application/migration-payload.mjs scripts/application/migrator-entrypoint.mjs /opt/aura/bin/
+COPY migrator-input/payload/ /opt/aura/migrations/
+COPY migrator-input/payload.sha256 /opt/aura/payload.sha256
+RUN node /opt/aura/bin/migration-payload.mjs verify /opt/aura/migrations "$(cat /opt/aura/payload.sha256)" \
+    && chmod -R a-w /opt/aura/bin /opt/aura/migrations /opt/aura/payload.sha256
+USER 65532:65532
+WORKDIR /tmp
+ENTRYPOINT ["/usr/local/bin/node", "/opt/aura/bin/migrator-entrypoint.mjs"]
+CMD ["info"]

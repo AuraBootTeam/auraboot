@@ -94,6 +94,12 @@ public class AsyncTask {
     @TableField("timeout_seconds")
     private Integer timeoutSeconds;
 
+    @TableField("execution_token")
+    private String executionToken;
+
+    @TableField("lease_until")
+    private Instant leaseUntil;
+
     /**
      * Check if the task is in a terminal state.
      */

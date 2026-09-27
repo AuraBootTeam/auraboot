@@ -52,6 +52,7 @@ class TenantBootstrapServiceImplBranchTest {
     @Mock private I18nResourceService i18nResourceService;
     @Mock private I18nService i18nService;
     @Mock private DynamicDataMapper dynamicDataMapper;
+    @Mock private com.auraboot.framework.agent.service.SkillAutoGenerator skillAutoGenerator;
 
     private TenantBootstrapServiceImpl service;
 
@@ -70,7 +71,8 @@ class TenantBootstrapServiceImplBranchTest {
                 permissionMapper,
                 i18nResourceService,
                 i18nService,
-                dynamicDataMapper);
+                dynamicDataMapper,
+                skillAutoGenerator);
     }
 
     private RoleTemplate roleTpl(String code, String name, Integer priority) {

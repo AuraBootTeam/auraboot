@@ -28,7 +28,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
+import java.util.UUID;
 
 /**
  * Core async task service.
@@ -56,6 +56,27 @@ public class AsyncTaskServiceImpl {
     /** Running task futures for cancellation support */
     private final ConcurrentHashMap<String, Thread> runningTaskThreads = new ConcurrentHashMap<>();
 
+    private record Execution(Long id, Long tenantId, String token, Thread thread,
+                             java.util.concurrent.atomic.AtomicBoolean active) {}
+    private final ConcurrentHashMap<String, Execution> executions = new ConcurrentHashMap<>();
+
+    @Scheduled(fixedDelay = 15000, initialDelay = 15000)
+    public void renewExecutionLeases() {
+        for (Execution execution : executions.values()) {
+            synchronized (execution) {
+                if (!execution.active().get()) continue;
+                try {
+                    if (asyncTaskMapper.renewLease(execution.id(), execution.tenantId(), execution.token()) == 1) continue;
+                } catch (RuntimeException failure) {
+                    log.error("Async task lease renewal failed: id={}", execution.id(), failure);
+                }
+                // Finish waits for this check, so an already-reused pool thread cannot be interrupted.
+                // Interrupt is cooperative; database writes remain fenced independently.
+                execution.thread().interrupt();
+            }
+        }
+    }
+
     @PostConstruct
     public void init() {
         for (AsyncTaskExecutor executor : executors) {
@@ -68,6 +89,8 @@ public class AsyncTaskServiceImpl {
 
     @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000, initialDelay = 30000)
     public void recoverResumablePendingTasks() {
+        asyncTaskMapper.requeueExpiredResumableTasks();
+        asyncTaskMapper.failExpiredTasks();
         for (AsyncTask task : asyncTaskMapper.findResumablePendingTasks(100)) {
             self.executeTaskAsync(task.getId(), task.getTenantId());
         }
@@ -167,9 +190,11 @@ public class AsyncTaskServiceImpl {
             throw new MetaServiceException("Task cannot be cancelled in status: " + task.getStatus());
         }
 
+        if (asyncTaskMapper.cancelActive(task.getId(), task.getTenantId()) != 1) {
+            throw new MetaServiceException("Task changed before cancellation: " + taskCode);
+        }
         task.setStatus(AsyncTask.STATUS_CANCELLED);
         task.setCancelledAt(Instant.now());
-        asyncTaskMapper.updateById(task);
 
         // Interrupt the running thread if applicable
         Thread taskThread = runningTaskThreads.remove(taskCode);
@@ -242,24 +267,30 @@ public class AsyncTaskServiceImpl {
         }
 
         // Claim once even if after-commit dispatch and recovery race.
-        if (asyncTaskMapper.claimPending(task.getId(), tenantId, Instant.now()) != 1) return;
+        String token = UUID.randomUUID().toString();
+        if (asyncTaskMapper.claimPending(task.getId(), tenantId, token) != 1) return;
+        task.setExecutionToken(token);
+        Execution execution = new Execution(taskId, tenantId, token, Thread.currentThread(),
+                new java.util.concurrent.atomic.AtomicBoolean(true));
+        executions.put(token, execution);
         task.setStatus(AsyncTask.STATUS_RUNNING);
         task.setStartedAt(Instant.now());
 
         // Register thread for cancellation support
         runningTaskThreads.put(task.getTaskCode(), Thread.currentThread());
 
-        AsyncTaskExecutor executor = executorRegistry.get(task.getTaskType());
-        if (executor == null) {
-            failTask(task, "No executor registered for task type: " + task.getTaskType());
-            runningTaskThreads.remove(task.getTaskCode());
-            return;
-        }
-
         try {
+            AsyncTaskExecutor executor = executorRegistry.get(task.getTaskType());
+            if (executor == null) {
+                failTask(task, "No executor registered for task type: " + task.getTaskType());
+                return;
+            }
             // Create a progress callback that persists to DB
             AsyncTaskExecutor.ProgressCallback callback = (percentage, message) -> {
-                asyncTaskMapper.updateProgress(task.getId(), Math.min(percentage, 99), message);
+                if (asyncTaskMapper.updateOwnedProgress(task.getId(), tenantId, token,
+                        Math.max(0, Math.min(percentage, 99)), message) != 1) {
+                    throw new IllegalStateException("Async task execution lease is no longer owned");
+                }
             };
 
             // Execute with timeout awareness
@@ -269,7 +300,7 @@ public class AsyncTaskServiceImpl {
                 // Task was cancelled during execution
                 task.setStatus(AsyncTask.STATUS_CANCELLED);
                 task.setCancelledAt(Instant.now());
-                asyncTaskMapper.updateById(task);
+                asyncTaskMapper.finishOwned(task);
                 log.info("Task execution interrupted (cancelled): code={}", task.getTaskCode());
                 return;
             }
@@ -280,7 +311,7 @@ public class AsyncTaskServiceImpl {
                 task.setProgressMessage("Completed");
                 task.setResultData(result.getData());
                 task.setCompletedAt(Instant.now());
-                asyncTaskMapper.updateById(task);
+                if (asyncTaskMapper.finishOwned(task) != 1) return;
                 log.info("Async task completed: code={}, type={}", task.getTaskCode(), task.getTaskType());
             } else {
                 handleFailure(task, result.getErrorMessage(), result.isRetryable());
@@ -290,7 +321,7 @@ public class AsyncTaskServiceImpl {
             if (Thread.currentThread().isInterrupted()) {
                 task.setStatus(AsyncTask.STATUS_CANCELLED);
                 task.setCancelledAt(Instant.now());
-                asyncTaskMapper.updateById(task);
+                asyncTaskMapper.finishOwned(task);
                 log.info("Task execution interrupted by cancellation: code={}", task.getTaskCode());
             } else {
                 log.error("Async task execution failed: code={}, type={}",
@@ -298,7 +329,11 @@ public class AsyncTaskServiceImpl {
                 handleFailure(task, e.getMessage(), AsyncTaskFailureClassifier.isRetryable(e));
             }
         } finally {
-            runningTaskThreads.remove(task.getTaskCode());
+            synchronized (execution) {
+                execution.active().set(false);
+                executions.remove(token);
+            }
+            runningTaskThreads.remove(task.getTaskCode(), Thread.currentThread());
         }
     }
 
@@ -342,7 +377,7 @@ public class AsyncTaskServiceImpl {
                     task.getRetryCount(), task.getMaxRetries(), task.getTaskCode(), errorMessage);
             task.setStatus(AsyncTask.STATUS_PENDING);
             task.setProgressMessage("Retry " + task.getRetryCount() + "/" + task.getMaxRetries());
-            asyncTaskMapper.updateById(task);
+            if (asyncTaskMapper.finishOwned(task) != 1) return;
 
             // Re-submit for execution via self-proxy
             triggerExecution(task.getId(), task.getTenantId());
@@ -355,7 +390,7 @@ public class AsyncTaskServiceImpl {
         task.setStatus(AsyncTask.STATUS_FAILED);
         task.setErrorMessage(errorMessage);
         task.setCompletedAt(Instant.now());
-        asyncTaskMapper.updateById(task);
+        if (asyncTaskMapper.finishOwned(task) != 1) return;
         log.error("Async task failed permanently: code={}, error={}", task.getTaskCode(), errorMessage);
     }
 
