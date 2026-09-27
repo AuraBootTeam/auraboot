@@ -59,8 +59,11 @@
 | `check-scripts-index.mjs` | 2 | — | Falsifiable freshness gate for scripts/README.md (the scripts index). |
 | `check-test-system.sh` | 0 | 2026-07-23 | Umbrella gate for the test system's own integrity. exit code = result. |
 | `check-version-sync.sh` | 1 | 2026-06-18 | Gate: VERSION (release version, single source of truth) must equal |
+| `application/deployment-target-attestation.it.mjs` | 0 | 2026-09-25 | Verify target reservation and signed deployment observation through the protected executor. |
+| `application/run-migrator-image-gate.mjs` | 0 | 2026-09-25 | Run the retained-container Linux migrator lifecycle gate and emit digest-bound evidence. |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
+| `db/test-stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Verify deterministic staging of immutable pre-#1900 Core migration bytes. |
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
@@ -101,6 +104,7 @@
 | `e2e-report.sh` | 0 | 2026-03-26 | e2e-report.sh — View E2E test run results by testRunId |
 | `e2e-run.sh` | 0 | 2026-03-31 | Unified E2E Test Runner — GAP-169 |
 | `host-e2e-up.sh` | 0 | 2026-06-08 | Host-mode E2E stack bring-up — host parity with docker-ga-e2e-up.sh. |
+| `hifi-golden-gate-run.sh` | 0 | 2026-09-25 | Run the analytics designer high-fidelity browser golden gate. |
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
@@ -121,7 +125,11 @@
 | `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
 | `application/audit-core-only-schema.sh` | 1 | 2026-09-12 | Fail closed when a migrated core-only database contains BPM/CRM tables or persisted product literals. |
 | `application/create-release-screenshot-manifest.mjs` | 2 | 2026-09-13 | Build the immutable release screenshot manifest: stable IDs, image facts, and SHA-256 checksums for every captured screenshot. |
+| `application/migration-composition-audit.mjs` | 0 | 2026-09-25 | Audit migration packages as one ownership-safe application composition. |
+| `application/migration-payload.mjs` | 0 | 2026-09-25 | Package and verify reviewed SQL migration payloads with deterministic digests. |
+| `application/migrator-entrypoint.mjs` | 0 | 2026-09-25 | Execute info, validate, or migrate against a verified migration payload. |
 | `application/migration-ownership.mjs` | 1 | 2026-09-12 | Split legacy core migrations into deterministic core, CRM, and BPM ownership sets without Flyway version collisions. |
+| `application/schema-ownership-audit.mjs` | 0 | 2026-09-25 | Audit declared migration ownership without rewriting released SQL. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
 
@@ -151,7 +159,14 @@
 | `agent-git-guard.mjs` | 4 | 2026-06-24 |  |
 | `agent-write-guard.mjs` | 2 | 2026-06-24 |  |
 | `application/application-artifact-verifier.mjs` | 1 | 2026-09-12 | Dependency-free verifier for staged application lock identities, checksums, and migrations. |
+| `application/application-release-requirements.mjs` | 0 | 2026-09-25 | Extract checksum-bound capability requirements from a registered application release. |
 | `application/auraboot-core-env.sh` | 1 | 2026-09-12 | Lifecycle driver for a staged Core artifact set. |
+| `application/deployment-capability-verifier.mjs` | 0 | 2026-09-25 | Verify deployment capabilities against application and platform release contracts. |
+| `application/deployment-observation-attestation.mjs` | 0 | 2026-09-25 | Sign and verify expiry-bound deployment observation attestations. |
+| `application/deployment-observation-fixture.mjs` | 0 | 2026-09-25 | Provide synthetic declarations and ephemeral keys for attestation tests. |
+| `application/migration-execution-verifier.mjs` | 0 | 2026-09-25 | Verify a migration execution receipt against its exact invocation and result digests. |
+| `application/registry-role-policy.mjs` | 0 | 2026-09-25 | Generate the reviewed database role policy for release registry tables. |
+| `application/shadow-binding-role-policy.mjs` | 0 | 2026-09-25 | Generate the database role policy that prevents shadow writers from activating bindings. |
 | `aps-fixtures/compare-strategies.sh` | 1 | 2026-05-28 | Compare APS V2 scheduling strategies on the fixture data set. |
 | `db/cleanup-scheduler-residue.sh` | 0 | 2026-07-26 | Read-only-by-default cleanup for three exact retired system scheduler definitions. |
 | `behavior-keyed-load-test.mjs` | 0 | 2026-06-23 |  |
@@ -159,6 +174,7 @@
 | `db/flyway-common.sh` | 5 | 2026-06-18 | Shared Flyway environment + invocation for AuraBoot PostgreSQL schema governance. |
 | `db/flyway-migrate.sh` | 4 | 2026-06-18 | Run Flyway migrate for AuraBoot. |
 | `db/flyway-validate.sh` | 2 | 2026-06-18 | Run Flyway validate for AuraBoot (checks applied migrations against the |
+| `db/stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Stage immutable pre-#1900 Core migration bytes for legacy checksum compatibility. |
 | `db/write-platform-release.sh` | 1 | 2026-06-18 | Append a row to ab_platform_release after a successful Flyway migrate. |
 | `deploy/oss-remote/deploy.sh` | 5 | 2026-07-23 | AuraBoot OSS — remote deploy via pre-built images ("image mechanism"). |
 | `dev/cleanup-artifacts.sh` | 3 | 2026-05-12 | Targeted cleanup for slug/date-scoped Playwright artifacts. |

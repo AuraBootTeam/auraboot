@@ -72,6 +72,7 @@ PATH_HITS=$(grep -rEn \
   | grep -v 'docker-compose\.isolated\.yml' \
   | grep -v 'oss-scope\.json' \
   | grep -v 'scripts/dev/env\.sh' \
+  | grep -v 'scripts/dev/rebuild-ent-backend\.sh' \
   | grep -v 'scripts/dev/start-dev-infra\.sh' \
   | grep -v 'scripts/lib/test-multi-worktree-guard\.sh' \
   | grep -v 'scripts/oss-golden-stack\.sh' || true)
@@ -85,8 +86,8 @@ PATH_HITS=$(grep -rEn \
   #  - docker-compose.{cleanup-batch,ga-e2e,isolated}.yml: dev/test compose mounts enterprise plugins
   #    when both repos are checked out side-by-side (no-op in pure OSS clones)
   #  - oss-scope.json: documents which OSS specs depend on enterprise plugins (negative space)
-  #  - scripts/dev/{env,start-dev-infra}.sh: local dev infra detects sibling enterprise checkout
-  #    (PRODUCT=enterprise branch; no enterprise imports in OSS code)
+  #  - scripts/dev/{env,rebuild-ent-backend,start-dev-infra}.sh: local dev tooling detects or
+  #    explicitly targets a sibling enterprise checkout; no enterprise code is imported into OSS
   #  - scripts/lib/test-multi-worktree-guard.sh: tests the multi-worktree guard with enterprise
   #    paths as fixtures (no enterprise code imported)
   #  - oss-golden-stack.sh: header comment points at the enterprise engineering-gotchas runbook
