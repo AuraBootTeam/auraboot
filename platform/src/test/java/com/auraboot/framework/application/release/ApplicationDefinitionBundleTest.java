@@ -35,12 +35,16 @@ class ApplicationDefinitionBundleTest {
         String digest = directoryDigest(componentRoot);
         String lockIdentity = writeLock("config/edu-core", digest);
 
-        var manifest = new ApplicationDefinitionBundle(root, root.resolve("empty-retained-store"), new ObjectMapper())
-                .load("aura-edu", lockIdentity, component("edu-core", digest));
+        var bundle = new ApplicationDefinitionBundle(root, root.resolve("empty-retained-store"), new ObjectMapper());
+        var manifest = bundle.load("aura-edu", lockIdentity, component("edu-core", digest));
+        var repeated = bundle.load("aura-edu", lockIdentity, component("edu-core", digest));
 
         assertEquals("com.auraboot.edu", manifest.getPluginId());
         assertEquals("edu", manifest.getNamespace());
         assertEquals("edu:enroll", manifest.getCommands().getFirst().getCode());
+        assertEquals(manifest, repeated);
+        assertEquals(1, bundle.cacheMissCount(), "first exact bundle read loads immutable bytes once");
+        assertEquals(1, bundle.cacheHitCount(), "repeated exact bundle read is served from cache");
     }
 
     @Test
