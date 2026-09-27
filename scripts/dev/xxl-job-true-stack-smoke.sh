@@ -250,7 +250,9 @@ log "starting AuraBoot Postgres/Redis infra"
 log "starting AuraBoot backend on $BACKEND_URL"
 (
   cd "$PLATFORM_DIR"
-  ./gradlew --no-daemon :bootJar -x test
+  # The xxl engine lives in the optional platform-scheduler-xxl module (GPL
+  # dependency); opt it into this true-stack build explicitly.
+  ./gradlew -PwithSchedulerXxl=true --no-daemon :bootJar -x test
 )
 BOOT_JAR="$(find "$PLATFORM_DIR/build/libs" -maxdepth 1 -type f -name '*-boot.jar' -print 2>/dev/null \
   | while IFS= read -r candidate; do

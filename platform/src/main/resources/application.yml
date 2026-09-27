@@ -338,7 +338,10 @@ ai:
 aura:
   scheduler:
     # local: AuraBoot database-backed Spring TaskScheduler
-    # xxl: delegate scheduling to XXL-JOB Admin while executing inside AuraBoot
+    # xxl: delegate scheduling to XXL-JOB Admin while executing inside AuraBoot.
+    #      Requires the OPTIONAL platform-scheduler-xxl module on the classpath
+    #      (build with -PwithSchedulerXxl=true). It is NOT part of the default
+    #      distribution; engine=xxl without it fails fast on the missing bean.
     engine: ${AURA_SCHEDULER_ENGINE:local}
     xxl:
       admin-addresses: ${XXL_JOB_ADMIN_ADDRESSES:}

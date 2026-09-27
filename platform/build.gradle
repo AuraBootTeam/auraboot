@@ -210,7 +210,6 @@ ext {
     // PF4J Plugin Framework
     pf4jVersion = '3.15.1'
     pf4jSpringVersion = '0.10.0'
-    xxlJobVersion = '3.4.2'
     springKafkaVersion = '3.3.16'
     kafkaClientsVersion = '3.9.2'
     mcpSdkVersion = '2.0.1'
@@ -290,6 +289,14 @@ dependencies {
     runtimeOnly project(':platform-storage-s3')
     runtimeOnly project(':platform-storage-oss')
 
+    // XXL-JOB scheduler engine is opt-in only (-PwithSchedulerXxl=true): xxl-job-core
+    // is GPL-3.0 and must never enter the default distribution. See
+    // platform/platform-scheduler-xxl/README.md. aura.scheduler.engine=xxl without
+    // this module fails fast on the missing SchedulerEngine bean.
+    if (providers.gradleProperty('withSchedulerXxl').isPresent()) {
+        runtimeOnly project(':platform-scheduler-xxl')
+    }
+
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
 
@@ -328,7 +335,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
-    implementation "com.xuxueli:xxl-job-core:${xxlJobVersion}"
     implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
     implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
         exclude group: 'com.networknt', module: 'json-schema-validator'
