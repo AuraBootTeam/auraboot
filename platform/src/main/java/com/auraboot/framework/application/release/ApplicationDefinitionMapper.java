@@ -5,7 +5,8 @@ import com.auraboot.framework.plugin.entity.PluginResource;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
@@ -56,7 +57,16 @@ public interface ApplicationDefinitionMapper {
               AND resource_type IN ('model','field','command','permission','menu','page')
             ORDER BY resource_type,resource_code
             """)
-    @ResultMap("mybatis-plus_PluginResource")
+    @Results(id = "applicationDefinitionPluginResource", value = {
+            @Result(column = "pid", property = "pid"),
+            @Result(column = "tenant_id", property = "tenantId"),
+            @Result(column = "plugin_pid", property = "pluginPid"),
+            @Result(column = "resource_type", property = "resourceType"),
+            @Result(column = "resource_code", property = "resourceCode"),
+            @Result(column = "import_snapshot", property = "importSnapshot",
+                    typeHandler = com.auraboot.framework.plugin.typehandler.PluginSettingsTypeHandler.class),
+            @Result(column = "user_modified", property = "userModified")
+    })
     @InterceptorIgnore(tenantLine = "true")
     List<PluginResource> findComparableResources(@Param("tenantId") long tenantId,
                                                  @Param("pluginPid") String pluginPid);
