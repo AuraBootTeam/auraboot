@@ -51,6 +51,11 @@ test('product release-image gate is CI-only, Docker-only and evidence-backed', (
   assert.match(productImageGate, /"applicationLock": \{"path": "application\.lock", "digest": digest/);
   assert.match(productImageGate, /"sbom": \{"path": "sbom\.cdx\.json", "format": "CycloneDX-1\.5"/);
   assert.match(productImageGate, /fresh database migration failed/);
+  assert.match(productImageGate, /registry-role-policy\.mjs/);
+  assert.match(productImageGate, /RUNTIME_DB_ROLE=aura_runtime_ci/);
+  assert.match(productImageGate, /REGISTRATION_DB_ROLE=aura_registry_ci/);
+  assert.match(productImageGate, /SPRING_DATASOURCE_USERNAME="\$RUNTIME_DB_ROLE"/);
+  assert.match(productImageGate, /AURA_REGISTRY_REGISTRATION_USERNAME="\$REGISTRATION_DB_ROLE"/);
   assert.match(productImageGate, /CI=1 pnpm --dir "\$CORE_ROOT" install --frozen-lockfile --ignore-scripts/);
   assert.match(productImageGate, /core-pnpm-install\.log/);
   assert.match(productImageGate, /NPM_CONFIG_REGISTRY=https:\/\/registry\.npmjs\.org AURA_OCI_BUILDER=docker/);

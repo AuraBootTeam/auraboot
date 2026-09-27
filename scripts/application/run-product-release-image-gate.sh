@@ -286,26 +286,51 @@ docker run --rm --network "$NETWORK" \
   -table=ab_flyway_schema_history -baselineOnMigrate=false -validateMigrationNaming=true -cleanDisabled=true migrate \
   >"$ARTIFACTS/logs/flyway.log" 2>&1 || fail 'fresh database migration failed; see logs/flyway.log'
 
+RUNTIME_DB_ROLE=aura_runtime_ci
+REGISTRATION_DB_ROLE=aura_registry_ci
+RUNTIME_DB_PASSWORD="$(openssl rand -hex 24)"
+REGISTRATION_DB_PASSWORD="$(openssl rand -hex 24)"
+DATABASE_ROLE_SQL="$WORK_ROOT/database-roles.sql"
+umask 077
+cat >"$DATABASE_ROLE_SQL" <<SQL
+CREATE ROLE $RUNTIME_DB_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '$RUNTIME_DB_PASSWORD';
+CREATE ROLE $REGISTRATION_DB_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '$REGISTRATION_DB_PASSWORD';
+GRANT CONNECT ON DATABASE aura_product_ci TO $RUNTIME_DB_ROLE, $REGISTRATION_DB_ROLE;
+GRANT USAGE ON SCHEMA public TO $RUNTIME_DB_ROLE;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO $RUNTIME_DB_ROLE;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO $RUNTIME_DB_ROLE;
+SQL
+docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U auraboot -d aura_product_ci \
+  <"$DATABASE_ROLE_SQL" >"$ARTIFACTS/logs/database-roles.log" 2>&1 \
+  || fail 'isolated runtime and registry database roles could not be created'
+OWNER_DB_ROLE="$(docker exec "$PG_CONTAINER" psql -U auraboot -d aura_product_ci -tAX -c \
+  "SELECT tableowner FROM pg_tables WHERE schemaname='public' AND tablename='ab_application'")"
+node "$CORE_ROOT/scripts/application/registry-role-policy.mjs" \
+  public "$RUNTIME_DB_ROLE" "$REGISTRATION_DB_ROLE" "$OWNER_DB_ROLE" \
+  | docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U auraboot -d aura_product_ci \
+    >>"$ARTIFACTS/logs/database-roles.log" 2>&1 \
+  || fail 'least-privilege registry database policy could not be applied'
+rm -f "$DATABASE_ROLE_SQL"
+
 LOCK_IDENTITY="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).identity)" "$PRODUCT_RELEASE/application.lock")"
 APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).application.version)" "$PRODUCT_RELEASE/application.lock")"
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
 REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
-umask 077
-printf '%s\n' auraboot_ci >"$REGISTRATION_PASSWORD_FILE"
+printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
 docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
   -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
   -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
-  -e SPRING_DATASOURCE_USERNAME=auraboot -e SPRING_DATASOURCE_PASSWORD=auraboot_ci \
+  -e SPRING_DATASOURCE_USERNAME="$RUNTIME_DB_ROLE" -e SPRING_DATASOURCE_PASSWORD="$RUNTIME_DB_PASSWORD" \
   -e AURA_APPLICATION_MODE=application -e AURABOOT_BOOTSTRAP_ENABLED=false -e AURABOOT_DEMO_SEED=false \
   -e JWT_SECRET="$JWT_SECRET" -e JAVA_TOOL_OPTIONS=-Daura.plugins.dir=/opt/auraboot/plugins \
   -e AURA_APPLICATION_ID="$AURA_PRODUCT_ID" -e AURA_APPLICATION_VERSION="$APP_VERSION" \
   -e AURA_APPLICATION_LOCK_IDENTITY="$LOCK_IDENTITY" -e AURA_APPLICATION_SOURCE_COMMIT="$PRODUCT_SHA" \
   -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" \
   -e AURA_REGISTRY_REGISTRATION_JDBC_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
-  -e AURA_REGISTRY_REGISTRATION_USERNAME=auraboot \
+  -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
   -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
   "$IMAGE_REF" \
   --aura.persistence.tenant-bypass-table-prefixes=se_ \
@@ -319,7 +344,7 @@ for attempt in $(seq 1 90); do
 done
 
 WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
-COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER=auraboot PGPASSWORD=auraboot_ci ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
+COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER="$RUNTIME_DB_ROLE" PGPASSWORD="$RUNTIME_DB_PASSWORD" ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
 if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
