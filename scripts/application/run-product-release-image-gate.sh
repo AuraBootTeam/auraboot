@@ -264,10 +264,12 @@ for payload_directory in plugins config migrations web bin; do
   diff -qr "$PRODUCT_RELEASE/$payload_directory" "$IMAGE_PAYLOAD_ROOT/$payload_directory" \
     >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail "release image $payload_directory differs from the locked release payload"
 done
-for payload_file in app.yaml application.lock artifact-catalog.json release-registration.json sbom.cdx.json; do
+for payload_file in application.lock artifact-catalog.json release-registration.json sbom.cdx.json; do
   cmp "$PRODUCT_RELEASE/$payload_file" "$IMAGE_PAYLOAD_ROOT/$payload_file" \
     >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail "release image $payload_file differs from the locked release payload"
 done
+cmp "$PRODUCT_ROOT/app.yaml" "$IMAGE_PAYLOAD_ROOT/app.yaml" \
+  >>"$ARTIFACTS/logs/payload-check.log" 2>&1 || fail 'release image app.yaml differs from the exact product source'
 
 docker run -d --name "$PG_CONTAINER" --network "$NETWORK" -p 127.0.0.1::5432 \
   -e POSTGRES_USER=auraboot -e POSTGRES_PASSWORD=auraboot_ci -e POSTGRES_DB=aura_product_ci \
