@@ -9,12 +9,14 @@ import {
   PlusIcon,
   ShieldCheckIcon,
   TrashIcon,
+  UserGroupIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import OpenPlatformOperationsPanel from './OpenPlatformOperationsPanel';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
+import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 
 interface Capability {
   code: string;
@@ -40,7 +42,30 @@ interface ExternalApplication {
   description?: string;
   status: string;
   createdAt: string;
+  accessRole: 'owner' | 'maintainer' | 'viewer';
+  permissions: ApplicationPermissions;
+  members: ApplicationMember[];
   installations: Installation[];
+}
+
+interface ApplicationPermissions {
+  manageMembers: boolean;
+  disableApplication: boolean;
+  manageRuntime: boolean;
+  readOperations: boolean;
+}
+
+interface ApplicationMember {
+  userPid: string;
+  displayName: string;
+  email?: string;
+  role: 'owner' | 'maintainer' | 'viewer';
+  createdAt: string;
+}
+
+interface OpenPlatformAccess {
+  platformAdmin: boolean;
+  canCreateApplications: boolean;
 }
 
 interface Credential {
@@ -65,6 +90,10 @@ export default function OpenPlatformPage() {
   const { showToast } = useToastContext();
   const [applications, setApplications] = useState<ExternalApplication[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [access, setAccess] = useState<OpenPlatformAccess>({
+    platformAdmin: false,
+    canCreateApplications: false,
+  });
   const [credentials, setCredentials] = useState<Record<string, Credential[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +122,9 @@ export default function OpenPlatformPage() {
     | { kind: 'installation'; pid: string; name: string }
     | null
   >(null);
+  const [managingMembers, setManagingMembers] = useState<ExternalApplication | null>(null);
+  const [memberPid, setMemberPid] = useState<string | undefined>();
+  const [memberRole, setMemberRole] = useState<ApplicationMember['role']>('viewer');
 
   const scopeCatalog = useMemo(
     () => [...new Set(capabilities.map((capability) => capability.requiredScope))].sort(),
@@ -103,12 +135,14 @@ export default function OpenPlatformPage() {
     setLoading(true);
     setError(null);
     try {
-      const [appData, capabilityData] = await Promise.all([
+      const [appData, capabilityData, accessData] = await Promise.all([
         apiFetch<ExternalApplication[]>('/api/open-platform/applications'),
         apiFetch<Capability[]>('/api/open-platform/capabilities'),
+        apiFetch<OpenPlatformAccess>('/api/open-platform/access'),
       ]);
       setApplications(appData ?? []);
       setCapabilities(capabilityData ?? []);
+      setAccess(accessData);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -319,6 +353,47 @@ export default function OpenPlatformPage() {
     showToast(t('common.copied', undefined, 'Copied to clipboard'), 'success');
   };
 
+  const saveMember = async () => {
+    if (!managingMembers || !memberPid) return;
+    try {
+      await apiFetch<ApplicationMember>(
+        `/api/open-platform/applications/${managingMembers.pid}/members/${memberPid}`,
+        { method: 'PUT', body: JSON.stringify({ role: memberRole }) },
+      );
+      setMemberPid(undefined);
+      setMemberRole('viewer');
+      showToast(t('openPlatform.memberSaved', undefined, 'Application member saved'), 'success');
+      await load();
+      setManagingMembers(null);
+    } catch (memberError) {
+      showToast(
+        memberError instanceof Error
+          ? memberError.message
+          : t('openPlatform.memberSaveFailed', undefined, 'Unable to save application member'),
+        'error',
+      );
+    }
+  };
+
+  const removeMember = async (application: ExternalApplication, member: ApplicationMember) => {
+    try {
+      await apiFetch<void>(
+        `/api/open-platform/applications/${application.pid}/members/${member.userPid}`,
+        { method: 'DELETE' },
+      );
+      showToast(t('openPlatform.memberRemoved', undefined, 'Application member removed'), 'success');
+      await load();
+      setManagingMembers(null);
+    } catch (memberError) {
+      showToast(
+        memberError instanceof Error
+          ? memberError.message
+          : t('openPlatform.memberRemoveFailed', undefined, 'Unable to remove application member'),
+        'error',
+      );
+    }
+  };
+
   return (
     <main
       className="mx-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 space-y-6 p-4 sm:w-auto sm:max-w-6xl sm:p-6"
@@ -357,15 +432,17 @@ export default function OpenPlatformPage() {
             {t('openPlatform.apiReference', undefined, 'API reference')}
             <ArrowTopRightOnSquareIcon className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            data-testid="open-platform-create-app"
-          >
-            <PlusIcon className="h-4 w-4" />
-            {t('openPlatform.newApplication', undefined, 'New application')}
-          </button>
+          {access.canCreateApplications && (
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              data-testid="open-platform-create-app"
+            >
+              <PlusIcon className="h-4 w-4" />
+              {t('openPlatform.newApplication', undefined, 'New application')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -417,9 +494,13 @@ export default function OpenPlatformPage() {
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             {t(
-              'openPlatform.emptyBody',
+              access.canCreateApplications
+                ? 'openPlatform.emptyBody'
+                : 'openPlatform.emptyCollaboratorBody',
               undefined,
-              'Create the first application to issue tenant-bound credentials.',
+              access.canCreateApplications
+                ? 'Create the first application to issue tenant-bound credentials.'
+                : 'No Open Platform applications have been shared with you.',
             )}
           </p>
         </div>
@@ -437,23 +518,38 @@ export default function OpenPlatformPage() {
                       {application.name}
                     </h2>
                     <StatusBadge status={application.status} t={t} />
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      {t(`openPlatform.role.${application.accessRole}`, undefined, application.accessRole)}
+                    </span>
                   </div>
                   {application.description && (
                     <p className="mt-1 text-sm text-gray-500">{application.description}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => beginInstall(application.pid)}
-                    disabled={application.status !== 'active'}
-                    className="inline-flex items-center gap-2 self-start rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-800 dark:text-indigo-300"
-                    data-testid={`open-platform-install-${application.pid}`}
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    {t('openPlatform.addInstallation', undefined, 'Add installation')}
-                  </button>
-                  {application.status === 'active' && (
+                  {application.permissions.manageMembers && (
+                    <button
+                      type="button"
+                      onClick={() => setManagingMembers(application)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
+                    >
+                      <UserGroupIcon className="h-4 w-4" />
+                      {t('openPlatform.manageMembers', undefined, 'Manage members')}
+                    </button>
+                  )}
+                  {application.permissions.manageRuntime && (
+                    <button
+                      type="button"
+                      onClick={() => beginInstall(application.pid)}
+                      disabled={application.status !== 'active'}
+                      className="inline-flex items-center gap-2 self-start rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-800 dark:text-indigo-300"
+                      data-testid={`open-platform-install-${application.pid}`}
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      {t('openPlatform.addInstallation', undefined, 'Add installation')}
+                    </button>
+                  )}
+                  {application.status === 'active' && application.permissions.disableApplication && (
                     <button
                       type="button"
                       onClick={() =>
@@ -471,6 +567,13 @@ export default function OpenPlatformPage() {
                 </div>
               </div>
               <div className="space-y-3 p-5">
+                <div className="flex flex-wrap gap-2" aria-label={t('openPlatform.members', undefined, 'Members')}>
+                  {application.members.map((member) => (
+                    <span key={member.userPid} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                      {member.displayName} · {t(`openPlatform.role.${member.role}`, undefined, member.role)}
+                    </span>
+                  ))}
+                </div>
                 {application.installations.length === 0 ? (
                   <p className="text-sm text-gray-400">
                     {t('openPlatform.noInstallations', undefined, 'No installations')}
@@ -496,7 +599,7 @@ export default function OpenPlatformPage() {
                           </div>
                         </div>
                         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
-                          <button
+                          {application.permissions.readOperations && <button
                             type="button"
                             onClick={() =>
                               setOperationsInstallation((current) =>
@@ -508,23 +611,23 @@ export default function OpenPlatformPage() {
                           >
                             <WrenchScrewdriverIcon className="h-3.5 w-3.5" />
                             {t('openPlatform.operations', undefined, 'Operations')}
-                          </button>
-                          <button
+                          </button>}
+                          {application.permissions.manageRuntime && <button
                             type="button"
                             onClick={() => void loadCredentials(installation.pid)}
                             className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
                           >
                             {t('openPlatform.viewCredentials', undefined, 'View credentials')}
-                          </button>
-                          <button
+                          </button>}
+                          {application.permissions.manageRuntime && <button
                             type="button"
                             onClick={() => beginEditScopes(installation)}
                             disabled={installation.status !== 'active'}
                             className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-200"
                           >
                             {t('openPlatform.editScopes', undefined, 'Edit scopes')}
-                          </button>
-                          <button
+                          </button>}
+                          {application.permissions.manageRuntime && <button
                             type="button"
                             onClick={() => void createCredential(installation.pid)}
                             disabled={installation.status !== 'active'}
@@ -532,8 +635,8 @@ export default function OpenPlatformPage() {
                           >
                             <KeyIcon className="h-3.5 w-3.5" />
                             {t('openPlatform.newCredential', undefined, 'New credential')}
-                          </button>
-                          {installation.status === 'active' && (
+                          </button>}
+                          {installation.status === 'active' && application.permissions.manageRuntime && (
                             <button
                               type="button"
                               onClick={() =>
@@ -573,7 +676,7 @@ export default function OpenPlatformPage() {
                           </span>
                         ))}
                       </div>
-                      {credentials[installation.pid] && (
+                      {application.permissions.manageRuntime && credentials[installation.pid] && (
                         <CredentialList
                           installationPid={installation.pid}
                           credentials={credentials[installation.pid]}
@@ -587,7 +690,7 @@ export default function OpenPlatformPage() {
                           t={t}
                         />
                       )}
-                      {operationsInstallation === installation.pid && (
+                      {application.permissions.readOperations && operationsInstallation === installation.pid && (
                         <OpenPlatformOperationsPanel installationPid={installation.pid} />
                       )}
                     </div>
@@ -630,6 +733,63 @@ export default function OpenPlatformPage() {
             onConfirm={() => void createApplication()}
             confirmDisabled={creating || !appName.trim()}
             confirmText={t('common.create', undefined, 'Create')}
+            cancelText={t('common.cancel', undefined, 'Cancel')}
+          />
+        </Dialog>
+      )}
+
+      {managingMembers && (
+        <Dialog
+          title={t('openPlatform.manageMembers', undefined, 'Manage members')}
+          onClose={() => setManagingMembers(null)}
+        >
+          <div className="space-y-2">
+            {managingMembers.members.map((member) => (
+              <div key={member.userPid} className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{member.displayName}</p>
+                  <p className="text-xs text-gray-500">{t(`openPlatform.role.${member.role}`, undefined, member.role)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void removeMember(managingMembers, member)}
+                  disabled={
+                    member.role === 'owner' &&
+                    managingMembers.members.filter((candidate) => candidate.role === 'owner')
+                      .length === 1
+                  }
+                  className="rounded p-2 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label={`${t('openPlatform.removeMember', undefined, 'Remove member')} ${member.displayName}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <MemberPicker
+              label={t('openPlatform.member', undefined, 'Member')}
+              value={memberPid}
+              onChange={(value) => setMemberPid(typeof value === 'string' ? value : undefined)}
+            />
+            <label className="mt-3 block text-sm font-medium text-gray-700 dark:text-gray-200">
+              {t('openPlatform.memberRole', undefined, 'Role')}
+              <select
+                value={memberRole}
+                onChange={(event) => setMemberRole(event.target.value as ApplicationMember['role'])}
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950"
+              >
+                {(['viewer', 'maintainer', 'owner'] as const).map((role) => (
+                  <option key={role} value={role}>{t(`openPlatform.role.${role}`, undefined, role)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <DialogActions
+            onCancel={() => setManagingMembers(null)}
+            onConfirm={() => void saveMember()}
+            confirmDisabled={!memberPid}
+            confirmText={t('common.save', undefined, 'Save')}
             cancelText={t('common.cancel', undefined, 'Cancel')}
           />
         </Dialog>

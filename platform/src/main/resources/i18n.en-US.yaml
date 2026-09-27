@@ -1622,7 +1622,21 @@ openPlatform:
   loadFailed: Unable to load Open Platform
   emptyTitle: No external applications yet
   emptyBody: Create the first application to issue tenant-bound credentials.
+  emptyCollaboratorBody: No Open Platform applications have been shared with you.
   applicationCreated: Application created
+  members: Members
+  member: Member
+  memberRole: Role
+  manageMembers: Manage members
+  removeMember: Remove member
+  memberSaved: Application member saved
+  memberSaveFailed: Unable to save application member
+  memberRemoved: Application member removed
+  memberRemoveFailed: Unable to remove application member
+  role:
+    owner: Owner
+    maintainer: Maintainer
+    viewer: Viewer
   createFailed: Unable to create application
   createTitle: Create external application
   name: Application name

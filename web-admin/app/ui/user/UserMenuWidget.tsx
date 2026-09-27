@@ -71,9 +71,6 @@ export function UserMenuWidget({
     { productName: branding.productName },
     locale === 'zh-CN' ? `关于 ${branding.productName}` : `About ${branding.productName}`,
   );
-  const permissionCodes = rootData?.permissions?.permissionCodes;
-  const canManageOpenPlatform =
-    Array.isArray(permissionCodes) && permissionCodes.includes('sys.connector.update');
   const openPlatformLabel = locale === 'zh-CN' ? '开放平台' : 'Open Platform';
 
   // Lazy-load spaces for tenant switching in the account menu
@@ -318,7 +315,7 @@ export function UserMenuWidget({
             </div>
           )}
 
-          {canManageOpenPlatform && (
+          {user && (
             <div className="border-b border-gray-200 py-1 dark:border-gray-700">
               <Link
                 to="/settings/api-docs"

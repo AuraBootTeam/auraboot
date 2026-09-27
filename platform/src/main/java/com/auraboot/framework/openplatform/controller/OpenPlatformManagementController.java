@@ -7,18 +7,20 @@ import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialSecret
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CredentialView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallApplicationRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.InstallationView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.ApplicationMemberView;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.OpenPlatformAccessView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.OperationsOverview;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotateCredentialRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.RotatedCredentialSecret;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpdateInstallationScopesRequest;
+import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.UpsertApplicationMemberRequest;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookDeliveryView;
 import com.auraboot.framework.openplatform.dto.OpenPlatformDtos.WebhookSubscriptionHealthView;
 import com.auraboot.framework.openplatform.service.OpenApiEventCatalog;
 import com.auraboot.framework.openplatform.service.OpenPlatformManagementService;
 import com.auraboot.framework.openplatform.service.OpenApiCapabilityRegistry;
-import com.auraboot.framework.permission.annotation.RequirePermission;
-import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,12 +37,17 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/open-platform")
-@RequirePermission(MetaPermission.SYS_CONNECTOR_MANAGE)
+@AuthenticatedAccess("Tenant-scoped Open Platform collaboration is authorized by the service per application")
 @RequiredArgsConstructor
 public class OpenPlatformManagementController {
     private final OpenPlatformManagementService managementService;
     private final OpenApiCapabilityRegistry capabilityRegistry;
     private final OpenApiEventCatalog eventCatalog;
+
+    @GetMapping("/access")
+    public ApiResponse<OpenPlatformAccessView> getAccess() {
+        return ApiResponse.success(managementService.getAccess());
+    }
 
     @GetMapping("/capabilities")
     public ApiResponse<List<OpenApiCapabilityRegistry.Capability>> listCapabilities() {
@@ -60,6 +67,19 @@ public class OpenPlatformManagementController {
     @PostMapping("/applications")
     public ApiResponse<ApplicationView> createApplication(@Valid @RequestBody CreateApplicationRequest request) {
         return ApiResponse.success(managementService.createApplication(request));
+    }
+
+    @PutMapping("/applications/{applicationPid}/members/{userPid}")
+    public ApiResponse<ApplicationMemberView> upsertMember(
+            @PathVariable String applicationPid, @PathVariable String userPid,
+            @Valid @RequestBody UpsertApplicationMemberRequest request) {
+        return ApiResponse.success(managementService.upsertMember(applicationPid, userPid, request));
+    }
+
+    @DeleteMapping("/applications/{applicationPid}/members/{userPid}")
+    public ApiResponse<Void> removeMember(@PathVariable String applicationPid, @PathVariable String userPid) {
+        managementService.removeMember(applicationPid, userPid);
+        return ApiResponse.success();
     }
 
     @PostMapping("/applications/{applicationPid}/installations")

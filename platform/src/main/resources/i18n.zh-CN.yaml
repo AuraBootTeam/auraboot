@@ -1928,7 +1928,21 @@ openPlatform:
   loadFailed: 开放平台加载失败
   emptyTitle: 暂无外部应用
   emptyBody: 创建第一个应用，开始签发租户绑定的访问凭据。
+  emptyCollaboratorBody: 暂无共享给你的开放平台应用。
   applicationCreated: 应用已创建
+  members: 协作成员
+  member: 成员
+  memberRole: 角色
+  manageMembers: 管理成员
+  removeMember: 移除成员
+  memberSaved: 应用成员已保存
+  memberSaveFailed: 应用成员保存失败
+  memberRemoved: 应用成员已移除
+  memberRemoveFailed: 应用成员移除失败
+  role:
+    owner: 所有者
+    maintainer: 维护者
+    viewer: 查看者
   createFailed: 应用创建失败
   createTitle: 创建外部应用
   name: 应用名称

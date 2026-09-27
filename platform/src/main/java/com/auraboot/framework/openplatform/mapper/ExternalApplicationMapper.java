@@ -20,9 +20,28 @@ public interface ExternalApplicationMapper extends BaseMapper<ExternalApplicatio
     List<ExternalApplication> findByOwnerTenant(@Param("tenantId") Long tenantId);
 
     @Select("""
+            SELECT a.* FROM ab_external_application a
+            JOIN ab_external_application_member m
+              ON m.tenant_id = a.owner_tenant_id AND m.application_id = a.id
+            WHERE a.owner_tenant_id = #{tenantId} AND m.user_pid = #{userPid}
+            ORDER BY a.created_at DESC
+            """)
+    List<ExternalApplication> findAccessibleByUser(@Param("tenantId") Long tenantId,
+                                                    @Param("userPid") String userPid);
+
+    @Select("""
             SELECT * FROM ab_external_application
             WHERE owner_tenant_id = #{tenantId} AND pid = #{pid}
             LIMIT 1
             """)
     ExternalApplication findOwnedByPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
+
+    @Select("""
+            SELECT * FROM ab_external_application
+            WHERE owner_tenant_id = #{tenantId} AND pid = #{pid}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    ExternalApplication findOwnedByPidForUpdate(@Param("tenantId") Long tenantId,
+                                                 @Param("pid") String pid);
 }
