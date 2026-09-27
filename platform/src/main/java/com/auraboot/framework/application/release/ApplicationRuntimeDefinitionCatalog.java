@@ -163,6 +163,44 @@ public final class ApplicationRuntimeDefinitionCatalog {
         return Set.copyOf(permissions);
     }
 
+    /**
+     * Mirrors config-import semantics: tenant_admin owns every explicit, referenced, and generated
+     * model permission available from the release.
+     */
+    public Set<String> permissionCodes(long tenantId, String applicationCode) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Set.of();
+        LinkedHashSet<String> permissions = new LinkedHashSet<>();
+        for (var component : release.components()) {
+            for (com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO permission
+                    : list(component.manifest().getPermissions())) {
+                if (permission.getCode() != null && !permission.getCode().isBlank()) {
+                    permissions.add(permission.getCode());
+                }
+            }
+            for (RoleDefinitionDTO role : list(component.manifest().getRoles())) {
+                if (role.getPermissions() != null) {
+                    role.getPermissions().stream().filter(code -> code != null && !code.isBlank())
+                            .forEach(permissions::add);
+                }
+            }
+            for (com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO command
+                    : list(component.manifest().getCommands())) {
+                if (command.getPermissions() != null) {
+                    command.getPermissions().stream().filter(code -> code != null && !code.isBlank())
+                            .forEach(permissions::add);
+                }
+            }
+            for (ModelDefinitionDTO model : list(component.manifest().getModels())) {
+                if (model.getCode() == null || model.getCode().isBlank()) continue;
+                for (String action : List.of("read", "create", "update", "delete", "export", "import")) {
+                    permissions.add("model." + model.getCode() + "." + action);
+                }
+            }
+        }
+        return Set.copyOf(permissions);
+    }
+
     /** Release menus carry no tenant-local identity; their hierarchy is built from stable menu codes. */
     public List<Menu> menuTree(long tenantId, String applicationCode) {
         var release = activeRelease(tenantId, applicationCode);

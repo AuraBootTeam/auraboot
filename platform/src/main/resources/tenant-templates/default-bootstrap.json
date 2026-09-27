@@ -1209,6 +1209,16 @@
       "resourceType": "function"
     },
     {
+      "code": "admin_tenant_member",
+      "name": "Manage tenant members",
+      "description": "Tenant membership — approve, reject, suspend, restore, and remove members",
+      "type": "function",
+      "module": "org",
+      "resource": "/api/tenant/members",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "org.tenant.invite.manage",
       "name": "Manage tenant invite codes",
       "description": "Tenant membership — generate / revoke invite codes",

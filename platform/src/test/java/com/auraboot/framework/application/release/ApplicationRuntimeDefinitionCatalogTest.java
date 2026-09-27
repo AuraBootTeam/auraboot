@@ -80,6 +80,11 @@ class ApplicationRuntimeDefinitionCatalogTest {
     void resolvesRolePermissionsAndBuildsMenuHierarchyFromStableCodes() {
         assertThat(catalog.permissionsForRoles(42L, "aura-edu", Set.of("xy_school_admin")))
                 .containsExactlyInAnyOrder("xy.school.manage", "model.xy_student.read");
+        assertThat(catalog.permissionCodes(42L, "aura-edu"))
+                .containsExactlyInAnyOrder(
+                        "xy.school.manage", "xy.petops.manage",
+                        "model.xy_student.read", "model.xy_student.create", "model.xy_student.update",
+                        "model.xy_student.delete", "model.xy_student.export", "model.xy_student.import");
         var roots = catalog.menuTree(42L, "aura-edu");
         assertThat(roots).extracting("code").containsExactly("xy_root");
         assertThat(roots.getFirst().getId()).isNull();
@@ -110,6 +115,11 @@ class ApplicationRuntimeDefinitionCatalogTest {
         manifest.setRoles(List.of(com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO.builder()
                 .code("xy_school_admin").nameZhCN("学校管理员")
                 .permissions(List.of("xy.school.manage", "model.xy_student.read")).build()));
+        manifest.setPermissions(List.of(
+                com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO.builder()
+                        .code("xy.school.manage").nameZhCN("学校管理").build(),
+                com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO.builder()
+                        .code("xy.petops.manage").nameZhCN("内容运营").build()));
         manifest.setMenus(List.of(
                 com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO.builder()
                         .code("xy_root").nameZhCN("校园").type(0).orderNo(1).build(),

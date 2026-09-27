@@ -1,8 +1,11 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.constant.Status;
+import com.auraboot.framework.meta.dto.BindingRuleDTO;
+import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.impl.CommandMetadataCacheService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,12 +17,44 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LoadPhaseTest {
 
     private final CommandMetadataCacheService metadata = mock(CommandMetadataCacheService.class);
-    private final LoadPhase phase = new LoadPhase(metadata, new ObjectMapper());
+    private final CommandService commandService = mock(CommandService.class);
+    private final LoadPhase phase = new LoadPhase(metadata, commandService, new ObjectMapper());
+
+    @Test
+    void releaseCommand_executesWithoutTenantLocalCommandRows() {
+        CommandExecuteRequest request = request("source-record-pid");
+        CommandPipelineContext context = context("xy:create_gp", request);
+        BindingRuleDTO binding = new BindingRuleDTO();
+        binding.setRuleType("FIELD_MAP");
+        binding.setSourceField("xy_gp_name");
+        binding.setTargetField("xy_gp_name");
+        binding.setEnabled(true);
+        CommandDefinitionDTO command = new CommandDefinitionDTO();
+        command.setCode("xy:create_gp");
+        command.setModelCode("xy_growth_plan");
+        command.setExecutionConfig("{\"type\":\"create\"}");
+        command.setStatus(Status.PUBLISHED.getCode());
+        command.setVersion(1);
+        command.setSemver("1.0.0");
+        command.setIsCurrent(true);
+        command.setBindingRules(List.of(binding));
+        when(commandService.findByCode("xy:create_gp")).thenReturn(command);
+
+        phase.execute(context);
+
+        assertThat(context.getCommand().getCode()).isEqualTo("xy:create_gp");
+        assertThat(context.getCommand().getId()).isNull();
+        assertThat(context.getRulesByType().get("FIELD_MAP")).hasSize(1);
+        assertThat(request.getTargetRecordId()).isNull();
+        verify(metadata, never()).findBindingRulesByCommandId(null);
+    }
 
     @Test
     void createCommand_clearsSourceRecordTarget_butKeepsSourcePidInPayload() {
