@@ -192,19 +192,29 @@ class ApplicationReleaseRegistrationServicePostgresIT {
     }
     private void verifyShadowStore(JdbcTemplate jdbc, DriverManagerDataSource source, long applicationId,
                                    String first, String second, String third, String otherRelease) throws Exception {
+        try (var migration = getClass().getResourceAsStream("/db/migration/core/V20260926040000__tenant_binding_operator_audit.sql")) {
+            assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
+        }
         var store = new TenantApplicationShadowBindingStore(jdbc);
         java.util.function.Function<String, String> digest = release -> jdbc.queryForObject(
                 "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, release);
-        var initial = store.createShadow(711, applicationId, first, digest.apply(first));
-        assertEquals(initial, store.createShadow(711, applicationId, first, digest.apply(first)));
+        var firstAudit = bindingAudit();
+        var initial = store.createShadow(711, applicationId, first, digest.apply(first), firstAudit);
+        assertEquals(initial, store.createShadow(711, applicationId, first, digest.apply(first), bindingAudit()));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
-        assertThrows(IllegalArgumentException.class, () -> store.createShadow(711, applicationId, first, "sha256:" + "0".repeat(64)));
-        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, otherRelease, digest.apply(otherRelease)));
-        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, first, digest.apply(first)));
+        assertEquals(firstAudit.actor(), jdbc.queryForObject("SELECT business_actor FROM ab_tenant_application_binding_history WHERE tenant_id=711", String.class));
+        assertEquals(firstAudit.operationId(), jdbc.queryForObject("SELECT operation_id FROM ab_tenant_application_binding_history WHERE tenant_id=711", String.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=710 AND business_actor IS NULL", Integer.class));
+        var missingAudit = assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "UPDATE ab_tenant_application_binding SET current_release_id=?,binding_version=binding_version+1 WHERE tenant_id=710", first));
+        assertTrue(missingAudit.getMostSpecificCause().getMessage().contains("requires business actor"));
+        assertThrows(IllegalArgumentException.class, () -> store.createShadow(711, applicationId, first, "sha256:" + "0".repeat(64), bindingAudit()));
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, otherRelease, digest.apply(otherRelease), bindingAudit()));
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(initial, first, digest.apply(first), bindingAudit()));
         var start = new CountDownLatch(1);
         try (var workers = Executors.newFixedThreadPool(2)) {
             java.util.function.Function<String, Boolean> change = target -> {
-                try { store.compareAndSetShadow(initial, target, digest.apply(target)); return true; }
+                try { store.compareAndSetShadow(initial, target, digest.apply(target), bindingAudit()); return true; }
                 catch (TenantApplicationShadowBindingStore.BindingConflictException conflict) { return false; }
             };
             var left = workers.submit(() -> { assertTrue(start.await(10, TimeUnit.SECONDS)); return change.apply(second); });
@@ -213,25 +223,37 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         }
         assertEquals(2L, jdbc.queryForObject("SELECT binding_version FROM ab_tenant_application_binding WHERE tenant_id=711", Long.class));
         assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
-                () -> store.createShadow(711, applicationId, first, digest.apply(first)));
+                () -> store.createShadow(711, applicationId, first, digest.apply(first), bindingAudit()));
         assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
-                () -> store.compareAndSetShadow(initial, second, digest.apply(second)));
+                () -> store.compareAndSetShadow(initial, second, digest.apply(second), bindingAudit()));
         String winner = jdbc.queryForObject("SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=711", String.class);
         var current = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "shadow", 2);
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> store.compareAndSetShadow(current, first, digest.apply(first), firstAudit));
+        assertEquals(2L, jdbc.queryForObject("SELECT binding_version FROM ab_tenant_application_binding WHERE tenant_id=711", Long.class));
         var tx = new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(source));
         tx.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
         tx.executeWithoutResult(status -> {
-            assertEquals(3, store.compareAndSetShadow(current, first, digest.apply(first)).version());
+            jdbc.queryForObject("SELECT set_config('aura.binding.actor','test:outer-caller',true)", String.class);
+            String outerOperation = bindingAudit().operationId();
+            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, outerOperation);
+            assertEquals(3, store.compareAndSetShadow(current, first, digest.apply(first), bindingAudit()).version());
+            assertEquals("test:outer-caller", jdbc.queryForObject("SELECT current_setting('aura.binding.actor')", String.class));
+            assertEquals(outerOperation, jdbc.queryForObject("SELECT current_setting('aura.binding.operation')", String.class));
             status.setRollbackOnly();
         });
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
         // A storage-level activation is only a fixture for the shadow API boundary, not admission proof.
-        jdbc.update("UPDATE ab_tenant_application_binding SET status='active',binding_version=3 WHERE tenant_id=711");
+        tx.executeWithoutResult(status -> {
+            jdbc.queryForObject("SELECT set_config('aura.binding.actor','test:activation-fixture',true)", String.class);
+            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, bindingAudit().operationId());
+            jdbc.update("UPDATE ab_tenant_application_binding SET status='active',binding_version=3 WHERE tenant_id=711");
+        });
         var active = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "active", 3);
-        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(active, first, digest.apply(first)));
+        assertThrows(IllegalArgumentException.class, () -> store.compareAndSetShadow(active, first, digest.apply(first), bindingAudit()));
         var forgedShadow = new TenantApplicationShadowBindingStore.Binding(711, applicationId, winner, digest.apply(winner), 1, "shadow", 3);
         assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
-                () -> store.compareAndSetShadow(forgedShadow, first, digest.apply(first)));
+                () -> store.compareAndSetShadow(forgedShadow, first, digest.apply(first), bindingAudit()));
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
         verifyShadowRoles(source, applicationId, first, second);
         verifyShadowLoginPool(source, applicationId, first, second);
@@ -268,11 +290,11 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             String firstDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, first);
             String secondDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, second);
             try (var disabled = new TenantApplicationShadowBindingService(new org.springframework.mock.env.MockEnvironment())) {
-                assertThrows(IllegalStateException.class, () -> disabled.createShadow(713, applicationId, first, firstDigest));
+                assertThrows(IllegalStateException.class, () -> disabled.createShadow(713, applicationId, first, firstDigest, bindingAudit()));
             }
             try (var service = new TenantApplicationShadowBindingService(environment)) {
-                var created = service.createShadow(713, applicationId, first, firstDigest);
-                assertEquals(2, service.compareAndSetShadow(created, second, secondDigest).version());
+                var created = service.createShadow(713, applicationId, first, firstDigest, bindingAudit());
+                assertEquals(2, service.compareAndSetShadow(created, second, secondDigest, bindingAudit()).version());
                 assertEquals(second, jdbc.queryForObject("SELECT current_release_id FROM ab_tenant_application_binding WHERE tenant_id=713", String.class));
                 assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=713", Integer.class));
             }
@@ -337,9 +359,9 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 var store = new TenantApplicationShadowBindingStore(jdbc);
                 String firstDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, first);
                 String secondDigest = jdbc.queryForObject("SELECT digest FROM ab_application_release WHERE release_id=?", String.class, second);
-                var created = store.createShadow(712, applicationId, first, firstDigest);
-                assertEquals(created, store.createShadow(712, applicationId, first, firstDigest));
-                assertEquals(2, store.compareAndSetShadow(created, second, secondDigest).version());
+                var created = store.createShadow(712, applicationId, first, firstDigest, bindingAudit());
+                assertEquals(created, store.createShadow(712, applicationId, first, firstDigest, bindingAudit()));
+                assertEquals(2, store.compareAndSetShadow(created, second, secondDigest, bindingAudit()).version());
                 assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=712", Integer.class));
                 // No status predicate in the caller: row security still protects the active binding.
                 assertEquals(0, jdbc.update("UPDATE ab_tenant_application_binding SET current_release_id=?,binding_version=binding_version+1 WHERE tenant_id=711", first));
@@ -354,6 +376,10 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 jdbc.execute("RESET ROLE");
             } finally { manager.rollback(transaction); }
         }
+    }
+    private static TenantApplicationShadowBindingStore.AuditContext bindingAudit() {
+        return new TenantApplicationShadowBindingStore.AuditContext("test:binding-operator",
+                com.auraboot.framework.common.util.UlidGenerator.generate());
     }
     private static byte[] readBytes(java.io.InputStream stream) {
         try { return stream.readAllBytes(); }

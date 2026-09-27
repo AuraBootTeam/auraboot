@@ -18,12 +18,14 @@ public final class TenantApplicationShadowBindingService implements AutoCloseabl
         store = new TenantApplicationShadowBindingStore(new JdbcTemplate(pool));
     }
 
-    public TenantApplicationShadowBindingStore.Binding createShadow(long tenantId, long applicationId, String releaseId, String digest) {
-        requireEnabled(); return store.createShadow(tenantId, applicationId, releaseId, digest);
+    public TenantApplicationShadowBindingStore.Binding createShadow(long tenantId, long applicationId, String releaseId, String digest,
+            TenantApplicationShadowBindingStore.AuditContext audit) {
+        requireEnabled(); return store.createShadow(tenantId, applicationId, releaseId, digest, audit);
     }
     public TenantApplicationShadowBindingStore.Binding compareAndSetShadow(
-            TenantApplicationShadowBindingStore.Binding expected, String releaseId, String digest) {
-        requireEnabled(); return store.compareAndSetShadow(expected, releaseId, digest);
+            TenantApplicationShadowBindingStore.Binding expected, String releaseId, String digest,
+            TenantApplicationShadowBindingStore.AuditContext audit) {
+        requireEnabled(); return store.compareAndSetShadow(expected, releaseId, digest, audit);
     }
     private void requireEnabled() {
         if (store == null) throw new IllegalStateException("Shadow binding connection is not enabled");

@@ -710,17 +710,24 @@ END $$;
 CREATE FUNCTION public.ab_tenant_binding_project_history() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path TO 'public', '$user', 'public'
-    AS $$
+    AS $_$
+DECLARE
+    actor TEXT := current_setting('aura.binding.actor', true);
+    operation TEXT := current_setting('aura.binding.operation', true);
 BEGIN
+    IF actor IS NULL OR actor !~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'
+       OR operation IS NULL OR operation !~ '^[0-9A-HJKMNP-TV-Z]{26}$' THEN
+        RAISE EXCEPTION 'Binding transition requires business actor and operation identity';
+    END IF;
     INSERT INTO ab_tenant_application_binding_history
         (tenant_id, application_id, binding_version, previous_release_id, previous_status,
-         current_release_id, status, changed_at, database_actor)
+         current_release_id, status, changed_at, database_actor, business_actor, operation_id)
     VALUES (NEW.tenant_id, NEW.application_id, NEW.binding_version,
         CASE WHEN TG_OP = 'UPDATE' THEN OLD.current_release_id END,
         CASE WHEN TG_OP = 'UPDATE' THEN OLD.status END,
-        NEW.current_release_id, NEW.status, NEW.updated_at, current_user);
+        NEW.current_release_id, NEW.status, NEW.updated_at, current_user, actor, operation);
     RETURN NEW;
-END $$;
+END $_$;
 
 
 --
@@ -16103,8 +16110,12 @@ CREATE TABLE public.ab_tenant_application_binding_history (
     status text NOT NULL,
     changed_at timestamp with time zone NOT NULL,
     database_actor text NOT NULL,
+    business_actor text,
+    operation_id character varying(26),
     CONSTRAINT ab_tenant_application_binding_history_binding_version_check CHECK ((binding_version > 0)),
+    CONSTRAINT ab_tenant_application_binding_history_business_actor_check CHECK ((business_actor ~ '^(user|ci|system|test):[A-Za-z0-9._:-]{1,200}$'::text)),
     CONSTRAINT ab_tenant_application_binding_history_check CHECK ((((binding_version = 1) AND (previous_release_id IS NULL) AND (previous_status IS NULL)) OR ((binding_version > 1) AND (previous_release_id IS NOT NULL) AND (previous_status IS NOT NULL)))),
+    CONSTRAINT ab_tenant_application_binding_history_operation_id_check CHECK (((operation_id)::text ~ '^[0-9A-HJKMNP-TV-Z]{26}$'::text)),
     CONSTRAINT ab_tenant_application_binding_history_previous_status_check CHECK ((previous_status = ANY (ARRAY['shadow'::text, 'active'::text]))),
     CONSTRAINT ab_tenant_application_binding_history_status_check CHECK ((status = ANY (ARRAY['shadow'::text, 'active'::text])))
 );
@@ -16115,6 +16126,20 @@ CREATE TABLE public.ab_tenant_application_binding_history (
 --
 
 COMMENT ON COLUMN public.ab_tenant_application_binding_history.database_actor IS 'Database principal only; does not identify the authenticated business operator';
+
+
+--
+-- Name: COLUMN ab_tenant_application_binding_history.business_actor; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_tenant_application_binding_history.business_actor IS 'Operator asserted by the trusted control connection; legacy unknown values remain null';
+
+
+--
+-- Name: COLUMN ab_tenant_application_binding_history.operation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_tenant_application_binding_history.operation_id IS 'Control-plane operation identity, unique per tenant and application';
 
 
 --
@@ -23594,6 +23619,14 @@ ALTER TABLE ONLY public.ab_subject_permission
 
 ALTER TABLE ONLY public.ab_tenant_entitlement
     ADD CONSTRAINT uq_te_tenant_plugin_source_plan UNIQUE (tenant_id, plugin_id, entitlement_source, plan_pid);
+
+
+--
+-- Name: ab_tenant_application_binding_history uq_tenant_binding_operation; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_tenant_application_binding_history
+    ADD CONSTRAINT uq_tenant_binding_operation UNIQUE (tenant_id, application_id, operation_id);
 
 
 --

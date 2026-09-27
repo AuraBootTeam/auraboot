@@ -22,13 +22,19 @@ public final class TenantApplicationShadowBindingStore {
 
     public record Binding(long tenantId, long applicationId, String releaseId, String releaseDigest,
                           int compatibilityEpoch, String status, long version) {}
+    public record AuditContext(String actor, String operationId) {
+        public AuditContext {
+            require(actor != null && actor.matches("(user|ci|system|test):[A-Za-z0-9._:-]{1,200}"), "Authenticated binding actor required");
+            require(operationId != null && operationId.matches("[0-9A-HJKMNP-TV-Z]{26}"), "Exact binding operation ID required");
+        }
+    }
     public static final class BindingConflictException extends RuntimeException {
         public BindingConflictException() { super("Shadow binding identity, version, or state conflict"); }
     }
 
-    public Binding createShadow(long tenantId, long applicationId, String releaseId, String releaseDigest) {
+    public Binding createShadow(long tenantId, long applicationId, String releaseId, String releaseDigest, AuditContext audit) {
         validate(tenantId, applicationId, releaseId, releaseDigest);
-        return transactions.execute(transaction -> {
+        return audited(audit, () -> {
             requireRelease(applicationId, releaseId, releaseDigest);
             jdbc.update("""
                     INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id)
@@ -41,14 +47,14 @@ public final class TenantApplicationShadowBindingStore {
         });
     }
 
-    public Binding compareAndSetShadow(Binding expected, String targetReleaseId, String targetDigest) {
+    public Binding compareAndSetShadow(Binding expected, String targetReleaseId, String targetDigest, AuditContext audit) {
         Objects.requireNonNull(expected, "Expected binding required");
         validate(expected.tenantId(), expected.applicationId(), targetReleaseId, targetDigest);
         validate(expected.tenantId(), expected.applicationId(), expected.releaseId(), expected.releaseDigest());
         require(expected.version() > 0 && expected.version() < Long.MAX_VALUE
                 && "shadow".equals(expected.status()), "Explicit shadow binding version required");
         require(!expected.releaseId().equals(targetReleaseId), "Target release must change");
-        return transactions.execute(transaction -> {
+        return audited(audit, () -> {
             require(requireRelease(expected.applicationId(), expected.releaseId(), expected.releaseDigest())
                     == expected.compatibilityEpoch(), "Expected release epoch mismatch");
             requireRelease(expected.applicationId(), targetReleaseId, targetDigest);
@@ -58,6 +64,21 @@ public final class TenantApplicationShadowBindingStore {
                     """, targetReleaseId, expected.tenantId(), expected.applicationId(), expected.releaseId(), expected.version());
             if (changed != 1) throw new BindingConflictException();
             return read(expected.tenantId(), expected.applicationId());
+        });
+    }
+
+    private Binding audited(AuditContext audit, java.util.function.Supplier<Binding> operation) {
+        Objects.requireNonNull(audit, "Binding audit context required");
+        return transactions.execute(transaction -> {
+            String previousActor = jdbc.queryForObject("SELECT current_setting('aura.binding.actor',true)", String.class);
+            String previousOperation = jdbc.queryForObject("SELECT current_setting('aura.binding.operation',true)", String.class);
+            jdbc.queryForObject("SELECT set_config('aura.binding.actor',?,true)", String.class, audit.actor());
+            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, audit.operationId());
+            Binding result = operation.get();
+            // Restore caller context on success. Exceptions roll back this transaction, including local settings.
+            jdbc.queryForObject("SELECT set_config('aura.binding.actor',?,true)", String.class, previousActor == null ? "" : previousActor);
+            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, previousOperation == null ? "" : previousOperation);
+            return result;
         });
     }
 

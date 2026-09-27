@@ -69,6 +69,13 @@ final class ShadowBindingConnection {
                   AND a.attnum>0 AND NOT a.attisdropped
                 """, Boolean.class);
         require(Boolean.TRUE.equals(columns), "Shadow binding column privileges are incomplete or excessive");
+        Integer auditColumns = jdbc.queryForObject("""
+                SELECT count(*) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
+                JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema()
+                  AND c.relname='ab_tenant_application_binding_history' AND NOT a.attisdropped
+                  AND a.attname IN ('business_actor','operation_id')
+                """, Integer.class);
+        require(auditColumns != null && auditColumns == 2, "Shadow binding operator audit migration is required");
         Boolean rls = jdbc.queryForObject("""
                 SELECT c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname=current_schema() AND c.relname='ab_tenant_application_binding'

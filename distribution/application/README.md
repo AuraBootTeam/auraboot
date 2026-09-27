@@ -326,3 +326,18 @@ the new pool and fails startup. It never contributes a primary DataSource or fal
 business connection. Shutdown closes only this owned pool. This does not expose a public binding
 API or grant activation. Privilege checks occur at pool initialization; operational policy changes
 remain controlled by the database owner, and credential rollout requires separate verification.
+
+
+Shadow writes require `AuditContext(actor, operationId)`. The trusted caller supplies an actor in
+`user:`, `ci:`, `system:`, or `test:` form and a ULID operation identity. The store installs this
+context with transaction-local PostgreSQL settings and restores caller settings after success;
+failures roll back the transaction. Migration `V20260926040000` records these values in the immutable
+history projection and rejects new transitions without them. An operation ID is unique within a
+tenant/application history; reusing it for another transition rolls back the pointer and history.
+Existing initial-binding retries preserve the first history entry. This is not general CAS retry
+idempotency: stale expected versions still conflict. Legacy unknown operator metadata stays null.
+
+Database settings carry an assertion by the control account, not authentication proof. Public
+controllers must derive the actor from authenticated context and must not accept a client-selected
+actor. That HTTP boundary is not yet exposed. Pool startup requires the operator audit migration;
+there is no unaudited write overload or fallback.
