@@ -205,5 +205,26 @@
     "domain_category": "platform",
     "data_sensitivity": "internal",
     "lifecycle_description": "Stage field advances discovery → qualification → proposal → negotiation → closed_won (or terminal closed_lost)."
+  },
+  {
+    "code": "e2et_crm_opp",
+    "displayName:zh-CN": "商机演示(遗留)",
+    "displayName:en": "Demo Opportunity (legacy)",
+    "description": "Legacy CRM-era opportunity twin of e2et_stage_record, present only in long-lived fixture databases. Declared so the e2et_crm_opp.create/update verb-label declarations (PR #2073) stay self-consistent on a fresh install.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "titleField": "e2et_crm_opp_name",
+      "importPolicy": {
+        "enabled": true,
+        "modes": [
+          "insert"
+        ]
+      }
+    },
+    "semantic_description": "Legacy API-fixture opportunity model. The OSS stage-rail UI fixture is e2et_stage_record; this twin only backs the durable e2et_crm_opp command labels.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Stage field advances discovery → qualification → proposal → negotiation → closed_won (or terminal closed_lost)."
   }
 ]

@@ -1238,9 +1238,20 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'downstream action completed on webhook fire').toBe(true);
   });
 
+  // /api/bpm/* (and the e2et_payment_approval process definition) ship with the
+  // independent aura-bpm application, not the OSS core runtime.
+  async function bpmRuntimeAvailable(page: Page): Promise<boolean> {
+    const probe = await page.request.get('/api/bpm/process-definitions');
+    return probe.ok();
+  }
+
   test('N-START-PROCESS: drag trigger-webhook→action-start-process, pick a BPM process, fire webhook → BPM instance is started and correlated by businessKey @golden', async ({
     page,
   }) => {
+    test.skip(
+      !(await bpmRuntimeAvailable(page)),
+      'requires the independent aura-bpm application (absent from the OSS core runtime)',
+    );
     const tag = uniqueId();
     const processKey = 'e2et_payment_approval';
     const businessKey = `NSP-${tag}`;
@@ -1313,6 +1324,10 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test('N-TRIGGER-BPM-EVENT: drag trigger-workflow-event→action-create-record, pick a BPM process and event type, start BPM → automation runs from task_assigned @golden', async ({
     page,
   }) => {
+    test.skip(
+      !(await bpmRuntimeAvailable(page)),
+      'requires the independent aura-bpm application (absent from the OSS core runtime)',
+    );
     const tag = uniqueId();
     const processKey = 'e2et_payment_approval';
     const businessKey = `NBE-${tag}`;

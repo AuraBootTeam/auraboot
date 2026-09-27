@@ -1,6 +1,6 @@
 {
   "version": "1.3",
-  "last_updated": "2026-09-23",
+  "last_updated": "2026-09-28",
   "_scope_note": "plugins[] lists publishable packages in this repository, not the core-only runtime. core_plugins[] are platform-owned; example_plugins[] are optional public examples; internal_test_plugins[] never ship. CRM, BPM, EDU, and other applications are composed from independent repositories.",
   "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
   "platform_modules": [
@@ -62,9 +62,20 @@
     "showcase",
     "simple-inventory"
   ],
-  "independent_applications": ["aura-bpm", "aura-crm", "aura-edu"],
-  "internal_test_plugins": ["test-fixtures"],
-  "tooling_dirs": ["acp-showcase", "cli", "schemas", "scripts"],
+  "independent_applications": [
+    "aura-bpm",
+    "aura-crm",
+    "aura-edu"
+  ],
+  "internal_test_plugins": [
+    "test-fixtures"
+  ],
+  "tooling_dirs": [
+    "acp-showcase",
+    "cli",
+    "schemas",
+    "scripts"
+  ],
   "test_paths": [
     "tests/e2e/auth/**",
     "tests/e2e/permission/**",
@@ -135,7 +146,10 @@
     "tests/e2e/organization/org-department.spec.ts",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
     "tests/e2e/user/user-management.spec.ts",
-    "tests/e2e/bpm/bpm-form-integration.spec.ts"
+    "tests/e2e/bpm/bpm-form-integration.spec.ts",
+    "tests/e2e/approval/approval-workflow.spec.ts",
+    "tests/e2e/approval/inline-approval-panel.spec.ts",
+    "tests/e2e/model/model-publish-governance.spec.ts"
   ],
   "test_excludes_rationale": {
     "_note": "Explanations for each entry in test_excludes. Plain-string exclusion list is what the playwright.oss.config.ts runner consumes; this map is metadata only.",
@@ -165,7 +179,10 @@
     "tests/e2e/organization/org-department.spec.ts": "[A] 1/5 cases (create-department-via-...) uses enterprise-only field; whole file excluded because playwright.oss.config.ts filter is file-path level only — 4 passing sibling cases lost. See per_case_excludes_todo.",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts": "[A] CS-007 column-order persistence relies on enterprise wiring; whole file excluded (7 passing siblings lost). See per_case_excludes_todo.",
     "tests/e2e/user/user-management.spec.ts": "[A] UM-006/UM-007 role assignment/list are enterprise; whole file excluded (9 passing siblings lost). See per_case_excludes_todo.",
-    "tests/e2e/bpm/bpm-form-integration.spec.ts": "[A] BFI-004 asserts /api/inbox endpoint; unified Inbox API lives in enterprise platform only. OSS backend has no /api/inbox controller."
+    "tests/e2e/bpm/bpm-form-integration.spec.ts": "[A] BFI-004 asserts /api/inbox endpoint; unified Inbox API lives in enterprise platform only. OSS backend has no /api/inbox controller.",
+    "tests/e2e/approval/approval-workflow.spec.ts": "[A] approval→BPM integration: drives /bpm/task-center and /api/bpm/tasks; aura-bpm is an independent application absent from the OSS core runtime (all cases fail).",
+    "tests/e2e/approval/inline-approval-panel.spec.ts": "[A] asserts /api/bpm/process-instances/by-business-key/status; aura-bpm is an independent application absent from the OSS core runtime (all cases fail).",
+    "tests/e2e/model/model-publish-governance.spec.ts": "[A] all three cases (RC-MODEL-01/01B/01C) provision SLA configs and BPM process definitions via /api/bpm/*; aura-bpm is an independent application absent from the OSS core runtime."
   },
   "per_case_excludes_todo": {
     "_note": "The current playwright.oss.config.ts filter operates at file path level only. These are the specific failing cases we actually want to skip; their sibling cases in the same files currently pass but are excluded along with them. When scope filter gains per-title support, move the file back into test_paths and list individual case titles here.",

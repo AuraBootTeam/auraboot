@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "089acef61",
+    "commit": "5f6f9d832",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -1661,6 +1661,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/amos-lenses/amos-lens-journeys.spec.ts",
             "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
             "web-admin/tests/e2e/aurabot/behavior-analytics-permission.spec.ts",
             "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
@@ -2701,7 +2702,8 @@
             "web-admin/tests/e2e/organization/org-department.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/organization/org-position.spec.ts"
+            "web-admin/tests/e2e/organization/org-position.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4785,6 +4787,28 @@
           "verdict": "untested"
         },
         {
+          "id": "e2et_crm_opp.create",
+          "action": "e2et_crm_opp.create",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "e2et_crm_opp.update",
+          "action": "e2et_crm_opp.update",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "e2et_field_zoo.create",
           "action": "e2et_field_zoo.create",
           "surface": "ui",
@@ -5457,6 +5481,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/dashboard/dashboard-crud-parity.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-hifi-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
             "web-admin/tests/e2e/designer/dashboard-designer-deep.spec.ts",
@@ -5562,12 +5587,13 @@
             "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts",
             "web-admin/tests/e2e/pcba/pcba-role-button-matrix.spec.ts",
             "web-admin/tests/e2e/pcba-solution/bom-format-review-ui.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/bom-workbench-golden.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/bom-workbench-line-detail-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/bom-workbench-role-eng-golden.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/bom-workbench-self-scope-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-role-menu-smoke.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-soft-delete-golden.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-offline-price-library-golden.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-price-workbench-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-role-proc-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-role-sales-golden.spec.ts",
             "web-admin/tests/e2e/permission/menu-system.spec.ts",
@@ -5771,6 +5797,7 @@
             "web-admin/tests/e2e/designer/designer-unified-architecture.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-ops-golden.spec.ts",
+            "web-admin/tests/e2e/designer/report-hifi-golden.spec.ts",
             "web-admin/tests/e2e/designer-ux-improvements.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/report-designer-history-golden.spec.ts",
@@ -5951,6 +5978,7 @@
             "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts",
             "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
             "web-admin/tests/e2e/home/oss-workbench.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/bom-rule-center-crud.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-operations-dashboard.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts",
             "web-admin/tests/e2e/workbench/workbench-redesign.spec.ts"
@@ -6467,9 +6495,11 @@
           "surface": "platform-page",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec navigates to this route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/settings/open-platform-collaboration.golden.spec.ts"
+          ],
+          "assertion": "a browser spec navigates to this route",
+          "verdict": "pass",
           "note": "plugin=core-settings file=./plugins/core-settings/pages/settings/api-docs.tsx"
         },
         {
@@ -6594,11 +6624,11 @@
     }
   ],
   "stats": {
-    "commands": 255,
-    "untested": 179,
+    "commands": 257,
+    "untested": 181,
     "pages": 167,
     "pagesUntested": 103,
     "platformPages": 95,
-    "platformPagesUntested": 42
+    "platformPagesUntested": 41
   }
 }
