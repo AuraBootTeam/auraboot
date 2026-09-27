@@ -588,7 +588,7 @@ public class PluginDirectoryLoader {
                     "bindingRules", "menus", "permissions", "roles", "fieldMasks", "capabilities", "pages",
                     "pageContributions", "i18n", "namedQueries", "agentDefinitions", "savedViews",
                     "notificationTemplates", "dashboards", "decisionDefinitions", "conditionFragments",
-                    "eventPolicies", "automations", "semantic");
+                    "eventPolicies", "automations", "semantic", "defaultBootstrap");
             if (resourceDirs.containsKey("bindings") && resourceDirs.containsKey("modelFieldBindings")) {
                 throw new IOException("Ambiguous binding resource declarations");
             }
