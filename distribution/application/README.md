@@ -110,6 +110,24 @@ immutable Maven, npm, migration/config, and OCI registries). A downstream releas
 must never resolve an AuraBoot sibling checkout, Maven Local, `workspace:` link,
 `SNAPSHOT`, `latest`, or branch reference.
 
+## Publishing an application release for tenant binding
+
+Registration records immutable application release content, but it does not make a
+release selectable by tenants. `ApplicationReleaseControlService` provides the small
+control-plane boundary used after registration:
+
+1. `publish` records an immutable publication fact for one exact registered release.
+2. `promoteStable` moves the application's single `stable` target with a required
+   compare-and-set version after the initial target.
+3. `bindStable` resolves `stable` once inside the transaction and creates an exact
+   active tenant binding with the authenticated actor and operation ID in its history.
+
+An active binding is admitted only when its exact release is the current published
+`stable` target. Existing tenant bindings remain pinned when `stable` advances; rollout,
+automatic upgrades, approval workflows, revocation, and retirement are separate future
+concerns. The channel history is an immutable audit projection, not a deployment state
+machine.
+
 ## Deployment capability checks
 
 `application-release-requirements.schema.json` defines requirements pinned to an exact

@@ -195,7 +195,11 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         try (var migration = getClass().getResourceAsStream("/db/migration/core/V20260926040000__tenant_binding_operator_audit.sql")) {
             assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
         }
+        try (var migration = getClass().getResourceAsStream("/db/migration/core/V20260927010000__application_stable_publication.sql")) {
+            assertNotNull(migration); jdbc.execute(new String(migration.readAllBytes(), StandardCharsets.UTF_8));
+        }
         var store = new TenantApplicationShadowBindingStore(jdbc);
+        var control = new ApplicationReleaseControlService(jdbc);
         java.util.function.Function<String, String> digest = release -> jdbc.queryForObject(
                 "SELECT digest FROM ab_application_release WHERE release_id=?", String.class, release);
         var firstAudit = bindingAudit();
@@ -243,7 +247,38 @@ class ApplicationReleaseRegistrationServicePostgresIT {
             status.setRollbackOnly();
         });
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
-        // A storage-level activation is only a fixture for the shadow API boundary, not admission proof.
+        jdbc.update("INSERT INTO ab_tenant VALUES (714),(715)");
+        assertThrows(IllegalArgumentException.class,
+                () -> control.bindStable(714, "aura-edu", "test:school-creator", bindingAudit().operationId()));
+        String publishOperation = bindingAudit().operationId();
+        var publication = control.publish("aura-edu", winner, "ci:edu-release", publishOperation);
+        assertEquals(winner, publication.releaseId());
+        assertEquals(publication, control.publish("aura-edu", winner, "ci:retry", bindingAudit().operationId()));
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "UPDATE ab_application_release_publication SET published_by='test:forged' WHERE release_id=?", winner));
+        assertThrows(IllegalArgumentException.class,
+                () -> control.promoteStable("aura-edu", first, null, "ci:edu-release", bindingAudit().operationId()));
+        var stable = control.promoteStable("aura-edu", winner, null, "ci:edu-release", bindingAudit().operationId());
+        assertEquals("stable", stable.channel());
+        assertEquals(winner, stable.releaseId());
+        assertEquals(1L, stable.version());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM ab_application_channel_target_history", Integer.class));
+        assertEquals(stable, control.promoteStable(
+                "aura-edu", winner, null, "ci:retry", bindingAudit().operationId()));
+        String bindOperation = bindingAudit().operationId();
+        var bound = control.bindStable(714, "aura-edu", "user:school-founder", bindOperation);
+        assertEquals("active", bound.status());
+        assertEquals(winner, bound.releaseId());
+        assertEquals(1L, bound.version());
+        assertEquals(bound, control.bindStable(714, "aura-edu", "user:school-founder", bindOperation));
+        assertEquals("user:school-founder", jdbc.queryForObject(
+                "SELECT business_actor FROM ab_tenant_application_binding_history WHERE tenant_id=714", String.class));
+        assertEquals(bindOperation, jdbc.queryForObject(
+                "SELECT operation_id FROM ab_tenant_application_binding_history WHERE tenant_id=714", String.class));
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id,status) VALUES (715,?,?,'active')",
+                applicationId, first));
+        // Stable publication is now the admission proof for explicit shadow activation.
         tx.executeWithoutResult(status -> {
             jdbc.queryForObject("SELECT set_config('aura.binding.actor','test:activation-fixture',true)", String.class);
             jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)", String.class, bindingAudit().operationId());
@@ -255,6 +290,14 @@ class ApplicationReleaseRegistrationServicePostgresIT {
         assertThrows(TenantApplicationShadowBindingStore.BindingConflictException.class,
                 () -> store.compareAndSetShadow(forgedShadow, first, digest.apply(first), bindingAudit()));
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding_history WHERE tenant_id=711", Integer.class));
+        control.publish("aura-edu", first, "ci:edu-release", bindingAudit().operationId());
+        assertThrows(IllegalStateException.class, () -> control.promoteStable(
+                "aura-edu", first, 2L, "ci:edu-release", bindingAudit().operationId()));
+        assertEquals(2L, control.promoteStable(
+                "aura-edu", first, 1L, "ci:edu-release", bindingAudit().operationId()).version());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_application_channel_target_history", Integer.class));
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "UPDATE ab_application_channel_target_history SET changed_by='test:forged'"));
         verifyShadowRoles(source, applicationId, first, second);
         verifyShadowLoginPool(source, applicationId, first, second);
     }
@@ -352,7 +395,7 @@ class ApplicationReleaseRegistrationServicePostgresIT {
                 assertTrue(failure.getMostSpecificCause().getMessage().contains("Unknown binding row policy"));
                 connection.rollback(savepoint); connection.releaseSavepoint(savepoint);
                 jdbc.execute("SET LOCAL ROLE " + runtime);
-                assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding", Integer.class));
+                assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM ab_tenant_application_binding", Integer.class));
                 assertDenied(connection, jdbc, "UPDATE ab_tenant_application_binding SET binding_version=binding_version+1");
                 assertDenied(connection, jdbc, "DELETE FROM ab_tenant_application_binding_history");
                 jdbc.execute("RESET ROLE"); jdbc.execute("SET LOCAL ROLE " + writer);
