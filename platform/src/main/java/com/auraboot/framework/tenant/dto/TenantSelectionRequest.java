@@ -5,6 +5,9 @@ import lombok.Data;
 @Data
 public class TenantSelectionRequest {
     private String action; // "create", "join", or "select"
+
+    // Stable across retries of the same create request. Reusing it with changed input is rejected.
+    private String clientRequestId;
     
     // 创建租户时使用
     private String tenantName;

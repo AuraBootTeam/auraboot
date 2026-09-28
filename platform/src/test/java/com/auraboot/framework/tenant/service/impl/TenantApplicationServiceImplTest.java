@@ -8,6 +8,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.auraboot.framework.menu.service.MenuService;
+import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
@@ -40,6 +41,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -73,6 +75,7 @@ class TenantApplicationServiceImplTest {
     @Mock private BuiltinPluginImportService builtinPluginImportService;
     @Mock private SystemModeService systemModeService;
     @Mock private ApplicationReleaseControlService applicationReleaseControlService;
+    @Mock private IdempotencyService idempotencyService;
     @Mock private com.auraboot.framework.application.release.ApplicationReleaseTenantInitializer applicationReleaseTenantInitializer;
 
     @InjectMocks
@@ -176,6 +179,35 @@ class TenantApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("createTenantForUser replays the committed response after a client timeout")
+    void createForUserReplaysCommittedOutcome() {
+        when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
+        metaContextMock = Mockito.mockStatic(MetaContext.class);
+        metaContextMock.when(MetaContext::exists).thenReturn(true);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(1L);
+        TenantSelectionRequest req = new TenantSelectionRequest();
+        req.setTenantName("acme");
+        req.setDisplayName("Acme Inc");
+        req.setClientRequestId("school-create-001");
+        when(idempotencyService.claimScopedIdempotency(
+                eq("school-create-001"), eq("tenant.create.user.7"), any(), eq(1L)))
+                .thenReturn(Map.of(
+                        "status", "success",
+                        "message", "$i18n:tenant.application.create_success",
+                        "tenantId", 99L,
+                        "tenantName", "acme",
+                        "jwt", "committed-jwt",
+                        "needsApproval", false));
+
+        TenantSelectionResponse replay = service.createTenantForUser(req, user(7L, "u@x.com"));
+
+        assertEquals(99L, replay.getTenantId());
+        assertEquals("committed-jwt", replay.getJwt());
+        verify(tenantService, never()).findByName(anyString());
+        verify(tenantService, never()).createTenant(any());
+    }
+
+    @Test
     @DisplayName("createTenantForUser bootstraps tenant + assigns admin")
     void createForUserOk() {
         when(systemModeService.isTenantSelfProvisioningAllowed()).thenReturn(true);
@@ -198,6 +230,10 @@ class TenantApplicationServiceImplTest {
         TenantSelectionRequest req = new TenantSelectionRequest();
         req.setTenantName("acme");
         req.setDisplayName("Acme Inc");
+        req.setClientRequestId("school-create-002");
+        when(idempotencyService.claimScopedIdempotency(
+                eq("school-create-002"), eq("tenant.create.user.7"), any(), eq(0L)))
+                .thenReturn(null);
         TenantSelectionResponse resp = service.createTenantForUser(req, user(7L, "u@x.com"));
 
         assertEquals(StatusConstants.SUCCESS, resp.getStatus());
@@ -208,6 +244,8 @@ class TenantApplicationServiceImplTest {
                 eq(99L), eq("aura-edu"), eq("user:id:7"), anyString());
         verify(builtinPluginImportService).importForTenant(99L, 7L);
         verify(sessionManagementService).createSession(eq(7L), eq("jwt-token"), any(), any());
+        verify(idempotencyService).recordScopedOutcome(
+                eq("school-create-002"), eq("tenant.create.user.7"), any(), any(), eq(0L));
     }
 
     @Test

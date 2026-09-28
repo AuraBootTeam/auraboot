@@ -12,9 +12,12 @@ import java.util.Objects;
 public final class ApplicationReleaseControlService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
+    private final ApplicationBindingCapabilityVerifier bindingCapabilities;
 
-    public ApplicationReleaseControlService(JdbcTemplate jdbc) {
+    public ApplicationReleaseControlService(JdbcTemplate jdbc,
+                                            ApplicationBindingCapabilityVerifier bindingCapabilities) {
         this.jdbc = Objects.requireNonNull(jdbc);
+        this.bindingCapabilities = Objects.requireNonNull(bindingCapabilities);
         var manager = new DataSourceTransactionManager(Objects.requireNonNull(jdbc.getDataSource()));
         transactions = new TransactionTemplate(manager);
         // Keep the database default for standalone control calls and inherit an existing
@@ -100,6 +103,7 @@ public final class ApplicationReleaseControlService {
         validateActor(actor, operationId);
         return transactions.execute(status -> audited(actor, operationId, () -> {
             var target = publishedStable(applicationCode);
+            bindingCapabilities.requireDeployed(applicationCode, target.releaseId(), target.digest());
             jdbc.update("""
                     INSERT INTO ab_tenant_application_binding
                         (tenant_id,application_id,current_release_id,status)
@@ -121,6 +125,7 @@ public final class ApplicationReleaseControlService {
         require(expectedVersion != null && expectedVersion > 0, "Positive expected binding version required");
         return transactions.execute(status -> audited(actor, operationId, () -> {
             var target = publishedStable(applicationCode);
+            bindingCapabilities.requireDeployed(applicationCode, target.releaseId(), target.digest());
             require(target.releaseId().equals(expectedReleaseId), "Expected release is no longer published stable");
             var replay = bindingActivationByOperation(tenantId, target.applicationId(), operationId);
             if (!replay.isEmpty()) {
