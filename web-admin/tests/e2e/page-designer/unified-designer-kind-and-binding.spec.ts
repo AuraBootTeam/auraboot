@@ -36,7 +36,7 @@ type LeafBlockMoveType = 'column' | 'filter-field';
 type ActionLeafParentType = 'action-bar' | 'table';
 type ActionLeafCrossParentRoute = { source: ActionLeafParentType; target: ActionLeafParentType };
 
-async function createFormPage(page: Page): Promise<string> {
+async function createFormPage(page: Page): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_kind');
   const pageKey = `udw_kind_${id}`;
   const resp = await page.request.post('/api/pages', {
@@ -86,7 +86,7 @@ async function createFormPage(page: Page): Promise<string> {
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
   expect(body.code).toBe('0');
-  return pageKey;
+  return { pageKey, pid: String(body.data?.pid ?? '') };
 }
 
 async function createPaletteAuthoringFormPage(page: Page): Promise<CreatedDesignerPage> {
@@ -1305,12 +1305,16 @@ async function createCrossKindWorkflowGuardListPage(page: Page): Promise<Created
  * navigation can race optimizeDeps and render a transient "Application Error";
  * reload once (Vite is warm by then) before asserting on the workbench.
  */
-async function openDesigner(page: Page, pageKey: string) {
+async function openDesigner(page: Page, pagePid: string) {
+  // The designer boot opens a governed authoring session, which needs the page
+  // pid. GET /api/pages/page-key/{key} is the runtime endpoint and only serves
+  // published baselines (draft pages 404 there by design), so these helpers
+  // pass the created page's pid and boot the designer via ?pageId=.
   const workbench = page.getByTestId('unified-designer-workbench');
   const attempts = 4;
   for (let i = 0; i < attempts; i++) {
     if (i === 0) {
-      await page.goto(`/unified-designer?pageKey=${pageKey}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     } else {
       // Cold dev Vite re-runs optimizeDeps on the heavy designer route and can
       // render a transient "Application Error" until it settles; reload until ready.
@@ -1342,8 +1346,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test('a form page collapses the palette and renders zh-CN copy', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
 
     // Canvas band shows the localized form kind label, not the old Composite text.
     const band = page.getByTestId('canvas-root-drop-zone');
@@ -1366,8 +1370,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   });
 
   test('dragging a model field into a section binds a field block via @dnd-kit', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
 
     // Wait for the outline tree to populate before querying it.
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({
@@ -1415,7 +1419,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1452,7 +1456,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1483,7 +1487,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1528,7 +1532,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1561,7 +1565,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1593,7 +1597,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1609,7 +1613,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1647,7 +1651,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1666,7 +1670,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes deleting a saved palette-created container before saving readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1698,7 +1702,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1714,7 +1718,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     page,
   }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-form_root').click();
@@ -1752,7 +1756,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1769,7 +1773,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing field block between form-section containers and persists schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1785,7 +1789,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1803,7 +1807,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes a cross-container move-before before saving schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1834,7 +1838,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1852,7 +1856,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing field block inside an empty form-section container and persists schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1866,7 +1870,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1880,7 +1884,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes a cross-container move-inside into an empty section before saving schema order', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1909,7 +1913,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1923,7 +1927,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing sub-table subtree before another sub-table in a different section', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1939,7 +1943,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1961,7 +1965,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('moves an existing sub-table subtree inside an empty section and preserves children', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -1975,7 +1979,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -1994,7 +1998,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes moving a sub-table subtree before another sub-table', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2025,7 +2029,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2047,7 +2051,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
   test('undoes and redoes moving a sub-table subtree inside an empty section', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2076,7 +2080,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2100,7 +2104,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const movedBlockId = `${blockType}_move_candidate`;
       const targetBlockId = `${blockType}_target`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -2116,7 +2120,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -2136,7 +2140,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -2150,7 +2154,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -2169,7 +2173,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const movedBlockId = `${blockType}_move_candidate`;
       const targetBlockId = `${blockType}_target`;
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType);
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -2200,7 +2204,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -2220,7 +2224,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: formKey, pid } = await createCrossContainerAdvancedContainerFormPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, formKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -2249,7 +2253,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${formKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -2269,7 +2273,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2285,7 +2289,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2308,7 +2312,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2320,7 +2324,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2341,7 +2345,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2375,7 +2379,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2398,7 +2402,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerActionBarFormPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2427,7 +2431,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2448,7 +2452,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2464,7 +2468,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2487,7 +2491,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2499,7 +2503,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2520,7 +2524,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'tab',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2554,7 +2558,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2577,7 +2581,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: formKey, pid } = await createCrossContainerFormSectionPage(page, {
       source: 'form',
     });
-    await openDesigner(page, formKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2606,7 +2610,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2627,7 +2631,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'table', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2643,7 +2647,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2667,7 +2671,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'table', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2696,7 +2700,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2720,7 +2724,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'filter-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2732,7 +2736,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2753,7 +2757,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'filter-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2779,7 +2783,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2807,7 +2811,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2840,7 +2844,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2863,7 +2867,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2889,7 +2893,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2917,7 +2921,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'widget', {
       source: 'tab',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2946,7 +2950,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -2969,7 +2973,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'widget', {
       source: 'list',
     });
-    await openDesigner(page, listKey);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -2995,7 +2999,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
     await saveDesignerPage(page, pid);
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3026,7 +3030,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const candidateId = isColumn ? 'column_move_candidate' : 'filter_field_move_candidate';
       const targetLeafId = isColumn ? 'target_col_title' : 'target_filter_status';
       const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType);
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3061,7 +3065,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3087,7 +3091,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: listKey, pid } = await createCrossContainerLeafBlockListPage(page, blockType, {
         emptyTarget: true,
       });
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3116,7 +3120,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3145,7 +3149,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
         page,
         parentType,
       );
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3180,7 +3184,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3210,7 +3214,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
           emptyTarget: true,
         },
       );
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3239,7 +3243,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3269,7 +3273,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const candidateId = 'action_move_candidate';
       const targetLeafId = 'target_action_view';
       const { pageKey: listKey, pid } = await createCrossParentActionLeafListPage(page, route);
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3300,7 +3304,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3326,7 +3330,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const { pageKey: listKey, pid } = await createCrossParentActionLeafListPage(page, route, {
         emptyTarget: true,
       });
-      await openDesigner(page, listKey);
+      await openDesigner(page, pid);
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
@@ -3355,7 +3359,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       await saveDesignerPage(page, pid);
 
-      const readback = await page.request.get(`/api/pages/key/${listKey}`);
+      const readback = await page.request.get(`/api/pages/${pid}`);
       expect(readback.ok(), await readback.text()).toBe(true);
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
@@ -3373,8 +3377,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   }
 
   test('rejects moving a cross-kind block within a form designer and keeps persisted schema unchanged', async ({ page }) => {
-    const { pageKey: formKey } = await createCrossKindGuardFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createCrossKindGuardFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3391,7 +3395,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(await isBeforeInDom(tabsRoot, 'section_main', 'detail_section_from_detail')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3406,8 +3410,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('rejects moving a kind-allowed child into an incompatible container and keeps persisted schema unchanged', async ({
     page,
   }) => {
-    const { pageKey: formKey } = await createIncompatibleContainerGuardFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createIncompatibleContainerGuardFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3424,7 +3428,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(targetSection.getByTestId('canvas-block-column_move_candidate')).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${formKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3438,8 +3442,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('rejects moving a workflow block in a list designer even when the local tab can contain it', async ({
     page,
   }) => {
-    const { pageKey: listKey } = await createCrossKindWorkflowGuardListPage(page);
-    await openDesigner(page, listKey);
+    const { pageKey: listKey, pid } = await createCrossKindWorkflowGuardListPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
@@ -3457,7 +3461,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(await isBeforeInDom(tabMain, 'table_main', 'bpm_panel_from_detail')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
-    const readback = await page.request.get(`/api/pages/key/${listKey}`);
+    const readback = await page.request.get(`/api/pages/${pid}`);
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
@@ -3474,8 +3478,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // whose single jump-move pointerWithin can miss — the workbench's
   // pointerWithin→closestCenter fallback is what keeps those green.
   test('binds a model field via Playwright .dragTo() (UDW drag-driver guard)', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     const sectionItem = page
@@ -3501,8 +3505,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   // Block deletion: a designer must let users remove blocks (golden-standard
   // delete). The top-level kind container is protected; descendants are deletable.
   test('deletes a canvas block via the delete control and persists the removal', async ({ page }) => {
-    const formKey = await createFormPage(page);
-    await openDesigner(page, formKey);
+    const { pageKey: formKey, pid } = await createFormPage(page);
+    await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
     // The root form container has no delete control (it defines the page kind).
