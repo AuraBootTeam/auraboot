@@ -64,13 +64,17 @@ All changes typecheck (`pnpm typecheck` clean) and `./scripts/check-test-system.
 
 ## Remaining failure families (verified root causes)
 
-1. **V2-flat save contract — 57 cases, `unified-designer-kind-and-binding.spec.ts`**.
-   With the boot fixed, these reach their assertions and fail on one delta: the authoring
-   save persists the flattened top-level block list (the kind root is implied), while the
-   assertions expect the legacy `form_root`-nested tree. Product side matches the documented
-   V2-flat red line; the fix is the assertion migration already tracked as
-   `HANDOVER-e2e-flat-contract-migration` (workspace root). This is the single largest lever:
-   converting it also removes most of the 206 did-not-run (serial-mode downstream skips).
+1. **v3→v4 flat-contract migration debt — 57 cases, `unified-designer-kind-and-binding.spec.ts`**.
+   With the boot fixed, these reach their assertions and fail on one delta: the seeds still
+   POST `schemaVersion: 3` tree documents and the assertions still expect the legacy
+   `form_root`-nested readback, while the designer save persists the v4 flattened top-level
+   block list (kind root implied). This file is #16 (largest, 14 v3 refs / 14 ROOT_BLOCK refs)
+   of the 16-file migration queued in `HANDOVER-e2e-flat-contract-migration.md` (workspace
+   root; file 1/17 `canvas-box-select-golden` already migrated and green, 24/24). Deletion is
+   not recommended: the interactions under test (kind collapse + zh-CN copy, cross-kind guard
+   rails, undo/redo container authoring) are the only coverage of those current-designer
+   behaviors; no v4 equivalent exists yet. This is the single largest lever: converting it
+   also removes most of the 206 did-not-run (serial-mode downstream skips).
 2. **No LLM provider — ~35 cases** (`ai/knowledge-*`, `ai/form-draft-fill`, `aurabot/chat-bi-*`,
    `aurabot/behavior-*`, `aurabot/competitive-intelligence-*`). Runtime evidence:
    `"No LLM provider configured for agent: aurabot"`. These need a provider contract
