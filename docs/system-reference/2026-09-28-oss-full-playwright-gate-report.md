@@ -28,6 +28,35 @@ results json:      web-admin/test-results/results-regular.json (this worktree)
 log:               /tmp/oss-regular-146.log
 ```
 
+## 2026-09-29 targeted follow-up: unified designer flat-contract migration
+
+The 57-case `unified-designer-kind-and-binding.spec.ts` migration is now functionally green
+against the live slot-146 backend/Web/BFF stack. This is a targeted regression result, not a
+replacement for the 2026-09-28 full OSS gate result above.
+
+```text
+base commit:        8a3a3df1b8a85a390fb5472fd5051a8aa997f78b + current test migration
+runtime endpoints:  backend 127.0.0.1:6546 / web 127.0.0.1:5246 / bff 127.0.0.1:6246
+database:           auraboot_146
+browser execution:  57 collected / 57 passed / 0 failed / 0 skipped / 0 did-not-run (2.2m)
+unit regression:    4 files / 85 passed / 0 failed
+browser artifacts:  web-admin/test-results/unified-designer-full-green-candidate/
+```
+
+The migration now uses flat-v4-valid fixtures and verifies real pointer drag/drop, DOM order,
+undo/redo, save requests, and API readback for sub-table, repeater, subform, action-bar,
+form-section, table, filter-bar, widget, column, filter-field, and action subtrees/leaves. Root
+container moves use top-level siblings; inside moves use compatible empty tabs. The outline and
+canvas surfaces still feed the same `@dnd-kit` kernel, so switching long-list reorder gestures to
+the compact outline surface removes auto-scroll geometry drift without bypassing drag/drop.
+
+Trust boundary: `./aura runtime verify oss-full-gate-wt` is still invalid because this legacy
+verification runtime has no immutable source-set descriptor, its live backend/Web/BFF PIDs are
+unregistered, and no canonical product runtime manifest was published. The services are healthy
+and the browser tests truly executed, but this result must be reported as targeted functional
+evidence, not a trusted full-gate PASS. A fresh, correctly registered runtime plus the entire OSS
+regular/deep gate is still required before closing the overall gate debt.
+
 ## Fixes delivered (this branch)
 
 1. **OSS scope debt — independent applications** (`oss-scope.json`): excluded
@@ -62,9 +91,10 @@ log:               /tmp/oss-regular-146.log
 
 All changes typecheck (`pnpm typecheck` clean) and `./scripts/check-test-system.sh` PASSes.
 
-## Remaining failure families (verified root causes)
+## Remaining failure families (verified root causes from the 2026-09-28 full run)
 
-1. **v3→v4 flat-contract migration debt — 57 cases, `unified-designer-kind-and-binding.spec.ts`**.
+1. **v3→v4 flat-contract migration debt — 57 cases, `unified-designer-kind-and-binding.spec.ts`**
+   (**resolved in the 2026-09-29 targeted follow-up; full OSS gate not yet rerun**).
    With the boot fixed, these reach their assertions and fail on one delta: the seeds still
    POST `schemaVersion: 3` tree documents and the assertions still expect the legacy
    `form_root`-nested readback, while the designer save persists the v4 flattened top-level

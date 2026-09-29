@@ -25,6 +25,8 @@ import type { PageSchemaV3 } from '../../../app/plugins/core-designer/components
 type TestBlock = {
   id: string;
   blockType?: string;
+  title?: string;
+  field?: string;
   actionType?: string;
   widgetType?: string;
   layout?: Record<string, unknown>;
@@ -310,13 +312,17 @@ async function createCrossContainerSubTableFormPage(
         },
       ],
     },
-    {
-      id: 'tabs_holder',
-      blockType: 'tabs',
-      title: 'Tabs holder',
-      span: 12,
-      tabs: [{ id: 'tab_empty', key: 'tab_empty', label: { en: 'Empty tab' }, blocks: [] }],
-    },
+    ...(options.emptyTarget
+      ? [
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            span: 12,
+            blocks: [{ id: 'tab_empty', blockType: 'tab', title: 'Empty target tab', blocks: [] }],
+          },
+        ]
+      : []),
   ];
   const resp = await page.request.post('/api/pages', {
     data: postFlatPageDoc({
@@ -352,68 +358,72 @@ async function createCrossContainerAdvancedContainerFormPage(
   const pageKey = `udw_${blockType}_move_${id}`;
   const candidateId = `${blockType}_move_candidate`;
   const targetId = `${blockType}_target`;
-  const targetBlocks = options.emptyTarget
-    ? []
-    : [
+  const rootBlocks: TestBlock[] = [
+    {
+      id: 'section_source',
+      blockType: 'form-section',
+      title: 'Source section',
+      fields: [
         {
-          id: targetId,
-          blockType,
-          title: `Target ${blockType}`,
-          layout: { span: 12 },
-          blocks: createAdvancedContainerChildren(blockType, 'target'),
+          id: 'field_source_name',
+          blockType: 'field',
+          field: 'name',
+          layout: { span: 6 },
+          props: { label: 'Source name', component: 'input' },
         },
-      ];
+      ],
+      span: 12,
+    },
+    ...(options.emptyTarget
+      ? []
+      : [
+          {
+            id: targetId,
+            blockType,
+            title: `Target ${blockType}`,
+            span: 12,
+            blocks: createAdvancedContainerChildren(blockType, 'target'),
+          },
+        ]),
+    {
+      id: candidateId,
+      blockType,
+      title: `Move candidate ${blockType}`,
+      span: 12,
+      blocks: createAdvancedContainerChildren(blockType, 'candidate'),
+    },
+    ...(options.emptyTarget
+      ? [
+          {
+            id: 'tabs_holder',
+            blockType: 'tabs',
+            title: 'Tabs holder',
+            span: 12,
+            blocks: [{ id: 'tab_empty', blockType: 'tab', title: 'Empty target tab', blocks: [] }],
+          },
+        ]
+      : []),
+  ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} move ${id}`,
       pageKey,
       title: `UDW ${blockType} move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Form root',
           dataSource: { model: 'page_schema' },
           layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_source',
-              blockType: 'form-section',
-              title: 'Source section',
-              layout: { span: 12 },
-              blocks: [
-                {
-                  id: 'field_source_name',
-                  blockType: 'field',
-                  field: 'name',
-                  layout: { span: 6 },
-                  props: { label: 'Source name', component: 'input' },
-                },
-                {
-                  id: candidateId,
-                  blockType,
-                  title: `Move candidate ${blockType}`,
-                  layout: { span: 12 },
-                  blocks: createAdvancedContainerChildren(blockType, 'candidate'),
-                },
-              ],
-            },
-            {
-              id: 'section_target',
-              blockType: 'form-section',
-              title: 'Target section',
-              layout: { span: 12 },
-              blocks: targetBlocks,
-            },
-          ],
+          blocks: rootBlocks,
         },
       ],
       extension: { e2e: true, scenario: `unified-designer-${blockType}-cross-container-move` },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1965,7 +1975,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+    await dragOutlineRowBefore(page, 'sub_table_move_candidate', 'sub_table_target');
 
     const workbench = page.getByTestId('unified-designer-workbench');
     await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
@@ -1984,7 +1994,6 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
-      'tabs_holder',
     ]);
     expect(findBlock(savedBlocks, 'sub_table_move_candidate')?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_title',
@@ -2027,7 +2036,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
+    await dragOutlineRowBefore(page, 'sub_table_move_candidate', 'sub_table_target');
 
     const workbench = page.getByTestId('unified-designer-workbench');
     await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
@@ -2058,7 +2067,6 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
-      'tabs_holder',
     ]);
   });
 
@@ -2100,7 +2108,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   });
 
   for (const blockType of ['repeater', 'subform'] as const) {
-    test(`moves an existing ${blockType} subtree before another ${blockType} in a different section`, async ({
+    test(`moves an existing ${blockType} subtree before another ${blockType} at the page root`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
@@ -2110,14 +2118,11 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+      await dragOutlineRowBefore(page, movedBlockId, targetBlockId);
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${targetBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      const workbench = page.getByTestId('unified-designer-workbench');
+      await expect(page.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
@@ -2127,15 +2132,15 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
-
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual([
+        'section_source',
+        movedBlockId,
+        targetBlockId,
+      ]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
-    test(`moves an existing ${blockType} subtree inside an empty section and preserves children`, async ({
+    test(`moves an existing ${blockType} subtree inside an empty tab and preserves children`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
@@ -2146,12 +2151,10 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+      await dragCanvasBlockInto(page, movedBlockId, 'tab_empty');
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
@@ -2161,11 +2164,10 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
+      const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual(['section_source', 'tabs_holder']);
+      expect(savedTab?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
@@ -2179,29 +2181,22 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockBeforeHeader(page, movedBlockId, targetBlockId);
+      await dragOutlineRowBefore(page, movedBlockId, targetBlockId);
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      const workbench = page.getByTestId('unified-designer-workbench');
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
       await waitForDesignerDragToSettle(page);
 
       await clickDesignerToolbarButton(page, 'designer-undo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      expect(await isBeforeInDom(workbench, targetBlockId, movedBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
       await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
       await clickDesignerToolbarButton(page, 'designer-redo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      expect(await isBeforeInDom(targetSection, movedBlockId, targetBlockId)).toBe(true);
+      expect(await isBeforeInDom(workbench, movedBlockId, targetBlockId)).toBe(true);
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
@@ -2211,15 +2206,15 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
-
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId, targetBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual([
+        'section_source',
+        movedBlockId,
+        targetBlockId,
+      ]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
 
-    test(`undoes and redoes moving a ${blockType} subtree inside an empty section`, async ({
+    test(`undoes and redoes moving a ${blockType} subtree inside an empty tab`, async ({
       page,
     }) => {
       const movedBlockId = `${blockType}_move_candidate`;
@@ -2230,27 +2225,23 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, movedBlockId, 'section_target');
+      await dragCanvasBlockInto(page, movedBlockId, 'tab_empty');
 
-      const sourceSection = page.getByTestId('canvas-block-section_source');
-      const targetSection = page.getByTestId('canvas-block-section_target');
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
       await waitForDesignerDragToSettle(page);
 
       await clickDesignerToolbarButton(page, 'designer-undo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      expect(await isBeforeInDom(sourceSection, 'field_source_name', movedBlockId)).toBe(true);
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
+      await expect(page.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
       await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
       await clickDesignerToolbarButton(page, 'designer-redo');
 
-      await expect(sourceSection.getByTestId(`canvas-block-${movedBlockId}`)).toHaveCount(0);
-      await expect(targetSection.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
+      await expect(tabsHolder.getByTestId(`canvas-block-${movedBlockId}`)).toBeVisible();
       await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
       await saveDesignerPage(page, pid);
@@ -2260,11 +2251,10 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       const readbackBody = await readback.json();
       expect(readbackBody.code).toBe('0');
       const savedBlocks = readbackBody.data.blocks as TestBlock[];
-      const savedSource = findBlock(savedBlocks, 'section_source');
-      const savedTarget = findBlock(savedBlocks, 'section_target');
+      const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-      expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-      expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
+      expect(savedBlocks.map((block) => block.id)).toEqual(['section_source', 'tabs_holder']);
+      expect(savedTab?.blocks?.map((block) => block.id)).toEqual([movedBlockId]);
       expectAdvancedContainerChildren(savedBlocks, blockType, movedBlockId);
     });
   }
@@ -3139,11 +3129,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      if (parentType === 'action-bar') {
-        await dragCanvasBlockBeforeHeader(page, candidateId, targetLeafId);
-      } else {
-        await dragCanvasBlockBefore(page, candidateId, targetLeafId);
-      }
+      await dragOutlineRowBefore(page, candidateId, targetLeafId);
 
       const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
       const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
@@ -3204,7 +3190,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
       await page.getByTestId('designer-mode-layout').click();
-      await dragCanvasBlockInto(page, candidateId, targetParentId);
+      await dragOutlineRowBefore(page, candidateId, targetParentId);
 
       const sourceParent = page.getByTestId(`canvas-block-${sourceParentId}`);
       const targetParent = page.getByTestId(`canvas-block-${targetParentId}`);
@@ -3548,6 +3534,28 @@ async function dragCanvasBlockBeforeHeader(page: Page, sourceBlockId: string, ta
   await page.mouse.move(targetX, targetY, { steps: 18 });
   await page.mouse.move(targetX + 3, targetY + 3, { steps: 4 });
   await page.mouse.up();
+}
+
+async function dragOutlineRowBefore(page: Page, sourceBlockId: string, targetBlockId: string) {
+  const sourceRow = page.getByTestId(`outline-item-${sourceBlockId}`);
+  const targetRow = page.getByTestId(`outline-item-${targetBlockId}`);
+  await expect(sourceRow).toBeVisible();
+  await expect(targetRow).toBeVisible();
+
+  const src = await sourceRow.boundingBox();
+  const dst = await targetRow.boundingBox();
+  expect(src && dst).toBeTruthy();
+  const sourceX = src!.x + src!.width / 2;
+  const sourceY = src!.y + src!.height / 2;
+  const targetX = dst!.x + dst!.width / 2;
+  const targetY = dst!.y + dst!.height / 2;
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  await page.mouse.move(sourceX + 8, sourceY + 8, { steps: 6 });
+  await page.mouse.move(targetX, targetY, { steps: 14 });
+  await page.mouse.move(targetX + 2, targetY + 2, { steps: 4 });
+  await page.mouse.up();
+  await waitForDesignerDragToSettle(page);
 }
 
 async function dragCanvasBlockInto(page: Page, sourceBlockId: string, parentBlockId: string) {
