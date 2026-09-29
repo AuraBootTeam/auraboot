@@ -26,6 +26,7 @@ import com.auraboot.framework.tenant.dto.TenantSelectionResponse;
 import com.auraboot.framework.tenant.service.TenantApplicationService;
 import com.auraboot.framework.application.release.ApplicationReleaseControlService;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.tenant.service.TenantBootstrapService;
 import com.auraboot.framework.tenant.service.TenantInviteService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
@@ -94,6 +95,9 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
 
     @Autowired
     private ApplicationReleaseControlService applicationReleaseControlService;
+
+    @Autowired
+    private IdempotencyService idempotencyService;
 
     @Autowired
     private com.auraboot.framework.application.release.ApplicationReleaseTenantInitializer applicationReleaseTenantInitializer;
@@ -193,6 +197,16 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         if (!systemModeService.isTenantSelfProvisioningAllowed()) {
             throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
                     "Tenant self-provisioning is disabled for this deployment");
+        }
+        Long requestScopeTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : 0L;
+        String operationCode = "tenant.create.user." + user.getId();
+        Map<String, Object> requestIntent = tenantCreationIntent(request, user.getId());
+        Map<String, Object> replay = request.getClientRequestId() == null || request.getClientRequestId().isBlank()
+                ? null
+                : idempotencyService.claimScopedIdempotency(
+                        request.getClientRequestId(), operationCode, requestIntent, requestScopeTenantId);
+        if (replay != null) {
+            return tenantCreationResponse(replay);
         }
         TenantSelectionResponse response = new TenantSelectionResponse();
 
@@ -302,6 +316,51 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         response.setJwt(newJwt);
         response.setNeedsApproval(false);
 
+        if (request.getClientRequestId() != null && !request.getClientRequestId().isBlank()) {
+            idempotencyService.recordScopedOutcome(
+                    request.getClientRequestId(), operationCode, requestIntent,
+                    tenantCreationOutcome(response), requestScopeTenantId);
+        }
+
+        return response;
+    }
+
+    private static Map<String, Object> tenantCreationIntent(TenantSelectionRequest request, Long userId) {
+        Map<String, Object> intent = new LinkedHashMap<>();
+        intent.put("userId", userId);
+        intent.put("tenantName", Objects.toString(request.getTenantName(), ""));
+        intent.put("displayName", Objects.toString(request.getDisplayName(), ""));
+        intent.put("industry", Objects.toString(request.getIndustry(), ""));
+        intent.put("contactEmail", Objects.toString(request.getContactEmail(), ""));
+        intent.put("contactPhone", Objects.toString(request.getContactPhone(), ""));
+        intent.put("description", Objects.toString(request.getDescription(), ""));
+        return intent;
+    }
+
+    private static Map<String, Object> tenantCreationOutcome(TenantSelectionResponse response) {
+        Map<String, Object> outcome = new LinkedHashMap<>();
+        outcome.put("status", Objects.toString(response.getStatus(), ""));
+        outcome.put("message", Objects.toString(response.getMessage(), ""));
+        outcome.put("tenantId", response.getTenantId());
+        outcome.put("tenantName", Objects.toString(response.getTenantName(), ""));
+        outcome.put("jwt", Objects.toString(response.getJwt(), ""));
+        outcome.put("needsApproval", response.getNeedsApproval());
+        return outcome;
+    }
+
+    private static TenantSelectionResponse tenantCreationResponse(Map<String, Object> outcome) {
+        TenantSelectionResponse response = new TenantSelectionResponse();
+        response.setStatus(Objects.toString(outcome.get("status"), null));
+        response.setMessage(Objects.toString(outcome.get("message"), null));
+        Object tenantId = outcome.get("tenantId");
+        if (tenantId instanceof Number number) {
+            response.setTenantId(number.longValue());
+        } else if (tenantId != null) {
+            response.setTenantId(Long.valueOf(tenantId.toString()));
+        }
+        response.setTenantName(Objects.toString(outcome.get("tenantName"), null));
+        response.setJwt(Objects.toString(outcome.get("jwt"), null));
+        response.setNeedsApproval(Boolean.TRUE.equals(outcome.get("needsApproval")));
         return response;
     }
 
