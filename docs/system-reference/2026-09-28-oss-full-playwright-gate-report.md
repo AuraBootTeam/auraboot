@@ -35,12 +35,12 @@ against the live slot-146 backend/Web/BFF stack. This is a targeted regression r
 replacement for the 2026-09-28 full OSS gate result above.
 
 ```text
-base commit:        8a3a3df1b8a85a390fb5472fd5051a8aa997f78b + current test migration
+base commit:        07852d4db2051d0b760646665396c3092f8e36db + final widget drag stabilization
 runtime endpoints:  backend 127.0.0.1:6546 / web 127.0.0.1:5246 / bff 127.0.0.1:6246
 database:           auraboot_146
-browser execution:  57 collected / 57 passed / 0 failed / 0 skipped / 0 did-not-run (2.2m)
+browser execution:  57 collected / 57 passed / 0 failed / 0 skipped / 0 did-not-run (2.0m)
 unit regression:    4 files / 85 passed / 0 failed
-browser artifacts:  web-admin/test-results/unified-designer-full-green-candidate/
+browser artifacts:  web-admin/test-results/unified-designer-post-main-merge-final/
 ```
 
 The migration now uses flat-v4-valid fixtures and verifies real pointer drag/drop, DOM order,

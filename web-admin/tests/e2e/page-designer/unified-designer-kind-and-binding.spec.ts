@@ -2954,7 +2954,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'widget_move_candidate', 'tab_empty');
+    await dragOutlineRowBefore(page, 'widget_move_candidate', 'tab_empty');
 
     const listRoot = page.getByTestId('canvas-block-list_root');
     const targetTab = page.getByTestId('canvas-block-tab_empty');
