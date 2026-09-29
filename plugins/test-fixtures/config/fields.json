@@ -748,7 +748,7 @@
     "code": "e2et_crm_opp_amount",
     "displayName:zh-CN": "商机金额",
     "displayName:en": "Opportunity Amount",
-    "dataType": "number",
+    "dataType": "decimal",
     "description": "Opportunity amount"
   }
 ]
