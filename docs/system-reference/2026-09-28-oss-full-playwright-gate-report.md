@@ -108,7 +108,12 @@ All changes typecheck (`pnpm typecheck` clean) and `./scripts/check-test-system.
 2. **No LLM provider — ~35 cases** (`ai/knowledge-*`, `ai/form-draft-fill`, `aurabot/chat-bi-*`,
    `aurabot/behavior-*`, `aurabot/competitive-intelligence-*`). Runtime evidence:
    `"No LLM provider configured for agent: aurabot"`. These need a provider contract
-   (real key or a scripted fake) or a dedicated LLM-gated profile; not a code defect.
+   (real key or a scripted fake) or a dedicated LLM-gated profile. This is a mixed family,
+   not a valid whole-file exclusion: the same 19 files also contain already-passing permission
+   and safety cases, deliberate no-provider assertions, provider-independent UI/API coverage,
+   and failures caused by unrelated contract drift. The 2026-09-29 audit therefore keeps all
+   19 files in the OSS denominator until case-level selection or a separately executable,
+   evidence-producing provider profile exists.
 3. **`meta.command.execute` deny-by-default vs direct-backend API tests — ~15 cases**
    (`cross-field-validation` 6, `platform/command-pipeline` 5, `multi-tenant-isolation`,
    `rbac-platform-baseline`, `cross-tenant-grants`). These log into the backend directly and
