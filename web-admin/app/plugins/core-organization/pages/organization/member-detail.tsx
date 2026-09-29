@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useFetcher } from 'react-router';
 import {
   ArrowLeftIcon,
   UserIcon,
   BuildingOfficeIcon,
   UserGroupIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useAuth } from '~/contexts/AuthContext';
 
 // --- Types ---
 
@@ -25,7 +27,6 @@ interface UserInfo {
 
 interface MemberData {
   pid: string;
-  userId: number;
   status: string;
   joinDate: string | null;
   leaveDate: string | null;
@@ -59,6 +60,19 @@ interface TeamMembership {
   joinedAt: string;
 }
 
+interface ImpersonationAuditRecord {
+  sessionPid: string;
+  operatorDisplayName: string;
+  authorizationMethod: string;
+  reason: string;
+  reference: string | null;
+  clientType: string | null;
+  status: 'active' | 'ended' | 'expired';
+  startedAt: string;
+  expiresAt: string;
+  endedAt: string | null;
+}
+
 // --- Status config ---
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -79,14 +93,23 @@ export default function MemberDetailPage() {
   const navigate = useNavigate();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { locale } = useI18n();
+  const { hasPermission } = useAuth();
+  const impersonationFetcher = useFetcher<{ ok?: boolean; error?: string }>();
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const [member, setMember] = useState<MemberData | null>(null);
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'org' | 'teams' | 'accessHistory'>('basic');
+  const [accessHistory, setAccessHistory] = useState<ImpersonationAuditRecord[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showImpersonationDialog, setShowImpersonationDialog] = useState(false);
+
+  useEffect(() => {
+    if (impersonationFetcher.data?.ok) window.location.assign('/');
+  }, [impersonationFetcher.data]);
 
   const loadData = useCallback(async () => {
     if (!memberPid) return;
@@ -136,6 +159,24 @@ export default function MemberDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!memberPid || activeTab !== 'accessHistory' || historyLoaded) return;
+    (async () => {
+      try {
+        const result = await get<ImpersonationAuditRecord[]>('/api/impersonation-sessions/history', {
+          targetMemberPid: memberPid,
+          limit: '50',
+        });
+        if (!ResultHelper.isSuccess(result)) throw new Error(result.desc || 'Failed to load access history');
+        setAccessHistory(result.data || []);
+      } catch (error: any) {
+        showErrorToast(error.message || l('加载代登录记录失败', 'Failed to load access history'));
+      } finally {
+        setHistoryLoaded(true);
+      }
+    })();
+  }, [activeTab, historyLoaded, l, memberPid, showErrorToast]);
 
   // --- Action handlers ---
 
@@ -217,14 +258,18 @@ export default function MemberDetailPage() {
     member.user?.realName ||
     member.user?.username ||
     member.user?.email ||
-    `User #${member.userId}`;
-  const accountName = member.user?.username || `User #${member.userId}`;
+    l('客户账户', 'Customer account');
+  const accountName =
+    member.user?.username || member.user?.email || l('客户账户', 'Customer account');
   const avatarText = (displayName || accountName).charAt(0).toUpperCase();
 
   const tabs = [
     { key: 'basic' as const, label: l('基本信息', 'Basic Info'), icon: UserIcon },
     { key: 'org' as const, label: l('组织信息', 'Organization'), icon: BuildingOfficeIcon },
     { key: 'teams' as const, label: l('团队', 'Teams'), icon: UserGroupIcon, count: teams.length },
+    ...(member.user && hasPermission('admin.customer.impersonate')
+      ? [{ key: 'accessHistory' as const, label: l('代登录记录', 'Access history'), icon: ClockIcon }]
+      : []),
   ];
 
   return (
@@ -254,7 +299,9 @@ export default function MemberDetailPage() {
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-gray-700 dark:text-gray-300">{accountName}</span>
-                {member.user?.email && <span>{member.user.email}</span>}
+                {member.user?.email && member.user.email !== accountName && (
+                  <span>{member.user.email}</span>
+                )}
                 {member.user?.phone && <span>{member.user.phone}</span>}
               </p>
             </div>
@@ -283,6 +330,15 @@ export default function MemberDetailPage() {
         )}
         {member.status === 'active' && (
           <>
+            {member.user && hasPermission('admin.customer.impersonate') && (
+              <ActionButton
+                onClick={() => setShowImpersonationDialog(true)}
+                disabled={actionLoading}
+                variant="primary"
+              >
+                {l('代客户登录', 'Access as customer')}
+              </ActionButton>
+            )}
             <ActionButton onClick={doSuspend} disabled={actionLoading} variant="warning">
               {l('暂停', 'Suspend')}
             </ActionButton>
@@ -300,6 +356,110 @@ export default function MemberDetailPage() {
           {l('删除', 'Delete')}
         </ActionButton>
       </div>
+
+      {showImpersonationDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setShowImpersonationDialog(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="impersonation-dialog-title"
+            data-testid="impersonation-dialog"
+          >
+            <h2
+              id="impersonation-dialog-title"
+              className="text-xl font-semibold text-gray-950 dark:text-white"
+            >
+              {l('代客户登录', 'Access as customer')}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              {l(
+                `将以 ${displayName} 的权限操作 30 分钟。请记录客户授权方式和本次用途。`,
+                `You will use ${displayName}'s permissions for 30 minutes. Record the customer's authorization and purpose.`,
+              )}
+            </p>
+            <impersonationFetcher.Form
+              method="post"
+              action="/_action/start-impersonation"
+              className="mt-5 space-y-4"
+            >
+              <input type="hidden" name="targetMemberPid" value={member.pid} />
+              <label className="block">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {l('授权方式', 'Authorization method')}
+                </span>
+                <select
+                  name="authorizationMethod"
+                  required
+                  defaultValue="offline"
+                  className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="offline">{l('线下授权', 'Offline authorization')}</option>
+                  <option value="phone">{l('电话授权', 'Phone authorization')}</option>
+                  <option value="wechat">{l('微信授权', 'WeChat authorization')}</option>
+                  <option value="email">{l('邮件授权', 'Email authorization')}</option>
+                  <option value="other">{l('其他', 'Other')}</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {l('操作原因', 'Reason')}
+                </span>
+                <textarea
+                  name="reason"
+                  required
+                  maxLength={500}
+                  rows={3}
+                  placeholder={l('例如：协助客户检查订单状态', 'For example: help review an order')}
+                  className="mt-1.5 w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {l('授权凭据说明（选填）', 'Authorization reference (optional)')}
+                </span>
+                <input
+                  name="reference"
+                  maxLength={200}
+                  placeholder={l('例如：9 月 24 日门店现场授权', 'For example: in-store approval on Sep 24')}
+                  className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </label>
+              {impersonationFetcher.data?.error && (
+                <p className="text-sm font-medium text-red-600 dark:text-red-400" role="alert">
+                  {impersonationFetcher.data.error}
+                </p>
+              )}
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowImpersonationDialog(false)}
+                  disabled={impersonationFetcher.state !== 'idle'}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  {l('取消', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={impersonationFetcher.state !== 'idle'}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  data-testid="confirm-impersonation"
+                >
+                  {impersonationFetcher.state !== 'idle'
+                    ? l('正在进入…', 'Starting…')
+                    : l('确认并进入', 'Confirm and continue')}
+                </button>
+              </div>
+            </impersonationFetcher.Form>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -339,7 +499,64 @@ export default function MemberDetailPage() {
         {activeTab === 'basic' && <BasicInfoTab member={member} displayName={displayName} l={l} />}
         {activeTab === 'org' && <OrgInfoTab employee={employee} l={l} />}
         {activeTab === 'teams' && <TeamsTab teams={teams} l={l} navigate={navigate} />}
+        {activeTab === 'accessHistory' && (
+          <AccessHistoryTab records={accessHistory} loaded={historyLoaded} l={l} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function AccessHistoryTab({
+  records,
+  loaded,
+  l,
+}: {
+  records: ImpersonationAuditRecord[];
+  loaded: boolean;
+  l: (zh: string, en: string) => string;
+}) {
+  if (!loaded) {
+    return <div className="p-6 py-12 text-center text-gray-500 dark:text-gray-400">{l('正在加载…', 'Loading…')}</div>;
+  }
+  if (records.length === 0) {
+    return (
+      <div className="p-6 py-12 text-center text-gray-500 dark:text-gray-400">
+        <ClockIcon className="mx-auto mb-3 h-10 w-10 opacity-40" />
+        <p>{l('暂无代登录记录', 'No customer-access history')}</p>
+      </div>
+    );
+  }
+  const statusText: Record<ImpersonationAuditRecord['status'], string> = {
+    active: l('进行中', 'Active'),
+    ended: l('已结束', 'Ended'),
+    expired: l('已到期', 'Expired'),
+  };
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-900">
+          <tr>
+            {[l('操作人', 'Operator'), l('授权方式', 'Authorization'), l('操作原因', 'Reason'), l('开始时间', 'Started'), l('状态', 'Status')].map((label) => (
+              <th key={label} className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          {records.map((record) => (
+            <tr key={record.sessionPid}>
+              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{record.operatorDisplayName}</td>
+              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{record.authorizationMethod}</td>
+              <td className="max-w-sm px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                <p>{record.reason}</p>
+                {record.reference && <p className="mt-1 text-xs text-gray-500">{record.reference}</p>}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{formatDateTime(record.startedAt)}</td>
+              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{statusText[record.status]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

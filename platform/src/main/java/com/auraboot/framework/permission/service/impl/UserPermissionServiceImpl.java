@@ -194,26 +194,42 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     @Override
     @Observed(name = "permission.check", contextualName = "permission-check")
     public boolean hasPermission(Long userId, String permissionCode) {
-        if (userId == null || permissionCode == null || permissionCode.isEmpty()) {
-            log.warn("Invalid parameters: userId={}, permissionCode={}", userId, permissionCode);
-            return false;
-        }
-
-        log.debug("Checking permission by code: userId={}, permissionCode={}",
-            userId, permissionCode);
-
         if (!MetaContext.exists()) {
             return false;
         }
-        Long permissionId = permissionSnapshotCache.resolvePermissionId(
-                MetaContext.getCurrentTenantId(), permissionCode);
+        return hasPermission(
+                MetaContext.getCurrentTenantId(),
+                userId,
+                MetaContext.getCurrentMemberId(),
+                permissionCode);
+    }
+
+    @Override
+    public boolean hasPermission(
+            Long tenantId,
+            Long userId,
+            Long memberId,
+            String permissionCode) {
+        if (tenantId == null || userId == null || memberId == null
+                || permissionCode == null || permissionCode.isEmpty()) {
+            log.warn("Invalid explicit permission context: tenantId={}, userId={}, memberId={}, permissionCode={}",
+                    tenantId, userId, memberId, permissionCode);
+            return false;
+        }
+
+        log.debug("Checking permission by explicit member context: tenantId={}, userId={}, memberId={}, permissionCode={}",
+                tenantId, userId, memberId, permissionCode);
+
+        Long permissionId = permissionSnapshotCache.resolvePermissionId(tenantId, permissionCode);
         if (permissionId == null) {
             log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false (unregistered code)",
                 userId, permissionCode);
             return false;
         }
 
-        boolean granted = hasPermission(userId, permissionId);
+        boolean granted = permissionSnapshotCache
+                .getEffectivePermissionIds(tenantId, userId, memberId)
+                .contains(permissionId);
         log.debug("Permission check result: userId={}, permissionCode={}, hasPermission={}",
             userId, permissionCode, granted);
         return granted;

@@ -128,6 +128,15 @@ public interface UserPermissionService {
      * @return true if user has the permission
      */
     boolean hasPermission(Long userId, String permissionCode);
+
+    /**
+     * Check a permission for an explicitly identified tenant member.
+     *
+     * <p>Use this overload when the subject differs from the current request actor, such as
+     * administrative eligibility checks. It prevents the caller's member context from being
+     * reused accidentally for another user.
+     */
+    boolean hasPermission(Long tenantId, Long userId, Long memberId, String permissionCode);
     
     /**
      * Check if user has specific permission

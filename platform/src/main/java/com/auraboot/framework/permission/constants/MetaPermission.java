@@ -36,6 +36,9 @@ public final class MetaPermission {
     public static final String PARTY_READ = "party.party.read";
     public static final String PARTY_MANAGE = "party.party.manage";
 
+    /** Create short-lived, audited sessions that execute as another tenant member. */
+    public static final String CUSTOMER_IMPERSONATE = "admin.customer.impersonate";
+
     // ==================== MODEL permissions ====================
 
     /**

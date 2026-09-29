@@ -76,6 +76,19 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
+    void explicitMemberPermissionCheckDoesNotReuseCurrentActorMember() {
+        when(permissionSnapshotCache.resolvePermissionId(200L, "admin.customer.impersonate"))
+                .thenReturn(70L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(200L, 2L, 9L))
+                .thenReturn(Set.of());
+
+        assertThat(service.hasPermission(200L, 2L, 9L, "admin.customer.impersonate"))
+                .isFalse();
+        verify(permissionSnapshotCache).getEffectivePermissionIds(200L, 2L, 9L);
+        verify(permissionSnapshotCache, never()).getEffectivePermissionIds(200L, 2L, 5L);
+    }
+
+    @Test
     void unknownPermissionCodeFailsClosedWithoutLoadingUserSnapshot() {
         when(permissionSnapshotCache.resolvePermissionId(100L, "missing.code")).thenReturn(null);
 

@@ -1,5 +1,7 @@
 package com.auraboot.framework.auth.service.impl;
 
+import com.auraboot.framework.audit.entity.AdminEventLog;
+import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.mapper.UserSessionMapper;
 import com.auraboot.framework.auth.service.SessionManagementService;
@@ -34,6 +36,9 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Autowired(required = false)
     private JwtUtil jwtUtil;
 
+    @Autowired(required = false)
+    private AdminEventLogService adminEventLogService;
+
     // Throttle map: tokenHash -> lastUpdateTime (avoid DB writes on every request)
     private final ConcurrentHashMap<String, Instant> lastActiveThrottle = new ConcurrentHashMap<>();
     private static final Duration THROTTLE_DURATION = Duration.ofMinutes(5);
@@ -41,12 +46,50 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Override
     @Transactional
     public UserSession createSession(Long userId, String token, String ipAddress, String userAgent) {
+        return createSessionInternal(userId, token, null, null, null, ipAddress, userAgent);
+    }
+
+    @Override
+    @Transactional
+    public UserSession createImpersonationSession(
+            Long userId,
+            String token,
+            String authorizationMethod,
+            String reason,
+            String reference,
+            String ipAddress,
+            String userAgent) {
+        if (jwtUtil == null || !jwtUtil.extractImpersonation(token)) {
+            throw new IllegalArgumentException("A signed impersonation token is required");
+        }
+        return createSessionInternal(
+                userId, token, authorizationMethod, reason, reference, ipAddress, userAgent);
+    }
+
+    private UserSession createSessionInternal(
+            Long userId,
+            String token,
+            String authorizationMethod,
+            String reason,
+            String reference,
+            String ipAddress,
+            String userAgent) {
         UserSession session = new UserSession();
         String sid = extractSidClaim(token);
         session.setPid(sid == null ? UlidGenerator.generate() : sid);
         session.setUserId(userId);
         session.setTokenHash(hashToken(token));
         populateExecutionContext(session, token);
+        boolean impersonation = jwtUtil != null && jwtUtil.extractImpersonation(token);
+        session.setSessionKind(impersonation ? "impersonation" : "user");
+        if (impersonation) {
+            session.setInitiatedByUserId(jwtUtil.extractOperatorUserId(token));
+            session.setImpersonationExpiresAt(jwtUtil.extractExpiration(token).toInstant());
+            session.setImpersonationAuthorizationMethod(authorizationMethod);
+            session.setImpersonationReason(reason);
+            session.setImpersonationReference(reference);
+            session.setClientType(jwtUtil.extractClientType(token));
+        }
         session.setIpAddress(ipAddress);
         session.setUserAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent);
         session.setDeviceInfo(parseDeviceInfo(userAgent));
@@ -85,7 +128,10 @@ public class SessionManagementServiceImpl implements SessionManagementService {
     @Override
     public boolean isSessionValid(String token) {
         UserSession session = findByToken(token);
-        return session != null && !Boolean.TRUE.equals(session.getRevoked());
+        return session != null
+                && !Boolean.TRUE.equals(session.getRevoked())
+                && (session.getImpersonationExpiresAt() == null
+                    || session.getImpersonationExpiresAt().isAfter(Instant.now()));
     }
 
     /**
@@ -183,6 +229,29 @@ public class SessionManagementServiceImpl implements SessionManagementService {
         int removed = before - lastActiveThrottle.size();
         if (removed > 0) {
             log.debug("Cleaned up {} expired entries from lastActiveThrottle", removed);
+        }
+    }
+
+    /** Revokes expired delegated sessions and writes one terminal audit event exactly once. */
+    @Scheduled(fixedDelayString = "${security.impersonation.expiry-scan-ms:60000}")
+    @Transactional
+    public void expireImpersonationSessions() {
+        for (UserSession session : userSessionMapper.findExpiredImpersonationSessions()) {
+            if (userSessionMapper.revokeExpiredSession(session.getId()) != 1) {
+                continue;
+            }
+            if (adminEventLogService != null) {
+                adminEventLogService.record(AdminEventLog.builder()
+                        .tenantId(session.getTenantId())
+                        .actorUserId(session.getInitiatedByUserId())
+                        .actorType("user")
+                        .actionType("impersonation.expired")
+                        .resourceType("user_session")
+                        .resourcePid(session.getPid())
+                        .success(true)
+                        .reason("Delegated customer session reached its fixed expiry")
+                        .build());
+            }
         }
     }
 

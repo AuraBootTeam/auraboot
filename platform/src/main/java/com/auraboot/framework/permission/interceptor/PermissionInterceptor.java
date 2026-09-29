@@ -6,6 +6,7 @@ import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import com.auraboot.framework.permission.annotation.DisallowImpersonation;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -117,6 +118,13 @@ public class PermissionInterceptor implements HandlerInterceptor {
                             HttpServletResponse response, 
                             Object handler) throws Exception {
         
+        DisallowImpersonation impersonationRestriction = extractImpersonationRestriction(handler);
+        if (impersonationRestriction != null && MetaContext.isImpersonating()) {
+            log.warn("Security-sensitive operation denied during impersonation: endpoint={}",
+                    request.getRequestURI());
+            throw new AccessDeniedException(impersonationRestriction.value());
+        }
+
         // 1. Extract @RequirePermission annotation
         RequirePermission annotation = extractAnnotation(handler);
         if (annotation == null) {
@@ -287,6 +295,17 @@ public class PermissionInterceptor implements HandlerInterceptor {
             return true;
         }
         return handlerMethod.getBeanType().getAnnotation(AuthenticatedAccess.class) != null;
+    }
+
+    private DisallowImpersonation extractImpersonationRestriction(Object handler) {
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            return null;
+        }
+        DisallowImpersonation methodAnnotation =
+                handlerMethod.getMethodAnnotation(DisallowImpersonation.class);
+        return methodAnnotation != null
+                ? methodAnnotation
+                : handlerMethod.getBeanType().getAnnotation(DisallowImpersonation.class);
     }
 
     /**

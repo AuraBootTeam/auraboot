@@ -10,9 +10,8 @@ import { coreRoutes } from '../packages/core/route-manifest';
 const webRouteManifest = process.env.AURA_WEB_ROUTE_MANIFEST
   ? await import(/* @vite-ignore */ process.env.AURA_WEB_ROUTE_MANIFEST)
   : null;
-const APPLICATION_ROUTES: RouteConfigEntry[] = webRouteManifest?.APPLICATION_ROUTES
-  ?? webRouteManifest?.ENTERPRISE_ROUTES
-  ?? [];
+const APPLICATION_ROUTES: RouteConfigEntry[] =
+  webRouteManifest?.APPLICATION_ROUTES ?? webRouteManifest?.ENTERPRISE_ROUTES ?? [];
 const RESOURCE_ROUTES: RouteConfigEntry[] = webRouteManifest?.RESOURCE_ROUTES ?? [];
 const STANDALONE_ROUTES: RouteConfigEntry[] = webRouteManifest?.STANDALONE_ROUTES ?? [];
 const PLATFORM_ROUTES: RouteConfigEntry[] = webRouteManifest?.PLATFORM_ROUTES ?? [];
@@ -29,6 +28,8 @@ export default [
   ...RESOURCE_ROUTES,
   route('/_action/switch-space', './routes/api.switch-space.tsx'),
   route('/_action/switch-actor', './routes/api.switch-actor.tsx'),
+  route('/_action/start-impersonation', './routes/api.start-impersonation.tsx'),
+  route('/_action/end-impersonation', './routes/api.end-impersonation.tsx'),
 
   // Setup wizard (standalone, no layout wrapper, no auth required)
   route('/setup', './routes/setup/SetupWizard.tsx'),
