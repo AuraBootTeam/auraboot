@@ -72,6 +72,33 @@ trap cleanup EXIT
 
 echo "[rbac-golden-run] === RBAC platform-baseline golden — name=$NAME slot=$SLOT mode=$RUNTIME_MODE repeat=$REPEAT ==="
 
+# 0/4 GC — concurrent sessions routinely leave DEAD verification stacks
+# resident (backend process gone, resident entry kept), which exhausts the
+# ephemeral class capacity and blocks allocation. Close any owner whose
+# SERVER_PORT has no listener. Skips live stacks unconditionally.
+gc_dead_owners() {
+  local ws1="$REPO_ROOT/../.workspace/env"
+  local ws2="/Users/ghj/work/auraboot/auraboot-workspace"
+  local R="$SCRIPT_DIR/../../../scripts/dev/runtime.sh"
+  [ -x "$R" ] || R="/Users/ghj/work/auraboot/scripts/dev/runtime.sh"
+  local env_file name port closed=0
+  for env_file in "$ws1"/*.env "$ws2"/*.env; do
+    [ -f "$env_file" ] || continue
+    name="$(basename "$env_file" .env)"
+    [ "$name" = "$NAME" ] && continue
+    port="$(grep -E '^SERVER_PORT=' "$env_file" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
+    [ -n "$port" ] || continue
+    if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      continue  # alive — concurrent session, leave it alone
+    fi
+    echo "[rbac-golden-run] GC: closing dead resident owner '$name' (port $port has no listener)"
+    bash "$R" close "$name" >/dev/null 2>&1 || true
+    closed=$((closed + 1))
+  done
+  echo "[rbac-golden-run] GC: closed $closed dead owner(s)"
+}
+gc_dead_owners
+
 # 1. Fresh isolated stack (destroy any prior instance of this name first so the DB is
 #    always freshly bootstrapped — guards against a stale-slot role model).
 echo "[rbac-golden-run] 1/4 fresh stack (destroy prior + up + import)"
