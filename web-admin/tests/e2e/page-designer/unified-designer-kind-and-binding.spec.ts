@@ -254,87 +254,87 @@ async function createCrossContainerSubTableFormPage(
 ): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_sub_table_move');
   const pageKey = `udw_sub_table_move_${id}`;
-  const targetBlocks = options.emptyTarget
-    ? []
-    : [
+  // v4 dialect: sections carry fields only, so cross-container container moves
+  // are re-based onto top-level siblings and an empty tab as the move target.
+  const rootBlocks = [
+    {
+      id: 'section_source',
+      blockType: 'form-section',
+      title: 'Source section',
+      fields: [
         {
-          id: 'sub_table_target',
-          blockType: 'sub-table',
-          title: 'Target items',
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'target_col_status',
-              blockType: 'column',
-              field: 'status',
-              props: { label: 'Target status' },
-            },
-          ],
+          id: 'field_source_name',
+          blockType: 'field',
+          field: 'name',
+          layout: { span: 6 },
+          props: { label: 'Source name', component: 'input' },
         },
-      ];
+      ],
+      span: 12,
+    },
+    ...(options.emptyTarget
+      ? []
+      : [
+          {
+            id: 'sub_table_target',
+            blockType: 'sub-table',
+            title: 'Target items',
+            span: 12,
+            blocks: [
+              {
+                id: 'target_col_status',
+                blockType: 'column',
+                field: 'status',
+                props: { label: 'Target status' },
+              },
+            ],
+          },
+        ]),
+    {
+      id: 'sub_table_move_candidate',
+      blockType: 'sub-table',
+      title: 'Move candidate items',
+      span: 12,
+      blocks: [
+        {
+          id: 'candidate_col_title',
+          blockType: 'column',
+          field: 'name',
+          props: { label: 'Candidate title' },
+        },
+        {
+          id: 'candidate_action_add',
+          blockType: 'action',
+          actionType: 'create',
+          props: { label: 'Add item' },
+        },
+      ],
+    },
+    {
+      id: 'tabs_holder',
+      blockType: 'tabs',
+      title: 'Tabs holder',
+      span: 12,
+      tabs: [{ id: 'tab_empty', key: 'tab_empty', label: { en: 'Empty tab' }, blocks: [] }],
+    },
+  ];
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW sub table move ${id}`,
       pageKey,
       title: `UDW sub table move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      extension: { e2e: true, scenario: 'unified-designer-sub-table-cross-container-move' },
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
           title: 'Form root',
-          dataSource: { model: 'page_schema' },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_source',
-              blockType: 'form-section',
-              title: 'Source section',
-              layout: { span: 12 },
-              blocks: [
-                {
-                  id: 'field_source_name',
-                  blockType: 'field',
-                  field: 'name',
-                  layout: { span: 6 },
-                  props: { label: 'Source name', component: 'input' },
-                },
-                {
-                  id: 'sub_table_move_candidate',
-                  blockType: 'sub-table',
-                  title: 'Move candidate items',
-                  layout: { span: 12 },
-                  blocks: [
-                    {
-                      id: 'candidate_col_title',
-                      blockType: 'column',
-                      field: 'name',
-                      props: { label: 'Candidate title' },
-                    },
-                    {
-                      id: 'candidate_action_add',
-                      blockType: 'action',
-                      actionType: 'create',
-                      props: { label: 'Add item' },
-                    },
-                  ],
-                },
-              ],
-            },
-            {
-              id: 'section_target',
-              blockType: 'form-section',
-              title: 'Target section',
-              layout: { span: 12 },
-              blocks: targetBlocks,
-            },
-          ],
+          blocks: rootBlocks,
         },
       ],
-      extension: { e2e: true, scenario: 'unified-designer-sub-table-cross-container-move' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1959,7 +1959,7 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['field_move_candidate']);
   });
 
-  test('moves an existing sub-table subtree before another sub-table in a different section', async ({ page }) => {
+  test('moves an existing sub-table subtree before another sub-table at the page root', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page);
     await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
@@ -1967,12 +1967,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await page.getByTestId('designer-mode-layout').click();
     await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_target')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    const workbench = page.getByTestId('unified-designer-workbench');
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
@@ -1982,33 +1979,29 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
+      'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
+      'tabs_holder',
     ]);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+    expect(findBlock(savedBlocks, 'sub_table_move_candidate')?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_title',
       'candidate_action_add',
     ]);
   });
 
-  test('moves an existing sub-table subtree inside an empty section and preserves children', async ({ page }) => {
+  test('moves an existing sub-table subtree inside an empty tab and preserves children', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
     await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'tab_empty');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
@@ -2018,13 +2011,11 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+    const savedTab = findBlock(savedBlocks, 'tab_empty');
+    const savedCandidate = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedTab?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
+    expect(savedCandidate?.blocks?.map((block) => block.id)).toEqual([
       'candidate_col_title',
       'candidate_action_add',
     ]);
@@ -2038,27 +2029,21 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     await page.getByTestId('designer-mode-layout').click();
     await dragCanvasBlockBeforeHeader(page, 'sub_table_move_candidate', 'sub_table_target');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    const workbench = page.getByTestId('unified-designer-workbench');
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await waitForDesignerDragToSettle(page);
 
     await clickDesignerToolbarButton(page, 'designer-undo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    expect(await isBeforeInDom(workbench, 'sub_table_target', 'sub_table_move_candidate')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
     await clickDesignerToolbarButton(page, 'designer-redo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    expect(await isBeforeInDom(targetSection, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
+    expect(await isBeforeInDom(workbench, 'sub_table_move_candidate', 'sub_table_target')).toBe(true);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
@@ -2068,48 +2053,38 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
+      'section_source',
       'sub_table_move_candidate',
       'sub_table_target',
-    ]);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
-      'candidate_col_title',
-      'candidate_action_add',
+      'tabs_holder',
     ]);
   });
 
-  test('undoes and redoes moving a sub-table subtree inside an empty section', async ({ page }) => {
+  test('undoes and redoes moving a sub-table subtree inside an empty tab', async ({ page }) => {
     const { pageKey: formKey, pid } = await createCrossContainerSubTableFormPage(page, { emptyTarget: true });
     await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible();
 
     await page.getByTestId('designer-mode-layout').click();
-    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'section_target');
+    await dragCanvasBlockInto(page, 'sub_table_move_candidate', 'tab_empty');
 
-    const sourceSection = page.getByTestId('canvas-block-section_source');
-    const targetSection = page.getByTestId('canvas-block-section_target');
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    const tabsHolder = page.getByTestId('canvas-block-tabs_holder');
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await waitForDesignerDragToSettle(page);
 
     await clickDesignerToolbarButton(page, 'designer-undo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    expect(await isBeforeInDom(sourceSection, 'field_source_name', 'sub_table_move_candidate')).toBe(true);
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await expect(page.getByTestId('designer-redo')).toBeEnabled();
 
     await clickDesignerToolbarButton(page, 'designer-redo');
 
-    await expect(sourceSection.getByTestId('canvas-block-sub_table_move_candidate')).toHaveCount(0);
-    await expect(targetSection.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
+    await expect(tabsHolder.getByTestId('canvas-block-sub_table_move_candidate')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pid);
@@ -2119,16 +2094,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedSource = findBlock(savedBlocks, 'section_source');
-    const savedTarget = findBlock(savedBlocks, 'section_target');
-    const movedSubTable = findBlock(savedBlocks, 'sub_table_move_candidate');
+    const savedTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedSource?.blocks?.map((block) => block.id)).toEqual(['field_source_name']);
-    expect(savedTarget?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
-    expect(movedSubTable?.blocks?.map((block) => block.id)).toEqual([
-      'candidate_col_title',
-      'candidate_action_add',
-    ]);
+    expect(savedTab?.blocks?.map((block) => block.id)).toEqual(['sub_table_move_candidate']);
   });
 
   for (const blockType of ['repeater', 'subform'] as const) {

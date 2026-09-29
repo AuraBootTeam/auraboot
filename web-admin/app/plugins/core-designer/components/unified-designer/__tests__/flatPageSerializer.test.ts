@@ -583,6 +583,73 @@ describe('flatPageSerializer fail-fast boundaries', () => {
     ]);
   });
 
+  it('keeps registry-allowed leaf children of passthrough containers verbatim', () => {
+    const flat = serializePageTreeToFlat({
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'my_form',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'repeater_items',
+              blockType: 'repeater',
+              title: 'Items',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'repeater_field_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Item name', component: 'input' },
+                },
+              ],
+            },
+            {
+              id: 'sub_table_items',
+              blockType: 'sub-table',
+              title: 'Items table',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'candidate_col_title',
+                  blockType: 'column',
+                  field: 'name',
+                  props: { label: 'Candidate title' },
+                },
+                {
+                  id: 'candidate_action_add',
+                  blockType: 'action',
+                  actionType: 'create',
+                  props: { label: 'Add item' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(flat.blocks.map((block) => block.id)).toEqual(['repeater_items', 'sub_table_items']);
+    const repeater = flat.blocks[0];
+    expect(repeater.blocks).toEqual([
+      {
+        id: 'repeater_field_name',
+        blockType: 'field',
+        field: 'name',
+        layout: { span: 6 },
+        props: { label: 'Item name', component: 'input' },
+      },
+    ]);
+    const subTable = flat.blocks[1];
+    expect(subTable.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
   it('maps chart/stat-card widgets to their flat block types', () => {
     const flat = serializePageTreeToFlat({
       schemaVersion: 3,

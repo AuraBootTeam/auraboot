@@ -67,6 +67,9 @@ const PASSTHROUGH_BLOCK_TYPES = new Set([
   'custom',
 ]);
 
+/** Leaf block types that live inside passthrough containers and pass through verbatim. */
+const PASSTHROUGH_LEAF_TYPES = new Set(['field', 'column', 'action', 'filter-field']);
+
 export class FlatSerializationError extends Error {
   readonly issues: string[];
 
@@ -313,9 +316,19 @@ function serializePassthrough(block: DslBlockV3, issues: string[]): LegacyDslBlo
   applyCommonShape(block, flat, stripNone(block.props));
   const children = block.blocks ?? [];
   if (children.length > 0) {
-    flat.blocks = children
-      .map((child) => serializeBlock(child, issues))
-      .filter((block): block is LegacyDslBlockV2 => block !== null);
+    // Passthrough containers (repeater / subform / sub-table / columns / …)
+    // legitimately own leaf children — the registry's allowedChildren says so
+    // (repeater: field, sub-table: column + action). Routing leaves through
+    // serializeBlock would fail the save even though the passthrough contract
+    // is "nested blocks pass through unchanged", so leaves are kept verbatim
+    // and only nested *containers* keep receiving dialect conversion.
+    flat.blocks = children.map((child) => {
+      if (PASSTHROUGH_LEAF_TYPES.has(child.blockType)) {
+        return child as unknown as LegacyDslBlockV2;
+      }
+      const flat = serializeBlock(child, issues);
+      return flat ?? (child as unknown as LegacyDslBlockV2);
+    });
   }
   return flat;
 }
