@@ -13,6 +13,8 @@ import com.auraboot.framework.i18n.service.AiTranslationService;
 import com.auraboot.framework.i18n.service.I18nCoverageService;
 import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.i18n.service.I18nOverrideAuditor;
 import com.auraboot.framework.i18n.service.OrphanKeyDetector;
 import com.auraboot.framework.i18n.sync.I18nSyncService;
@@ -34,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/i18n")
 @RequiredArgsConstructor
+@RequirePermission(MetaPermission.SYSTEM_MANAGEMENT)
 public class I18nAdminController {
 
     private final I18nResourceService i18nResourceService;
