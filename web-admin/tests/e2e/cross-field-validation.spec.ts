@@ -14,23 +14,17 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { DEFAULT_TEST_ACCOUNT } from '../helpers/test-accounts';
+import { backendLoginForCommands } from '../helpers/backend-auth';
 import { BACKEND_URL } from '../helpers/environments';
 
 const uniqueId = () => `cfv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-// Helper: login and get token
+// Helper: login and get a business-space token. A raw login token pins the
+// System tenant where the admin lacks meta.command.execute (endpoint gate,
+// deny-by-default since #2041); commands must run under the business space.
 async function getToken(): Promise<string> {
-  const resp = await fetch(`${BACKEND_URL}/api/auth/login`, {
-    method: 'post',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: DEFAULT_TEST_ACCOUNT.email,
-      password: DEFAULT_TEST_ACCOUNT.password,
-    }),
-  });
-  const data = await resp.json();
-  return data.data.jwt;
+  const session = await backendLoginForCommands();
+  return session.jwt;
 }
 
 // Helper: execute command via API
