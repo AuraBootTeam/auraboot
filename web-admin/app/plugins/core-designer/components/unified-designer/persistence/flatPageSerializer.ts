@@ -35,6 +35,7 @@ const DESIGNER_ONLY_BLOCK_TYPES = new Set([
 const PASSTHROUGH_BLOCK_TYPES = new Set([
   'repeater',
   'subform',
+  'columns',
   'ai-fill-banner',
   'sub-table',
   'embedded-list',

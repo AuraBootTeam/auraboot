@@ -19,6 +19,8 @@
 import { test, expect } from '../../fixtures';
 import type { Locator, Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
+import { serializePageTreeToFlat } from '../../../app/plugins/core-designer/components/unified-designer/persistence/flatPageSerializer';
+import type { PageSchemaV3 } from '../../../app/plugins/core-designer/components/unified-designer/types';
 
 type TestBlock = {
   id: string;
@@ -28,8 +30,51 @@ type TestBlock = {
   layout?: Record<string, unknown>;
   props?: Record<string, unknown>;
   blocks?: TestBlock[];
+  fields?: Array<string | Record<string, unknown>>;
+  columns?: Array<string | Record<string, unknown>>;
+  tabs?: Array<Record<string, unknown>>;
+  span?: number;
 };
 type CreatedDesignerPage = { pageKey: string; pid: string };
+
+/**
+ * Seed helper: authors pages as readable v3 trees, then stores them through the
+ * designer's own v4 flat serializer — the exact dialect `savePageSchemaV3`
+ * persists. `designerRootId` keeps the synthetic kind-root (and therefore every
+ * outline-item-* id) stable across boot and save/reload cycles.
+ */
+function postFlatPageDoc(doc: {
+  name: string;
+  pageKey: string;
+  title: string;
+  kind: 'form' | 'list' | 'detail';
+  modelCode: string;
+  extension: Record<string, unknown>;
+  wrappedBlocks: unknown[];
+}): Record<string, unknown> {
+  const tree = {
+    schemaVersion: 3 as const,
+    kind: doc.kind,
+    id: doc.pageKey,
+    pageKey: doc.pageKey,
+    modelCode: doc.modelCode,
+    title: doc.title,
+    layout: undefined,
+    blocks: doc.wrappedBlocks,
+    extension: doc.extension,
+  } as unknown as PageSchemaV3;
+  const flat = serializePageTreeToFlat(tree);
+  return {
+    name: doc.name,
+    pageKey: doc.pageKey,
+    title: doc.title,
+    kind: doc.kind,
+    modelCode: doc.modelCode,
+    schemaVersion: flat.schemaVersion,
+    blocks: flat.blocks,
+    extension: { ...doc.extension, designerRootId: flat.rootBlockId ?? `${doc.kind}_root` },
+  };
+}
 type AdvancedContainerBlockType = 'repeater' | 'subform';
 type ListBlockMoveType = 'table' | 'filter-bar' | 'action-bar' | 'widget';
 type LeafBlockMoveType = 'column' | 'filter-field';
@@ -40,14 +85,13 @@ async function createFormPage(page: Page): Promise<CreatedDesignerPage> {
   const id = uniqueId('udw_kind');
   const pageKey = `udw_kind_${id}`;
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW kind ${id}`,
       pageKey,
       title: `UDW kind ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -81,7 +125,7 @@ async function createFormPage(page: Page): Promise<CreatedDesignerPage> {
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-kind-and-binding' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -99,26 +143,21 @@ async function createPaletteAuthoringFormPage(page: Page): Promise<CreatedDesign
       title: `UDW palette container ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
+      schemaVersion: 4,
       blocks: [
         {
-          id: 'form_root',
-          blockType: 'form',
-          title: 'Form root',
-          dataSource: { model: 'page_schema' },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: 'section_main',
-              blockType: 'form-section',
-              title: 'Main section',
-              layout: { span: 12 },
-              blocks: [],
-            },
-          ],
+          id: 'section_main',
+          blockType: 'form-section',
+          title: 'Main section',
+          fields: [],
+          span: 12,
         },
       ],
-      extension: { e2e: true, scenario: 'unified-designer-palette-container-authoring' },
+      extension: {
+        e2e: true,
+        scenario: 'unified-designer-palette-container-authoring',
+        designerRootId: 'form_root',
+      },
     },
   });
   expect(resp.ok(), await resp.text()).toBe(true);
@@ -153,14 +192,13 @@ async function createCrossContainerFormPage(
         },
       ];
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW cross container ${id}`,
       pageKey,
       title: `UDW cross container ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -201,7 +239,7 @@ async function createCrossContainerFormPage(
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-cross-container-move' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -499,14 +537,13 @@ async function createCrossContainerActionBarFormPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW action bar move ${id}`,
       pageKey,
       title: `UDW action bar move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -520,7 +557,7 @@ async function createCrossContainerActionBarFormPage(
         e2e: true,
         scenario: `unified-designer-action-bar-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -605,14 +642,13 @@ async function createCrossContainerFormSectionPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW form-section move ${id}`,
       pageKey,
       title: `UDW form-section move ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -626,7 +662,7 @@ async function createCrossContainerFormSectionPage(
         e2e: true,
         scenario: `unified-designer-form-section-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -742,14 +778,13 @@ async function createCrossContainerListBlockPage(
         ];
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} move ${id}`,
       pageKey,
       title: `UDW ${blockType} move ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -763,7 +798,7 @@ async function createCrossContainerListBlockPage(
         e2e: true,
         scenario: `unified-designer-${blockType}-${options.source}-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -812,14 +847,13 @@ async function createCrossContainerLeafBlockListPage(
   };
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ${blockType} leaf move ${id}`,
       pageKey,
       title: `UDW ${blockType} leaf move ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -833,7 +867,7 @@ async function createCrossContainerLeafBlockListPage(
         e2e: true,
         scenario: `unified-designer-${blockType}-leaf-cross-container-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -956,14 +990,13 @@ async function createCrossParentActionLeafListPage(
   );
 
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW ax ${sourceKey} to ${targetKey} ${id}`,
       pageKey,
       title: `UDW ax ${sourceKey} to ${targetKey} ${id}`,
       kind: 'list',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'list_root',
           blockType: 'list',
@@ -977,7 +1010,7 @@ async function createCrossParentActionLeafListPage(
         e2e: true,
         scenario: `unified-designer-${route.source}-to-${route.target}-action-leaf-cross-parent-move`,
       },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1074,11 +1107,11 @@ function expectListBlockChildren(
     expect(movedBlock?.blocks ?? []).toEqual([]);
     // The flat v4 metric card IS the stat-card block; the designer's
     // number-card widget converges to it on save.
-    expect(movedBlock?.widgetType).toBe('stat-card');
+    expect(movedBlock?.blockType).toBe('stat-card');
     expect(movedBlock?.props?.title).toBe('Candidate metric');
     expect(movedBlock?.props?.value).toBe('42');
     expect(movedBlock?.props?.suffix).toBe('widgets');
-    expect(movedBlock?.layout?.span).toBe(12);
+    expect(movedBlock?.span).toBe(12);
     expect(movedBlock?.layout?.w).toBe(3);
     expect(movedBlock?.layout?.h).toBe(2);
     return;
@@ -1091,14 +1124,13 @@ async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesigner
   const id = uniqueId('udw_cross_kind_guard');
   const pageKey = `udw_cross_kind_guard_${id}`;
   const resp = await page.request.post('/api/pages', {
-    data: {
+    data: postFlatPageDoc({
       name: `UDW cross kind guard ${id}`,
       pageKey,
       title: `UDW cross kind guard ${id}`,
       kind: 'form',
       modelCode: 'page_schema',
-      schemaVersion: 3,
-      blocks: [
+      wrappedBlocks: [
         {
           id: 'form_root',
           blockType: 'form',
@@ -1155,7 +1187,7 @@ async function createCrossKindGuardFormPage(page: Page): Promise<CreatedDesigner
         },
       ],
       extension: { e2e: true, scenario: 'unified-designer-cross-kind-guard' },
-    },
+    }),
   });
   expect(resp.ok(), await resp.text()).toBe(true);
   const body = await resp.json();
@@ -1417,8 +1449,18 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .toBeGreaterThan(beforeFields);
   });
 
-  test('adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
+  test('ZPROBE adds nested containers from the palette with undo, redo, save, and readback', async ({ page }) => {
     const { pageKey: formKey, pid } = await createPaletteAuthoringFormPage(page);
+    page.on('request', (req) => {
+      if (req.url().includes(`/api/pages/${pid}`) && req.method() === 'PUT') {
+        console.log('[ZPUT]', req.postData()?.slice(0, 2200));
+      }
+    });
+    page.on('response', async (res) => {
+      if (res.url().includes(`/api/pages/${pid}`) && res.request().method() === 'PUT') {
+        console.log('[ZPUT-RESP]', (await res.text()).slice(0, 500));
+      }
+    });
     await openDesigner(page, pid);
     await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
 
@@ -1460,25 +1502,21 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(readback.ok(), await readback.text()).toBe(true);
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
+    console.log('[ZREADBACK]', JSON.stringify(readbackBody.data).slice(0, 2600));
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTabs = findBlock(savedBlocks, 'tabs_new_tabs');
-    const savedTab = findBlock(savedBlocks, 'tab_new_tab');
+    const savedTab = savedTabs?.tabs?.find((tab) => tab.id === 'tab_new_tab');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
-      'section_main',
-      'tabs_new_tabs',
-    ]);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main', 'tabs_new_tabs']);
     expect(savedTabs).toMatchObject({
       blockType: 'tabs',
       title: { en: 'New tabs', 'zh-CN': '新标签页' },
-      layout: { span: 12 },
+      span: 12,
     });
-    expect(savedTabs?.blocks?.map((block) => block.id)).toEqual(['tab_new_tab']);
+    expect((savedTabs?.tabs ?? []).map((tab) => tab.id)).toEqual(['tab_new_tab']);
     expect(savedTab).toMatchObject({
-      blockType: 'tab',
-      title: { en: 'New tab', 'zh-CN': '新标签' },
-      layout: { span: 12 },
+      label: { en: 'New tab', 'zh-CN': '新标签' },
+      key: 'tab_1',
       blocks: [],
     });
   });
@@ -1537,18 +1575,18 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
     const savedNestedSection = findBlock(savedBlocks, 'form_section_new_section');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'section_main',
       'columns_new_columns',
     ]);
     expect(savedColumns).toMatchObject({
       blockType: 'columns',
       title: { en: 'New columns', 'zh-CN': '新分栏' },
-      layout: { span: 12, columns: 2, gap: 16 },
+      span: 12,
+      layout: { columns: 2, gap: 16 },
     });
     expect(savedColumns?.blocks?.map((block) => block.id)).toEqual([
       'form_section_new_section',
@@ -1556,8 +1594,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     expect(savedNestedSection).toMatchObject({
       blockType: 'form-section',
       title: { en: 'New section', 'zh-CN': '新分组' },
-      layout: { span: 12 },
-      blocks: [],
+      span: 12,
+      fields: [],
     });
   });
 
@@ -1602,9 +1640,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['section_main']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main']);
     expect(findBlock(savedBlocks, 'columns_new_columns')).toBeNull();
     expect(findBlock(savedBlocks, 'form_section_new_section')).toBeNull();
   });
@@ -1656,10 +1693,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedColumns = findBlock(savedBlocks, 'columns_new_columns');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'columns_new_columns',
       'section_main',
     ]);
@@ -1707,9 +1743,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['section_main']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['section_main']);
     expect(findBlock(savedBlocks, 'tabs_new_tabs')).toBeNull();
     expect(findBlock(savedBlocks, 'tab_new_tab')).toBeNull();
   });
@@ -1761,10 +1796,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTabs = findBlock(savedBlocks, 'tabs_new_tabs');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_new_tabs',
       'section_main',
     ]);
@@ -2294,10 +2328,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_move_candidate',
       'section_target',
@@ -2329,10 +2362,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2384,10 +2416,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_move_candidate',
       'section_target',
@@ -2436,10 +2467,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2473,10 +2503,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'form_section_move_candidate',
       'section_target',
@@ -2508,10 +2537,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'form_section_move_candidate',
     ]);
@@ -2563,10 +2591,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'form_section_move_candidate',
       'section_target',
@@ -2615,10 +2642,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'form_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'form_section_move_candidate',
     ]);
@@ -2652,10 +2678,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_target',
       'table_move_candidate',
@@ -2705,10 +2730,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'tabs_holder',
       'action_bar_target',
       'table_move_candidate',
@@ -2741,10 +2765,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'filter_bar_move_candidate',
     ]);
@@ -2788,10 +2811,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'filter_bar_move_candidate',
     ]);
@@ -2849,10 +2871,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
       'action_bar_anchor_table',
       'tabs_holder',
@@ -2898,10 +2919,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual([
       'action_bar_move_candidate',
     ]);
@@ -2955,10 +2975,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedSourceTab = findBlock(savedBlocks, 'tab_source');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual([
+    expect(savedBlocks.map((block) => block.id)).toEqual([
       'widget_move_candidate',
       'widget_anchor_table',
       'tabs_holder',
@@ -3004,10 +3023,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const readbackBody = await readback.json();
     expect(readbackBody.code).toBe('0');
     const savedBlocks = readbackBody.data.blocks as TestBlock[];
-    const savedRoot = findBlock(savedBlocks, 'list_root');
     const savedTargetTab = findBlock(savedBlocks, 'tab_empty');
 
-    expect(savedRoot?.blocks?.map((block) => block.id)).toEqual(['tabs_holder']);
+    expect(savedBlocks.map((block) => block.id)).toEqual(['tabs_holder']);
     expect(savedTargetTab?.blocks?.map((block) => block.id)).toEqual(['widget_move_candidate']);
     expectListBlockChildren(savedBlocks, 'widget', 'widget_move_candidate');
   });
@@ -3076,8 +3094,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedLeaf?.blockType).toBe(blockType);
-      expect(movedLeaf?.props?.label).toBe('Move candidate');
+      expect(movedLeaf).not.toBeNull();
+      expect((movedLeaf as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving a ${blockType} leaf inside an empty compatible parent`, async ({
@@ -3131,8 +3149,8 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedLeaf?.blockType).toBe(blockType);
-      expect(movedLeaf?.props?.label).toBe('Move candidate');
+      expect(movedLeaf).not.toBeNull();
+      expect((movedLeaf as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
@@ -3195,9 +3213,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving an action leaf inside an empty ${parentType}`, async ({
@@ -3254,9 +3272,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
@@ -3315,9 +3333,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId, targetLeafId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
 
     test(`undoes and redoes moving a cross-parent action leaf inside an empty ${route.target} from ${route.source}`, async ({
@@ -3370,9 +3388,9 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
 
       expect(savedSource?.blocks?.map((block) => block.id)).toEqual([sourceAnchorId]);
       expect(savedTarget?.blocks?.map((block) => block.id)).toEqual([candidateId]);
-      expect(movedAction?.blockType).toBe('action');
+      expect(movedAction).not.toBeNull();
       expect(movedAction?.actionType).toBe('refresh');
-      expect(movedAction?.props?.label).toBe('Move candidate');
+      expect((movedAction as Record<string, unknown> | null)?.label).toBe('Move candidate');
     });
   }
 
