@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.service.impl;
 
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class UserPermissionServiceImpl implements UserPermissionService {
     private final PermissionSnapshotCache permissionSnapshotCache;
+    private final com.auraboot.framework.application.security.AdminRoleChecker adminRoleChecker;
     private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
     private final com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
 
@@ -234,6 +237,16 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         Long permissionId = permissionSnapshotCache.resolvePermissionId(
                 MetaContext.getCurrentTenantId(), permissionCode);
         if (permissionId == null) {
+            // #2057 made unregistered codes fail closed. A tenant's own admin
+            // must stay able to bootstrap: at FIRST deployment the permission
+            // table is empty (permissions arrive WITH the plugin import), so
+            // tenant_admin + unregistered code = allow. Registered codes keep
+            // the strict path; non-admin users keep failing closed.
+            if (adminRoleChecker.hasRole(MetaContext.getCurrentTenantId(), userId, RoleCodes.TENANT_ADMIN)) {
+                log.debug("Permission check result: userId={}, permissionCode={}, tenant_admin bootstrap allowance",
+                    userId, permissionCode);
+                return true;
+            }
             log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false (unregistered code)",
                 userId, permissionCode);
             return false;

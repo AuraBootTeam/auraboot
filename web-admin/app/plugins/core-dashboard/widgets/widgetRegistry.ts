@@ -587,6 +587,22 @@ const widgetDefinitions: WidgetDefinition[] = [
     ],
   },
   {
+    type: 'smart-filter-bar',
+    label: '筛选栏',
+    icon: '🔎',
+    category: '交互',
+    description: '看板级筛选栏(下拉/多选/日期范围),联动刷新全部接收筛选的 widget',
+    defaultConfig: {
+      title: '筛选',
+      filterFields: [],
+      linkage: { groupId: 'amos-filter', enabled: true },
+    },
+    defaultSize: {
+      w: 12,
+      h: 1,
+    },
+  },
+  {
     type: 'smart-progress',
     label: '进度条',
     icon: '📈',

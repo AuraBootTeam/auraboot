@@ -52,6 +52,14 @@ function extractAllowlist(configSource) {
   return [...body.matchAll(/['"]([a-z0-9-]+)['"]/g)].map((m) => m[1]);
 }
 
+function quoteOpsProjectHasSameOriginHeader(configSource) {
+  const start = configSource.indexOf("...(runProfile === 'quoteops'");
+  const end = configSource.indexOf("...(runProfile === 'rbac'", start);
+  if (start < 0 || end < 0) return false;
+  const project = configSource.slice(start, end);
+  return /extraHTTPHeaders:\s*\{\s*(?:Origin|Referer):\s*`\$\{baseURL\}\//.test(project);
+}
+
 function main() {
   const configSource = readFileSync(configPath, 'utf8');
   const allowlist = extractAllowlist(configSource);
@@ -69,6 +77,13 @@ function main() {
   const allowSet = new Set(allowlist);
   const excludeSet = new Set(excluded);
   const errors = [];
+
+  if (!quoteOpsProjectHasSameOriginHeader(configSource)) {
+    errors.push(
+      'ORIGIN CONTRACT: the quoteops project must give APIRequestContext a same-origin ' +
+        'Origin or Referer header; otherwise authenticated setup writes are rejected by CSRF.',
+    );
+  }
 
   // 1. Every quote/bom spec on disk must be classified.
   for (const name of quoteBomOnDisk) {

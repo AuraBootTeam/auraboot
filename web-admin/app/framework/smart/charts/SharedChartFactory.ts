@@ -103,6 +103,11 @@ reg('waterfall', () =>
     default: m.SmartWaterfallChart,
   })),
 );
+reg('filter-bar', () =>
+  import('~/framework/smart/components/charts/SmartFilterBar').then((m) => ({
+    default: m.SmartFilterBar,
+  })),
+);
 reg('table', () =>
   import('~/framework/smart/components/charts/SmartTableChart').then((m) => ({ default: m.SmartTableChart })),
 );

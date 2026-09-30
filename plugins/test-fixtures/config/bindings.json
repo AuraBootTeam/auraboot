@@ -638,19 +638,19 @@
   {
     "modelCode": "e2et_crm_opp",
     "fieldCode": "e2et_crm_opp_name",
-    "sequence": 1,
+    "sequence": 14,
     "required": true,
     "visible": true,
     "editable": true,
     "displayConfig": {
       "searchable": true,
-      "sortable": false
+      "sortable": true
     }
   },
   {
     "modelCode": "e2et_crm_opp",
     "fieldCode": "e2et_crm_opp_stage",
-    "sequence": 2,
+    "sequence": 15,
     "required": true,
     "visible": true,
     "editable": true,
@@ -662,7 +662,7 @@
   {
     "modelCode": "e2et_crm_opp",
     "fieldCode": "e2et_crm_opp_amount",
-    "sequence": 3,
+    "sequence": 16,
     "required": false,
     "visible": true,
     "editable": true,
