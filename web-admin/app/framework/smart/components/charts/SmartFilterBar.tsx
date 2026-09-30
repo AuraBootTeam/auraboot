@@ -135,13 +135,6 @@ export const SmartFilterBar: React.FC<SmartFilterBarProps> = ({
     'rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200';
   const wrapCls = className ?? 'flex flex-wrap items-end gap-3 p-3';
 
-  const w2 = (typeof window !== 'undefined' ? (window as unknown as { __flMount?: unknown[] }) : undefined);
-  if (w2) {
-    w2.__flMount = w2.__flMount || [];
-    w2.__flMount.push({ hasEmit: typeof onLinkageEmit, linkage, nFields: filterFields.length,
-      stack: (new Error().stack || '').split('\n').slice(1, 22).join(' | ').slice(0, 1600) }); // stack probe deep
-  }
-  // mount probe
   const items = useMemo(
     () =>
       filterFields.map((f) => {
