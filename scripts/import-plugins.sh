@@ -172,10 +172,18 @@ if [ "${#EXTRA_PLUGIN_ROOTS[@]}" -gt 0 ]; then
 fi
 echo "Plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
 
-health="$(NO_PROXY=localhost curl -s "$BACKEND_URL/actuator/health" 2>/dev/null || echo '{}')"
-status="$(printf '%s' "$health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")"
+# Transient failures (load, slow disk, network hiccup on remote backends) used to
+# surface as a bare "{}" and a hard exit right after a healthy wait loop. Probe
+# with a timeout and short retries before giving up.
+health='{}'
+for _attempt in 1 2 3 4 5; do
+    health="$(NO_PROXY=localhost curl -s --max-time 5 "$BACKEND_URL/actuator/health" 2>/dev/null || echo '{}')"
+    status="$(printf '%s' "$health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")"
+    [ "$status" = "UP" ] && break
+    sleep 2
+done
 if [ "$status" != "UP" ]; then
-    echo "ERROR: backend is not healthy: $health" >&2
+    echo "ERROR: backend is not healthy after 5 attempts: $health" >&2
     exit 1
 fi
 
