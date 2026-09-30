@@ -76,6 +76,10 @@
     "core-dashboard": {
       "core_dashboard:propose_suggestion": "Save suggestion version is invoked by web-admin/app/plugins/core-aurabot/components-internal/AnalyticsSuggestions.tsx through /api/meta/commands/execute/core_dashboard:propose_suggestion; this platform React result-card action is outside the DSL scanner. Browser journey: web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts.",
       "core_dashboard:adopt_suggestion": "Confirm adoption is invoked by web-admin/app/plugins/core-aurabot/components-internal/AnalyticsSuggestions.tsx through /api/meta/commands/execute/core_dashboard:adopt_suggestion; this platform React result-card action is outside the DSL scanner. Browser journey: web-admin/tests/e2e/aurabot/chat-bi-agent-suggestions.spec.ts."
+    },
+    "test-fixtures": {
+      "e2et_crm_opp.create": "API-fixture surface (no UI): legacy CRM-era opportunity twin kept only so fixture reinstall preserves the verb-label command declarations (PR #2073); the OSS UI stage-rail fixture is e2et_stage_record.",
+      "e2et_crm_opp.update": "API-fixture surface (no UI): legacy CRM-era opportunity twin kept only so fixture reinstall preserves the verb-label command declarations (PR #2073); the OSS UI stage-rail fixture is e2et_stage_record."
     }
   },
   "baseline": {
