@@ -1,6 +1,6 @@
 {
   "version": "1.3",
-  "last_updated": "2026-09-29",
+  "last_updated": "2026-09-30",
   "_scope_note": "plugins[] lists publishable packages in this repository, not the core-only runtime. core_plugins[] are platform-owned; example_plugins[] are optional public examples; internal_test_plugins[] never ship. CRM, BPM, EDU, and other applications are composed from independent repositories.",
   "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
   "platform_modules": [
