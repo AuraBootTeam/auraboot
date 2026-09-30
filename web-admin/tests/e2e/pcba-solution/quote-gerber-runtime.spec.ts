@@ -28,7 +28,11 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
     page,
   }) => {
     const created = await seedGerberRuntimeQuote(page);
-    const fileRequests: Array<{ fileId: string; authorization: string; cookie: string }> = [];
+    const fileRequests: Array<{
+      fileId: string;
+      authorization: string | undefined;
+      cookie: string;
+    }> = [];
 
     await page.route(
       new RegExp(
@@ -42,7 +46,7 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
         const headers = route.request().headers();
         fileRequests.push({
           fileId,
-          authorization: headers.authorization || '',
+          authorization: headers.authorization,
           cookie: headers.cookie || '',
         });
 
@@ -93,7 +97,7 @@ test.describe('PCBA quote Gerber runtime viewer', () => {
       const bottomRequest = fileRequests.find(
         (request) => request.fileId === GERBER_RUNTIME_BOTTOM_FILE_ID,
       );
-      expect(bottomRequest?.authorization).toBe(`Bearer ${VIEWER_TOKEN}`);
+      expect(bottomRequest?.authorization).toBeUndefined();
       expect(bottomRequest?.cookie).toContain('__session=');
     } finally {
       await cleanupRows(page, created);
