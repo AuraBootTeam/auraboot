@@ -128,10 +128,6 @@ public class MybatisPlusConfig {
                     // ── Currency (has tenant_id, but all queries pass it explicitly as @Param) ──
                     || "ab_exchange_rate".equals(tableName)           // ExchangeRateMapper passes tenantId explicitly
 
-                    // ── Consolidation (explicit tenantId in @Select queries) ──
-                    || "ab_legal_entity".equals(tableName)
-                    || "ab_intercompany_txn".equals(tableName)
-
                     // ── RBAC (has tenant_id, but queried during login before MetaContext is set) ──
                     || "ab_user_role".equals(tableName)              // Login: countUserRolesInTenant passes tenantId explicitly
                     || "ab_role".equals(tableName)                   // Login: role lookup by tenantId explicitly
@@ -154,7 +150,6 @@ public class MybatisPlusConfig {
                     || "ab_scheduled_task_log".equals(tableName)      // Scheduler context, tenant_id NULLABLE
                     || "ab_notification_digest".equals(tableName)     // Scheduler flushes without tenant context
                     || "ab_async_task".equals(tableName)              // Thread pool execution without MetaContext
-                    || "ab_sla_record".equals(tableName)              // Scheduler scans across all tenants every 60s
                     || "ab_automation".equals(tableName)              // Scheduler scans across all tenants every 60s/300s
                     || "ab_idempotency_record".equals(tableName)      // Scheduler cleanup runs across all tenants
                     || "ab_idempotent_key".equals(tableName)          // Scheduler cleanup runs across all tenants
