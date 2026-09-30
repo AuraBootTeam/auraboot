@@ -108,13 +108,6 @@ export const SmartFilterBar: React.FC<SmartFilterBarProps> = ({
 
   const emit = useCallback(
     (current: FieldValues) => {
-      const w = window as unknown as { __flDebug?: unknown[] };
-      w.__flDebug = w.__flDebug || [];
-      w.__flDebug.push({
-        hasEmit: typeof onLinkageEmit === 'function',
-        linkage,
-        filters: buildFilters(current),
-      });
       if (!linkage?.enabled && !linkage?.groupId) return;
       if (!onLinkageEmit) return;
       onLinkageEmit(buildFilters(current));
