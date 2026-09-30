@@ -197,6 +197,23 @@ export async function runSemanticQuery(
   return unwrap<SemanticQueryResult>(res);
 }
 
+/** BI usage rollup entry (R1): one row per summary window. */
+export interface UsageSummary {
+  days: number;
+  totalQueries: number;
+  p95DurationMs: number | null;
+  cacheHitRate: number | null;
+  activeUsers: number;
+  totalRows: number;
+  daily: { day: string; queries: number; p95DurationMs: number | null }[];
+}
+
+/** GET /api/semantic/usage/summary — governed-query usage rollup (R1). */
+export async function fetchUsageSummary(days = 7): Promise<UsageSummary> {
+  const res = await fetch(`/api/semantic/usage/summary?days=${days}`);
+  return unwrap<UsageSummary>(res);
+}
+
 /** A ready-to-edit starter model over the always-present ab_role table. */
 export const EXAMPLE_SEMANTIC_YAML = `version: "0.1"
 

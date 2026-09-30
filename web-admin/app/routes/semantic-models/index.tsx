@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  fetchUsageSummary,
+  type UsageSummary,
   saveExploration,
   loadExploration,
   qualifiedDimension,
@@ -229,6 +231,24 @@ function BrowsePanel({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SemanticQueryResult | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+
+  // R1 dog-food surface: the governed pipeline's own usage rollup for the
+  // last 7 days, shown where BI authors work. Hidden silently if the
+  // endpoint is unavailable (older backends).
+  useEffect(() => {
+    let cancelled = false;
+    fetchUsageSummary(7)
+      .then((u) => {
+        if (!cancelled) setUsage(u);
+      })
+      .catch(() => {
+        /* endpoint unavailable — the strip stays hidden */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reset picks when the model changes; restore this model's saved exploration
   // (R4) when one exists instead of the default first metric.
@@ -303,6 +323,35 @@ function BrowsePanel({
           <span className="ml-2 text-xs font-normal text-gray-400">{model.code}</span>
         </h2>
       </div>
+
+      {/* R1 usage strip: governed-query rollup, last 7 days */}
+      {usage && (
+        <div
+          data-testid="semantic-usage-strip"
+          className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50/60 p-3 text-center dark:border-gray-800 dark:bg-gray-900/60 sm:grid-cols-4"
+        >
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">{usage.totalQueries}</div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.queries7d', undefined, '7日查询')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              {usage.p95DurationMs == null ? '—' : `${Math.round(usage.p95DurationMs)} ms`}
+            </div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.p95', undefined, 'P95 耗时')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              {usage.cacheHitRate == null ? '—' : `${Math.round(usage.cacheHitRate * 100)}%`}
+            </div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.cache', undefined, '缓存命中')}</div>
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-gray-800 dark:text-gray-100">{usage.activeUsers}</div>
+            <div className="text-[11px] text-gray-500">{t('semantic.usage.users7d', undefined, '7日用户')}</div>
+          </div>
+        </div>
+      )}
 
       {/* Metrics */}
       <div>
