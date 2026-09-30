@@ -100,6 +100,15 @@ public class MybatisPlusConfig {
 
             @Override
             public boolean ignoreTable(String tableName) {
+                // Explicit code-level scope replaces blanket table exemptions
+                // (tenant-exemption cleanup W1): pre-auth lookups and system
+                // workers wrap their queries in MetaContext.runWithoutTenantFilter
+                // instead of the table being permanently exempt below. The list
+                // at the bottom is being driven down to only genuinely
+                // tenant-less global tables.
+                if (MetaContext.isTenantFilterBypassed()) {
+                    return true;
+                }
                 // ── Global tables (no tenant_id column) ──
                 return "ab_user".equals(tableName)
                     || "ab_tenant".equals(tableName)
