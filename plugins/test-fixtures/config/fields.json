@@ -738,11 +738,12 @@
     "code": "e2et_crm_opp_stage",
     "displayName:zh-CN": "商机阶段",
     "displayName:en": "Opportunity Stage",
-    "dataType": "string",
+    "dataType": "enum",
     "description": "CRM pipeline stage (stage-rail block persists transitions)",
     "constraints": {
       "required": true
-    }
+    },
+    "dictCode": "e2et_crm_opp_stage"
   },
   {
     "code": "e2et_crm_opp_amount",
