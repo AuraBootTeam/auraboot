@@ -112,9 +112,8 @@ public class MybatisPlusConfig {
                 // ── Global tables (no tenant_id column) ──
                 return "ab_user".equals(tableName)
                     || "ab_tenant".equals(tableName)
-                    || "ab_tenant_member".equals(tableName)           // Cross-tenant: "which tenants does user belong to"
-                    || "ab_invitation".equals(tableName)              // Pre-join: invitation verified before tenant context
-                    || "ab_user_session".equals(tableName)            // Global session/token lookup; effective tenant context is stored explicitly
+                    || "ab_tenant_member".equals(tableName)           // W2 pending: cross-tenant by design; migrate to explicit scope
+                    || "ab_invitation".equals(tableName)              // W2 pending: pre-join invitation verified before tenant context
                     || "ab_user_social_link".equals(tableName)        // No tenant_id, global per user
                     || "ab_login_application".equals(tableName)       // Pre-auth global application registry
                     || "ab_login_channel".equals(tableName)           // Pre-auth routing; tenant selector is explicit
