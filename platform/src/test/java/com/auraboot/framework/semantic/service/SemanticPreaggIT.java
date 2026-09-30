@@ -1,0 +1,208 @@
+package com.auraboot.framework.semantic.service;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
+import com.auraboot.framework.semantic.compiler.UserContext;
+import com.auraboot.framework.semantic.entity.AbSemanticMetric;
+import com.auraboot.framework.semantic.entity.AbSemanticPreagg;
+import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
+import com.auraboot.framework.semantic.parser.SemanticYamlParser;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Golden IT for the pre-aggregation engine (R3): the materialized view is
+ * created from the governed compiled SQL, is consistent with the live
+ * pipeline at refresh time, goes stale when the data moves, and converges on
+ * refresh. Runs on a fresh-seed migration-only database.
+ */
+@Slf4j
+@SpringBootTest(classes = com.auraboot.framework.application.TestApplication.class)
+@ActiveProfiles("integration-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DisplayName("Semantic preagg golden IT — MV lifecycle, staleness, consistency")
+class SemanticPreaggIT {
+
+    private static final long TENANT_ID = 991_950_001L;
+    private static final long USER_ID = 991_950_002L;
+    private static final String META_MODEL_PID = "preagg-golden-meta-model";
+    private static final String MODEL_YAML = """
+            version: "0.1"
+
+            semantic_model:
+              code: preagg_golden_alias
+              label:
+                zh-CN: 预聚合金样对象别名
+                en-US: Preagg Golden Object Alias
+              description: Migration-owned object-alias table backing the preagg golden IT.
+              model_ref: ab_object_alias
+              primary_entity: pid
+
+            entities:
+              - name: pid
+                type: primary
+                field_ref: pid
+
+            dimensions:
+              - code: alias_language
+                label:
+                  zh-CN: 语言
+                field_ref: language
+                type: categorical
+
+            measures:
+              - code: alias_count
+                label:
+                  zh-CN: 别名数
+                agg: COUNT
+                field_ref: pid
+
+            metrics:
+              - code: alias_count_metric
+                label:
+                  zh-CN: 别名数指标
+                  en-US: Alias Count Metric
+                type: simple
+                type_params:
+                  measure: alias_count
+            """;
+
+    @Autowired
+    private SemanticYamlParser parser;
+    @Autowired
+    private SemanticPublishService publishService;
+    @Autowired
+    private SemanticPreaggService preaggService;
+    @Autowired
+    private SemanticQueryService queryService;
+    @Autowired
+    private AbSemanticMetricMapper metricMapper;
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    private String modelPid;
+    private String metricPid;
+
+    @PostConstruct
+    void bindTenantContext() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+    }
+
+    @BeforeEach
+    void publishModelOnce() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        if (modelPid != null) return;
+        jdbc.update("DELETE FROM ab_meta_model WHERE id = 991950010 OR pid = ?", META_MODEL_PID);
+        jdbc.update("INSERT INTO ab_meta_model (id, pid, tenant_id, code, table_name, "
+                        + "source_type, is_current, status, version, created_at, updated_at, deleted_flag) "
+                        + "VALUES (991950010, ?, ?, 'ab_object_alias', 'ab_object_alias', "
+                        + "'physical', TRUE, 'published', 1, NOW(), NOW(), FALSE)",
+                META_MODEL_PID, TENANT_ID);
+        modelPid = publishService.publishFromYaml(
+                MODEL_YAML.getBytes(StandardCharsets.UTF_8), "test-fixtures", TENANT_ID, USER_ID);
+        AbSemanticMetric metric = metricMapper.listActiveByModel(TENANT_ID, modelPid).get(0);
+        metricPid = metric.getPid();
+    }
+
+    @AfterAll
+    void cleanup() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        jdbc.execute("DROP MATERIALIZED VIEW IF EXISTS mv_semantic_preagg_it_golden");
+        for (String[] stmt : new String[][]{
+                {"DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID + ""},
+                {"DELETE FROM ab_semantic_preagg WHERE tenant_id = ?", TENANT_ID + ""},
+                {"DELETE FROM ab_semantic_metric WHERE semantic_model_pid = ?", modelPid + ""},
+                {"DELETE FROM ab_semantic_dimension WHERE semantic_model_pid = ?", modelPid + ""},
+                {"DELETE FROM ab_semantic_model WHERE pid = ?", modelPid + ""},
+                {"DELETE FROM ab_meta_model WHERE pid = ? OR id = 991950010", META_MODEL_PID}}) {
+            try {
+                jdbc.update(stmt[0], stmt[1]);
+            } catch (Exception e) {
+                log.warn("cleanup step failed (continuing): {}", e.getMessage());
+            }
+        }
+        MetaContext.clear();
+    }
+
+    private long liveValue() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+        UserContext user = new UserContext(USER_ID, TENANT_ID, java.util.Map.of());
+        SemanticQueryRequest req = new SemanticQueryRequest();
+        req.setMetrics(List.of("preagg_golden_alias.alias_count_metric"));
+        var resp = queryService.executeQuery(req, user);
+        Object value = resp.getRows().get(0).values().iterator().next();
+        return value instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(value));
+    }
+
+    /**
+     * The metric VALUE inside the MV (a dimension-less preagg holds exactly one
+     * aggregate row whose only column is the qualified metric). Row-count of
+     * the MV is always 1 and proves nothing about staleness.
+     */
+    private long mvMetricValue(String mvName, String metricColumn) {
+        Long value = jdbc.queryForObject(
+                "SELECT \"" + metricColumn + "\" FROM " + mvName, Long.class);
+        return value == null ? -1 : value;
+    }
+
+    private long insertAliasRow(String alias) {
+        jdbc.update("DELETE FROM ab_object_alias WHERE pid = ?", "pg-" + alias);
+        jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, "
+                        + "acp_priority, created_at, updated_at, created_by, updated_by, deleted_flag) "
+                        + "VALUES (?, ?, 'preagg_golden', ?, 'zh-CN', 0, NOW(), NOW(), ?, ?, FALSE)",
+                "pg-" + alias, TENANT_ID, alias, USER_ID, USER_ID);
+        long count = jdbc.queryForObject(
+                "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'",
+                Long.class, TENANT_ID);
+        return count;
+    }
+
+    @Test
+    @DisplayName("MV is consistent at refresh, goes stale on data change, converges on refresh")
+    void goldenPreaggLifecycle() {
+        // Cross-run leftovers break the deterministic counts: purge every
+        // golden row before the lifecycle starts.
+        jdbc.update("DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID);
+        long afterFirst = insertAliasRow("golden-one");
+
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-golden", modelPid, "alias_count_metric", List.of(), 60);
+        String mvName = preagg.getMvName();
+
+        String metricColumn = "preagg_golden_alias." + preagg.getMetricCode();
+
+        // Consistency at creation: the MV's metric value equals the live governed value.
+        assertThat(mvMetricValue(mvName, metricColumn)).isEqualTo(liveValue());
+        assertThat(preagg.getLastRefreshedAt()).isNotNull();
+
+        // Data moves: the live value moves, the MV keeps the refresh snapshot (stale).
+        long afterSecond = insertAliasRow("golden-two");
+        assertThat(liveValue()).isEqualTo(afterSecond);
+        assertThat(mvMetricValue(mvName, metricColumn)).isNotEqualTo(liveValue());
+
+        // Refresh converges the MV's metric value to the live value.
+        preaggService.refreshNow(preagg.getPid());
+        assertThat(mvMetricValue(mvName, metricColumn)).isEqualTo(liveValue()).isEqualTo(afterSecond);
+
+        // Delete drops the MV together with the definition.
+        preaggService.delete(preagg.getPid());
+        Integer mvLeft = jdbc.queryForObject(
+                "SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
+                Integer.class, mvName.replace("\"", ""));
+        assertThat(mvLeft).isZero();
+    }
+}
