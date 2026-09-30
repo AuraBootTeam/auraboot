@@ -48,6 +48,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for AsyncTaskAccessor in the settings map. */
     String ASYNC_TASK_ACCESSOR_KEY = AsyncTaskAccessor.SETTINGS_KEY;
 
+    /** Well-known key for the nested command dispatch bridge in the settings map. */
+    String COMMAND_DISPATCHER_ACCESSOR_KEY = CommandDispatcherAccessor.SETTINGS_KEY;
+
     /** Well-known key for independently committed, bounded checkpoint work. */
     String INDEPENDENT_TRANSACTION_ACCESSOR_KEY = IndependentTransactionAccessor.SETTINGS_KEY;
 
@@ -300,13 +303,23 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return accessor instanceof AsyncTaskAccessor ? (AsyncTaskAccessor) accessor : null;
         }
 
-        /** Returns the host-owned REQUIRES_NEW bridge for bounded progress checkpoints. */
-        public IndependentTransactionAccessor independentTransactionAccessor() {
-            Object accessor = settings != null
-                    ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
-            return accessor instanceof IndependentTransactionAccessor
-                    ? (IndependentTransactionAccessor) accessor : null;
-        }
+    /** Returns the host-owned REQUIRES_NEW bridge for bounded progress checkpoints. */
+    public IndependentTransactionAccessor independentTransactionAccessor() {
+        Object accessor = settings != null
+                ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
+        return accessor instanceof IndependentTransactionAccessor
+                ? (IndependentTransactionAccessor) accessor : null;
+    }
+
+    /**
+     * Returns the host-owned nested command dispatch bridge, or {@code null} on
+     * older hosts — in which case handlers chaining a follow-up command fall
+     * back to direct handler execution (unaudited legacy behaviour).
+     */
+    public CommandDispatcherAccessor commandDispatcherAccessor() {
+        Object accessor = settings != null ? settings.get(COMMAND_DISPATCHER_ACCESSOR_KEY) : null;
+        return accessor instanceof CommandDispatcherAccessor value ? value : null;
+    }
 
         /** Returns the host-owned record-share bridge, or {@code null} on older hosts. */
         public RecordShareAccessor recordShareAccessor() {
