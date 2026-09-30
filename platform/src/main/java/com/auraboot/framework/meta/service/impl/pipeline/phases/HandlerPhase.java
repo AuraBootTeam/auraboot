@@ -106,6 +106,11 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private RecordShareAccessor recordShareAccessor;
 
+    /** Lazy so the phase → executor → (lazy) pipeline edge never cycles at startup. */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
+
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -587,6 +592,13 @@ public class HandlerPhase implements CommandPhase {
             }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+            if (commandExecutor != null) {
+                // Q03-04: nested follow-up commands dispatch through the real
+                // pipeline (validated, invariant-checked, evented, audited)
+                // instead of handlers `new`-ing other handlers directly.
+                pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
+            }
             if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
                 pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
                         new TenantProjectionAccessorImpl(tenantId,
