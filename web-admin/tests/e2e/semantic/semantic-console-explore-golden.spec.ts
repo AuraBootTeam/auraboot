@@ -83,7 +83,8 @@ test('SC-00 register meta model and publish the semantic model', async ({ reques
   // model_ref governance resolves it (tolerate re-registration).
   const created = await request.post('/api/meta/models', { data: ALIAS_MODEL });
   const createdBody = await created.json().catch(() => ({}));
-  expect(created.ok() || String(createdBody?.message || '').includes('已存在')).toBeTruthy();
+  expect(created.ok() || String(createdBody?.message || '').includes('已存在'),
+      `meta model create: http=${created.status()} body=${JSON.stringify(createdBody)}`).toBeTruthy();
 
   // NOTE: no dynamic row seeding — the pre-existing ab_object_alias meta model
   // on a golden stack carries its own field set (unknown to this spec), and the
