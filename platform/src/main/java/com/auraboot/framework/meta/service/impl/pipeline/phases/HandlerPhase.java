@@ -521,6 +521,20 @@ public class HandlerPhase implements CommandPhase {
         // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
         List<CommandHandlerExtension> secondaryHandlers = extensionRegistry.getSecondaryCommandHandlers(handlerCode);
         if (pluginHandler.isEmpty() && secondaryHandlers.isEmpty()) {
+            // A command whose execution config explicitly declares a handler has a handler contract.
+            // Letting the phase return silently here turns every effect of a custom command into a
+            // swallowed no-op while the overall command still reports success (observed on AMOS
+            // inventory commands when the plugin instance flapped). Fail closed instead; purely
+            // declarative commands declare no handler and keep the silent skip.
+            boolean handlerDeclared = execConfig != null
+                    && execConfig.get("handler") instanceof String declared
+                    && StringUtils.hasText(declared);
+            if (handlerDeclared) {
+                throw new IllegalStateException(
+                        "No plugin command handler registered for declared handler '" + handlerCode
+                                + "' (command=" + commandCode
+                                + "); refusing to execute a custom command as a silent no-op");
+            }
             log.debug("No plugin command handler found for: {} (command={})", handlerCode, commandCode);
             return;
         }
