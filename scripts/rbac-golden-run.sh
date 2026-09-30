@@ -109,17 +109,20 @@ echo "[rbac-golden-run] 1/4 fresh stack (destroy prior + up + import)"
 # by LIVE concurrent gates — retry with backoff before giving up (dead owners
 # are already GC'd by the step-0 sweep).
 up_ok=0
-for attempt in 1 2 3; do
+# 6 attempts x 10 min = ~1h retry window: concurrent iteration gates run for
+# hours at a stretch, and the ephemeral budget (raised 5→7→10) is routinely
+# subscribed by live multi-session workloads.
+for attempt in 1 2 3 4 5 6; do
   if "$GS" up "$NAME" --slot "$SLOT" --ttl 2h --no-warm --runtime-mode "$RUNTIME_MODE"; then
     up_ok=1
     break
   fi
-  [ "$attempt" = 3 ] || {
+  [ "$attempt" = 6 ] || {
     echo "[rbac-golden-run] bring-up attempt $attempt failed — retrying in 10 min (concurrent ephemeral capacity)"
     sleep 600
   }
 done
-[ "$up_ok" = 1 ] || die "stack bring-up failed after 3 attempts (spread over ~20 min)"
+[ "$up_ok" = 1 ] || die "stack bring-up failed after 6 attempts (spread over ~1h)"
 "$GS" import "$NAME" || die "plugin import failed"
 
 # 2. Export the Playwright env (PW_SKIP_WEBSERVER + base URL + backend + PG*).
