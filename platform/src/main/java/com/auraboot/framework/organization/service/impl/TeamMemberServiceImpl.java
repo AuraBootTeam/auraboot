@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +48,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Autowired
     private TeamGovernanceService teamGovernanceService;
 
+    @Autowired
+    private com.auraboot.framework.meta.service.ActivityService activityService;
+
     @Override
     public List<TeamMemberResponse> listMembers(String teamPid) {
         Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
@@ -57,6 +61,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
     @Override
     @Transactional
+    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public TeamMemberResponse addMember(String teamPid, TeamMemberAddRequest request, Long operatorId) {
         Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
         teamGovernanceService.assertMemberRoleCanBeAdded(request.getRole());
@@ -87,6 +92,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         member.setCreatedBy(operatorId);
         member.setUpdatedBy(operatorId);
         save(member);
+
+        recordMembershipActivity(team, member, "team_member_added",
+                "Added member to team " + team.getName());
 
         log.info("Member added to team: teamPid={}, userId={}, role={}", teamPid, userId, member.getRole());
         return toResponse(member);
@@ -129,6 +137,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
     @Override
     @Transactional
+    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void removeMember(String teamPid, String memberPid) {
         Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
 
@@ -142,7 +151,35 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
 
         teamGovernanceService.assertCanRemoveMembership(team, member);
         removeById(member.getId());
+        recordMembershipActivity(team, member, "team_member_removed",
+                "Removed member from team " + team.getName());
         log.info("Member removed from team: teamPid={}, memberPid={}", teamPid, memberPid);
+    }
+
+    /**
+     * X03-04 audit parity ("成员变更走审计,与 DEPT 同轨"): team membership changes
+     * bypass the command pipeline, so the timeline entry the dynamic-model track
+     * gets for free is recorded here explicitly. Must never break the member flow.
+     */
+    private void recordMembershipActivity(Team team, TeamMember member, String activityType, String subject) {
+        try {
+            activityService.recordSystemActivity(
+                    MetaContext.getCurrentTenantId(),
+                    "ab_team",
+                    team.getPid(),
+                    activityType,
+                    subject,
+                    null,
+                    activityType.endsWith("_removed") ? "delete" : "create",
+                    member.getUserId(),
+                    null,
+                    Map.of("teamPid", String.valueOf(team.getPid()),
+                            "memberPid", String.valueOf(member.getPid()),
+                            "memberRole", String.valueOf(member.getRole()))
+            );
+        } catch (Exception e) {
+            log.warn("Failed to record team membership activity: {}", e.getMessage());
+        }
     }
 
     @Override

@@ -106,7 +106,7 @@ public class DataScopeEvaluator {
             return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateSelf(condition, recordMap));
         }
 
-        if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType)) {
+        if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType) || "team".equals(scopeType)) {
             return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap, strict));
         }
 
@@ -235,7 +235,7 @@ public class DataScopeEvaluator {
     private EvaluationStep evaluateDept(DataScopeCondition condition, Map<String, Object> record, boolean strict) {
         if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
             return new EvaluationStep(NAME, EvaluationVerdict.DENY,
-                    "Scope: dept — no department PIDs resolved");
+                    "Scope: " + condition.scopeType() + " — no accessible group PIDs resolved");
         }
 
         if (condition.deptOwnerField() != null && !condition.deptOwnerField().isBlank()) {

@@ -443,7 +443,8 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             // String owner value (userPid against a varchar/ULID owner column): quote + escape
             return condition.ownerField() + " = '" + String.valueOf(ownerValue).replace("'", "''") + "'";
         }
-        if ("dept".equals(condition.scopeType()) || "dept_and_sub".equals(condition.scopeType())) {
+        if ("dept".equals(condition.scopeType()) || "dept_and_sub".equals(condition.scopeType())
+                || "team".equals(condition.scopeType())) {
             if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
                 return "1 = 0";
             }
