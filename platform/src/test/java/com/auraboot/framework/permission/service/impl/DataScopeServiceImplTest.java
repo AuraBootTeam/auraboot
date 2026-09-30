@@ -57,6 +57,9 @@ class DataScopeServiceImplTest {
     @Mock
     private MetaModelService metaModelService;
 
+    @Mock
+    private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
+
     @InjectMocks
     private DataScopeServiceImpl service;
 
@@ -71,6 +74,9 @@ class DataScopeServiceImplTest {
         var metaField = DataScopeServiceImpl.class.getDeclaredField("metaModelService");
         metaField.setAccessible(true);
         metaField.set(service, metaModelService);
+        var teamField = DataScopeServiceImpl.class.getDeclaredField("teamMemberService");
+        teamField.setAccessible(true);
+        teamField.set(service, teamMemberService);
     }
 
     @AfterEach
@@ -227,6 +233,96 @@ class DataScopeServiceImplTest {
 
         assertThat(c.scopeType()).isEqualTo("dept");
         assertThat(c.deptPids()).containsExactly("dept-1");
+    }
+
+    @Test
+    void resolveScopeBuildsTeamConditionFromMembershipsAndDeclaredTeamField() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1", "team-2"));
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
+
+        assertThat(c.scopeType()).isEqualTo("team");
+        assertThat(c.deptField()).isEqualTo("org_team_pid");
+        assertThat(c.deptPids()).containsExactlyInAnyOrder("team-1", "team-2");
+    }
+
+    @Test
+    void teamScopeWithoutDeclaredTeamFieldFailsClosed() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        when(metaModelService.getModelDefinition("model.user")).thenReturn(Optional.empty());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.user", "read");
+
+        assertThat(c.scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void teamScopeWithNoMembershipsFallsBackToSelfOutsideHistoricalEvaluation() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("team");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of());
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
+        assertThat(c.scopeType()).isEqualTo("self");
+
+        DataScopeCondition historical = service.resolveHistoricalScope(5L, "model.task", "read");
+        assertThat(historical.scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void teamScopeWinsMaxMergeOverDept() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L, 8L));
+        RoleDataScope dept = new RoleDataScope();
+        dept.setScopeType("dept");
+        dept.setMergeStrategy("MAX");
+        RoleDataScope team = new RoleDataScope();
+        team.setScopeType("team");
+        team.setMergeStrategy("MAX");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString()))
+                .thenReturn(List.of(dept, team));
+        TenantMember m = new TenantMember();
+        m.setId(5L);
+        m.setPid("member-pid");
+        m.setTenantId(100L);
+        m.setUserId(1L);
+        when(tenantMemberMapper.selectById(5L)).thenReturn(m);
+        when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1"));
+        when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
+                .build());
+
+        // MAX takes the higher-priority TEAM condition (documented merge rule)
+        assertThat(service.resolveScope(5L, "model.task", "read").scopeType()).isEqualTo("team");
     }
 
     @Test

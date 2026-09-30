@@ -170,6 +170,20 @@ class DataPermissionEngineImplDataScopeTest {
     }
 
     @Test
+    @DisplayName("TEAM scope renders teamField IN (quoted pids) and fails secure on injected field")
+    void dataScopeSql_teamScopeRendersInPredicateAndFailsSecure() {
+        DataScopeCondition team = new DataScopeCondition(
+                "team", "created_by", USER_ID, "org_team_pid", List.of("t1", "t'2"), List.of());
+        String sql = (String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", team);
+        assertThat(sql).isEqualTo("org_team_pid IN ('t1','t''2')");
+
+        DataScopeCondition malicious = new DataScopeCondition(
+                "team", null, null, "org_team_pid); DROP TABLE x --", List.of("p1"), List.of());
+        String maliciousSql = (String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", malicious);
+        assertThat(maliciousSql).isEqualTo("1 = 0");
+    }
+
+    @Test
     @DisplayName("dataScopeConditionToSql builds normal SQL for valid identifiers")
     void dataScopeSql_buildsNormalSqlForValidFields() {
         DataScopeCondition self = new DataScopeCondition(

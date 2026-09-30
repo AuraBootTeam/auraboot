@@ -120,6 +120,30 @@ class DataScopeEvaluatorTest {
     }
 
     @Test
+    void teamScopeMatchingTeamPidAllows() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("team", "owner_id", 1L, "org_team_pid", List.of("t1", "t2"), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("org_team_pid", "t2"));
+        assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+    }
+
+    @Test
+    void teamScopeForeignTeamDenies() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("team", "owner_id", 1L, "org_team_pid", List.of("t1"), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("org_team_pid", "other"));
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    @Test
+    void teamScopeNoPidsDenies() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("team", "owner_id", 99L, "org_team_pid", List.of(), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("org_team_pid", "t1"));
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    @Test
     void ownerDerivedDeptScopeUsesAuthoritativeOrganizationMembership() {
         DataScopeCondition condition = new DataScopeCondition(
                 "dept_and_sub", "owner_id", "current-user", null, "owner_id",
