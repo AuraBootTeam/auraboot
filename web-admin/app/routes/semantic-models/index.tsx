@@ -372,7 +372,7 @@ function BrowsePanel({
             understands the __grain suffix (DATE_TRUNC). */}
         {pickedDims
           .map((code) => (model.dimensions || []).find((d: DimensionMeta) => d.code === code))
-          .filter((d): d is DimensionMeta => !!d && d.type === 'time')
+          .filter((d): d is DimensionMeta => !!d && String(d.type || '').toLowerCase() === 'time')
           .map((d) => (
             <div key={d.code} className="mt-2 flex items-center gap-2">
               <span className="text-xs text-gray-500">
