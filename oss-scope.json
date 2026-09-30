@@ -171,7 +171,13 @@
     "tests/e2e/aurabot/competitive-intelligence-agent-scenario.spec.ts",
     "tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
     "tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
-    "tests/e2e/admin/platform-admin-crud.spec.ts"
+    "tests/e2e/admin/platform-admin-crud.spec.ts",
+    "tests/e2e/automation/automation-designer.spec.ts",
+    "tests/e2e/automation/automation-enhanced.spec.ts",
+    "tests/e2e/automation/automation-golden.spec.ts",
+    "tests/e2e/automation/automation-management.spec.ts",
+    "tests/e2e/automation/automation-action-points-golden.spec.ts",
+    "tests/e2e/automation/llm-call-node.spec.ts"
   ],
   "test_excludes_rationale": {
     "_note": "Explanations for each entry in test_excludes. Plain-string exclusion list is what the playwright.oss.config.ts runner consumes; this map is metadata only.",
@@ -226,7 +232,13 @@
     "tests/e2e/aurabot/competitive-intelligence-agent-scenario.spec.ts": "[L] requires a configured LLM/embedding/agent provider; the OSS gate runs hermetically without provider secrets (runtime evidence: 'No LLM provider configured for agent: aurabot', empty extraction results). Owner decision 2026-09-29/30: excluded; re-introduce under a provider-gated profile. (Re-lands 07852d4db after eebf92223 reverted it.)",
     "tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts": "[L] requires a configured LLM/embedding/agent provider; the OSS gate runs hermetically without provider secrets (runtime evidence: 'No LLM provider configured for agent: aurabot', empty extraction results). Owner decision 2026-09-29/30: excluded; re-introduce under a provider-gated profile. (Re-lands 07852d4db after eebf92223 reverted it.)",
     "tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts": "[L] requires a configured LLM/embedding/agent provider; the OSS gate runs hermetically without provider secrets (runtime evidence: 'No LLM provider configured for agent: aurabot', empty extraction results). Owner decision 2026-09-29/30: excluded; re-introduce under a provider-gated profile. (Re-lands 07852d4db after eebf92223 reverted it.)",
-    "tests/e2e/admin/platform-admin-crud.spec.ts": "[V] vehicle dependency: PA-001..008/025/026 exercise SLA-config and BPM-domain-config admin surfaces (admin:create_sla_config / admin:create_bpm_domain_config, /p/sla_config menu) that the OSS runtime does not ship — the installed admin:* command set covers webhook/api-connector/data-permission/member/scheduled-task only. Enterprise admin-plugin surface; re-vehicle or ship tracked as follow-up. ~12 passing siblings lost to the file-level filter."
+    "tests/e2e/admin/platform-admin-crud.spec.ts": "[V] vehicle dependency: PA-001..008/025/026 exercise SLA-config and BPM-domain-config admin surfaces (admin:create_sla_config / admin:create_bpm_domain_config, /p/sla_config menu) that the OSS runtime does not ship — the installed admin:* command set covers webhook/api-connector/data-permission/member/scheduled-task only. Enterprise admin-plugin surface; re-vehicle or ship tracked as follow-up. ~12 passing siblings lost to the file-level filter.",
+    "tests/e2e/automation/automation-designer.spec.ts": "[W] AD-01/02/05/07 render and drive the automation editor shell whose registration (menus/pages) is not part of the OSS e2e runtime; drag/probe cases fail before any assertion. [W] workflow-application dependency: enabling an automation deploys a synthesized SmartEngine process via WorkflowCapabilityRegistry ('automation.deploy'); OSS core ships no WorkflowCapability provider - the engine belongs to the independent workflow application (per #1900 composition contracts). Owner decision 2026-09-30: excluded; re-introduce when the workflow application is composed into the gate runtime.",
+    "tests/e2e/automation/automation-enhanced.spec.ts": "[W] AUTO-02/03 render the automation editor shell (not registered in the OSS e2e runtime); AUTO-04 toggles enable - blocked by the missing workflow capability. [W] workflow-application dependency: enabling an automation deploys a synthesized SmartEngine process via WorkflowCapabilityRegistry ('automation.deploy'); OSS core ships no WorkflowCapability provider - the engine belongs to the independent workflow application (per #1900 composition contracts). Owner decision 2026-09-30: excluded; re-introduce when the workflow application is composed into the gate runtime.",
+    "tests/e2e/automation/automation-golden.spec.ts": "[W] workflow-application dependency: enabling an automation deploys a synthesized SmartEngine process via WorkflowCapabilityRegistry ('automation.deploy'); OSS core ships no WorkflowCapability provider - the engine belongs to the independent workflow application (per #1900 composition contracts). Owner decision 2026-09-30: excluded; re-introduce when the workflow application is composed into the gate runtime. (B1-G01/E6/action-execute-command fail at enable with 'Internal system error').",
+    "tests/e2e/automation/automation-management.spec.ts": "[W] workflow-application dependency: enabling an automation deploys a synthesized SmartEngine process via WorkflowCapabilityRegistry ('automation.deploy'); OSS core ships no WorkflowCapability provider - the engine belongs to the independent workflow application (per #1900 composition contracts). Owner decision 2026-09-30: excluded; re-introduce when the workflow application is composed into the gate runtime. (AM-003 enable/disable toggle times out).",
+    "tests/e2e/automation/automation-action-points-golden.spec.ts": "[W] drives the automation editor canvas whose shell is not registered in the OSS e2e runtime. [W] workflow-application dependency: enabling an automation deploys a synthesized SmartEngine process via WorkflowCapabilityRegistry ('automation.deploy'); OSS core ships no WorkflowCapability provider - the engine belongs to the independent workflow application (per #1900 composition contracts). Owner decision 2026-09-30: excluded; re-introduce when the workflow application is composed into the gate runtime.",
+    "tests/e2e/automation/llm-call-node.spec.ts": "[L] edits an LLM call node's prompt/outputVariableName through the UI; LLM-provider dependent."
   },
   "per_case_excludes_todo": {
     "_note": "The current playwright.oss.config.ts filter operates at file path level only. These are the specific failing cases we actually want to skip; their sibling cases in the same files currently pass but are excluded along with them. When scope filter gains per-title support, move the file back into test_paths and list individual case titles here.",
@@ -246,6 +258,18 @@
       {
         "file": "tests/e2e/user/user-management.spec.ts",
         "case": "UM-007 role list"
+      },
+      {
+        "file": "tests/e2e/automation/automation-designer.spec.ts",
+        "case": "AD-03/04/06/08-24 (passing siblings, shell-independent)"
+      },
+      {
+        "file": "tests/e2e/automation/automation-golden.spec.ts",
+        "case": "15 passing behavioral cases independent of enable/fire"
+      },
+      {
+        "file": "tests/e2e/automation/automation-management.spec.ts",
+        "case": "AM-001/002/004/005/006 (passing siblings)"
       }
     ]
   },
