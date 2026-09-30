@@ -9,6 +9,7 @@
 #
 #   tests/e2e/designer/report-hifi-golden.spec.ts    HIFI-00/01/02
 #   tests/e2e/dashboard/dashboard-hifi-golden.spec.ts DHIFI-01/02/03
+#   tests/e2e/semantic/semantic-console-explore-golden.spec.ts SC-00/01
 #
 # These specs assert business fidelity, not just contracts: a 48-order CJK seed,
 # a multi-block report (header/stat cards/detail table), real aggregate-bound
@@ -137,6 +138,7 @@ NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test \
     tests/e2e/designer/report-hifi-golden.spec.ts \
     tests/e2e/dashboard/dashboard-hifi-golden.spec.ts \
+    tests/e2e/semantic/semantic-console-explore-golden.spec.ts \
     --project=chromium --workers=1 --retries=0 \
     --repeat-each="$REPEAT" --reporter=line 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
