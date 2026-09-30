@@ -607,6 +607,42 @@ class HandlerPhaseTest {
         verify(dataDomainService, never()).buildDomainFilter(any(), any());
     }
 
+    @Test
+    void execute_failClosedWhenDeclaredHandlerMissingFromRegistry() {
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.empty());
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of("dslPersistence", false)
+        ));
+
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 5L, "pr_purchase_order", "po-1", () ->
+                        assertThatThrownBy(() -> phase.execute(ctx))
+                                .isInstanceOf(IllegalStateException.class)
+                                .hasMessageContaining("No plugin command handler registered")
+                                .hasMessageContaining(PLUGIN_HANDLER_CODE)
+                                .hasMessageContaining(BUSINESS_COMMAND_CODE));
+        verify(extensionRegistry).getCommandHandler(PLUGIN_HANDLER_CODE);
+    }
+
+    @Test
+    void execute_silentSkipRetainedForPurelyDeclarativeCommands() {
+        when(extensionRegistry.getCommandHandler(any())).thenReturn(Optional.empty());
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition",
+                "statusField", "pr_po_status"
+        ));
+
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 5L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
+
+        verify(extensionRegistry).getCommandHandler(BUSINESS_COMMAND_CODE);
+        org.assertj.core.api.Assertions.assertThat(ctx.getHandlerResults()).isEmpty();
+    }
+
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
         CommandDefinition command = new CommandDefinition();
         command.setCode(commandCode);
