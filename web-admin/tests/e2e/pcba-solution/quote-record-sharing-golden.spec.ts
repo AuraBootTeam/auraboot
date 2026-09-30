@@ -271,14 +271,16 @@ test('quote sharing release gate: collaborator full processing, record isolation
   await saveWorkbookDownload(downloaded, savedPath, testInfo, 'shared-quote-standard');
   validateQuoteWorkbook(savedPath, { expectedFirstBomUnitPrice: 1.25, fixedCounts: { apertures: 3, holes: 2 } });
 
-  // 加工点数 tab: the collaborator can recalculate process points via the toolbar command
-  // (the configured button carries count_hole_mode=default and dispatches directly, then an
-  // async-task completion modal must be dismissed before the rest of the page is clickable).
+  // 加工点数 tab: the collaborator can recalculate after explicitly choosing the hole scope;
+  // the async-task completion modal must be dismissed before the rest of the page is clickable.
   await memberPage.getByRole('tab',{name:'加工点数',exact:true}).click();
   const recalc = memberPage.waitForResponse(response =>
     response.url().includes('/api/meta/commands/execute/qo_quote_common:compute_process_fee') &&
     response.request().method() === 'POST', { timeout: 60_000 });
   await memberPage.getByRole('button',{name:'计算／重新计算',exact:true}).click();
+  await expect(memberPage.getByTestId('form-dialog')).toBeVisible();
+  await memberPage.getByTestId('form-dialog-field-count_hole_mode').selectOption('none');
+  await memberPage.getByTestId('form-dialog-submit').click();
   const recalcResponse = await recalc;
   expect(recalcResponse.ok(), await recalcResponse.text()).toBe(true);
   expect(((await recalcResponse.json().catch(() => ({}))) as {code?:string}).code).toBe('0');

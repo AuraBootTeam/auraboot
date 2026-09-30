@@ -224,8 +224,7 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
   });
 
   test('loading overlay appears while a slow toolbar command is in flight', async ({ page }) => {
-    // 直发式 default=pads 口径,包内必须有钻带,否则任务按契约大声拒绝、
-    // 断言不到 completed;本测试只关心加载浮层生命周期。
+    // 显式选择不计插件孔口径；本测试只关心确认后命令的加载浮层生命周期。
     const created = await seedFixedCountQuote(page, { withDrillFile: true });
 
     try {
@@ -253,7 +252,9 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
         { timeout: 30_000 },
       );
       await page.getByTestId('toolbar-btn-count_process').click();
-      // 直发式:工具栏按钮直接派发 count_hole_mode=default,无口径选择对话框。
+      await expect(page.getByTestId('form-dialog')).toBeVisible();
+      await page.getByTestId('form-dialog-field-count_hole_mode').selectOption('none');
+      await page.getByTestId('form-dialog-submit').click();
       // 路由延迟 1.5s 保证在途命令期间加载浮层可见,断言非竞态。
       await expect(page.getByTestId('loading-overlay')).toBeVisible({ timeout: 5_000 });
 
