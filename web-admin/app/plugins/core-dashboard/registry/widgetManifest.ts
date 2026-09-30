@@ -11,6 +11,7 @@ export const OSS_WIDGETS: readonly string[] = [
   'smart-area-chart',
   'smart-bar-chart',
   'smart-countdown',
+  'smart-filter-bar',
   'smart-iframe',
   'smart-image',
   'smart-line-chart',

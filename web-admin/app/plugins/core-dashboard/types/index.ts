@@ -27,6 +27,7 @@ export type DashboardText = string | LocalizedText;
  * Widget type
  */
 export type WidgetType =
+  | 'smart-filter-bar'
   | 'smart-number-card'
   | 'smart-bar-chart'
   | 'smart-line-chart'
@@ -160,6 +161,8 @@ export interface WidgetConfig {
   visualization?: Record<string, unknown>;
   style?: StyleSettings;
   linkage?: LinkageConfig;
+  /** Filter bar field definitions (smart-filter-bar only) */
+  filterFields?: unknown;
   drillDown?: DrillDownConfig;
   refreshInterval?: number;
   /**
