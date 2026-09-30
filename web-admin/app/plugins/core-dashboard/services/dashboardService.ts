@@ -264,6 +264,13 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
       title,
       dataSource,
       ...(visualization && Object.keys(visualization).length > 0 ? { visualization } : {}),
+      // Interaction widgets without a dataSource (e.g. smart-filter-bar) still
+      // carry linkage/filterFields through — dropping them silently disabled
+      // dashboard-level filtering (2026-09-30 SmartFilterBar investigation).
+      ...(rawConfig.linkage !== undefined ? { linkage: rawConfig.linkage as Widget['config']['linkage'] } : {}),
+      ...(rawConfig.filterFields !== undefined
+        ? { filterFields: rawConfig.filterFields as unknown as Widget['config']['filterFields'] }
+        : {}),
       ...passthrough,
     },
   };
