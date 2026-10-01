@@ -24,8 +24,8 @@ const ALIAS_MODEL = {
   sourceType: 'physical',
   tableName: 'ab_object_alias',
   fields: [
-    { fieldCode: 'alias', columnExpr: 'alias', dataType: 'string', operators: ['eq'], sortable: true },
-    { fieldCode: 'language', columnExpr: 'language', dataType: 'string', operators: ['eq'] },
+    { code: 'alias', fieldCode: 'alias', columnExpr: 'alias', dataType: 'string', operators: ['eq'], sortable: true },
+    { code: 'language', fieldCode: 'language', columnExpr: 'language', dataType: 'string', operators: ['eq'] },
   ],
 };
 
