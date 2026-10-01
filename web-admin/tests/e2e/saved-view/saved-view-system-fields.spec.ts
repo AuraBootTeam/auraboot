@@ -105,7 +105,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
     await expect(colBtn).toBeVisible({ timeout: 30000 });
     await colBtn.click();
 
-    await expect(page.locator('text=Column Settings')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#column-settings-title')).toBeVisible({ timeout: 5000 });
 
     // System fields should be unchecked (line-through class on label)
     // The "Created At" label should have line-through styling (indicating hidden)
