@@ -124,6 +124,8 @@ test('SC-01 console exploration: TopN, governed run, time grain, save-restore', 
   await expect(page.getByTestId('semantic-query-error')).toHaveCount(0);
   // The result meta line ("N 行 · Xms") renders for empty and non-empty sets.
   await expect(page.getByText(/\d+ 行 · \d+ms/)).toBeVisible({ timeout: 15000 });
+  // The usage strip must stay mounted across model-switch remounts (no flash).
+  await expect(page.getByTestId('semantic-usage-strip')).toBeVisible();
   await page.screenshot({ path: `${EV}/semantic-console-run.png`, fullPage: true });
 
   // Time dimension grain selector (R4): pick the created-day dimension + month

@@ -37,6 +37,16 @@ import {
 
 type Tab = 'browse' | 'author';
 
+/**
+ * Module-level cache for the usage strip (R1): the explore panel remounts on
+ * model switches, and an async refetch would flash the strip away between
+ * mounts. A 60-second cache keeps the strip stable across remounts while
+ * staying fresh enough for a dog-food surface.
+ */
+let usageCache: UsageSummary | null = null;
+let usageCacheAt = 0;
+const USAGE_CACHE_TTL_MS = 60_000;
+
 function localize(
   label: Record<string, string> | undefined,
   fallback: string,
