@@ -60,7 +60,7 @@ public class AsyncTaskServiceImpl {
                              java.util.concurrent.atomic.AtomicBoolean active) {}
     private final ConcurrentHashMap<String, Execution> executions = new ConcurrentHashMap<>();
 
-    @Scheduled(fixedDelay = 15000, initialDelay = 15000)
+    @Scheduled(fixedDelay = 15000, initialDelay = 15000, scheduler = "asyncTaskLeaseScheduler")
     public void renewExecutionLeases() {
         for (Execution execution : executions.values()) {
             synchronized (execution) {
