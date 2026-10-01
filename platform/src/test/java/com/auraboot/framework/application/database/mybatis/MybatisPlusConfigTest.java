@@ -35,11 +35,14 @@ public class MybatisPlusConfigTest {
 
     private MybatisPlusConfig config;
     private DatabaseDialect mockDialect;
+    private org.springframework.core.env.Environment envMock;
 
     @BeforeEach
     public void setUp() {
         mockDialect = mock(DatabaseDialect.class);
         when(mockDialect.getType()).thenReturn(DatabaseType.POSTGRESQL);
+        envMock = mock(org.springframework.core.env.Environment.class);
+        when(envMock.getActiveProfiles()).thenReturn(new String[0]);
         config = new MybatisPlusConfig();
     }
 
@@ -80,7 +83,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证MybatisPlusInterceptor已正确创建")
     public void testMybatisPlusInterceptorCreation() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
 
         // Then
         assertNotNull(interceptor, "MybatisPlusInterceptor不应为null");
@@ -90,7 +93,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证TenantLineInnerInterceptor已注册")
     public void testTenantLineInnerInterceptorRegistered() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
         // Then
@@ -106,7 +109,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证PaginationInnerInterceptor已注册")
     public void testPaginationInnerInterceptorRegistered() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
         // Then
@@ -118,7 +121,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证TenantLineHandler已正确配置")
     public void testTenantLineHandlerConfiguration() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -144,7 +147,7 @@ public class MybatisPlusConfigTest {
         MetaContext.setSystemTenantContext(expectedTenantId);
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -173,7 +176,7 @@ public class MybatisPlusConfigTest {
         MetaContext.clear();  // 确保没有租户上下文
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -198,7 +201,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证getTenantIdColumn()返回正确的列名")
     public void testGetTenantIdColumn() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -227,14 +230,13 @@ public class MybatisPlusConfigTest {
                 "ab_tenant",
                 "ab_tenant_member",
                 "ab_invitation",
-                "ab_user_session",
                 "ab_user_social_link",
                 "ab_user_deactivation",
                 "ab_verification_code"
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -265,7 +267,7 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -291,8 +293,10 @@ public class MybatisPlusConfigTest {
         var prefixes = MybatisPlusConfig.class.getDeclaredField("tenantBypassTablePrefixes");
         prefixes.setAccessible(true);
         prefixes.set(config, "ext_, vendor_");
+        // The bypass is dev-profile-only since the W5 guard; opt this functional test in.
+        when(envMock.getActiveProfiles()).thenReturn(new String[]{"dev"});
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = findTenantInterceptor(interceptor);
         var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
         field.setAccessible(true);
@@ -313,7 +317,7 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -341,7 +345,7 @@ public class MybatisPlusConfigTest {
                 "ab_review"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor =
                 findTenantInterceptor(interceptor);
 
@@ -367,7 +371,7 @@ public class MybatisPlusConfigTest {
                 "ab_role"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor =
                 findTenantInterceptor(interceptor);
 
@@ -389,7 +393,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证调度器/异步表仍被忽略")
     public void testSchedulerTablesStillIgnored() {
         String[] schedulerTables = {
-                "ab_sla_record",
+                "ab_outbox",
                 "ab_automation",
                 "ab_idempotent_key",
                 "ab_idempotency_record",
@@ -403,7 +407,7 @@ public class MybatisPlusConfigTest {
                 "ab_decision_definition"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor =
                 findTenantInterceptor(interceptor);
 
@@ -434,7 +438,7 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         TenantLineInnerInterceptor tenantInterceptor = 
                 findTenantInterceptor(interceptor);
 
@@ -459,7 +463,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证拦截器注册顺序正确")
     public void testInterceptorOrder() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
         // Then — env-layering #19 added EnvWriteLockGuardInnerInterceptor + a second

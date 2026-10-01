@@ -28,6 +28,19 @@ class MetaContextTenantFilterScopeTest {
         MetaContext.clear();
     }
 
+    private TenantLineInnerInterceptor tenantInterceptor() {
+        DatabaseDialect dialect = mock(DatabaseDialect.class);
+        when(dialect.getType()).thenReturn(DatabaseType.POSTGRESQL);
+        MybatisPlusInterceptor interceptor = new MybatisPlusConfig()
+                .mybatisPlusInterceptor(dialect, mock(org.springframework.context.ApplicationContext.class),
+                        mock(org.springframework.core.env.Environment.class));
+        return interceptor.getInterceptors().stream()
+                .filter(TenantLineInnerInterceptor.class::isInstance)
+                .map(TenantLineInnerInterceptor.class::cast)
+                .findFirst()
+                .orElseThrow();
+    }
+
     @Nested
     class ScopeSemantics {
 
@@ -90,17 +103,6 @@ class MetaContextTenantFilterScopeTest {
     @Nested
     class TenantLineInterceptorWiring {
 
-        private TenantLineInnerInterceptor tenantInterceptor() {
-            DatabaseDialect dialect = mock(DatabaseDialect.class);
-            when(dialect.getType()).thenReturn(DatabaseType.POSTGRESQL);
-            MybatisPlusInterceptor interceptor = new MybatisPlusConfig()
-                    .mybatisPlusInterceptor(dialect, mock(org.springframework.context.ApplicationContext.class));
-            return interceptor.getInterceptors().stream()
-                    .filter(TenantLineInnerInterceptor.class::isInstance)
-                    .map(TenantLineInnerInterceptor.class::cast)
-                    .findFirst()
-                    .orElseThrow();
-        }
 
         @Test
         void businessTableIsFilteredWithoutScope() {
@@ -136,6 +138,70 @@ class MetaContextTenantFilterScopeTest {
             assertTrue(handler.ignoreTable("ab_user"));
             MetaContext.runWithoutTenantFilter(() ->
                     assertTrue(handler.ignoreTable("ab_user")));
+        }
+    }
+
+    @Nested
+    class RegistryLedger {
+
+        @Test
+        void registrySetsAreDisjointAndClean() {
+            for (String name : MybatisPlusConfig.VERIFIED_GLOBAL_TABLES) {
+                assertFalse(MybatisPlusConfig.MIGRATION_PENDING_TABLES.contains(name),
+                        name + " cannot be both verified-global and migration-pending");
+                assertTrue(name.startsWith("ab_"));
+            }
+            for (String name : MybatisPlusConfig.MIGRATION_PENDING_TABLES) {
+                assertTrue(name.startsWith("ab_"));
+            }
+        }
+
+        @Test
+        void pendingLedgerCountsDownTowardZero() {
+            // The ledger IS the campaign dashboard: every wave that removes an
+            // exemption updates its expected count here. 33 = post-W2a state.
+            assertEquals(33, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W2a removed ab_user_session; update this ledger when the next wave lands");
+            assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
+        }
+
+        @Test
+        void abUserSessionIsNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            assertFalse(handler.ignoreTable("ab_user_session"),
+                    "W2a removed this exemption; the tenant filter must apply");
+        }
+    }
+
+    @Nested
+    class PrefixBypassGuard {
+
+        private final MybatisPlusConfig config = new MybatisPlusConfig();
+
+        private org.springframework.core.env.Environment env(String... profiles) {
+            var environment = mock(org.springframework.core.env.Environment.class);
+            when(environment.getActiveProfiles()).thenReturn(profiles);
+            return environment;
+        }
+
+        @Test
+        void emptyPrefixNeverFails() {
+            org.springframework.test.util.ReflectionTestUtils.setField(config, "tenantBypassTablePrefixes", "");
+            assertDoesNotThrow(() -> config.guardTenantBypassPrefixes(env("production")));
+        }
+
+        @Test
+        void prefixInNonDevProfileFailsStartup() {
+            org.springframework.test.util.ReflectionTestUtils.setField(config, "tenantBypassTablePrefixes", "ext_,partner_");
+            var error = assertThrows(IllegalStateException.class,
+                    () -> config.guardTenantBypassPrefixes(env("production")));
+            assertTrue(error.getMessage().contains("tenant-bypass-table-prefixes"));
+        }
+
+        @Test
+        void prefixInDevProfileWarnsOnly() {
+            org.springframework.test.util.ReflectionTestUtils.setField(config, "tenantBypassTablePrefixes", "ext_");
+            assertDoesNotThrow(() -> config.guardTenantBypassPrefixes(env("dev")));
         }
     }
 }
