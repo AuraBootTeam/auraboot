@@ -90,20 +90,16 @@ public class MybatisPlusConfig {
         // W4 pending — @Async write without MetaContext
         "ab_permission_audit_log",
         // W3 pending — scheduler/worker/async executors without MetaContext
-        "ab_i18n_resource",                 // startup seeder writes tenantId=0 without context
         "ab_outbox",                        // outbox processor runs without tenant context
         "ab_scheduled_task",                // scheduler context, tenant_id NULLABLE
         "ab_scheduled_task_log",            // scheduler context, tenant_id NULLABLE
         "ab_notification_digest",           // scheduler flushes without tenant context
         "ab_async_task",                    // thread pool execution without MetaContext
         "ab_automation",                    // scheduler scans across all tenants every 60s/300s
-        "ab_idempotency_record",            // scheduler cleanup runs across all tenants
-        "ab_idempotent_key",                // scheduler cleanup runs across all tenants
         "ab_export_task",                   // @Async export + scheduler cleanup across tenants
         "ab_behavior_event",                // MQ consumer/analytics paths pass tenant_id explicitly
         "ab_behavior_quarantine",           // MQ consumer/replay sink; tenant_id is carried explicitly
         "ab_behavior_outcome_outbox",       // server outcome relay scans across tenants
-        "ab_cloud_config",                  // PLATFORM-level rows have tenant_id=NULL
         "ab_invariant_definition",          // InvariantAlarmWorker scans across all tenants in thread pool
         "ab_decision_definition",           // DecisionAlarmWorker scans across all tenants in thread pool
         // W4 pending — mobile config (schema HAS tenant_id despite the old "no tenant_id" comment)

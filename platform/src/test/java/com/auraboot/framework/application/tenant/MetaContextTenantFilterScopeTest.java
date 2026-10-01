@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(32, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W4a removed ab_exchange_rate (fetcher binds its own context; mapper params = context tenant); update this ledger per wave");
+            assertEquals(28, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W3a removed the two idempotency tables + i18n/cloud seeders (own-table seams wrapped); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -177,6 +177,16 @@ class MetaContextTenantFilterScopeTest {
             var handler = tenantInterceptor().getTenantLineHandler();
             assertFalse(handler.ignoreTable("ab_exchange_rate"),
                     "W4a removed this exemption; explicit-param queries are same-tenant as context");
+        }
+
+        @Test
+        void w3aSeedersAndCleanupsAreNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_i18n_resource", "ab_cloud_config",
+                    "ab_idempotency_record", "ab_idempotent_key"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
         }
     }
 

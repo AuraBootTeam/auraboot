@@ -7,6 +7,7 @@ import com.auraboot.framework.application.bootstrap.seeder.MarketplaceCategorySe
 import com.auraboot.framework.application.bootstrap.seeder.QueryOperatorSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.SolutionSeeder;
 import com.auraboot.framework.application.bootstrap.seeder.SystemFieldSeeder;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.i18n.service.I18nOverrideAuditor;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,9 +36,12 @@ public class PlatformSeedService {
         log.info("PlatformSeedService: starting explicit platform data initialization...");
         systemFieldSeeder.seed();
         queryOperatorSeeder.seed();
-        i18nBaseSeeder.seed();
+        // Bootstrap runs without MetaContext; these two seeders write rows whose
+        // tenant_id is set explicitly (0 / NULL platform rows). Scope only them:
+        // the other seeders rely on the tenant-line INSERT fill and must keep it.
+        MetaContext.runWithoutTenantFilter(() -> i18nBaseSeeder.seed());
         auditI18nDrift();
-        cloudConfigSeeder.seed();
+        MetaContext.runWithoutTenantFilter(() -> cloudConfigSeeder.seed());
         marketplaceCategorySeeder.seed();
         agentTemplateSeeder.seed();
         solutionSeeder.seed();

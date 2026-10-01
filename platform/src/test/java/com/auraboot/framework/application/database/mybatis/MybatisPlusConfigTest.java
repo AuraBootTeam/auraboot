@@ -395,10 +395,8 @@ public class MybatisPlusConfigTest {
         String[] schedulerTables = {
                 "ab_outbox",
                 "ab_automation",
-                "ab_idempotent_key",
-                "ab_idempotency_record",
                 "ab_export_task",
-                "ab_i18n_resource",
+                "ab_async_task",
                 "ab_async_task",
                 "ab_notification_digest",
                 "ab_behavior_event",
