@@ -454,7 +454,7 @@ export default defineConfig({
           {
             name: 'rbac-chromium',
             testDir: './tests/e2e/permission',
-            testMatch: /dynamic-data-scope-runtime\.spec\.ts$/,
+            testMatch: /(dynamic|team)-data-scope-runtime\.spec\.ts$/,
             dependencies: ['rbac-auth'],
             use: {
               ...devices['Desktop Chrome'],
