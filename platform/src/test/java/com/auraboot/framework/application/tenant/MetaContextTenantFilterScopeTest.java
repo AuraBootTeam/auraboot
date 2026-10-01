@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(21, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W3c removed the two alarm-definition tables (worker seams wrapped in W3b); update this ledger per wave");
+            assertEquals(19, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W3d removed the scheduled-task pair (engine lifecycle + executor plane wrapped); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -186,6 +186,15 @@ class MetaContextTenantFilterScopeTest {
                     "ab_idempotency_record", "ab_idempotent_key"}) {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
+        }
+
+        @Test
+        void w3dScheduledTaskPairIsNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_scheduled_task", "ab_scheduled_task_log"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W3d removed these exemptions; engine + executor planes are scoped, handlers stay fail-closed");
             }
         }
 

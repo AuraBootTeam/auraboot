@@ -95,8 +95,6 @@ public class MybatisPlusConfig {
         "ab_permission_audit_log",
         // W3 pending — scheduler/worker/async executors without MetaContext
         "ab_outbox",                        // outbox processor runs without tenant context
-        "ab_scheduled_task",                // scheduler context, tenant_id NULLABLE
-        "ab_scheduled_task_log",            // scheduler context, tenant_id NULLABLE
         "ab_notification_digest",           // scheduler flushes without tenant context
         "ab_automation",                    // scheduler scans across all tenants every 60s/300s
         // W4 pending — mobile config (schema HAS tenant_id despite the old "no tenant_id" comment)

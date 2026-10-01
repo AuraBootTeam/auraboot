@@ -1,6 +1,7 @@
 package com.auraboot.framework.scheduler.service.impl;
 
 import com.auraboot.framework.common.util.TenantClock;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
 import com.auraboot.framework.scheduler.service.SchedulerEngine;
@@ -57,7 +58,10 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
     @Override
     public void start() {
         log.info("Starting database scheduler engine...");
-        List<ScheduledTask> tasks = taskMapper.findAllEnabled();
+        // Engine lifecycle threads have no MetaContext; the task registry itself
+        // is scheduler-plane state (tenant-exemption cleanup W3).
+        List<ScheduledTask> tasks = MetaContext.runWithoutTenantFilter(
+                () -> taskMapper.findAllEnabled());
         int scheduled = 0;
         for (ScheduledTask task : tasks) {
             try {

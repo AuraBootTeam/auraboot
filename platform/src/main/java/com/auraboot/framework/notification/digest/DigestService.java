@@ -82,8 +82,10 @@ public class DigestService {
     @Transactional
     public void flushDigests() {
         Instant cutoff = Instant.now().minus(DIGEST_WINDOW);
-        // Row-level lock prevents duplicate processing across nodes
-        List<DigestEntry> entries = digestMapper.findFlushableEntriesForUpdate(DIGEST_THRESHOLD, cutoff);
+        // Cross-tenant scan; per-entry processing below binds each row's tenant
+        // context. Explicit scope instead of a blanket table exemption (W3).
+        List<DigestEntry> entries = MetaContext.runWithoutTenantFilter(
+                () -> digestMapper.findFlushableEntriesForUpdate(DIGEST_THRESHOLD, cutoff));
 
         for (DigestEntry entry : entries) {
             try {
