@@ -4,17 +4,18 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import com.auraboot.framework.meta.dto.DynamicBatchResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -58,6 +59,7 @@ class ExcelEdgeCaseTest {
 
     @BeforeEach
     void setUp() {
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
                 commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
@@ -67,9 +69,17 @@ class ExcelEdgeCaseTest {
                 .enabled(true)
                 .modes(java.util.Set.of("insert", "update"))
                 .updateKeys(List.of("code"))
+                .profileCode("test_model:default-import")
+                .createCommand("test:create")
+                .updateCommand("test:update")
                 .createFields(java.util.Set.of("name", "code"))
                 .updateFields(java.util.Set.of("name", "code"))
                 .build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     /**
@@ -123,8 +133,7 @@ class ExcelEdgeCaseTest {
             assertEquals(0, result.getErrorCount());
             assertFalse(result.isHasErrors());
 
-            // No calls to dynamicDataService since there are no rows to insert
-            verify(dynamicDataService, never()).create(anyString(), anyMap());
+            verify(commandExecutor, never()).execute(anyString(), any(CommandExecuteRequest.class));
         }
     }
 
@@ -144,9 +153,6 @@ class ExcelEdgeCaseTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new DynamicBatchResponse());
-
         ImportOptions options = new ImportOptions();
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 
@@ -155,6 +161,7 @@ class ExcelEdgeCaseTest {
         assertEquals(2, result.getSuccessCount());
         assertEquals(0, result.getErrorCount());
         assertFalse(result.isHasErrors());
+        verify(commandExecutor, times(2)).execute(eq("test:create"), any(CommandExecuteRequest.class));
     }
 
     // ========== Test 3: Fewer data columns than headers ==========
@@ -171,14 +178,12 @@ class ExcelEdgeCaseTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new DynamicBatchResponse());
-
         ImportOptions options = new ImportOptions();
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 
         assertEquals(1, result.getTotalRows());
         assertEquals(1, result.getSuccessCount());
+        verify(commandExecutor).execute(eq("test:create"), any(CommandExecuteRequest.class));
     }
 
     // ========== Test 4: Large dataset (100 rows) all processed ==========
@@ -201,10 +206,6 @@ class ExcelEdgeCaseTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        // batchCreate succeeds
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new DynamicBatchResponse());
-
         ImportOptions options = new ImportOptions();
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 
@@ -213,8 +214,8 @@ class ExcelEdgeCaseTest {
         assertEquals(0, result.getErrorCount());
         assertFalse(result.isHasErrors());
 
-        // 100 rows in 1 batch (< 500 batch size)
-        verify(dynamicDataService, times(1)).batchCreate(eq("test_model"), anyList());
+        verify(commandExecutor, times(rowCount))
+                .execute(eq("test:create"), any(CommandExecuteRequest.class));
         verify(dynamicDataService, never()).create(anyString(), anyMap());
     }
 
@@ -238,7 +239,7 @@ class ExcelEdgeCaseTest {
             assertEquals(0, result.getSuccessCount());
             assertFalse(result.isHasErrors());
 
-            verify(dynamicDataService, never()).create(anyString(), anyMap());
+            verify(commandExecutor, never()).execute(anyString(), any(CommandExecuteRequest.class));
         }
     }
 
@@ -252,13 +253,11 @@ class ExcelEdgeCaseTest {
         ByteArrayInputStream stream = createExcel(headers, data);
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of());
 
-        when(dynamicDataService.batchCreate(eq("test_model"), anyList()))
-                .thenReturn(new DynamicBatchResponse());
-
         // Pass null options — should use defaults
         ExcelImportResult result = importService.importExcel("test_model", stream, null);
 
         assertEquals(1, result.getTotalRows());
         assertEquals(1, result.getSuccessCount());
+        verify(commandExecutor).execute(eq("test:create"), any(CommandExecuteRequest.class));
     }
 }
