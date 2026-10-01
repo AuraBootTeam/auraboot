@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
@@ -64,5 +65,40 @@ class CommandDispatcherAccessorImplTest {
         assertThatThrownBy(() -> accessor.execute("m:compute_fee", "m_model", "record-1", Map.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("invariant violated");
+    }
+
+    @Test
+    void nested_dispatch_restores_the_callers_identity_context() {
+        CommandExecutor executor = mock(CommandExecutor.class);
+        when(executor.execute(any(), any())).thenAnswer(invocation -> {
+            MetaContext.clear();
+            return CommandExecuteResult.builder().commandCode("m:compute_fee").build();
+        });
+        MetaContext.setContext(7L, 42L, "user-42", "operator");
+        try {
+            new CommandDispatcherAccessorImpl(executor)
+                    .execute("m:compute_fee", "m_model", "record-1", Map.of());
+
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(42L);
+            assertThat(MetaContext.getCurrentUserPid()).isEqualTo("user-42");
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void nested_dispatch_does_not_leak_an_identity_when_the_caller_had_none() {
+        MetaContext.clear();
+        CommandExecutor executor = mock(CommandExecutor.class);
+        when(executor.execute(any(), any())).thenAnswer(invocation -> {
+            MetaContext.setContext(9L, 99L, "nested", "nested");
+            return CommandExecuteResult.builder().commandCode("m:compute_fee").build();
+        });
+
+        new CommandDispatcherAccessorImpl(executor)
+                .execute("m:compute_fee", "m_model", "record-1", Map.of());
+
+        assertThat(MetaContext.exists()).isFalse();
     }
 }
