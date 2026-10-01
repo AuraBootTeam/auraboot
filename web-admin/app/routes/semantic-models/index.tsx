@@ -322,6 +322,18 @@ function BrowsePanel({
         grains,
         limit,
       });
+      // R1: refresh the usage strip so the just-executed query is counted
+      // immediately instead of waiting for the next panel mount.
+      usageCache = null;
+      fetchUsageSummary(7)
+        .then((u) => {
+          usageCache = u;
+          usageCacheAt = Date.now();
+          setUsage(u);
+        })
+        .catch(() => {
+          /* strip keeps its previous values on refresh failure */
+        });
     } catch (e) {
       setQueryError(e instanceof Error ? e.message : String(e));
     } finally {
