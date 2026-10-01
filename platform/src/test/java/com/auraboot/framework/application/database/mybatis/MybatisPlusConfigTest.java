@@ -398,9 +398,7 @@ public class MybatisPlusConfigTest {
         String[] schedulerTables = {
                 "ab_outbox",
                 "ab_automation",
-                "ab_notification_digest",
-                "ab_invariant_definition",
-                "ab_decision_definition"
+                "ab_notification_digest"
         };
 
         MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);

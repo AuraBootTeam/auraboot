@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(23, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W3b removed behavior trio + export/async (@Async executors propagate tenant; scheduled/MQ seams wrapped); update this ledger per wave");
+            assertEquals(21, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W3c removed the two alarm-definition tables (worker seams wrapped in W3b); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -186,6 +186,15 @@ class MetaContextTenantFilterScopeTest {
                     "ab_idempotency_record", "ab_idempotent_key"}) {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
+        }
+
+        @Test
+        void w3cAlarmDefinitionTablesAreNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_invariant_definition", "ab_decision_definition"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W3c removed these exemptions; worker entry seams wrapped in W3b");
             }
         }
 

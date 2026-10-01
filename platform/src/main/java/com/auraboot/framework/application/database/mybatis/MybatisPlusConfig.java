@@ -99,8 +99,6 @@ public class MybatisPlusConfig {
         "ab_scheduled_task_log",            // scheduler context, tenant_id NULLABLE
         "ab_notification_digest",           // scheduler flushes without tenant context
         "ab_automation",                    // scheduler scans across all tenants every 60s/300s
-        "ab_invariant_definition",          // InvariantAlarmWorker scans across all tenants in thread pool
-        "ab_decision_definition",           // DecisionAlarmWorker scans across all tenants in thread pool
         // W4 pending — mobile config (schema HAS tenant_id despite the old "no tenant_id" comment)
         "ab_mobile_config",
         "ab_mobile_client_log"
