@@ -11,9 +11,31 @@
       "subtitleField": "e2et_order_no",
       "importPolicy": {
         "enabled": true,
+        "code": "e2et-order-standard-document",
+        "atomicUnit": "document",
         "modes": [
           "insert"
-        ]
+        ],
+        "document": {
+          "command": "e2eto:create_e2et_order",
+          "headerSheet": "Orders",
+          "lineSheet": "Lines",
+          "groupBy": "e2et_order_title",
+          "lineGroupField": "e2et_item_spec",
+          "lineModelCode": "e2et_order_item",
+          "linesPayloadField": "lines",
+          "headerFields": [
+            "e2et_order_title",
+            "e2et_order_desc"
+          ],
+          "lineFields": [
+            "e2et_item_spec",
+            "e2et_item_name",
+            "e2et_item_qty",
+            "e2et_item_price"
+          ],
+          "requireLines": true
+        }
       },
       "rules": [
         {

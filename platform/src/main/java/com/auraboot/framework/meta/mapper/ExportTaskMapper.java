@@ -23,6 +23,11 @@ public interface ExportTaskMapper extends BaseMapper<ExportTask> {
     List<ExportTask> findByQueryCode(@Param("queryCode") String queryCode, @Param("tenantId") Long tenantId,
                                      @Param("userId") Long userId, @Param("limit") int limit);
 
+    @Select("SELECT * FROM ab_export_task WHERE tenant_id = #{tenantId} AND created_by = #{userId} ORDER BY created_at DESC LIMIT #{limit}")
+    List<ExportTask> findRecentForOwner(@Param("tenantId") Long tenantId,
+                                        @Param("userId") Long userId,
+                                        @Param("limit") int limit);
+
     @Update("UPDATE ab_export_task SET status = #{status}, progress = #{progress}, processed_rows = #{processedRows} WHERE id = #{id}")
     int updateProgress(@Param("id") Long id, @Param("status") String status,
                        @Param("progress") int progress, @Param("processedRows") long processedRows);

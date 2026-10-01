@@ -32,6 +32,11 @@ const REQUIRED_OSS_PLUGINS = [
     probeModelCode: 'ab_announcement',
     probeCommandCode: 'announcement:create_announcement',
   },
+  {
+    name: 'core-data-exchange',
+    pluginId: 'com.auraboot.core-data-exchange',
+    probeModelCode: 'ab_document_artifact',
+  },
 ];
 
 async function login(request: APIRequestContext): Promise<string> {
@@ -54,6 +59,13 @@ test('import required OSS plugins for OSS E2E profile', async ({ request }) => {
   const token = await login(request);
 
   for (const plugin of REQUIRED_OSS_PLUGINS) {
+    if (!plugin.probeCommandCode) {
+      const existingModel = await request.get(
+        `${BACKEND_URL}/api/meta/models/code/${encodeURIComponent(plugin.probeModelCode)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (existingModel.ok()) continue;
+    }
     const existingCommandsRes = await request.get(
       `${BACKEND_URL}/api/meta/commands?modelCode=${encodeURIComponent(plugin.probeModelCode)}`,
       {
@@ -67,7 +79,8 @@ test('import required OSS plugins for OSS E2E profile', async ({ request }) => {
         data?: Array<{ code?: string }>;
       };
       const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
-      if (commands.some((command) => command?.code === plugin.probeCommandCode)) {
+      if (plugin.probeCommandCode
+          && commands.some((command) => command?.code === plugin.probeCommandCode)) {
         continue;
       }
     }

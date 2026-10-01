@@ -558,7 +558,7 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
           const rawList = await peer.page.request.get(`/api/dynamic/${model}/list`);
           expect(rawList.status(), `Raw ${model} list must remain private`).toBe(403);
           const rawExport = await peer.page.request.post(`/api/dynamic/${model}/export`, {
-            data: { format: 'CSV' },
+            data: { format: 'CSV', scope: 'filtered', conditions: [] },
           });
           expect(rawExport.status(), `Raw ${model} export must remain private`).toBe(403);
           const rawAggregate = await peer.page.request.post('/api/meta/chart-data', {

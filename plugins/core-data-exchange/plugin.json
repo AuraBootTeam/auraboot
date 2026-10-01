@@ -1,0 +1,30 @@
+{
+  "pluginId": "com.auraboot.core-data-exchange",
+  "namespace": "core-data-exchange",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Data Exchange Center",
+  "displayName:zh-CN": "数据交换中心",
+  "displayName:en": "Data Exchange Center",
+  "description": "Owner-scoped task center for governed imports, exports, and document artifacts",
+  "author": "AuraBoot Team",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields.json",
+    "modelFieldBindings": "config/bindings.json",
+    "pages": "config/pages.json",
+    "dicts": "config/dicts.json",
+    "menus": "config/menus.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": false
+  }
+}

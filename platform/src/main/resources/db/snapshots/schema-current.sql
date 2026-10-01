@@ -10094,7 +10094,7 @@ CREATE TABLE public.ab_import_job (
     processed_rows integer DEFAULT 0 NOT NULL,
     success_rows integer DEFAULT 0 NOT NULL,
     error_rows integer DEFAULT 0 NOT NULL,
-    import_mode character varying(16) DEFAULT 'insert'::character varying NOT NULL,
+    import_mode character varying(128) DEFAULT 'insert'::character varying NOT NULL,
     error_report_url text,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,

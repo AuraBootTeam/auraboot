@@ -18,6 +18,8 @@ import java.util.Set;
 @Builder
 public class ExcelImportPolicy {
 
+    /** Stable logical profile id exposed in task and audit evidence. */
+    private String profileCode;
     private String modelCode;
     private boolean enabled;
     @Builder.Default
@@ -32,6 +34,10 @@ public class ExcelImportPolicy {
     private Set<String> createAutoSetFields = Set.of();
     @Builder.Default
     private Set<String> updateFields = Set.of();
+
+    /** Slice A supports row-atomic profiles; document profiles use a dedicated runner. */
+    @Builder.Default
+    private String atomicUnit = "row";
 
     public boolean supports(String mode) {
         return mode != null && modes.contains(mode.toLowerCase(java.util.Locale.ROOT));

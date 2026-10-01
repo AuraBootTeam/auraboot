@@ -42,6 +42,7 @@ public class ExcelImportController {
     private final ExcelImportPolicyResolver policyResolver;
     private final ExcelImportErrorReportService errorReportService;
     private final I18nLocaleResolver i18nLocaleResolver;
+    private final DocumentImportService documentImportService;
 
     private static final long MAX_IMPORT_BYTES = 10L * 1024L * 1024L;
 
@@ -78,6 +79,51 @@ public class ExcelImportController {
                     log.warn("Failed to delete generated import template {}", templatePath, cleanupError);
                 }
             }
+        }
+    }
+
+    @GetMapping("/document-template/{modelCode}")
+    @RequirePermission("model.{modelCode}.import")
+    public ResponseEntity<Resource> downloadDocumentTemplate(@PathVariable String modelCode) {
+        Path templatePath = null;
+        try {
+            templatePath = documentImportService.generateTemplate(modelCode);
+            Resource resource = new ByteArrayResource(Files.readAllBytes(templatePath));
+            String fileName = URLEncoder.encode(modelCode + "-document-import-template.xlsx",
+                    StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(resource);
+        } catch (IOException failure) {
+            log.error("Failed to generate document import template for model {}", modelCode, failure);
+            return ResponseEntity.internalServerError().build();
+        } finally {
+            if (templatePath != null) {
+                try {
+                    Files.deleteIfExists(templatePath);
+                } catch (IOException cleanupError) {
+                    log.warn("Failed to delete document import template {}", templatePath, cleanupError);
+                }
+            }
+        }
+    }
+
+    @PostMapping("/document-import/{modelCode}")
+    @RequirePermission("model.{modelCode}.import")
+    public ApiResponse<ExcelImportResult> importDocument(
+            @PathVariable String modelCode,
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean dryRun,
+            @RequestParam(defaultValue = "false") boolean skipErrors) {
+        validateUpload(file);
+        try {
+            return ApiResponse.success(documentImportService.importWorkbook(
+                    modelCode, file.getInputStream(), dryRun, skipErrors, file.getOriginalFilename()));
+        } catch (IOException failure) {
+            log.error("Failed to read document import workbook for model {}", modelCode, failure);
+            return ApiResponse.error("Failed to read uploaded file");
         }
     }
 
@@ -224,35 +270,6 @@ public class ExcelImportController {
         } catch (IOException e) {
             log.error("Failed to validate Excel file for model {}: {}", modelCode, e.getMessage());
             return ApiResponse.error("Failed to read uploaded file: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Chain import: import parent records from Sheet1, then child records from Sheet2
-     * with automatic FK resolution.
-     *
-     * @param parentModelCode parent model code (Sheet1)
-     * @param childModelCode  child model code (Sheet2)
-     * @param parentKeyField  unique field on parent used to match child FK values
-     * @param childFkField    field on child that references the parent
-     * @param file            multi-sheet .xlsx file
-     */
-    @PostMapping("/chain-import")
-    @RequirePermission("meta.model.update")
-    public ApiResponse<ExcelImportResult> chainImport(
-            @RequestParam String parentModelCode,
-            @RequestParam String childModelCode,
-            @RequestParam String parentKeyField,
-            @RequestParam String childFkField,
-            @RequestParam MultipartFile file) {
-        try {
-            ExcelImportResult result = importService.chainImport(
-                    parentModelCode, childModelCode, parentKeyField, childFkField,
-                    file.getInputStream());
-            return ApiResponse.success(result);
-        } catch (IOException e) {
-            log.error("Chain import failed: {}", e.getMessage());
-            return ApiResponse.error("Chain import failed: " + e.getMessage());
         }
     }
 

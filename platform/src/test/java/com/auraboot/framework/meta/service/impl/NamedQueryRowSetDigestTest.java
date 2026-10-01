@@ -3,6 +3,8 @@ package com.auraboot.framework.meta.service.impl;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,5 +51,14 @@ class NamedQueryRowSetDigestTest {
         List<Map<String, Object>> rows = List.of(row("a", 1L));
         assertThat(NamedQueryRowSetDigest.digest(rows, List.of("record_key", "amount")))
                 .isNotEqualTo(NamedQueryRowSetDigest.digest(rows, List.of("amount", "record_key")));
+    }
+
+    @Test void commonDatabaseTemporalTypesAreCanonicalizedWithoutConversionFailures() {
+        assertThat(NamedQueryRowSetDigest.digest(
+                List.of(row("a", Instant.parse("2026-09-30T02:00:00Z"))),
+                List.of("record_key", "amount"))).hasSize(64);
+        assertThat(NamedQueryRowSetDigest.digest(
+                List.of(row("a", LocalDateTime.parse("2026-09-30T10:00:00"))),
+                List.of("record_key", "amount"))).hasSize(64);
     }
 }

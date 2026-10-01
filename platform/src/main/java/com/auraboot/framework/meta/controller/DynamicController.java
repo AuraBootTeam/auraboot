@@ -11,6 +11,9 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
+import com.auraboot.framework.meta.service.impl.ExportTaskService;
+import com.auraboot.module.exchange.profile.ExportProfile;
+import com.auraboot.module.exchange.profile.ExportProfileResolver;
 import com.auraboot.framework.meta.util.PageKeyConverter;
 import com.auraboot.framework.meta.util.PublicRecordSanitizer;
 import com.auraboot.framework.organization.service.OrganizationService;
@@ -22,6 +25,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
@@ -93,6 +97,12 @@ public class DynamicController {
 
     @Autowired
     private RecordShareService recordShareService;
+
+    @Autowired
+    private ExportTaskService exportTaskService;
+
+    @Autowired
+    private ExportProfileResolver exportProfileResolver;
 
     @Autowired
     private com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;
@@ -767,64 +777,78 @@ public class DynamicController {
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @RequestBody(required = false) Map<String, Object> exportParams) {
+            @Valid @RequestBody DynamicDataExportRequest exportParams) {
         log.info("导出数据: {}", logSafe(pageKey));
 
         // Parse export params
         String modelCode = resolveModelCode(pageKey);
-        DataExportRequest.ExportFormat format = DataExportRequest.ExportFormat.EXCEL;
+        ExportProfile profile = exportProfileResolver.requireEnabled(modelCode);
+        DataExportRequest.ExportFormat format = parseExportFormat(exportParams.getFormat());
+        if (!profile.getScopes().contains(exportParams.getScope())) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    "Export scope is not allowed by profile: " + exportParams.getScope());
+        }
+        if (!profile.getFormats().contains(format)) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    "Export format is not allowed by profile: " + format);
+        }
         List<QueryCondition> conditions = null;
         String keyword = null;
 
-        if (exportParams != null) {
-            // Parse format
-            Object formatObj = exportParams.get("format");
-            if (formatObj != null) {
-                format = parseExportFormat(formatObj);
-            }
-
-            // Parse conditions from frontend filters
-            Object conditionsObj = exportParams.get("conditions");
-            if (conditionsObj instanceof List<?> conditionsList) {
-                conditions = new java.util.ArrayList<>();
-                for (Object item : conditionsList) {
-                    if (item instanceof Map<?, ?> condMap) {
-                        String field = condMap.get("field") != null ? condMap.get("field").toString() : null;
-                        String op = condMap.get("operator") != null ? condMap.get("operator").toString() : null;
-                        Object val = resolveRuntimeFilterValue(condMap.get("value"), modelCode);
-                        if (field != null && op != null) {
-                            try {
-                                QueryCondition.Operator operator = QueryCondition.Operator.fromCode(op);
-                                if (operator == null) {
-                                    throw new IllegalArgumentException("Unsupported operator: " + op);
-                                }
-                                QueryCondition.QueryConditionBuilder conditionBuilder = QueryCondition.builder()
-                                        .fieldName(field)
-                                        .operator(operator)
-                                        .value(val);
-                                if ((operator == QueryCondition.Operator.IN
-                                        || operator == QueryCondition.Operator.NOT_IN
-                                        || operator == QueryCondition.Operator.BETWEEN)
-                                        && val instanceof List<?> values) {
-                                    conditionBuilder.values(flattenResolvedValues(values));
-                                }
-                                conditions.add(conditionBuilder.build());
-                            } catch (IllegalArgumentException e) {
-                                log.warn("Invalid operator in export condition: {}", logSafe(op));
-                            }
+        // Parse conditions from frontend filters.
+        List<DynamicDataExportRequest.Condition> conditionsList = exportParams.getConditions();
+        if (conditionsList != null) {
+            conditions = new java.util.ArrayList<>();
+            for (DynamicDataExportRequest.Condition condition : conditionsList) {
+                String field = condition.getField();
+                String op = condition.getOperator();
+                Object val = resolveRuntimeFilterValue(condition.getValue(), modelCode);
+                if (field != null && op != null) {
+                    try {
+                        QueryCondition.Operator operator = QueryCondition.Operator.fromCode(op);
+                        if (operator == null) {
+                            throw new IllegalArgumentException("Unsupported operator: " + op);
                         }
+                        QueryCondition.QueryConditionBuilder conditionBuilder = QueryCondition.builder()
+                                .fieldName(field)
+                                .operator(operator)
+                                .value(val);
+                        if ((operator == QueryCondition.Operator.IN
+                                || operator == QueryCondition.Operator.NOT_IN
+                                || operator == QueryCondition.Operator.BETWEEN)
+                                && val instanceof List<?> values) {
+                            conditionBuilder.values(flattenResolvedValues(values));
+                        }
+                        conditions.add(conditionBuilder.build());
+                    } catch (IllegalArgumentException e) {
+                        throw new com.auraboot.framework.exception.BusinessException(
+                                "Invalid export filter operator: " + op);
                     }
                 }
-                if (conditions.isEmpty()) conditions = null;
             }
-            Object keywordObj = exportParams.get("keyword");
-            if (keywordObj != null && !keywordObj.toString().isBlank()) {
-                keyword = keywordObj.toString().trim();
+            if (conditions.isEmpty()) conditions = null;
+        }
+        if (exportParams.getKeyword() != null && !exportParams.getKeyword().isBlank()) {
+            keyword = exportParams.getKeyword().trim();
+        }
+
+        if (exportParams.getScope() == DynamicDataExportRequest.Scope.selected) {
+            if (exportParams.getSelectedPids() == null || exportParams.getSelectedPids().isEmpty()) {
+                return ApiResponse.error("Selected export requires at least one record");
             }
+            if (conditions == null) conditions = new ArrayList<>();
+            conditions.add(QueryCondition.builder()
+                    .fieldName("pid")
+                    .operator(QueryCondition.Operator.IN)
+                    .values(new ArrayList<>(new LinkedHashSet<>(exportParams.getSelectedPids())))
+                    .build());
+        } else if (exportParams.getSelectedPids() != null && !exportParams.getSelectedPids().isEmpty()) {
+            return ApiResponse.error("Filtered export cannot include selected record ids");
         }
 
         DataExportRequest request = DataExportRequest.builder()
                 .format(format)
+                .fields(exportProfileResolver.resolveFields(profile, exportParams.getFields()))
                 .conditions(conditions)
                 .keyword(keyword)
                 .includeHeader(true)
@@ -836,9 +860,9 @@ public class DynamicController {
             return ApiResponse.error(result.getErrorMessage() != null ? result.getErrorMessage() : "导出失败");
         }
 
-        // 生成下载URL
-        String downloadUrl = "/api/dynamic/" + pageKey + "/download?file=" +
-                java.net.URLEncoder.encode(result.getFilePath(), java.nio.charset.StandardCharsets.UTF_8);
+        ExportTaskDTO task = exportTaskService.registerModelExport(
+                modelCode, profile.getCode(), request, result);
+        String downloadUrl = "/api/dynamic/" + pageKey + "/exports/" + task.getPid() + "/download";
 
         Map<String, Object> legacyResult = Map.of(
             "success", true,
@@ -850,6 +874,7 @@ public class DynamicController {
     }
 
     private static DataExportRequest.ExportFormat parseExportFormat(Object formatObj) {
+        if (formatObj == null) return DataExportRequest.ExportFormat.EXCEL;
         String formatStr = formatObj.toString().trim().toLowerCase(java.util.Locale.ROOT);
         return switch (formatStr) {
             case "csv" -> DataExportRequest.ExportFormat.CSV;
@@ -874,41 +899,33 @@ public class DynamicController {
     /**
      * 下载导出文件
      */
-    @GetMapping("/{pageKey}/download")
-    @Operation(summary = "下载导出文件", description = "下载导出的CSV文件")
+    @GetMapping("/{pageKey}/exports/{taskPid}/download")
+    @Operation(summary = "下载导出文件", description = "下载当前用户仍有权限领取的导出产物")
     // Gated by read — see exportData above (export = packaging readable data).
     @RequirePermission("model.{pageKey}.read")
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @Parameter(description = "文件路径") @RequestParam String file,
+            @Parameter(description = "任务PID") @PathVariable String taskPid,
             HttpServletResponse response) throws java.io.IOException {
-        log.info("下载导出文件: pageKey={}, file={}", logSafe(pageKey), logSafe(file));
-
-        // Security: validate file path is within temp directory to prevent path traversal
-        java.nio.file.Path tempDir = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
-        java.nio.file.Path filePath = java.nio.file.Paths.get(file).normalize().toAbsolutePath();
-        if (!filePath.startsWith(tempDir.normalize().toAbsolutePath())) {
-            log.warn("Path traversal attempt blocked: {}", logSafe(file));
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
-            return;
-        }
-        if (!java.nio.file.Files.exists(filePath)) {
+        String modelCode = resolveModelCode(pageKey);
+        ExportTaskService.ExportArtifactDownload artifact =
+                exportTaskService.openModelArtifact(taskPid, modelCode);
+        if (artifact == null) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "文件不存在");
             return;
         }
 
-        String extension = exportExtension(filePath);
+        String extension = artifact.extension().replaceFirst("^\\.", "");
         String fileName = pageKey + "_export." + extension;
         String encodedFileName = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
-        long fileSize = java.nio.file.Files.size(filePath);
         response.setContentType(exportContentType(extension));
-        response.setContentLengthLong(fileSize);
+        response.setContentLengthLong(artifact.size());
         response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedFileName);
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 
-        try (java.io.InputStream is = java.nio.file.Files.newInputStream(filePath);
+        try (java.io.InputStream is = artifact.content();
              java.io.OutputStream os = response.getOutputStream()) {
             byte[] buffer = new byte[8192];
             int bytesRead;
@@ -918,20 +935,6 @@ public class DynamicController {
             os.flush();
         }
 
-        // 下载完成后删除临时文件
-        try {
-            java.nio.file.Files.deleteIfExists(filePath);
-        } catch (Exception e) {
-            log.warn("Failed to delete temp export file: {}", logSafe(file));
-        }
-    }
-
-    private static String exportExtension(java.nio.file.Path filePath) {
-        String fileName = filePath.getFileName() != null ? filePath.getFileName().toString().toLowerCase() : "";
-        if (fileName.endsWith(".csv")) return "csv";
-        if (fileName.endsWith(".json")) return "json";
-        if (fileName.endsWith(".xml")) return "xml";
-        return "xlsx";
     }
 
     private static String exportContentType(String extension) {
@@ -952,27 +955,8 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> importData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> importParams) {
-        log.info("导入数据: {}", logSafe(pageKey));
-        
-        // 转换为新的接口调用
-        String modelCode = resolveModelCode(pageKey);
-        DataImportRequest request = DataImportRequest.builder()
-                .format(DataImportRequest.ImportFormat.EXCEL)
-                .mode(DataImportRequest.ImportMode.UPSERT)
-                .batchSize(1000)
-                .build();
-        
-        ImportResult result = dynamicDataService.importData(modelCode, request);
-        
-        // 转换为旧格式返回
-        Map<String, Object> legacyResult = Map.of(
-            "success", result.getSuccess(),
-            "imported", result.getSuccessCount() != null ? result.getSuccessCount() : 0,
-            "failed", result.getFailedCount() != null ? result.getFailedCount() : 0,
-            "total", result.getTotalCount() != null ? result.getTotalCount() : 0
-        );
-        
-        return ApiResponse.success(legacyResult);
+        throw new com.auraboot.framework.exception.BusinessException(
+                "Legacy dynamic import is disabled; use a command-bound ImportProfile");
     }
 
     /**

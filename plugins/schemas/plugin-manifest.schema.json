@@ -1654,6 +1654,10 @@
                   "type": "object"
                 }
               },
+              "recordsFromPayload": {
+                "type": "string",
+                "description": "Payload field containing records to create inside the aggregate command"
+              },
               "count": {
                 "type": "integer",
                 "description": "Number of records to create"
