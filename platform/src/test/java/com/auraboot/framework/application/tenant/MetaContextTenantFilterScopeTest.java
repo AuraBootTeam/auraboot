@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(28, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W3a removed the two idempotency tables + i18n/cloud seeders (own-table seams wrapped); update this ledger per wave");
+            assertEquals(23, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W3b removed behavior trio + export/async (@Async executors propagate tenant; scheduled/MQ seams wrapped); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -186,6 +186,16 @@ class MetaContextTenantFilterScopeTest {
                     "ab_idempotency_record", "ab_idempotent_key"}) {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
+        }
+
+        @Test
+        void w3bAsyncAndBehaviorTablesAreNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_behavior_event", "ab_behavior_quarantine",
+                    "ab_behavior_outcome_outbox", "ab_export_task", "ab_async_task"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W3b removed these exemptions; @Async executors propagate tenant, MQ/scheduled seams wrapped");
             }
         }
     }

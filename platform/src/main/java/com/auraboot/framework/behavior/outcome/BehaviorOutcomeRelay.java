@@ -1,6 +1,7 @@
 package com.auraboot.framework.behavior.outcome;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.behavior.ingest.BehaviorIngestPublisher;
 import com.auraboot.framework.behavior.mapper.BehaviorOutcomeOutboxMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -37,7 +38,10 @@ public class BehaviorOutcomeRelay {
 
     @org.springframework.transaction.annotation.Transactional
     public int publishPending(int limit) {
-        int safeLimit = limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, DEFAULT_LIMIT);
+        // Scheduled relay scans across all tenants — explicit scope instead of a
+        // blanket table exemption (tenant-exemption cleanup W3).
+        return MetaContext.runWithoutTenantFilter(() -> {
+            int safeLimit = limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, DEFAULT_LIMIT);
         int published = 0;
         for (BehaviorOutcomeOutbox row : mapper.findPending(safeLimit)) {
             if (mapper.claimPending(row.getId()) == 0) {
@@ -54,6 +58,7 @@ public class BehaviorOutcomeRelay {
             }
         }
         return published;
+        });
     }
 
     private BehaviorEventInput toBehaviorEvent(BehaviorOutcomeOutbox row) {

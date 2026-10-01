@@ -392,15 +392,13 @@ public class MybatisPlusConfigTest {
     @Test
     @DisplayName("验证调度器/异步表仍被忽略")
     public void testSchedulerTablesStillIgnored() {
+        // W3b removed behavior trio + export/async (seams wrapped / decorator
+        // propagates tenant); the still-pending scheduler tables remain exempt
+        // until their worker seams migrate.
         String[] schedulerTables = {
                 "ab_outbox",
                 "ab_automation",
-                "ab_export_task",
-                "ab_async_task",
-                "ab_async_task",
                 "ab_notification_digest",
-                "ab_behavior_event",
-                "ab_behavior_quarantine",
                 "ab_invariant_definition",
                 "ab_decision_definition"
         };

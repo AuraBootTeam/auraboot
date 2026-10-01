@@ -65,9 +65,13 @@ public class MybatisPlusConfig {
      * Tables that HAVE a tenant_id column (schema-verified) but are still exempted for
      * behavioral reasons. Every entry here is a scheduled migration: wrap the context-less
      * call sites in {@link MetaContext#runWithoutTenantFilter} and delete the entry.
-     * Cluster notes: login/auth-seam (W2b/c/d), explicit-param currency (W4), admin &
-     * entitlement (W4), permission-audit @Async (W4), scheduler/worker & async executors (W3),
-     * mobile config (W4 — schema shows tenant_id despite the old "no tenant_id" comment).
+     * Cluster notes: login/auth-seam (W2b/c/d), admin & entitlement (W4),
+     * permission-audit @Async (W4), remaining scheduler/worker seams (W3:
+     * outbox, scheduled-task pair), mobile config (W4 — schema shows tenant_id
+     * despite the old "no tenant_id" comment). Done: W4a exchange-rate, W3a
+     * idempotency/i18n/cloud seeders, W3b behavior trio + export/async
+     * (@Async executors propagate MetaContext via TenantAwareTaskDecorator —
+     * the old "@Async threads lack MetaContext" comments were wrong).
      */
     public static final Set<String> MIGRATION_PENDING_TABLES = Set.of(
         // W2 pending — auth seam / cross-tenant by design
@@ -94,12 +98,7 @@ public class MybatisPlusConfig {
         "ab_scheduled_task",                // scheduler context, tenant_id NULLABLE
         "ab_scheduled_task_log",            // scheduler context, tenant_id NULLABLE
         "ab_notification_digest",           // scheduler flushes without tenant context
-        "ab_async_task",                    // thread pool execution without MetaContext
         "ab_automation",                    // scheduler scans across all tenants every 60s/300s
-        "ab_export_task",                   // @Async export + scheduler cleanup across tenants
-        "ab_behavior_event",                // MQ consumer/analytics paths pass tenant_id explicitly
-        "ab_behavior_quarantine",           // MQ consumer/replay sink; tenant_id is carried explicitly
-        "ab_behavior_outcome_outbox",       // server outcome relay scans across tenants
         "ab_invariant_definition",          // InvariantAlarmWorker scans across all tenants in thread pool
         "ab_decision_definition",           // DecisionAlarmWorker scans across all tenants in thread pool
         // W4 pending — mobile config (schema HAS tenant_id despite the old "no tenant_id" comment)
