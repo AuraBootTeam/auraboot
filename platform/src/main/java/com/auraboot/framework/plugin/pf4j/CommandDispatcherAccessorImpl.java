@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
@@ -32,6 +33,7 @@ public class CommandDispatcherAccessorImpl implements CommandDispatcherAccessor 
         request.setPayload(payload != null ? payload : Map.of());
         request.setTargetRecordId(recordPid);
         request.setTargetRecordPid(recordPid);
+        MetaContext.Snapshot callerContext = MetaContext.snapshot();
         try {
             CommandExecuteResult result = commandExecutor.execute(commandCode, request);
             return result == null ? null : result.getData();
@@ -39,6 +41,14 @@ public class CommandDispatcherAccessorImpl implements CommandDispatcherAccessor 
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Nested command dispatch failed: " + commandCode, e);
+        } finally {
+            // A nested pipeline may clear its request-scoped identity while unwinding.
+            // Plugin code after the nested call still belongs to the outer command.
+            if (callerContext == null) {
+                MetaContext.clear();
+            } else {
+                MetaContext.restore(callerContext);
+            }
         }
     }
 }

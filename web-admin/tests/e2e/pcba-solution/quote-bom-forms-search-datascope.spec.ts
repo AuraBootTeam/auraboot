@@ -87,10 +87,9 @@ async function createProject(page: Page, name: string): Promise<void> {
 async function openRowForEdit(page: Page, row: Locator): Promise<void> {
   await expect(row).toBeVisible();
   try {
-    // CRM lists expose View directly and Edit in the row menu. Locator actions
-    // auto-wait through the search refresh; an isVisible probe does not wait.
-    await row.getByTestId('row-action-more').click();
-    await page.getByTestId('row-action-dropdown').getByTestId('row-action-edit').click();
+    // The list can replace its row DOM after a search response. The shared
+    // helper re-resolves the row-scoped action and handles the portal menu.
+    await clickRowActionByLocator(page, row, 'edit', '编辑');
   } catch (error) {
     await test.info().attach('customer-edit-failure-browser', { body: await page.screenshot(), contentType: 'image/png' });
     await test.info().attach('customer-edit-failure-state', {

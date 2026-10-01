@@ -166,16 +166,18 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await expect(documentHistoryTable.getByText('xlsx', { exact: true }).first()).toBeVisible();
       await expect(documentHistoryTable.getByText(new RegExp(created.quoteCode)).first()).toBeVisible();
       await admin.screenshot({ path: info.outputPath('quote-document-history.png'), fullPage: true });
-      await ensureSidebarExpanded(admin);
-      const jobsMenu = admin.locator('nav a[href="/p/c/exchange_job_center"], aside a[href="/p/c/exchange_job_center"]').first();
+      // Job center is owner-scoped. Both document generations were performed
+      // by the sales user, while the administrator only verifies output access.
+      await ensureSidebarExpanded(page);
+      const jobsMenu = page.locator('nav a[href="/p/c/exchange_job_center"], aside a[href="/p/c/exchange_job_center"]').first();
       await expect(jobsMenu).toBeVisible({ timeout: 20_000 });
       await jobsMenu.click();
-      await expect(admin).toHaveURL(/\/p\/c\/exchange_job_center(?:[?#].*)?$/);
-      await expect(admin.getByRole('button', { name: '刷新任务', exact: true })).toBeVisible();
-      await expect(admin.getByText('正式文档 v2，2 个文件', { exact: true })).toBeVisible({ timeout: 20_000 });
-      await expect(admin.getByText('正式文档', { exact: true }).first()).toBeVisible();
-      await expect(admin.getByRole('link', { name: '下载', exact: true }).first()).toBeVisible();
-      await admin.screenshot({ path: info.outputPath('quote-job-center.png'), fullPage: true });
+      await expect(page).toHaveURL(/\/p\/c\/exchange_job_center(?:[?#].*)?$/);
+      await expect(page.getByRole('button', { name: '刷新任务', exact: true })).toBeVisible();
+      await expect(page.getByText('正式文档 v2，2 个文件', { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('正式文档', { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole('link', { name: '下载', exact: true }).first()).toBeVisible();
+      await page.screenshot({ path: info.outputPath('quote-job-center.png'), fullPage: true });
       await info.attach('priced-document-persistence', { body: JSON.stringify({ before, priced, generated, sheets: wb.SheetNames }), contentType: 'application/json' });
     } catch (error) {
       await info.attach('priced-document-failure-browser', { body: await page.screenshot(), contentType: 'image/png' });
