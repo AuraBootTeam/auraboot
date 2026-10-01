@@ -76,8 +76,6 @@ public class MybatisPlusConfig {
         "ab_login_channel",                 // pre-auth routing; tenant selector is explicit
         "ab_identity_provider_instance",    // pre-auth routing; tenant selector is explicit
         "ab_external_identity_link",        // identity lookup occurs before tenant context
-        // W4 pending — explicit tenantId param on every query
-        "ab_exchange_rate",                 // ExchangeRateMapper passes tenantId explicitly
         // W2b pending — RBAC pair (highest fan-out: explicit-param style spreads context-less
         // callers across initializers/listeners/caches; needs a dedicated census)
         "ab_user_role",                     // login + auth-filter role load pass tenantId explicitly

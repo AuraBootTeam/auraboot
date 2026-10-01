@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(33, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W2a removed ab_user_session; update this ledger when the next wave lands");
+            assertEquals(32, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W4a removed ab_exchange_rate (fetcher binds its own context; mapper params = context tenant); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -170,6 +170,13 @@ class MetaContextTenantFilterScopeTest {
             var handler = tenantInterceptor().getTenantLineHandler();
             assertFalse(handler.ignoreTable("ab_user_session"),
                     "W2a removed this exemption; the tenant filter must apply");
+        }
+
+        @Test
+        void abExchangeRateIsNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            assertFalse(handler.ignoreTable("ab_exchange_rate"),
+                    "W4a removed this exemption; explicit-param queries are same-tenant as context");
         }
     }
 
