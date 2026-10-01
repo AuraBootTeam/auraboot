@@ -41,7 +41,7 @@ dependencies {
     // distribution makes the combined work subject to GPL-3.0; review the
     // AuraBoot License FAQ before shipping it commercially.
     implementation 'com.xuxueli:xxl-job-core:3.4.2'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.19.1'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.46'
@@ -54,7 +54,7 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:6.2.19'
     testImplementation 'org.springframework.boot:spring-boot:3.5.16'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.19.1'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
     testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
     testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'
 
