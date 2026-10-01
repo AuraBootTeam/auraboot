@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.concurrent.Executor;
 
@@ -94,6 +95,25 @@ public class EventConfiguration {
         executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Dedicated scheduler for async-task lease heartbeats.
+     *
+     * <p>Lease renewal is fencing infrastructure. It must not share Spring's default
+     * scheduler with application jobs, because one slow scheduled job can otherwise
+     * delay every heartbeat past the 90-second lease and invalidate healthy workers.</p>
+     */
+    @Bean("asyncTaskLeaseScheduler")
+    public ThreadPoolTaskScheduler asyncTaskLeaseScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("async-task-lease-");
+        scheduler.setRemoveOnCancelPolicy(true);
+        scheduler.setWaitForTasksToCompleteOnShutdown(true);
+        scheduler.setAwaitTerminationSeconds(10);
+        scheduler.initialize();
+        return scheduler;
     }
 
     // ── Transport beans (GAP-105) ───────────────────────────────────

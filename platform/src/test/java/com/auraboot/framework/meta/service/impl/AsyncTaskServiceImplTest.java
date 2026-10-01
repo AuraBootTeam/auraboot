@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -36,6 +37,16 @@ import static org.mockito.Mockito.when;
  * to after-commit when a transaction is active.</p>
  */
 class AsyncTaskServiceImplTest {
+
+    @Test
+    void leaseHeartbeatUsesDedicatedScheduler() throws Exception {
+        Scheduled scheduled = AsyncTaskServiceImpl.class
+                .getMethod("renewExecutionLeases")
+                .getAnnotation(Scheduled.class);
+
+        assertThat(scheduled).isNotNull();
+        assertThat(scheduled.scheduler()).isEqualTo("asyncTaskLeaseScheduler");
+    }
 
     private AsyncTaskMapper asyncTaskMapper;
     private AsyncTaskServiceImpl service;
