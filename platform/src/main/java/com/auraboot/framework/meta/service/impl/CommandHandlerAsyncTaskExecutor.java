@@ -88,6 +88,11 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     @Autowired(required = false)
     private CommandEffectExecutor commandEffectExecutor;
 
+    /** Lazy so the executor → pipeline → phase edge never cycles at startup. */
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
+
     @Autowired
     private com.auraboot.framework.tenant.service.TenantMemberService tenantMemberService;
     @Autowired
@@ -171,6 +176,14 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                         commandExpectedVersion);
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+            if (commandExecutor != null) {
+                // Q03-04: async-dispatched handlers must get the same nested
+                // command dispatch bridge as pipeline HandlerPhase, or chains
+                // like parse_gerber → compute_process_fee silently fall back to
+                // unaudited direct calls on the production async path.
+                pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
+            }
             if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
                 pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
                         new TenantProjectionAccessorImpl(tenantId,
