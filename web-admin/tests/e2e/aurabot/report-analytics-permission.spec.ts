@@ -8,6 +8,8 @@ import { ensureRoleUser, makeRoleUser, openAsRole, fetchRoleSnapshot } from '../
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
+
+
 for (const sourceType of ['model', 'aggregate', 'semantic'] as const) {
   test(`${sourceType} report export requires model read permission in addition to artifact permissions`, async ({
     page,
@@ -273,7 +275,9 @@ metrics:
 
         if (hasModelRead) {
           await expect(session.page.getByRole('cell', { name: key, exact: true })).toBeVisible();
-          const event = session.page.waitForEvent('download');
+          // PDF export spawns the packaged Chromium renderer (~30s cold start);
+          // the BFF proxy timeout is raised to 120s to match (PROXY_TIMEOUT).
+          const event = session.page.waitForEvent('download', { timeout: 120_000 });
           await session.page.getByRole('button', { name: '导出 JSON', exact: true }).click();
           const artifact = await event;
           const path = `${process.env.AURA_EVIDENCE_DIR ?? testInfo.outputDir}/report-${sourceType}-role-allowed.json`;
@@ -286,7 +290,7 @@ metrics:
               session.page.getByRole('row').filter({ hasText: key }).getByRole('cell', { name: '1', exact: true }),
             ).toBeVisible();
           }
-          const pdfDownload = session.page.waitForEvent('download');
+          const pdfDownload = session.page.waitForEvent('download', { timeout: 120_000 });
           await session.page.getByRole('button', { name: '导出 PDF', exact: true }).click();
           const pdf = await pdfDownload;
           expect(pdf.suggestedFilename()).toBe(`${key}.pdf`);
