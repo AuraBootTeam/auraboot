@@ -1971,6 +1971,10 @@ export function FormPageContent(props: PageContentProps) {
           })
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Failed to submit form';
+            // Server-side model-rule rejections (e.g. cross-field checks) carry
+            // the human-readable reason; surface it in the inline summary next
+            // to the form as well as the toast.
+            setSummaryErrors([errorMessage]);
             setError(errorMessage);
             showErrorToast(errorMessage);
           })

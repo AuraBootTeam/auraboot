@@ -534,6 +534,122 @@ describe('flatPageSerializer fail-fast boundaries', () => {
     ).toThrow(/widget_gauge/);
   });
 
+  it('serializes a palette-authored columns container with its nested children', () => {
+    const flat = serializePageTreeToFlat({
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'my_form',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'columns_new_columns',
+              blockType: 'columns',
+              title: 'New columns',
+              layout: { span: 12, columns: 2, gap: 16 },
+              blocks: [
+                {
+                  id: 'form_section_new_section',
+                  blockType: 'form-section',
+                  title: 'New section',
+                  layout: { span: 6 },
+                  blocks: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(flat.blocks).toEqual([
+      {
+        id: 'columns_new_columns',
+        blockType: 'columns',
+        title: 'New columns',
+        span: 12,
+        layout: { columns: 2, gap: 16 },
+        blocks: [
+          {
+            id: 'form_section_new_section',
+            blockType: 'form-section',
+            title: 'New section',
+            fields: [],
+            span: 6,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps registry-allowed leaf children of passthrough containers verbatim', () => {
+    const flat = serializePageTreeToFlat({
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'my_form',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'repeater_items',
+              blockType: 'repeater',
+              title: 'Items',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'repeater_field_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                  props: { label: 'Item name', component: 'input' },
+                },
+              ],
+            },
+            {
+              id: 'sub_table_items',
+              blockType: 'sub-table',
+              title: 'Items table',
+              layout: { span: 12 },
+              blocks: [
+                {
+                  id: 'candidate_col_title',
+                  blockType: 'column',
+                  field: 'name',
+                  props: { label: 'Candidate title' },
+                },
+                {
+                  id: 'candidate_action_add',
+                  blockType: 'action',
+                  actionType: 'create',
+                  props: { label: 'Add item' },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(flat.blocks.map((block) => block.id)).toEqual(['repeater_items', 'sub_table_items']);
+    const repeater = flat.blocks[0];
+    expect(repeater.blocks).toEqual([
+      {
+        id: 'repeater_field_name',
+        blockType: 'field',
+        field: 'name',
+        layout: { span: 6 },
+        props: { label: 'Item name', component: 'input' },
+      },
+    ]);
+    const subTable = flat.blocks[1];
+    expect(subTable.blocks?.map((block) => block.id)).toEqual([
+      'candidate_col_title',
+      'candidate_action_add',
+    ]);
+  });
+
   it('maps chart/stat-card widgets to their flat block types', () => {
     const flat = serializePageTreeToFlat({
       schemaVersion: 3,

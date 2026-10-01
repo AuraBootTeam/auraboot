@@ -1329,6 +1329,20 @@ async function ensureCrmPluginImported(page: Page): Promise<void> {
   expect(await hasCommand(page, 'crm_account_common', 'crm:create_account')).toBe(true);
 }
 
+// CRM workbench fixtures import the com.auraboot.crm plugin from plugins/crm,
+// whose manifest ships with the independent aura-crm application — absent from
+// the OSS core runtime. BPM workbench fixtures drive /api/bpm/*, owned by the
+// independent aura-bpm application. Both probe cheaply so the affected tests
+// skip (instead of red-cascading) while the platform widget tests still run.
+function crmPluginImportable(): boolean {
+  return existsSync(resolve(BACKEND_PLUGIN_ROOT, 'crm', 'plugin.json'));
+}
+
+async function bpmRuntimeAvailable(page: Page): Promise<boolean> {
+  const probe = await page.request.get('/api/bpm/process-definitions');
+  return probe.ok();
+}
+
 async function hasCommand(page: Page, modelCode: string, commandCode: string): Promise<boolean> {
   const response = await page.request.get('/api/meta/commands', {
     params: { modelCode },
@@ -2015,6 +2029,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
   });
 
   test('DWR-008: CRM workbench widgets render live dynamic CRM data', async ({ page }) => {
+    test.skip(!crmPluginImportable(), 'requires the com.auraboot.crm plugin (independent aura-crm application, absent from the OSS core runtime)');
     let dashboard: CreatedDashboard | undefined;
     let crmFixture: CreatedCrmWorkbenchFixture | undefined;
 
@@ -2093,6 +2108,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
   });
 
   test('DWR-010: CRM workbench widget clicks use canonical dynamic page navigation', async ({ page }) => {
+    test.skip(!crmPluginImportable(), 'requires the com.auraboot.crm plugin (independent aura-crm application, absent from the OSS core runtime)');
     let dashboard: CreatedDashboard | undefined;
     let crmFixture: CreatedCrmWorkbenchFixture | undefined;
 
@@ -2420,6 +2436,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
   });
 
   test('DWR-009: BPM workbench widgets render live BPM runtime data', async ({ page }) => {
+    test.skip(!(await bpmRuntimeAvailable(page)), 'requires the independent aura-bpm application (absent from the OSS core runtime)');
     let dashboard: CreatedDashboard | undefined;
     let bpmFixture: CreatedBpmWorkbenchFixture | undefined;
 

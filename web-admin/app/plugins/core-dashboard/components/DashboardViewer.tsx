@@ -110,11 +110,6 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
           (card) => (card as { drillDown?: DrillDownConfig }).drillDown?.enabled,
         )
       : false;
-    const w3 = (typeof window !== 'undefined' ? (window as unknown as { __dvDebug?: unknown[] }) : undefined);
-    if (w3) {
-      w3.__dvDebug = w3.__dvDebug || [];
-      w3.__dvDebug.push({ id: widget.id, linkageConfig, hasEmitFilter: Boolean(linkageConfig?.emitFilter) }); // dv probe
-    }
     const groupId = linkageConfig?.groupId || 'default';
     const widgetTitle = getLocalizedText(widget.config.title, locale, t);
 

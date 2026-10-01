@@ -147,6 +147,7 @@
 | `lib/runtime-process-owner.sh` | 4 | 2026-08-19 | Runtime-scoped process ownership and exact cleanup safeguards. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 | `lib/test-runtime-process-owner.sh` | 1 | 2026-08-19 | Fixture integration tests for runtime process ownership. |
+| `lib/web-admin-node-modules.sh` | 2 | 2026-09-29 | Validate a reusable Web Admin dependency tree, including native-module ABI compatibility. |
 | `application/application-contract.mjs` | 2 | 2026-09-12 | Shared manifest, lock, artifact identity, and checksum contract implementation. |
 | `application/oci-layout.mjs` | 1 | 2026-09-12 | Build a digest-addressed Linux OCI layout with Docker on the admitted CI builder. |
 

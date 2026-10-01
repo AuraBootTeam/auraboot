@@ -357,6 +357,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   let liveNamedQueryTitle = '';
   let liveHelperNamedQueryCode = '';
   let liveHelperNamedQueryTitle = '';
+  // /api/bpm/* ships with the independent aura-bpm application, not the OSS
+  // core runtime. Only UDW-015 (live workflow action) consumes the provisioned
+  // process definition; every other test in this file is pure platform.
+  let bpmAvailable = false;
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
@@ -438,27 +442,35 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     liveHelperNamedQueryCode = stableBlockId('udw_live_helpers', uid);
     liveHelperNamedQueryTitle = `Named query helper data ${uid}`;
 
-    const createWorkflowResp = await page.request.post('/api/bpm/process-definitions', {
-      data: {
-        processKey: liveWorkflowKey,
-        processName: `UDW Live Workflow ${uid}`,
-        description: 'Auto-generated for Unified Designer workflow live runtime E2E',
-        category: 'e2e-test',
-        bpmnContent: generateMinimalBpmn(liveWorkflowKey),
-      },
-    });
-    expect(createWorkflowResp.ok(), await createWorkflowResp.text()).toBe(true);
-    const createWorkflowBody = await createWorkflowResp.json();
-    expect(createWorkflowBody.code).toBe('0');
-    const liveWorkflowPid = String(createWorkflowBody.data?.pid ?? '');
-    expect(liveWorkflowPid).toBeTruthy();
+    const bpmProbe = await page.request.get('/api/bpm/process-definitions');
+    bpmAvailable = bpmProbe.ok();
+    if (!bpmAvailable) {
+      // OSS core runtime has no aura-bpm application: skip provisioning here so
+      // the whole serial suite doesn't cascade; UDW-015 self-skips on the flag.
+      console.warn('[udw] /api/bpm unavailable — skipping live workflow provisioning');
+    } else {
+      const createWorkflowResp = await page.request.post('/api/bpm/process-definitions', {
+        data: {
+          processKey: liveWorkflowKey,
+          processName: `UDW Live Workflow ${uid}`,
+          description: 'Auto-generated for Unified Designer workflow live runtime E2E',
+          category: 'e2e-test',
+          bpmnContent: generateMinimalBpmn(liveWorkflowKey),
+        },
+      });
+      expect(createWorkflowResp.ok(), await createWorkflowResp.text()).toBe(true);
+      const createWorkflowBody = await createWorkflowResp.json();
+      expect(createWorkflowBody.code).toBe('0');
+      const liveWorkflowPid = String(createWorkflowBody.data?.pid ?? '');
+      expect(liveWorkflowPid).toBeTruthy();
 
-    const deployWorkflowResp = await page.request.post(
-      `/api/bpm/process-definitions/${liveWorkflowPid}/deploy`,
-    );
-    expect(deployWorkflowResp.ok(), await deployWorkflowResp.text()).toBe(true);
-    const deployWorkflowBody = await deployWorkflowResp.json();
-    expect(deployWorkflowBody.code).toBe('0');
+      const deployWorkflowResp = await page.request.post(
+        `/api/bpm/process-definitions/${liveWorkflowPid}/deploy`,
+      );
+      expect(deployWorkflowResp.ok(), await deployWorkflowResp.text()).toBe(true);
+      const deployWorkflowBody = await deployWorkflowResp.json();
+      expect(deployWorkflowBody.code).toBe('0');
+    }
 
     await ensureNamedQuery(page, {
       code: liveNamedQueryCode,
@@ -1814,6 +1826,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
   test('UDW-015: executes live workflow actions through backend and shows process instance feedback', async ({
     page,
   }) => {
+    test.skip(
+      !bpmAvailable,
+      'live workflow actions require the independent aura-bpm application (absent from the OSS core runtime)',
+    );
     expect(listPagePid).toBeTruthy();
     expect(liveWorkflowKey).toBeTruthy();
 

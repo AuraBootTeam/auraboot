@@ -134,7 +134,9 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   reportPid = (await report.json()).data.pid;
   expect(reportPid).toBeTruthy();
 
-  const pdf = await request.post(`/api/reports/export/pdf`, { data: { reportPid } });
+  // Cold-stack first use spawns the headless renderer (font load + chrome);
+  // the default 5s API timeout cannot cover it.
+  const pdf = await request.post(`/api/reports/export/pdf`, { data: { reportPid }, timeout: 120_000 });
   expect(pdf.status(), await pdf.text()).toBe(200);
   const pdfBody = await pdf.body();
   expect(pdfBody.subarray(0, 4).toString()).toBe('%PDF');

@@ -85,25 +85,38 @@ async function findMemberPidByEmail(
   token: string,
   email: string,
 ): Promise<string> {
-  const membersRes = await request.post(`${BACKEND_URL}/api/tenant/members/search`, {
-    data: { keyword: email, pageNum: 1, pageSize: 20 },
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  expect(
-    membersRes.ok(),
-    `member search failed for ${email}: ${membersRes.status()} ${await membersRes.text()}`,
-  ).toBe(true);
-  const membersBody = (await membersRes.json()) as {
-    data?: { records?: MemberRecord[] };
-  };
-  const records = Array.isArray(membersBody?.data?.records) ? membersBody.data.records : [];
-  const member = records.find((item) => item.user?.email === email) ?? records[0];
-  const memberPid = member?.pid ?? '';
-  expect(memberPid, `member not found for ${email}`).toBeTruthy();
-  return memberPid;
+  // Setup spec files run in parallel within this project: 01-multi-role-users
+  // owns creating the e2e-* members, and under a loaded runner this spec can
+  // reach its role assignment first. Poll briefly for the member to appear
+  // instead of racing 01; after the deadline the failure is still loud.
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const membersRes = await request.post(`${BACKEND_URL}/api/tenant/members/search`, {
+      data: { keyword: email, pageNum: 1, pageSize: 20 },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    expect(
+      membersRes.ok(),
+      `member search failed for ${email}: ${membersRes.status()} ${await membersRes.text()}`,
+    ).toBe(true);
+    const membersBody = (await membersRes.json()) as {
+      data?: { records?: MemberRecord[] };
+    };
+    const records = Array.isArray(membersBody?.data?.records) ? membersBody.data.records : [];
+    const member = records.find((item) => item.user?.email === email) ?? records[0];
+    const memberPid = member?.pid ?? '';
+    if (memberPid) return memberPid;
+    if (Date.now() >= deadline) {
+      expect(
+        memberPid,
+        `member not found for ${email} after 30s — did 01-multi-role-users provision it?`,
+      ).toBeTruthy();
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 1_000));
+  }
 }
 
 async function assignFixtureRole(

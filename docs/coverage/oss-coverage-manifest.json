@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "833ded0d0",
+    "commit": "d2c01f1d2",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -1698,6 +1698,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/e2et-order/e2et-excel.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-doc-excel.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -6502,6 +6503,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/semantic/semantic-console-explore-golden.spec.ts",
             "web-admin/tests/e2e/semantic/semantic-console-golden.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",

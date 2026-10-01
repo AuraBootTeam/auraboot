@@ -441,8 +441,9 @@ export default defineConfig({
             use: {
               ...devices['Desktop Chrome'],
               storageState: adminStorageState,
-              // APIRequestContext omits browser navigation metadata; preserve
-              // the same-origin contract for cookie-authenticated Quote/BOM writes.
+              // page.request/APIRequestContext does not add browser navigation
+              // metadata. Cookie-authenticated writes must still prove they
+              // originate from this application.
               extraHTTPHeaders: { Referer: `${baseURL}/` },
             },
           },

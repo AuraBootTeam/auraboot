@@ -129,9 +129,11 @@ test.describe('Button Field (GAP-131)', () => {
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     const viewName = `BF_Persist_${uniqueId()}`;
+    // The overlay validator requires column fieldCodes to exist on the base
+    // page, so the button column rides a real field rendered as a button.
     const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [
-        { fieldCode: 'action_button', visible: true, order: 0, valueType: 'button' },
+        { fieldCode: 'e2et_order_type', visible: true, order: 0, valueType: 'button' },
         { fieldCode: 'e2et_order_title', visible: true, order: 1 },
       ],
     });
@@ -150,8 +152,8 @@ test.describe('Button Field (GAP-131)', () => {
     const viewName = `BF_Multi_${uniqueId()}`;
     const pid = await createViewViaApi(page, MODEL_CODE, viewName, {
       columns: [
-        { fieldCode: 'approve_btn', visible: true, order: 0, valueType: 'button' },
-        { fieldCode: 'reject_btn', visible: true, order: 1, valueType: 'button' },
+        { fieldCode: 'e2et_order_type', visible: true, order: 0, valueType: 'button' },
+        { fieldCode: 'e2et_order_urgent', visible: true, order: 1, valueType: 'button' },
         { fieldCode: 'e2et_order_title', visible: true, order: 2 },
       ],
     });
