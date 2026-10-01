@@ -21,7 +21,7 @@ dependencies {
     compileOnly project(':')
 
     // RabbitMQ AMQP Client
-    implementation 'com.rabbitmq:amqp-client:5.35.0'
+    implementation 'com.rabbitmq:amqp-client:5.36.0'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.46'
