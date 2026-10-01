@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "5f6f9d832",
+    "commit": "d2c01f1d2",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -1684,6 +1684,26 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=behavior_quarantine"
+        }
+      ]
+    },
+    {
+      "id": "core-data-exchange",
+      "title": "core-data-exchange",
+      "rows": [
+        {
+          "id": "page:exchange_job_center",
+          "action": "exchange_job_center",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/e2et-order/e2et-excel.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-doc-excel.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
         }
       ]
     },
@@ -6483,6 +6503,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/semantic/semantic-console-explore-golden.spec.ts",
             "web-admin/tests/e2e/semantic/semantic-console-golden.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -6626,7 +6647,7 @@
   "stats": {
     "commands": 257,
     "untested": 181,
-    "pages": 167,
+    "pages": 168,
     "pagesUntested": 103,
     "platformPages": 95,
     "platformPagesUntested": 41

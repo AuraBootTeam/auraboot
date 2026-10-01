@@ -31,6 +31,11 @@ final class NamedQueryRowSetDigest {
         rowStrings.sort(String::compareTo);
         try {
             MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            for (String fieldCode : fieldCodes) {
+                sha.update(fieldCode.getBytes(StandardCharsets.UTF_8));
+                sha.update((byte) 1);
+            }
+            sha.update((byte) 0);
             for (String row : rowStrings) {
                 sha.update(row.getBytes(StandardCharsets.UTF_8));
                 sha.update((byte) 0);
@@ -44,10 +49,10 @@ final class NamedQueryRowSetDigest {
     private static String canonical(Object value) {
         if (value == null) return "\u0000null";
         if (value instanceof java.math.BigDecimal decimal) return decimal.stripTrailingZeros().toPlainString();
-        if (value instanceof java.time.temporal.TemporalAccessor temporal) {
-            return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
-                    java.time.OffsetDateTime.from(temporal));
-        }
+        if (value instanceof java.time.Instant instant) return instant.toString();
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) return offsetDateTime.toString();
+        if (value instanceof java.time.ZonedDateTime zonedDateTime) return zonedDateTime.toOffsetDateTime().toString();
+        if (value instanceof java.time.temporal.TemporalAccessor temporal) return temporal.toString();
         return String.valueOf(value);
     }
 }

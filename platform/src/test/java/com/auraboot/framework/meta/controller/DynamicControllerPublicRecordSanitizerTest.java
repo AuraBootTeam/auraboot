@@ -7,9 +7,13 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.dto.DataExportRequest;
+import com.auraboot.framework.meta.dto.DynamicDataExportRequest;
 import com.auraboot.framework.meta.dto.ExportResult;
+import com.auraboot.framework.meta.dto.ExportTaskDTO;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.ExportTaskService;
+import com.auraboot.module.exchange.profile.ExportProfileResolver;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.service.RecordShareService;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -52,6 +56,9 @@ class DynamicControllerPublicRecordSanitizerTest {
 
     @Mock
     private RecordShareService recordShareService;
+
+    @Mock
+    private ExportTaskService exportTaskService;
 
     @AfterEach
     void clearContext() {
@@ -288,15 +295,24 @@ class DynamicControllerPublicRecordSanitizerTest {
                         .filePath("/tmp/opportunities.xlsx")
                         .recordCount(2L)
                         .build());
+        ExportTaskDTO exportTask = new ExportTaskDTO();
+        exportTask.setPid("export-owner-filter");
+        when(exportTaskService.registerModelExport(eq("crm_opportunity_common"),
+                eq("crm_opportunity_common:default-export"), any(), any()))
+                .thenReturn(exportTask);
 
-        controller.exportData("crm_opportunity_common", Map.of(
-                "format", "excel",
-                "conditions", List.of(Map.of(
-                        "field", "crm_opp_owner",
-                        "operator", "IN",
-                        "value", List.of(Map.of(
-                                "$currentDepartmentOwnerPids",
-                                Map.of("includeSubDepartments", true)))))));
+        DynamicDataExportRequest request = new DynamicDataExportRequest();
+        request.setScope(DynamicDataExportRequest.Scope.filtered);
+        request.setFormat("excel");
+        DynamicDataExportRequest.Condition ownerCondition = new DynamicDataExportRequest.Condition();
+        ownerCondition.setField("crm_opp_owner");
+        ownerCondition.setOperator("IN");
+        ownerCondition.setValue(List.of(Map.of(
+                "$currentDepartmentOwnerPids",
+                Map.of("includeSubDepartments", true))));
+        request.setConditions(List.of(ownerCondition));
+
+        controller.exportData("crm_opportunity_common", request);
 
         ArgumentCaptor<DataExportRequest> requestCaptor = ArgumentCaptor.forClass(DataExportRequest.class);
         verify(dynamicDataService).exportData(eq("crm_opportunity_common"), requestCaptor.capture());
@@ -357,6 +373,9 @@ class DynamicControllerPublicRecordSanitizerTest {
         ReflectionTestUtils.setField(controller, "metaModelService", metaModelService);
         ReflectionTestUtils.setField(controller, "organizationService", organizationService);
         ReflectionTestUtils.setField(controller, "recordShareService", recordShareService);
+        ReflectionTestUtils.setField(controller, "exportTaskService", exportTaskService);
+        ReflectionTestUtils.setField(controller, "exportProfileResolver",
+                new ExportProfileResolver(metaModelService));
         return controller;
     }
 

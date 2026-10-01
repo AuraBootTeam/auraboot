@@ -51,6 +51,7 @@ public class AutoPermissionAssignmentService {
     private final RoleService roleService;
     private final RolePermissionMapper rolePermissionMapper;
     private final CommandActionDeriver commandActionDeriver;
+    private final UserPermissionService userPermissionService;
 
     /**
      * Auto-assign hierarchical permissions for a model.
@@ -262,6 +263,10 @@ public class AutoPermissionAssignmentService {
             return;
         }
 
+        // Permission rows are written directly through the mapper, bypassing
+        // PermissionService's definition-cache eviction.
+        userPermissionService.evictPermissionDefinitions(effectiveTenantId);
+
         List<Role> roles = roleService.findByTenantId(effectiveTenantId);
 
         if (roles.isEmpty()) {
@@ -273,6 +278,12 @@ public class AutoPermissionAssignmentService {
 
         for (Role role : roles) {
             assignPermissionsToRole(role, permissions, effectiveTenantId);
+        }
+
+        // Generated role bindings also bypass PermissionService, so invalidate
+        // every affected role-user snapshot before callers can observe stale grants.
+        for (Role role : roles) {
+            userPermissionService.evictRoleUsers(effectiveTenantId, role.getId());
         }
     }
 

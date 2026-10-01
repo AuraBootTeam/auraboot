@@ -102,7 +102,7 @@ class FileUploadControllerTest {
     }
 
     @Test
-    void downloadFile_nonImage_keepsAttachmentDisposition() throws Exception {
+    void downloadFile_pdf_returnsInlineDispositionForBrowserPreview() throws Exception {
         FileEntity file = storedFile("quote.pdf", "application/pdf", "/tmp/quote.pdf");
         when(fileService.getFileById("file-pid")).thenReturn(file);
         when(storageProvider.download("/tmp/quote.pdf"))
@@ -111,7 +111,7 @@ class FileUploadControllerTest {
         mvc.perform(get("/api/file/download/file-pid"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/pdf"))
-                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"quote.pdf\""))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"quote.pdf\""))
                 .andExpect(content().string("pdf"));
     }
 

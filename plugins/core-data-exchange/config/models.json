@@ -1,0 +1,21 @@
+[
+  {
+    "code": "ab_document_artifact",
+    "displayName:zh-CN": "正式文档产物",
+    "displayName:en": "Formal Document Artifact",
+    "description": "Platform-generic, immutable projection of one generated document artifact",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "titleField": "ab_da_filename",
+      "subtitleField": "ab_da_format",
+      "softDelete": true,
+      "dataScope": {
+        "ownerField": "created_by",
+        "departmentField": null
+      }
+    }
+  }
+]

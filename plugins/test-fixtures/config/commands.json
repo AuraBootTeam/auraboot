@@ -27,6 +27,14 @@
         "value": "draft"
       }
     },
+    "postActions": [
+      {
+        "type": "create_children",
+        "targetModel": "e2et_order_item",
+        "parentField": "e2et_order_id",
+        "recordsFromPayload": "lines"
+      }
+    ],
     "permissions": [
       "e2et.order.manage"
     ]

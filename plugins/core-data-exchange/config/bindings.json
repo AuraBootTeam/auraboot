@@ -1,0 +1,17 @@
+[
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_job_key", "sequence": 1, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_definition_code", "sequence": 2, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_definition_version", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_document_version", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_business_version", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_renderer_version", "sequence": 6, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_source_model", "sequence": 7, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_source_record_pid", "sequence": 8, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_filename", "sequence": 9, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_format", "sequence": 10, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_file_id", "sequence": 11, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_download_url", "sequence": 12, "required": true, "visible": true, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_file_size", "sequence": 13, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_checksum_sha256", "sequence": 14, "required": true, "visible": false, "editable": false },
+  { "modelCode": "ab_document_artifact", "fieldCode": "ab_da_status", "sequence": 15, "required": true, "visible": true, "editable": false }
+]

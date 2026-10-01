@@ -65,6 +65,8 @@ class ExcelImportPolicyResolverTest {
         assertEquals(java.util.Set.of("crm_acc_name", "crm_acc_status"), policy.getCreateFields());
         assertEquals(java.util.Set.of("crm_acc_code", "crm_acc_status"), policy.getCreateAutoSetFields());
         assertEquals("crm:update_account", policy.getUpdateCommand());
+        assertEquals("crm_account_common:default-import", policy.getProfileCode());
+        assertEquals("row", policy.getAtomicUnit());
     }
 
     @Test
@@ -95,7 +97,7 @@ class ExcelImportPolicyResolverTest {
     }
 
     @Test
-    void resolve_shouldExcludeInfrastructureFieldsForPureCrudModels() {
+    void requireEnabled_shouldRejectBusinessImportWithoutCreateCommand() {
         String modelCode = "simple_model";
         when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(
                 ModelDefinition.builder().code(modelCode).extension(Map.of(
@@ -107,9 +109,27 @@ class ExcelImportPolicyResolverTest {
                 FieldDefinition.builder().code("name").build()));
         when(commandService.resolveCrudCommands(modelCode)).thenReturn(Map.of());
 
-        ExcelImportPolicy policy = new ExcelImportPolicyResolver(metaModelService, commandService)
-                .requireEnabled(modelCode);
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> new ExcelImportPolicyResolver(metaModelService, commandService)
+                        .requireEnabled(modelCode));
 
-        assertEquals(java.util.Set.of("name"), policy.getCreateFields());
+        assertTrue(error.getMessage().contains("requires a create command"));
+    }
+
+    @Test
+    void requireEnabled_shouldRouteDocumentProfilesToDedicatedRunner() {
+        String modelCode = "purchase_order";
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(
+                ModelDefinition.builder().code(modelCode).extension(Map.of(
+                        "importPolicy", Map.of(
+                                "enabled", true,
+                                "code", "purchase-order-import",
+                                "atomicUnit", "document")))
+                        .build()));
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> new ExcelImportPolicyResolver(metaModelService, commandService)
+                        .requireEnabled(modelCode));
+
+        assertTrue(error.getMessage().contains("document import runner"));
     }
 }

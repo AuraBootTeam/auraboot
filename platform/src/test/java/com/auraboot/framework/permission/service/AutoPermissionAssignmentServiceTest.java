@@ -41,6 +41,9 @@ class AutoPermissionAssignmentServiceTest {
     @Mock
     private CommandActionDeriver commandActionDeriver;
 
+    @Mock
+    private UserPermissionService userPermissionService;
+
     @Test
     void shouldBindGeneratedPermissionsToExplicitTenant() {
         AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(
@@ -48,7 +51,8 @@ class AutoPermissionAssignmentServiceTest {
                 permissionMapper,
                 roleService,
                 rolePermissionMapper,
-                commandActionDeriver
+                commandActionDeriver,
+                userPermissionService
         );
 
         when(commandActionDeriver.deriveActions("crm_lead_common")).thenReturn(List.of("read", "create"));
@@ -78,6 +82,8 @@ class AutoPermissionAssignmentServiceTest {
                 .containsOnly(false);
 
         verify(roleService).findByTenantId(123L);
+        verify(userPermissionService).evictPermissionDefinitions(123L);
+        verify(userPermissionService).evictRoleUsers(123L, 88L);
 
         ArgumentCaptor<RolePermission> bindingCaptor = ArgumentCaptor.forClass(RolePermission.class);
         verify(rolePermissionMapper, org.mockito.Mockito.times(2)).insert(bindingCaptor.capture());

@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.entity.ExportTask;
 import com.auraboot.framework.meta.mapper.ExportTaskMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +30,8 @@ class ExportTaskWorkerTest {
         ExportTaskMapper mapper = mock(ExportTaskMapper.class);
         NamedQueryService queries = mock(NamedQueryService.class);
         ObjectMapper json = new ObjectMapper();
-        ExportTaskService service = new ExportTaskService(mapper, mock(NamedQueryMapper.class), queries, json);
+        ExportTaskService service = new ExportTaskService(mapper, mock(NamedQueryMapper.class), queries, json,
+                mock(StorageProvider.class), mock(DynamicDataService.class));
         AtomicReference<Runnable> queued = new AtomicReference<>();
         ReflectionTestUtils.setField(service, "exportTaskExecutor", (Executor) command ->
                 queued.set(new TenantAwareTaskDecorator().decorate(command)));

@@ -1,0 +1,17 @@
+[
+  { "code": "ab_da_job_key", "displayName:zh-CN": "文档任务标识", "displayName:en": "Document Job Key", "dataType": "string" },
+  { "code": "ab_da_definition_code", "displayName:zh-CN": "文档定义", "displayName:en": "Document Definition", "dataType": "string" },
+  { "code": "ab_da_definition_version", "displayName:zh-CN": "定义版本", "displayName:en": "Definition Version", "dataType": "string" },
+  { "code": "ab_da_document_version", "displayName:zh-CN": "文档版本", "displayName:en": "Document Version", "dataType": "integer" },
+  { "code": "ab_da_business_version", "displayName:zh-CN": "业务版本", "displayName:en": "Business Version", "dataType": "string" },
+  { "code": "ab_da_renderer_version", "displayName:zh-CN": "渲染器版本", "displayName:en": "Renderer Version", "dataType": "string" },
+  { "code": "ab_da_source_model", "displayName:zh-CN": "来源模型", "displayName:en": "Source Model", "dataType": "string" },
+  { "code": "ab_da_source_record_pid", "displayName:zh-CN": "来源记录", "displayName:en": "Source Record", "dataType": "string" },
+  { "code": "ab_da_filename", "displayName:zh-CN": "文件名", "displayName:en": "Filename", "dataType": "string" },
+  { "code": "ab_da_format", "displayName:zh-CN": "格式", "displayName:en": "Format", "dataType": "string" },
+  { "code": "ab_da_file_id", "displayName:zh-CN": "文件", "displayName:en": "File", "dataType": "string" },
+  { "code": "ab_da_download_url", "displayName:zh-CN": "下载地址", "displayName:en": "Download URL", "dataType": "string" },
+  { "code": "ab_da_file_size", "displayName:zh-CN": "文件大小", "displayName:en": "File Size", "dataType": "integer" },
+  { "code": "ab_da_checksum_sha256", "displayName:zh-CN": "文件校验值", "displayName:en": "File Checksum", "dataType": "string" },
+  { "code": "ab_da_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "string" }
+]

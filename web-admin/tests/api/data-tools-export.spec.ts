@@ -14,7 +14,7 @@ test.describe('Data Tools Export API', () => {
    */
   test('DT-E07: Export API endpoint responds', async ({ request }) => {
     const response = await request.post('/api/dynamic/e2et_record/export', {
-      data: { format: 'excel' },
+      data: { format: 'excel', scope: 'filtered', conditions: [] },
     });
 
     const status = response.status();

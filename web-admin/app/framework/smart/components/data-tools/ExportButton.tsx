@@ -61,6 +61,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
           method: 'post',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            scope: 'filtered',
             format: format === 'xlsx' ? 'excel' : 'csv',
             viewPid,
             conditions: filters,

@@ -1099,6 +1099,47 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         assertEquals(3, ((Number) children.get(2).get("seq_" + suffix)).intValue());
     }
 
+    @Test
+    @Order(62)
+    @DisplayName("P0-BE-6: postAction CREATE_CHILDREN consumes aggregate payload records")
+    void test62_postAction_createChildrenFromPayload() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 4);
+        String parentModel = createModel("plan3_" + suffix, "name_" + suffix + ":STRING");
+        String childModel = createModel("line3_" + suffix,
+                "parent_id_" + suffix + ":STRING",
+                "sku_" + suffix + ":STRING");
+        String parentId = insertRecord(parentModel, Map.of("name_" + suffix, "Aggregate plan"));
+
+        String execConfig = """
+                {
+                    "postActions": [
+                        {
+                            "action": "create_children",
+                            "targetModel": "%s",
+                            "parentField": "parent_id_%s",
+                            "recordsFromPayload": "lines"
+                        }
+                    ]
+                }
+                """.formatted(childModel, suffix);
+        String commandCode = createCommand(parentModel, execConfig, null);
+
+        CommandExecuteRequest req = new CommandExecuteRequest();
+        req.setPayload(new HashMap<>(Map.of("lines", List.of(
+                Map.of("parent_id_" + suffix, "foreign-parent", "sku_" + suffix, "SKU-A"),
+                Map.of("sku_" + suffix, "SKU-B")))));
+        req.setOperationType("update");
+        req.setTargetRecordId(parentId);
+        req.setExpectedVersion(1);
+        req.setClientRequestId("req_" + UUID.randomUUID());
+
+        assertNotNull(commandExecutor.execute(commandCode, req));
+        assertEquals(2, countRecords(childModel, "parent_id_" + suffix, parentId),
+                "Aggregate payload rows must be attached to the command target");
+        assertEquals(0, countRecords(childModel, "parent_id_" + suffix, "foreign-parent"),
+                "Payload rows must not override the command-owned parent relation");
+    }
+
     // ==================== Combined Tests ====================
 
     @Test
