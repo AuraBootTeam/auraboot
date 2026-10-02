@@ -16,7 +16,7 @@ test('capacity refusal exits environment-invalid without teardown of an absent a
     writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
     writeFileSync(join(fixture, 'aura'), `#!/bin/bash
 printf '%s\\n' "$*" >> "$AURA_FIXTURE_CALLS"
-case "$1 ${2:-}" in
+case "$1 $2" in
   'runtime list') printf 'NAME REPO SLOT\\n';;
   'runtime show') printf '{"allocation":null}';;
   'runtime ') printf 'runtime ensure\\n';;
