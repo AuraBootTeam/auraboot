@@ -46,7 +46,8 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   };
   await nq(`${run}_stat`,
     `SELECT count(*) AS total_orders, count(*) FILTER (WHERE e2et_order_urgent) AS urgent_orders,` +
-    ` count(*) FILTER (WHERE e2et_order_status = 'completed') AS completed_orders FROM mt_e2et_order`,
+    ` count(*) FILTER (WHERE e2et_order_status = 'completed') AS completed_orders FROM mt_e2et_order` +
+    ` WHERE e2et_order_title LIKE 'HiFi订单-${run}%'`,
     []);
   await nq(`${run}_detail`,
     `SELECT ROW_NUMBER() OVER (ORDER BY id) AS seq, e2et_order_title AS title, e2et_order_type AS type,` +

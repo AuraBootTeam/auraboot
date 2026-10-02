@@ -11,6 +11,7 @@ import com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.entity.AbSemanticModel;
 import com.auraboot.framework.userattribute.service.UserAttributeService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -120,13 +121,10 @@ public class SemanticPreaggService {
                     .plusMinutes(preagg.getRefreshMinutes() == null ? 60 : preagg.getRefreshMinutes());
             if (due.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) continue;
             try {
-                MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
-                        "semantic-preagg", "semantic-preagg-refresher");
                 refresh(preagg);
             } catch (Exception e) {
-                log.warn("Semantic preagg {} refresh failed: {}", preagg.getPid(), e.getMessage());
-            } finally {
-                MetaContext.clear();
+                // Each preagg is independent; retain the failure without stopping other tenants.
+                log.warn("Semantic preagg {} refresh failed", preagg.getPid(), e);
             }
         }
     }
@@ -138,6 +136,8 @@ public class SemanticPreaggService {
             throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
                     "Semantic model not found: " + preagg.getSemanticModelPid());
         }
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        MetaContext.clear();
         MetaContext.setContext(preagg.getTenantId(), preagg.getCreatedBy(),
                 "semantic-preagg", "semantic-preagg-refresher");
         try {
@@ -164,6 +164,7 @@ public class SemanticPreaggService {
             return preagg.getLastRefreshRows();
         } finally {
             MetaContext.clear();
+            MetaContext.restore(previous);
         }
     }
 
@@ -204,17 +205,22 @@ public class SemanticPreaggService {
 
     private List<String> fromJson(String json) {
         try {
-            return objectMapper.readValue(json == null ? "[]" : json, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            return List.of();
+            List<String> dimensions = objectMapper.readValue(json == null ? "[]" : json,
+                    new TypeReference<List<String>>() {});
+            if (dimensions == null || dimensions.stream().anyMatch(d -> d == null || d.isBlank())) {
+                throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Invalid dimension definitions");
+            }
+            return dimensions;
+        } catch (JsonProcessingException e) {
+            throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Invalid dimension definitions", e);
         }
     }
 
     private String toJson(List<String> codes) {
         try {
             return objectMapper.writeValueAsString(codes == null ? List.of() : codes);
-        } catch (Exception e) {
-            return "[]";
+        } catch (JsonProcessingException e) {
+            throw new SemanticValidationException("SEMANTIC_PREAGG_INVALID", "Cannot encode dimension definitions", e);
         }
     }
 

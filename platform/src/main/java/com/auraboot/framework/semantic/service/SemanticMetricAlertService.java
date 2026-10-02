@@ -148,7 +148,8 @@ public class SemanticMetricAlertService {
         // API caller's thread, where wiping the context would break every
         // subsequent request on it. Only the scheduler thread has no prior
         // context to restore.
-        MetaContext previous = MetaContext.exists() ? MetaContext.get() : null;
+        MetaContext.Snapshot previous = MetaContext.snapshot();
+        MetaContext.clear();
         MetaContext.setContext(alert.getTenantId(), alert.getCreatedBy(),
                 "semantic-alert", "semantic-alert-evaluator");
         try {
@@ -201,12 +202,8 @@ public class SemanticMetricAlertService {
             if (triggered && !notify) out.put("silenced", true);
             return out;
         } finally {
-            if (previous != null) {
-                MetaContext.setContext(previous.getTenantId(), previous.getUserId(),
-                        previous.getUserPid(), previous.getUsername(), previous.getCurrentRoleIds());
-            } else {
-                MetaContext.clear();
-            }
+            MetaContext.clear();
+            MetaContext.restore(previous);
         }
     }
 
