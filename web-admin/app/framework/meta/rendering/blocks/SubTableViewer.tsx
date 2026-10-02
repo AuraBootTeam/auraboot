@@ -72,11 +72,12 @@ interface ChildFieldMeta {
   dictCode?: string;
   referenceModelCode?: string;
   refTarget?: Record<string, any>;
-  constraints?: { required?: boolean };
+  constraints?: { required?: boolean; maxLength?: number };
   extension?: Record<string, any>;
 }
 
 type EnrichedColumnConfig = ColumnConfig & {
+  maxLength?: number;
   dataType?: string;
   refTarget?: Record<string, any>;
   referenceModelCode?: string;
@@ -137,6 +138,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const shouldLoadChildFieldMeta = useMemo(() => {
     if (!config.childModel) return false;
+    if (config.commands?.create || config.commands?.update) return true;
     return config.columns.some((col) => {
       const anyCol = col as EnrichedColumnConfig;
       return (
@@ -148,7 +150,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         Boolean(anyCol.refTarget || anyCol.referenceModelCode)
       );
     });
-  }, [config.childModel, config.columns]);
+  }, [config.childModel, config.columns, config.commands?.create, config.commands?.update]);
 
   useEffect(() => {
     if (!shouldLoadChildFieldMeta || !config.childModel) {
@@ -254,6 +256,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           metaExtension.refModelCode ||
           refTarget.targetModel ||
           refTarget.modelCode;
+      }
+      if (enriched.maxLength === undefined && meta.constraints?.maxLength !== undefined) {
+        enriched.maxLength = meta.constraints.maxLength;
       }
       if (!enriched.required && meta.constraints?.required) {
         enriched.required = true;
@@ -1404,6 +1409,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             <InlineEditableCell
                               col={col}
                               referenceDataSource={referenceInputSources.get(col.field)}
+                              maxLength={col.maxLength}
                               referenceContext={runtime?.getContext()}
                               value={editable ? editingValues[col.field] : row[col.field]}
                               displayValue={formatCellValue(
@@ -1596,6 +1602,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                         ) : (
                           <input
                             type={isNumericField(col) ? 'number' : 'text'}
+                            maxLength={isNumericField(col) ? undefined : col.maxLength}
                             value={newRowData[col.field] ?? ''}
                             onChange={(e) => {
                               const val =

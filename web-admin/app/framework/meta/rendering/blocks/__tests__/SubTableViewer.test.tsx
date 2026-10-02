@@ -877,3 +877,33 @@ describe('SubTableViewer reference input', () => {
     );
   });
 });
+
+describe('SubTableViewer string constraints', () => {
+  it('inherits the child field maximum length in the actual row input', async () => {
+    fetchResultMock.mockImplementation(async (endpoint: string) =>
+      endpoint.endsWith('/field-meta')
+        ? {
+            code: '0',
+            data: [{ code: 'lot_code', dataType: 'string', constraints: { maxLength: 100 } }],
+          }
+        : { code: '0', data: { records: [] } },
+    );
+    render(
+      <SubTableViewer
+        config={{
+          childModel: 'line',
+          parentField: 'parent_id',
+          columns: [{ field: 'lot_code', label: 'Batch' }],
+          commands: { create: 'inventory:add_line' },
+          readOnly: false,
+        }}
+        parentRecordPid="parent-public-pid"
+        isEditable
+      />,
+    );
+    fireEvent.click(await screen.findByTestId('subtable-empty-action'));
+    await waitFor(() =>
+      expect(screen.getByTestId('subtable-add-lot_code')).toHaveAttribute('maxlength', '100'),
+    );
+  });
+});

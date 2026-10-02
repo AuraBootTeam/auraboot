@@ -184,3 +184,12 @@ export function useListUrlState(): ListUrlState {
 
   return { sorts, filters, setSorts, setFilters };
 }
+
+export function resolveListFilterState(input: {
+  initialUrlFilters: ViewFilterConfig[];
+  hasLocalFilterChange: boolean;
+}): { applySavedViewFilters: boolean } {
+  return {
+    applySavedViewFilters: input.initialUrlFilters.length === 0 && !input.hasLocalFilterChange,
+  };
+}

@@ -26,6 +26,7 @@ export interface InlineEditableCellProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   referenceDataSource?: DataSourceConfig;
   referenceContext?: Record<string, any>;
+  maxLength?: number;
   dictOptions?: Array<{ value: string; label: string }>;
   autoFocus?: boolean;
   t?: (key: string) => string;
@@ -42,6 +43,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
   dictOptions,
   referenceDataSource,
   referenceContext,
+  maxLength,
   autoFocus = false,
 }) => {
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
@@ -156,6 +158,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
       <input
         ref={inputRef as React.RefObject<HTMLInputElement>}
         type="text"
+        maxLength={maxLength}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
