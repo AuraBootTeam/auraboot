@@ -1,12 +1,14 @@
 {
   "code": "org:delete_employee",
-  "displayName:zh-CN": "Delete Employee",
+  "displayName:zh-CN": "删除员工",
   "displayName:en": "Delete Employee",
   "type": "delete",
   "modelCode": "org_employee",
-  "permissions": ["ORG.hr.manage"],
+  "permissions": [
+    "ORG.hr.manage"
+  ],
   "extension": {
-    "confirmMessage:zh-CN": "Confirm delete this employee record?",
+    "confirmMessage:zh-CN": "确认删除这条员工记录？",
     "confirmMessage:en": "Confirm delete this employee record?"
   }
 }

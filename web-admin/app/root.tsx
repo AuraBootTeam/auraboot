@@ -394,7 +394,7 @@ export default function App() {
           skipTenantPreferences={data.skipTenantPreferences}
         >
           <TenantThemeProvider>
-            <ToastProvider>
+            <ToastProvider closeLabel={data.i18n?.['notification.close']}>
               <ConfirmDialogProvider>
                 {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
               </ConfirmDialogProvider>
@@ -436,9 +436,10 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
   const { title, detail } = resolveErrorPresentation(view, locale);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [clientContext, setClientContext] = useState<{ pageUrl: string; occurredAt: string } | null>(
-    null,
-  );
+  const [clientContext, setClientContext] = useState<{
+    pageUrl: string;
+    occurredAt: string;
+  } | null>(null);
   const t = (key: Parameters<typeof rootT>[0]) => rootT(key, locale);
   const errorMessage = error instanceof Error ? error.message : String(error ?? '');
   const stack = error instanceof Error ? error.stack : undefined;
@@ -544,9 +545,7 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
             )}
             <div className="flex justify-between gap-3">
               <dt>{t('pageUrl')}</dt>
-              <dd className="max-w-[15rem] truncate font-mono">
-                {clientContext?.pageUrl ?? '—'}
-              </dd>
+              <dd className="max-w-[15rem] truncate font-mono">{clientContext?.pageUrl ?? '—'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt>{t('occurredAt')}</dt>

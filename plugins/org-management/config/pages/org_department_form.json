@@ -1,6 +1,6 @@
 {
   "pageKey": "org_department_form",
-  "name:zh-CN": "Department Form",
+  "name:zh-CN": "部门信息",
   "name:en": "Department Form",
   "modelCode": "org_department",
   "description": "Department create/edit form",
@@ -16,7 +16,7 @@
       "id": "block_dept_basic",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "Basic Information",
+        "zh-CN": "基本信息",
         "en": "Basic Information"
       },
       "layout": {
@@ -105,7 +105,7 @@
     }
   ],
   "title": {
-    "zh-CN": "Department Form",
+    "zh-CN": "部门信息",
     "en": "Department Form"
   }
 }

@@ -108,9 +108,7 @@ export default function PermissionManagement() {
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const matched = searchQuery
-      ? roles.filter(
-          (r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q),
-        )
+      ? roles.filter((r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))
       : roles;
     return sortRolesForPermissionSetup(matched);
   }, [roles, searchQuery]);
@@ -270,9 +268,9 @@ export default function PermissionManagement() {
             <table data-testid="role-table" className="w-full table-fixed">
               <thead className="sr-only">
                 <tr>
-                  <th>Role</th>
-                  <th>Type</th>
-                  <th>Actions</th>
+                  <th>{t('permission.role')}</th>
+                  <th>{t('permission.type')}</th>
+                  <th>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,7 +343,7 @@ export default function PermissionManagement() {
                                   handleToggleRole(role);
                                 }}
                                 className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20"
-                                title={isDisabled ? 'Enable' : 'Disable'}
+                                title={t(isDisabled ? 'action.enable' : 'action.disable')}
                               >
                                 <PowerIcon className="h-3.5 w-3.5" />
                               </button>
@@ -441,7 +439,9 @@ export default function PermissionManagement() {
             (selectedRole ? (
               <CapabilityRoleEditor key={selectedRole.pid} rolePid={selectedRole.pid} />
             ) : (
-              <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
+              <div className="text-sm text-gray-400">
+                {t('admin.permission.selectRole') || 'Select a role'}
+              </div>
             ))}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
           {activeRightTab === 'audit' && <PermissionAuditTab />}

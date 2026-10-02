@@ -1,6 +1,6 @@
 {
   "pageKey": "org_position_form",
-  "name:zh-CN": "Position Form",
+  "name:zh-CN": "岗位信息",
   "name:en": "Position Form",
   "modelCode": "org_position",
   "description": "Position create/edit form",
@@ -16,7 +16,7 @@
       "id": "block_pos_basic",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "Basic Information",
+        "zh-CN": "基本信息",
         "en": "Basic Information"
       },
       "layout": {
@@ -99,7 +99,7 @@
     }
   ],
   "title": {
-    "zh-CN": "Position Form",
+    "zh-CN": "岗位信息",
     "en": "Position Form"
   }
 }

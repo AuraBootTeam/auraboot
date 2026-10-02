@@ -4058,5 +4058,130 @@
     "en-US": "{count} unread items",
     "ja-JP": "未読 {count} 件",
     "ko-KR": "읽지 않은 항목 {count}개"
+  },
+  {
+    "key": "dashboard.designer.title",
+    "zh-CN": "仪表盘设计器",
+    "en-US": "Dashboard Designer"
+  },
+  {
+    "key": "dashboard.designer.presentation",
+    "zh-CN": "演示模式",
+    "en-US": "Presentation Mode"
+  },
+  {
+    "key": "dashboard.designer.history",
+    "zh-CN": "版本历史",
+    "en-US": "Version History"
+  },
+  {
+    "key": "dashboard.designer.validate",
+    "zh-CN": "验证",
+    "en-US": "Validate"
+  },
+  {
+    "key": "dashboard.designer.validationPassed",
+    "zh-CN": "验证通过",
+    "en-US": "Validation passed"
+  },
+  {
+    "key": "dashboard.designer.validationFailed",
+    "zh-CN": "验证失败：{error}",
+    "en-US": "Validation failed: {error}"
+  },
+  {
+    "key": "dashboard.designer.unpublish",
+    "zh-CN": "取消发布",
+    "en-US": "Unpublish"
+  },
+  {
+    "key": "dashboard.designer.publish",
+    "zh-CN": "发布",
+    "en-US": "Publish"
+  },
+  {
+    "key": "dashboard.exportExcel",
+    "zh-CN": "导出 Excel",
+    "en-US": "Export to Excel"
+  },
+  {
+    "key": "member.invite",
+    "zh-CN": "邀请成员",
+    "en-US": "Invite"
+  },
+  {
+    "key": "member.import",
+    "zh-CN": "导入成员",
+    "en-US": "Import Members"
+  },
+  {
+    "key": "permission.role",
+    "zh-CN": "角色",
+    "en-US": "Role"
+  },
+  {
+    "key": "permission.type",
+    "zh-CN": "类型",
+    "en-US": "Type"
+  },
+  {
+    "key": "table.doubleClickEdit",
+    "zh-CN": "双击编辑",
+    "en-US": "Double-click to edit"
+  },
+  {
+    "key": "notification.close",
+    "zh-CN": "关闭通知",
+    "en-US": "Close notification"
+  },
+  {
+    "key": "designer.dragBlock",
+    "zh-CN": "拖动{label}",
+    "en-US": "Drag {label}"
+  },
+  {
+    "key": "designer.resizeBlock",
+    "zh-CN": "调整{label}大小",
+    "en-US": "Resize {label}"
+  },
+  {
+    "key": "designer.blockOrder",
+    "zh-CN": "区块顺序",
+    "en-US": "Block order"
+  },
+  {
+    "key": "designer.moveUp",
+    "zh-CN": "上移区块",
+    "en-US": "Move block up"
+  },
+  {
+    "key": "designer.moveDown",
+    "zh-CN": "下移区块",
+    "en-US": "Move block down"
+  },
+  {
+    "key": "designer.spanPresets",
+    "zh-CN": "宽度预设",
+    "en-US": "Span presets"
+  },
+  {
+    "key": "designer.setSpan",
+    "zh-CN": "设置宽度 {span}",
+    "en-US": "Set span {span}"
+  },
+  {
+    "key": "dashboard.exportEmpty",
+    "zh-CN": "没有可导出的数据",
+    "en-US": "No data to export"
+  },
+  {
+    "key": "dashboard.exportSuccess",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets"
+  },
+  {
+    "key": "dashboard.exportFailed",
+    "zh-CN": "Excel 导出失败",
+    "en-US": "Excel export failed"
   }
 ]

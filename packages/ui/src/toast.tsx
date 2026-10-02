@@ -17,6 +17,7 @@ export interface ToastProps {
   show: boolean;
   onClose: () => void;
   duration?: number;
+  closeLabel?: string;
 }
 
 export interface ToastContextValue {
@@ -50,7 +51,7 @@ function CloseIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>;
 }
 
-export function Toast({ message, type, show, onClose, duration = 2500 }: ToastProps) {
+export function Toast({ message, type, show, onClose, duration = 2500, closeLabel = "Close notification" }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const handleClose = useCallback(() => {
@@ -84,7 +85,7 @@ export function Toast({ message, type, show, onClose, duration = 2500 }: ToastPr
       <div className="px-4 py-3"><div className="flex items-start gap-3">
         <div className="mt-0.5 flex-shrink-0"><StatusIcon kind={type} className={`h-5 w-5 ${iconClass}`} /></div>
         <div className="min-w-0 flex-1"><p className="text-text text-sm leading-5 font-medium break-words">{message}</p></div>
-        <button className="text-text-3 hover:bg-hover hover:text-text -mr-1 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-200 focus:ring-2 focus:ring-blue-500/30 focus:outline-none" onClick={handleClose} aria-label="Close notification">
+        <button className="text-text-3 hover:bg-hover hover:text-text -mr-1 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-200 focus:ring-2 focus:ring-blue-500/30 focus:outline-none" onClick={handleClose} aria-label={closeLabel}>
           <CloseIcon className="h-4 w-4" />
         </button>
       </div></div>
@@ -92,7 +93,7 @@ export function Toast({ message, type, show, onClose, duration = 2500 }: ToastPr
   );
 }
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children, closeLabel }: { children: ReactNode; closeLabel?: string }) {
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const toastIdCounter = useRef(0);
   const addToast = useCallback((message: string, type: ToastKind, duration?: number) => {
@@ -120,7 +121,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={methods}>
       {children}
       <div data-testid="toast-stack" aria-live="polite" className="pointer-events-none fixed top-4 left-1/2 z-50 flex w-[min(calc(100vw-2rem),28rem)] -translate-x-1/2 flex-col gap-2.5">
-        {toasts.map((toast) => <Toast key={toast.id} {...toast} onClose={() => setToasts((items) => items.filter((item) => item.id !== toast.id))} />)}
+        {toasts.map((toast) => <Toast key={toast.id} {...toast} closeLabel={closeLabel} onClose={() => setToasts((items) => items.filter((item) => item.id !== toast.id))} />)}
       </div>
     </ToastContext.Provider>
   );

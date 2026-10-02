@@ -7,6 +7,10 @@ import { I18nProvider } from '~/contexts/I18nContext';
 import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
 import { DraggableColumnHeader } from '~/framework/meta/rendering/pages/list/DraggableColumnHeader';
 import { ListTabs } from '~/framework/meta/rendering/pages/list/ListTabs';
+import {
+  getBlockLabel,
+  getBlockTypeLabel,
+} from '~/plugins/core-designer/components/unified-designer/canvas/CanvasHost';
 import { InboxBadge } from '../inbox/InboxBadge';
 vi.mock('~/shared/services/inboxService', () => ({ getUnreadCount: vi.fn(async () => 3) }));
 const seed = JSON.parse(
@@ -71,5 +75,20 @@ describe('Chinese and English chrome use bundled translation copy', () => {
       />,
     );
     expect(screen.getByRole('navigation', { name: '状态筛选' })).toBeVisible();
+  });
+  it('designer blocks use registry labels in Chinese and English', () => {
+    expect(getBlockLabel({ id: 'table', blockType: 'table' }, 'zh-CN')).toBe('表格');
+    expect(getBlockLabel({ id: 'table', blockType: 'table' }, 'en-US')).toBe('Table');
+    expect(getBlockTypeLabel('action-bar', 'zh-CN')).toBe('操作栏');
+  });
+  it('designer button title resolves its actual translation key', () => {
+    const words = translations('zh-CN');
+    expect(
+      getBlockLabel(
+        { id: 'new', blockType: 'action', title: '$i18n:common.button.create' },
+        'zh-CN',
+        (key) => words[key] || key,
+      ),
+    ).toBe('新建');
   });
 });
