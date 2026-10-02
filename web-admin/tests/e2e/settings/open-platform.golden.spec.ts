@@ -103,6 +103,8 @@ test.describe('Open Platform golden journey', () => {
     await openAccountMenu(page);
     const menuEntry = page.getByTestId('open-platform-link');
     await expect(menuEntry).toBeVisible();
+    await expect(page.getByTestId('user-dropdown')).toContainText('退出登录');
+    await expect(page.getByTestId('user-dropdown')).not.toContainText('user.logout');
     await capture(page, 'OP-OPS-01');
     await menuEntry.click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
@@ -534,16 +536,18 @@ test.describe('Open Platform golden journey', () => {
     const eventCatalog = operations.getByTestId('open-platform-event-catalog');
     const webhookHealth = operations.getByTestId('open-platform-webhook-health');
     await expect(eventCatalog).toContainText('inventory.stock-in.confirmed');
+    await expect(eventCatalog).toContainText('事件目录');
+    await expect(webhookHealth).toContainText('Webhook 兼容性与签名');
     await expect(webhookHealth.locator('[data-rotation-status="healthy"]')).toHaveCount(2);
     await expect(webhookHealth.locator('[data-rotation-status="due"]')).toHaveCount(1);
     await expect(webhookHealth.locator('[data-rotation-status="overdue"]')).toContainText(
-      'Rotate the signing secret now.',
+      '请立即轮换签名密钥。',
     );
     await expect(webhookHealth.locator('[data-rotation-status="missing"]')).toContainText(
-      'Add a signing secret before enabling delivery.',
+      '启用投递前请添加签名密钥。',
     );
     await expect(webhookHealth.locator('[data-compatible="false"]')).toContainText(
-      'Choose a supported event version.',
+      '请选择受支持的事件版本。',
     );
     await expect(operations).not.toContainText(
       /super-secret|https:\/\/.*hook|Bearer [A-Za-z0-9._-]+/,
