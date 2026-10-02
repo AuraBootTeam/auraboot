@@ -15,6 +15,8 @@ if "$GS" env "$NAME" >/dev/null 2>&1; then
   exit 2
 fi
 trap 'echo "[i18n-browser] retained runtime and evidence: $NAME"' EXIT
+# Exercise the documented placeholder strategy without paid provider calls.
+export AGENT_LLM_STUB_MODE=true
 "$GS" up "$NAME" --slot auto --ttl 2h --no-warm --runtime-mode verification || exit 2
 "$GS" import "$NAME" || exit 2
 eval "$("$GS" env "$NAME")"
@@ -29,4 +31,4 @@ TEST_RC=$?
 set -e
 [[ "$TEST_RC" == 0 ]] || exit 1
 node "$SCRIPT_DIR/i18n-admin-browser-result.mjs" "$PW_RESULTS_JSON" "$NAME" "$REPO_ROOT" "$BASELINE_COMMIT" || exit 1
-echo '[i18n-browser] four browser cases and one tenant-isolation API case passed; original screenshot review remains separate'
+echo '[i18n-browser] five browser cases and one tenant-isolation API case passed; original screenshot review remains separate'

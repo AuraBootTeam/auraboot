@@ -5,7 +5,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 import { ensureSidebarExpanded } from '../helpers';
 
-type Resource = { pid: string; i18nKey: string; value: string; status: string; rejectReason: string | null; reviewedAt: string | null };
+type Resource = { pid: string; i18nKey: string; value: string; source: string; status: string; rejectReason: string | null; reviewedAt: string | null };
 async function accepted<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), `HTTP ${response.status()} from ${response.url()}`).toBe(true);
   const envelope = await response.json();
@@ -19,10 +19,10 @@ async function packValue(page: Page, key: string) {
   const pack = await accepted<Record<string, string>>(await page.request.get('/api/i18n/zh-CN'));
   return pack[key];
 }
-async function openResources(page: Page) {
+async function openSidebarPage(page: Page, path: string) {
   await ensureSidebarExpanded(page);
   // Reachability is part of the acceptance: do not bypass the sidebar by goto.
-  const entry = page.locator('nav a[href="/i18n-resources"]');
+  const entry = page.locator(`nav a[href="${path}"]`);
   await expect(entry).toHaveCount(1);
   // SidebarSubmenu mounts children even when their parent is collapsed.
   // Open the actual ancestor buttons, outermost first, without forcing a click.
@@ -36,7 +36,10 @@ async function openResources(page: Page) {
   }
   await expect(entry).toBeVisible();
   await entry.click();
-  await expect(page).toHaveURL(/\/i18n-resources(?:\?|$)/);
+  await expect(page).toHaveURL(url => url.pathname === path);
+}
+async function openResources(page: Page) {
+  await openSidebarPage(page, '/i18n-resources');
   await expect(page.getByTestId('i18n-resources-page')).toBeVisible();
 }
 async function filter(page: Page, prefix: string) {
@@ -59,6 +62,74 @@ async function persisted(page: Page, pid: string, status: keyof typeof statusLab
 
 test.describe('i18n admin real workflow', () => {
   test.describe.configure({ timeout: 120_000, retries: 0 });
+
+  test('AI placeholder drafts match persisted counts and can be reviewed through the settings UI', async ({ browser }, info) => {
+    expect(process.env.AGENT_LLM_STUB_MODE, 'this case requires explicit no-paid-provider mode').toBe('true');
+    const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const key = `000000.e2e.ios-handover.${Date.now()}.${info.workerIndex}.ai`;
+    const sourceValue = 'Source placeholder requiring human translation';
+    try {
+      await accepted(await page.request.post('/api/admin/i18n/resources', { data: { key, lang: 'zh-CN', value: sourceValue } }));
+      const existingKey = `${key}.existing`;
+      await accepted(await page.request.post('/api/admin/i18n/resources', { data: { key: existingKey, lang: 'zh-CN', value: 'Existing source' } }));
+      const existing = await accepted<Resource>(await page.request.post('/api/admin/i18n/resources', { data: {
+        key: existingKey, lang: 'ja-JP', value: 'Previously approved target wording',
+      } }));
+      const existingBefore = await read(page, existing.pid);
+      expect(await accepted(await page.request.get('/api/admin/i18n/resources/by-key', { params: { key, lang: 'ja-JP' } }))).toBeNull();
+      const coverage = await accepted<{ missingKeys: Array<{ key: string }> }>(await page.request.get('/api/admin/i18n/coverage'));
+      expect(coverage.missingKeys.map(entry => entry.key), 'fixture must be inside the ordered missing-key sample before generation').toContain(key);
+      const total = async () => Number((await accepted<{ total: number }>(await page.request.get('/api/admin/i18n/resources', {
+        params: { lang: 'ja-JP', pageNum: 1, pageSize: 1 },
+      }))).total);
+      const before = await total();
+      await openSidebarPage(page, '/settings/i18n-workflow');
+      await expect(page.getByRole('heading', { name: 'Translation Workflow', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'AI Generate Drafts', exact: true }).click();
+      const modal = page.getByRole('heading', { name: 'AI Generate Drafts', exact: true }).locator('xpath=ancestor::div[contains(@class,"max-w-md")]');
+      await expect(modal).toBeVisible();
+      await expect(modal.locator('select')).toHaveValue('ja-JP');
+      await modal.getByRole('spinbutton').fill('200');
+      const generation = page.waitForResponse(response => response.url().endsWith('/api/admin/i18n/ai-translate') && response.request().method() === 'POST');
+      await modal.getByRole('button', { name: 'Generate Drafts', exact: true }).click();
+      const response = await generation;
+      expect(response.request().postDataJSON()).toEqual({ targetLocale: 'ja-JP', sourceLocale: 'zh-CN', maxKeys: 200 });
+      const result = await accepted<{ generated: number; skipped: number; errors: number; llmUsed: boolean }>(response);
+      expect(result.llmUsed).toBe(false);
+      expect(result.generated).toBeGreaterThan(0);
+      expect(result.generated).toBeLessThanOrEqual(200);
+      expect(result.errors).toBe(0);
+      expect(result.skipped).toBe(0);
+      expect(await total() - before).toBe(result.generated);
+      const draft = await accepted<Resource>(await page.request.get('/api/admin/i18n/resources/by-key', { params: { key, lang: 'ja-JP' } }));
+      expect(draft).toMatchObject({ i18nKey: key, lang: 'ja-JP', value: sourceValue, status: 'draft', source: 'ai' });
+      expect(await read(page, existing.pid)).toEqual(existingBefore);
+      await expect(modal.getByText(`+${result.generated} generated`, { exact: true })).toBeVisible();
+      await expect(modal.getByText('Fallback: used source locale values as placeholder drafts', { exact: true })).toBeVisible();
+      await info.attach('AI-placeholder-summary-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await info.attach('AI-placeholder-persistence', { body: Buffer.from(JSON.stringify({ before, after: before + result.generated, result, draftPid: draft.pid, unchangedTargetPid: existing.pid }, null, 2)), contentType: 'application/json' });
+      await modal.getByRole('button', { name: 'Close', exact: true }).click();
+      const status = page.locator('select').filter({ has: page.locator('option[value="draft"]') });
+      await status.selectOption('draft');
+      await page.getByPlaceholder('Search by key or value…', { exact: true }).fill(key);
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      const workflowRow = page.locator('table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
+      await expect(workflowRow).toHaveCount(1);
+      await workflowRow.getByRole('button', { name: 'Submit for Review', exact: true }).click();
+      await expect.poll(async () => (await read(page, draft.pid))?.status).toBe('review');
+      await status.selectOption('review');
+      await expect(workflowRow).toHaveCount(1);
+      const packBefore = await accepted<Record<string, string>>(await page.request.get('/api/i18n/ja-JP'));
+      expect(packBefore[key]).toBeUndefined();
+      await workflowRow.getByRole('button', { name: 'Approve', exact: true }).click();
+      await expect.poll(async () => (await read(page, draft.pid))?.status).toBe('approved');
+      const packAfter = await accepted<Record<string, string>>(await page.request.get('/api/i18n/ja-JP'));
+      expect(packAfter[key]).toBe(sourceValue);
+      await status.selectOption('approved');
+      await expect(workflowRow.getByText(sourceValue, { exact: true })).toBeVisible();
+      await info.attach('AI-placeholder-approved-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    } finally { await context.close(); }
+  });
 
   test('same-role tenant administrators cannot read or mutate each other translation resources', async ({ browser }, info) => {
     const backend = process.env.BACKEND_URL;

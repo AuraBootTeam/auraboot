@@ -4,7 +4,7 @@ import { expectedTitles, validateReport } from './i18n-admin-browser-result.mjs'
 function report() {
   return { stats: { startTime: new Date(Date.now() - 1000).toISOString(), duration: 500 }, suites: [{ specs: expectedTitles.map(title => ({ title, tests: [{ projectName: 'chromium', status: 'expected', results: [{ status: 'passed', retry: 0 }] }] })) }] };
 }
-test('exact five successful browser/API cases are accepted', () => assert.equal(validateReport(report()).executed, 5));
+test('exact six successful browser/API cases are accepted', () => assert.equal(validateReport(report()).executed, 6));
 for (const [name, mutate] of [
   ['empty execution', r => { r.suites = []; }],
   ['duplicate title', r => { r.suites[0].specs[1] = r.suites[0].specs[0]; }],
