@@ -890,6 +890,43 @@ export function collectListReferenceDisplayConfigs(
   return configs;
 }
 
+export function collectListReferenceValues(
+  config: ListReferenceDisplayConfig,
+  records: Record<string, any>[],
+  filters: ViewFilterConfig[],
+  cached: Record<string, string>,
+): string[] {
+  const rowValues = records
+    .filter((record) => !record[config.displayKey])
+    .map((record) => record[config.field]);
+  const filterValues = filters
+    .filter((filter) => filter.fieldCode === config.field && !filter.isExpression)
+    .flatMap((filter) => (Array.isArray(filter.value) ? filter.value : [filter.value]));
+  return Array.from(
+    new Set(
+      [...rowValues, ...filterValues]
+        .filter((value) => value !== null && value !== undefined && value !== '')
+        .map(String),
+    ),
+  ).filter((value) => cached[value] === undefined);
+}
+
+export function resolveListReferenceFilterLabel(
+  filter: ViewFilterConfig,
+  configs: ListReferenceDisplayConfig[],
+  cache: Record<string, Record<string, string>>,
+  fallback: string,
+): string | undefined {
+  const config = configs.find((candidate) => candidate.field === filter.fieldCode);
+  if (!config || filter.operator === 'isNull' || filter.operator === 'isNotNull') return undefined;
+  const labels = cache[buildListReferenceDisplayCacheKey(config)] || {};
+  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+  return values
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .map((value) => labels[String(value)] || fallback)
+    .join('、');
+}
+
 interface PaginationResult<T> {
   records: T[];
   total: number;
@@ -3584,12 +3621,19 @@ function ListPageContentInner(props: PageContentProps) {
   }, [tableBlock, effectiveViewConfig, modelFieldMap, SYSTEM_FIELD_DEFS]);
 
   const referenceDisplayConfigs = useMemo(
-    () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
-    [tableColumns, modelFieldMap],
+    () =>
+      collectListReferenceDisplayConfigs(
+        [
+          ...tableColumns,
+          ...chipFilters.map((filter) => ({ field: filter.fieldCode, label: filter.fieldCode })),
+        ],
+        modelFieldMap,
+      ),
+    [tableColumns, modelFieldMap, chipFilters],
   );
 
   useEffect(() => {
-    if (referenceDisplayConfigs.length === 0 || data.length === 0) return;
+    if (referenceDisplayConfigs.length === 0) return;
     let cancelled = false;
 
     async function loadReferenceDisplays(): Promise<void> {
@@ -3597,15 +3641,7 @@ function ListPageContentInner(props: PageContentProps) {
         .map((config) => {
           const cacheKey = buildListReferenceDisplayCacheKey(config);
           const cached = referenceDisplayCache[cacheKey] || {};
-          const values = Array.from(
-            new Set(
-              data
-                .filter((record) => !record[config.displayKey])
-                .map((record) => record[config.field])
-                .filter((value) => value !== null && value !== undefined && value !== '')
-                .map((value) => String(value)),
-            ),
-          ).filter((value) => cached[value] === undefined);
+          const values = collectListReferenceValues(config, data, chipFilters, cached);
           return { config, cacheKey, values };
         })
         .filter((entry) => entry.values.length > 0);
@@ -3693,7 +3729,7 @@ function ListPageContentInner(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [referenceDisplayConfigs, data, referenceDisplayCache, token]);
+  }, [referenceDisplayConfigs, data, chipFilters, referenceDisplayCache, token]);
 
   // Column order — derived from SavedView or default column order
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
@@ -5294,6 +5330,13 @@ function ListPageContentInner(props: PageContentProps) {
                       }
                       return filter.expression;
                     }
+                    const referenceLabel = resolveListReferenceFilterLabel(
+                      filter,
+                      referenceDisplayConfigs,
+                      referenceDisplayCache,
+                      translateCommon('common.unknown', '未知'),
+                    );
+                    if (referenceLabel !== undefined) return referenceLabel;
                     const dc = filterFieldMetadata.find(
                       (field) => field.fieldCode === filter.fieldCode,
                     )?.dictCode;
