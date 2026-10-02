@@ -1833,3 +1833,42 @@ designer_device_selector:
   apply: "Apply"
   landscape: "Switch to landscape"
   portrait: "Switch to portrait"
+
+designer_page_mode:
+  "modes":
+    "floor":
+      "name": "Floor mode"
+      "description": "For complex business forms, such as order details and customer records"
+    "form":
+      "name": "Form mode"
+      "description": "For standard data entry, such as creating customers and editing products"
+    "grid":
+      "name": "Free-flow mode"
+      "description": "For dashboards, reports and custom layouts"
+  "column_description":
+    "2": "Default layout for most forms"
+    "3": "Compact layout for forms with more fields"
+    "4": "Dense layout for dashboard-style forms"
+  "position":
+    "top":
+      "label": "Top"
+      "description": "Labels above inputs"
+    "left":
+      "label": "Left"
+      "description": "Labels to the left of inputs"
+    "inline":
+      "label": "Inline"
+      "description": "Labels as placeholders"
+  "column_label": "{count} columns"
+  "title": "Page mode"
+  "layout": "Form layout"
+  "columns": "Columns"
+  "label_position": "Label position"
+  "label_width": "Label width"
+  "gutter": "Gutter ({value}px)"
+  "confirm_title": "Switch page mode"
+  "from": "From"
+  "to": "to"
+  "warning": "Some components may need adjustment for the new layout."
+  "cancel": "Cancel"
+  "confirm": "Confirm switch"

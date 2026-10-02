@@ -2137,3 +2137,42 @@ designer_device_selector:
   apply: "应用"
   landscape: "切换为横屏"
   portrait: "切换为竖屏"
+
+designer_page_mode:
+  "modes":
+    "floor":
+      "name": "楼层模式"
+      "description": "适用于复杂业务表单，如订单详情、客户档案"
+    "form":
+      "name": "表单模式"
+      "description": "适用于标准数据录入，如新建客户、编辑商品"
+    "grid":
+      "name": "自由流模式"
+      "description": "适用于仪表盘、报表和自定义布局"
+  "column_description":
+    "2": "默认布局，适合大多数表单"
+    "3": "紧凑布局，适合字段较多的表单"
+    "4": "超紧凑布局，适合仪表盘式表单"
+  "position":
+    "top":
+      "label": "顶部"
+      "description": "标签在输入框上方"
+    "left":
+      "label": "左侧"
+      "description": "标签在输入框左侧"
+    "inline":
+      "label": "内联"
+      "description": "标签作为占位符"
+  "column_label": "{count}列"
+  "title": "页面模式"
+  "layout": "表单布局"
+  "columns": "列数"
+  "label_position": "标签位置"
+  "label_width": "标签宽度"
+  "gutter": "间距 ({value}px)"
+  "confirm_title": "切换页面模式"
+  "from": "从"
+  "to": "切换到"
+  "warning": "部分组件可能需要调整以适应新布局。"
+  "cancel": "取消"
+  "confirm": "确认切换"
