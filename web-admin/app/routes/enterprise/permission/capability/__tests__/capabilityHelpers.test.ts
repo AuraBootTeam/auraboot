@@ -10,11 +10,22 @@ import {
 } from '../capabilityHelpers';
 
 function cap(code: string, granted: boolean, sensitive = false) {
-  return { code, group: '客户管理', label: code, sensitive, includes: [code + '.read'], granted, conventionDerived: false };
+  return {
+    code,
+    group: '客户管理',
+    label: code,
+    sensitive,
+    includes: [code + '.read'],
+    granted,
+    conventionDerived: false,
+  };
 }
 
 const groups: CapabilityGroup[] = [
-  { group: '客户管理', capabilities: [cap('crm.cap.account', true), cap('crm.cap.account_contact_full', false, true)] },
+  {
+    group: '客户管理',
+    capabilities: [cap('crm.cap.account', true), cap('crm.cap.account_contact_full', false, true)],
+  },
   { group: '线索', capabilities: [cap('crm.cap.lead', false)] },
 ];
 
@@ -48,10 +59,45 @@ describe('capabilityHelpers', () => {
       {
         group: 'g',
         capabilities: [
-          { code: 'a', group: 'g', label: 'a', sensitive: false, tier: 'viewer', includes: [], granted: false, conventionDerived: false },
-          { code: 'b', group: 'g', label: 'b', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
-          { code: 'c', group: 'g', label: 'c', sensitive: false, tier: 'admin', includes: [], granted: false, conventionDerived: false },
-          { code: 'd', group: 'g', label: 'd', sensitive: false, includes: [], granted: false, conventionDerived: false },
+          {
+            code: 'a',
+            group: 'g',
+            label: 'a',
+            sensitive: false,
+            tier: 'viewer',
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+          },
+          {
+            code: 'b',
+            group: 'g',
+            label: 'b',
+            sensitive: false,
+            tier: 'editor',
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+          },
+          {
+            code: 'c',
+            group: 'g',
+            label: 'c',
+            sensitive: false,
+            tier: 'admin',
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+          },
+          {
+            code: 'd',
+            group: 'g',
+            label: 'd',
+            sensitive: false,
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+          },
         ],
       },
     ];
@@ -66,26 +112,71 @@ describe('capabilityHelpers', () => {
       {
         group: '报价单',
         capabilities: [
-          { code: 'qo.cap.quote_view', group: '报价单', label: '查看报价', sensitive: false, tier: 'viewer', includes: ['qo.quote.read'], granted: true, conventionDerived: false },
+          {
+            code: 'qo.cap.quote_view',
+            group: '报价单',
+            label: '查看报价',
+            sensitive: false,
+            tier: 'viewer',
+            includes: ['qo.quote.read'],
+            granted: true,
+            conventionDerived: false,
+          },
         ],
       },
       {
         group: 'model',
         capabilities: [
-          { code: 'model.qo_quote_common', group: 'model', label: 'Qo_quote_common Read', sensitive: false, tier: null, includes: ['model.qo_quote_common.read'], granted: true, conventionDerived: true },
-          { code: 'model.crm_account_common', group: 'model', label: 'Crm_account_common Read', sensitive: false, tier: null, includes: ['model.crm_account_common.read'], granted: false, conventionDerived: true },
+          {
+            code: 'model.qo_quote_common',
+            group: 'model',
+            label: 'Qo_quote_common Read',
+            sensitive: false,
+            tier: null,
+            includes: ['model.qo_quote_common.read'],
+            granted: true,
+            conventionDerived: true,
+          },
+          {
+            code: 'model.crm_account_common',
+            group: 'model',
+            label: 'Crm_account_common Read',
+            sensitive: false,
+            tier: null,
+            includes: ['model.crm_account_common.read'],
+            granted: false,
+            conventionDerived: true,
+          },
         ],
       },
       {
         group: '客户管理',
         capabilities: [
-          { code: 'crm.cap.account', group: '客户管理', label: '维护客户资料', sensitive: false, tier: 'editor', includes: ['crm.account.manage'], granted: true, conventionDerived: false },
+          {
+            code: 'crm.cap.account',
+            group: '客户管理',
+            label: '维护客户资料',
+            sensitive: false,
+            tier: 'editor',
+            includes: ['crm.account.manage'],
+            granted: true,
+            conventionDerived: false,
+          },
         ],
       },
       {
         group: 'meta',
         capabilities: [
-          { code: 'meta.model', group: 'meta', label: 'Meta model read', sensitive: false, tier: null, includes: ['meta.model.read'], granted: true, conventionDerived: true },
+          {
+            code: 'meta.model',
+            group: 'meta',
+            label: 'Meta model read',
+            sensitive: false,
+            tier: null,
+            includes: ['meta.model.read'],
+            granted: true,
+            conventionDerived: true,
+          },
         ],
       },
     ];
@@ -107,14 +198,44 @@ describe('capabilityHelpers', () => {
       {
         group: '规则配置',
         capabilities: [
-          { code: 'bom.rule.manage', group: '规则配置', label: '编辑 BOM 规则', sensitive: false, includes: [], granted: false, conventionDerived: false, displayGroupOrder: 80, displayOrder: 20 },
+          {
+            code: 'bom.rule.manage',
+            group: '规则配置',
+            label: '编辑 BOM 规则',
+            sensitive: false,
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+            displayGroupOrder: 80,
+            displayOrder: 20,
+          },
         ],
       },
       {
         group: '报价管理',
         capabilities: [
-          { code: 'qo.cap.quote_edit', group: '报价管理', label: '编辑报价', sensitive: false, includes: [], granted: false, conventionDerived: false, displayGroupOrder: 10, displayOrder: 30 },
-          { code: 'qo.cap.quote_view', group: '报价管理', label: '查看报价', sensitive: false, includes: [], granted: true, conventionDerived: false, displayGroupOrder: 10, displayOrder: 10 },
+          {
+            code: 'qo.cap.quote_edit',
+            group: '报价管理',
+            label: '编辑报价',
+            sensitive: false,
+            includes: [],
+            granted: false,
+            conventionDerived: false,
+            displayGroupOrder: 10,
+            displayOrder: 30,
+          },
+          {
+            code: 'qo.cap.quote_view',
+            group: '报价管理',
+            label: '查看报价',
+            sensitive: false,
+            includes: [],
+            granted: true,
+            conventionDerived: false,
+            displayGroupOrder: 10,
+            displayOrder: 10,
+          },
         ],
       },
     ];
@@ -135,7 +256,17 @@ describe('capabilityHelpers', () => {
       {
         group: '组织与权限管理',
         capabilities: [
-          { code: 'org.cap.role', group: '组织与权限管理', label: '管理角色与授权', sensitive: false, includes: ['org.role.read'], granted: false, conventionDerived: false, displayGroupOrder: 90, displayOrder: 40 },
+          {
+            code: 'org.cap.role',
+            group: '组织与权限管理',
+            label: '管理角色与授权',
+            sensitive: false,
+            includes: ['org.role.read'],
+            granted: false,
+            conventionDerived: false,
+            displayGroupOrder: 90,
+            displayOrder: 40,
+          },
         ],
       },
     ];
@@ -151,7 +282,17 @@ describe('capabilityHelpers', () => {
       {
         group: '系统管理',
         capabilities: [
-          { code: 'sys.cap.model_service', group: '系统管理', label: '模型服务配置', sensitive: false, includes: ['ai_center'], granted: false, conventionDerived: false, displayGroupOrder: 95, displayOrder: 20 },
+          {
+            code: 'sys.cap.model_service',
+            group: '系统管理',
+            label: '模型服务配置',
+            sensitive: false,
+            includes: ['ai_center'],
+            granted: false,
+            conventionDerived: false,
+            displayGroupOrder: 95,
+            displayOrder: 20,
+          },
         ],
       },
     ];
@@ -162,19 +303,27 @@ describe('capabilityHelpers', () => {
     expect(split.advancedGroups).toEqual([]);
   });
 
-  it('menu-view: a CRM group with no focused menu (线索与商机) folds into advanced', () => {
+  it('menu-view: new declared groups appear in the primary selection', () => {
     const groups: CapabilityGroup[] = [
       {
         group: '线索与商机',
         capabilities: [
-          { code: 'crm.cap.lead', group: '线索与商机', label: '维护线索', sensitive: false, includes: ['crm.lead.read'], granted: false, conventionDerived: false },
+          {
+            code: 'crm.cap.lead',
+            group: '线索与商机',
+            label: '维护线索',
+            sensitive: false,
+            includes: ['crm.lead.read'],
+            granted: false,
+            conventionDerived: false,
+          },
         ],
       },
     ];
 
     const split = splitCapabilityGroupsForPrimaryView(groups);
 
-    expect(split.primaryGroups).toEqual([]);
-    expect(split.advancedGroups.map((g) => g.group)).toEqual(['线索与商机']);
+    expect(split.primaryGroups.map((g) => g.group)).toEqual(['线索与商机']);
+    expect(split.advancedGroups).toEqual([]);
   });
 });

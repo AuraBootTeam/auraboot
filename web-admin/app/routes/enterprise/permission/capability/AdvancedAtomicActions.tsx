@@ -3,7 +3,8 @@ import { ChevronDownIcon, ChevronRightIcon, Cog6ToothIcon } from '@heroicons/rea
 import { useI18n } from '~/contexts/I18nContext';
 import type { PermissionMatrixDTO } from '../types';
 import type { CapabilityGroup } from './types';
-import { SCOPE_OPTIONS, normalizeScope } from '../scopeConfig';
+import { SCOPE_OPTIONS, normalizeScope, isValidScope, scopeOption } from '../scopeConfig';
+import { useToastContext } from '~/contexts/ToastContext';
 import { deriveCodeSources, sourceFor } from './coverageHelpers';
 import PolicyConfigDialog from '../PolicyConfigDialog';
 import { permissionService } from '~/shared/services/permissionService';
@@ -14,6 +15,7 @@ interface AdvancedAtomicActionsProps {
   capabilityGroups: CapabilityGroup[];
   onToggle: (permissionId: number, granted: boolean) => void;
   onScopeChange: (resourceCode: string, actionCode: string, scopeType: string) => void;
+  disabled?: boolean;
 }
 
 interface FlatRow {
@@ -52,8 +54,10 @@ export default function AdvancedAtomicActions({
   capabilityGroups,
   onToggle,
   onScopeChange,
+  disabled = false,
 }: AdvancedAtomicActionsProps) {
   const { t } = useI18n();
+  const { showErrorToast } = useToastContext();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [onlyGranted, setOnlyGranted] = useState(false);
@@ -100,7 +104,8 @@ export default function AdvancedAtomicActions({
     return rows.filter((r) => {
       if (onlyGranted && !r.granted) return false;
       if (onlyUncovered && sources[r.code]?.covered) return false;
-      if (q && !r.code.toLowerCase().includes(q) && !(r.label || '').toLowerCase().includes(q)) return false;
+      if (q && !r.code.toLowerCase().includes(q) && !(r.label || '').toLowerCase().includes(q))
+        return false;
       return true;
     });
   }, [rows, query, onlyGranted, onlyUncovered, sources]);
@@ -133,11 +138,18 @@ export default function AdvancedAtomicActions({
             ③
           </span>
           <span className="font-semibold">
-            {t('admin.permission.advanced.title', undefined, 'Advanced · configure by atomic action')}
+            {t(
+              'admin.permission.advanced.title',
+              undefined,
+              'Advanced · configure by atomic action',
+            )}
           </span>
           <span className="text-[11px] text-gray-400">
-            {t('admin.permission.advanced.summary', { total: totalCodes, exceptions: exceptionCount },
-              `${totalCodes} codes · ${exceptionCount} exceptions`)}
+            {t(
+              'admin.permission.advanced.summary',
+              { total: totalCodes, exceptions: exceptionCount },
+              `${totalCodes} actions · ${exceptionCount} granted actions without declared capability coverage`,
+            )}
           </span>
         </span>
         {expanded ? (
@@ -154,7 +166,7 @@ export default function AdvancedAtomicActions({
             {t(
               'admin.permission.advanced.banner',
               undefined,
-              'These are low-level permission codes — for everyday work use the capability checklist above, which manages them automatically. Use this only to audit which codes a capability includes, or to grant an exception not yet covered by any capability.',
+              'Use business capabilities for everyday changes. This table shows individual actions and which declared capabilities include them. Coverage does not identify how an action was granted.',
             )}
           </div>
 
@@ -183,131 +195,175 @@ export default function AdvancedAtomicActions({
                 checked={onlyUncovered}
                 onChange={(e) => setOnlyUncovered(e.target.checked)}
               />
-              {t('admin.permission.advanced.onlyUncovered', undefined, 'Uncovered / exception only')}
+              {t(
+                'admin.permission.advanced.onlyUncovered',
+                undefined,
+                'Not covered by business capabilities',
+              )}
             </label>
           </div>
 
           {/* table */}
-          <div className="overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-[28px_1fr_160px_180px] items-center border-b border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-500 dark:border-gray-700 dark:bg-gray-800">
-              <div />
-              <div>{t('admin.permission.advanced.colCode', undefined, 'Code / name')}</div>
-              <div>{t('admin.permission.scope.label', undefined, 'Data scope')}</div>
-              <div>{t('admin.permission.advanced.colSource', undefined, 'Source')}</div>
-            </div>
-
-            {grouped.length === 0 ? (
-              <div data-testid="advanced-atomic-empty" className="px-3 py-8 text-center text-xs text-gray-400">
-                {t('admin.permission.advanced.empty', undefined, 'No matching permission codes')}
+          <div className="rounded-card border-border overflow-x-auto border dark:border-gray-700">
+            <div className="min-w-2xl">
+              <div className="grid grid-cols-[28px_1fr_160px_180px] items-center border-b border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-500 dark:border-gray-700 dark:bg-gray-800">
+                <div />
+                <div>{t('admin.permission.advanced.colCode', undefined, 'Code / name')}</div>
+                <div>{t('admin.permission.scope.label', undefined, 'Data scope')}</div>
+                <div>{t('admin.permission.advanced.colSource', undefined, 'Source')}</div>
               </div>
-            ) : (
-              grouped.map(([groupKey, { groupName, rows: resRows }]) => (
-                <div key={groupKey} data-testid={`atomic-resource-${groupKey}`}>
-                  <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-800 dark:bg-gray-800/40">
-                    {groupName}
-                  </div>
-                  {resRows.map((r) => {
-                    const src = sourceFor(sources, r.code);
-                    const isException = r.granted && !src.covered;
-                    return (
-                      <div
-                        key={r.code}
-                        data-testid={`atomic-row-${r.code}`}
-                        className={`grid grid-cols-[28px_1fr_160px_180px] items-center border-b border-gray-50 px-3 py-2 dark:border-gray-800 ${
-                          isException ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          data-testid={`atomic-checkbox-${r.code}`}
-                          checked={r.granted}
-                          onChange={() => onToggle(r.permissionId, !r.granted)}
-                          className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600"
-                        />
-                        <div className="min-w-0">
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                            {r.code}
-                          </span>
-                          <span className="ml-2 text-xs text-gray-800 dark:text-gray-200">{r.label}</span>
-                          {r.granted && r.policySchema && (
-                            <button
-                              type="button"
-                              title={t('admin.permission.advanced.configurePolicy', undefined, 'Configure policy')}
-                              data-testid={`atomic-policy-${r.code}`}
-                              disabled={loadingPolicyPid === r.permissionPid}
-                              onClick={async () => {
-                                try {
-                                  setLoadingPolicyPid(r.permissionPid);
-                                  const initialValues = await permissionService.getPolicy(rolePid, r.permissionPid);
-                                  setPolicyDialog({
-                                    permissionPid: r.permissionPid,
-                                    permissionLabel: r.label || r.code,
-                                    schema: JSON.parse(r.policySchema!),
-                                    initialValues,
-                                  });
-                                } catch {
+
+              {grouped.length === 0 ? (
+                <div
+                  data-testid="advanced-atomic-empty"
+                  className="px-3 py-8 text-center text-xs text-gray-400"
+                >
+                  {t('admin.permission.advanced.empty', undefined, 'No matching permission codes')}
+                </div>
+              ) : (
+                grouped.map(([groupKey, { groupName, rows: resRows }]) => (
+                  <div key={groupKey} data-testid={`atomic-resource-${groupKey}`}>
+                    <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-800 dark:bg-gray-800/40">
+                      {groupName}
+                    </div>
+                    {resRows.map((r) => {
+                      const src = sourceFor(sources, r.code);
+                      const isException = r.granted && !src.covered;
+                      return (
+                        <div
+                          key={r.code}
+                          data-testid={`atomic-row-${r.code}`}
+                          className={`grid grid-cols-[28px_1fr_160px_180px] items-center border-b border-gray-50 px-3 py-2 dark:border-gray-800 ${
+                            isException ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            data-testid={`atomic-checkbox-${r.code}`}
+                            checked={r.granted}
+                            disabled={disabled}
+                            aria-label={r.label}
+                            onChange={() => {
+                              if (!disabled) onToggle(r.permissionId, !r.granted);
+                            }}
+                            className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600"
+                          />
+                          <div className="min-w-0">
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                              {r.code}
+                            </span>
+                            <span className="ml-2 text-xs text-gray-800 dark:text-gray-200">
+                              {r.label}
+                            </span>
+                            {r.granted && r.policySchema && (
+                              <button
+                                type="button"
+                                title={t(
+                                  'admin.permission.advanced.configurePolicy',
+                                  undefined,
+                                  'Configure policy',
+                                )}
+                                data-testid={`atomic-policy-${r.code}`}
+                                disabled={disabled || loadingPolicyPid === r.permissionPid}
+                                onClick={async () => {
                                   try {
+                                    setLoadingPolicyPid(r.permissionPid);
+                                    const initialValues = await permissionService.getPolicy(
+                                      rolePid,
+                                      r.permissionPid,
+                                    );
                                     setPolicyDialog({
                                       permissionPid: r.permissionPid,
                                       permissionLabel: r.label || r.code,
                                       schema: JSON.parse(r.policySchema!),
+                                      initialValues,
                                     });
                                   } catch {
-                                    /* invalid schema — ignore */
+                                    showErrorToast(
+                                      t(
+                                        'admin.permission.policy.loadError',
+                                        undefined,
+                                        'Could not load permission policy',
+                                      ),
+                                    );
+                                  } finally {
+                                    setLoadingPolicyPid(null);
                                   }
-                                } finally {
-                                  setLoadingPolicyPid(null);
+                                }}
+                                className="ml-1 inline-flex items-center rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 dark:hover:bg-gray-700"
+                              >
+                                <Cog6ToothIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <div>
+                            {r.granted ? (
+                              <select
+                                data-testid={`atomic-scope-${r.code}`}
+                                value={r.scopeType}
+                                disabled={disabled}
+                                aria-label={t(
+                                  'admin.permission.scope.label',
+                                  undefined,
+                                  'Data scope',
+                                )}
+                                onChange={(e) =>
+                                  !disabled &&
+                                  onScopeChange(r.resourceCode, r.action, e.target.value)
                                 }
-                              }}
-                              className="ml-1 inline-flex items-center rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 dark:hover:bg-gray-700"
-                            >
-                              <Cog6ToothIcon className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                                className="w-full rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                              >
+                                {!isValidScope(r.scopeType) && (
+                                  <option value={r.scopeType} disabled>
+                                    {t(
+                                      scopeOption(r.scopeType).labelKey,
+                                      undefined,
+                                      scopeOption(r.scopeType).labelFallback,
+                                    )}
+                                  </option>
+                                )}
+                                {SCOPE_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {t(opt.labelKey, undefined, opt.labelFallback)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-[11px] text-gray-300">—</span>
+                            )}
+                          </div>
+                          <div data-testid={`atomic-source-${r.code}`}>
+                            {src.covered ? (
+                              <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] text-green-700 dark:border-green-900/40 dark:bg-green-900/10 dark:text-green-400">
+                                {t(
+                                  'admin.permission.advanced.sourceCapability',
+                                  { name: src.capabilityLabel ?? '' },
+                                  `Included in "${src.capabilityLabel ?? ''}"`,
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+                                {t(
+                                  'admin.permission.advanced.sourceException',
+                                  undefined,
+                                  'No declared capability coverage',
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          {r.granted ? (
-                            <select
-                              data-testid={`atomic-scope-${r.code}`}
-                              value={r.scopeType}
-                              onChange={(e) => onScopeChange(r.resourceCode, r.action, e.target.value)}
-                              className="w-full rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                            >
-                              {SCOPE_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {t(opt.labelKey, undefined, opt.labelFallback)}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="text-[11px] text-gray-300">—</span>
-                          )}
-                        </div>
-                        <div data-testid={`atomic-source-${r.code}`}>
-                          {src.covered ? (
-                            <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] text-green-700 dark:border-green-900/40 dark:bg-green-900/10 dark:text-green-400">
-                              {t('admin.permission.advanced.sourceCapability', { name: src.capabilityLabel ?? '' },
-                                `Capability "${src.capabilityLabel ?? ''}"`)}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
-                              {t('admin.permission.advanced.sourceException', undefined, 'Uncovered · exception')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))
-            )}
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-
           <p className="mt-2 text-[11px] text-gray-400">
             {t(
               'admin.permission.advanced.legend',
               undefined,
-              'Green "Capability X" = granted by a capability above; edit it there. Amber "exception" = no matching business capability; grant directly here (counted as an exception for audit).',
+              'Capability coverage means the action is included in a declared capability. Uncovered actions have no such declaration; neither label proves the source of the grant.',
             )}
           </p>
         </div>

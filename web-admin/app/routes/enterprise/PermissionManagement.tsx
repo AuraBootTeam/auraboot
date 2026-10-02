@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useBlocker } from 'react-router';
 import {
   ShieldCheckIcon,
   PlusIcon,
@@ -60,11 +60,37 @@ export default function PermissionManagement() {
   const [rolesLoading, setRolesLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    rolePid?: string;
+    tab?: RightTabKey;
+  } | null>(null);
+  const blocker = useBlocker(editorDirty);
 
   // Right panel tab state — capability editor is the default surface.
   const [activeRightTab, setActiveRightTab] = useState<RightTabKey>(
     auditDeepLink ? 'audit' : 'capabilities',
   );
+
+  const selectRole = (rolePid: string) => {
+    if (rolePid === selectedRolePid) return;
+    if (editorDirty) setPendingNavigation({ rolePid });
+    else setSelectedRolePid(rolePid);
+  };
+  const selectTab = (tab: RightTabKey) => {
+    if (tab === activeRightTab) return;
+    if (editorDirty) setPendingNavigation({ tab });
+    else setActiveRightTab(tab);
+  };
+  useEffect(() => {
+    if (!editorDirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [editorDirty]);
 
   // Dialog state
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -108,9 +134,7 @@ export default function PermissionManagement() {
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const matched = searchQuery
-      ? roles.filter(
-          (r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q),
-        )
+      ? roles.filter((r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))
       : roles;
     return sortRolesForPermissionSetup(matched);
   }, [roles, searchQuery]);
@@ -216,9 +240,9 @@ export default function PermissionManagement() {
   // -------------------------------------------------------------------------
 
   const renderRolesTab = () => (
-    <div className="flex min-w-0 flex-1 overflow-hidden">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
       {/* Left — Role table */}
-      <div className="flex w-80 min-w-0 flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+      <div className="border-border flex max-h-56 w-full min-w-0 flex-shrink-0 flex-col border-b lg:max-h-none lg:w-72 lg:border-r lg:border-b-0 dark:border-gray-700">
         <div className="border-b border-gray-200 p-3 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -252,7 +276,7 @@ export default function PermissionManagement() {
               {t(
                 'admin.permission.role.recommendedHint',
                 undefined,
-                '建议岗位: 管理员 tenant_admin；销售/采购 bom_operator + qo_quoter；工程 bom_operator',
+                'Set up separate administrator, sales, procurement and engineering roles according to responsibilities.',
               )}
             </div>
           )}
@@ -283,7 +307,7 @@ export default function PermissionManagement() {
                     <tr
                       key={role.pid}
                       data-testid={`role-item-${role.code}`}
-                      onClick={() => setSelectedRolePid(role.pid)}
+                      onClick={() => selectRole(role.pid)}
                       className={`group cursor-pointer border-b border-gray-100 transition-colors dark:border-gray-700 ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-900/20'
@@ -323,7 +347,7 @@ export default function PermissionManagement() {
                         )}
                       </td>
                       <td className="w-20 px-2 py-2 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex items-center justify-end gap-0.5">
                           <button
                             data-testid={`role-action-edit-${role.code}`}
                             onClick={(e) => {
@@ -374,7 +398,7 @@ export default function PermissionManagement() {
       </div>
 
       {/* Right — Role detail tabs (Permissions / Members) */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
             <button
@@ -382,7 +406,7 @@ export default function PermissionManagement() {
               role="tab"
               aria-selected={activeRightTab === 'capabilities'}
               data-testid="permission-right-tab-capabilities"
-              onClick={() => setActiveRightTab('capabilities')}
+              onClick={() => selectTab('capabilities')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'capabilities'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -397,7 +421,7 @@ export default function PermissionManagement() {
               role="tab"
               aria-selected={activeRightTab === 'members'}
               data-testid="permission-right-tab-members"
-              onClick={() => setActiveRightTab('members')}
+              onClick={() => selectTab('members')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'members'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -412,7 +436,7 @@ export default function PermissionManagement() {
               role="tab"
               aria-selected={activeRightTab === 'audit'}
               data-testid="permission-right-tab-audit"
-              onClick={() => setActiveRightTab('audit')}
+              onClick={() => selectTab('audit')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'audit'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -439,9 +463,15 @@ export default function PermissionManagement() {
 
           {activeRightTab === 'capabilities' &&
             (selectedRole ? (
-              <CapabilityRoleEditor key={selectedRole.pid} rolePid={selectedRole.pid} />
+              <CapabilityRoleEditor
+                key={selectedRole.pid}
+                rolePid={selectedRole.pid}
+                onDirtyChange={setEditorDirty}
+              />
             ) : (
-              <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
+              <div className="text-sm text-gray-400">
+                {t('admin.permission.selectRole') || 'Select a role'}
+              </div>
             ))}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
           {activeRightTab === 'audit' && <PermissionAuditTab />}
@@ -488,6 +518,31 @@ export default function PermissionManagement() {
       />
 
       {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={pendingNavigation !== null || blocker.state === 'blocked'}
+        title={t(
+          'admin.permission.editor.discardTitle',
+          undefined,
+          'Discard unsaved permission changes?',
+        )}
+        content={t(
+          'admin.permission.editor.discardNote',
+          undefined,
+          'Your draft has not been saved. Continue to discard it, or cancel to keep editing.',
+        )}
+        confirmText={t('admin.permission.editor.discard', undefined, 'Discard changes')}
+        onCancel={() => {
+          setPendingNavigation(null);
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
+        onConfirm={() => {
+          setEditorDirty(false);
+          if (pendingNavigation?.rolePid) setSelectedRolePid(pendingNavigation.rolePid);
+          if (pendingNavigation?.tab) setActiveRightTab(pendingNavigation.tab);
+          setPendingNavigation(null);
+          if (blocker.state === 'blocked') blocker.proceed();
+        }}
+      />
       <ConfirmDialog
         open={confirmDelete.open}
         title={t('admin.permission.role.delete.title') || 'Delete Role'}

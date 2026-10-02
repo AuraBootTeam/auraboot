@@ -16,7 +16,12 @@ const BASE = BASE_URL;
 async function createRole(page: Page) {
   const code = `e2e_defscope_${Date.now()}`;
   const resp = await page.request.post(`${BASE}/api/roles`, {
-    data: { code, name: `DefScope ${Date.now()}`, description: 'role default scope golden', type: 'custom' },
+    data: {
+      code,
+      name: `DefScope ${Date.now()}`,
+      description: 'role default scope golden',
+      type: 'custom',
+    },
   });
   expect(resp.ok()).toBeTruthy();
   return (await resp.json()).data as { pid: string; code: string };
@@ -38,7 +43,9 @@ test('a role default data scope is inherited by newly-granted permissions', asyn
   await page.getByTestId('data-scope-option-dept').click();
   await page.getByTestId('data-scope-apply').click();
   await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByTestId('data-scope-current')).toContainText(/仅本部门|Dept Only|本部门/, { timeout: 10_000 });
+  await expect(page.getByTestId('data-scope-default')).toContainText(/仅本部门|Dept Only|本部门/, {
+    timeout: 10_000,
+  });
 
   // ③ expand advanced; grant a NEW atomic permission via its checkbox (precision-safe rolePid path)
   await page.getByTestId('advanced-atomic-toggle').click();
@@ -67,19 +74,24 @@ test('a role default data scope is inherited by newly-granted permissions', asyn
   await page.screenshot({ path: `${SHOTS}/01-inherited-scope.png`, fullPage: true });
 
   // backend cross-check: the role's stored default is persisted
-  const defResp = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}/default-scope`);
+  const defResp = await page.request.get(
+    `${BASE}/api/permissions/matrix/${role.pid}/default-scope`,
+  );
   expect(defResp.ok()).toBeTruthy();
   expect((await defResp.json()).data).toBe('dept');
 });
 
-test('capability save grants via the precision-safe rolePid endpoint (snowflake-id role)', async ({ page }) => {
+test('capability save grants via the precision-safe rolePid endpoint (snowflake-id role)', async ({
+  page,
+}) => {
   // Regression guard for the snowflake-id precision bug: the capability endpoint must key on the
   // role PID (string), not the numeric id (which round-trips lossily through the browser and would
   // FK-violate / target the wrong role). Driven at the API layer the editor uses.
   const role = await createRole(page);
 
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
-  const grantedCaps = (groups: any[]) => groups.flatMap((g) => g.capabilities).filter((c: any) => c.granted);
+  const grantedCaps = (groups: any[]) =>
+    groups.flatMap((g) => g.capabilities).filter((c: any) => c.granted);
 
   // a freshly-created custom role has no granted capabilities yet
   const before = (await (await page.request.get(capUrl)).json()).data as Array<{

@@ -917,13 +917,13 @@
   },
   {
     "key": "admin.permission.advanced.summary",
-    "zh-CN": "{total} 项原子码 · {exceptions} 项破例",
-    "en-US": "{total} codes · {exceptions} exceptions"
+    "zh-CN": "共 {total} 个动作 · {exceptions} 项已授权动作未被业务能力覆盖",
+    "en-US": "{total} actions · {exceptions} granted actions without business capability coverage"
   },
   {
     "key": "admin.permission.advanced.banner",
-    "zh-CN": "这是底层原子权限码 — 日常请用上方“业务能力”,它会自动管理这些。仅用于:① 审计核对某能力包含哪些原子码;② 破例授予尚未被任何能力覆盖的权限。",
-    "en-US": "These are low-level permission codes — for everyday work use the capability checklist above, which manages them automatically. Use this only to audit which codes a capability includes, or to grant an exception not yet covered by any capability."
+    "zh-CN": "日常授权请使用上方业务能力。此表用于查看单个动作及包含它的能力；覆盖关系不能证明授权来源。",
+    "en-US": "Use business capabilities for everyday changes. This table shows individual actions and which capabilities include them. Coverage does not prove the source of a grant."
   },
   {
     "key": "admin.permission.advanced.search",
@@ -937,8 +937,8 @@
   },
   {
     "key": "admin.permission.advanced.onlyUncovered",
-    "zh-CN": "只看未覆盖/破例",
-    "en-US": "Uncovered / exception only"
+    "zh-CN": "仅看未被业务能力覆盖的动作",
+    "en-US": "Actions without business capability coverage"
   },
   {
     "key": "admin.permission.advanced.colCode",
@@ -957,18 +957,18 @@
   },
   {
     "key": "admin.permission.advanced.sourceCapability",
-    "zh-CN": "能力「{name}」",
-    "en-US": "Capability “{name}”"
+    "zh-CN": "能力「{name}」包含",
+    "en-US": "Included in “{name}”"
   },
   {
     "key": "admin.permission.advanced.sourceException",
-    "zh-CN": "未覆盖 · 破例",
-    "en-US": "Uncovered · exception"
+    "zh-CN": "无业务能力覆盖",
+    "en-US": "No business capability coverage"
   },
   {
     "key": "admin.permission.advanced.legend",
-    "zh-CN": "绿色“能力 X”= 由上方某能力授予,改它请去能力清单;黄色“破例”= 无对应业务能力,在此直接授予(计入破例,留审计)。",
-    "en-US": "Green “Capability X” = granted by a capability above; edit it there. Amber “exception” = no matching business capability; grant directly here (counted as an exception for audit)."
+    "zh-CN": "“能力包含”表示该动作被某个已声明能力收录；“无覆盖”表示没有对应声明。二者都不代表实际授权来源。",
+    "en-US": "Coverage means a declared capability includes the action. Uncovered means no such declaration exists. Neither label proves the source of a grant."
   },
   {
     "key": "admin.permission.advanced.configurePolicy",
@@ -977,8 +977,8 @@
   },
   {
     "key": "admin.permission.effective.summary",
-    "zh-CN": "有效权限 {total} 项 · {exceptions} 项破例",
-    "en-US": "{total} effective permissions · {exceptions} exceptions"
+    "zh-CN": "已授权动作 {total} 项 · {exceptions} 项未被业务能力覆盖",
+    "en-US": "{total} granted actions · {exceptions} not covered by business capabilities"
   },
   {
     "key": "admin.permission.members.orgPickerUnavailable",
@@ -3939,5 +3939,125 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "admin.permission.scope.team",
+    "zh-CN": "所属团队",
+    "en-US": "My teams"
+  },
+  {
+    "key": "admin.permission.scope.not_configured",
+    "zh-CN": "未配置",
+    "en-US": "Not configured"
+  },
+  {
+    "key": "admin.permission.scope.invalid",
+    "zh-CN": "范围配置无效",
+    "en-US": "Invalid scope configuration"
+  },
+  {
+    "key": "admin.permission.scope.no_grants",
+    "zh-CN": "暂无已授权动作",
+    "en-US": "No granted actions"
+  },
+  {
+    "key": "admin.permission.scope.unavailable",
+    "zh-CN": "范围不可用",
+    "en-US": "Scope unavailable"
+  },
+  {
+    "key": "admin.permission.scope.actual",
+    "zh-CN": "当前已授权动作范围",
+    "en-US": "Current granted action scopes"
+  },
+  {
+    "key": "admin.permission.scope.default",
+    "zh-CN": "角色默认范围",
+    "en-US": "Role default scope"
+  },
+  {
+    "key": "admin.permission.scope.loadError",
+    "zh-CN": "角色默认范围加载失败",
+    "en-US": "Could not load role default scope"
+  },
+  {
+    "key": "admin.permission.scope.verifyError",
+    "zh-CN": "范围已提交，但未能确认保存结果，请重新加载后继续",
+    "en-US": "Scope was submitted but could not be verified. Reload before continuing."
+  },
+  {
+    "key": "admin.permission.editor.loadError",
+    "zh-CN": "角色权限加载失败，请重试",
+    "en-US": "Could not load role permissions. Retry to continue."
+  },
+  {
+    "key": "admin.permission.editor.capabilities",
+    "zh-CN": "业务能力",
+    "en-US": "Business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.search",
+    "zh-CN": "搜索业务能力",
+    "en-US": "Search business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.empty",
+    "zh-CN": "没有匹配的业务能力",
+    "en-US": "No matching business capabilities"
+  },
+  {
+    "key": "admin.permission.editor.selection",
+    "zh-CN": "已选 {selected} / {total} 项",
+    "en-US": "{selected} selected of {total}"
+  },
+  {
+    "key": "admin.permission.editor.draft",
+    "zh-CN": "有 {count} 项待保存变更。请先保存或撤销草稿，再修改数据范围或高级权限。",
+    "en-US": "{count} pending changes. Save or discard before editing data scope or advanced permissions."
+  },
+  {
+    "key": "admin.permission.editor.discard",
+    "zh-CN": "撤销变更",
+    "en-US": "Discard changes"
+  },
+  {
+    "key": "admin.permission.editor.reviewSave",
+    "zh-CN": "预览并保存",
+    "en-US": "Review and save"
+  },
+  {
+    "key": "admin.permission.editor.preview",
+    "zh-CN": "确认权限变更",
+    "en-US": "Review permission changes"
+  },
+  {
+    "key": "admin.permission.editor.add",
+    "zh-CN": "授予",
+    "en-US": "Grant"
+  },
+  {
+    "key": "admin.permission.editor.remove",
+    "zh-CN": "移除",
+    "en-US": "Revoke"
+  },
+  {
+    "key": "admin.permission.editor.discardTitle",
+    "zh-CN": "放弃未保存的权限变更？",
+    "en-US": "Discard unsaved permission changes?"
+  },
+  {
+    "key": "admin.permission.editor.discardNote",
+    "zh-CN": "草稿尚未保存。继续将放弃草稿，取消则保留并继续编辑。",
+    "en-US": "Your draft has not been saved. Continue to discard it, or cancel to keep editing."
+  },
+  {
+    "key": "admin.permission.role.recommendedHint",
+    "zh-CN": "按职责分别设置管理员、销售、采购和工程岗位角色。",
+    "en-US": "Set up separate administrator, sales, procurement and engineering roles according to responsibilities."
+  },
+  {
+    "key": "admin.permission.policy.loadError",
+    "zh-CN": "权限策略加载失败，请重试",
+    "en-US": "Could not load permission policy. Retry to continue."
   }
 ]

@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { PermissionMatrixDTO } from '../types';
 import { grantedActions, deriveRoleScope } from '../scopeHelpers';
 
-function matrix(actions: Array<{ r: string; a: string; granted: boolean; scope?: string }>): PermissionMatrixDTO {
+function matrix(
+  actions: Array<{ r: string; a: string; granted: boolean; scope?: string }>,
+): PermissionMatrixDTO {
   return {
     modules: [
       {
@@ -34,17 +36,19 @@ describe('scopeHelpers', () => {
     const m = matrix([
       { r: 'crm.account', a: 'read', granted: true, scope: 'dept' },
       { r: 'crm.lead', a: 'read', granted: false, scope: 'self' },
-      { r: 'crm.deal', a: 'read', granted: true }, // no scope -> all
+      { r: 'crm.deal', a: 'read', granted: true }, // missing scope remains explicit
     ]);
     expect(grantedActions(m)).toEqual([
       { resourceCode: 'crm.account', actionCode: 'read', scopeType: 'dept' },
-      { resourceCode: 'crm.deal', actionCode: 'read', scopeType: 'all' },
+      { resourceCode: 'crm.deal', actionCode: 'read', scopeType: 'not_configured' },
     ]);
   });
 
-  it('deriveRoleScope is all when nothing granted', () => {
-    expect(deriveRoleScope(matrix([{ r: 'crm.account', a: 'read', granted: false }]))).toBe('all');
-    expect(deriveRoleScope(null)).toBe('all');
+  it('distinguishes empty grants from an unavailable matrix', () => {
+    expect(deriveRoleScope(matrix([{ r: 'crm.account', a: 'read', granted: false }]))).toBe(
+      'no_grants',
+    );
+    expect(deriveRoleScope(null)).toBe('unavailable');
   });
 
   it('deriveRoleScope returns the shared scope when uniform', () => {

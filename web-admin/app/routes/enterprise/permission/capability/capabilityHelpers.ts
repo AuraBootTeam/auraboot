@@ -20,15 +20,8 @@ export interface CapabilityPrimaryViewSplit {
   advancedTotal: number;
 }
 
-/**
- * Menu-view: map each business-function capability group to the top-level sidebar menu section it
- * belongs to, so the permission editor mirrors the real navigation tree (owner-approved mockup
- * docs/mockups/rbac-menu-view) instead of dozens of abstract groups. Capabilities whose group is not
- * in this map (CRM lead/opportunity/campaign… that have no focused menu, plus generated model/system
- * codes) fold into the advanced escape hatch. The map IS the declaration of "which menu section owns
- * this capability"; keeping it here (a focused-deployment UI concern) avoids multi-repo
- * capabilities.json churn and a fragile permissionCode derivation (most actions don't gate a menu).
- */
+/** Declared business groups follow known menu sections, with new groups kept selectable under
+ * their declared names. Only convention-derived model capabilities use the advanced view. */
 const GROUP_TO_MENU_SECTION: Record<string, string> = {
   客户管理: '客户',
   项目管理: '项目',
@@ -37,6 +30,7 @@ const GROUP_TO_MENU_SECTION: Record<string, string> = {
   规则配置: 'BOM 转化工具',
   报价单: '报价工具',
   报价管理: '报价工具',
+  报价业务面: '报价工具',
   来料处理: '报价工具',
   寻源与定价: '报价工具',
   敏感信息: '报价工具',
@@ -56,10 +50,11 @@ const MENU_SECTION_ORDER: Record<string, number> = {
   系统管理: 60,
 };
 
-/** The top-level menu section a capability belongs to, or null if it has no focused menu. */
+/** The top-level menu section a capability belongs to, or null for convention-derived capabilities. */
 export function menuSectionForCapability(capability: Capability): string | null {
   if (capability.conventionDerived) return null;
-  return GROUP_TO_MENU_SECTION[capability.group] ?? null;
+  // New declared business capabilities stay selectable without a frontend whitelist change.
+  return GROUP_TO_MENU_SECTION[capability.group] ?? capability.group;
 }
 
 function isAdvancedCapability(capability: Capability): boolean {
@@ -70,12 +65,7 @@ function countGranted(groups: CapabilityGroup[]): number {
   return allCapabilities(groups).filter((capability) => capability.granted).length;
 }
 
-/**
- * Menu-view split: primary capabilities are RE-GROUPED by their top-level menu section (客户 / 项目 /
- * BOM 转化工具 / 报价工具 / 组织管理), so the editor mirrors the sidebar tree. Capabilities with no
- * focused menu section (CRM lead/opportunity/campaign…, generated model/platform codes) stay in the
- * advanced escape hatch, keeping their original business group for auditability.
- */
+/** Group declared business capabilities by menu section; preserve new group names automatically. */
 export function splitCapabilityGroupsForPrimaryView(
   groups: CapabilityGroup[],
 ): CapabilityPrimaryViewSplit {
@@ -98,7 +88,10 @@ export function splitCapabilityGroupsForPrimaryView(
   }
 
   const primaryGroups: CapabilityGroup[] = [...bySection.entries()]
-    .map(([group, capabilities]) => ({ group, capabilities: [...capabilities].sort(compareCapabilities) }))
+    .map(([group, capabilities]) => ({
+      group,
+      capabilities: [...capabilities].sort(compareCapabilities),
+    }))
     .sort((a, b) => menuSectionOrder(a.group) - menuSectionOrder(b.group));
 
   return {
@@ -134,7 +127,9 @@ function sortCapabilityGroups(groups: CapabilityGroup[]): CapabilityGroup[] {
 }
 
 function firstDisplayGroupOrder(group: CapabilityGroup): number {
-  return Math.min(...group.capabilities.map((capability) => numberOrMax(capability.displayGroupOrder)));
+  return Math.min(
+    ...group.capabilities.map((capability) => numberOrMax(capability.displayGroupOrder)),
+  );
 }
 
 function compareCapabilities(a: Capability, b: Capability): number {
@@ -158,9 +153,7 @@ export function grantedCapabilityCodes(groups: CapabilityGroup[]): string[] {
 
 /** Toggle a capability code in the selection, returning a new array (immutable). */
 export function toggleCapability(selected: string[], code: string): string[] {
-  return selected.includes(code)
-    ? selected.filter((c) => c !== code)
-    : [...selected, code];
+  return selected.includes(code) ? selected.filter((c) => c !== code) : [...selected, code];
 }
 
 /** Per-group granted/total counts for the group header summary. */

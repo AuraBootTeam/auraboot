@@ -16,7 +16,12 @@ const BASE = BASE_URL;
 async function createRole(page: Page) {
   const code = `e2e_capsave_${Date.now()}`;
   const resp = await page.request.post(`${BASE}/api/roles`, {
-    data: { code, name: `CapSave ${Date.now()}`, description: 'capability save ui golden', type: 'custom' },
+    data: {
+      code,
+      name: `CapSave ${Date.now()}`,
+      description: 'capability save ui golden',
+      type: 'custom',
+    },
   });
   expect(resp.ok()).toBeTruthy();
   return (await resp.json()).data as { pid: string; code: string };
@@ -25,14 +30,22 @@ async function createRole(page: Page) {
 test('① capability save persists through the browser on a snowflake-id role', async ({ page }) => {
   const role = await createRole(page);
   const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
-  const grantedCaps = (groups: any[]) => groups.flatMap((g) => g.capabilities).filter((c: any) => c.granted);
+  const grantedCaps = (groups: any[]) =>
+    groups.flatMap((g) => g.capabilities).filter((c: any) => c.granted);
 
   // pick a capability that expands to real codes (avoid vacuous empty-includes ones)
   const view = (await (await page.request.get(capUrl)).json()).data as Array<{
-    capabilities: Array<{ code: string; includes: string[]; granted: boolean }>;
+    capabilities: Array<{
+      code: string;
+      includes: string[];
+      granted: boolean;
+      conventionDerived: boolean;
+    }>;
   }>;
   expect(grantedCaps(view).length).toBe(0);
-  const cap = view.flatMap((g) => g.capabilities).find((c) => (c.includes?.length ?? 0) > 0);
+  const cap = view
+    .flatMap((g) => g.capabilities)
+    .find((c) => !c.conventionDerived && (c.includes?.length ?? 0) > 0);
   expect(cap, 'a capability with includes must exist').toBeTruthy();
 
   // drive the real browser flow: select the role, check the capability, Save, await the PUT
@@ -53,6 +66,9 @@ test('① capability save persists through the browser on a snowflake-id role', 
     { timeout: 15_000 },
   );
   await page.getByTestId('capability-save').click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/00-capability-preview.png`, fullPage: true });
+  await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);
 
   // the checkbox stays checked after the editor reloads (grant persisted, not reverted)
