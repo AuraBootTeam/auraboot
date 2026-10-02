@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart/types/savedView';
 import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
@@ -73,7 +74,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   onAction,
   onToolbarConfigChange,
   resolveLabel,
-  t,
+  t: providedT,
   evaluateVisible,
   onImport,
   onExport,
@@ -86,6 +87,8 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   hideBuiltInExport,
   hideBuiltInPrint,
 }) => {
+  const { t: contextT } = useI18n();
+  const t = providedT ?? contextT;
   return (
     <div className="border-border bg-panel border-b px-6 py-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

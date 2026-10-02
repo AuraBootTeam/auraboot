@@ -1,4 +1,4 @@
-import { getLocalizedText, type TranslateFunction } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { getLocalizedText, type TranslateFunction, type LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -806,7 +806,7 @@ function CanvasColumnLeaf({ block, locale }: { block: DslBlockV3; locale: string
   const modelField = block.field
     ? modelFields.find((candidate) => candidate.code === block.field)
     : undefined;
-  const propLabel = block.props?.label ? getLocalizedText(block.props.label, locale, t) : undefined;
+  const propLabel = block.props?.label ? getLocalizedText(asBlockText(block.props.label), locale, t) : undefined;
   const label = propLabel ?? resolveModelFieldLabel(modelField, locale) ?? getBlockLabel(block, locale, t);
   return <div className="px-3 py-2 text-sm font-medium text-slate-700">{label}</div>;
 }
@@ -977,6 +977,16 @@ function SpanQuickControls({
   );
 }
 
+function asBlockText(value: unknown): string | LocalizedText | undefined {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const localized: LocalizedText = {};
+  for (const [locale, text] of Object.entries(value)) {
+    if (typeof text === 'string') localized[locale] = text;
+  }
+  return Object.keys(localized).length ? localized : undefined;
+}
+
 export function getBlockTypeLabel(blockType: string, locale = 'en-US', t?: TranslateFunction): string {
   const definition = createDefaultBlockRegistryV3().get(blockType);
   return definition?.label ? getLocalizedText(definition.label, locale, t) : blockType;
@@ -984,7 +994,8 @@ export function getBlockTypeLabel(blockType: string, locale = 'en-US', t?: Trans
 
 export function getBlockLabel(block: DslBlockV3, locale = 'en-US', t?: TranslateFunction): string {
   const title = block.title ?? block.props?.label ?? block.props?.title;
-  if (title) return getLocalizedText(title, locale, t);
+  const text = asBlockText(title);
+  if (text) return getLocalizedText(text, locale, t);
   return block.field || block.widgetType || block.actionType
     || getBlockTypeLabel(block.blockType, locale, t);
 }

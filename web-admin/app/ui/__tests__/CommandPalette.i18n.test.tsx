@@ -53,7 +53,7 @@ describe('CommandPalette bundled locale copy', () => {
   beforeEach(() => {
     vi.mocked(fetchResult)
       .mockReset()
-      .mockResolvedValue({ code: '0', data: { models: [], preference: {} } });
+      .mockResolvedValue({ code: '0', desc: '', data: { models: [], preference: {} } });
   });
   it('renders the Chinese header trigger and search dialog from actual YAML and seed resources', () => {
     renderLocale('zh-CN');
