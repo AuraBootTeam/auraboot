@@ -4235,5 +4235,33 @@
     "en-US": "Excel export failed. Please try again.",
     "ja-JP": "Excel のエクスポートに失敗しました。もう一度お試しください。",
     "ko-KR": "Excel 내보내기에 실패했습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "form.draft.title",
+    "zh-CN": "发现未保存的草稿",
+    "en-US": "Unsaved draft found",
+    "ja-JP": "未保存の下書きがあります",
+    "ko-KR": "저장하지 않은 초안이 있습니다"
+  },
+  {
+    "key": "form.draft.restorePrompt",
+    "zh-CN": "您有一份保存于 {time} 的未提交草稿。",
+    "en-US": "You have unsaved changes from {time}.",
+    "ja-JP": "{time} の未保存の変更があります。",
+    "ko-KR": "{time}에 저장하지 않은 변경 내용이 있습니다."
+  },
+  {
+    "key": "form.draft.restore",
+    "zh-CN": "恢复草稿",
+    "en-US": "Restore",
+    "ja-JP": "復元",
+    "ko-KR": "복원"
+  },
+  {
+    "key": "form.draft.discard",
+    "zh-CN": "放弃草稿",
+    "en-US": "Discard",
+    "ja-JP": "破棄",
+    "ko-KR": "삭제"
   }
 ]
