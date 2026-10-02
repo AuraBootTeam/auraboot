@@ -217,6 +217,8 @@ SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
+MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
+GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
 platform/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest
 
 # The test task remains the sole gate authority.  Allure is an additional

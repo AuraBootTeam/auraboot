@@ -441,6 +441,9 @@ dependencies {
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
     testImplementation 'org.testcontainers:testcontainers'
     testImplementation 'org.testcontainers:mysql'
+    // Testcontainers' MySQL integration tests need the JDBC driver; it remains
+    // test-only and is not added to the production runtime archive.
+    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:junit-jupiter'
 
