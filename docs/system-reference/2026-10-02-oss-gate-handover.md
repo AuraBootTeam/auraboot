@@ -8,12 +8,16 @@
 跑全量 OSS Playwright 门禁并修复全部问题。口径:`PW_PROFILE=oss` 的 `--project=oss`(playwright.oss.config.ts,1042 tests,scope 由根 `oss-scope.json` 定义,58+ 文件带 rationale 排除)。
 水位轨迹:393 → 176 → 118 → 51 → 41–57(历史"稳定带")。全部 16 个战役 PR 已合 main(main=2b11f1193)。
 
-## 2. 接手时正在跑:v18b(第一件事=收它的结果)
+## 2. v18b 结果(已收,2026-10-02 20:44)
 
-- 后台任务:`exec_581a9d69-57ad-490e-ba1e-224e0c61a96d`,2026-10-02 20:30 起跑,预计 ~14 分钟。
-- 日志:`/tmp/v18b-regular.log`;结束行=`REGULAR_EXIT=…` + passed/failed/did not run 汇总。
-- 栈:隔离栈 6448/5248/6248,库 `auraboot_oss_v18`,16 插件已导入(250 命令注册),auth 21/21。
-- 若任务已完成:直接读日志汇总;若被中断:用 §3 配方重启 regular 阶段即可(auth/storage 仍有效,无需重跑 reset)。
+**720 passed / 53 failed / 190 did not run / 79 skipped(12.4m)**,日志 `/tmp/v18b-regular.log`。
+
+Diff 结论(对 `/tmp/stable-core.txt`=v15∩v16 32 文件):
+- **stable-core 32/32 仍然全红** → 稳定核是确定性 per-case 失败,与 jsep/插件环境债无关(v15 轮结论最终确认)。
+- v18 的插件爆炸半径(80 文件)全部消退(失败文件 110→47);其中 15 个新面孔=轮转层(saved-view kanban/gantt/gallery/calendar/conditional-format/quick-filters、standard-blocks-runtime、showcase×2、header、session-lifetime、cloud-config、account-policy、manual-refresh-code-runtime)。
+- **nl-modeling 定性变化**:jsep 修复后 vite overlay 消失、页面可渲染,现失败点="生成选项|Generation Options" 不渲染——与 OSS 无 LLM provider 的门控条件一致,归 [L] 家族(provider 门控),不是环境债残余。
+
+即:**有效基线 ≈ 53 红中 32 例稳定核 + ~21 例轮转层**。下一阶段主体=32 例稳定核逐例(v18b 失败清单:`/tmp/v18b-failfiles.txt`;每例先隔离复跑分诊,再逐例修)。
 
 ## 3. 隔离栈完整配方(默认栈被并发会话占用时的正规路径)
 
