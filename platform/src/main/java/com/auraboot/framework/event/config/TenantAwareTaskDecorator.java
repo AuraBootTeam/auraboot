@@ -31,18 +31,18 @@ public class TenantAwareTaskDecorator implements TaskDecorator {
         }
 
         return () -> {
-            if (snapshot != null) {
-                MetaContext.restore(snapshot);
-            }
-            ExecutionPrincipalContext.restore(executionPrincipal);
-            ContextEnvelopeContext.restore(contextEnvelope);
-            try {
-                runnable.run();
-            } finally {
-                ContextEnvelopeContext.clear();
-                ExecutionPrincipalContext.clear();
-                MetaContext.clear();
-            }
+            ExecutionPrincipal previousPrincipal = ExecutionPrincipalContext.current().orElse(null);
+            ContextEnvelope previousEnvelope = ContextEnvelopeContext.current().orElse(null);
+            MetaContext.runWithSnapshot(snapshot, () -> {
+                ExecutionPrincipalContext.restore(executionPrincipal);
+                ContextEnvelopeContext.restore(contextEnvelope);
+                try {
+                    runnable.run();
+                } finally {
+                    ContextEnvelopeContext.restore(previousEnvelope);
+                    ExecutionPrincipalContext.restore(previousPrincipal);
+                }
+            });
         };
     }
 }
