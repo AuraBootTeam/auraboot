@@ -109,7 +109,12 @@ public class SemanticPreaggService {
     /** Scheduler sweep: refresh every preagg whose interval has elapsed. */
     @Scheduled(fixedDelay = 60_000)
     public void refreshAllDue() {
-        for (AbSemanticPreagg preagg : preaggMapper.listAllAcrossTenants()) {
+        // Cross-tenant scan on a @Scheduled thread; per-row execution below binds
+        // its own tenant context. Explicit scope (tenant-exemption cleanup W3e
+        // follow-up; the top thrower in the W5 runtime census — 609 failures).
+        List<AbSemanticPreagg> dueList = MetaContext.runWithoutTenantFilter(
+                () -> preaggMapper.listAllAcrossTenants());
+        for (AbSemanticPreagg preagg : dueList) {
             OffsetDateTime due = (preagg.getLastRefreshedAt() == null ? preagg.getUpdatedAt()
                     : preagg.getLastRefreshedAt())
                     .plusMinutes(preagg.getRefreshMinutes() == null ? 60 : preagg.getRefreshMinutes());
