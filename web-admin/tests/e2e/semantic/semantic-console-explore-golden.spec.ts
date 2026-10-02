@@ -53,7 +53,10 @@ access_policies:
 async function openConsole(page: Page) {
   await page.goto('/');
   await ensureSidebarExpanded(page);
+  const catalog = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
   await navigateToMenuByClick(page, ['语义模型']);
+  const catalogBody = await (await catalog).json();
+  expect(String(catalogBody.code)).toBe('0');
   await expect(page).toHaveURL(/\/semantic\/models$/);
   await expect(page.getByTestId('semantic-models-page')).toBeVisible();
   await expect(page.getByTestId('semantic-models-loading')).toHaveCount(0);
@@ -129,7 +132,9 @@ test('SC-01 console exploration: TopN, governed run, time grain, save-restore', 
   await page.getByTestId('semantic-dim-created_day').locator('input').check();
   await page.getByTestId('semantic-grain-created_day').selectOption('month');
   await runQuery(true);
+  const restoredCatalog = page.waitForResponse(r => r.url().endsWith('/api/semantic/meta'));
   await page.reload();
+  expect(String((await (await restoredCatalog).json()).code)).toBe('0');
   await page.getByTestId(`semantic-model-item-${model}`).click();
   await expect(page.getByTestId('semantic-limit')).toHaveValue('10');
   await expect(page.getByTestId('semantic-dim-created_day').locator('input')).toBeChecked();
