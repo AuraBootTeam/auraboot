@@ -170,6 +170,12 @@ public class PermissionServiceImpl implements PermissionService {
 
     }
     
+    @Override
+    public PermissionDTO findByPid(String pid) {
+        List<Permission> permissions = permissionMapper.findByPids(List.of(pid));
+        return permissions.isEmpty() ? null : permissionConverter.toDTO(permissions.get(0));
+    }
+
     /**
      * 查询Permission
      */
