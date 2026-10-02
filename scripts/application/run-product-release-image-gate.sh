@@ -98,6 +98,7 @@ PRODUCT_SHA="$(git -C "$PRODUCT_ROOT" rev-parse HEAD)"
 
 CORPUS_CONFIG="${AURA_PRODUCT_CORPUS_CONFIG:-}"
 CORPUS_VERIFIER="${AURA_PRODUCT_CORPUS_VERIFIER:-}"
+CORPUS_CONTAINER_ARGS=()
 if [[ -n "$CORPUS_CONFIG" || -n "$CORPUS_VERIFIER" ]]; then
   for corpus_input in "$CORPUS_CONFIG" "$CORPUS_VERIFIER"; do
     [[ -n "$corpus_input" && "$corpus_input" != /* && "$corpus_input" =~ ^[A-Za-z0-9._/-]+$ ]] \
@@ -107,6 +108,11 @@ if [[ -n "$CORPUS_CONFIG" || -n "$CORPUS_VERIFIER" ]]; then
     [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$corpus_input" 2>/dev/null || true)" == blob ]] \
       || fatal 'corpus inputs must be tracked at the exact product commit'
   done
+  # The browser driver owns the HTTP fixture on the CI host. Its loopback is
+  # different from the release container's loopback; expose one explicit host
+  # alias rather than letting a serviceTask call the wrong listener.
+  CORPUS_CONTAINER_ARGS=(--add-host aura-ci-fixture-host:host-gateway
+    -e AURA_SSRF_ALLOWED_PRIVATE_HOSTS=aura-ci-fixture-host)
 fi
 SIGNATURE_ENV=()
 case "${AURA_PRODUCT_SIGNATURE_KEY_REQUIRED:-0}" in
@@ -355,6 +361,7 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
   -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
   "${SIGNATURE_ENV[@]}" \
+  "${CORPUS_CONTAINER_ARGS[@]}" \
   "$IMAGE_REF" \
   --aura.persistence.tenant-bypass-table-prefixes=se_ \
   --cors.allowed-origins="http://127.0.0.1:$WEB_PORT" \
@@ -417,7 +424,9 @@ if [[ -n "$CORPUS_CONFIG" ]]; then
   CORPUS_ENV=("${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT"
     BACKEND_URL="http://127.0.0.1:$APP_PORT" BFF_URL="http://127.0.0.1:$WEB_PORT"
     BE_PORT="$APP_PORT" BFF_PORT="$WEB_PORT" VITE_PORT="$WEB_PORT" PW_SKIP_WEBSERVER=1
-    PW_CORPUS_STORAGE_STATE="$STATE_ROOT/corpus-admin.json")
+    SVCH_FIXTURE_HOST=aura-ci-fixture-host
+    PW_CORPUS_STORAGE_STATE="$STATE_ROOT/corpus-admin.json"
+    PW_ADMIN_STORAGE_STATE="$STATE_ROOT/corpus-admin.json")
   env "${CORPUS_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" exec playwright test \
     --config "$CORPUS_CONFIG" --list --reporter=json \
     >"$ARTIFACTS/corpus/collection.json" 2>"$ARTIFACTS/logs/corpus-collection.log" \
