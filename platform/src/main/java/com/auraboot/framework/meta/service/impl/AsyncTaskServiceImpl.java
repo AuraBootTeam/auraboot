@@ -220,15 +220,19 @@ public class AsyncTaskServiceImpl {
      * Delete a completed/failed/cancelled task record.
      */
     public void deleteTask(String taskCode) {
-        AsyncTask task = asyncTaskMapper.findByTaskCode(taskCode);
-        if (task == null) {
-            throw new MetaServiceException("Async task not found: " + taskCode);
-        }
-        if (!task.isTerminal()) {
-            throw new MetaServiceException("Only terminal tasks can be deleted (current: " + task.getStatus() + ")");
-        }
-        asyncTaskMapper.deleteById(task.getId());
-        log.info("Async task deleted: code={}", taskCode);
+        // Reachable pre-context via the plugin-import accessor during bootstrap —
+        // explicit scope (tenant-exemption W3, found by the W5 real-stack gate).
+        MetaContext.runWithoutTenantFilter(() -> {
+            AsyncTask task = asyncTaskMapper.findByTaskCode(taskCode);
+            if (task == null) {
+                throw new MetaServiceException("Async task not found: " + taskCode);
+            }
+            if (!task.isTerminal()) {
+                throw new MetaServiceException("Only terminal tasks can be deleted (current: " + task.getStatus() + ")");
+            }
+            asyncTaskMapper.deleteById(task.getId());
+            log.info("Async task deleted: code={}", taskCode);
+        });
     }
 
     // ==================== Async Execution ====================
@@ -355,16 +359,19 @@ public class AsyncTaskServiceImpl {
      */
     @Scheduled(fixedDelay = 21600000) // 6 hours
     public void cleanupOldTasks() {
-        Instant cutoff = Instant.now().minusSeconds(7 * 24 * 3600);
-        LambdaQueryWrapper<AsyncTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(AsyncTask::getStatus,
-                AsyncTask.STATUS_COMPLETED, AsyncTask.STATUS_FAILED, AsyncTask.STATUS_CANCELLED);
-        wrapper.lt(AsyncTask::getCreatedAt, cutoff);
+        // @Scheduled thread: explicit scope (tenant-exemption W3, missed in W3b).
+        MetaContext.runWithoutTenantFilter(() -> {
+            Instant cutoff = Instant.now().minusSeconds(7 * 24 * 3600);
+            LambdaQueryWrapper<AsyncTask> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(AsyncTask::getStatus,
+                    AsyncTask.STATUS_COMPLETED, AsyncTask.STATUS_FAILED, AsyncTask.STATUS_CANCELLED);
+            wrapper.lt(AsyncTask::getCreatedAt, cutoff);
 
-        int deleted = asyncTaskMapper.delete(wrapper);
-        if (deleted > 0) {
-            log.info("Cleaned up {} old async tasks (older than 7 days)", deleted);
-        }
+            int deleted = asyncTaskMapper.delete(wrapper);
+            if (deleted > 0) {
+                log.info("Cleaned up {} old async tasks (older than 7 days)", deleted);
+            }
+        });
     }
 
     // ==================== Private Helpers ====================
