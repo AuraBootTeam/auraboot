@@ -2028,3 +2028,16 @@ designer_settings:
 
 table_actions:
   more: "More actions"
+
+toolbar_more:
+  more: "More actions"
+  print: "Print"
+  import: "Import"
+  export_excel: "Export Excel"
+  export_csv: "Export CSV"
+  loading_reports: "Loading reports..."
+  no_reports: "No reports available"
+  load_failed: "Unable to load reports"
+  export_failed: "Unable to export records"
+  report_failed: "Unable to generate report"
+  report_generated: "Report generated: {name}"

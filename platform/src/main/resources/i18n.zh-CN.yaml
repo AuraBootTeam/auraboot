@@ -2332,3 +2332,16 @@ designer_settings:
 
 table_actions:
   more: "更多操作"
+
+toolbar_more:
+  more: "更多操作"
+  print: "打印"
+  import: "导入"
+  export_excel: "导出 Excel"
+  export_csv: "导出 CSV"
+  loading_reports: "正在加载报告…"
+  no_reports: "暂无可用报告"
+  load_failed: "无法加载报告"
+  export_failed: "无法导出记录"
+  report_failed: "无法生成报告"
+  report_generated: "报告已生成：{name}"
