@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root-data';
@@ -22,6 +22,17 @@ export function AuthAppearanceEditor() {
   const { t, locale } = useI18n();
   const zh = locale.startsWith('zh');
   const label = (key: string, cn: string, en: string) => t(`auth.appearance.${key}`, undefined, zh ? cn : en);
+  const explainError = (cause: unknown) => {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    const messages: Record<string, string> = {
+      '$i18n:auth.appearance.versionConflict': label('versionConflict', '配置已被其他管理员更新。你的修改仍保留，请重新加载后再编辑。', 'Another administrator updated the configuration. Your edits are retained; reload before editing again.'),
+      '$i18n:auth.appearance.commercialRequired': label('commercialRequired', '需要启用有效的商业品牌配置。', 'Valid commercial branding must be enabled.'),
+      '$i18n:auth.appearance.draftRequired': label('draftRequired', '请先保存草稿。', 'Save a draft first.'),
+      '$i18n:auth.appearance.releaseNotFound': label('releaseNotFound', '未找到所选历史发布版本，请重新加载。', 'The selected release was not found. Reload the history.'),
+      '$i18n:auth.appearance.assetMissing': label('assetMissing', '所选图片不存在，请重新上传后发布。', 'An image is missing. Upload it again before publishing.'),
+    };
+    return messages[message] ?? (message.startsWith('$i18n:') ? label('invalidConfig', '配置尚不完整，请检查文案和图片。', 'Configuration is incomplete. Check the copy and images.') : message);
+  };
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const [view, setView] = useState<AppearanceView>();
   const [draft, setDraft] = useState<AuthAppearance>(INITIAL);
@@ -47,7 +58,7 @@ export function AuthAppearanceEditor() {
       const result = await get<AppearanceView>('/api/admin/auth-appearance');
       if (!ResultHelper.isSuccess(result) || !result.data) throw new Error(result.message);
       accept(result.data);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(explainError(cause)); }
     finally { setLoading(false); }
   }, [accept]);
   useEffect(() => { void load(); }, [load]);
@@ -68,7 +79,7 @@ export function AuthAppearanceEditor() {
       accept(result.data);
       setNotice(label(operation === 'save' ? 'saved' : 'released', operation === 'save' ? '草稿已保存，线上页面未改变。' : '已发布。新打开的认证页面将使用此版本。', operation === 'save' ? 'Draft saved. The live appearance has not changed.' : 'Published. Newly opened authentication pages will use this version.'));
       setConfirm(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(explainError(cause)); }
     finally { setBusy(false); }
   };
   useEffect(() => {
@@ -101,7 +112,7 @@ export function AuthAppearanceEditor() {
   if (!view) return <div role="alert" className="space-y-3 p-6"><p>{error}</p><button className={BUTTON} onClick={() => void load()}>{label('reload', '重新加载', 'Reload')}</button></div>;
 
   return <div className="space-y-5" data-testid="auth-appearance-editor">
-    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-xl font-semibold text-text">{label('title', '品牌与登录外观', 'Brand and authentication appearance')}</h1><p className="mt-1 text-sm text-text-2">{label('deploymentScope', '此配置影响整个部署的认证页面。登录方式由登录渠道管理维护。', 'These settings affect authentication across this deployment. Login channels are managed separately.')}</p></div><div className="flex gap-2"><button className={BUTTON} disabled={busy} onClick={() => dirty ? setConfirm('reload') : void load()}>{label('reload', '重新加载', 'Reload')}</button><button className={BUTTON} disabled={busy || (!dirty && !!view.draft)} onClick={() => void mutate('save')}>{label('save', '保存草稿', 'Save draft')}</button><button className={`${BUTTON} bg-accent text-white`} disabled={busy || dirty || !view.draft} onClick={() => setConfirm('publish')}>{label('publish', '发布', 'Publish')}</button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-xl font-semibold text-text">{label('title', '品牌与登录外观', 'Brand and authentication appearance')}</h1><p className="mt-1 text-sm text-text-2">{label('deploymentScope', '此配置影响整个部署的认证页面。登录方式由登录渠道管理维护。', 'These settings affect authentication across this deployment. Login channels are managed separately.')}</p></div><div className="flex gap-2"><button className={BUTTON} disabled={busy} onClick={() => dirty ? setConfirm('reload') : void load()}>{label('reload', '重新加载', 'Reload')}</button><button className={BUTTON} disabled={busy || (!dirty && !!view.draft)} onClick={() => void mutate('save')}>{label('save', '保存草稿', 'Save draft')}</button><button className={`${BUTTON.replace('bg-panel', 'bg-accent')} text-white`} disabled={busy || dirty || !view.draft} onClick={() => setConfirm('publish')}>{label('publish', '发布', 'Publish')}</button></div></header>
     {error && <div role="alert" className="rounded-card border border-status-red p-3 text-status-red">{error}</div>}
     {notice && <p role="status" className="text-sm text-status-green">{notice}</p>}
     <p className="text-sm text-text-2">{label('publishedVersion', '线上版本', 'Published version')}：{view.publishedVersion} · {dirty ? label('unsaved', '有未保存修改', 'Unsaved changes') : view.draft ? label('savedState', '草稿已同步', 'Draft synchronized') : label('initialDraft', '草稿尚未保存', 'Draft has not been saved')}</p>
@@ -157,9 +168,21 @@ export function AuthAppearanceEditor() {
 
 function AppearancePreview({ children, title, width }: { children: ReactNode; title: string; width: number }) {
   const [body, setBody] = useState<HTMLElement>();
-  const scale = width === 1280 ? 0.45 : 1;
+  const container = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(width);
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return;
+    const measure = () => { if (element.clientWidth > 0) setAvailableWidth(element.clientWidth); };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [width]);
+  const scale = Math.min(1, availableWidth / width);
   const srcDoc = `<!doctype html><html><head><style>html,body{margin:0;font-family:system-ui}*{box-sizing:border-box}fieldset{border:0;padding:0}label{display:block;margin-block:1rem}input{display:block;width:100%;padding:0.75rem;border:1px solid #ccc}h1{font-size:1.7rem}button{padding:0.75rem;width:100%}${appearanceCss}</style></head><body></body></html>`;
-  return <div className="overflow-auto rounded-card border border-border bg-panel" style={{ height: 480 }}><iframe title={title} srcDoc={srcDoc} style={{ width, height: 900, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0 }} onLoad={e => setBody(e.currentTarget.contentDocument?.body)} />{body && createPortal(children, body)}</div>;
+  return <div ref={container} data-testid="auth-appearance-preview" className="relative overflow-hidden rounded-card border border-border bg-panel" style={{ height: 900 * scale }}><iframe title={title} srcDoc={srcDoc} style={{ position: 'absolute', width, height: 900, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0 }} onLoad={e => setBody(e.currentTarget.contentDocument?.body)} />{body && createPortal(children, body)}</div>;
 }
 
 export default AuthAppearanceEditor;

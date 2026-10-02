@@ -124,7 +124,8 @@ test('invalid draft, concurrent editor conflict, multilingual live copy and fail
   const conflictResponse = second.waitForResponse(r => r.url().endsWith('/api/admin/auth-appearance/draft') && r.request().method() === 'PUT');
   await second.getByRole('button', { name: 'Save draft', exact: true }).click();
   expect((await conflictResponse).status()).toBe(409);
-  await expect(second.getByRole('alert')).toBeVisible();
+  await expect(second.getByRole('alert')).toContainText(/updated|changed/);
+  await expect(second.getByRole('alert')).not.toContainText('$i18n:');
   await expect(second.getByRole('combobox', { name: 'Corners', exact: true })).toHaveValue('rounded');
   const afterConflict = await (await page.request.get('/api/admin/auth-appearance')).json();
   expect(afterConflict.data).toEqual(stable.data);
@@ -288,6 +289,10 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
       }
     }
     await testInfo.attach('visual-matrix', { body: JSON.stringify({ scenarios: rows, uploaded }, null, 2), contentType: 'application/json' });
+    const desktopPreview = await page.locator('iframe[title="Authentication preview"]').boundingBox();
+    const previewContainer = await page.getByTestId('auth-appearance-preview').boundingBox();
+    expect(desktopPreview!.width).toBeLessThanOrEqual(previewContainer!.width);
+    await page.getByTestId('auth-appearance-preview').screenshot({ path: testInfo.outputPath('desktop-login-preview.png') });
     await page.getByRole('combobox', { name: 'Preview device', exact: true }).selectOption('mobile');
     await page.getByRole('combobox', { name: 'Preview theme', exact: true }).selectOption('dark');
     for (const route of ['login', 'signup', 'recovery']) {
@@ -297,6 +302,7 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
       if (route !== 'recovery') await expect(preview.locator('button[type="submit"]')).toBeDisabled();
       await expect(preview.locator('[data-auth-theme]')).toHaveAttribute('data-auth-theme', 'dark');
     }
+    await page.getByTestId('auth-appearance-preview').screenshot({ path: testInfo.outputPath('mobile-recovery-preview.png') });
     await page.screenshot({ path: testInfo.outputPath('editor-mobile-recovery-preview.png'), fullPage: true });
   } finally { await anonymous.close(); }
 });
