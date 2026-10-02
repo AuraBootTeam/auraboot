@@ -10,8 +10,7 @@
 
 import React, { useState, useId } from 'react';
 import { createPage, getPageByPid } from '~/plugins/core-designer/components/studio/services/page-manager/pageApi';
-import type { ApiPageType } from '~/plugins/core-designer/components/studio/services/page-manager/api-types';
-import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
+import { preparePageCopyContent } from '../services/page-manager/pageCopyContent';
 import { useI18n } from '~/contexts/I18nContext';
 
 interface ClonePageDialogProps {
@@ -58,20 +57,18 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
       }
       const source = fetchResult.data;
 
+      const copiedContent = preparePageCopyContent(source);
       const result = await createPage({
         name: trimmedName,
         pageKey: trimmedKey,
         title: trimmedName,
-        kind: (source.kind || 'list') as ApiPageType,
-        blocks: source.blocks || [],
-        layout: source.layout,
         metaInfo: {
-          componentCount: source.blocks?.length ?? 0,
+          componentCount: copiedContent.blocks?.length ?? 0,
           clonedFrom: source.pid,
         },
         semver: '0.1.0',
-        schemaVersion: CURRENT_SCHEMA_VERSION,
-      } as any);
+        ...copiedContent,
+      });
 
       if (!result || result.code !== '0') {
         throw new Error(result?.message || t('designer_page_dialog.clone_failed'));

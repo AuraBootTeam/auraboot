@@ -9,14 +9,16 @@ import { ClonePageDialog } from '../ClonePageDialog';
 import { SaveAsTemplateDialog } from '../SaveAsTemplateDialog';
 
 const api = vi.hoisted(() => ({ getPageByPid: vi.fn(), createPage: vi.fn(), updatePage: vi.fn() }));
-vi.mock('~/plugins/core-designer/components/studio/services/page-manager/pageApi', () => api);
+vi.mock('~/plugins/core-designer/components/studio/services/page-manager/pageApi', () => ({ ...api, getPageByPageKey: vi.fn(), getVersionHistory: vi.fn(), createVersion: vi.fn(),
+  updatePage: ('updatePage' in api ? api.updatePage : vi.fn()), getPageByPid: ('getPageByPid' in api ? api.getPageByPid : vi.fn()),
+  publishPage: vi.fn(), unpublishPage: vi.fn(), rollbackToVersion: vi.fn(), compareVersions: vi.fn() }));
 const dictionary = (locale: string) => parse(readFileSync(
   path.resolve(process.cwd(), `../platform/src/main/resources/i18n.${locale}.yaml`), 'utf8',
 ));
 function localized(locale: string, element: React.ReactNode) {
   return render(<I18nProvider initialLocale={locale} initialData={dictionary(locale)}>{element}</I18nProvider>);
 }
-const source = { pid: 'source-pid', kind: 'list', blocks: [{ id: 'source-block', type: 'field' }], layout: { columns: 2 } };
+const source = { pid: 'source-pid', kind: 'list', blocks: [{ id: 'source-block', type: 'field' }], layout: { columns: 2 }, modelCode: 'orders', profile: 'order-profile', dataSources: { main: { modelCode: 'orders' } }, schemaVersion: 4, extension: { customOption: true } };
 beforeEach(() => {
   localStorage.clear(); vi.resetAllMocks();
   api.getPageByPid.mockResolvedValue({ code: '0', data: source });
@@ -48,7 +50,8 @@ describe.each(['en-US', 'zh-CN'])('page dialogs in %s', locale => {
     expect(api.getPageByPid).toHaveBeenCalledExactlyOnceWith('source-pid');
     expect(api.createPage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
       name: 'New orders', title: 'New orders', pageKey: 'new_orders', blocks: source.blocks,
-      layout: source.layout, kind: 'list', metaInfo: { componentCount: 1, clonedFrom: 'source-pid' },
+      layout: source.layout, kind: 'list', modelCode: source.modelCode, profile: source.profile,
+      dataSources: source.dataSources, schemaVersion: 4, extension: source.extension, metaInfo: { componentCount: 1, clonedFrom: 'source-pid' },
     }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
