@@ -85,6 +85,7 @@ die() { printf '\033[31m[golden-stack] FATAL:\033[0m %s\n' "$*" >&2; exit 1; }
 # lock across build → backend health so golden-stack runs serialize per checkout. CI
 # suites that don't take the lock are covered separately by spawning from a copied jar.
 GOLDEN_STACK_LOCK_DIR=""
+STACK_OPERATION_COMPLETE=0
 
 golden_stack_lock_dir() {
   local key; key="$(printf '%s' "$REPO_ROOT" | cksum | cut -d' ' -f1)"
@@ -111,7 +112,7 @@ acquire_stack_lock() {
   fi
   printf '%s\n' "$$" >"$lock_dir/pid"
   GOLDEN_STACK_LOCK_DIR="$lock_dir"
-  trap release_stack_lock EXIT
+  trap 'status=$?; release_stack_lock; if [ "$status" -eq 0 ] && [ "$STACK_OPERATION_COMPLETE" != 1 ]; then status=1; fi; exit "$status"' EXIT
 }
 
 state_dir() { echo "$STATE_ROOT/golden/$1"; }
@@ -389,10 +390,10 @@ cmd_up() {
   fi
   local source_args=(--source "workspace=$WORKSPACE" --source "auraboot=$REPO_ROOT")
   local source_index=0
-  for extra_root in "${extra_plugin_roots[@]}"; do
+  for extra_root in ${extra_plugin_roots[@]+"${extra_plugin_roots[@]}"}; do
     source_args+=(--source "plugin-$source_index=$extra_root"); source_index=$((source_index + 1))
   done
-  for migration_root in "${product_migration_roots[@]}"; do
+  for migration_root in ${product_migration_roots[@]+"${product_migration_roots[@]}"}; do
     source_args+=(--source "migration-$source_index=$migration_root"); source_index=$((source_index + 1))
   done
   "$DEV" runtime migrate "$name" "${source_args[@]}" >"$sd/source-freeze.log" \
@@ -476,7 +477,7 @@ cmd_up() {
     : >"$sd/product-migrations.log"
     printf 'root\tfile\tsha256\n' >"$sd/product-migrations.tsv"
     local product_root migration_file migration_count=0 migration_hash
-    for product_root in "${product_migration_roots[@]}"; do
+    for product_root in ${product_migration_roots[@]+"${product_migration_roots[@]}"}; do
       while IFS= read -r migration_file; do
         [ -n "$migration_file" ] || continue
         migration_count=$((migration_count + 1))
@@ -521,7 +522,7 @@ cmd_up() {
 
   local staging_args=(--profile "${plugin_profile:-none}")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
-    for extra_root in "${extra_plugin_roots[@]}"; do
+    for extra_root in ${extra_plugin_roots[@]+"${extra_plugin_roots[@]}"}; do
       staging_args+=(--extra-plugin-root "$extra_root")
     done
   fi
@@ -579,7 +580,7 @@ cmd_up() {
   if [ -n "$plugin_profile" ] || [ "${#import_plugins[@]}" -gt 0 ]; then
     local import_args=(--plugin-profile "${plugin_profile:-none}")
     if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
-      for extra_root in "${extra_plugin_roots[@]}"; do
+      for extra_root in ${extra_plugin_roots[@]+"${extra_plugin_roots[@]}"}; do
         import_args+=(--extra-plugin-root "$extra_root")
       done
     fi
@@ -721,7 +722,7 @@ cmd_import() {
 
   local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
-    for extra_root in "${extra_plugin_roots[@]}"; do
+    for extra_root in ${extra_plugin_roots[@]+"${extra_plugin_roots[@]}"}; do
       args+=("--extra-plugin-root=$extra_root")
     done
   fi
@@ -893,3 +894,5 @@ case "$sub" in
   destroy) cmd_destroy "$name";;
   *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|down|destroy)";;
 esac
+
+STACK_OPERATION_COMPLETE=1
