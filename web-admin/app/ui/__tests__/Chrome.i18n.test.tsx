@@ -11,6 +11,7 @@ import {
   getBlockLabel,
   getBlockTypeLabel,
 } from '~/plugins/core-designer/components/unified-designer/canvas/CanvasHost';
+import { ResourcePanel } from '~/plugins/core-designer/components/unified-designer/workbench/ResourcePanel';
 import { InboxBadge } from '../inbox/InboxBadge';
 vi.mock('~/shared/services/inboxService', () => ({ getUnreadCount: vi.fn(async () => 3) }));
 const seed = JSON.parse(
@@ -75,6 +76,31 @@ describe('Chinese and English chrome use bundled translation copy', () => {
       />,
     );
     expect(screen.getByRole('navigation', { name: '状态筛选' })).toBeVisible();
+  });
+  it('designer outline renders translated titles and type badges', () => {
+    view(
+      <DndContext>
+        <ResourcePanel
+          document={{ schemaVersion: 3, kind: 'list', id: 'outline', blocks: [
+            { id: 'tabs', blockType: 'tabs' },
+            { id: 'actions', blockType: 'action-bar' },
+            { id: 'create', blockType: 'action', title: '$i18n:common.button.create' },
+            { id: 'table', blockType: 'table' },
+          ] }}
+          selectedBlockId={null} selectedBlock={null} blockDefinitions={[]}
+          selectedModelCode={null} modelFields={[]} canAddCustomField={false}
+          canAddBlock={() => true} canAddModelField={() => true}
+          isModelFieldUsed={() => false} onSelect={vi.fn()}
+          onAddBlock={vi.fn()} onAddModelField={vi.fn()}
+        />
+      </DndContext>,
+    );
+    expect(screen.getByTestId('outline-item-create')).toHaveTextContent('新建');
+    expect(screen.getByTestId('outline-item-actions')).toHaveTextContent('操作栏');
+    expect(screen.getByTestId('outline-item-table')).toHaveTextContent('表格');
+    for (const id of ['tabs', 'actions', 'create', 'table']) {
+      expect(screen.getByTestId(`outline-item-${id}`).textContent).not.toMatch(/\$i18n:|action-bar|table|tabs/);
+    }
   });
   it('designer blocks use registry labels in Chinese and English', () => {
     expect(getBlockLabel({ id: 'table', blockType: 'table' }, 'zh-CN')).toBe('表格');
