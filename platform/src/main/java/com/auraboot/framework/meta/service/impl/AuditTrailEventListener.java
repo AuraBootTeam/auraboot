@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,8 +39,16 @@ public class AuditTrailEventListener {
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
+        MetaContext.Snapshot previous = MetaContext.snapshot();
         try {
             AuditTrailEvent auditEvent = buildAuditEvent(event);
+            // AFTER_COMMIT dispatch may happen after request context cleanup. The
+            // persisted event owns the audit tenant; never inherit a pooled worker's tenant.
+            if (auditEvent.getTenantId() == null || auditEvent.getTenantId() <= 0) {
+                throw new IllegalArgumentException("Audit event requires a positive tenantId");
+            }
+            MetaContext.setContext(auditEvent.getTenantId(), auditEvent.getActorId(),
+                    extractString(event.getMetadata(), "actorPid"), auditEvent.getActorName());
             auditTrailService.recordAudit(auditEvent);
         } catch (Exception e) {
             // Audit trail failures must never break the main flow.
@@ -47,6 +56,9 @@ public class AuditTrailEventListener {
             log.error("Failed to record audit trail for command={}, model={}, record={}: {}",
                     event.getCommandCode(), event.getModelCode(),
                     event.getRecordId(), e.getMessage(), e);
+        } finally {
+            MetaContext.clear();
+            if (previous != null) MetaContext.restore(previous);
         }
     }
 
