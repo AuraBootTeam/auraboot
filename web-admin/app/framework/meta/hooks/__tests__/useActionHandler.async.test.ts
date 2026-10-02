@@ -64,6 +64,24 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.loading).toBe(false);
   });
 
+  it('normalizes rejected HTTP command errors before displaying detail feedback', async () => {
+    fetchResultMock.mockRejectedValue(new Error(
+      'Plugin handler execution failed: Insufficient stock for product [01SECRET-PID] at the line location: required 5.00, available 2.00'));
+    const showToast = vi.fn();
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_outbound',
+      locale: 'zh-CN', t: ((key: string) => key) as any, showToast,
+    }));
+    await act(async () => {
+      await result.current.handleAction({ code: 'confirm_other_out',
+        action: { type: 'command', command: 'inv:confirm_other_out' },
+      } as unknown as ButtonConfig, { pid: 'issue-1', row_version: 1 });
+    });
+    expect(result.current.error).toBe('所选库位库存不足：需要 5.00，可用 2.00。请调整数量或选择其他库位。');
+    expect(showToast).toHaveBeenCalledWith(result.current.error, 'error');
+    expect(result.current.loading).toBe(false);
+  });
+
   it('keeps the action loading until the post-command detail refresh settles', async () => {
     fetchResultMock.mockResolvedValueOnce({
       code: '0',

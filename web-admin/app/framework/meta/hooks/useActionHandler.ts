@@ -1222,7 +1222,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Action execution failed';
+        const errorMessage = resolveCommandErrorMessage(
+          { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
+          button.code, t, locale,
+        );
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);

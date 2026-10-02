@@ -17,7 +17,7 @@ function firstNonBlankString(...values: unknown[]): string | undefined {
 export function resolveCommandErrorMessage(
   result: unknown,
   commandCode: string,
-  translate?: (key: string) => string,
+  translate?: (key: string, params?: Record<string, string>) => string,
   locale?: string,
 ): string {
   const body = (result || {}) as Record<string, any>;
@@ -75,6 +75,17 @@ export function resolveCommandErrorMessage(
     return locale?.toLowerCase().startsWith('zh')
       ? '关联记录不存在或不可访问，请重新选择后再提交。'
       : 'The referenced record is unavailable. Select an accessible record and try again.';
+  }
+
+  const shortage = resolved.match(/Insufficient stock for product \[.*?\] (?:at the line location|in source warehouse|at the storage location): required ([0-9.-]+), available ([0-9.-]+)/i);
+  if (shortage) {
+    const key = 'common.error.insufficientStock';
+    const params = { required: shortage[1], available: shortage[2] };
+    const localized = translate?.(key, params);
+    if (localized && localized !== key) return localized;
+    return locale?.toLowerCase().startsWith('zh')
+      ? `所选库位库存不足：需要 ${params.required}，可用 ${params.available}。请调整数量或选择其他库位。`
+      : `Insufficient stock at the selected location: required ${params.required}, available ${params.available}. Adjust the quantity or select another location.`;
   }
 
   // PF4J/platform wrappers are implementation details, not business feedback. Keep

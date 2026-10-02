@@ -4263,5 +4263,19 @@
     "en-US": "Discard",
     "ja-JP": "破棄",
     "ko-KR": "삭제"
+  },
+  {
+    "key": "common.button.back",
+    "zh-CN": "返回",
+    "en-US": "Back",
+    "ja-JP": "戻る",
+    "ko-KR": "뒤로"
+  },
+  {
+    "key": "common.error.insufficientStock",
+    "zh-CN": "所选库位库存不足：需要 {required}，可用 {available}。请调整数量或选择其他库位。",
+    "en-US": "Insufficient stock at the selected location: required {required}, available {available}. Adjust the quantity or select another location.",
+    "ja-JP": "選択した保管場所の在庫が不足しています：必要数 {required}、利用可能数 {available}。数量または保管場所を変更してください。",
+    "ko-KR": "선택한 위치의 재고가 부족합니다: 필요 수량 {required}, 가용 수량 {available}. 수량이나 위치를 변경하세요."
   }
 ]
