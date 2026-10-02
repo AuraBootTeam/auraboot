@@ -12,6 +12,8 @@
  */
 
 import React, { useRef, useEffect } from 'react';
+import { Select } from '~/ui/smart/form/Select';
+import type { DataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
 export interface InlineEditableCellProps {
@@ -22,6 +24,8 @@ export interface InlineEditableCellProps {
   error?: string;
   onChange: (value: any) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
+  referenceDataSource?: DataSourceConfig;
+  referenceContext?: Record<string, any>;
   dictOptions?: Array<{ value: string; label: string }>;
   autoFocus?: boolean;
   t?: (key: string) => string;
@@ -36,6 +40,8 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
   onChange,
   onKeyDown,
   dictOptions,
+  referenceDataSource,
+  referenceContext,
   autoFocus = false,
 }) => {
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
@@ -60,6 +66,23 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
         ? 'border-red-300 focus:ring-red-400 bg-red-50/30'
         : 'border-gray-300 focus:ring-blue-400'
     }`;
+
+  if (referenceDataSource) {
+    return (
+      <div className="relative">
+        <Select
+          name={col.field}
+          value={value ?? ''}
+          onChange={onChange}
+          placeholder={displayValue || undefined}
+          size="small"
+          dataSource={referenceDataSource}
+          context={referenceContext}
+        />
+        {error && <ErrorTooltip message={error} />}
+      </div>
+    );
+  }
 
   // Dict / tag select
   if (col.dictCode && dictOptions && dictOptions.length > 0) {

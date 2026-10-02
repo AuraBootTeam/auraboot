@@ -50,6 +50,8 @@ import { useAuth } from '~/contexts/AuthContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
+import { Select } from '~/ui/smart/form/Select';
+import type { DataSourceConfig as SelectDataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -281,6 +283,27 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const referenceDisplayByField = useMemo(
     () => new Map(referenceDisplayConfigs.map((entry) => [entry.field, entry])),
+    [referenceDisplayConfigs],
+  );
+
+  const referenceInputSources = useMemo(
+    () =>
+      new Map<string, SelectDataSourceConfig>(
+        referenceDisplayConfigs.map((reference) => [
+          reference.field,
+          {
+            type: 'api',
+            modelCode: reference.modelCode,
+            endpoint: '/api/dynamic/' + reference.modelCode + '/list',
+            method: 'get',
+            params: { pageNum: 1, pageSize: 200 },
+            adaptor: 'optionList',
+            valueField: reference.valueField,
+            labelField: reference.displayField,
+            autoFetch: true,
+          },
+        ]),
+      ),
     [referenceDisplayConfigs],
   );
 
@@ -1149,7 +1172,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   );
 
   const configuredRowActions = config.actions ?? config.rowActions ?? [];
-  const configuredToolbarActions = config.toolbarActions ?? [];
+  const configuredToolbarActions = useMemo(
+    () => config.toolbarActions ?? [],
+    [config.toolbarActions],
+  );
   const toolbarBlock = useMemo<BlockConfig | null>(() => {
     if (configuredToolbarActions.length === 0) return null;
     return {
@@ -1377,6 +1403,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           >
                             <InlineEditableCell
                               col={col}
+                              referenceDataSource={referenceInputSources.get(col.field)}
+                              referenceContext={runtime?.getContext()}
                               value={editable ? editingValues[col.field] : row[col.field]}
                               displayValue={formatCellValue(
                                 row[col.field],
@@ -1548,43 +1576,62 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                       <span className="text-text-3 text-xs">-</span>
                     ) : (
                       <div>
-                        <input
-                          type={isNumericField(col) ? 'number' : 'text'}
-                          value={newRowData[col.field] ?? ''}
-                          onChange={(e) => {
-                            const val =
-                              isNumericField(col) && e.target.value
-                                ? Number(e.target.value)
-                                : e.target.value;
-                            setNewRowData((prev) => ({ ...prev, [col.field]: val }));
-                            if (addErrors[col.field]) {
-                              setAddErrors((prev) => {
-                                const next = { ...prev };
+                        {referenceInputSources.has(col.field) ? (
+                          <Select
+                            name={col.field}
+                            value={newRowData[col.field] ?? ''}
+                            placeholder={resolveColumnLabel(col.field)}
+                            size="small"
+                            dataSource={referenceInputSources.get(col.field)}
+                            context={runtime?.getContext()}
+                            onChange={(value) => {
+                              setNewRowData((previous) => ({ ...previous, [col.field]: value }));
+                              setAddErrors((previous) => {
+                                const next = { ...previous };
                                 delete next[col.field];
                                 return next;
                               });
+                            }}
+                          />
+                        ) : (
+                          <input
+                            type={isNumericField(col) ? 'number' : 'text'}
+                            value={newRowData[col.field] ?? ''}
+                            onChange={(e) => {
+                              const val =
+                                isNumericField(col) && e.target.value
+                                  ? Number(e.target.value)
+                                  : e.target.value;
+                              setNewRowData((prev) => ({ ...prev, [col.field]: val }));
+                              if (addErrors[col.field]) {
+                                setAddErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next[col.field];
+                                  return next;
+                                });
+                              }
+                            }}
+                            placeholder={
+                              col.required
+                                ? `${resolveColumnLabel(col.field)} *`
+                                : resolveColumnLabel(col.field)
                             }
-                          }}
-                          placeholder={
-                            col.required
-                              ? `${resolveColumnLabel(col.field)} *`
-                              : resolveColumnLabel(col.field)
-                          }
-                          data-testid={`subtable-add-${col.field}`}
-                          className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
-                            addErrors[col.field]
-                              ? 'border-status-red focus:ring-status-red'
-                              : 'border-border-strong focus:ring-accent'
-                          }`}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddRow();
-                            if (e.key === 'Escape') {
-                              setIsAdding(false);
-                              setNewRowData({});
-                              setAddErrors({});
-                            }
-                          }}
-                        />
+                            data-testid={`subtable-add-${col.field}`}
+                            className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
+                              addErrors[col.field]
+                                ? 'border-status-red focus:ring-status-red'
+                                : 'border-border-strong focus:ring-accent'
+                            }`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddRow();
+                              if (e.key === 'Escape') {
+                                setIsAdding(false);
+                                setNewRowData({});
+                                setAddErrors({});
+                              }
+                            }}
+                          />
+                        )}
                         {addErrors[col.field] && (
                           <p
                             className="text-status-red mt-0.5 text-xs"
