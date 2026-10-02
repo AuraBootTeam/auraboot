@@ -2176,3 +2176,18 @@ designer_page_mode:
   "warning": "部分组件可能需要调整以适应新布局。"
   "cancel": "取消"
   "confirm": "确认切换"
+
+designer_viewport:
+  zoom_out: "缩小 (Ctrl + -)"
+  zoom_in: "放大 (Ctrl + +)"
+  fit_canvas: "适应画布"
+  reset_zoom: "重置 (100%)"
+  responsive: "自适应"
+  panning: "拖动中"
+  devices:
+    desktop: "桌面"
+    laptop: "笔记本"
+    tablet-landscape: "平板横屏"
+    tablet: "平板"
+    mobile: "手机"
+    mobile-small: "小屏手机"

@@ -1872,3 +1872,18 @@ designer_page_mode:
   "warning": "Some components may need adjustment for the new layout."
   "cancel": "Cancel"
   "confirm": "Confirm switch"
+
+designer_viewport:
+  zoom_out: "Zoom out (Ctrl + -)"
+  zoom_in: "Zoom in (Ctrl + +)"
+  fit_canvas: "Fit canvas"
+  reset_zoom: "Reset (100%)"
+  responsive: "Responsive"
+  panning: "Panning"
+  devices:
+    desktop: "Desktop"
+    laptop: "Laptop"
+    tablet-landscape: "Tablet landscape"
+    tablet: "Tablet"
+    mobile: "Mobile"
+    mobile-small: "Small mobile"
