@@ -3,6 +3,7 @@ import {
   buildFormCommandPayload,
   getBomUploadReviewError,
   canRenderFormButton,
+  isFormAuthoringDenied,
   collectFormFieldDataTypes,
   getJsonFormValueError,
   getFormFieldValueWithAlias,
@@ -34,6 +35,28 @@ describe('isFormButtonDisabled', () => {
   it('disables every form action during an active submission', () => {
     expect(isFormButtonDisabled({ code: 'cancel' }, false, true, true)).toBe(true);
     expect(isFormButtonDisabled({ code: 'refresh' }, true, false, true)).toBe(true);
+  });
+});
+
+describe('isFormAuthoringDenied', () => {
+  it('denies a declared write action even when unrestricted cancel remains available', () => {
+    expect(isFormAuthoringDenied([
+      { primary: true, permissionCode: 'bom.rule.manage' },
+      { primary: false },
+    ], () => false)).toBe(true);
+  });
+
+  it('permits a granted primary action and preserves legacy forms without declarations', () => {
+    expect(isFormAuthoringDenied([{ primary: true, permissionCode: 'bom.rule.manage' }], () => true)).toBe(false);
+    expect(isFormAuthoringDenied([{ primary: true }], () => false)).toBe(false);
+    expect(isFormAuthoringDenied([], () => false)).toBe(false);
+  });
+
+  it('does not deny a form with another available primary action', () => {
+    expect(isFormAuthoringDenied([
+      { primary: true, permissionCode: 'bom.rule.manage' },
+      { primary: true, permissionCode: 'bom.rule.request' },
+    ], (code) => code === 'bom.rule.request')).toBe(false);
   });
 });
 

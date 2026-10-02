@@ -356,3 +356,17 @@ owner 授权验证额度18，使用现有 AURA_RUNTIME_MAX_OPEN_EPHEMERAL 配置
 r6权限编辑器14项实际执行，9通过、5失败、0retry。原图确认长预览弹窗超出屏幕，保存按钮无法点击；成员勾选同时触发行点击与复选框事件，导致切换两次。这两项真实交互缺陷已修；范围另两项是测试仍要求5个动作，而声明及实际UI为8项且全部正确继承，改为逐代码检查8项，不降低范围断言。新增长弹窗整框和按钮的完整viewport断言；类型检查通过，浏览器重验尚未执行。r6已暂停，失败DB和原图保留。
 
 CI冻结批次 permission-capability-r6-5d32c1db9-v1：Quote/BOM job 20261002t151751z-e0610564 已开始，不能取消，继续保留旧候选结果；backend/composition两个queued任务因候选更新通过公开CLI取消。新候选后续重新冻结，旧候选CI不替代当前验收。
+
+### r7 修复候选与配置阻挡
+
+r7 分配被共享 allocations.tsv 中 bpm-goal-final-slot45 → aura-bpm 的登记阻挡：当前 runtime.yaml 未配置该 repo，allocator 在校验全部登记端口时 fail closed。没有删除其他任务登记、终止其进程或修改共享 dirty 配置；已请求创建该环境的任务补齐配置。本轮仍显式使用额度18。
+
+成员 checkbox/row 真实事件 UT 2项通过；受控删除 stopPropagation 后2项均失败，恢复后2项通过。能力及成员9文件60项通过。BOM表单修复后 FormPageContent 与成员2文件62项通过，typecheck退出0；这些不替代浏览器。
+
+CI旧候选实际暴露只读角色直接打开规则新增表单的缺陷：菜单改为允许查看后，表单未声明写权限。沿用 command.permissions 真源，为13个BOM表单24个主要动作补 bom.rule.manage，未增加角色授权。通用form renderer只在当前visibleWhen生效的primary动作全部显式声明且被拒绝时显示现有无权限页；无声明旧表单、无primary页面、存在可用primary动作均保持兼容，取消按钮不能授予写权限。后端命令权限继续最终裁决。
+
+页面 UX Blueprint：现有规则/映射/结构/模板维护表单，管理角色维护、查看角色只能访问列表/详情；primary为当前创建/编辑/上传命令，secondary为既有返回/取消；字段、section、顺序、对象摘要保持原定义；本次改变No Permission状态。截图场景为管理角色真实创建、查看角色直接new/edit拒绝、返回列表可读；继续使用既有BOM规则CRUD与独立维护角色旅程。平台路线是已有DSL按钮permissionCode +通用form渲染修补，非新增页面/权限引擎。
+
+13个变更表单的UX审计before/after均120错误、0警告（全文件73页328错误），为既有字段引导/分组等债务，本轮未新增；不宣称黄金验收通过。当前CI旧候选134项仍运行，已出现更多失败，需取终态及逐项根因，不以日志进度作为门禁通过。
+
+旧候选共享文件负例实际GET /api/file/{pid}返回500。已沿CI backend trace定位到 authorizeRecordId 的 recordLoader catch(Exception)把 getById 抛出的 AccessDeniedException 包成MetaServiceException。仅补明确拒绝异常原样抛出，不改授权裁决、record lookup或数据库故障语义；补原异常身份保留与普通故障仍包装两项UT。严格403浏览器断言保持，当前修复须重新真栈验证。

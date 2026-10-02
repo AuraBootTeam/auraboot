@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Map;
 
@@ -103,6 +104,26 @@ class DataAccessAuthorizationHelperImplTest {
                 .thenReturn(true);
 
         assertThat(helper.authorizeRecordId(RESOURCE_CODE, "read", "q-3", id -> record)).isTrue();
+    }
+
+    @Test
+    void authorizeRecordId_preservesLoaderAccessDenialWithoutReauthorizing() {
+        AccessDeniedException denied = new AccessDeniedException("record access revoked");
+        assertThatThrownBy(() -> helper.authorizeRecordId(RESOURCE_CODE, "read", "q-3", id -> {
+            throw denied;
+        })).isSameAs(denied);
+        verifyNoInteractions(dataPermissionEngine);
+    }
+
+    @Test
+    void authorizeRecordId_keepsLoaderFailureDistinctFromAccessDenial() {
+        IllegalStateException unavailable = new IllegalStateException("database unavailable");
+        assertThatThrownBy(() -> helper.authorizeRecordId(RESOURCE_CODE, "read", "q-3", id -> {
+            throw unavailable;
+        })).isInstanceOf(MetaServiceException.class)
+                .hasCause(unavailable)
+                .hasMessageContaining("Failed to load record for authorization");
+        verifyNoInteractions(dataPermissionEngine);
     }
 
     @Test

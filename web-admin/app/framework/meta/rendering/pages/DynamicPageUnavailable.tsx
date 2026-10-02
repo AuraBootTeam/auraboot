@@ -2,7 +2,7 @@ import { useSmartText } from '~/utils/i18n';
 
 export function DynamicPageUnavailable(_props: { message: string }) {
   const text = useSmartText();
-  // This component is used only for explicit menu-access denials. Keep server
+  // This component is used for explicit menu or form-authoring access denials. Keep server
   // diagnostics out of the user-facing message, including internal route keys.
   return (
     <div className="flex min-h-screen items-center justify-center">

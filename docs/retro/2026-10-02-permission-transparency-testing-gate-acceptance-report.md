@@ -6,9 +6,15 @@ created: 2026-10-02
 
 # 管理员权限能力验收报告
 
-`allowed_claim: targeted-tested / partial`。当前候选 browser E2E did_not_run（executed=0），r6 启动被宿主机验证名额上限拒绝。r5 编辑器14项通过属于前一候选，不能替代后续业务依赖、范围名称、成员新增移除、只读按钮和文件下载变更的验证。Goal 保持 active，未完成验收。
+`allowed_claim: targeted-tested / partial`。当前修复候选 browser E2E did_not_run（executed=0）；r6已实测，r7分配被共享aura-bpm登记缺配置阻挡。r5 编辑器14项通过属于前一候选，不能替代后续业务依赖、范围名称、成员新增移除、只读按钮和文件下载变更的验证。Goal 保持 active，未完成验收。
 
 最新状态：owner授权额度18并确认局域网ssh dev后，r6启动及双重身份验证成功；编辑器14项实测9通过、5失败、0retry。长预览超屏和成员checkbox双重切换为真实交互缺陷，范围两项为5→8动作分母漂移。已集中修复并通过类型检查；修复后的候选仍待浏览器验收。此前capacity/VPN阻挡已解除，旧描述保留为历史记录。
+
+补充实测：旧r6冻结候选CI完整134项终态为111 passed、20 failed、3 did_not_run（串行组前项失败导致后续未运行）；job 20261002t151751z-e0610564 状态failed，覆盖门明确拒绝。证据ui/capability-r6-ci-full-terminal.log与capability-r6-ci-terminal-state.json。失败涉及BOM只读直达表单、长预览、关联文件拒绝被包装成500，以及转换/下载/角色入口等待调查项；不能将整个失败批次归为环境问题。
+
+当前修复候选：成员真实DOM事件2项通过且受控删除修复后2项失败、恢复后2项通过；能力+成员9文件60项通过；表单+成员2文件62项通过（与前批有重叠，不相加）。定向后端UT DataAccessAuthorizationHelperImplTest 12项、FileUploadControllerTest 9项全部通过、0skip，补验证loader拒绝原样抛出与普通故障包装不变。typecheck最终退出0。证据ui/capability-r7-form-member-final.log、capability-r7-form-typecheck-final.log、capability-r7-file-auth-unit-final.log及JUnit XML。首次Gradle选择未限定根任务导致included build无匹配测试，未作为通过；改为:test后实际执行21项。
+
+13个BOM表单24个主要动作补齐命令已要求的bom.rule.manage；通用form在当前primary动作全部显式拒绝时呈现无权限页。关联文件GET拒绝异常保留403语义，不改授权裁决。两项修复仍须真栈浏览器复验。13表单UX before/after均120错误、0警告，本轮未新增但未达到黄金标准。r7共享aura-bpm缺配置阻挡仍在，没有删除其他任务登记或改共享dirty配置。
 
 唯一实施账本是[已确认完整方案](../plans/2026-10/2026-10-02-permission-transparency-plan.md)，稳定契约见[范围与记录诊断 SoT](../system-reference/permission-scope-and-record-diagnostics.md)。本报告不创建另一份任务清单。
 
