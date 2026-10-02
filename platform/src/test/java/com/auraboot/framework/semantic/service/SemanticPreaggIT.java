@@ -222,6 +222,11 @@ class SemanticPreaggIT {
 
         // Delete drops the MV together with the definition.
         preaggService.delete(preagg.getPid());
+        assertThat(preaggMapper.findByPid(TENANT_ID, preagg.getPid())).isNull();
+        assertThat(preaggService.list()).extracting(AbSemanticPreagg::getPid)
+                .doesNotContain(preagg.getPid());
+        assertThat(MetaContext.runWithoutTenantFilter(preaggMapper::listAllAcrossTenants))
+                .extracting(AbSemanticPreagg::getPid).doesNotContain(preagg.getPid());
         Integer mvLeft = jdbc.queryForObject(
                 "SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
                 Integer.class, mvName.replace("\"", ""));
