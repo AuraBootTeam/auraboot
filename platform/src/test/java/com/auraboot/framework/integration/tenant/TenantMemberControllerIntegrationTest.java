@@ -7,6 +7,28 @@ import com.auraboot.framework.organization.dto.TeamMemberAddRequest;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.organization.service.TeamService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.user.service.UserService;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.time.Instant;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +58,15 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private TeamMemberService teamMemberService;
+
+    @Autowired private UserService users;
+    @Autowired private TenantMemberMapper memberMapper;
+    @Autowired private PermissionMapper permissions;
+    @Autowired private RolePermissionMapper grants;
+    @Autowired private UserPermissionService userPermissions;
+    @Autowired private DataScopeService scopes;
+    @Autowired private MetaModelMapper models;
+    @Autowired private MetaModelService modelService;
 
     private MockMvc mockMvc;
 
@@ -70,15 +101,16 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         // Set up MockMvc with a filter that injects MetaContext per request
         Filter metaContextFilter = (request, response, chain) -> {
             try {
-                MetaContext.setContext(
-                        getTestTenant().getId(),
-                        getTestUser().getId(),
-                        getTestUser().getPid(),
-                        getTestUser().getUserName()
-                );
+                applyTestMetaContext();
+                CustomUserDetails principal = new CustomUserDetails(getTestUser().getUserName(), "test-password",
+                        getTestUser().getId(), getTestUser().getPid(), AuthorityUtils.NO_AUTHORITIES,
+                        true, true, true, true);
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
                 chain.doFilter(request, response);
             } finally {
                 MetaContext.clear();
+                SecurityContextHolder.clearContext();
             }
         };
         mockMvc = MockMvcBuilders
@@ -110,6 +142,137 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[]"))
                 .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void memberActionOnlyPreflightAllowsAndThenRejectsRevokedGrant() throws Exception {
+        prepareMemberModel();
+        grantMemberAction("read");
+        RolePermission suspend = grantMemberAction("suspend");
+        TenantMember target = createMemberFixture(false);
+        assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
+                .contains("model.tenant_member.read", "model.tenant_member.suspend")
+                .doesNotContain("admin_tenant_member", "org.role.update", "model.tenant_member.delete");
+        String api = "/api/tenant/members/" + target.getPid();
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", "suspend"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.memberPid").value(target.getPid()))
+                .andExpect(jsonPath("$.data.resources").isArray());
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "suspend"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", "remove"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "remove"))
+                .andExpect(status().isForbidden());
+        applyTestMetaContext();
+        grants.deleteById(suspend.getId());
+        evictMemberGrants();
+        assertThat(userPermissions.hasPermission(getTestUser().getId(), "model.tenant_member.suspend")).isFalse();
+        mockMvc.perform(get(api + "/offboarding-impact").param("action", "suspend"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(api + "/offboarding-candidates").param("action", "suspend"))
+                .andExpect(status().isForbidden());
+        applyTestMetaContext();
+        assertThat(tenantMemberService.findByPid(target.getPid()).getStatus()).isEqualTo("active");
+    }
+
+    @Test
+    void memberPreflightAndRecipientsHonorRealSelfScope() throws Exception {
+        prepareMemberModel();
+        grantMemberAction("read");
+        grantMemberAction("suspend");
+        TenantMember owned = createMemberFixture(true);
+        TenantMember hidden = createMemberFixture(false);
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        assertThat(scopes.resolveScope(testTenantMember.getId(), "tenant_member", "read").scopeType())
+                .isEqualTo("self");
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-impact").param("action", "suspend"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-impact").param("action", "suspend"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/tenant/members/" + hidden.getPid() + "/offboarding-candidates").param("action", "suspend"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-candidates").param("action", "suspend"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data[?(@.memberPid == '" + testTenantMember.getPid() + "')]").isNotEmpty())
+                .andExpect(jsonPath("$.data[?(@.memberPid == '" + hidden.getPid() + "')]").isEmpty());
+    }
+
+    private void prepareMemberModel() {
+        applyTestMetaContext();
+        Model model = models.findCurrentByCode("tenant_member");
+        if (model == null) {
+            model = new Model();
+            model.setPid(UniqueIdGenerator.generate());
+            model.setTenantId(getTestTenant().getId());
+            model.setCode("tenant_member");
+            model.setTableName("ab_tenant_member");
+            model.setSourceType("physical");
+            model.setVersion(1);
+            model.setIsCurrent(true);
+            model.setStatus("published");
+            model.setDeletedFlag(false);
+            model.setCreatedAt(Instant.now());
+            model.setUpdatedAt(Instant.now());
+            ExtensionBean extension = new ExtensionBean();
+            extension.setExtension(Map.of("modelType", "entity", "displayName", "Tenant member"));
+            model.setExtension(extension);
+            models.insert(model);
+        }
+        assertThat(model.getTableName()).isEqualTo("ab_tenant_member");
+        modelService.refreshModelCache("tenant_member");
+        // Reset the real scope and its cache before each case; rolled-back rows alone
+        // do not invalidate the previous case's cached self condition.
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "all", "MAX");
+    }
+
+    private TenantMember createMemberFixture(boolean owned) {
+        applyTestMetaContext();
+        var user = users.signUp("offboarding-" + UniqueIdGenerator.generate() + "@example.test", "Test-password-2026!");
+        TenantMember member = tenantMemberService.addMember(user.getId(), getTestTenant().getId(), "active");
+        member.setCreatedBy(owned ? getTestUser().getId() : user.getId());
+        memberMapper.updateById(member);
+        return member;
+    }
+
+    private RolePermission grantMemberAction(String action) {
+        applyTestMetaContext();
+        String code = "model.tenant_member." + action;
+        Permission permission = permissions.findByCode(code);
+        if (permission == null) {
+            permission = new Permission();
+            permission.setPid(UniqueIdGenerator.generate());
+            permission.setTenantId(getTestTenant().getId());
+            permission.setCode(code);
+            permission.setName("Tenant member " + action);
+            permission.setResourceType("model");
+            permission.setResourceCode("tenant_member");
+            permission.setAction(action);
+            permission.setSource("integration_test");
+            permission.setStatus("active");
+            permission.setDeletedFlag(false);
+            permission.setCreatedAt(Instant.now());
+            permission.setUpdatedAt(Instant.now());
+            permissions.insert(permission);
+        }
+        RolePermission grant = new RolePermission();
+        grant.setPid(UniqueIdGenerator.generate());
+        grant.setTenantId(getTestTenant().getId());
+        grant.setRoleId(getTestRole().getId());
+        grant.setPermissionId(permission.getId());
+        grant.setGrantType("grant");
+        grant.setStatus("active");
+        grant.setDeletedFlag(false);
+        grant.setCreatedAt(Instant.now());
+        grant.setUpdatedAt(Instant.now());
+        grants.insert(grant);
+        evictMemberGrants();
+        return grant;
+    }
+
+    private void evictMemberGrants() {
+        userPermissions.evictPermissionDefinitions(getTestTenant().getId());
+        userPermissions.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     // ===== helpers =====
