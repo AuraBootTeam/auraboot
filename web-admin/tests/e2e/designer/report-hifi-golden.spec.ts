@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { ensureSidebarExpanded, navigateToMenuByClick, clickRowActionByLocator } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
@@ -136,9 +137,8 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
   reportPid = (await report.json()).data.pid;
   expect(reportPid).toBeTruthy();
 
-  // The API only arranges fixtures; export actions and downloads are driven by
-  // the actual editor. Direct record navigation remains an explicit menu gap.
-  await page.goto(`/report-designer/${reportPid}`);
+  // Fixtures are arranged by API; menu navigation and export actions use the UI.
+  await openReportFromManagement(page);
   await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`);
   await downloadAndInspectPdf(page, /^(导出 PDF|Export PDF)$/, 'hifi-report-editor.pdf');
   const jsonRequest = page.waitForResponse(r => r.url().endsWith('/api/reports/export/json') && r.request().method() === 'POST');
@@ -173,7 +173,7 @@ test('HIFI-00 seed realistic dataset and build the multi-block report', async ({
 });
 
 test('HIFI-01 designer renders every block of the high-fidelity report', async ({ page }) => {
-  await page.goto(`/report-designer/${reportPid}`);
+  await openReportFromManagement(page);
   await expect(page.getByTestId('report-canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue(`订单运营月报 ${run}`, { timeout: 30000 });
   await expect(page.getByTestId('report-canvas')).toContainText('订单总数');
@@ -197,6 +197,28 @@ test('HIFI-02 view page renders the full business report', async ({ page }) => {
   await downloadAndInspectPdf(page, /^Export PDF$/, 'hifi-report-viewer.pdf');
   await page.screenshot({ path: `${EV}/hifi-02-business.png`, fullPage: true });
 });
+
+async function openReportFromManagement(page: import('@playwright/test').Page) {
+  expect(reportPid).not.toBe('');
+  await page.goto('/');
+  await ensureSidebarExpanded(page);
+  const listResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/report-definitions'
+    && r.request().method() === 'GET');
+  await navigateToMenuByClick(page, ['元数据管理', '报表管理']);
+  await expect(page).toHaveURL(/\/p\/c\/report_management$/);
+  const response = await listResponse;
+  expect(response.ok()).toBeTruthy();
+  const body = await response.json();
+  expect(String(body.code)).toBe('0');
+  expect(body.data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ pid: reportPid, title: `订单运营月报 ${run}` }),
+  ]));
+  // The DSL table uses pid as its row key; do not select a historical title match.
+  const row = page.getByTestId(`table-row-${reportPid}`);
+  await expect(row).toContainText(`订单运营月报 ${run}`);
+  await clickRowActionByLocator(page, row, 'open_report');
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${reportPid}$`));
+}
 
 async function downloadAndInspectPdf(page: import('@playwright/test').Page, button: RegExp, artifact: string) {
   const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/reports/export/pdf') && r.request().method() === 'POST');
