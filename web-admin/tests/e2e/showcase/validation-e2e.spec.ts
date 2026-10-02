@@ -173,7 +173,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
     const fieldErrorClass = page.locator('.field-error, [data-testid="field-error"]').first();
     const requiredText = page
       .locator(
-        'text=/必填|is required|required|不能为空|cannot be empty|This field is required/i',
+        'text=/请填写|必填|is required|required|不能为空|cannot be empty|This field is required/i',
       )
       .first();
     const toastAlert = page.locator('[role="alert"], [data-sonner-toast], .toast-error').first();
