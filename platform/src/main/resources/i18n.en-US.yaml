@@ -1610,6 +1610,34 @@ notification_rule:
   create_rule: Create rule
 
 openPlatform:
+  eventCatalog: "Event catalog"
+  eventCatalogHint: "Only explicitly published partner events can be selected by installed applications."
+  noPublishedEvents: "No partner events published"
+  webhookHealth: "Webhook compatibility & signing"
+  webhookHealthHint: "Rotate signing secrets every 90 days and keep subscriptions on a supported schema."
+  noInstalledWebhooks: "No webhooks for this installation"
+  compatibleVersions: "Supported {versions}"
+  compatible: "Compatible"
+  actionRequired: "Action required"
+  schemaVersion: "Schema v{version}"
+  catalogVersion: "Catalog v{version}"
+  signing: "Signing"
+  rotateBy: "Rotate by {date}"
+  chooseSupportedVersion: "Choose a supported event version."
+  rotateSigningNow: "Rotate the signing secret now."
+  addSigningSecret: "Add a signing secret before enabling delivery."
+  classification:
+    partner: Partner
+  rotation:
+    healthy: Healthy
+    due: Due soon
+    overdue: Overdue
+    missing: Missing
+  delivery:
+    dead_letter: Dead letter
+    failed: Failed
+    pending: Pending
+    success: Delivered
   title: Open Platform
   badge: Machine-to-machine access
   subtitle: Create tenant-scoped applications, grant minimum scopes, rotate credentials, and inspect the unified public API contract.
@@ -1728,3 +1756,6 @@ aurabot:
     saving: Saving…
     saved_as_dashboard: Saved to dashboard
     save_failed: Failed to save to dashboard
+
+user:
+  logout: Logout
