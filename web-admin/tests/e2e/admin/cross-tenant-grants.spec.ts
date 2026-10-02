@@ -55,9 +55,11 @@ async function apiCreateGrant(
   const resp = await request.post(API_BASE, { data: body });
   if (!resp.ok()) return null;
   const json = await resp.json().catch(() => null);
-  // Controller returns ApiResponse<Map<String, Object>> — id lives under data.id
-  const id = json?.data?.id;
-  return typeof id === 'number' ? id : null;
+  // Controller returns ApiResponse<Map<String, Object>> — id lives under
+  // data.id and serializes as a string (platform numeric-pid convention).
+  const raw = json?.data?.id;
+  const id = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(id) ? id : null;
 }
 
 async function apiRevoke(request: APIRequestContext, id: number): Promise<void> {
