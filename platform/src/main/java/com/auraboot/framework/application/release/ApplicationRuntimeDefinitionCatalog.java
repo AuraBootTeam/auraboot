@@ -6,6 +6,8 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
 import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
@@ -222,6 +224,13 @@ public final class ApplicationRuntimeDefinitionCatalog {
                 menu.setI18nKey(source.getI18nKey());
                 menu.setRedirect(source.getRedirect());
                 menu.setPageKey(source.getPageKey());
+                if (source.getExtension() != null) {
+                    if (source.getExtension().containsKey("applicationNavigation")
+                            && source.getParentCode() != null && !source.getParentCode().isBlank()) {
+                        throw unavailable("Application navigation policy must be declared on a Release root menu");
+                    }
+                    menu.setExtension(mapper.convertValue(source.getExtension(), ExtensionBean.class));
+                }
                 if (menus.putIfAbsent(source.getCode(), menu) != null) {
                     throw unavailable("Menu key is ambiguous in the active Application Release: " + source.getCode());
                 }
@@ -240,6 +249,7 @@ public final class ApplicationRuntimeDefinitionCatalog {
             if (parent.getChildren() == null) parent.setChildren(new ArrayList<>());
             parent.getChildren().add(entry.getValue());
         }
+        roots = ApplicationNavigationPolicy.groupRoots(roots);
         sortMenus(roots);
         return List.copyOf(roots);
     }

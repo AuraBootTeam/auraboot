@@ -2,6 +2,7 @@ package com.auraboot.framework.menu.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.menu.service.MenuEnvironmentScopeService;
 import com.auraboot.framework.menu.service.MenuService;
@@ -212,8 +213,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     private List<Menu> releaseMenuTree(Long tenantId, Set<String> permissionCodes) {
         if (!releaseReadsEnabled(tenantId)) return List.of();
-        return filterReleaseMenus(applicationRuntimeDefinitionCatalog.menuTree(
-                tenantId, defaultApplicationCode.trim()), permissionCodes);
+        List<Menu> roots = applicationRuntimeDefinitionCatalog.menuTree(tenantId, defaultApplicationCode.trim());
+        boolean deduplicate = ApplicationNavigationPolicy.declared(roots);
+        List<Menu> allowed = filterReleaseMenus(roots, permissionCodes);
+        return deduplicate ? ApplicationNavigationPolicy.deduplicateVisible(allowed) : allowed;
     }
 
     private List<Menu> filterReleaseMenus(List<Menu> menus, Set<String> permissionCodes) {
