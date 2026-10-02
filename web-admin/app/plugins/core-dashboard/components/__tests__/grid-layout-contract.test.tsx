@@ -31,7 +31,7 @@ it('the actual installed grid respects saved row height and makes the viewer rea
 
 it('the actual designer grid uses the same saved geometry and retains editing controls', () => {
   const { container } = render(<DesignerCanvas />);
-  const item = container.querySelector<HTMLElement>('.react-grid-item');
+  const item = container.querySelector('.react-grid-item') as HTMLElement | null;
   expect(item?.style.height).toBe('176px');
   expect(item).toHaveClass('react-draggable');
   expect(container.querySelector('.react-resizable-handle')).not.toBeNull();
