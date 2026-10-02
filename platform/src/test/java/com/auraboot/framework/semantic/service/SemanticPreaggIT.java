@@ -21,6 +21,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Arrays;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -170,6 +172,55 @@ class SemanticPreaggIT {
                 "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'",
                 Long.class, TENANT_ID);
         return count;
+    }
+
+    @Test
+    @DisplayName("Governed aggregation over 100k isolated rows has P95 below one second")
+    void hundredThousandRowAggregationP95() {
+        // Migration-owned table; a unique language keeps other IT fixtures out
+        // of both the expected value and the measured governed query.
+        String run = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+        String prefix = "pg-golden-p-" + run + "-";
+        String language = "p" + run;
+        int inserted = jdbc.update("INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, "
+                        + "acp_priority, created_at, updated_at, created_by, updated_by, deleted_flag) "
+                        + "SELECT ? || n::text, ?, 'preagg_golden', ? || n::text, ?, "
+                        + "0, NOW(), NOW(), ?, ?, FALSE FROM generate_series(1, 100000) n",
+                prefix, TENANT_ID, prefix, language, USER_ID, USER_ID);
+        assertThat(inserted).isEqualTo(100_000);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? "
+                + "AND language = ? AND deleted_flag = FALSE", Long.class, TENANT_ID, language))
+                .isEqualTo(100_000L);
+
+        SemanticQueryRequest request = new SemanticQueryRequest();
+        request.setMetrics(List.of("preagg_golden_alias.alias_count_metric"));
+        request.setFilters(List.of(new SemanticQueryRequest.Filter("alias_language", "eq", language)));
+        UserContext user = new UserContext(USER_ID, TENANT_ID, java.util.Map.of());
+        int warmups = 5;
+        int samples = 40;
+        long[] durations = new long[samples];
+        long coldNanos = 0;
+        for (int i = 0; i < warmups + samples; i++) {
+            long started = System.nanoTime();
+            var response = queryService.executeQuery(request, user);
+            long elapsed = System.nanoTime() - started;
+            if (i == 0) coldNanos = elapsed;
+            // Verify every result, so a cheap empty or incorrect query cannot
+            // satisfy the latency bound. Compilation, DB and audit are timed.
+            assertThat(response.getRows()).hasSize(1);
+            assertThat(response.getRows().get(0)).hasSize(1);
+            Object value = response.getRows().get(0).values().iterator().next();
+            assertThat(((Number) value).longValue()).isEqualTo(100_000L);
+            if (i >= warmups) durations[i - warmups] = elapsed;
+        }
+        long[] sorted = durations.clone();
+        Arrays.sort(sorted);
+        long p95Nanos = sorted[(int) Math.ceil(samples * 0.95) - 1];
+        log.info("BI_R3_PERF tenant={} rows={} warmups={} samples={} coldMs={} p95Ms={} samplesNs={}",
+                TENANT_ID, inserted, warmups, samples, coldNanos / 1_000_000.0,
+                p95Nanos / 1_000_000.0, Arrays.toString(durations));
+        assertThat(p95Nanos).as("100k governed aggregation P95, nearest-rank over 40 samples")
+                .isLessThan(1_000_000_000L);
     }
 
     @Test
