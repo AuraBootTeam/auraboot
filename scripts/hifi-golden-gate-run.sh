@@ -10,7 +10,7 @@ GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 PROFILE="$REPO_ROOT/scripts/gates/hifi-golden-profile.json"
 AUDIT="$REPO_ROOT/scripts/gates/hifi-golden-results.mjs"
 NAME="hifi-golden-$(date -u +%Y%m%dT%H%M%SZ)-$$"
-SLOT=""
+SLOT="${AURA_REGRESSION_SLOT:-}"
 REPEAT=1
 log() { printf '[hifi-golden-gate] %s\n' "$*"; }
 die_env() { log "ENVIRONMENT-INVALID: $*" >&2; exit 2; }
@@ -27,13 +27,18 @@ done
 [[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die_env 'invalid runtime name'
 [[ "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die_env 'repeat must be a positive integer'
 [[ -z "$SLOT" || "$SLOT" =~ ^[0-9]+$ ]] || die_env 'slot must be an integer'
-WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-$REPO_ROOT}}"
+WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-}}"
+if [[ -z "$WORKSPACE" && -x "$(dirname "$REPO_ROOT")/auraboot-workspace/aura" ]]; then
+  WORKSPACE="$(dirname "$REPO_ROOT")/auraboot-workspace"
+fi
+WORKSPACE="${WORKSPACE:-$REPO_ROOT}"
 while [[ "$WORKSPACE" != / && ! -x "$WORKSPACE/aura" ]]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 [[ -x "$WORKSPACE/aura" ]] || die_env 'workspace aura CLI not found'
+WORKSPACE_STATE="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
 [[ -x "$GS" && -f "$PROFILE" && -f "$AUDIT" ]] || die_env 'missing gate dependency'
 command -v pdftotext >/dev/null 2>&1 || die_env 'pdftotext (Poppler) is required to inspect exported PDF contents'
 # A supplied name never grants ownership of an existing runtime or its database.
-[[ ! -e "$WORKSPACE/.workspace/env/$NAME.env" && ! -e "$WORKSPACE/.workspace/golden/$NAME" ]] \
+[[ ! -e "$WORKSPACE_STATE/env/$NAME.env" && ! -e "$WORKSPACE_STATE/golden/$NAME" ]] \
   || die_env "runtime name '$NAME' already exists; choose a fresh name"
 RUNTIMES="$("$WORKSPACE/aura" runtime list)" || die_env 'runtime inventory unavailable'
 slot_in_use() {
@@ -53,7 +58,7 @@ if [[ -z "$SLOT" ]]; then
 else
   slot_in_use "$SLOT" && die_env "slot $SLOT is already in use"
 fi
-export AURA_EVIDENCE_ROOT="$WORKSPACE/.workspace/evidence/$NAME"
+export AURA_EVIDENCE_ROOT="$WORKSPACE_STATE/evidence/$NAME"
 export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/hifi-golden"
 mkdir -p "$AURA_EVIDENCE_DIR"
 trap 'log "runtime retained: name=$NAME slot=$SLOT evidence=$AURA_EVIDENCE_ROOT"' EXIT

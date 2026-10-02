@@ -41,10 +41,10 @@ if(collection)console.log(JSON.stringify(report));else fs.writeFileSync(process.
 `);
   const calls = path.join(root, 'calls.log');
   fs.writeFileSync(calls, '');
-  return { root, calls, run: () => spawnSync('bash', [path.join(repo, 'scripts/hifi-golden-gate-run.sh'), '--name', 'owned-run', '--slot', '900'], {
+  return { root, repo, calls, run: (extraEnv = {}, slotArgs = ['--slot', '900']) => spawnSync('bash', [path.join(repo, 'scripts/hifi-golden-gate-run.sh'), '--name', 'owned-run', ...slotArgs], {
     encoding: 'utf8', timeout: 10000,
     env: { ...process.env, AURA_WORKSPACE_ROOT: root, CALLS: calls, FAKE_MODE: mode,
-      PATH: path.join(root, 'bin') + path.delimiter + process.env.PATH },
+      PATH: path.join(root, 'bin') + path.delimiter + process.env.PATH, ...extraEnv },
   }) };
 }
 
@@ -55,6 +55,57 @@ test('existing runtime is rejected before any subprocess mutates it', t => {
   assert.equal(f.run().status, 2);
   assert.equal(fs.readFileSync(f.calls, 'utf8'), '');
   assert.equal(fs.readFileSync(path.join(f.root, '.workspace/env/owned-run.env'), 'utf8'), 'foreign');
+});
+test('shared CI state rejects an existing runtime before collection or allocation', t => {
+  const f = fixture(t);
+  const state = path.join(f.root, 'shared-state');
+  fs.mkdirSync(path.join(state, 'env'), { recursive: true });
+  fs.writeFileSync(path.join(state, 'env/owned-run.env'), 'foreign');
+  const result = f.run({ AURA_WORKSPACE_STATE_DIR: state });
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.equal(fs.readFileSync(f.calls, 'utf8'), '');
+  assert.equal(fs.readFileSync(path.join(state, 'env/owned-run.env'), 'utf8'), 'foreign');
+});
+test('legacy CI sibling checkouts locate the frozen workspace CLI', t => {
+  const f = fixture(t);
+  const workspace = path.join(f.root, 'auraboot-workspace');
+  fs.mkdirSync(workspace);
+  fs.copyFileSync(path.join(f.root, 'aura'), path.join(workspace, 'aura'));
+  const result = f.run({ AURA_WORKSPACE_ROOT: '', AURA_CI_WORKSPACE_ROOT: '' });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(workspace, '.workspace/evidence/owned-run/execution-ledger.json'))).executed, 8);
+});
+test('CI execution uses the orchestrator lease instead of an independent slot', t => {
+  const f = fixture(t);
+  const result = f.run({ AURA_REGRESSION_SLOT: '214' }, []);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(fs.readFileSync(f.calls, 'utf8'), /stack up owned-run --slot 214 /);
+  assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /--slot 73 /);
+});
+test('gate evidence and real golden-stack env use the same shared CI state', t => {
+  const f = fixture(t);
+  const state = path.join(f.root, 'shared-state');
+  const result = f.run({ AURA_WORKSPACE_STATE_DIR: state });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const evidence = path.join(state, 'evidence/owned-run');
+  assert.ok(fs.existsSync(path.join(evidence, 'execution-ledger.json')), 'gate must write its ledger into the shared runtime state');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(evidence, 'execution-ledger.json'))).executed, 8);
+  assert.equal(fs.existsSync(path.join(f.root, '.workspace/evidence/owned-run')), false);
+  fs.copyFileSync(new URL('../oss-golden-stack.sh', import.meta.url), path.join(f.repo, 'scripts/oss-golden-stack.sh'));
+  fs.mkdirSync(path.join(f.repo, 'scripts/lib'), { recursive: true });
+  fs.copyFileSync(new URL('../lib/web-admin-node-modules.sh', import.meta.url), path.join(f.repo, 'scripts/lib/web-admin-node-modules.sh'));
+  fs.writeFileSync(path.join(f.root, 'dev.sh'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+  fs.mkdirSync(path.join(state, 'golden/owned-run'), { recursive: true });
+  fs.mkdirSync(path.join(state, 'env'), { recursive: true });
+  fs.writeFileSync(path.join(state, 'golden/owned-run/ports'), '7300 6000 7000\n');
+  fs.writeFileSync(path.join(state, 'env/owned-run.env'), `AURA_EVIDENCE_ROOT=${evidence}\n`);
+  const env = spawnSync('bash', [path.join(f.repo, 'scripts/oss-golden-stack.sh'), 'env', 'owned-run'], {
+    encoding: 'utf8', timeout: 10000,
+    env: { ...process.env, AURA_WORKSPACE_ROOT: f.root, AURA_WORKSPACE_STATE_DIR: state },
+  });
+  assert.equal(env.status, 0, env.stdout + env.stderr);
+  assert.match(env.stdout, /PLAYWRIGHT_BASE_URL=http:\/\/127\.0\.0\.1:6000/);
+  assert.ok(env.stdout.includes(`export AURA_EVIDENCE_ROOT=${evidence}`));
 });
 for (const [mode, status] of [['', 0], ['up-failure', 2], ['missing-result', 1]]) {
   test(`runtime retention and exact verdict: ${mode || 'success'}`, t => {
