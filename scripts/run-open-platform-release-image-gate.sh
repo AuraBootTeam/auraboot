@@ -78,11 +78,32 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for base_image in pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
-  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE"; do
-  timeout "$PULL_TIMEOUT" docker pull "$base_image" >/dev/null 2>&1 \
+BASE_IMAGE_MANIFEST="$ARTIFACTS/base-images.json"
+# The admitted host prewarms these images. Freeze only digests belonging to each
+# configured source repository; public mirror aliases are never source authority.
+python3 "$SCRIPT_DIR/ci/freeze-release-base-images.py" "$BASE_IMAGE_MANIFEST" \
+  pgvector/pgvector:pg16 redis:7.4-alpine "$FLYWAY_IMAGE" "$K6_IMAGE" "$PYTHON_IMAGE" \
+  "$BUILD_JDK_IMAGE" "$RUNTIME_JRE_IMAGE" \
+  || fatal "unable to freeze prewarmed base image identities"
+base_ref() {
+  python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print(next(row["reference"] for row in rows if row["tag"]==sys.argv[2]))' \
+    "$BASE_IMAGE_MANIFEST" "$1"
+}
+PINNED_BASES="$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]))["images"]; print("\n".join(row["reference"]+"\t"+row["imageId"] for row in rows))' "$BASE_IMAGE_MANIFEST")" \
+  || fatal "invalid frozen base image manifest"
+while IFS=$'\t' read -r base_image expected_image_id; do
+  timeout "$PULL_TIMEOUT" docker pull "$base_image" > "$ARTIFACTS/logs/base-pull-${expected_image_id#sha256:}.log" 2>&1 \
     || fatal "bounded pull failed for $base_image; mirror it by immutable digest in the controlled registry"
-done
+  [[ "$(docker image inspect "$base_image" --format '{{.Id}}')" == "$expected_image_id" ]] \
+    || fatal "pulled image identity differs from frozen manifest: $base_image"
+done <<< "$PINNED_BASES"
+PGVECTOR_IMAGE="$(base_ref pgvector/pgvector:pg16)"
+REDIS_IMAGE="$(base_ref redis:7.4-alpine)"
+FLYWAY_IMAGE="$(base_ref "$FLYWAY_IMAGE")"
+K6_IMAGE="$(base_ref "$K6_IMAGE")"
+PYTHON_IMAGE="$(base_ref "$PYTHON_IMAGE")"
+BUILD_JDK_IMAGE="$(base_ref "$BUILD_JDK_IMAGE")"
+RUNTIME_JRE_IMAGE="$(base_ref "$RUNTIME_JRE_IMAGE")"
 
 # The admitted host installer prewarms this distribution from the configured transport mirror and
 # verifies it against Gradle's fixed official SHA-256. Seed the BuildKit cache from that verified
@@ -116,14 +137,15 @@ git -C "$REPO_ROOT" archive --format=tar HEAD | tar -x -C "$STAGE"
 # mount without running as root or changing permissions in the source checkout.
 chmod -R a+rX "$STAGE/plugins"
 info "building exact-ref image $IMAGE"
-docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" "$STAGE" \
+docker build -f "$STAGE/platform/Dockerfile" -t "$IMAGE" \
+  --build-arg "BUILD_JDK_IMAGE=$BUILD_JDK_IMAGE" --build-arg "RUNTIME_JRE_IMAGE=$RUNTIME_JRE_IMAGE" "$STAGE" \
   > "$ARTIFACTS/logs/docker-build.log" 2>&1 || fail "image build failed"
 DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 
 docker network create "$NET" >/dev/null
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_USER=auraboot \
-  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci pgvector/pgvector:pg16 >/dev/null
-docker run -d --name "$REDIS" --network "$NET" redis:7.4-alpine >/dev/null
+  -e POSTGRES_PASSWORD=open_platform_ci -e POSTGRES_DB=open_platform_ci "$PGVECTOR_IMAGE" >/dev/null
+docker run -d --name "$REDIS" --network "$NET" "$REDIS_IMAGE" >/dev/null
 for attempt in $(seq 1 30); do
   docker exec "$PG" pg_isready -U auraboot -d open_platform_ci >/dev/null 2>&1 && break
   [[ "$attempt" != 30 ]] || fatal "PostgreSQL did not become ready"
