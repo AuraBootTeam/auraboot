@@ -366,7 +366,6 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   "${SIGNATURE_ENV[@]}" \
   "${CORPUS_CONTAINER_ARGS[@]}" \
   "$IMAGE_REF" \
-  --aura.persistence.tenant-bypass-table-prefixes=se_ \
   --cors.allowed-origins="http://127.0.0.1:$WEB_PORT" \
   --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
   "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
