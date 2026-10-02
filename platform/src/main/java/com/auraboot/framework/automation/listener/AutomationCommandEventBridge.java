@@ -1,6 +1,9 @@
 package com.auraboot.framework.automation.listener;
 
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,43 @@ public class AutomationCommandEventBridge {
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
+        if (event.getTenantId() == null || event.getTenantId() <= 0) {
+            log.error("Automation event requires a positive tenantId: command={}", event.getCommandCode());
+            return;
+        }
+        Map<String, Object> metadata = event.getMetadata();
+        Object actor = metadata == null ? null : metadata.get("actorId");
+        Long actorId;
+        try {
+            actorId = actor == null ? null : Long.valueOf(actor.toString());
+        } catch (NumberFormatException exception) {
+            log.error("Automation event has an invalid actorId: command={}", event.getCommandCode());
+            return;
+        }
+        MetaContext.Snapshot identity = new MetaContext.Snapshot(event.getTenantId(), actorId,
+                metadataString(metadata, "actorPid"), metadataString(metadata, "actorName"),
+                java.util.Set.of(), null, null, null, null);
+        var previousPrincipal = ExecutionPrincipalContext.current().orElse(null);
+        var previousEnvelope = ContextEnvelopeContext.current().orElse(null);
+        MetaContext.runWithSnapshot(identity, () -> {
+            // Event identity cannot inherit another worker's runtime authority or envelope.
+            ExecutionPrincipalContext.clear();
+            ContextEnvelopeContext.clear();
+            try {
+                dispatch(event);
+            } finally {
+                ContextEnvelopeContext.restore(previousEnvelope);
+                ExecutionPrincipalContext.restore(previousPrincipal);
+            }
+        });
+    }
+
+    private static String metadataString(Map<String, Object> metadata, String key) {
+        Object value = metadata == null ? null : metadata.get(key);
+        return value == null ? null : value.toString();
+    }
+
+    private void dispatch(CommandCompletedEvent event) {
         String modelCode = event.getModelCode();
         String recordPid = event.getRecordId();
         String operationType = event.getOperationType();
