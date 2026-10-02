@@ -2,7 +2,6 @@ common:
   type: 类型
   title: 标题
   notice: 提示
-  status: 状态
   date: 日期
   id: 编号
   name: 名称
@@ -248,7 +247,6 @@ common:
 
   query_conditions: 查询条件
   reset: 重置
-  search: 查询
   query: 查询
   operation: 操作
   actions: 操作
@@ -2034,3 +2032,66 @@ aurabot:
     saving: 保存中…
     saved_as_dashboard: 已存为看板
     save_failed: 存为看板失败
+
+designer_icon_picker:
+  choose: "选择图标"
+  search: "搜索图标..."
+  all: "全部"
+  no_matches: "没有找到匹配的图标"
+  clear: "清除选择"
+  labels:
+    search: "搜索"
+    plus: "添加"
+    minus: "减少"
+    edit: "编辑"
+    delete: "删除"
+    save: "保存"
+    copy: "复制"
+    refresh: "刷新"
+    info: "信息"
+    warning: "警告"
+    error: "错误"
+    success: "成功"
+    home: "首页"
+    menu: "菜单"
+    arrow_left: "左箭头"
+    arrow_right: "右箭头"
+    arrow_up: "上箭头"
+    arrow_down: "下箭头"
+    chevron_left: "左尖括号"
+    chevron_right: "右尖括号"
+    document: "文档"
+    folder: "文件夹"
+    image: "图片"
+    video: "视频"
+    link: "链接"
+    mail: "邮件"
+    phone: "电话"
+    chat: "聊天"
+    bell: "通知"
+    user: "用户"
+    users: "用户组"
+    settings: "设置"
+    lock: "锁定"
+    unlock: "解锁"
+    eye: "可见"
+    eye_off: "隐藏"
+    star: "收藏"
+    heart: "喜欢"
+  categories:
+    action: "操作"
+    alert: "提示"
+    av: "媒体"
+    communication: "通信"
+    content: "内容"
+    device: "设备"
+    editor: "编辑"
+    file: "文件"
+    hardware: "硬件"
+    image: "图像"
+    maps: "地图"
+    navigation: "导航"
+    notification: "通知"
+    places: "地点"
+    social: "社交"
+    toggle: "切换"
