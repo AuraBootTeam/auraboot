@@ -103,8 +103,29 @@ export async function ensureBusinessSpace(page: Page): Promise<void> {
     data?: Array<Record<string, unknown>>;
   };
   const business = (body?.data ?? []).find((sp) => sp.spaceType === 'business');
-  if (!business || typeof business.tenantId !== 'string') return;
-  await page.request.post('/api/switch-space', {
-    form: { tenantId: business.tenantId, redirectTo: '/' },
-  });
+  if (!business || typeof business.tenantId !== 'string') {
+    throw new Error(`ensureBusinessSpace: no business space in my-spaces (${await spaces.text()})`);
+  }
+  // Already inside a business space? A redundant switch-space 500s on the
+  // current stack — probe a business-scoped endpoint first and skip.
+  const alreadyBusiness = await page.request.get('/api/meta/models?page=1&pageSize=1');
+  if (alreadyBusiness.ok()) return;
+  let switched: Awaited<ReturnType<typeof page.request.post>> | null = null;
+  let lastDetail = '';
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    // The BFF registers this handler at /_action/switch-space (app/routes.ts);
+    // /api/switch-space is NOT a BFF route — it catch-all-proxies to Spring and
+    // 404s ("No static resource"), which silently left sessions in the System
+    // space (page.page.manage missing downstream).
+    switched = await page.request.post('/_action/switch-space', {
+      form: { tenantId: business.tenantId, redirectTo: '/' },
+      maxRedirects: 0,
+    });
+    if (switched.ok() || switched.status() === 302) break;
+    lastDetail = `${switched.status()} ${await switched.text()}`;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  if (!switched || !(switched.ok() || switched.status() === 302)) {
+    throw new Error(`ensureBusinessSpace: switch-space failed after retries: ${lastDetail}`);
+  }
 }

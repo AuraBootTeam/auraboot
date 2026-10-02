@@ -39,7 +39,7 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
       extension: { e2e: true, scenario: 'zz-probe-inspector' },
     },
   });
-  expect(resp.ok(), `seed failed: ${resp.status()}`).toBeTruthy();
+  expect(resp.ok(), `seed failed: ${resp.status()} ${await resp.text()} [url=${resp.url()}]`).toBeTruthy();
   const body = await resp.json();
   const pid = String(body.data?.pid ?? '');
   expect(pid).toBeTruthy();
@@ -99,6 +99,18 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
   await page.getByTestId('inspector-selected-id').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
   await page.waitForTimeout(2500);
   await dump('after-reload-desc');
+
+  // UDW-055 probe: enter preview and dump all runtime-* testids.
+  await page.getByTestId('designer-mode-preview').click().catch(() => {});
+  await page.getByTestId('unified-runtime-preview').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(2000);
+  const runtimeIds = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-testid]'))
+      .map((el) => el.getAttribute('data-testid'))
+      .filter((id) => id?.startsWith('runtime-')),
+  );
+  const fs5 = await import('fs');
+  fs5.appendFileSync('/tmp/pd-probe-fields.log', `RUNTIME_IDS=${[...new Set(runtimeIds)].join(',')}\n`);
 
   // A1 probe: metric-strip field set after reload.
   await page.getByTestId('outline-item-probe_strip').click();
