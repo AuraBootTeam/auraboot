@@ -96,8 +96,9 @@ test.describe('Unified Inbox', () => {
     const inboxPage = page.getByTestId('unified-inbox-page');
     await expect(inboxPage).toBeVisible();
 
-    // Page header visible
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
+    // Page header visible — the title resolves through i18n, so accept both
+    // the en ('Inbox') and zh-CN ('待办事项') renderings.
+    await expect(page.getByRole('heading', { name: /Inbox|待办事项/ })).toBeVisible();
 
     // D2: Tabs are visible
     await expect(page.getByTestId('inbox-tab-all')).toBeVisible();
