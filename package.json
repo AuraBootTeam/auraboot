@@ -2,7 +2,7 @@
   "name": "auraboot-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "AuraBoot OSS monorepo root — manages framework packages and web-admin",
+  "description": "AuraBoot OSS monorepo root \u2014 manages framework packages and web-admin",
   "scripts": {
     "build:packages": "pnpm -r --filter './packages/*' build",
     "typecheck:packages": "pnpm -r --filter './packages/*' typecheck",
@@ -20,7 +20,9 @@
     "validate:status-colors": "node scripts/check-dsl-status-colors.mjs",
     "validate:cache-eviction": "node scripts/check-cache-eviction.mjs",
     "validate:e2e-assertions": "node scripts/check-e2e-assertions.mjs",
-    "validate:scripts-index": "node scripts/check-scripts-index.mjs"
+    "validate:scripts-index": "node scripts/check-scripts-index.mjs",
+    "validate:package-distribution": "python3 scripts/check-package-distribution.py",
+    "test:package-distribution": "python3 scripts/test-package-distribution.py"
   },
   "devDependencies": {
     "ajv": "^8.18.0",
