@@ -2107,3 +2107,7 @@ aurabot:
 "admin.permission.members.permanent": "长期有效"
 
 permission.org.role.update: "修改角色"
+
+"cloudConfig.save.readbackPending": "配置已保存，请重新读取后继续修改。"
+
+"cloudConfig.save.retryReadback": "重试读取"

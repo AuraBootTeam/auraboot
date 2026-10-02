@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   useCloudConfigs,
+  SaveReadbackNotice,
   PROVIDER_LABELS,
   PROVIDER_FIELDS,
   PROVIDERS_BY_TYPE,
@@ -197,6 +198,8 @@ export default function LlmProvidersPage() {
     handleDelete,
     handleToggleEnabled,
     handleSave,
+    saveReadbackPending,
+    retrySaveReadback,
   } = useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: canManagePlatform ? 'platform' : 'tenant' });
 
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -431,6 +434,12 @@ export default function LlmProvidersPage() {
           customMode={sidePanel.customMode}
           currentLevel={level}
           canManagePlatform={canManagePlatform}
+          saveReadbackPending={saveReadbackPending}
+          onRetryReadback={async () => {
+            const loaded = await retrySaveReadback();
+            if (loaded) setSidePanel(null);
+            return loaded;
+          }}
           onClose={handleSideClose}
           onSave={handleSideSave}
           onTest={handleTestInline}
@@ -737,6 +746,8 @@ function EditSidePanel({
   customMode,
   currentLevel,
   canManagePlatform,
+  saveReadbackPending,
+  onRetryReadback,
   onClose,
   onSave,
   onTest,
@@ -748,6 +759,8 @@ function EditSidePanel({
   customMode?: boolean;
   currentLevel: ConfigLevel;
   canManagePlatform: boolean;
+  saveReadbackPending: boolean;
+  onRetryReadback: () => Promise<boolean>;
   onClose: () => void;
   onSave: (data: {
     configLevel: ConfigLevel;
@@ -899,8 +912,9 @@ function EditSidePanel({
         </div>
 
         {/* Panel body (scrollable) */}
+        {saveReadbackPending && <SaveReadbackNotice onRetry={onRetryReadback} />}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="space-y-5 p-6">
+          <fieldset disabled={saving || saveReadbackPending} className="space-y-5 p-6">
             {/* Custom mode: Display Name + Base URL first */}
             {customMode && isNew && (
               <>
@@ -1107,7 +1121,7 @@ function EditSidePanel({
                 )}
               </button>
             )}
-          </div>
+          </fieldset>
         </form>
 
         {/* Panel footer */}
@@ -1122,7 +1136,7 @@ function EditSidePanel({
           <button
             onClick={handleSubmit as any}
             disabled={
-              saving ||
+              saving || saveReadbackPending ||
               (!customMode && !providerCode) ||
               (customMode && isNew && !customDisplayName.trim())
             }

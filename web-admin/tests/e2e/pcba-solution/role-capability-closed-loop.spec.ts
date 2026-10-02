@@ -376,17 +376,42 @@ test('a standalone model-service capability manages tenant LLM settings without 
     const pid = rows[0].pid;
     await member.page.getByTestId(`provider-edit-${provider}`).click();
     await member.page.getByTestId('field-priority').fill('7');
+    let editPosts = 0;
+    const countEditPosts = (request: import('@playwright/test').Request) => {
+      if (new URL(request.url()).pathname === '/api/llm-config' && request.method() === 'POST') editPosts++;
+    };
+    member.page.on('request', countEditPosts);
+    await member.page.route('**/api/llm-config*', async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ status: 503, contentType: 'application/json',
+          body: JSON.stringify({ code: '503', message: 'Injected configuration readback failure' }) });
+      } else await route.continue();
+    });
     const editing = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
     await member.page.getByTestId('panel-save-btn').click();
     const edited = await editing;
     expect(edited.status()).toBe(200);
     expect(String((await edited.json()).code)).toBe('0');
     expect(edited.request().postDataJSON()).toMatchObject({ pid, priority: 7, serviceType: 'llm' });
+    await expect(member.page.getByTestId('config-save-readback-notice')).toBeVisible();
+    await expect(member.page.getByTestId('field-priority')).toBeDisabled();
+    await expect(member.page.getByTestId('panel-save-btn')).toBeDisabled();
+    await member.page.screenshot({ path: info.outputPath('standalone-model-service-readback-error.png'), fullPage: true });
     const afterEdit = await member.page.request.get('/api/llm-config');
     expect(afterEdit.status()).toBe(200);
     const updated = (await afterEdit.json()).data.filter((row: { providerCode: string }) => row.providerCode === provider);
     expect(updated).toHaveLength(1);
     expect(updated[0]).toMatchObject({ pid, priority: 7 });
+    await member.page.unroute('**/api/llm-config*');
+    const retriedRead = member.page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'GET');
+    await member.page.getByTestId('config-save-readback-retry').click();
+    const readResponse = await retriedRead;
+    expect(readResponse.status()).toBe(200);
+    expect(String((await readResponse.json()).code)).toBe('0');
+    await expect(member.page.getByTestId('provider-edit-panel')).toHaveCount(0);
+    expect(editPosts).toBe(1);
+    member.page.off('request', countEditPosts);
     const toggling = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
     await member.page.getByTestId(`provider-toggle-${provider}`).click();
     const toggled = await toggling;

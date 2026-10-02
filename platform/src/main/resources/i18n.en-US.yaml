@@ -1801,3 +1801,7 @@ aurabot:
 "admin.permission.members.permanent": "Permanent"
 
 permission.org.role.update: "Update roles"
+
+"cloudConfig.save.readbackPending": "Configuration saved. Reload it before making further changes."
+
+"cloudConfig.save.retryReadback": "Retry loading"

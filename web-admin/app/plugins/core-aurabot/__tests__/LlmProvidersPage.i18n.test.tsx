@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   configs: [] as any[],
   useCloudConfigs: vi.fn(),
   save: vi.fn().mockResolvedValue(true),
+  readbackPending: false,
+  retryReadback: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -55,6 +57,8 @@ vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
       handleDelete: vi.fn(),
       handleToggleEnabled: vi.fn(),
       handleSave: state.save,
+      saveReadbackPending: state.readbackPending,
+      retrySaveReadback: state.retryReadback,
     };
     },
   };
@@ -66,6 +70,8 @@ afterEach(() => {
   state.configs = [];
   state.save.mockReset().mockResolvedValue(true);
   state.useCloudConfigs.mockClear();
+  state.readbackPending = false;
+  state.retryReadback.mockReset().mockResolvedValue(true);
 });
 
 describe('LlmProvidersPage i18n', () => {
@@ -106,6 +112,24 @@ describe('LlmProvidersPage i18n', () => {
 
 
 describe('LlmProvidersPage scoped configuration', () => {
+  it('locks a saved draft until explicit readback succeeds', async () => {
+    state.platformAdmin = false;
+    state.readbackPending = true;
+    state.configs = [{ pid: 'existing-llm', configLevel: 'tenant', serviceType: 'llm', providerCode: 'openai',
+      config: '{"apiKey":"****","defaultModel":"fixture-model"}', enabled: false, priority: 7 }];
+    render(<I18nProvider initialLocale="zh-CN" initialData={{ cloudConfig: { save: {
+      readbackPending: '配置已保存，请重新读取后继续修改。', retryReadback: '重试读取',
+    } } }}><LlmProvidersPage /></I18nProvider>);
+    fireEvent.click(screen.getByTestId('provider-edit-openai'));
+    expect(screen.getByText('配置已保存，请重新读取后继续修改。')).toBeVisible();
+    expect(screen.getByTestId('field-priority')).toBeDisabled();
+    expect(screen.getByTestId('panel-save-btn')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '重试读取' }));
+    await waitFor(() => expect(screen.queryByTestId('provider-edit-panel')).not.toBeInTheDocument());
+    expect(state.retryReadback).toHaveBeenCalledTimes(1);
+    expect(state.save).not.toHaveBeenCalled();
+  });
+
   it('uses the LLM-only API and hides global levels for a model-service member', () => {
     state.platformAdmin = false;
     render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);

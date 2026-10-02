@@ -4274,5 +4274,19 @@
     "key": "permission.org.role.update",
     "zh-CN": "修改角色",
     "en-US": "Update roles"
+  },
+  {
+    "key": "cloudConfig.save.readbackPending",
+    "zh-CN": "配置已保存，请重新读取后继续修改。",
+    "en-US": "Configuration saved. Reload it before making further changes.",
+    "source": "seed",
+    "refType": "ui"
+  },
+  {
+    "key": "cloudConfig.save.retryReadback",
+    "zh-CN": "重试读取",
+    "en-US": "Retry loading",
+    "source": "seed",
+    "refType": "ui"
   }
 ]

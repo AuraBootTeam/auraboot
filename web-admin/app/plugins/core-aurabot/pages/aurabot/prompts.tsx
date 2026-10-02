@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   useCloudConfigs,
+  SaveReadbackNotice,
   PROVIDER_LABELS,
   safeParseJSON,
   type CloudConfig,
@@ -102,7 +103,8 @@ export default function PromptTemplatesPage() {
     handleEdit,
     handleDelete,
     handleSave,
-    loadConfigs,
+    saveReadbackPending,
+    retrySaveReadback,
   } = useCloudConfigs();
 
   const promptConfigs = configs.filter((c) => c.serviceType === PROMPT_TYPE);
@@ -217,7 +219,8 @@ export default function PromptTemplatesPage() {
                 config={selectedConfig}
                 level={level}
                 onSave={handleSave}
-                onReload={loadConfigs}
+                saveReadbackPending={saveReadbackPending}
+                onRetryReadback={retrySaveReadback}
               />
             ) : (
               <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-24 dark:border-gray-700 dark:bg-gray-800">
@@ -319,7 +322,8 @@ function TemplateEditor({
   config,
   level,
   onSave,
-  onReload,
+  saveReadbackPending,
+  onRetryReadback,
 }: {
   config: CloudConfig;
   level: ConfigLevel;
@@ -330,8 +334,9 @@ function TemplateEditor({
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
-  }) => Promise<boolean | void>;
-  onReload: () => Promise<void>;
+  }) => Promise<boolean>;
+  saveReadbackPending: boolean;
+  onRetryReadback: () => Promise<boolean>;
 }) {
   const parsed = safeParseJSON(config.config);
   const [template, setTemplate] = useState(parsed.template || '');
@@ -364,7 +369,7 @@ function TemplateEditor({
   const handleSaveClick = useCallback(async () => {
     setSaving(true);
     try {
-      await onSave({
+      const confirmed = await onSave({
         configLevel: config.configLevel || level,
         serviceType: PROMPT_TYPE,
         providerCode: config.providerCode,
@@ -372,13 +377,14 @@ function TemplateEditor({
         enabled: config.enabled,
         priority: config.priority,
       });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      await onReload();
+      if (confirmed) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
     } finally {
       setSaving(false);
     }
-  }, [config, level, template, description, onSave, onReload]);
+  }, [config, level, template, description, onSave]);
 
   const handleInsertVariable = useCallback(
     (varName: string) => {
@@ -422,7 +428,7 @@ function TemplateEditor({
           )}
           <button
             onClick={handleSaveClick}
-            disabled={saving || !isDirty}
+            disabled={saving || saveReadbackPending || !isDirty}
             data-testid="prompt-save-btn"
             className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
               saved
@@ -441,6 +447,7 @@ function TemplateEditor({
       </div>
 
       {/* Tab bar */}
+      {saveReadbackPending && <SaveReadbackNotice onRetry={onRetryReadback} />}
       <div className="flex border-b border-gray-200 px-5 dark:border-gray-700">
         {[
           { key: 'editor' as EditorTab, label: 'Editor', icon: CodeBracketIcon },
@@ -463,7 +470,7 @@ function TemplateEditor({
       </div>
 
       {/* Tab content */}
-      <div className="p-5">
+      <fieldset disabled={saving || saveReadbackPending} className="p-5">
         {activeTab === 'editor' ? (
           <EditorTabContent
             template={template}
@@ -481,7 +488,7 @@ function TemplateEditor({
             sampleData={sampleData}
           />
         )}
-      </div>
+      </fieldset>
     </div>
   );
 }
