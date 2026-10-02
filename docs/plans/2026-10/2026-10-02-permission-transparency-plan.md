@@ -76,3 +76,226 @@ PR #2154 已核实进入 origin/main，执行 closeout 后删除旧分支，目�
 重验补充：UI 11/12；同一旧勾选用例在无 trace 时失败、带 trace 5 次通过，尚不证明稳定。本轮进一步使用 hydration marker、固定 capability test ID 及显式 setChecked 驱动，保留选择改变/保存 dirty 的原断言，待重验。角色 20 quoteops + 1 chromium 均通过，产品总门因为 14 条覆盖注册差异仍失败。已核实公开 launcher 错用共享 plugins 根目录；正确冻结根目录后只剩 7 个文件摘要更新，所有断言锚点都存在。续作修复从 runtime manifest 传递 plugins/CRM 根目录，缺失即拒绝，并补 3 项路由单测；旧实现 mutation 会红。登记按已核验断言更新，未将登记结果替代执行。
 
 根因复核：React Router 默认 entry.client 使用 StrictMode，编辑器初始 effect 产生重复读取；旧实现允许迟到响应覆盖用户草稿。延迟旧响应的受控测试执行 1/失败 1，修复请求代次后定向 UT 50/50、skip=0。浏览器测试仍保留鼠标两次勾选；新增原子授权已持久化但回读故障的 UI retry 用例，验证旧快照不能继续编辑。最终 UI 13 项与固定产品 24 个 golden 待本次冻结构件重验。
+
+
+## 管理员权限能力完整实施方案（2026-10-02 owner 已确认）
+
+状态：owner 已确认并授权完整开发。以下为冻结实施目标；盘点证据不等于上线及验收。
+
+### 1. 范围和证据
+
+本轮针对当前报价/BOM/CRM/组织/平台管理组合，读取当前 runtime 的管理员权限矩阵、能力声明、菜单及成员基线，并对比冻结源码中的能力声明。不是全平台所有可选插件的权限完备性验收，也不是逐项业务入口功能验收。
+
+- Runtime：permission-transparency-ui-r2，Web http://127.0.0.1:5304，Backend http://127.0.0.1:6604；本轮 runtime verify 为 ok。
+- OSS e7e7d6b1a77dd812a677c0f8a740e202551b6699；Quote 2b5d3087dc3f726febafa7db861aebd174ea4921；Enterprise eef734f194fa；CRM 10b7b395d6bd；Plugins 521d0cc19871。
+- 采集时间：2026-10-02T11:04:14.552672+00:00。仅执行只读 GET；没有新增、撤销或重写角色权限。
+- 1617 个 supported 动作，1615 个管理员已授权动作，61 个运行时声明能力，121 个动作被声明能力覆盖；1494 个已授权动作未覆盖。覆盖不是授权来源，也不是访问裁决。
+- 源码中有 62 条能力声明、61 个唯一 code，来自 5 份配置；重复 code 为 sys.cap.member_base。
+
+### 2. 建议确认的产品边界
+
+1. 普通租户管理员的所有合理授权需求，应能通过上层业务或平台管理能力表达，不要求理解原子权限码。
+2. 一套现有权限引擎和授权表；业务能力继续通过 includes 展开，不引入第二套授权模型。
+3. 能力表示“可以做什么”；记录范围、字段敏感权限、共享关系保持各自既有语义，不合并为菜单授权。self 是范围，own 不新增为别名枚举，share 不作为普通数据范围。
+4. 菜单是组织与解释维度；无菜单入口但可独立授予的业务/API操作也必须有上层能力。
+5. 底层诊断默认只读。普通管理员的日常授权主界面不出现原子动作勾选器和覆盖数量告警。原子写入若保留，只进入受限维护工具，不承担补齐业务功能的职责。
+6. 不以覆盖率归零为目标，不批量补授权，不将未知用途动作直接归为内部动作。角色模板沿用已有销售、采购等角色，不在本轮新增模板框架。
+
+### 3. 全量动作清单及分流
+
+[逐项动作清单](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/permission-layering-action-inventory.csv)包含每个动作的模块、资源、当前管理员授权、成员基线、全部声明关联能力、直接关联菜单及可见状态。分类是核查优先级，不是已确认业务语义；无菜单不能证明无人工授权需求。
+
+| 核查分类 | 动作数 | 本轮结论 |
+| --- | ---: | --- |
+| 已有声明覆盖 | 121 | 保留；仍需核验能力依赖闭包和敏感边界 |
+| 未覆盖且有直接菜单关联 | 19 | 优先补上层能力/入口依赖；部分菜单在当前组合中隐藏，不擅自开放 |
+| 未覆盖且已有成员基线、无上述菜单关联 | 2 | 核验基线安全性，避免重复人工配置 |
+| 其余未覆盖模型动作 | 1227 | 按实际模型入口与调用方确定能力依赖、独立业务操作或内部动作 |
+| 其余未覆盖非模型动作 | 248 | 按具体命令/API/后台入口裁决，不能仅按前缀打包 |
+
+五类互斥且合计1617。1227是本表分流后的模型数量；先前1494个未覆盖已授权动作中1228为model前缀，两者筛选口径不同。当前模型条目包含E2E夹具，发布配置须与测试注册分开核对，不能将测试模型包装成产品能力。
+
+### 4. 当前上层能力目录
+
+以下为运行时实际61项能力，不是新增设计。动作数可重叠，不可相加推导全目录。
+
+| 功能组 | 能力 code | 名称 | 包含动作数 |
+| --- | --- | --- | ---: |
+| 报价管理 | qo.cap.quote_view | 查看报价 | 7 |
+| 报价管理 | qo.cap.quote_draft | 新建报价草稿 | 1 |
+| 报价管理 | qo.cap.quote_edit | 编辑报价 | 2 |
+| 报价管理 | qo.cap.document | 生成报价单 | 3 |
+| 项目管理 | bom.cap.project | 维护 BOM 项目 | 4 |
+| 来料处理 | qo.cap.intake | 上传客户资料与导入 BOM | 9 |
+| 转换作业 | bom.cap.convert | 执行 BOM 转换与导出 | 40 |
+| 寻源与定价 | qo.cap.sourcing | 寻源、采纳价与工艺费评审 | 8 |
+| 物料库 | bom.cap.library_view | 查看物料库 | 2 |
+| 物料库 | bom.cap.library_manage | 管理物料库 | 1 |
+| 敏感信息 | qo.cap.cost | 查看成本 | 2 |
+| 敏感信息 | qo.cap.evidence | 查看寻源证据 | 2 |
+| 规则配置 | bom.cap.rules_view | 查看 BOM 规则 | 2 |
+| 规则配置 | bom.cap.rules_manage | 编辑 BOM 规则 | 1 |
+| 组织与权限管理 | org.cap.hr | 维护组织架构 | 2 |
+| 组织与权限管理 | org.cap.hr_view | 查看组织架构 | 1 |
+| 组织与权限管理 | org.cap.team | 维护团队 | 2 |
+| 组织与权限管理 | org.cap.member | 管理账号成员 | 7 |
+| 组织与权限管理 | org.cap.member_view | 查看账号成员 | 1 |
+| 组织与权限管理 | org.cap.role | 管理角色与授权 | 4 |
+| 组织与权限管理 | org.cap.role_view | 查看角色 | 2 |
+| 组织与权限管理 | org.cap.permission | 管理权限与菜单 | 5 |
+| 组织与权限管理 | org.cap.tenant | 维护企业信息 | 3 |
+| 系统管理 | sys.cap.console | 系统配置与安全策略 | 1 |
+| 系统管理 | sys.cap.model_service | 模型服务配置 | 1 |
+| 系统管理 | sys.cap.login_channel | 登录渠道管理 | 1 |
+| 系统管理 | sys.cap.cloud_config | 云服务配置 | 1 |
+| 系统管理 | sys.cap.notification_rule | 通知规则管理 | 1 |
+| 系统管理 | sys.cap.automation | 自动化查看 | 1 |
+| 系统管理 | sys.cap.data_permission | 数据权限策略 | 1 |
+| 系统管理 | sys.cap.integration | 集成与连接器 | 2 |
+| 系统管理 | sys.cap.plugin | 插件与应用模板 | 2 |
+| 系统管理 | sys.cap.scheduled_task | 定时任务管理 | 1 |
+| 系统管理 | sys.cap.member_base | 成员基础访问 | 5 |
+| 平台基础 | sys.cap.saved_view_personalize | 维护个人列表视图 | 2 |
+| 客户管理 | crm.cap.account_view | 查看客户 | 2 |
+| 客户管理 | crm.cap.account | 维护客户资料 | 3 |
+| 客户管理 | crm.cap.account_contact_full | 查看完整客户联系方式(电话/邮箱) | 1 |
+| 客户管理 | crm.cap.contact | 维护联系人 | 3 |
+| 线索与商机 | crm.cap.lead | 维护线索 | 3 |
+| 线索与商机 | crm.cap.opportunity | 维护商机 | 3 |
+| 报价业务面 | qo.cap.surface_bom_price | 查看BOM价格业务面 | 1 |
+| 报价业务面 | qo.cap.surface_process_fee | 查看加工点数业务面 | 1 |
+| 报价业务面 | qo.cap.surface_output | 查看报价输出业务面 | 1 |
+| APP-03成本与报价 | qo.cap.app03_scenario | 创建并查看成本方案 | 5 |
+| APP-03成本与报价 | qo.cap.app03_costing | 维护、计算并冻结成本方案 | 7 |
+| APP-03成本与报价 | qo.cap.app03_approval | 批准假设、缺口免责与正式报价 | 10 |
+| 客户请求与服务 | crm.cap.customer_request | 处理客户请求 | 3 |
+| 客户请求与服务 | crm.cap.complaint | 处理投诉 | 2 |
+| 客户请求与服务 | crm.cap.activity | 维护活动记录 | 3 |
+| 客户请求与服务 | crm.cap.sla | SLA 策略 | 2 |
+| 客户请求与服务 | crm.cap.clarification | 澄清事项 | 3 |
+| 报价与需求 | crm.cap.quote_summary | 报价汇总 | 3 |
+| 报价与需求 | crm.cap.approval_case | 审批单 | 3 |
+| 质量与风险 | crm.cap.review | 评审 | 3 |
+| 质量与风险 | crm.cap.risk | 风险 | 3 |
+| 营销活动 | crm.cap.campaign | 营销活动 | 2 |
+| 邮件触达 | crm.cap.email_template | 邮件模板 | 2 |
+| 邮件触达 | crm.cap.email_log | 邮件日志 | 2 |
+| 自动化规则 | crm.cap.lead_score_rule | 线索评分规则 | 2 |
+| 自动化规则 | crm.cap.assignment_rule | 分配规则 | 2 |
+
+### 5. 优先补齐的19个菜单关联动作
+
+关联菜单仅证明入口配置关系，不能证明完整操作所需权限。visible=false表示当前返回的菜单配置不可见，不代表动作永远不需要配置。
+
+| 动作 | 关联菜单 | 当前菜单可见 | 建议 |
+| --- | --- | --- | --- |
+| dashboard_mgmt | 仪表盘管理 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| dashboards | 仪表盘 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| decision.definition.manage | 条件片段库、决策表 | False、False | 规则/决策管理能力候选；按查看、维护、发布审批等授权边界划分 |
+| decision.definition.read | 规则中心、策略工作台、决策定义、发布治理、执行日志、数据模型 | False、False、False、False、False、False | 规则/决策管理能力候选；按查看、维护、发布审批等授权边界划分 |
+| decision.policy.read | 事件策略 | False | 规则/决策管理能力候选；按查看、维护、发布审批等授权边界划分 |
+| dict_management | 字典管理 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| field_management | 字段库 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| member_management | 账号 | True | 优先核验并纳入已有组织、团队、账号、角色授权能力的入口依赖；不新增重复权限按钮 |
+| meta.changelog.read | 审计日志 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| model.bom_material_revision.read | 正式物料版本 | False | 核验正式物料版本是否属于现有物料库查看能力，或确需独立业务能力 |
+| model_management | 模型管理 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| named_query_management | 命名查询 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| org_management | 组织管理 | True | 优先核验并纳入已有组织、团队、账号、角色授权能力的入口依赖；不新增重复权限按钮 |
+| org_teams | 团队 | True | 优先核验并纳入已有组织、团队、账号、角色授权能力的入口依赖；不新增重复权限按钮 |
+| permission_management | 角色、权限/授权关系 | True、False | 优先核验并纳入已有组织、团队、账号、角色授权能力的入口依赖；不新增重复权限按钮 |
+| pgm.page_schema.read | 页面配置 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| query_builder | 查询构建器 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| report.definition.view | 报表管理 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+| sys.connector.update | 集成连接器 | False | 纳入对应平台管理能力候选；当前组合是否开放此功能需确认 |
+
+### 6. 底层动作的候选归属
+
+此表用于安排实现核查，不是直接拼接includes的指令。尤其system/meta/model可能是兼容入口、元数据管理或业务依赖，必须查调用方；不得盲目把read全部加入全员基线。
+
+| 动作族 | 归属建议 | 必须核实的边界 |
+| --- | --- | --- |
+| 报价、来料、寻源、审批、输出、附件 | 优先完善已有报价能力；按实际需要拆上传/查看/生成/下载等独立边界 | 记录读取、业务面、文件关联、输出读取、成本和证据不能互相旁路 |
+| BOM、物料库、规则、项目 | 保留已有6项能力，核验依赖及查看/维护/导出拆分必要性 | execute与export是否允许独立授予；物料版本读归属 |
+| CRM各业务模型 | 归入现有20项能力或必要独立操作 | 查看与维护是否需独立、客户联系信息敏感权限 |
+| system.*、meta.*及元数据模型 | 模型、字段、菜单、字典、命令、查询、页面等平台管理能力；只读渲染依赖另核 | 重复/兼容权限码实际消费者；管理读不能自动当全员渲染读 |
+| dashboard、report、notification | 查看、个人配置、团队配置、发布/管理、导出等能力 | 个人与团队边界、导出和调度副作用 |
+| decision、automation | 查看、维护、执行、审批发布、回滚等能力候选 | 敏感发布不纳入普通编辑档；同名历史动作不盲目合并 |
+| sys.file.*、文件模型 | 业务能力依赖；确有独立资料管理需求时声明独立能力 | file.read和关联记录权限仍共同判定，上传者不自动绕过关系 |
+| data.record_share.manage、audit.* | 共享管理、访问审计等能力候选 | 共享不是scope枚举；审计查看与管理区分 |
+| billing、acp、ai、qr、iot等 | 按已启用产品的管理员职责声明能力；未启用功能仅留诊断 | 不能因为无当前菜单就归为内部动作或给全租户授权 |
+| 测试模型/无用户入口内部模型 | 经注册来源和调用方证明后标内部/测试用途，仅诊断 | 不凭model前缀认定，内部动作仍保留后端鉴权 |
+
+### 7. 已确认实现/配置问题与待核实风险
+
+| ID | 证据与判断 | 最小落地方式 |
+| --- | --- | --- |
+| P01 | sys.cap.member_base在platform-admin为5动作、quote-core为23动作；当前runtime采用platform版本。Registry按tenant+code更新，重复声明可覆盖，配置结果依赖导入路径/顺序 | 明确唯一声明所有者；核验各基础读消费者再整理配置；不取两者并集或扩大tenant_member基线 |
+| P02 | quote两个surface能力带permissions字段，DTO仅识别includes等字段；该字段不参与当前能力展开 | 核实这些模型读是否真实必要；必要时显式声明到合适能力，修正字段并校验未知字段；禁止机械搬入includes |
+| P03 | 能力granted为containsAll，部分授权与零授权显示相同 | 计算none/partial/full，展示缺少动作；部分授权不被普通能力保存静默清理 |
+| P04 | applySelection保护部分授权，但按当前完整能力集合计算可撤销动作，不存能力授权历史来源 | 预览与保存共用差异计算；明确表示“本角色将移除的动作”，不能宣称按历史来源精准撤销 |
+| P05 | 主能力草稿保存、原子立即保存两种交互混用 | 主界面移除原子写入；诊断只读，维护工具独立；不新增跨接口统一事务 |
+| P06 | 四个当前可见组织菜单动作未被声明覆盖；已有组织能力使用另一组动作码 | 核验菜单过滤及API实际检查，修正已有能力入口依赖；本轮仅确认声明缺口，不冒称实际403已复现 |
+| P07 | tier有approver，但前端预设只识别viewer/editor/admin；不能由层级自动推导敏感审批授权 | 保持审批显式选择、校验配置值；是否新增审批预设另行确认，不改变现有引擎 |
+| P08 | 角色成员基线隐式参与有效权限合并；当前实际基线5动作，与quote-core“平台基础读”不同 | 页面区分角色直接授权和已有基线，优先复用现有机制；核验安全性后再决定配置调整 |
+| P09 | 菜单标注通过menu.permissionCode与includes相交生成，不是完整访问证明 | 使用“相关菜单”措辞，避免承诺移除后用户必然不能访问；用户还有其他角色和共享 |
+| P10 | 原子写入成功但回读失败仍提示更新失败 | 若保留维护入口，区分写入失败和回读失败，不在失败界面允许编辑旧快照 |
+
+P01/P02/P03等是本轮源码/运行时确认的具体问题；补齐业务依赖的最终清单仍需逐入口验证。没有发现足以要求重做权限引擎、角色关系表或scope模型的证据。
+
+### 8. 建议页面和新权限发布流程
+
+页面沿用现有角色编辑器：角色与成员信息 → 业务/平台管理能力分组 → 就近显示数据范围及敏感能力 → 授权变更预览 → 保存和服务端回读。诊断入口展示角色动作、能力关联、基线及访问解释。1494项未覆盖不在主界面作为管理员操作提示。
+
+新增权限流程建议：
+1. 插件作者定义原子动作及实际后端检查。
+2. 判断是需要独立选择的能力、已有能力的必需依赖，还是经证明的内部/测试动作。
+3. 在现有capabilities配置声明名称、组、includes、敏感性和排序；记录范围/字段策略复用已有机制。
+4. import验证重复code归属、未知字段、不存在的includes；不能依靠运行时fallback把未声明动作当正常业务配置。
+5. 发布时核查可配置入口、命令、tab、字段与能力的关联；内部豁免必须有理由。先利用现有catalog/validator，证明确实缺口再加小范围校验，不本轮发明新schema。
+6. 现有角色的动作授权保持不变；新增/补齐声明可能导致“部分授权”状态，但不自动补齐动作。新增业务能力仍需管理员主动授权。
+
+### 9. 最小实施切片与确认项
+
+| 顺序 | 修改范围 | 交付结果 |
+| --- | --- | --- |
+| A | 配置及Registry/import校验 | 唯一基础能力所有者、报价无效字段修正、已启用可配置功能的能力归属清单 |
+| B | 现有能力解析/角色编辑器 | none/partial/full、主界面能力完整可配置、覆盖统计进入只读诊断 |
+| C | 现有能力应用服务 | 共用预览/应用差异计算、共享动作保留和残留部分授权说明 |
+| D | 具体业务权限缺陷 | 只在精确报价/附件/审批/tab/字段旅程复现后局部修正；不以admin绕过或扩权兜底 |
+
+owner 已确认这四点：
+- 所有正常管理员可配置权限只出现在上层；底层明细默认只读，原子写入移出日常入口。
+- 业务能力也包含平台管理；按功能分组，记录范围和字段控制复用现有体系。
+- 当前组合优先整理，隐藏/未启用平台模块不自动开放；先处理19个菜单关联缺口及既有能力依赖。
+- 不迁移角色授权、不自动补授权、不重做权限引擎；只有上述已确认问题与精确复现缺陷进入实现。
+
+### 10. 后续验收边界
+
+本轮新功能浏览器E2E did_not_run（executed=0）；本轮是只读盘点和方案，不是功能验收。后续按e2e规范复用已有固定门禁：能力选择/保存及角色范围UI、报价surface/隔离/团队共享/审批/附件等真实旅程。补none/partial/full、重叠能力撤销、未覆盖残留保留、预览与保存一致的hermetic/unit验证；入口授予/撤销、刷新和目标用户业务结果采用journey/real-stack/browser。重复声明及未知字段用现有import配置验证入口。不得把1617条清单或194条既有静态要求登记当执行通过数。
+
+现有product golden仍有BOM规则转换失败，原报价附件问题仍未精确复现，enterprise旧explain与多角色范围合并等风险保持在原review-ledger，不因本方案关闭。
+
+### 11. 数据文件
+
+- [逐动作清单](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/permission-layering-action-inventory.csv)
+- [汇总和源码/runtime差异](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/permission-layering-inventory-summary.json)
+- [实时API快照](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/permission-layering-runtime-snapshot.json)
+- [源码声明快照](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/permission-layering-source-declarations.json)
+- [既有执行及问题账本](/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/ui/review-ledger.md)
+
+SOT Updates：本轮仅形成待确认提案，未更改已上线契约；确认实施后同步既有permission-scope-and-record-diagnostics及对应平台/产品SoT，不将本文作为稳定契约的唯一来源。
+
+### 任务执行关联
+
+| ID | 目标/行动点 | 主裁决/复用入口 | 当前状态 |
+| --- | --- | --- | --- |
+| AUTH-01 | 上层能力配置完整，当前可见入口依赖补齐 | existing capability/import tests + role/业务真实旅程 | pending |
+| AUTH-02 | 部分授权、补齐授权、残留说明 | resolver/helper UT + capability-save-ui-golden | pending |
+| AUTH-03 | 原子诊断只读、覆盖提示移出主界面 | permission golden + screenshot review | pending |
+| AUTH-04 | 共用预览/保存差异计算、重叠保留、失败原子性 | capability service/controller UT/IT + browser preview/save | pending |
+| AUTH-05 | 唯一基础能力所有者、无效声明及校验 | plugin/import tests + runtime import/readback | pending |
+| AUTH-06 | 精确报价/附件/tab/字段/审批权限缺陷 | existing fixed quote/BOM/role/share gates | pending |
+| AUTH-07 | 完整回归、SoT、PR与证据收口 | fixed catalog, current commits, original screenshot reviews | pending |
+
+开发推进使用本表，不另建平行 active gap tracker。工作台证据是执行记录，仓库本计划是任务轨道；稳定行为同步既有SoT。
