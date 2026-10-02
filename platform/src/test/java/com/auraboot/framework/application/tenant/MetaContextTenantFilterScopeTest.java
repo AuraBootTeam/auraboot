@@ -163,7 +163,7 @@ class MetaContextTenantFilterScopeTest {
             // W5 TERMINAL: the migration ledger is closed at zero.
             assertEquals(0, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
                     "MIGRATION_PENDING must stay empty; new exemptions need an approved census (A4-class) and a new tier");
-            assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
+            assertEquals(17, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
             assertEquals(3, MybatisPlusConfig.AUTH_PLANE_TABLES.size(),
                     "auth-plane tier: tenant_member/user_role/role (owner-approved W5 2026-10-01)");
         }

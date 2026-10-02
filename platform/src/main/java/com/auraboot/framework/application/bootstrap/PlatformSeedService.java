@@ -23,6 +23,7 @@ public class PlatformSeedService {
 
     private static final List<String> AUDITED_LOCALES = List.of("zh-CN", "en-US");
 
+    private final com.auraboot.framework.branding.AuthAppearanceSeeder authAppearanceSeeder;
     private final SystemFieldSeeder systemFieldSeeder;
     private final QueryOperatorSeeder queryOperatorSeeder;
     private final I18nBaseSeeder i18nBaseSeeder;
@@ -34,6 +35,7 @@ public class PlatformSeedService {
 
     public void seed() {
         log.info("PlatformSeedService: starting explicit platform data initialization...");
+        authAppearanceSeeder.seed();
         systemFieldSeeder.seed();
         queryOperatorSeeder.seed();
         // Bootstrap runs without MetaContext; these two seeders write rows whose

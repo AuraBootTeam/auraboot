@@ -10,7 +10,7 @@
  */
 
 import jsep from 'jsep';
-import jsepObject from '@jsep-plugin/object';
+import jsepObject, { type ObjectExpression } from '@jsep-plugin/object';
 import MessageFormat from '@messageformat/core';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { BUSINESS_FUNCTION_NAMES } from './business-functions';
@@ -591,7 +591,7 @@ export class ExpressionParser {
       case 'ArrayExpression':
         return this.evaluateArrayExpression(node as jsep.ArrayExpression);
       case 'ObjectExpression':
-        return this.evaluateObjectExpression(node as jsep.ObjectExpression);
+        return this.evaluateObjectExpression(node as ObjectExpression);
 
       default:
         throw new Error(`不支持的节点类型: ${node.type}`);
@@ -966,7 +966,7 @@ export class ExpressionParser {
    * 对象字面量求值（数据构造）：键为字面量字符串，值仍经 evaluateNode
    * 白名单遍历——对象是数据，不引入任何绕过 FORBIDDEN_GLOBALS 的通道。
    */
-  private evaluateObjectExpression(node: jsep.ObjectExpression): Record<string, any> {
+  private evaluateObjectExpression(node: ObjectExpression): Record<string, any> {
     const result: Record<string, any> = {};
     for (const prop of node.properties) {
       if (prop.type !== 'Property') {
@@ -979,6 +979,7 @@ export class ExpressionParser {
           : keyNode.type === 'Literal'
             ? String(keyNode.value)
             : this.evaluateNode(keyNode);
+      if (!prop.value) throw new Error("对象属性必须显式提供值");
       result[String(key)] = this.evaluateNode(prop.value);
     }
     return result;

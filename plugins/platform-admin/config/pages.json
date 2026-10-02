@@ -2630,5 +2630,22 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "auth_appearance",
+    "name:zh-CN": "品牌与登录外观",
+    "name:en": "Brand and Authentication Appearance",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "auth_appearance_editor",
+        "blockType": "custom",
+        "component": "AuthAppearanceEditor"
+      }
+    ]
   }
 ]

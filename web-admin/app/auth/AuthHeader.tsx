@@ -25,7 +25,7 @@ export default function AuthHeader() {
   // (Login.tsx); the global header de-duplicates by dropping its brand row
   // and the self-pointing auth links there, keeping only the locale/theme
   // tools on a transparent bar.
-  const onLoginCardPage = location.pathname === '/login' || location.pathname === '/admin-login';
+  const onLoginCardPage = location.pathname === '/login' || location.pathname === '/admin-login' || (Boolean(branding.authAppearance) && ['/signup', '/forgot-password', '/reset-password'].includes(location.pathname));
 
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
