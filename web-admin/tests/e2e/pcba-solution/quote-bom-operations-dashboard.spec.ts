@@ -191,11 +191,10 @@ test.describe('Quote and BOM operations dashboard @smoke', () => {
   });
 
   test('admin gets one menu link and the same four charts on dashboard and home', async ({ page }, testInfo) => {
-    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await expectFourCharts(page, '/home');
     await ensureSidebarExpanded(page);
     await expect(page.getByTestId('sidebar').locator(`a[href="${HOME_PATH}"]`)).toHaveCount(1);
 
-    await expectFourCharts(page, '/home');
     await page.screenshot({ path: testInfo.outputPath('home-weekly-order.png'), fullPage: true });
     await expectFourCharts(page, DASHBOARD_PATH);
     await page.screenshot({ path: testInfo.outputPath('dashboard-weekly-order.png'), fullPage: true });

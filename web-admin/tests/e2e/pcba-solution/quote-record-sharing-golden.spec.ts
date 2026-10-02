@@ -12,7 +12,7 @@ const recipients: QuoteRoleUser[] = [
 ];
 
 test('quote sharing release gate: multiple members, role access and revocation through UI', async ({ page, browser }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const quote = await seedBomPriceManualReviewQuote(page);
   for (const user of recipients) await ensureQuoteRoleUser(page, user);
   const viewers: Awaited<ReturnType<typeof openQuoteRolePage>>[] = [];
@@ -187,6 +187,42 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await viewers[2].page.goto('/p/qo_quote_common');
   await procListLoad;
   await expect(viewers[2].page.getByText(quote.quoteCode, { exact: false })).toHaveCount(0);
+  // Use the public test-profile initializer to create a real second tenant.
+  const seed = await page.request.post('/api/test/seed', {
+    params: { testRunId: `quote-sharing-tenant-${Date.now()}` }, timeout: 90_000,
+  });
+  expect(seed.status(), await seed.text()).toBe(200);
+  const foreign = await openQuoteRolePage(browser, {
+    key: 'foreign-tenant', email: 'e2e@test.local', displayName: 'E2E Test User',
+    password: 'E2eTestPass2026!', roleCodes: ['tenant_admin'],
+  });
+  try {
+    const ownerIdentity = await page.request.get('/api/auth/me');
+    const foreignIdentity = await foreign.page.request.get('/api/auth/me');
+    expect(ownerIdentity.status()).toBe(200);
+    expect(foreignIdentity.status()).toBe(200);
+    const ownerMe = (await ownerIdentity.json()).data;
+    const foreignMe = (await foreignIdentity.json()).data;
+    expect(foreignMe.user.email).toBe('e2e@test.local');
+    expect(foreignMe.user.tenantId).toBeTruthy();
+    expect(String(foreignMe.user.tenantId)).not.toBe(String(ownerMe.user.tenantId));
+    expect(foreignMe.permissions.roles.map((role: { code: string }) => role.code)).toContain('tenant_admin');
+    const deniedRecord = foreign.page.waitForResponse(response =>
+      new URL(response.url()).pathname === root && response.request().method() === 'GET');
+    await foreign.page.goto(new URL(`/p/qo_quote_common/view/${quote.quoteId}`, page.url()).href);
+    expect((await deniedRecord).status()).toBe(403);
+    await expect(foreign.page.getByTestId('ab:detail:qo_quote_common:container')
+      .getByRole('heading', { level: 2 })).toHaveText('无法访问此记录');
+    await expect(foreign.page.getByTestId(`table-row-${quote.lineId}`)).toHaveCount(0);
+    for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_unassigned_facts']) {
+      const deniedQuery = await foreign.page.request.post(`/api/meta/named-queries/${query}/execute`, {
+        data: { parameters: { quoteId: quote.quoteId } },
+      });
+      expect(deniedQuery.status()).toBe(403);
+    }
+    expect((await foreign.page.request.get(`/api/file/${sharedQuoteFileId}`)).status()).toBe(403);
+    await foreign.page.screenshot({ path: testInfo.outputPath('quote-cross-tenant-denied.png'), fullPage: true });
+  } finally { await foreign.context.close(); }
   for(const viewer of viewers) await viewer.context.close();
 });
 

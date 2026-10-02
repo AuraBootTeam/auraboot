@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureSidebarExpanded } from '../helpers';
+import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator } from '../helpers';
 import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
@@ -276,7 +276,22 @@ test('a standalone BOM rules capability grants UI authoring and revokes to read-
     await writer.context.close();
     const reader = await openQuoteRolePage(browser, user);
     try {
-      await reader.page.goto(new URL(`/p/bom_header_alias/view/${rows[0].pid}`, reader.page.url()).href);
+      await ensureSidebarExpanded(reader.page);
+      const sidebar = reader.page.getByTestId('sidebar');
+      const alias = sidebar.locator('a[href="/p/bom_header_alias"]');
+      if (!(await alias.isVisible())) {
+        const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+        if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+        await expect(center).toBeVisible();
+        await center.click();
+      }
+      await expect(alias).toBeVisible();
+      await alias.click();
+      await expect(reader.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+      const row = reader.page.getByRole('row').filter({ hasText: code });
+      await expect(row).toBeVisible();
+      await clickRowActionByLocator(reader.page, row, 'view', '查看');
+      await expect(reader.page).toHaveURL(new RegExp(`/p/bom_header_alias/view/${rows[0].pid}$`));
       await expect(reader.page.locator('main')).toContainText(code);
       await expect(reader.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(reader.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
