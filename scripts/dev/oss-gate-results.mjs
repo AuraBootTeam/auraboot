@@ -10,7 +10,7 @@ export function auditResults(report) {
   };
   for (const suite of report.suites || []) visit(suite);
   const tests = specs.flatMap((spec) => spec.tests || []);
-  const counts = { collected: tests.length, executed: 0, passed: 0, failed: 0, skipped: 0, didNotRun: 0, retried: 0 };
+  const counts = { collected: tests.length, executed: 0, passed: 0, failed: 0, interrupted: 0, skipped: 0, didNotRun: 0, retried: 0 };
   for (const test of tests) {
     const results = test.results || [];
     counts.retried += Math.max(0, results.length - 1);
@@ -19,7 +19,8 @@ export function auditResults(report) {
     else if (result.status === 'skipped') counts.skipped++;
     else {
       counts.executed++;
-      if (result.status === 'passed' && test.expectedStatus === 'passed') counts.passed++;
+      if (result.status === 'interrupted') counts.interrupted++;
+      else if (result.status === 'passed' && test.expectedStatus === 'passed') counts.passed++;
       else counts.failed++;
     }
   }

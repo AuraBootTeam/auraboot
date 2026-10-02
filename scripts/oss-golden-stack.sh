@@ -754,53 +754,46 @@ cmd_import() {
 }
 
 # ---- warm (setup → auth storageState → pre-warm heavy routes) ------------------------
-# Makes the FIRST golden run after 'up' reliable:
-#   1. Run the Playwright `setup` project (00-bootstrap + 01-multi-role-users) so the
-#      isolated stack has a selectable business space + admin membership. The script's
-#      inline minimal bootstrap (companyName "AuraBoot Dev") already creates a business
-#      tenant, but running the canonical setup specs is the contract auth.setup expects
-#      and is idempotent. Loop up to 5× to absorb cold-start hiccups.
-#   2. Run `auth --no-deps` until tests/storage/admin.json exists (storageState the
-#      chromium golden project depends on). Loop up to 5×.
-#   3. Pre-warm /report-designer + /dashboard with a real authenticated headless nav so
-#      the client lazy chunk + Vite client deps are hot before any golden run.
+# Execute the complete canonical OSS setup project, then auth and route smoke.
+# Each phase has structured execution evidence and runs once without retries.
 cmd_warm() {
   local name="$1" sd; sd="$(state_dir "$name")"
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
   local admin_json="$fe/tests/storage/admin.json"
   local env_exports; env_exports="$(cmd_env "$name")"
+  local evidence_root; evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
 
-  # 1) setup project — creates business space + multi-role users (idempotent).
-  log "    warm[setup] running once without retries"
+  log "    warm[setup] complete canonical OSS project, once without retries"
   ( cd "$fe" && eval "$env_exports" \
-    && pnpm exec playwright test --project=setup --no-deps --retries=0 \
-      tests/api/setup/00-bootstrap.spec.ts tests/api/setup/01-multi-role-users.spec.ts \
-      --reporter=line ) >>"$sd/warm.log" 2>&1 \
-    || die "warm: setup failed; see $sd/warm.log"
+    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/setup-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/setup-results.json" \
+       pnpm exec playwright test --project=setup --no-deps --workers=1 --retries=0 --reporter=line,json \
+  ) >>"$sd/warm.log" 2>&1 || die "warm: setup failed; see $sd/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/setup-results.json" \
+    >>"$sd/warm.log" 2>&1 || die "warm: setup execution evidence incomplete"
 
-  # Require both the successful auth process and a non-empty session cookie.
   rm -f "$admin_json"
   ( cd "$fe" && eval "$env_exports" \
-    && pnpm exec playwright test --project=auth --no-deps --retries=0 \
-      --reporter=line ) >>"$sd/warm.log" 2>&1 \
-    || die "warm: auth failed; see $sd/warm.log"
+    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/auth-results.json" \
+       pnpm exec playwright test --project=auth --no-deps --workers=1 --retries=0 --reporter=line,json \
+  ) >>"$sd/warm.log" 2>&1 || die "warm: auth failed; see $sd/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/auth-results.json" \
+    >>"$sd/warm.log" 2>&1 || die "warm: auth execution evidence incomplete"
   node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1])); if(!s.cookies?.some(c=>c.name==="__session" && c.value)) process.exit(1)' "$admin_json" \
     || die "warm: auth produced no session cookie; see $sd/warm.log"
 
-  # 3) pre-warm the heavy lazy routes with a real authenticated headless nav.
-  log "    warm[routes] navigating /report-designer + /dashboard (real auth)"
-  if ( cd "$fe" && eval "$env_exports" \
-       && pnpm exec playwright test --project=chromium --no-deps --retries=0 \
-            tests/e2e/_golden-stack-warm.spec.ts \
-            --reporter=line ) >>"$sd/warm.log" 2>&1; then
-    log "    warm[routes] heavy routes hot ✓"
-  else
-    # Non-fatal: a failed warm nav doesn't break the stack; first golden will
-    # just pay the chunk-compile cost. Surface it so the operator can look.
-    log "    warm[routes] WARNING: pre-warm nav failed (see $sd/warm.log); stack still usable"
-  fi
-  log "    warm OK"
+  log "    warm[routes] authenticated report and dashboard smoke"
+  ( cd "$fe" && eval "$env_exports" \
+    && PW_PROFILE=full PW_RESULTS_JSON="$evidence_root/playwright/warm-route-results.json" \
+       PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/warm-route-results.json" \
+       pnpm exec playwright test --project=chromium --no-deps --workers=1 --retries=0 \
+         tests/e2e/_golden-stack-warm.spec.ts --reporter=line,json \
+  ) >>"$sd/warm.log" 2>&1 || die "warm: route smoke failed; see $sd/warm.log"
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$evidence_root/playwright/warm-route-results.json" \
+    >>"$sd/warm.log" 2>&1 || die "warm: route execution evidence incomplete"
+  log "    warm OK (setup, auth and route execution verified)"
 }
 
 # ---- env -----------------------------------------------------------------------------

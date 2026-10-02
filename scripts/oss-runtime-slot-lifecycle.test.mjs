@@ -9,6 +9,49 @@ import { fileURLToPath } from 'node:url';
 const gatePath = fileURLToPath(new URL('./oss-e2e-gate-run.sh', import.meta.url));
 const stackPath = fileURLToPath(new URL('./oss-golden-stack.sh', import.meta.url));
 
+for (const scenario of ['passed', 'skip-setup', 'skip-route']) {
+  test(`canonical warm execution audit: ${scenario}`, () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'oss-warm-contract-'));
+    try {
+      mkdirSync(join(fixture, 'web-admin', 'tests', 'storage'), { recursive: true });
+      mkdirSync(join(fixture, 'state'));
+      writeFileSync(join(fixture, 'state', 'ports'), '6473 5173 6173');
+      writeFileSync(join(fixture, 'pnpm'), `#!/usr/bin/env node
+const fs=require('fs'),path=require('path');
+const args=process.argv.slice(2),project=args.find(a=>a.startsWith('--project=')).split('=')[1];
+fs.appendFileSync(path.join(process.env.FIXTURE_ROOT,'calls.jsonl'),JSON.stringify({project,profile:process.env.PW_PROFILE,args})+'\\n');
+const skip=(process.env.SCENARIO==='skip-setup'&&project==='setup')||(process.env.SCENARIO==='skip-route'&&project==='chromium');
+const file=process.env.PLAYWRIGHT_JSON_OUTPUT_FILE;fs.mkdirSync(path.dirname(file),{recursive:true});
+fs.writeFileSync(file,JSON.stringify({suites:[{specs:[{tests:[{expectedStatus:'passed',results:[{status:skip?'skipped':'passed'}]}]}]}],errors:[]}));
+if(project==='auth')fs.writeFileSync('tests/storage/admin.json',JSON.stringify({cookies:[{name:'__session',value:'fixture-cookie'}]}));
+`);
+      chmodSync(join(fixture, 'pnpm'), 0o755);
+      const source = readFileSync(stackPath, 'utf8');
+      const warm = source.slice(source.indexOf('cmd_warm() {'), source.indexOf('# ---- env '));
+      const result = spawnSync('/bin/bash', ['-c', `
+set -euo pipefail
+REPO_ROOT="$FIXTURE_ROOT"
+SCRIPT_DIR="$REAL_SCRIPT_DIR"
+state_dir() { printf '%s/state' "$FIXTURE_ROOT"; }
+runtime_env() { printf '%s/evidence' "$FIXTURE_ROOT"; }
+cmd_env() { printf 'export AURA_EVIDENCE_ROOT=%s/evidence\\n' "$FIXTURE_ROOT"; }
+log() { :; }
+die() { echo "$*" >&2; exit 1; }
+${warm}
+cmd_warm sample
+`], { encoding: 'utf8', env: { ...process.env, FIXTURE_ROOT: fixture, SCENARIO: scenario,
+        REAL_SCRIPT_DIR: fileURLToPath(new URL('./', import.meta.url)), PATH: `${fixture}:${process.env.PATH}` } });
+      const calls = readFileSync(join(fixture, 'calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+      assert.equal(result.status, scenario === 'passed' ? 0 : 1, result.stderr);
+      assert.equal(calls[0].profile, 'oss');
+      assert.equal(calls[0].project, 'setup');
+      assert.equal(calls[0].args.some(arg => arg.startsWith('tests/')), false, 'setup must execute the complete canonical project');
+      assert.equal(calls.length, scenario === 'skip-setup' ? 1 : 3);
+      if (scenario === 'skip-route') assert.match(result.stderr, /route execution evidence incomplete/);
+    } finally { rmSync(fixture, { recursive: true, force: true }); }
+  });
+}
+
 test('capacity refusal exits environment-invalid without teardown of an absent allocation', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'oss-capacity-contract-'));
   try {

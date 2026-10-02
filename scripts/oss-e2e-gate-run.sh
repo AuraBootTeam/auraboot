@@ -213,7 +213,7 @@ echo "=============================================================="
 export AGENT_LLM_STUB_MODE=true
 log "1/4 new verification stack; require an empty isolated database"
 STACK_ATTEMPTED=1
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-empty-db --plugin-profile demo \
+"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-empty-db --no-warm --plugin-profile demo \
   || die_env "stack bring-up failed; inspect $STATE_ROOT/golden/$NAME/"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
@@ -224,6 +224,8 @@ STACK_ATTEMPTED=1
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
   || die_env "test-fixtures import failed — see $STATE_ROOT/golden/$NAME/import.log"
+
+"$GS" warm "$NAME" || die_env "canonical setup/auth/route preconditions failed"
 
 "$GS" verify-artifacts "$NAME" || die_env "runtime identity or import receipts invalid"
 
