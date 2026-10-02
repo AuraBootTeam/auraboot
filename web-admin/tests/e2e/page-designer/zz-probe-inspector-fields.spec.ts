@@ -97,4 +97,23 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
   await page.getByTestId('inspector-selected-id').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
   await page.waitForTimeout(2500);
   await dump('after-reload');
+
+  // Widget-family edit: set model via -manual input + props.value, save again.
+  await page.getByTestId('inspector-field-dataSource.model-manual').fill(`mdl_${uid}`).catch(() => {});
+  const pv = page.getByTestId('inspector-field-props.value');
+  if (await pv.isVisible().catch(() => false)) {
+    await pv.fill('42');
+  }
+  const save2 = page.getByTestId('designer-save');
+  if (await save2.isVisible().catch(() => false)) {
+    await save2.click();
+  } else {
+    await page.getByRole('button', { name: /保存|Save/ }).first().click();
+  }
+  await page.waitForTimeout(2000);
+  const persisted = await page.request.get(`/api/pages/${pid}`);
+  const ptext = await persisted.text();
+  const fs2 = await import('fs');
+  fs2.appendFileSync('/tmp/pd-probe-fields.log', `PERSISTED=${ptext.slice(0, 1200)}\n`);
+  await dump('after-widget-edit');
 });
