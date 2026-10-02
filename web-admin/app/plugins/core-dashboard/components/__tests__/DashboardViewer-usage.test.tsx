@@ -5,7 +5,7 @@ import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryCon
 import type { Widget } from '../../types';
 import { DashboardViewer } from '../DashboardViewer';
 
-vi.mock('react-grid-layout', () => ({
+vi.mock('react-grid-layout/legacy', () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock('../WidgetRenderer', () => ({ renderWidget: () => <Probe /> }));

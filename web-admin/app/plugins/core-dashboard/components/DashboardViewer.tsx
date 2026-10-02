@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useRef, useMemo, useState, useEffect } from 'react';
-import GridLayout from 'react-grid-layout';
+import GridLayout from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { renderWidget } from './WidgetRenderer';
@@ -198,21 +198,19 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
           <DashboardExportExcel widgets={widgets} fileName={title} />
         </div>
       )}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <GridLayout
-        {...({
-          className: 'layout',
-          layout,
-          cols: layoutConfig.columns,
-          rowHeight: layoutConfig.rowHeight,
-          width: containerWidth,
-          margin: [layoutConfig.gap, layoutConfig.gap] as [number, number],
-          containerPadding: [0, 0] as [number, number],
-          isDraggable: false,
-          isResizable: false,
-          compactType: layoutConfig.compactType || 'vertical',
-          useCSSTransforms: true,
-        } as any)}
+        className="layout"
+        layout={layout}
+        cols={layoutConfig.columns}
+        rowHeight={layoutConfig.rowHeight}
+        width={containerWidth}
+        margin={[layoutConfig.gap, layoutConfig.gap]}
+        containerPadding={[0, 0]}
+        isDraggable={false}
+        isResizable={false}
+        resizeHandles={[]}
+        compactType={layoutConfig.compactType ?? 'vertical'}
+        useCSSTransforms
       >
         {widgets.map((widget) => (
           <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
