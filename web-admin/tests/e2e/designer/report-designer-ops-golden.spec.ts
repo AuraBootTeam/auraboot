@@ -133,6 +133,8 @@ test('OPS-02 broken data source surfaces the query alert and recovers after fixi
 
 test('OPS-03 dirty state gates exports with the status banner and failures toast visibly', async ({ page, request }) => {
   await page.goto(`/report-designer/${reportPid}`);
+  // Editing before the persisted document loads would be overwritten by initialization.
+  await expect(page.getByPlaceholder(/^(报表标题|Report Title)$/)).toHaveValue('Ops golden report');
   await page.getByRole('button', { name: /Rich Text|富文本/ }).click();
   const banner = page.locator('#report-export-status');
   await expect(banner).toBeVisible();
