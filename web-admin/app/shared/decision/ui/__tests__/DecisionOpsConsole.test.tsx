@@ -1298,7 +1298,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('dt-in-record_data_wd_req_applicant')).toHaveTextContent('申请人');
   });
 
-  it('keeps scenario outputs when a restored Strategy Studio table has another output contract', async () => {
+  it('preserves published business outputs and rules when saving through Strategy Studio', async () => {
     const listVersions = vi.fn(async (decisionCode: string) => {
       if (decisionCode !== 'leave_request_automation') return [];
       return [
@@ -1337,13 +1337,38 @@ describe('DecisionOpsConsole', () => {
       ];
     });
 
-    renderConsole(undefined, { listVersions } as unknown as Partial<DecisionApi>);
+    const createDraftVersion = vi.fn(async () => ({ pid: 'preserved-draft' }));
+    renderConsole(undefined, {
+      listVersions,
+      createDraftVersion,
+    } as unknown as Partial<DecisionApi>);
     fireEvent.click(screen.getByTestId('strategy-scenario-AUTOMATION'));
 
     await waitFor(() => expect(listVersions).toHaveBeenCalledWith('leave_request_automation'));
-    await waitFor(() => expect(screen.getByTestId('dt-out-route')).toHaveTextContent('Route'));
-    expect(screen.getByTestId('dt-out-actions')).toHaveTextContent('Actions');
-    expect(screen.queryByTestId('dt-out-severity')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-out-severity')).toHaveTextContent('Severity'),
+    );
+    expect(screen.queryByTestId('dt-out-route')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+    await waitFor(() =>
+      expect(createDraftVersion).toHaveBeenCalledWith(
+        'leave_request_automation',
+        expect.objectContaining({
+          contentJson: expect.objectContaining({
+            outputs: expect.arrayContaining([
+              expect.objectContaining({ id: 'severity' }),
+              expect.objectContaining({ id: 'message' }),
+              expect.objectContaining({ id: 'actionType' }),
+            ]),
+            rules: [
+              expect.objectContaining({
+                then: { severity: 'warning', message: 'notify', actionType: 'NOTIFY' },
+              }),
+            ],
+          }),
+        }),
+      ),
+    );
   });
 
   it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {
