@@ -11,10 +11,19 @@ import { selectSavedViewByName, uniqueId } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
 
 import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+import { sweepStaleSavedViews } from './_saved-view-helpers';
 
 // Serialize e2et_order saved-view specs — they share the model's per-user view
 // state (active view / created views) under the shared admin storageState.
-test.beforeAll(async () => { await acquireSavedViewLock('saved-view-management'); });
+test.beforeAll(async ({ browser }) => {
+  await acquireSavedViewLock('saved-view-management');
+  // Sweep leftovers from earlier runs (explicit personal views count
+  // toward the backend's 10-view cap) while holding the file lock.
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  const page = await ctx.newPage();
+  await sweepStaleSavedViews(page, MODEL_CODE, PAGE_KEY);
+  await ctx.close();
+});
 test.afterAll(() => { releaseSavedViewLock('saved-view-management'); });
 
 const MODEL_CODE = 'e2et_order';
@@ -238,10 +247,11 @@ test.describe.serial('SavedView Personal-only management', () => {
     const selector = page.getByRole('listbox', { name: /选择视图|Select View/ });
     await expect(selector).toContainText('个人视图');
     await expect(selector).toContainText(personalName);
-    await expect(selector).not.toContainText(globalName);
-    await expect(selector).not.toContainText(
-      /团队共享|全员视图|Team Views|Global Views|New View|Manage Views/,
-    );
+    // Feishu-style selector redesign: global (全员) views render in their own
+    // labelled group instead of being hidden; team views still never appear.
+    await expect(selector).toContainText('全员视图');
+    await expect(selector).toContainText(globalName);
+    await expect(selector).not.toContainText(/团队共享|Team Views|New View|Manage Views/);
     await page.getByTestId('view-selector-search').fill('选择器');
     await expect(page.getByTestId(`view-option-${personalPid}`)).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/02-personal-selector.png`, fullPage: true });
@@ -252,6 +262,7 @@ test.describe.serial('SavedView Personal-only management', () => {
     await expect(panel).toContainText('管理视图');
     await expect(panel).toContainText('新建个人视图');
     await expect(panel).toContainText(personalName);
+    // The management panel remains personal-only: global views stay out.
     await expect(panel).not.toContainText(globalName);
     await expect(panel).not.toContainText(
       /View Management|New View|Configure|Skip|Done|Team Views|Global Views/,

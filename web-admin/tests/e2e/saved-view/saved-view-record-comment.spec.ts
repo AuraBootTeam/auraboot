@@ -164,9 +164,23 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
       return;
     }
 
+    // The interactive comment endpoint validates mentionUserPids (user pids);
+    // an unknown pid is silently dropped, so resolve the admin pid first.
+    const searchResp = await page.request.get('/api/users/search?keyword=admin');
+    expect(searchResp.ok()).toBeTruthy();
+    const searchBody = await searchResp.json();
+    const users = Array.isArray(searchBody.data)
+      ? searchBody.data
+      : searchBody.data?.records ?? [];
+    const admin = users.find((u: { username?: string; pid?: string }) => u?.username === 'admin');
+    test.skip(!admin?.pid, 'admin user not resolvable via users/search');
+
     const recordPid = records[0].pid;
     const resp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {
-      data: { content: `Hey @admin check this ${uniqueId()}`, mentions: '["admin"]' },
+      data: {
+        content: `Hey @admin check this ${uniqueId()}`,
+        mentionUserPids: [admin.pid],
+      },
     });
     expect(resp.ok()).toBeTruthy();
     const comment = (await resp.json()).data;
