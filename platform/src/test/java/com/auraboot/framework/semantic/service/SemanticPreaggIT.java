@@ -272,12 +272,12 @@ class SemanticPreaggIT {
         var scheduledTask = registered.get(0).getTask();
         Logger serviceLogger = (Logger) LoggerFactory.getLogger(SemanticPreaggService.class);
         ListAppender<ILoggingEvent> observationLog = new ListAppender<>();
-        observationLog.start();
-        serviceLogger.addAppender(observationLog);
         String run = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         insertAliasRow("golden-" + run + "-1");
         AbSemanticPreagg preagg = preaggService.create(
                 "preagg-timer-" + run, modelPid, "alias_count_metric", List.of(), 1);
+        observationLog.start();
+        serviceLogger.addAppender(observationLog);
         try {
             String column = "preagg_golden_alias." + preagg.getMetricCode();
             long before = mvMetricValue(preagg.getMvName(), column);
@@ -332,6 +332,7 @@ class SemanticPreaggIT {
                     System.getenv("AURA_RUNTIME_NAME"), preagg.getPid(), startedAt,
                     Duration.ofNanos(System.nanoTime() - started).toMillis(),
                     before, expected, actual, refreshedAt);
+            assertThat(elapsedMs).isGreaterThanOrEqualTo(120_000L);
             assertThat(actual).isEqualTo(expected);
             assertThat(refreshedAt).isAfter(startedAt);
             assertThat(outcome.status()).isEqualTo(TaskExecutionOutcome.Status.SUCCESS);
