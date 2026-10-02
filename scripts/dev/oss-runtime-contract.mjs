@@ -147,7 +147,9 @@ export async function execute(action, name, { repo, workspace, state, frontend =
     return;
   }
   if (action === 'stop') {
-    const report = show(); const registered = report.processes.map((item) => item.expected.pid);
+    const report = show();
+    if (!report.allocation) throw new Error('Runtime has no registered allocation; process ownership is unavailable');
+    const registered = report.processes.map((item) => item.expected.pid);
     const roots = ['frontend', 'backend'].filter((key) => existsSync(pidFile(key))).map(pid);
     const bound = [report.environment.SERVER_PORT, report.environment.WEB_PORT, report.environment.BFF_PORT].flatMap(listeners);
     const targets = assertOwnedStop({ registered, roots, table: processTable(), listeners: bound, isAlive: alive });

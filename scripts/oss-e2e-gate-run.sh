@@ -132,6 +132,7 @@ done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
 [[ -x "$DEV" ]] || die "workspace public aura CLI not found above $REPO_ROOT"
+[[ "$NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || die "invalid runtime name"
 [[ "$SLOT" =~ ^[0-9]*$ && "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "invalid slot or repeat count"
 [[ -z "$WORKERS" || "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die "invalid worker count"
 
@@ -177,7 +178,14 @@ cleanup() {
   trap - EXIT INT TERM
   if [[ "$STACK_ATTEMPTED" == 1 && "$KEEP" != 1 ]]; then
     log "stopping owned processes; retaining database and evidence (exit rc=$rc)"
-    if "$GS" down "$NAME"; then
+    local allocation
+    allocation="$("$DEV" runtime show "$NAME" --json | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const d=JSON.parse(s);if(d.allocation===null)console.log("absent");else if(d.allocation&&typeof d.allocation==="object")console.log("present");else process.exitCode=1})')" || allocation=unknown
+    if [[ "$allocation" == absent ]]; then
+      log "no allocation registered; startup state and evidence preserved"
+    elif [[ "$allocation" != present ]]; then
+      log "allocation status unavailable; refusing cleanup"
+      [[ "$rc" != 0 ]] || rc=2
+    elif "$GS" down "$NAME"; then
       "$DEV" runtime close "$NAME" || { [[ "$rc" != 0 ]] || rc=2; }
     else
       log "owned stop refused; runtime retained for diagnosis"
