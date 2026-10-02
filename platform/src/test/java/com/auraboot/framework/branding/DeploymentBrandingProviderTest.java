@@ -203,6 +203,8 @@ class DeploymentBrandingProviderTest {
         ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
         ObjectNode onboarding = document.putObject("tenantOnboarding");
         onboarding.put("entityLabel", "学校");
+        onboarding.put("industryCode", "education");
+        onboarding.put("postCreateRedirect", "/xy/setup");
         onboarding.put("selectionTitle", "选择你的开始方式");
         onboarding.put("selectionLead", "创建学校，或使用学校教师码加入已有学校");
         onboarding.put("createTitle", "创建学校");
@@ -225,6 +227,15 @@ class DeploymentBrandingProviderTest {
 
     @Test
     void commercialBrandingRejectsInvalidSchoolOnboarding() throws IOException {
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.put("industryCode", "Education"),
+                "industryCode", "lowercase code");
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.put("postCreateRedirect", "https://other.example.com"),
+                "postCreateRedirect", "same-origin path");
+        assertSchoolOnboardingRejected(
+                onboarding -> onboarding.put("postCreateRedirect", "//other.example.com"),
+                "postCreateRedirect", "same-origin path");
         assertSchoolOnboardingRejected(
                 onboarding -> onboarding.put("unknownField", true),
                 "unsupported fields", "unknownField");
