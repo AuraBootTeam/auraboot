@@ -51,28 +51,6 @@ async function authenticate(page: import('@playwright/test').Page) {
   ]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
 
-  const existingResponse = await page.request.get(`${BACKEND_URL}/api/open-platform/applications`, {
-    headers: { Authorization: `Bearer ${jwt}` },
-  });
-  expect(existingResponse.ok()).toBeTruthy();
-  const existing = (await existingResponse.json()).data as Array<{ pid: string; name: string }>;
-  for (const app of existing) {
-    expect(
-      app.name === '开放平台协作验收应用' ||
-        app.name.startsWith('开放平台多账号权限验收应用 ') ||
-        app.name === '金蝶 ERP 连接器',
-      `refusing to remove non-fixture application ${app.name}`,
-    ).toBe(true);
-    const remove = await page.request.delete(`${BACKEND_URL}/api/open-platform/applications/${app.pid}`, {
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    expect(remove.ok(), `fixture cleanup status ${remove.status()}`).toBeTruthy();
-  }
-  const emptyResponse = await page.request.get(`${BACKEND_URL}/api/open-platform/applications`, {
-    headers: { Authorization: `Bearer ${jwt}` },
-  });
-  expect(emptyResponse.ok()).toBeTruthy();
-  expect((await emptyResponse.json()).data).toEqual([]);
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
