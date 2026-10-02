@@ -428,8 +428,8 @@ ROLE_SEPARATION="$(docker exec "$PG_CONTAINER" psql -U auraboot -d aura_product_
   "SELECT has_schema_privilege('$RUNTIME_DB_ROLE','public','CREATE'), has_schema_privilege('$REGISTRATION_DB_ROLE','public','CREATE'), has_schema_privilege('$PUBLISH_DB_ROLE','public','CREATE'), has_table_privilege('$PUBLISH_DB_ROLE','ab_application','INSERT'), (SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner='$RUNTIME_DB_ROLE')")"
 printf '%s\n' "$ROLE_SEPARATION" >"$ARTIFACTS/logs/publication-role-separation.log"
 [[ "$ROLE_SEPARATION" == 'f|f|t|f|0' ]] || fail 'publication/runtime database authority separation failed'
-mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 2>&1
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$ARTIFACTS/logs/web.log" 2>&1 || fail 'release Web BFF failed to start'
+mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 2>&1
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
 
 env "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts >"$ARTIFACTS/logs/pnpm-install.log" 2>&1 || fatal 'product test dependencies unavailable'
