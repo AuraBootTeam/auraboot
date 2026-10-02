@@ -19,7 +19,9 @@ vi.mock('~/shared/services/permissionService', () => ({
 import { permissionService } from '~/shared/services/permissionService';
 import DataScopeBar from '../DataScopeBar';
 
-function matrix(actions: Array<{ r: string; a: string; granted: boolean; scope?: string }>): PermissionMatrixDTO {
+function matrix(
+  actions: Array<{ r: string; a: string; granted: boolean; scope?: string }>,
+): PermissionMatrixDTO {
   return {
     modules: [
       {
@@ -50,14 +52,20 @@ describe('DataScopeBar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (permissionService.getRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    (permissionService.setRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (permissionService.setRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(
+      undefined,
+    );
   });
 
   it('shows the persisted role default scope when set', async () => {
-    (permissionService.getRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue('dept_and_sub');
+    (permissionService.getRoleDefaultScope as ReturnType<typeof vi.fn>).mockResolvedValue(
+      'dept_and_sub',
+    );
     render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={() => {}} />);
     await waitFor(() =>
-      expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.dept_and_sub'),
+      expect(screen.getByTestId('data-scope-default').textContent).toContain(
+        'admin.permission.scope.dept_and_sub',
+      ),
     );
   });
 
@@ -70,7 +78,9 @@ describe('DataScopeBar', () => {
       />,
     );
     await waitFor(() => expect(permissionService.getRoleDefaultScope).toHaveBeenCalledWith('r1'));
-    expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.self');
+    expect(screen.getByTestId('data-scope-current').textContent).toContain(
+      'admin.permission.scope.self',
+    );
   });
 
   it('shows "mixed" when grants differ and no default is set', async () => {
@@ -85,12 +95,17 @@ describe('DataScopeBar', () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByTestId('data-scope-current').textContent).toContain('admin.permission.scope.mixed'),
+      expect(screen.getByTestId('data-scope-current').textContent).toContain(
+        'admin.permission.scope.mixed',
+      ),
     );
   });
 
   it('persists the chosen tier as the role default and refreshes', async () => {
     const onApplied = vi.fn();
+    vi.mocked(permissionService.getRoleDefaultScope)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('dept');
     render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={onApplied} />);
     await waitFor(() => expect(permissionService.getRoleDefaultScope).toHaveBeenCalledWith('r1'));
 
@@ -98,7 +113,66 @@ describe('DataScopeBar', () => {
     fireEvent.click(screen.getByTestId('data-scope-option-dept'));
     fireEvent.click(screen.getByTestId('data-scope-apply'));
 
-    await waitFor(() => expect(permissionService.setRoleDefaultScope).toHaveBeenCalledWith('r1', 'dept'));
+    await waitFor(() =>
+      expect(permissionService.setRoleDefaultScope).toHaveBeenCalledWith('r1', 'dept'),
+    );
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
+  });
+  it('does not select all implicitly when no grants or default exist', async () => {
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('data-scope-modify-btn')).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId('data-scope-modify-btn'));
+    expect(screen.getByTestId('data-scope-apply')).toBeDisabled();
+    expect(screen.getByTestId('data-scope-option-all')).not.toBeChecked();
+    expect(screen.getByTestId('data-scope-option-team')).toBeTruthy();
+  });
+  it('retains the drawer when server readback differs from the saved scope', async () => {
+    const applied = vi.fn();
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={applied} />);
+    await waitFor(() => expect(screen.getByTestId('data-scope-modify-btn')).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId('data-scope-modify-btn'));
+    fireEvent.click(screen.getByTestId('data-scope-option-team'));
+    fireEvent.click(screen.getByTestId('data-scope-apply'));
+    await waitFor(() => expect(permissionService.getRoleDefaultScope).toHaveBeenCalledTimes(2));
+    expect(applied).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+  it('shows mixed actual scopes even with an all default', async () => {
+    vi.mocked(permissionService.getRoleDefaultScope).mockResolvedValue('all');
+    render(
+      <DataScopeBar
+        rolePid="r1"
+        matrix={matrix([
+          { r: 'a', a: 'read', granted: true, scope: 'self' },
+          { r: 'b', a: 'read', granted: true, scope: 'team' },
+        ])}
+        onScopeApplied={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+        'admin.permission.scope.all',
+      ),
+    );
+    expect(screen.getByTestId('data-scope-current')).toHaveTextContent(
+      'admin.permission.scope.mixed',
+    );
+  });
+  it('shows a failed default read and supports retry without widening scope', async () => {
+    vi.mocked(permissionService.getRoleDefaultScope)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue('team');
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('data-scope-modify-btn')).toBeDisabled());
+    const retry = await screen.findByText('common.retry');
+    expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+      'admin.permission.scope.loadError',
+    );
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+        'admin.permission.scope.team',
+      ),
+    );
   });
 });

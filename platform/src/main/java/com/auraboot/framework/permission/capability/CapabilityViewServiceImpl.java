@@ -9,6 +9,10 @@ import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
+import java.util.LinkedHashSet;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -88,56 +92,85 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     }
 
     @Override
+    public CapabilitySelectionPreview previewCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes) {
+        return previewCapabilitySelection(roleId, selectedCapabilityCodes, Set.of());
+    }
+
+    @Override
+    public CapabilitySelectionPreview previewCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
+                                                                  Set<String> revokedPartialCapabilityCodes) {
+        return calculateSelection(roleId, selectedCapabilityCodes, revokedPartialCapabilityCodes, permissionService.findAllActive());
+    }
+
+    @Override
+    @Transactional
     public void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes) {
-        Long tenantId = MetaContext.getCurrentTenantId();
-        List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
+        applyCapabilitySelection(roleId, selectedCapabilityCodes, Set.of());
+    }
 
-        // Resolve against the full capability set the (now sole) capability view presents — declared
-        // AND convention-derived — so every capability the checklist renders is actually grantable.
-        // The caller sends the role's COMPLETE desired selection, so this is a full-state replace
-        // within the capability universe (codes outside the universe are never touched).
+    @Override
+    @Transactional
+    public void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
+                                         Set<String> revokedPartialCapabilityCodes) {
         List<PermissionDTO> all = permissionService.findAllActive();
-        List<String> allCodes = all.stream().map(PermissionDTO::getCode).filter(Objects::nonNull).toList();
-        Map<String, Set<String>> capabilityCodes = capabilityResolver.capabilityCodeMap(declarations, allCodes);
-
-        Set<String> current = roleCodes(roleId);
-        Set<String> desired = selectedCapabilityCodes == null ? Set.of() : selectedCapabilityCodes.stream()
-                .flatMap(c -> capabilityCodes.getOrDefault(c, Set.of()).stream())
-                .collect(Collectors.toSet());
-
-        // Revoke ONLY within capabilities the role currently holds in FULL (i.e. that render as
-        // granted). A resource the role holds only partially (e.g. just *.read, granted via the raw
-        // matrix) is not a "granted capability", so it stays outside the revoke universe and is never
-        // stripped by a capability save. This is what makes the all-or-nothing convention-derived
-        // capabilities safe to save.
-        Set<String> revokableUniverse = capabilityCodes.values().stream()
-                .filter(current::containsAll)
-                .flatMap(Set::stream)
-                .collect(Collectors.toSet());
-
-        Set<String> toGrant = desired.stream()
-                .filter(c -> !current.contains(c))
-                .collect(Collectors.toSet());
-        Set<String> toRevoke = revokableUniverse.stream()
-                .filter(c -> !desired.contains(c))
-                .collect(Collectors.toSet());
-
+        CapabilitySelectionPreview plan = calculateSelection(roleId, selectedCapabilityCodes, revokedPartialCapabilityCodes, all);
         Map<String, Long> codeToId = all.stream()
                 .filter(p -> p.getCode() != null && p.getId() != null)
                 .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getId, (a, b) -> a));
         Map<String, String> codeToPid = all.stream()
                 .filter(p -> p.getCode() != null && p.getPid() != null)
                 .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getPid, (a, b) -> a));
-
-        List<Long> grantIds = toGrant.stream().map(codeToId::get).filter(Objects::nonNull).toList();
-        List<String> revokePids = toRevoke.stream().map(codeToPid::get).filter(Objects::nonNull).toList();
-
-        if (!grantIds.isEmpty()) {
-            rolePermissionService.assignPermissionsToRole(roleId, grantIds);
+        List<Long> grantIds = plan.grantedCodes().stream().map(codeToId::get).toList();
+        List<String> revokePids = plan.revokedCodes().stream().map(codeToPid::get).toList();
+        if (grantIds.stream().anyMatch(Objects::isNull) || revokePids.stream().anyMatch(Objects::isNull)) {
+            throw new RootUnCheckedException(BadParam, "Capability references unavailable permission identities");
         }
-        if (!revokePids.isEmpty()) {
-            rolePermissionService.removePermissionsFromRoleByPids(roleId, revokePids);
+        if (!grantIds.isEmpty()) rolePermissionService.assignPermissionsToRole(roleId, grantIds);
+        if (!revokePids.isEmpty()) rolePermissionService.removePermissionsFromRoleByPids(roleId, revokePids);
+    }
+
+    private CapabilitySelectionPreview calculateSelection(
+            Long roleId, Set<String> selectedCapabilityCodes, Set<String> revokedPartialCapabilityCodes,
+            List<PermissionDTO> all) {
+        List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(MetaContext.getCurrentTenantId());
+        Map<String, Set<String>> capabilityCodes = new LinkedHashMap<>();
+        declarations.stream().filter(CapabilityDefinitionDTO::isValid)
+                .forEach(d -> capabilityCodes.put(d.getCode(), new LinkedHashSet<>(d.getIncludes())));
+        Set<String> selected = selectedCapabilityCodes == null ? Set.of() : selectedCapabilityCodes;
+        Set<String> explicitRevocations = revokedPartialCapabilityCodes == null ? Set.of() : revokedPartialCapabilityCodes;
+        if (!capabilityCodes.keySet().containsAll(selected) || !capabilityCodes.keySet().containsAll(explicitRevocations)) {
+            throw new RootUnCheckedException(BadParam, "Only declared capabilities can be selected");
         }
+        if (explicitRevocations.stream().anyMatch(selected::contains)) {
+            throw new RootUnCheckedException(BadParam, "A capability cannot be selected and explicitly revoked together");
+        }
+        Set<String> available = all.stream().map(PermissionDTO::getCode).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> current = roleCodes(roleId);
+        Set<String> desired = selected.stream().flatMap(code -> capabilityCodes.get(code).stream()).collect(Collectors.toSet());
+        if (!available.containsAll(desired)) {
+            throw new RootUnCheckedException(BadParam, "Selected capability references unavailable permissions");
+        }
+        // Preserve partial and undeclared grants. Selected bundles retain shared actions.
+        Set<String> revokable = capabilityCodes.values().stream().filter(current::containsAll)
+                .flatMap(Set::stream).collect(Collectors.toSet());
+        explicitRevocations.stream().flatMap(code -> capabilityCodes.get(code).stream())
+                .filter(current::contains).forEach(revokable::add);
+        List<String> grant = desired.stream().filter(code -> !current.contains(code)).sorted().toList();
+        List<String> revoke = revokable.stream().filter(code -> !desired.contains(code)).sorted().toList();
+        Set<String> resulting = new LinkedHashSet<>(current);
+        resulting.removeAll(revoke);
+        resulting.addAll(grant);
+        List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, new ArrayList<>(available), resulting);
+        annotateUnlockedMenus(groups);
+        List<Capability> affected = groups.stream().flatMap(group -> group.getCapabilities().stream())
+                .filter(cap -> !cap.isConventionDerived())
+                .filter(cap -> cap.getIncludes().stream().anyMatch(code -> grant.contains(code) || revoke.contains(code)))
+                .toList();
+        List<String> menus = affected.stream().filter(cap -> cap.getUnlockedMenus() != null)
+                .flatMap(cap -> cap.getUnlockedMenus().stream()).distinct().sorted().toList();
+        return new CapabilitySelectionPreview(grant, revoke,
+                current.stream().filter(code -> !desired.contains(code) && !revoke.contains(code)).sorted().toList(),
+                affected, menus);
     }
 
     private Set<String> roleCodes(Long roleId) {

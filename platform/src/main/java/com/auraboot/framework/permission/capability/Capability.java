@@ -28,6 +28,9 @@ public class Capability {
     private List<String> includes;
     /** True when every code in {@link #includes} is currently granted to the subject. */
     private boolean granted;
+    /** none / partial / full, computed from the role's current atomic grants. */
+    private String authorizationState;
+    private List<String> missingCodes;
     /** True when this capability was auto-derived from code convention rather than declared. */
     private boolean conventionDerived;
     /**

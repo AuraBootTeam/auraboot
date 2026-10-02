@@ -1,8 +1,11 @@
-import { get, put } from '~/shared/services/http-client';
+import { get, put, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type { CapabilityGroup } from './types';
+import type { CapabilityGroup, CapabilitySelectionPreview } from './types';
 
-function unwrap<T>(result: { code: string | number; desc?: string; data: T | null }, errorMsg: string): T {
+function unwrap<T>(
+  result: { code: string | number; desc?: string; data: T | null },
+  errorMsg: string,
+): T {
   if (ResultHelper.isSuccess(result) && result.data !== null) {
     return result.data;
   }
@@ -18,6 +21,12 @@ function unwrap<T>(result: { code: string | number; desc?: string; data: T | nul
 export class CapabilityService {
   private baseUrl = '/api/permission/capabilities';
 
+  private selectionQuery(rolePid: string, revokePartial: string[]): string {
+    const params = new URLSearchParams({ rolePid });
+    revokePartial.forEach((code) => params.append('revokePartial', code));
+    return params.toString();
+  }
+
   async getForRole(rolePid: string, request?: Request): Promise<CapabilityGroup[]> {
     const result = await get<CapabilityGroup[]>(
       `${this.baseUrl}?rolePid=${encodeURIComponent(rolePid)}`,
@@ -28,13 +37,26 @@ export class CapabilityService {
     return unwrap(result, 'Failed to fetch capabilities');
   }
 
+  async previewSelection(
+    rolePid: string,
+    selectedCapabilityCodes: string[],
+    revokePartial: string[] = [],
+  ): Promise<CapabilitySelectionPreview> {
+    const result = await post<CapabilitySelectionPreview>(
+      `${this.baseUrl}/preview?${this.selectionQuery(rolePid, revokePartial)}`,
+      selectedCapabilityCodes,
+    );
+    return unwrap(result, 'Failed to preview permission changes');
+  }
+
   async applySelection(
     rolePid: string,
     selectedCapabilityCodes: string[],
     request?: Request,
+    revokePartial: string[] = [],
   ): Promise<CapabilityGroup[]> {
     const result = await put<CapabilityGroup[]>(
-      `${this.baseUrl}?rolePid=${encodeURIComponent(rolePid)}`,
+      `${this.baseUrl}?${this.selectionQuery(rolePid, revokePartial)}`,
       selectedCapabilityCodes,
       undefined,
       request,

@@ -468,6 +468,8 @@ test('formal approval center: menu, approve with audit fields, reject, search an
 });
 
 test('formal expiry: inclusive validity date, next-day expiration and no resubmission', async ({page},info) => {
+  // Same multi-command journey budget as the formal approval cases in this suite.
+  test.setTimeout(120_000);
   const {quoteId}=await createFormalQuoteFixture(page,`EXPIRY-${Date.now()}`);
   const before=await readDynamicRecord(page,'qo_quote_common',quoteId);
   const tiers=await queryDynamicRecords(page,'qo_price_tier_common',[{fieldName:'qo_pt_quote_id',operator:'EQ',value:quoteId}]);

@@ -9,5 +9,5 @@
   "autoSetFields": {
     "org_dept_code": { "strategy": "auto_generate", "pattern": "DEPT-{yyyyMMdd}-{seq}" }
   },
-  "permissions": ["ORG.hr.manage"]
+  "permissions": ["org.hr.manage"]
 }

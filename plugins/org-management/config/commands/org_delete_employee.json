@@ -4,7 +4,7 @@
   "displayName:en": "Delete Employee",
   "type": "delete",
   "modelCode": "org_employee",
-  "permissions": ["ORG.hr.manage"],
+  "permissions": ["org.hr.manage"],
   "extension": {
     "confirmMessage:zh-CN": "Confirm delete this employee record?",
     "confirmMessage:en": "Confirm delete this employee record?"

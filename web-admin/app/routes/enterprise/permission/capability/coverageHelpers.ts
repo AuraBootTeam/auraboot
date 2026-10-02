@@ -5,8 +5,7 @@ import type { CapabilityGroup } from './types';
  *
  * A code is *covered* when a DECLARED (business-language) capability includes it — editing it should
  * happen through that capability. A code reachable only through a convention-derived (fallback)
- * capability, or through none at all, is *uncovered* — an "exception" grant configured directly in
- * the advanced table (counts toward the role's exception tally for audit).
+ * capability, or through none at all, is *uncovered*. Coverage describes declarations, not the historical source of a grant.
  */
 export interface CodeSource {
   /** True when a declared capability includes this code. */

@@ -46,7 +46,8 @@
     "name:en": "Cloud Service Config",
     "description": "管理对象存储、消息等云服务配置",
     "includes": [
-      "cloud_config_manage"
+      "cloud_config_manage",
+      "sys.cloud_config.update"
     ],
     "tier": "admin",
     "order": 40
@@ -59,7 +60,8 @@
     "name:en": "Notification Rule Management",
     "description": "管理系统通知规则与订阅",
     "includes": [
-      "notification_rule_manage"
+      "notification_rule_manage",
+      "notification.rule.manage"
     ],
     "tier": "admin",
     "order": 50
@@ -85,7 +87,14 @@
     "name:en": "Data Permission Policy",
     "description": "管理行级/字段级数据权限策略",
     "includes": [
-      "admin_data_permission"
+      "admin_data_permission",
+      "meta.permission.read",
+      "meta.permission.update",
+      "model.data_permission.read",
+      "model.data_permission.create",
+      "model.data_permission.update",
+      "model.data_permission.delete",
+      "meta.command.execute"
     ],
     "tier": "admin",
     "order": 70
@@ -99,7 +108,18 @@
     "description": "管理 Webhook 订阅与 API 连接器",
     "includes": [
       "admin_webhook",
-      "admin_api_connector"
+      "admin_api_connector",
+      "sys.webhook.update",
+      "sys.connector.update",
+      "model.webhook.read",
+      "model.api_connector.read",
+      "model.webhook.create",
+      "model.webhook.update",
+      "model.webhook.delete",
+      "model.api_connector.create",
+      "model.api_connector.update",
+      "model.api_connector.delete",
+      "meta.command.execute"
     ],
     "tier": "admin",
     "order": 80
@@ -113,7 +133,9 @@
     "description": "管理插件安装与应用模板市场",
     "includes": [
       "plugin_management",
-      "plugin.plugin.manage"
+      "plugin.plugin.manage",
+      "sys.plugin.read",
+      "sys.plugin.update"
     ],
     "tier": "admin",
     "order": 90
@@ -126,7 +148,13 @@
     "name:en": "Scheduled Task Management",
     "description": "管理系统定时任务",
     "includes": [
-      "admin_scheduled_task"
+      "admin_scheduled_task",
+      "sys.scheduler.update",
+      "model.scheduled_task.read",
+      "model.scheduled_task.create",
+      "model.scheduled_task.update",
+      "model.scheduled_task.delete",
+      "meta.command.execute"
     ],
     "tier": "admin",
     "order": 100

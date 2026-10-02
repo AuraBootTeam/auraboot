@@ -5,12 +5,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-final class PermissionCodeCandidates {
+public final class PermissionCodeCandidates {
 
     private PermissionCodeCandidates() {
     }
 
-    static List<String> forResourceAction(String resource, String action) {
+    public static List<String> forResourceAction(String resource, String action) {
         if (resource == null || resource.isBlank() || action == null || action.isBlank()) {
             return List.of();
         }

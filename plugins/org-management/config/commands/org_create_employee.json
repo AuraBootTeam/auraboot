@@ -10,5 +10,5 @@
     "org_emp_code": { "strategy": "auto_generate", "pattern": "EMP-{yyyyMMdd}-{seq}" },
     "org_emp_status": { "strategy": "fixed_value", "value": "active" }
   },
-  "permissions": ["ORG.hr.manage"]
+  "permissions": ["org.hr.manage"]
 }

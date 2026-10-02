@@ -8,7 +8,21 @@
     "description": "查看与维护组织架构、职位、人员",
     "includes": [
       "org.hr.read",
-      "org.hr.manage"
+      "org.hr.manage",
+      "org_management",
+      "model.org_department.read",
+      "model.org_position.read",
+      "model.org_employee.read",
+      "meta.command.execute",
+      "model.org_department.create",
+      "model.org_department.update",
+      "model.org_department.delete",
+      "model.org_position.create",
+      "model.org_position.update",
+      "model.org_position.delete",
+      "model.org_employee.create",
+      "model.org_employee.update",
+      "model.org_employee.delete"
     ],
     "tier": "editor",
     "order": 10
@@ -21,7 +35,11 @@
     "name:en": "View Organization",
     "description": "只读查看组织架构、职位、人员",
     "includes": [
-      "org.hr.read"
+      "org.hr.read",
+      "org_management",
+      "model.org_department.read",
+      "model.org_position.read",
+      "model.org_employee.read"
     ],
     "tier": "viewer",
     "order": 11
@@ -35,7 +53,14 @@
     "description": "查看与维护团队",
     "includes": [
       "org.team.read",
-      "org.team.manage"
+      "org.team.manage",
+      "org_management",
+      "org_teams",
+      "meta.command.execute",
+      "model.ab_team.read",
+      "model.ab_team.create",
+      "model.ab_team.update",
+      "model.ab_team.delete"
     ],
     "tier": "editor",
     "order": 20
@@ -49,12 +74,15 @@
     "description": "查看、审批、停用、重置租户成员账号",
     "includes": [
       "model.tenant_member.read",
-      "model.tenant_member.approve_member",
-      "model.tenant_member.reject_member",
-      "model.tenant_member.suspend_member",
-      "model.tenant_member.restore_member",
+      "model.tenant_member.approve",
+      "model.tenant_member.reject",
+      "model.tenant_member.suspend",
+      "model.tenant_member.restore",
       "model.tenant_member.reset_member_password",
-      "model.tenant_member.provision_member_from_employee"
+      "model.tenant_member.provision_member_from_employee",
+      "org_management",
+      "member_management",
+      "meta.command.execute"
     ],
     "tier": "editor",
     "order": 30
@@ -67,7 +95,9 @@
     "name:en": "View Members",
     "description": "只读查看租户成员账号",
     "includes": [
-      "model.tenant_member.read"
+      "model.tenant_member.read",
+      "org_management",
+      "member_management"
     ],
     "tier": "viewer",
     "order": 31
@@ -83,7 +113,9 @@
       "org.role.read",
       "org.role.update",
       "org.user_role.read",
-      "org.user_role.update"
+      "org.user_role.update",
+      "org_management",
+      "permission_management"
     ],
     "tier": "editor",
     "order": 40
@@ -97,7 +129,9 @@
     "description": "只读查看角色与授权关系",
     "includes": [
       "org.role.read",
-      "org.user_role.read"
+      "org.user_role.read",
+      "org_management",
+      "permission_management"
     ],
     "tier": "viewer",
     "order": 41
@@ -114,7 +148,9 @@
       "meta.permission.update",
       "meta.permission.manage",
       "meta.menu.read",
-      "meta.menu.update"
+      "meta.menu.update",
+      "org_management",
+      "permission_management"
     ],
     "tier": "editor",
     "order": 50
@@ -129,7 +165,8 @@
     "includes": [
       "org.tenant.read",
       "org.tenant.update",
-      "org.tenant.invite.manage"
+      "org.tenant.invite.manage",
+      "org_management"
     ],
     "tier": "editor",
     "order": 60
