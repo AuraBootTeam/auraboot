@@ -8,17 +8,12 @@
 #   1. brings up a FRESH, slot-isolated host-first stack (zero docker, safe
 #      alongside concurrent sessions, never oss-reset-and-init's global pkill);
 #   2. imports the OSS demo plugins + the internal test-fixtures plugin;
-#   3. runs a meaningful, currently-green Core regression slice under the exact
-#      env contract a real OSS run needs (PW_PROFILE=oss --project=oss);
-#   4. prints a PASS/FAIL banner and EXITS WITH THE GATE RESULT — 0 = green,
-#      nonzero = a real failure. The exit code is the whole point: it is what a
-#      crontab line or a release step checks;
-#   6. tears the stack down on the way out, on success OR failure OR interrupt,
-#      via a trap — a failed gate never leaks a stack.
+#   3. runs the selected OSS project specs with zero retries;
+#   4. exits with the runner result and retains database/artifacts/evidence;
+#   5. stops only registered processes and closes its allocation on exit.
 #
-# The stack is destroyed-then-recreated each run (--fresh-db), so the gate never
-# inherits a stale-slot DB that would skip bootstrap and quietly run against the
-# wrong schema.
+# Every verification uses a new name and an unused slot. Existing environments
+# are rejected rather than reset. --keep leaves the owned processes running.
 #
 # ENV CONTRACT (baked in — an OSS survey documented each of these; getting any
 # one wrong roughly doubles the apparent debt with false failures):
@@ -43,9 +38,9 @@
 #   scripts/oss-e2e-gate-run.sh [--slot N] [--name NAME] [--scope slice|full|<dir>...] [--keep] [--repeat K]
 #     --slot N     isolated-stack slot. Default: auto-pick a free one. Pick one
 #                  no other runtime uses (`../dev.sh runtime list`).
-#     --name NAME  runtime name        (default: oss-e2e-gate)
+#     --name NAME  runtime name        (default: unique oss-e2e-gate timestamp)
 #     --scope V    which specs the gate runs (default: slice):
-#                    slice  the curated, currently-green regression areas
+#                    slice  the fixed regression selection
 #                           (designer + saved-view + showcase + page-designer +
 #                           automation). Bounded and meaningful — the right
 #                           default for a gate.
@@ -54,7 +49,7 @@
 #                    <dir>  one or more explicit tests/e2e/<dir>/ paths — repeat
 #                           --scope, or list them after --scope, to override.
 #     --keep       leave the stack up after the run (to debug a failure). By
-#                  default the stack is ALWAYS torn down, even on failure.
+#                  default owned processes stop; database and evidence remain.
 #     --repeat K   run the slice K times (flakiness check; default: 1)
 #     --workers N  Playwright worker count (default: Playwright's own, PW_WORKERS
 #                  or 4). Heavy-canvas areas (designer/page-designer) need a low
@@ -86,9 +81,11 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
   main_wt="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "${main_wt:-}" ] && [ -f "$(dirname "$main_wt")/dev.sh" ] && WORKSPACE="$(dirname "$main_wt")"
 fi
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
+STATE_ROOT="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
+export AURA_WORKSPACE_ROOT="$WORKSPACE" AURA_WORKSPACE_STATE_DIR="$STATE_ROOT"
 
-NAME="oss-e2e-gate"
+NAME="oss-e2e-gate-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 SLOT=""            # empty => auto-pick
 SCOPE_MODE="slice"
 SCOPE_DIRS=()      # explicit override paths
@@ -96,15 +93,8 @@ KEEP=0
 REPEAT=1
 WORKERS=""         # empty => Playwright base default (PW_WORKERS||4)
 
-# The curated, currently-green regression areas. These are the areas the recent
-# OSS E2E survey work hardened; `slice` runs them minus their *-deep specs (which
-# the `oss` project routes to `oss-deep`, kept out of the gate to stay bounded).
+# Fixed default selection; each run supplies its own execution evidence.
 SLICE_DIRS=(
-  # Curated, deterministically-green specs the recent OSS E2E survey work verified
-  # (each confirmed green across multiple runs this session). The gate stays SMALL and
-  # reliable on purpose — a born-red gate protects nothing. Broaden with
-  # `--scope <dir>...` (see --help); broad areas carry known-flaky / vertical-excluded
-  # specs and are NOT a clean gate.
   tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts
   tests/e2e/showcase/runtime-rendering-e2e.spec.ts
   tests/e2e/saved-view/saved-view-gantt.spec.ts
@@ -141,7 +131,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -x "$GS" ]] || die "oss-golden-stack.sh not found/executable at $GS"
-[[ -f "$DEV" ]] || die "workspace dev.sh not found above $REPO_ROOT"
+[[ -x "$DEV" ]] || die "workspace public aura CLI not found above $REPO_ROOT"
+[[ "$SLOT" =~ ^[0-9]*$ && "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "invalid slot or repeat count"
+[[ -z "$WORKERS" || "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die "invalid worker count"
 
 # --- resolve the spec paths the gate will run --------------------------------
 RUN_PATHS=()
@@ -169,37 +161,36 @@ registered_slot_for_name() {
   "$DEV" runtime list 2>/dev/null | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
 }
 registered_slot="$(registered_slot_for_name)"
+[[ -z "$registered_slot" ]] || die "runtime '$NAME' already exists; choose a new verification name (existing data preserved)"
 if [[ -z "$SLOT" ]]; then
-  if [[ -n "$registered_slot" ]]; then
-    SLOT="$registered_slot"
-    log "reusing prior slot $SLOT for runtime name '$NAME' before the fresh rebuild"
-  else
-    for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
-      if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
-    done
-  fi
-  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot in 73..97 — pass --slot N explicitly"
-  [[ -n "$registered_slot" ]] || log "auto-picked free slot $SLOT"
-elif [[ -n "$registered_slot" && "$registered_slot" != "$SLOT" ]]; then
-  die "runtime '$NAME' is registered on slot $registered_slot, not requested slot $SLOT"
-elif [[ -n "$registered_slot" ]]; then
-  log "reusing requested slot $SLOT owned by runtime name '$NAME' before the fresh rebuild"
+  for cand in $(seq 73 249); do
+    if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
+  done
+  [[ -n "$SLOT" ]] || die "could not auto-pick a free slot; pass --slot N"
 elif slot_in_use "$SLOT"; then
-  die "slot $SLOT is already in use (a runtime claims it, or a port is bound) — pick another with --slot"
+  die "slot $SLOT is already in use; choose an unused slot"
 fi
 
-# --- teardown trap: destroy on EXIT (success | failure | interrupt) ----------
+STACK_ATTEMPTED=0
 cleanup() {
   local rc=$?
-  if [[ "$KEEP" == 1 ]]; then
-    log "--keep set; leaving stack '$NAME' up (env: $GS env $NAME; destroy: $GS destroy $NAME)"
-  else
-    log "tearing down stack '$NAME' (trap on exit rc=$rc)..."
-    "$GS" destroy "$NAME" >/dev/null 2>&1 || true
+  trap - EXIT INT TERM
+  if [[ "$STACK_ATTEMPTED" == 1 && "$KEEP" != 1 ]]; then
+    log "stopping owned processes; retaining database and evidence (exit rc=$rc)"
+    if "$GS" down "$NAME"; then
+      "$DEV" runtime close "$NAME" || { [[ "$rc" != 0 ]] || rc=2; }
+    else
+      log "owned stop refused; runtime retained for diagnosis"
+      [[ "$rc" != 0 ]] || rc=2
+    fi
+  elif [[ "$KEEP" == 1 ]]; then
+    log "--keep: stack '$NAME' remains available; database and evidence retained"
   fi
-  return "$rc"
+  exit "$rc"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 LOG="/tmp/oss-e2e-gate-${NAME}-$(date +%Y%m%d-%H%M%S).log"
 echo "=============================================================="
@@ -212,14 +203,10 @@ echo "=============================================================="
 # Backend-side contract set BEFORE the stack starts: exported here so it is plain
 # that the backend booted with it, not asserted after the fact.
 export AGENT_LLM_STUB_MODE=true
-log "1/4 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile demo"
-"$GS" destroy "$NAME" >/dev/null 2>&1 || true
-# --fresh-db => destroy-then-recreate the slot DB, guaranteeing a fresh bootstrap.
-# Default `up` runs the warm step (setup -> auth storageState -> pre-warm), which
-# is what produces tests/storage/admin.json — both the seed and the `oss` project
-# need that storageState, so warm is required here (do NOT pass --no-warm).
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
-  || die_env "stack bring-up failed — see the golden-stack logs under $WORKSPACE/.workspace/golden/$NAME/"
+log "1/4 new verification stack; require an empty isolated database"
+STACK_ATTEMPTED=1
+"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --require-empty-db --plugin-profile demo \
+  || die_env "stack bring-up failed; inspect $STATE_ROOT/golden/$NAME/"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
 # specs (incl. saved-view / automation) reference e2et_* models. Import it
@@ -228,7 +215,9 @@ log "1/4 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile
 # PW_PROFILE=oss auto-import — we do it here, deterministically.)
 log "1b/4 import internal test-fixtures plugin (e2et_* models)"
 "$GS" import "$NAME" --plugin-profile none --plugin test-fixtures \
-  || die_env "test-fixtures import failed — see $WORKSPACE/.workspace/golden/$NAME/import.log"
+  || die_env "test-fixtures import failed — see $STATE_ROOT/golden/$NAME/import.log"
+
+"$GS" verify-artifacts "$NAME" || die_env "runtime identity or import receipts invalid"
 
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/4 resolve stack env"
@@ -243,18 +232,22 @@ log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM
 # --- 3. run the gate slice under the OSS env contract ------------------------
 log "3/4 run gate: PW_PROFILE=oss --project=oss --no-deps (x$REPEAT)"
 cd "$REPO_ROOT/web-admin" || die_env "web-admin not found under $REPO_ROOT"
-PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --reporter=line)
+mkdir -p "$AURA_EVIDENCE_ROOT/playwright/report"
+export PLAYWRIGHT_JSON_OUTPUT_FILE="$AURA_EVIDENCE_ROOT/playwright/report/results.json"
+PW_ARGS=(--project=oss --no-deps --repeat-each="$REPEAT" --retries=0 --reporter=line,json)
 [[ -n "$WORKERS" ]] && PW_ARGS+=(--workers="$WORKERS")
 [[ ${#RUN_PATHS[@]} -gt 0 ]] && PW_ARGS+=("${RUN_PATHS[@]}")
 set +e
 PW_PROFILE=oss NO_PROXY=localhost,127.0.0.1 \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee "$LOG"
 GATE_RC=${PIPESTATUS[0]}
-set -e 2>/dev/null || true
+if [[ "$GATE_RC" == 0 ]]; then
+  node "$SCRIPT_DIR/dev/oss-gate-results.mjs" "$PLAYWRIGHT_JSON_OUTPUT_FILE" || GATE_RC=1
+fi
 
 # --- 4. report + exit = gate result ------------------------------------------
 log "4/4 result"
-# Informational counts parsed from the reporter line. The AUTHORITATIVE signal is
+# Informational counts parsed from the reporter line. The runner and structured execution audit determine the result. The runner signal is
 # GATE_RC (the process exit code), never the parsed text — a tee pipeline's own
 # exit code would lie, which is why GATE_RC comes from PIPESTATUS above.
 SUMMARY="$(grep -aoE '[0-9]+ (passed|failed|flaky|skipped|did not run)' "$LOG" 2>/dev/null | tail -6 | tr '\n' ' ')"

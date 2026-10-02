@@ -64,7 +64,12 @@ if [ ! -f "$WORKSPACE/dev.sh" ]; then
 fi
 [ -f "$WORKSPACE/dev.sh" ] || { echo "FATAL: cannot find workspace dev.sh for $REPO_ROOT"; exit 1; }
 CANONICAL="$WORKSPACE/auraboot"                      # canonical OSS checkout (for gradle wrapper / node_modules seed)
-DEV="$WORKSPACE/dev.sh"
+DEV="$WORKSPACE/aura"
+[ -x "$DEV" ] || { echo "FATAL: canonical workspace aura CLI is required" >&2; exit 1; }
+STATE_ROOT="${AURA_WORKSPACE_STATE_DIR:-$WORKSPACE/.workspace}"
+export AURA_WORKSPACE_STATE_DIR="$STATE_ROOT" AURA_WORKSPACE_ROOT="$WORKSPACE"
+export AURA_OSS_CONTRACT_REPO="$REPO_ROOT"
+runtime_contract() { node "$SCRIPT_DIR/dev/oss-runtime-contract.mjs" "$@"; }
 
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
@@ -109,11 +114,11 @@ acquire_stack_lock() {
   trap release_stack_lock EXIT
 }
 
-state_dir() { echo "$WORKSPACE/.workspace/golden/$1"; }
+state_dir() { echo "$STATE_ROOT/golden/$1"; }
 
 # Read a key from the runtime env file.
 runtime_env() {
-  local name="$1" key="$2" f="$WORKSPACE/.workspace/env/$1.env"
+  local name="$1" key="$2" f="$STATE_ROOT/env/$1.env"
   [ -f "$f" ] || die "runtime env not found: $f (run 'up' first / check the name)"
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
@@ -297,7 +302,7 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
+  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0 require_empty_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local extra_root migration_root plugin_item
   while [ $# -gt 0 ]; do case "$1" in
@@ -307,6 +312,7 @@ cmd_up() {
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
+    --require-empty-db) require_empty_db=1; shift;;
     --product-migration-root)
       [ -d "$2" ] || die "product migration root does not exist: $2"
       product_migration_roots+=("$(cd "$2" && pwd)")
@@ -350,6 +356,12 @@ cmd_up() {
 
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
+  for recorded_pid in "$sd/backend.pid" "$sd/frontend.pid"; do
+    if [ -f "$recorded_pid" ] && kill -0 "$(cat "$recorded_pid")" 2>/dev/null; then
+      die "recorded runtime process is alive; use verify-artifacts or down before up"
+    fi
+  done
+
   acquire_stack_lock
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
@@ -375,6 +387,16 @@ cmd_up() {
       "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
     fi
   fi
+  local source_args=(--source "workspace=$WORKSPACE" --source "auraboot=$REPO_ROOT")
+  local source_index=0
+  for extra_root in "${extra_plugin_roots[@]}"; do
+    source_args+=(--source "plugin-$source_index=$extra_root"); source_index=$((source_index + 1))
+  done
+  for migration_root in "${product_migration_roots[@]}"; do
+    source_args+=(--source "migration-$source_index=$migration_root"); source_index=$((source_index + 1))
+  done
+  "$DEV" runtime migrate "$name" "${source_args[@]}" >"$sd/source-freeze.log" \
+    || die "source freeze failed; verification source changes require a new allocation"
   "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
@@ -391,6 +413,15 @@ cmd_up() {
   # Persist PG coordinates so 'env' can export PG* for the Playwright setup
   # project (00-bootstrap verifies the isolated DB via node-postgres / PG* vars).
   printf '%s\n' "$pg_host $pg_port $pg_user $pg_db $pg_pass" >"$sd/pgenv"
+
+  chmod 600 "$sd/pgenv"
+  if [ "$require_empty_db" = "1" ]; then
+    local table_count
+    table_count="$(PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")" \
+      || die "could not establish database emptiness"
+    [ "$table_count" = "0" ] || die "verification requires an empty database; existing data preserved"
+    [ "$fresh_db" = "0" ] || die "empty-database verification cannot request destructive reset"
+  fi
 
   log "2/9 apply schema to $pg_db"
   # `dev.sh infra ensure` reuses an existing database for the slot, which may have been
@@ -470,13 +501,13 @@ cmd_up() {
     cp "$CANONICAL/platform/gradlew" "$REPO_ROOT/platform/gradlew" 2>/dev/null && chmod +x "$REPO_ROOT/platform/gradlew" || true
   fi
 
-  log "4/9 build bootJar (default ~/.gradle for plugin/mirror resolution; --no-daemon)"
+  log "4/9 build bootJar using the managed runtime Gradle wrapper/cache"
   # --no-build-cache: a golden stack must produce a correct, reproducible jar. The
   # shared local Gradle build cache can hand a fresh worktree a corrupt :compileJava
   # entry (observed 2026-07-23: MqProvider.class/MqMessageHandler.class missing from
   # the cached output → platform-mq-kafka fails to resolve them, masked by UP-TO-DATE),
   # so bypass it here rather than trust a cross-worktree cache for a release build.
-  ( cd "$REPO_ROOT/platform" && ./gradlew --no-daemon --no-build-cache :bootJar -x test --console=plain ) >"$sd/bootjar.log" 2>&1 \
+  "$DEV" gradle "$name" --project "$REPO_ROOT/platform" -- --no-build-cache :bootJar -x test --console=plain >"$sd/bootjar.log" 2>&1 \
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
@@ -484,8 +515,9 @@ cmd_up() {
   # path for its whole lifetime, and a build that rewrites build/libs mid-boot (CI suite,
   # second 'up' that lost the lock race on an older checkout) kills the process. The
   # golden-stack lock above only covers cooperating golden-stack runs.
-  local run_jar="$sd/boot-run.jar"
-  cp "$jar" "$run_jar"
+  "$DEV" runtime artifact stage "$name" --key backend --source auraboot --file "$jar" >"$sd/artifact-stage.log"
+  local run_jar; run_jar="$("$DEV" runtime artifact path "$name" backend)"
+  AURA_OSS_FRONTEND="$frontend" runtime_contract capture "$name"
 
   local staging_args=(--profile "${plugin_profile:-none}")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
@@ -531,6 +563,7 @@ cmd_up() {
     die "port $server_port is served by a foreign process ($(lsof -ti ":$server_port" 2>/dev/null | head -1)), not our backend pid $own_pid — pick another slot; see $sd/backend.log"
   fi
   log "    backend UP (pid $own_pid, port ownership verified)"
+  runtime_contract register-backend "$name"
 
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
   if ! curl --noproxy '*' -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then
@@ -611,6 +644,7 @@ cmd_up() {
     local code; code="$(curl --noproxy '*' -s -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$vite_port/" 2>/dev/null || true)"
     case "$code" in ""|000) die "Vite did not come up on $vite_port — see $sd/frontend.log";; esac
     log "    frontend UP (supervisor pid $(cat "$sd/frontend.pid"), vite http=$code)"
+    runtime_contract register "$name"
   else
     log "7/9 frontend: skipped (--no-frontend)"
   fi
@@ -624,6 +658,8 @@ cmd_up() {
     log "8/9 warm: skipped (--no-frontend)"
   fi
 
+  runtime_contract verify "$name" >"$sd/verify-artifacts.log" \
+    || die "product artifact verification failed — see $sd/verify-artifacts.log"
   log "9/9 ready ✓"
   echo
   cmd_env "$name"
@@ -710,6 +746,9 @@ cmd_import() {
     export PG_PASSWORD="$PGPASSWORD"
     "$SCRIPT_DIR/import-plugins.sh" "${args[@]}"
   ) >"$sd/import.log" 2>&1 || die "plugin import failed — see $sd/import.log"
+  local import_contract_args
+  import_contract_args="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' -- "${args[@]}")"
+  AURA_OSS_IMPORT_ARGS="$import_contract_args" runtime_contract record-import "$name"
   log "    plugin import OK — see $sd/import.log"
 }
 
@@ -732,46 +771,26 @@ cmd_warm() {
   local env_exports; env_exports="$(cmd_env "$name")"
 
   # 1) setup project — creates business space + multi-role users (idempotent).
-  local i=0 setup_ok=0
-  while [ "$i" -lt 5 ]; do
-    i=$((i+1))
-    log "    warm[setup] attempt $i/5"
-    if ( cd "$fe" && eval "$env_exports" \
-         && npx playwright test --project=setup --no-deps \
-              tests/api/setup/00-bootstrap.spec.ts \
-              tests/api/setup/01-multi-role-users.spec.ts \
-              --reporter=line ) >>"$sd/warm.log" 2>&1; then
-      setup_ok=1; break
-    fi
-    sleep 3
-  done
-  [ "$setup_ok" -eq 1 ] || die "warm: setup project failed after 5 attempts — see $sd/warm.log"
+  log "    warm[setup] running once without retries"
+  ( cd "$fe" && eval "$env_exports" \
+    && pnpm exec playwright test --project=setup --no-deps --retries=0 \
+      tests/api/setup/00-bootstrap.spec.ts tests/api/setup/01-multi-role-users.spec.ts \
+      --reporter=line ) >>"$sd/warm.log" 2>&1 \
+    || die "warm: setup failed; see $sd/warm.log"
 
-  # 2) auth project — produces tests/storage/admin.json (storageState).
-  i=0
-  rm -f "$admin_json" 2>/dev/null || true
-  while [ "$i" -lt 5 ]; do
-    i=$((i+1))
-    log "    warm[auth] attempt $i/5"
-    ( cd "$fe" && eval "$env_exports" \
-        && npx playwright test --project=auth --no-deps \
-             --reporter=line ) >>"$sd/warm.log" 2>&1 || true
-    # Require a NON-EMPTY admin.json with a __session cookie (empty {cookies:[]}
-    # means login failed — never accept that as ready).
-    if [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; then
-      log "    warm[auth] admin.json ready (has __session)"
-      break
-    fi
-    sleep 3
-  done
-  if ! { [ -s "$admin_json" ] && grep -q '__session' "$admin_json" 2>/dev/null; }; then
-    die "warm: admin.json never got a working session after 5 attempts — see $sd/warm.log"
-  fi
+  # Require both the successful auth process and a non-empty session cookie.
+  rm -f "$admin_json"
+  ( cd "$fe" && eval "$env_exports" \
+    && pnpm exec playwright test --project=auth --no-deps --retries=0 \
+      --reporter=line ) >>"$sd/warm.log" 2>&1 \
+    || die "warm: auth failed; see $sd/warm.log"
+  node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1])); if(!s.cookies?.some(c=>c.name==="__session" && c.value)) process.exit(1)' "$admin_json" \
+    || die "warm: auth produced no session cookie; see $sd/warm.log"
 
   # 3) pre-warm the heavy lazy routes with a real authenticated headless nav.
   log "    warm[routes] navigating /report-designer + /dashboard (real auth)"
   if ( cd "$fe" && eval "$env_exports" \
-       && npx playwright test --project=chromium --no-deps \
+       && pnpm exec playwright test --project=chromium --no-deps --retries=0 \
             tests/e2e/_golden-stack-warm.spec.ts \
             --reporter=line ) >>"$sd/warm.log" 2>&1; then
     log "    warm[routes] heavy routes hot ✓"
@@ -839,85 +858,21 @@ cmd_status() {
   echo "backend($server_port)=$be  vite($vite_port)=$vi  bff=$bff_port"
 }
 
-# Recursively SIGKILL a PID and ALL its descendants (post-order: leaves first).
-# The frontend tree is pnpm dev:full → sh -c → concurrently → {vite, bff}; a plain
-# `pkill -P` only reaps direct children and orphans vite/bff (which keep their
-# listeners and break the next 'up' with EADDRINUSE). SIGKILL (not SIGTERM) is
-# required because `concurrently --restart-tries 20` traps SIGTERM and respawns
-# its children; -9 stops it dead.
-kill_tree() {
-  local pid="$1" child sig="${2:-KILL}"
-  for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child" "$sig"; done
-  kill -"$sig" "$pid" 2>/dev/null || true
-}
-
-# SIGKILL the process listening on $1 AND its ancestor chain UP TO the
-# `concurrently` supervisor (matched by command line), so the restart-loop leader
-# dies too. Scoped to a single exact port → never touches another slot's stack.
-kill_listener_supervisor() {
-  local port="$1" pid ppid cmd
-  for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true); do
-    [ -n "$pid" ] || continue
-    # Walk up to (and including) the concurrently restart-loop leader, then kill
-    # that whole subtree. If the tree has already detached/reparented, keep the
-    # highest repo/frontend-related ancestor as the kill target.
-    local cur="$pid" sup="$pid" i=0
-    while [ "$i" -lt 12 ]; do
-      cmd="$(ps -o command= -p "$cur" 2>/dev/null || true)"
-      case "$cmd" in
-        *concurrently*) sup="$cur"; break;;
-        *"$REPO_ROOT/web-admin"*|*"pnpm dev:"*) sup="$cur";;
-      esac
-      ppid="$(ps -o ppid= -p "$cur" 2>/dev/null | tr -d ' ')"
-      [ -n "$ppid" ] && [ "$ppid" != "1" ] && [ "$ppid" != "0" ] || break
-      cur="$ppid"; i=$((i+1))
-    done
-    kill_tree "$sup"
-    kill_tree "$pid"
-  done
-}
-
 # ---- down (stop processes, keep runtime/DB) ------------------------------------------
 cmd_down() {
   local name="$1" sd; sd="$(state_dir "$name")"
   [ -d "$sd" ] || { echo "no stack for '$name'"; return 0; }
-  # Kill recorded supervisor trees before relying on port listeners; pnpm/concurrently
-  # can otherwise respawn vite/bff while the shutdown is in progress.
-  if [ -f "$sd/frontend.pid" ]; then local fp; fp="$(cat "$sd/frontend.pid")"; kill_tree "$fp"; fi
-  if [ -f "$sd/backend.pid" ]; then kill_tree "$(cat "$sd/backend.pid")"; fi
-  sleep 2
-  # Belt: kill anything still bound to THIS runtime's exact ports only (never a
-  # shared/other-slot port). For the frontend ports, walk up to the concurrently
-  # restart-loop leader and SIGKILL its subtree — killing just the listener lets
-  # `--restart-tries` respawn it. Retry a few times to absorb a mid-restart race.
-  if [ -f "$sd/ports" ]; then
-    read -r server_port vite_port bff_port <"$sd/ports"
-    local attempt
-    for attempt in 1 2 3 4; do
-      local any=0
-      # frontend ports: kill the supervisor subtree behind the listener
-      for p in "$vite_port" "$bff_port"; do
-        local pid; pid="$(lsof -nP -iTCP:"$p" -sTCP:LISTEN -t 2>/dev/null || true)"
-        if [ -n "$pid" ]; then any=1; kill_listener_supervisor "$p"; log "killed frontend supervisor on $p (attempt $attempt)"; fi
-      done
-      # backend port: a plain SIGKILL of the listener is enough (no restart loop)
-      local bpid; bpid="$(lsof -nP -iTCP:"$server_port" -sTCP:LISTEN -t 2>/dev/null || true)"
-      if [ -n "$bpid" ]; then any=1; kill -9 $bpid 2>/dev/null && log "killed straggler on $server_port (attempt $attempt)" || true; fi
-      [ "$any" -eq 0 ] && break
-      sleep 1
-    done
-  fi
-  rm -f "$sd/backend.pid" "$sd/frontend.pid"
-  log "stopped '$name' processes (runtime/DB kept; 'destroy' to remove)"
+  runtime_contract stop "$name" || die "owned stop refused; foreign processes and evidence preserved"
+  log "stopped '$name' registered processes (runtime/DB/evidence retained)"
 }
 
 # ---- destroy (down + infra cleanup + runtime destroy) --------------------------------
 cmd_destroy() {
   local name="$1"
-  cmd_down "$name" || true
+  cmd_down "$name" || return 1
   log "infra cleanup + runtime destroy '$name'"
-  "$DEV" infra cleanup "$name" --yes >/dev/null 2>&1 || true
-  "$DEV" runtime destroy "$name" --yes >/dev/null 2>&1 || true
+  "$DEV" infra cleanup "$name" --yes || return 1
+  "$DEV" runtime destroy "$name" --yes || return 1
   rm -rf "$(state_dir "$name")"
   # remove the node_modules symlink we created (gitignored, but keep the worktree clean)
   [ -L "$REPO_ROOT/web-admin/node_modules" ] && rm -f "$REPO_ROOT/web-admin/node_modules" || true
@@ -933,7 +888,8 @@ case "$sub" in
   warm) cmd_warm "$name";;
   env) cmd_env "$name";;
   status) cmd_status "$name";;
+  verify-artifacts) runtime_contract verify "$name";;
   down) cmd_down "$name";;
   destroy) cmd_destroy "$name";;
-  *) die "unknown subcommand: $sub (up|import|warm|env|status|down|destroy)";;
+  *) die "unknown subcommand: $sub (up|import|warm|env|status|verify-artifacts|down|destroy)";;
 esac
