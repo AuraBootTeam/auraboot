@@ -78,11 +78,8 @@ public class MybatisPlusConfig {
         // W2b pending — RBAC pair (highest fan-out: explicit-param style spreads context-less
         // callers across initializers/listeners/caches; needs a dedicated census)
         "ab_user_role",                     // login + auth-filter role load pass tenantId explicitly
-        "ab_role",                          // login + initializers pass tenantId explicitly
+        "ab_role"                           // login + initializers pass tenantId explicitly
         // W3 pending — scheduler/worker/async executors without MetaContext
-        "ab_outbox",                        // outbox processor runs without tenant context
-        "ab_notification_digest",           // scheduler flushes without tenant context
-        "ab_automation"                     // scheduler scans across all tenants every 60s/300s
     );
 
     /**

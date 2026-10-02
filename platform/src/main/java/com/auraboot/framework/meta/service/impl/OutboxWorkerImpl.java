@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.IntegrationBackoffPolicy;
 import com.auraboot.framework.integration.ReliableEventConsumerRegistry;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
@@ -60,8 +61,13 @@ public class OutboxWorkerImpl {
      */
     public void pollAndDispatch() {
         String leaseToken = UUID.randomUUID().toString();
-        List<OutboxEvent> events = outboxEventMapper.claimReadyEvents(
-                BATCH_SIZE, LEASE_OWNER, leaseToken, Instant.now().plus(LEASE_DURATION));
+        // Scope only the worker's own outbox-plane reads/writes; the consumer
+        // dispatch below must keep running exactly as today (unscoped), so
+        // downstream business queries keep their fail-closed semantics
+        // (tenant-exemption cleanup W3e).
+        List<OutboxEvent> events = MetaContext.runWithoutTenantFilter(
+                () -> outboxEventMapper.claimReadyEvents(
+                        BATCH_SIZE, LEASE_OWNER, leaseToken, Instant.now().plus(LEASE_DURATION)));
         if (events.isEmpty()) {
             return;
         }
@@ -76,13 +82,14 @@ public class OutboxWorkerImpl {
                 } else {
                     dispatchReliable(event, leaseToken);
                 }
-                if (!stateService.markDelivered(event, leaseToken)) {
+                if (!MetaContext.runWithoutTenantFilter(() -> stateService.markDelivered(event, leaseToken))) {
                     log.warn("Outbox event {} finished after its lease fence was lost", event.getEventId());
                 }
             } catch (Exception e) {
                 Instant nextRetry = Instant.now().plus(BACKOFF.delayForRetry(event.getRetryCount()));
                 String errorMsg = truncateError(e.getMessage());
-                stateService.recordFailure(event, leaseToken, nextRetry, errorMsg);
+                MetaContext.runWithoutTenantFilter(
+                        () -> stateService.recordFailure(event, leaseToken, nextRetry, errorMsg));
 
                 if (event.getRetryCount() + 1 >= event.getMaxRetries()) {
                     log.error("Outbox event {} exceeded max retries and entered the DLQ. " +
@@ -136,7 +143,7 @@ public class OutboxWorkerImpl {
      */
     public void cleanupDelivered() {
         Instant before = Instant.now().minus(CLEANUP_RETENTION);
-        int deleted = outboxEventMapper.cleanupDelivered(before);
+        int deleted = MetaContext.runWithoutTenantFilter(() -> outboxEventMapper.cleanupDelivered(before));
         if (deleted > 0) {
             log.info("Outbox cleanup: removed {} delivered events older than {} days",
                     deleted, CLEANUP_RETENTION.toDays());
@@ -145,7 +152,7 @@ public class OutboxWorkerImpl {
 
     /** Recover expired leases and materialize any missing terminal DLQ rows. */
     public ReliableIntegrationStateService.ReconcileResult reconcile() {
-        return stateService.reconcile(Instant.now());
+        return MetaContext.runWithoutTenantFilter(() -> stateService.reconcile(Instant.now()));
     }
 
     /** Explicit operator-owned replay; never called automatically for poison events. */
@@ -153,7 +160,7 @@ public class OutboxWorkerImpl {
         if (replayedBy == null || replayedBy.isBlank()) {
             throw new IllegalArgumentException("replayedBy must not be blank");
         }
-        return stateService.replay(outboxId, replayedBy);
+        return MetaContext.runWithoutTenantFilter(() -> stateService.replay(outboxId, replayedBy));
     }
 
     private Object deserializeEvent(OutboxEvent outboxEvent) {

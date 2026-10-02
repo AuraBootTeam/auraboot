@@ -395,9 +395,7 @@ public class MybatisPlusConfigTest {
         // propagates tenant); the still-pending scheduler tables remain exempt
         // until their worker seams migrate.
         String[] schedulerTables = {
-                "ab_outbox",
-                "ab_automation",
-                "ab_notification_digest"
+
         };
 
         MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null, envMock);

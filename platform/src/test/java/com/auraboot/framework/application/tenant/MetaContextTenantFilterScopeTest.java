@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 34 = post-W2a peak.
-            assertEquals(6, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W2a-c removed invitation + the IdP/login-channel family (pre-auth lookups scoped by explicit args); update this ledger per wave");
+            assertEquals(3, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W3e removed ab_outbox; W3d-followup removed ab_automation/ab_notification_digest (scan rows were already scoped in W3d — entries were missed then); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -187,6 +187,13 @@ class MetaContextTenantFilterScopeTest {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
             }
+        }
+
+        @Test
+        void abOutboxIsNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            assertFalse(handler.ignoreTable("ab_outbox"),
+                    "W3e removed this exemption; only the worker's own plane is scoped, dispatch stays unscoped");
         }
 
         @Test
