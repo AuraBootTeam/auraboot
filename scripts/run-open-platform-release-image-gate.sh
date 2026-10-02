@@ -66,12 +66,14 @@ cleanup() {
   if docker inspect "$APP" >/dev/null 2>&1; then
     docker logs "$APP" > "$ARTIFACTS/logs/app.log" 2>&1 || true
   fi
-  docker rm -f "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
-  docker network rm "$NET" >/dev/null 2>&1 || true
+  # Verification environments require owner-authorized deletion. Stop only this
+  # job's containers and retain their network, data and image for inspection.
+  docker stop "$APP" "$REDIS" "$PG" >/dev/null 2>&1 || true
+  printf 'retained verification environment: app=%s postgres=%s redis=%s network=%s image=%s\n' \
+    "$APP" "$PG" "$REDIS" "$NET" "$IMAGE" > "$ARTIFACTS/retained-environment.txt"
   if [[ -d "$LOCK_DIR" && "$(cat "$LOCK_DIR/owner" 2>/dev/null || true)" == "$LOCK_TOKEN" ]]; then
     rm -rf "$LOCK_DIR"
   fi
-  [[ "$status" -ne 0 ]] || docker image rm "$IMAGE" >/dev/null 2>&1 || true
   exit "$status"
 }
 trap cleanup EXIT INT TERM
