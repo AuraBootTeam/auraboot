@@ -97,26 +97,21 @@ async function seedDraftPage(page: Page, uid: string): Promise<string> {
       modelCode: MODEL_CODE,
       // The unified designer loads/saves a V3 document; its client validator
       // requires schemaVersion 3. A v4 seed loads but fails save validation.
-      schemaVersion: 3,
+      schemaVersion: 4,
       blocks: [
         {
-          id: ROOT_BLOCK,
-          blockType: 'detail',
-          title: 'Publish golden root',
-          dataSource: { model: MODEL_CODE },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: SECTION_BLOCK,
-              blockType: 'detail-section',
-              title: 'Original section',
-              layout: { columns: 12 },
-              blocks: [],
-            },
-          ],
+          id: SECTION_BLOCK,
+          blockType: 'detail-section',
+          title: 'Original section',
+          columns: 12,
+          fields: [],
         },
       ],
-      extension: { e2e: true, scenario: 'publish-export-import-golden' },
+      extension: {
+        e2e: true,
+        scenario: 'publish-export-import-golden',
+        designerRootId: ROOT_BLOCK,
+      },
     },
   });
   expect(resp.ok(), `seed page failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
@@ -271,8 +266,10 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
       contentType: 'application/json',
     });
 
-    // FILE CONTENT verification — the export is a faithful V3 snapshot of the
-    // canvas: schemaVersion 3, the root + the seeded section block are present.
+    // FILE CONTENT verification — the designer EXPORT still speaks the V3 tree
+    // dialect (schemaVersion 3, kind-root wrapper + the seeded section nested
+    // inside) even though storage is v4 flat; assert the live content survives
+    // the export round-trip.
     expect(exported.schemaVersion).toBe(3);
     expect(exported.id).toBe(expectedPageKey);
     expect(findBlockById(exported.blocks, ROOT_BLOCK), 'root block in export').toBeTruthy();
@@ -300,7 +297,7 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
     // A valid PageSchemaV3 document (same pageKey/id so the saved page stays
     // bound to this pid) whose detail root holds a DIFFERENT section block.
     const importedDoc = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       kind: 'detail',
       id: seeded.pageKey,
       pageKey: seeded.pageKey,
@@ -308,20 +305,11 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
       title: `Imported ${uid}`,
       blocks: [
         {
-          id: ROOT_BLOCK,
-          blockType: 'detail',
-          title: 'Imported root',
-          dataSource: { model: MODEL_CODE },
-          layout: { span: 12 },
-          blocks: [
-            {
-              id: IMPORTED_BLOCK,
-              blockType: 'detail-section',
-              title: `Imported section ${uid}`,
-              layout: { columns: 12 },
-              blocks: [],
-            },
-          ],
+          id: IMPORTED_BLOCK,
+          blockType: 'detail-section',
+          title: `Imported section ${uid}`,
+          columns: 12,
+          fields: [],
         },
       ],
     };
