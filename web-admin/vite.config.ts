@@ -239,6 +239,7 @@ export default defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       'react-grid-layout',
+      'react-grid-layout/legacy',
       'react-draggable',
       'react-resizable',
       '@xyflow/react',
