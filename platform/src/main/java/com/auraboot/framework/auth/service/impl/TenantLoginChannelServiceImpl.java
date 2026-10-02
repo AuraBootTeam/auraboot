@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
@@ -90,41 +91,47 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
 
     @Override
     public List<String> getEnabledChannels(Long tenantId) {
-        if (tenantId == null) {
-            // No tenant context (login page, pre-auth): return union of all
-            // enabled channels across all tenants so the login page shows
-            // every available login method. Table is in interceptor ignore list.
+        // Pre-auth login-page lookup: the null-tenant branch is a deliberate
+        // cross-tenant union read, the tenant branch scopes by its explicit
+        // argument. Both run under the explicit filter scope instead of the
+        // former blanket exemption (tenant-exemption cleanup W2c).
+        return MetaContext.runWithoutTenantFilter(() -> {
+            if (tenantId == null) {
+                // No tenant context (login page, pre-auth): return union of all
+                // enabled channels across all tenants so the login page shows
+                // every available login method.
+                QueryWrapper<TenantLoginChannel> qw = new QueryWrapper<>();
+                qw.eq("enabled", true)
+                  .orderByAsc("sort_order");
+
+                List<TenantLoginChannel> channels = channelMapper.selectList(qw);
+                if (channels.isEmpty()) {
+                    return List.of("email_password");
+                }
+                return channels.stream()
+                        .map(TenantLoginChannel::getChannel)
+                        .filter(this::isEnabledLoginMethod)
+                        .distinct()
+                        .collect(Collectors.toList());
+            }
+
             QueryWrapper<TenantLoginChannel> qw = new QueryWrapper<>();
-            qw.eq("enabled", true)
+            qw.eq("tenant_id", tenantId)
+              .eq("enabled", true)
               .orderByAsc("sort_order");
 
             List<TenantLoginChannel> channels = channelMapper.selectList(qw);
+
             if (channels.isEmpty()) {
+                // Tenant has no channel config yet: return default
                 return List.of("email_password");
             }
+
             return channels.stream()
                     .map(TenantLoginChannel::getChannel)
                     .filter(this::isEnabledLoginMethod)
-                    .distinct()
                     .collect(Collectors.toList());
-        }
-
-        QueryWrapper<TenantLoginChannel> qw = new QueryWrapper<>();
-        qw.eq("tenant_id", tenantId)
-          .eq("enabled", true)
-          .orderByAsc("sort_order");
-
-        List<TenantLoginChannel> channels = channelMapper.selectList(qw);
-
-        if (channels.isEmpty()) {
-            // Tenant has no channel config yet: return default
-            return List.of("email_password");
-        }
-
-        return channels.stream()
-                .map(TenantLoginChannel::getChannel)
-                .filter(this::isEnabledLoginMethod)
-                .collect(Collectors.toList());
+        });
     }
 
     @Override

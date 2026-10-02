@@ -84,22 +84,10 @@ public class MybatisPlusConfig {
         // callers across initializers/listeners/caches; needs a dedicated census)
         "ab_user_role",                     // login + auth-filter role load pass tenantId explicitly
         "ab_role",                          // login + initializers pass tenantId explicitly
-        // W4 pending — admin/entitlement explicit tenantId
-        "ab_tenant_entitlement",
-        "ab_license_audit_log",
-        "ab_payment_order",
-        "ab_payment_transaction",
-        "ab_marketplace_solution_install",
-        "ab_tenant_login_channel",          // queried by explicit tenantId before auth
-        // W4 pending — @Async write without MetaContext
-        "ab_permission_audit_log",
         // W3 pending — scheduler/worker/async executors without MetaContext
         "ab_outbox",                        // outbox processor runs without tenant context
         "ab_notification_digest",           // scheduler flushes without tenant context
-        "ab_automation",                    // scheduler scans across all tenants every 60s/300s
-        // W4 pending — mobile config (schema HAS tenant_id despite the old "no tenant_id" comment)
-        "ab_mobile_config",
-        "ab_mobile_client_log"
+        "ab_automation"                     // scheduler scans across all tenants every 60s/300s
     );
 
     /**

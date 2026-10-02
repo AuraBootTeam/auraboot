@@ -160,8 +160,8 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 33 = post-W2a state.
-            assertEquals(19, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W3d removed the scheduled-task pair (engine lifecycle + executor plane wrapped); update this ledger per wave");
+            assertEquals(10, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "W4c removed tenant_login_channel (pre-auth reads scoped), permission_audit_log (@Async on decorated taskExecutor propagates tenant), and the two mobile tables (zero OSS code access); update this ledger per wave");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
         }
 
@@ -186,6 +186,18 @@ class MetaContextTenantFilterScopeTest {
                     "ab_idempotency_record", "ab_idempotent_key"}) {
                 assertFalse(handler.ignoreTable(table),
                         "W3a removed this exemption; seams are wrapped in PlatformSeedService / cleanup tasks");
+            }
+        }
+
+        @Test
+        void w4bAndW4cTablesAreNoLongerExempt() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_tenant_entitlement", "ab_license_audit_log",
+                    "ab_payment_order", "ab_payment_transaction", "ab_marketplace_solution_install",
+                    "ab_tenant_login_channel", "ab_permission_audit_log",
+                    "ab_mobile_config", "ab_mobile_client_log"}) {
+                assertFalse(handler.ignoreTable(table),
+                        "W4b/W4c removed these exemptions (dead-for-OSS or scoped/propagated seams)");
             }
         }
 
