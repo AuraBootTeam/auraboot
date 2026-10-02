@@ -6,9 +6,19 @@
  * @since 3.2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useId } from 'react';
+import { useSmartText } from '~/utils/i18n';
 import type { PageMode, PageModeConfig, FormLayoutConfig } from './types';
 import { PAGE_MODES, FORM_COLUMN_PRESETS, LABEL_POSITIONS } from './modes';
+
+function useLocalizedModes(): Record<PageMode, PageModeConfig> {
+  const st = useSmartText();
+  return Object.fromEntries(Object.entries(PAGE_MODES).map(([mode, config]) => [mode, {
+    ...config,
+    name: st(`$i18n:designer_page_mode.modes.${mode}.name`, config.name),
+    description: st(`$i18n:designer_page_mode.modes.${mode}.description`, config.description),
+  }])) as Record<PageMode, PageModeConfig>;
+}
 
 interface PageModeSelectorProps {
   /** Current mode */
@@ -36,6 +46,8 @@ export const PageModeSelector: React.FC<PageModeSelectorProps> = ({
   compact = false,
   disabled = false,
 }) => {
+  const st = useSmartText();
+  const modes = useLocalizedModes();
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingMode, setPendingMode] = useState<PageMode | null>(null);
 
@@ -63,23 +75,25 @@ export const PageModeSelector: React.FC<PageModeSelectorProps> = ({
     setPendingMode(null);
   }, []);
 
+  const confirmation = showConfirm && pendingMode ? (
+    <ConfirmDialog fromMode={currentMode} toMode={pendingMode}
+      onConfirm={confirmModeChange} onCancel={cancelModeChange} />
+  ) : null;
+
   if (compact) {
-    return (
-      <CompactSelector
-        currentMode={currentMode}
-        onModeChange={handleModeClick}
-        disabled={disabled}
-      />
-    );
+    return <>
+      <CompactSelector currentMode={currentMode} onModeChange={handleModeClick} disabled={disabled} />
+      {confirmation}
+    </>;
   }
 
   return (
     <div className="p-4">
-      <h3 className="mb-4 text-sm font-semibold text-gray-900">页面模式</h3>
+      <h3 className="mb-4 text-sm font-semibold text-gray-900">{st('$i18n:designer_page_mode.title', 'Page mode')}</h3>
 
       {/* Mode cards */}
       <div className="mb-4 grid grid-cols-3 gap-3">
-        {Object.values(PAGE_MODES).map((config) => (
+        {Object.values(modes).map((config) => (
           <ModeCard
             key={config.mode}
             config={config}
@@ -91,7 +105,7 @@ export const PageModeSelector: React.FC<PageModeSelectorProps> = ({
       </div>
 
       {/* Description */}
-      <div className="mb-4 text-xs text-gray-500">{PAGE_MODES[currentMode].description}</div>
+      <div className="mb-4 text-xs text-gray-500">{modes[currentMode].description}</div>
 
       {/* Form layout options (only for form mode) */}
       {currentMode === 'form' && formLayout && onFormLayoutChange && (
@@ -99,14 +113,7 @@ export const PageModeSelector: React.FC<PageModeSelectorProps> = ({
       )}
 
       {/* Mode switch confirmation dialog */}
-      {showConfirm && pendingMode && (
-        <ConfirmDialog
-          fromMode={currentMode}
-          toMode={pendingMode}
-          onConfirm={confirmModeChange}
-          onCancel={cancelModeChange}
-        />
-      )}
+      {confirmation}
     </div>
   );
 };
@@ -163,9 +170,11 @@ const CompactSelector: React.FC<CompactSelectorProps> = ({
   currentMode,
   onModeChange,
   disabled,
-}) => (
+}) => {
+  const modes = useLocalizedModes();
+  return (
   <div className="inline-flex items-center rounded-md bg-gray-100 p-0.5">
-    {Object.values(PAGE_MODES).map((config) => (
+    {Object.values(modes).map((config) => (
       <button
         key={config.mode}
         type="button"
@@ -182,7 +191,8 @@ const CompactSelector: React.FC<CompactSelectorProps> = ({
       </button>
     ))}
   </div>
-);
+  );
+};
 
 /**
  * Form layout options
@@ -192,13 +202,16 @@ interface FormLayoutOptionsProps {
   onChange: (layout: FormLayoutConfig) => void;
 }
 
-const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange }) => (
+const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange }) => {
+  const st = useSmartText();
+  const inputId = useId();
+  return (
   <div className="space-y-3 border-t border-gray-100 pt-3">
-    <h4 className="text-xs font-medium text-gray-700">表单布局</h4>
+    <h4 className="text-xs font-medium text-gray-700">{st('$i18n:designer_page_mode.layout', 'Form layout')}</h4>
 
     {/* Column selector */}
     <div>
-      <label className="mb-1 block text-xs text-gray-500">列数</label>
+      <label className="mb-1 block text-xs text-gray-500">{st('$i18n:designer_page_mode.columns', 'Columns')}</label>
       <div className="flex gap-1">
         {FORM_COLUMN_PRESETS.map((preset) => (
           <button
@@ -210,9 +223,9 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
                 ? 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-gray-200 hover:border-gray-300'
             } `}
-            title={preset.description}
+            title={st(`$i18n:designer_page_mode.column_description.${preset.columns}`, preset.description)}
           >
-            {preset.label}
+            {st({ i18nKey: 'designer_page_mode.column_label', params: { count: preset.columns } }, '{count} columns')}
           </button>
         ))}
       </div>
@@ -220,7 +233,7 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
 
     {/* Label position */}
     <div>
-      <label className="mb-1 block text-xs text-gray-500">标签位置</label>
+      <label className="mb-1 block text-xs text-gray-500">{st('$i18n:designer_page_mode.label_position', 'Label position')}</label>
       <div className="flex gap-1">
         {LABEL_POSITIONS.map((pos) => (
           <button
@@ -232,9 +245,9 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
                 ? 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-gray-200 hover:border-gray-300'
             } `}
-            title={pos.description}
+            title={st(`$i18n:designer_page_mode.position.${pos.value}.description`, pos.description)}
           >
-            {pos.label}
+             {st(`$i18n:designer_page_mode.position.${pos.value}.label`, pos.label)}
           </button>
         ))}
       </div>
@@ -243,9 +256,10 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
     {/* Label width (only for left position) */}
     {layout.labelPosition === 'left' && (
       <div>
-        <label className="mb-1 block text-xs text-gray-500">标签宽度</label>
+        <label htmlFor={`${inputId}-width`} className="mb-1 block text-xs text-gray-500">{st('$i18n:designer_page_mode.label_width', 'Label width')}</label>
         <input
           type="number"
+          id={`${inputId}-width`}
           value={layout.labelWidth || 100}
           onChange={(e) => onChange({ ...layout, labelWidth: Number(e.target.value) })}
           className="w-full rounded border border-gray-200 px-2 py-1 text-xs"
@@ -258,9 +272,10 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
 
     {/* Gutter */}
     <div>
-      <label className="mb-1 block text-xs text-gray-500">间距 ({layout.gutter}px)</label>
+      <label htmlFor={`${inputId}-gutter`} className="mb-1 block text-xs text-gray-500">{st({ i18nKey: 'designer_page_mode.gutter', params: { value: layout.gutter } }, 'Gutter ({value}px)')}</label>
       <input
         type="range"
+        id={`${inputId}-gutter`}
         value={layout.gutter}
         onChange={(e) => onChange({ ...layout, gutter: Number(e.target.value) })}
         className="w-full"
@@ -270,7 +285,8 @@ const FormLayoutOptions: React.FC<FormLayoutOptionsProps> = ({ layout, onChange 
       />
     </div>
   </div>
-);
+  );
+};
 
 /**
  * Mode switch confirmation dialog
@@ -282,20 +298,24 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ fromMode, toMode, onConfirm, onCancel }) => (
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ fromMode, toMode, onConfirm, onCancel }) => {
+  const st = useSmartText();
+  const modes = useLocalizedModes();
+  const titleId = useId();
+  return (
   <>
     {/* Backdrop */}
     <div className="fixed inset-0 z-40 bg-black/20" onClick={onCancel} />
 
     {/* Dialog */}
-    <div className="fixed top-1/2 left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow-xl">
-      <h3 className="mb-2 text-sm font-semibold text-gray-900">切换页面模式</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fixed top-1/2 left-1/2 z-50 w-80 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow-xl">
+      <h3 id={titleId} className="mb-2 text-sm font-semibold text-gray-900">{st('$i18n:designer_page_mode.confirm_title', 'Switch page mode')}</h3>
       <p className="mb-4 text-xs text-gray-600">
-        从 <strong>{PAGE_MODES[fromMode].name}</strong> 切换到{' '}
-        <strong>{PAGE_MODES[toMode].name}</strong>？
+        {st('$i18n:designer_page_mode.from', 'From')} <strong>{modes[fromMode].name}</strong> {st('$i18n:designer_page_mode.to', 'to')}{' '}
+        <strong>{modes[toMode].name}</strong>？
         <br />
         <br />
-        部分组件可能需要调整以适应新布局。
+        {st('$i18n:designer_page_mode.warning', 'Some components may need adjustment for the new layout.')}
       </p>
       <div className="flex justify-end gap-2">
         <button
@@ -303,18 +323,19 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ fromMode, toMode, onConfi
           onClick={onCancel}
           className="rounded px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
         >
-          取消
+          {st('$i18n:designer_page_mode.cancel', 'Cancel')}
         </button>
         <button
           type="button"
           onClick={onConfirm}
           className="rounded bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600"
         >
-          确认切换
+          {st('$i18n:designer_page_mode.confirm', 'Confirm switch')}
         </button>
       </div>
     </div>
   </>
-);
+  );
+};
 
 export default PageModeSelector;

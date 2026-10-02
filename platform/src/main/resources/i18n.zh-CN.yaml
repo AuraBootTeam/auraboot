@@ -2,7 +2,6 @@ common:
   type: 类型
   title: 标题
   notice: 提示
-  status: 状态
   date: 日期
   id: 编号
   name: 名称
@@ -248,7 +247,6 @@ common:
 
   query_conditions: 查询条件
   reset: 重置
-  search: 查询
   query: 查询
   operation: 操作
   actions: 操作
@@ -2034,3 +2032,147 @@ aurabot:
     saving: 保存中…
     saved_as_dashboard: 已存为看板
     save_failed: 存为看板失败
+
+designer_icon_picker:
+  choose: "选择图标"
+  search: "搜索图标..."
+  all: "全部"
+  no_matches: "没有找到匹配的图标"
+  clear: "清除选择"
+  labels:
+    search: "搜索"
+    plus: "添加"
+    minus: "减少"
+    edit: "编辑"
+    delete: "删除"
+    save: "保存"
+    copy: "复制"
+    refresh: "刷新"
+    info: "信息"
+    warning: "警告"
+    error: "错误"
+    success: "成功"
+    home: "首页"
+    menu: "菜单"
+    arrow_left: "左箭头"
+    arrow_right: "右箭头"
+    arrow_up: "上箭头"
+    arrow_down: "下箭头"
+    chevron_left: "左尖括号"
+    chevron_right: "右尖括号"
+    document: "文档"
+    folder: "文件夹"
+    image: "图片"
+    video: "视频"
+    link: "链接"
+    mail: "邮件"
+    phone: "电话"
+    chat: "聊天"
+    bell: "通知"
+    user: "用户"
+    users: "用户组"
+    settings: "设置"
+    lock: "锁定"
+    unlock: "解锁"
+    eye: "可见"
+    eye_off: "隐藏"
+    star: "收藏"
+    heart: "喜欢"
+  categories:
+    action: "操作"
+    alert: "提示"
+    av: "媒体"
+    communication: "通信"
+    content: "内容"
+    device: "设备"
+    editor: "编辑"
+    file: "文件"
+    hardware: "硬件"
+    image: "图像"
+    maps: "地图"
+    navigation: "导航"
+    notification: "通知"
+    places: "地点"
+    social: "社交"
+    toggle: "切换"
+
+designer_color_picker:
+  hue: "色相"
+  opacity: "透明度"
+  presets: "预设颜色"
+  choose: "选择颜色"
+  colors:
+    black: "黑色"
+    white: "白色"
+    gray: "灰色"
+    red: "红色"
+    orange: "橙色"
+    yellow: "黄色"
+    green: "绿色"
+    cyan: "青色"
+    blue: "蓝色"
+    purple: "紫色"
+    pink: "粉色"
+    transparent: "透明"
+designer_json_editor:
+  type: "期望类型 \"{expected}\"，实际类型 \"{actual}\""
+  required: "缺少必需属性 \"{property}\""
+  property: "属性 \"{property}\": {error}"
+  index: "索引 {index}: {error}"
+  enum: "值必须是以下之一: {values}"
+  format: "格式化"
+  minify: "压缩"
+
+designer_device_selector:
+  type:
+    desktop: "桌面"
+    laptop: "笔记本"
+    tablet: "平板"
+    mobile: "手机"
+    custom: "自定义"
+  custom_dimensions: "自定义尺寸"
+  width: "宽度"
+  height: "高度"
+  cancel: "取消"
+  apply: "应用"
+  landscape: "切换为横屏"
+  portrait: "切换为竖屏"
+
+designer_page_mode:
+  "modes":
+    "floor":
+      "name": "楼层模式"
+      "description": "适用于复杂业务表单，如订单详情、客户档案"
+    "form":
+      "name": "表单模式"
+      "description": "适用于标准数据录入，如新建客户、编辑商品"
+    "grid":
+      "name": "自由流模式"
+      "description": "适用于仪表盘、报表和自定义布局"
+  "column_description":
+    "2": "默认布局，适合大多数表单"
+    "3": "紧凑布局，适合字段较多的表单"
+    "4": "超紧凑布局，适合仪表盘式表单"
+  "position":
+    "top":
+      "label": "顶部"
+      "description": "标签在输入框上方"
+    "left":
+      "label": "左侧"
+      "description": "标签在输入框左侧"
+    "inline":
+      "label": "内联"
+      "description": "标签作为占位符"
+  "column_label": "{count}列"
+  "title": "页面模式"
+  "layout": "表单布局"
+  "columns": "列数"
+  "label_position": "标签位置"
+  "label_width": "标签宽度"
+  "gutter": "间距 ({value}px)"
+  "confirm_title": "切换页面模式"
+  "from": "从"
+  "to": "切换到"
+  "warning": "部分组件可能需要调整以适应新布局。"
+  "cancel": "取消"
+  "confirm": "确认切换"

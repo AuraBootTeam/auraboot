@@ -6,8 +6,9 @@
  * @since 3.2.0
  */
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { DEVICE_PRESETS, getGroupedPresets, DEVICE_TYPE_LABELS, getDevicePreset } from './presets';
+import React, { useState, useCallback, useRef, useEffect, useMemo, useId } from 'react';
+import { DEVICE_PRESETS, getGroupedPresets, getDevicePreset } from './presets';
+import { useSmartText } from '~/utils/i18n';
 import type { DevicePreset, DeviceOrientation, CustomDevice } from './types';
 
 interface DeviceSelectorProps {
@@ -39,6 +40,22 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   onCustomDeviceChange,
   compact = false,
 }) => {
+  const st = useSmartText();
+  const inputId = useId();
+  const typeLabels: Record<DevicePreset['type'], string> = {
+    desktop: st('$i18n:designer_device_selector.type.desktop', 'Desktop'),
+    laptop: st('$i18n:designer_device_selector.type.laptop', 'Laptop'),
+    tablet: st('$i18n:designer_device_selector.type.tablet', 'Tablet'),
+    mobile: st('$i18n:designer_device_selector.type.mobile', 'Mobile'),
+    custom: st('$i18n:designer_device_selector.type.custom', 'Custom'),
+  };
+  const deviceLabel = (preset: DevicePreset) => {
+    if (preset.id === 'custom') return st('$i18n:designer_device_selector.custom_dimensions', 'Custom dimensions');
+    if (['desktop-1920', 'desktop-1440', 'desktop-1280', 'laptop-1366'].includes(preset.id)) {
+      return `${typeLabels[preset.type]} (${preset.width}×${preset.height})`;
+    }
+    return preset.name;
+  };
   const [isOpen, setIsOpen] = useState(false);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customWidth, setCustomWidth] = useState(customDevice?.width || 1024);
@@ -145,7 +162,7 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
           <span className="text-gray-700">
             {selectedId === 'custom' && customDevice
               ? `${effectiveDimensions.width}×${effectiveDimensions.height}`
-              : selectedDevice.name}
+              : deviceLabel(selectedDevice)}
           </span>
           <svg
             className={`${compact ? 'h-3 w-3' : 'h-4 w-4'} text-gray-400 ${
@@ -164,12 +181,13 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
           <div className="absolute z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
             {showCustomForm ? (
               <div className="p-3">
-                <div className="mb-2 text-sm font-medium text-gray-700">自定义尺寸</div>
+                <div className="mb-2 text-sm font-medium text-gray-700">{st('$i18n:designer_device_selector.custom_dimensions', 'Custom dimensions')}</div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="w-12 text-xs text-gray-500">宽度</label>
+                    <label htmlFor={`${inputId}-width`} className="w-12 text-xs text-gray-500">{st('$i18n:designer_device_selector.width', 'Width')}</label>
                     <input
                       type="number"
+                      id={`${inputId}-width`}
                       value={customWidth}
                       onChange={(e) => setCustomWidth(parseInt(e.target.value) || 0)}
                       className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -179,9 +197,10 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                     <span className="text-xs text-gray-400">px</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="w-12 text-xs text-gray-500">高度</label>
+                    <label htmlFor={`${inputId}-height`} className="w-12 text-xs text-gray-500">{st('$i18n:designer_device_selector.height', 'Height')}</label>
                     <input
                       type="number"
+                      id={`${inputId}-height`}
                       value={customHeight}
                       onChange={(e) => setCustomHeight(parseInt(e.target.value) || 0)}
                       className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -197,14 +216,14 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                     onClick={() => setShowCustomForm(false)}
                     className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
                   >
-                    取消
+                    {st('$i18n:designer_device_selector.cancel', 'Cancel')}
                   </button>
                   <button
                     type="button"
                     onClick={handleCustomApply}
                     className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
                   >
-                    应用
+                    {st('$i18n:designer_device_selector.apply', 'Apply')}
                   </button>
                 </div>
               </div>
@@ -213,7 +232,7 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                 {Array.from(groupedPresets.entries()).map(([type, presets]) => (
                   <div key={type}>
                     <div className="sticky top-0 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">
-                      {DEVICE_TYPE_LABELS[type]}
+                      {typeLabels[type]}
                     </div>
                     {presets.map((preset) => (
                       <button
@@ -236,7 +255,7 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                           />
                         </svg>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm text-gray-700">{preset.name}</div>
+                          <div className="text-sm text-gray-700">{deviceLabel(preset)}</div>
                           {preset.type !== 'custom' && (
                             <div className="text-xs text-gray-400">
                               {preset.width}×{preset.height}
@@ -274,7 +293,9 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
         type="button"
         onClick={handleOrientationToggle}
         className={`rounded-md border border-gray-200 bg-white p-1.5 transition-colors hover:border-gray-300 ${compact ? '' : ''} `}
-        title={orientation === 'portrait' ? '切换为横屏' : '切换为竖屏'}
+        title={orientation === 'portrait'
+          ? st('$i18n:designer_device_selector.landscape', 'Switch to landscape')
+          : st('$i18n:designer_device_selector.portrait', 'Switch to portrait')}
       >
         <svg
           className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} text-gray-500 ${

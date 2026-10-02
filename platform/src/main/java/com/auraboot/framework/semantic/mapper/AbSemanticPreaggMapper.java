@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Mapper
@@ -22,4 +24,9 @@ public interface AbSemanticPreaggMapper extends BaseMapper<AbSemanticPreagg> {
     @Select("SELECT * FROM ab_semantic_preagg "
           + "WHERE deleted_flag = FALSE ORDER BY pid")
     List<AbSemanticPreagg> listAllAcrossTenants();
+
+    @Update("UPDATE ab_semantic_preagg SET deleted_flag = TRUE, updated_at = #{updatedAt} "
+          + "WHERE tenant_id = #{tenantId} AND pid = #{pid} AND deleted_flag = FALSE")
+    int markDeleted(@Param("tenantId") Long tenantId, @Param("pid") String pid,
+                    @Param("updatedAt") OffsetDateTime updatedAt);
 }

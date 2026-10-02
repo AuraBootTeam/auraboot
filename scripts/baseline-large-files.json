@@ -4,15 +4,15 @@
   "grandfathered": [
     {
       "path": "platform/src/main/java/com/auraboot/framework/plugin/service/impl/PluginImportServiceImpl.java",
-      "lines": 4206
+      "lines": 2976
     },
     {
       "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/DynamicDataServiceImpl.java",
-      "lines": 4130
+      "lines": 2997
     },
     {
       "path": "platform/src/main/java/com/auraboot/framework/meta/service/impl/MetaModelServiceImpl.java",
-      "lines": 4102
+      "lines": 2748
     }
   ]
 }

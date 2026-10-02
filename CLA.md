@@ -23,7 +23,7 @@ By signing this CLA (via the CLA Assistant bot, which records your acceptance ag
 Subject to the terms and conditions of this Agreement, You hereby grant to the Licensor and to recipients of software distributed by the Licensor a **perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license** to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute Your Contributions and such derivative works.
 
 You acknowledge and agree that the Licensor may sublicense Your Contributions under any license, including without limitation:
-- The AuraBoot License (the source-available community license, see [`LICENSE.txt`](./LICENSE.txt))
+- The AuraBoot License v2.0 (Apache-2.0 with supplementary trademark terms; see [`LICENSE.txt`](./LICENSE.txt))
 - Proprietary commercial licenses offered by the Licensor (e.g., the AuraBoot Enterprise Edition Commercial License)
 
 ---

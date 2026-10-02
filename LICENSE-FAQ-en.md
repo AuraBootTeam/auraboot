@@ -124,7 +124,7 @@ Specific terms are governed by the commercial agreement signed between parties. 
 ## 7. Compliance & Enforcement
 
 ### Q19. What happens if I violate the license?
-v2.0 termination follows Apache-2.0 §9/§10 exclusively (Part 2 S6): the grant terminates only if you institute patent litigation claiming the AuraBoot Software infringes a patent. There is no general "30-day cure then destroy all copies" clause. Trademark misuse is handled under trademark law (Part 2 S3).
+Under [Apache-2.0 §3](https://www.apache.org/licenses/LICENSE-2.0) (Part 2 S6), if you institute patent litigation alleging that the Work or an incorporated Contribution infringes a patent, the **patent licenses** granted to you for that Work terminate when the litigation is filed. This does not mean that all copyright licenses automatically terminate. Part 2 adds no general "30-day cure then destroy all copies" provision and does not waive the redistribution obligations in Part 1. Trademark matters are covered by Part 2 S3; specific disputes require legal review.
 
 ### Q20. Which jurisdiction governs?
 Apache-2.0 does not designate an exclusive governing law, court, arbitration institution, or dispute-resolution forum. If the parties sign a Commercial License or another written agreement, that agreement may specify the governing law and dispute-resolution mechanism.
