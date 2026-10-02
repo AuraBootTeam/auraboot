@@ -238,6 +238,9 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
     await page.getByRole('combobox', { name: `${label} display mode`, exact: true }).selectOption('default');
   }
   const uploaded: Record<string, string> = {};
+  for (const [name, key] of [['Desktop horizontal focus', 'Home'], ['Desktop vertical focus', 'End'], ['Mobile horizontal focus', 'End'], ['Mobile vertical focus', 'Home']]) {
+    await page.getByRole('slider', { name, exact: true }).press(key);
+  }
   for (const key of ['logoUrl', 'darkLogoUrl', 'heroUrl', 'darkHeroUrl', 'backgroundUrl', 'darkBackgroundUrl']) {
     const response = page.waitForResponse(r => r.url().endsWith('/api/admin/auth-appearance/assets') && r.request().method() === 'POST');
     await page.getByLabel(`${key} Upload image`, { exact: true }).setInputFiles(`${assetRoot}/${key.includes('Logo') || key === 'logoUrl' ? 'logo.png' : 'scene.png'}`);
@@ -276,6 +279,7 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
           const expectedAssets = template === 'background' ? '.auth-background img' : device === 'desktop' && template === 'split' ? '.auth-brand-hero' : '.auth-compact-brand img';
           await expect(login.locator(expectedAssets)).toBeVisible();
           expect(await login.locator(expectedAssets).evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+          if (template === 'background') expect(await login.locator(expectedAssets).evaluate(el => getComputedStyle(el).objectPosition)).toBe(device === 'desktop' ? '0% 100%' : '100% 0%');
           const name = `auth-${template}-${device}-${theme}`;
           const screenshot = testInfo.outputPath(`${name}.png`);
           await login.screenshot({ path: screenshot, fullPage: true });
