@@ -662,8 +662,8 @@ test.describe('Page Designer standard block runtime', () => {
       { timeout: 15_000 },
     );
     await page.getByRole('button', { name: 'Edit' }).click();
-    await page.getByRole('combobox').selectOption('name');
-    await page.getByPlaceholder('Enter new value...').fill(editedName);
+    await page.getByTestId('bulk-edit-field').selectOption('name');
+await page.getByTestId('bulk-edit-value').fill(editedName);
     await page.getByRole('button', { name: 'Update 1 Records' }).click();
     expect((await bulkEditResponse).ok(), 'bulk edit response').toBeTruthy();
 
