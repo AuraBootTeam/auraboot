@@ -74,3 +74,5 @@ PR #2154 已核实进入 origin/main，执行 closeout 后删除旧分支，目�
 新增权限编辑文案同时进入构件 YAML 和 bootstrap seed，既有 DB 无新 seed 时也能加载；覆盖说明使用新的语义 key，避免旧 DB 的“破例/来源”文案覆写。DB 租户覆盖仍优先。完整角色门禁（含覆盖登记裁决）、share 撤销/过期、上传后附件预览、企业旧 explain 与 PCBA 错误 role name 声明均保持在未关闭分母。最终结果以 Workspace 对应源码的执行账本为准。
 
 重验补充：UI 11/12；同一旧勾选用例在无 trace 时失败、带 trace 5 次通过，尚不证明稳定。本轮进一步使用 hydration marker、固定 capability test ID 及显式 setChecked 驱动，保留选择改变/保存 dirty 的原断言，待重验。角色 20 quoteops + 1 chromium 均通过，产品总门因为 14 条覆盖注册差异仍失败。已核实公开 launcher 错用共享 plugins 根目录；正确冻结根目录后只剩 7 个文件摘要更新，所有断言锚点都存在。续作修复从 runtime manifest 传递 plugins/CRM 根目录，缺失即拒绝，并补 3 项路由单测；旧实现 mutation 会红。登记按已核验断言更新，未将登记结果替代执行。
+
+根因复核：React Router 默认 entry.client 使用 StrictMode，编辑器初始 effect 产生重复读取；旧实现允许迟到响应覆盖用户草稿。延迟旧响应的受控测试执行 1/失败 1，修复请求代次后定向 UT 50/50、skip=0。浏览器测试仍保留鼠标两次勾选；新增原子授权已持久化但回读故障的 UI retry 用例，验证旧快照不能继续编辑。最终 UI 13 项与固定产品 24 个 golden 待本次冻结构件重验。

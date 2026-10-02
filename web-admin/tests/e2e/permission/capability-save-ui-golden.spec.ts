@@ -54,7 +54,11 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await page.getByTestId('role-search-input').fill(role.code);
   await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid, { timeout: 15_000 });
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    role.pid,
+    { timeout: 15_000 },
+  );
 
   const checkbox = page.getByTestId(`capability-checkbox-${cap!.code}`);
   await checkbox.scrollIntoViewIfNeeded();
@@ -97,7 +101,10 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await expect(page.getByTestId('permission-page')).toBeVisible();
   await page.getByTestId('role-search-input').fill(role.code);
   await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    role.pid,
+  );
   const checkbox = page.getByTestId(`capability-checkbox-${cap.code}`);
   await checkbox.check();
   await expect(checkbox).toBeChecked();
@@ -131,4 +138,68 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await page.getByTestId('permission-right-tab-members').click();
   await page.getByTestId('confirm-ok').click();
   await expect(page.getByTestId('role-member-tab')).toBeVisible();
+});
+
+test('atomic grant readback failure blocks stale editing and retry reads the persisted grant', async ({
+  page,
+}) => {
+  test
+    .info()
+    .annotations.push({
+      type: 'fault-injection',
+      description: 'Browser GET matrix returns 503 after a real persisted atomic grant.',
+    });
+  const role = await createRole(page);
+  await page.goto('/home');
+  await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await page.getByTestId('role-search-input').fill(role.code);
+  await page.getByTestId(`role-item-${role.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    role.pid,
+  );
+  await page.getByTestId('advanced-atomic-toggle').click();
+  const checkbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
+  const code = (await checkbox.getAttribute('data-testid'))!.replace('atomic-checkbox-', '');
+  await expect(checkbox).not.toBeChecked();
+  const matrixPath = `/api/permissions/matrix/${role.pid}`;
+  await page.route(`**${matrixPath}`, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '503', message: 'Injected readback unavailable' }),
+      });
+    } else await route.continue();
+  });
+  const grant = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `${matrixPath}/batch` &&
+      response.request().method() === 'PUT',
+  );
+  await checkbox.click();
+  const response = await grant;
+  expect(response.status()).toBe(200);
+  expect(String((await response.json()).code)).toBe('0');
+  await expect(page.getByTestId('capability-editor-error')).toBeVisible();
+  await expect(page.getByTestId('capability-role-editor')).toHaveCount(0);
+  const persisted = await page.request.get(`${BASE}${matrixPath}`);
+  expect(persisted.ok()).toBeTruthy();
+  const actions = (await persisted.json()).data.modules
+    .flatMap((module: any) => module.resources)
+    .flatMap((resource: any) => resource.actions);
+  expect(actions.find((action: any) => action.code === code).granted).toBe(true);
+  await page.screenshot({ path: `${SHOTS}/03-atomic-readback-error.png`, fullPage: true });
+  await page.unroute(`**${matrixPath}`);
+  await page
+    .getByTestId('capability-editor-error')
+    .getByRole('button', { name: /重试|Retry/ })
+    .click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    role.pid,
+  );
+  await page.getByTestId('advanced-atomic-toggle').click();
+  await expect(page.getByTestId(`atomic-checkbox-${code}`)).toBeChecked();
 });

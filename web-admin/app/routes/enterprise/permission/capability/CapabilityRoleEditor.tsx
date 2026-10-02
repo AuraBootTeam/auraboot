@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { CapabilityGroup } from './types';
@@ -47,6 +47,7 @@ export default function CapabilityRoleEditor({
   const [preview, setPreview] = useState(false);
   const [query, setQuery] = useState('');
   const [atomicUpdating, setAtomicUpdating] = useState(false);
+  const loadRequest = useRef(0);
 
   const capabilityView = useMemo(() => splitCapabilityGroupsForPrimaryView(groups), [groups]);
   const primaryCodes = useMemo(
@@ -64,13 +65,6 @@ export default function CapabilityRoleEditor({
     onDirtyChange?.(dirty || saving || atomicUpdating);
   }, [dirty, saving, atomicUpdating, onDirtyChange]);
 
-  const loadGroups = useCallback(async () => {
-    const fetched = await capabilityService.getForRole(rolePid);
-    setGroups(fetched);
-    setSelected(grantedCapabilityCodes(fetched));
-    return fetched;
-  }, [rolePid]);
-
   const loadMatrix = useCallback(async () => {
     const data = await permissionService.getMatrixForRole(rolePid);
     setMatrix(data);
@@ -78,6 +72,7 @@ export default function CapabilityRoleEditor({
   }, [rolePid]);
 
   const load = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true);
     setLoadError(false);
     try {
@@ -85,18 +80,23 @@ export default function CapabilityRoleEditor({
         capabilityService.getForRole(rolePid),
         permissionService.getMatrixForRole(rolePid),
       ]);
+      // StrictMode can launch two reads. Only the current initialization may seed a draft.
+      if (request !== loadRequest.current) return;
       setGroups(fetched);
       setSelected(grantedCapabilityCodes(fetched));
       setMatrix(data);
     } catch {
-      setLoadError(true);
+      if (request === loadRequest.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }, [rolePid]);
 
   useEffect(() => {
     void load();
+    return () => {
+      loadRequest.current++;
+    };
   }, [load]);
 
   const onToggle = useCallback((code: string) => {
@@ -143,8 +143,16 @@ export default function CapabilityRoleEditor({
         await permissionService.batchUpdateRolePermissions(rolePid, [{ permissionId, granted }]);
         // Refetch both: a grant may complete/break a capability's all-or-nothing state, and newly-
         // granted codes inherit the role's default data scope server-side — reload to surface it.
-        await Promise.all([loadGroups(), loadMatrix()]);
+        const [fetched, data] = await Promise.all([
+          capabilityService.getForRole(rolePid),
+          permissionService.getMatrixForRole(rolePid),
+        ]);
+        setGroups(fetched);
+        setSelected(grantedCapabilityCodes(fetched));
+        setMatrix(data);
       } catch {
+        // A write may have succeeded. Hide the old snapshot until a fresh read is available.
+        setLoadError(true);
         showErrorToast(
           t('admin.permission.matrix.updateError', undefined, 'Failed to update permission'),
         );
@@ -152,7 +160,7 @@ export default function CapabilityRoleEditor({
         setAtomicUpdating(false);
       }
     },
-    [rolePid, loadGroups, loadMatrix, showErrorToast, t, dirty, saving, atomicUpdating],
+    [rolePid, showErrorToast, t, dirty, saving, atomicUpdating],
   );
 
   // ③ per-code data scope override — persist before displaying the new scope.
@@ -164,6 +172,7 @@ export default function CapabilityRoleEditor({
         await permissionService.updateScope(rolePid, { resourceCode, actionCode, scopeType });
         await loadMatrix();
       } catch {
+        setLoadError(true);
         showErrorToast(
           t('admin.permission.scope.updateError', undefined, 'Failed to update data scope'),
         );
