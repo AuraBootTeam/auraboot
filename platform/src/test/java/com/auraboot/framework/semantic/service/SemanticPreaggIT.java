@@ -15,12 +15,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.scheduling.support.ScheduledMethodRunnable;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -99,6 +103,8 @@ class SemanticPreaggIT {
     private AbSemanticPreaggMapper preaggMapper;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private ScheduledAnnotationBeanPostProcessor scheduler;
 
     private String modelPid;
     private String metricPid;
@@ -238,6 +244,52 @@ class SemanticPreaggIT {
             MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
             assertThat(preaggMapper.findByPid(TENANT_ID, preagg.getPid()).getLastRefreshedAt())
                     .isAfter(stale);
+        } finally {
+            MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+            preaggService.delete(preagg.getPid());
+        }
+    }
+
+    @Test
+    @Timeout(180)
+    @DisplayName("Real scheduled sweep refreshes due data during a two-minute observation")
+    void scheduledSweepDuringTwoMinuteObservation() throws InterruptedException {
+        assertThat(scheduler.getScheduledTasks()).anySatisfy(task -> {
+            assertThat(task.getTask().getRunnable()).isInstanceOf(ScheduledMethodRunnable.class);
+            ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getTask().getRunnable();
+            assertThat(runnable.getMethod().getName()).isEqualTo("refreshAllDue");
+            assertThat(runnable.getTarget()).isSameAs(preaggService);
+        });
+        String run = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        insertAliasRow("golden-" + run + "-1");
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-timer-" + run, modelPid, "alias_count_metric", List.of(), 1);
+        try {
+            String column = "preagg_golden_alias." + preagg.getMetricCode();
+            long before = mvMetricValue(preagg.getMvName(), column);
+            insertAliasRow("golden-" + run + "-2");
+            long expected = liveValue();
+            assertThat(expected).isGreaterThan(before);
+            preagg.setLastRefreshedAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(2));
+            preaggMapper.updateById(preagg);
+            OffsetDateTime startedAt = OffsetDateTime.now(ZoneOffset.UTC);
+            long started = System.nanoTime();
+            MetaContext.clear();
+            while (System.nanoTime() - started < Duration.ofMinutes(2).toNanos()) {
+                Thread.sleep(1_000);
+                assertThat(MetaContext.exists()).isFalse();
+            }
+            long actual = mvMetricValue(preagg.getMvName(), column);
+            MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+            OffsetDateTime refreshedAt = preaggMapper.findByPid(TENANT_ID, preagg.getPid())
+                    .getLastRefreshedAt();
+            log.info("Preagg scheduled observation runtime={} pid={} start={} elapsedMs={} "
+                            + "before={} expected={} actual={} refreshedAt={}",
+                    System.getenv("AURA_RUNTIME_NAME"), preagg.getPid(), startedAt,
+                    Duration.ofNanos(System.nanoTime() - started).toMillis(),
+                    before, expected, actual, refreshedAt);
+            assertThat(actual).isEqualTo(expected);
+            assertThat(refreshedAt).isAfter(startedAt);
         } finally {
             MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
             preaggService.delete(preagg.getPid());
