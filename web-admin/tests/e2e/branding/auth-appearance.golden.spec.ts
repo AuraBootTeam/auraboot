@@ -30,7 +30,7 @@ test('menu → draft → preview → publish → anonymous SSR → rollback', as
   // The platform sidebar opens its only top-level group by default.
   await expect(navigation.getByRole('link', { name: /Brand and Authentication Appearance|品牌与登录外观/ })).toBeVisible();
   await navigation.getByRole('link', { name: /Brand and Authentication Appearance|品牌与登录外观/ }).click();
-  expect(new URL(page.url()).pathname).toBe('/p/c/auth_appearance');
+  await expect(page).toHaveURL(/\/p\/c\/auth_appearance$/);
   await expect(page.getByTestId('auth-appearance-editor')).toBeVisible();
   const original = await (await page.request.get('/api/admin/auth-appearance')).json();
   expect(String(original.code)).toBe('0');
@@ -289,6 +289,7 @@ test('three templates, light and dark themes, desktop and mobile with uploaded a
       }
     }
     await testInfo.attach('visual-matrix', { body: JSON.stringify({ scenarios: rows, uploaded }, null, 2), contentType: 'application/json' });
+    await page.setViewportSize({ width: 1440, height: 1200 });
     const desktopPreview = await page.locator('iframe[title="Authentication preview"]').boundingBox();
     const previewContainer = await page.getByTestId('auth-appearance-preview').boundingBox();
     expect(desktopPreview!.width).toBeLessThanOrEqual(previewContainer!.width);
