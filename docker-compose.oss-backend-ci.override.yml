@@ -1,10 +1,24 @@
-# Linux CI only: start the fixed-port PostgreSQL database empty. The backend
+# Linux CI only: provision runtime-owned ports and a blank PostgreSQL database. The backend
 # integration runner applies the canonical Flyway migrations after PostgreSQL
 # is healthy so both schema and migration-owned platform seed rows are tested.
 services:
   postgres:
+    container_name: ${AURA_OSS_CI_POSTGRES_CONTAINER:?CI PostgreSQL container identity is required}
+    ports: !override
+      - "${AURA_OSS_CI_POSTGRES_PORT:?CI PostgreSQL port is required}:5432"
+    environment:
+      POSTGRES_DB: aura_boot
+      POSTGRES_USER: auraboot
+      POSTGRES_PASSWORD: auraboot_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auraboot -d aura_boot"]
     volumes: !override
       - skills_c2_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: ${AURA_OSS_CI_REDIS_CONTAINER:?CI Redis container identity is required}
+    ports: !override
+      - "${AURA_OSS_CI_REDIS_PORT:?CI Redis port is required}:6379"
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -30,3 +44,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+volumes:
+  skills_c2_postgres_data:
+    driver: local

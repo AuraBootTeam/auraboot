@@ -43,10 +43,8 @@ export AURA_OSS_CI_POSTGRES_CONTAINER="auraboot-oss-ci-postgres-$RUNTIME_TOKEN"
 export AURA_OSS_CI_REDIS_CONTAINER="auraboot-oss-ci-redis-$RUNTIME_TOKEN"
 COMPOSE_ARGS=(
   -f "$PROJECT_ROOT/docker-compose.yml"
-  -f "$PROJECT_ROOT/docker-compose.skills-c2.override.yml"
   -f "$PROJECT_ROOT/docker-compose.oss-backend-ci.override.yml"
   -p "$COMPOSE_PROJECT"
-  --profile skills-c2-stack
 )
 FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001af9ee7f450326aa46af14d447bb'
 
