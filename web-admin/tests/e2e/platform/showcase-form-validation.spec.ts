@@ -154,6 +154,8 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
         const selectors = [
           '.ant-form-item-explain-error',
           '[data-testid*="error"]',
+          '.text-status-red:not(:empty)',
+            '.text-status-red:not(:empty)',
           '.field-error',
           '[role="alert"]',
           '.text-red-500',

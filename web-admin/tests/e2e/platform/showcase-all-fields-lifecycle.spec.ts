@@ -907,7 +907,9 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
           const selectors = [
             '.ant-form-item-explain-error',
             '[data-testid*="error"]',
-            '.field-error',
+            '.text-status-red:not(:empty)',
+            '.text-status-red:not(:empty)',
+          '.field-error',
             '[role="alert"]',
             '.text-red-500',
             '.text-red-600',
