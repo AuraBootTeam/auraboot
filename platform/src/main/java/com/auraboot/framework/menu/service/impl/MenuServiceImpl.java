@@ -178,6 +178,10 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     }
 
     private boolean isAllowedByPermissionCode(Menu menu, Set<String> userPermissionCodes) {
+        // Directories organize authorized children; empty directories are pruned afterwards.
+        if (Integer.valueOf(0).equals(menu.getType())) {
+            return true;
+        }
         String permissionCode = menu.getPermissionCode();
         if (permissionCode == null || permissionCode.isBlank()) {
             return true;
