@@ -1210,9 +1210,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");
                     ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET NOT NULL");
                 }
-                // SET DEFAULT is idempotent and avoids a second metadata connection querying
-                // the relation while the import transaction owns DDL locks.
-                ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET DEFAULT 1");
+                // A correct default needs no DDL, which lets least-privilege imports
+                // synchronize metadata without requiring ownership of migrated tables.
+                if (!tableMetadataService.hasPostgresIntegerDefaultOne(tableName, "row_version")) {
+                    ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET DEFAULT 1");
+                }
             } else {
                 if (nullable) {
                     ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");
