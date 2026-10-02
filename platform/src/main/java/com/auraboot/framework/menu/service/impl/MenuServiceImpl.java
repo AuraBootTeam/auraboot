@@ -241,7 +241,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     
     @Override
     public boolean hasMenuPermission(Long userId, String permissionCode, Long tenantId) {
-        // 1. 通过permissionCode查询Menu
+        if (userId == null || tenantId == null || permissionCode == null || permissionCode.isBlank()) return false;
+        if (releaseReadsEnabled(tenantId) && containsMenuPermission(
+                releaseMenuTree(tenantId, userPermissionService.getUserPermissionCodes(userId)), permissionCode)) {
+            return true;
+        }
+        // Platform/legacy menus retain their persisted subject visibility check.
         Menu menu = baseMapper.findByPermissionCode(permissionCode);
 
         if (!MenuEnvironmentScopeService.isVisibleIn(
@@ -258,6 +263,15 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
 
     
+    private boolean containsMenuPermission(List<Menu> menus, String permissionCode) {
+        for (Menu menu : menus) {
+            if (Objects.equals(menu.getPermissionCode(), permissionCode)
+                    && MenuEnvironmentScopeService.isVisibleIn(menu, MetaContext.getCurrentEnvironmentId())) return true;
+            if (menu.getChildren() != null && containsMenuPermission(menu.getChildren(), permissionCode)) return true;
+        }
+        return false;
+    }
+
     @Override
     @Transactional
     public Menu createMenu(Menu menu) {
