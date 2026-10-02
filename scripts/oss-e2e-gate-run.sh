@@ -136,6 +136,8 @@ done
 [[ "$SLOT" =~ ^[0-9]*$ && "$REPEAT" =~ ^[1-9][0-9]*$ ]] || die "invalid slot or repeat count"
 [[ -z "$WORKERS" || "$WORKERS" =~ ^[1-9][0-9]*$ ]] || die "invalid worker count"
 
+node "$SCRIPT_DIR/dev/oss-disk-preflight.mjs" "$STATE_ROOT" || die_env "insufficient or unreadable verification storage; no allocation created"
+
 # --- resolve the spec paths the gate will run --------------------------------
 RUN_PATHS=()
 case "$SCOPE_MODE" in
