@@ -1,4 +1,5 @@
 import type { RuleAssert } from './crossFieldRuleTypes';
+import { evaluateScopedExpression } from '~/framework/meta/runtime/expression/scopedEval';
 
 type Data = Record<string, unknown>;
 
@@ -69,12 +70,13 @@ function compareOp(left: unknown, right: unknown, op: string): boolean {
  */
 export function evaluateAssert(assertion: RuleAssert, data: Data): AssertResult {
   if (assertion.expr) {
+    // Sandbox interpreter (was: raw new Function — injection vector).
     try {
-      const fn = new Function(...Object.keys(data), `return !!(${assertion.expr})`);
-      const result = fn(...Object.values(data));
+      const result = evaluateScopedExpression(assertion.expr, data);
       return result ? PASSED : failed('expr');
     } catch {
-      return skipped; // Expression error → skip
+      // Parse/eval errors are an assertion failure (deny), never a skip.
+      return failed('expr');
     }
   }
 

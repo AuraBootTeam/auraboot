@@ -1,4 +1,5 @@
 import type { RuleCondition } from './crossFieldRuleTypes';
+import { evaluateScopedCondition } from '~/framework/meta/runtime/expression/scopedEval';
 
 type Data = Record<string, unknown>;
 
@@ -104,10 +105,8 @@ export function evaluateCondition(condition: RuleCondition, data: Data): boolean
 }
 
 function evaluateExpressionBestEffort(expr: string, data: Data): boolean {
-  try {
-    const fn = new Function(...Object.keys(data), `return !!(${expr})`);
-    return fn(...Object.values(data));
-  } catch {
-    return true; // Expression error → skip (best-effort)
-  }
+  // Route through the sandboxed AST interpreter: `new Function` compilation
+  // bypassed FORBIDDEN_GLOBALS (script-injection vector). Broken expressions
+  // now resolve to false (deny) with an error log — fail-fast, never skip.
+  return evaluateScopedCondition(expr, data);
 }

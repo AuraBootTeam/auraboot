@@ -3,6 +3,9 @@
  * 用于解析和执行动态表达式，支持变量替换、函数调用等
  */
 
+import { createExpressionParser } from '~/framework/meta/runtime/expression/parser';
+import jsep from 'jsep';
+
 export interface ExpressionContext {
   [key: string]: any;
 }
@@ -150,28 +153,23 @@ export class ExpressionParser {
    * 执行表达式
    */
   private evaluateExpression(code: string, context: ExpressionContext): any {
-    // 创建安全的执行环境
-    const safeContext = {
+    // 沙箱 AST 解释器求值（原 new Function 编译绕过 FORBIDDEN_GLOBALS，为注入
+    // 向量）。注册函数与构造器全局合并进上下文；Math/JSON 使用解释器内置的
+    // 安全代理（不在此处覆盖）。
+    const sandboxContext = {
       ...context,
       // 添加注册的函数
       ...Object.fromEntries(
         Array.from(this.functions.entries()).map(([name, func]) => [name, func.fn]),
       ),
-      // 添加常用的全局对象（安全版本）
-      Math: Math,
       Date: Date,
       String: String,
       Number: Number,
       Boolean: Boolean,
       Array: Array,
       Object: Object,
-      JSON: JSON,
     };
-
-    // 使用 Function 构造器创建安全的执行环境
-    const func = new Function(...Object.keys(safeContext), `"use strict"; return (${code});`);
-
-    return func(...Object.values(safeContext));
+    return createExpressionParser(sandboxContext as never).evaluate(code);
   }
 
   /**
@@ -216,8 +214,8 @@ export class ExpressionParser {
 
     try {
       const code = trimmed.slice(2, -2).trim();
-      // 尝试解析但不执行
-      new Function(`"use strict"; return (${code});`);
+      // 纯语法校验（jsep 解析，不执行）
+      jsep(code);
       return { valid: true };
     } catch (error) {
       return {
