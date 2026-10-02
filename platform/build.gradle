@@ -629,7 +629,18 @@ test {
 
 tasks.register('bootstrapBillingAccountTest', Test) {
     group = 'verification'
-    description = 'Run the destructive full-bootstrap billing account integration test last.'
+    description = 'Verify full-bootstrap billing in a dedicated freshly migrated database.'
+    def bootstrapDatabaseUrl = providers.environmentVariable('BOOTSTRAP_TEST_DATABASE_URL')
+    doFirst {
+        if (!bootstrapDatabaseUrl.present) {
+            throw new GradleException('BOOTSTRAP_TEST_DATABASE_URL must identify a separate freshly migrated database.')
+        }
+    }
+    if (bootstrapDatabaseUrl.present) {
+        environment 'TEST_DATABASE_URL', bootstrapDatabaseUrl.get()
+        environment 'DATABASE_URL', bootstrapDatabaseUrl.get()
+        environment 'SPRING_DATASOURCE_URL', bootstrapDatabaseUrl.get()
+    }
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }

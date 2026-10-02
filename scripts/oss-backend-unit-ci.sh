@@ -170,6 +170,20 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   exit 1
 fi
 
+# Bootstrap verifies initial installation, so it must never reuse the database
+# populated by the complete integration suite or truncate guarded tenant bindings.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+    createdb -U auraboot aura_boot_bootstrap; then
+  environment_invalid 'cannot create the separate fresh bootstrap database'
+fi
+FLYWAY_ARGS[0]="-url=jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap"
+if ! run_flyway migrate > "$ARTIFACTS/bootstrap-flyway-migrate.log" 2>&1 \
+    || ! run_flyway validate > "$ARTIFACTS/bootstrap-flyway-validate.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: bootstrap database migration failed\n' >&2
+  exit 1
+fi
+export BOOTSTRAP_TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/aura_boot_bootstrap?charSet=UTF8"
+
 # Tests exercise migration-owned defaults; prove the denominator before Gradle
 # so a missing seed is reported as database bootstrap drift rather than dozens
 # of misleading service-level assertion failures.
