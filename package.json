@@ -32,16 +32,33 @@
   },
   "pnpm": {
     "overrides": {
-      "@hono/node-server": "^1.19.13",
-      "brace-expansion": "1.1.13",
-      "dompurify": "^3.4.8",
-      "esbuild": "^0.27.7",
-      "fast-uri": "^3.1.2",
-      "hono": "^4.12.23",
-      "postcss": "^8.5.10",
-      "qs": "^6.15.2",
+      "@hono/node-server": "1.19.15",
+      "brace-expansion": "1.1.21",
+      "dompurify": "3.4.16",
+      "esbuild": "0.28.1",
+      "fast-uri": "3.1.8",
+      "hono": "4.13.7",
+      "postcss": "8.5.23",
+      "qs": "6.16.0",
       "uuid": "^11.1.1",
-      "vite": "^8.0.16"
+      "vite": "^8.0.16",
+      "@babel/core": "7.29.6",
+      "@tiptap/core": "3.31.4",
+      "axios": "1.20.0",
+      "baseline-browser-mapping": "2.11.0",
+      "body-parser@1": "1.20.6",
+      "body-parser@2": "2.3.0",
+      "browserslist": "4.28.7",
+      "fflate": "0.8.3",
+      "form-data@4": "4.0.6",
+      "ip-address": "10.7.1",
+      "js-yaml@3": "3.15.2",
+      "morgan": "1.12.1",
+      "nanoid@3": "3.3.18",
+      "shell-quote": "1.9.0",
+      "undici@7": "7.29.1",
+      "urllib@2": "2.44.1",
+      "valibot": "1.4.2"
     }
   }
 }
