@@ -250,6 +250,24 @@ test.describe('i18n admin real workflow', () => {
       const snapshot = await fetchRoleSnapshot(member.page);
       expect(snapshot.roleCodes).toEqual(['tenant_member']);
       expect(snapshot.permissionCodes).not.toContain('system_management');
+      // Negative navigation requires a loaded, nonempty authenticated sidebar;
+      // missing admin links in an empty/error shell must not pass acceptance.
+      await ensureSidebarExpanded(member.page);
+      await expect(member.page.getByTestId('sidebar')).toBeVisible();
+      await expect.poll(() => member!.page.locator('nav a[href]').count()).toBeGreaterThan(0);
+      const loadedSnapshot = await fetchRoleSnapshot(member.page);
+      expect(loadedSnapshot.roleCodes).toEqual(['tenant_member']);
+      expect(loadedSnapshot.menuPaths.length).toBeGreaterThan(0);
+      for (const path of ['/i18n-resources', '/settings/i18n-workflow']) {
+        expect(loadedSnapshot.menuPaths, `member menu must exclude ${path}`).not.toContain(path);
+        await expect(member.page.locator(`nav a[href="${path}"]`)).toHaveCount(0);
+      }
+      await info.attach('authenticated-member-navigation-original', {
+        body: await member.page.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+      await info.attach('authenticated-member-menu-snapshot', {
+        body: Buffer.from(JSON.stringify(loadedSnapshot, null, 2)), contentType: 'application/json',
+      });
       const requests = [
         { method: 'GET', path: '/api/admin/i18n/resources' },
         { method: 'GET', path: `/api/admin/i18n/resources/${resource.pid}` },
