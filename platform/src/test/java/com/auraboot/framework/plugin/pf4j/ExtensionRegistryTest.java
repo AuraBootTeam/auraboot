@@ -336,4 +336,27 @@ class ExtensionRegistryTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(registry::getAllCommandHandlers)
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed repeatedly");
     }
+    @Test
+    void moduleActionsBecomeDiscoverableAfterCachedLookupAndDisappearOnUnload() {
+        assertThat(registry.getServiceTaskAction("SEND_IM")).isEmpty();
+        TestAction action = new TestAction("SEND_IM", -100);
+        registry.registerApplicationModuleActions("bpm", List.of(action));
+        assertThat(registry.getServiceTaskAction("SEND_IM")).contains(action);
+        registry.refreshAllCaches();
+        assertThat(registry.getServiceTaskAction("SEND_IM")).contains(action);
+        registry.unregisterApplicationModuleActions("bpm");
+        assertThat(registry.getServiceTaskAction("SEND_IM")).isEmpty();
+    }
+
+    @Test
+    void unloadingOneModulePreservesOtherModuleActions() {
+        TestAction first = new TestAction("SEND_IM", 1);
+        TestAction second = new TestAction("SEND_IM", 2);
+        registry.registerApplicationModuleActions("first", List.of(first));
+        registry.registerApplicationModuleActions("second", List.of(second));
+        assertThat(registry.getServiceTaskAction("SEND_IM")).contains(second);
+        registry.unregisterApplicationModuleActions("second");
+        assertThat(registry.getServiceTaskAction("SEND_IM")).contains(first);
+    }
+
 }

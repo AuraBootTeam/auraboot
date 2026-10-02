@@ -2487,10 +2487,6 @@ export function FormPageContent(props: PageContentProps) {
     'custom',
     'form-buttons',
     'sub-table',
-    // Toolbar blocks render through the kernel ToolbarBlockRenderer (emitting
-    // toolbar-btn-* testids, matching detail pages and e2e). Rendering them
-    // here as well duplicated the same DSL buttons twice on the page.
-    'toolbar',
   ]);
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
