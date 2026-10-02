@@ -814,6 +814,7 @@ cmd_env() {
   fi
   evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
   [ -n "$evidence_root" ] || die "runtime env lacks AURA_EVIDENCE_ROOT; deploy the workspace runtime lifecycle before running this gate"
+  mkdir -p "$evidence_root/playwright/evidence" "$evidence_root/logs/seed"
   cat <<EOF
 # Playwright env contract for golden specs against '$name' (run from web-admin/):
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:$vite_port
@@ -823,6 +824,8 @@ export BFF_PORT=$bff_port
 export PW_SKIP_WEBSERVER=1
 export NO_PROXY=localhost,127.0.0.1
 export AURA_EVIDENCE_ROOT=$evidence_root
+export AURA_EVIDENCE_DIR=$evidence_root/playwright/evidence
+export SEED_LOG_DIR=$evidence_root/logs/seed
 export PW_ARTIFACT_DIR=$evidence_root/playwright/artifacts
 export PW_REPORT_DIR=$evidence_root/playwright/report
 export PW_RESULTS_JSON=$evidence_root/playwright/report/results.json

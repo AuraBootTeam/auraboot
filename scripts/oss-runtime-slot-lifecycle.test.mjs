@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,28 @@ import { fileURLToPath } from 'node:url';
 
 const gatePath = fileURLToPath(new URL('./oss-e2e-gate-run.sh', import.meta.url));
 const stackPath = fileURLToPath(new URL('./oss-golden-stack.sh', import.meta.url));
+
+test('public stack env routes screenshots, downloads and seed logs to managed evidence', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'oss-env-contract-'));
+  try {
+    const state = join(fixture, 'state');
+    const evidence = join(fixture, 'evidence');
+    mkdirSync(join(state, 'golden', 'sample'), { recursive: true });
+    mkdirSync(join(state, 'env'));
+    writeFileSync(join(fixture, 'dev.sh'), '#!/bin/bash\n');
+    writeFileSync(join(fixture, 'aura'), '#!/bin/bash\nexit 1\n');
+    chmodSync(join(fixture, 'aura'), 0o755);
+    writeFileSync(join(state, 'golden', 'sample', 'ports'), '6473 5173 6173\n');
+    writeFileSync(join(state, 'env', 'sample.env'), `AURA_EVIDENCE_ROOT=${evidence}\n`);
+    const result = spawnSync('/bin/bash', [stackPath, 'env', 'sample'], { encoding: 'utf8',
+      env: { ...process.env, AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: state } });
+    assert.equal(result.status, 0, result.stderr);
+    const evaluated = spawnSync('/bin/bash', ['-c', `${result.stdout}\nprintf '%s\\n' "$AURA_EVIDENCE_DIR" "$SEED_LOG_DIR"`], { encoding: 'utf8' });
+    assert.equal(evaluated.status, 0, evaluated.stderr);
+    assert.deepEqual(evaluated.stdout.trim().split('\n'), [join(evidence, 'playwright', 'evidence'), join(evidence, 'logs', 'seed')]);
+    assert.equal(existsSync(join(evidence, 'playwright', 'evidence')), true);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
 
 test('default Bash handles empty source arrays and preserves incomplete-operation failure', () => {
   const source = readFileSync(stackPath, 'utf8');
