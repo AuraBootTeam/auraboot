@@ -68,7 +68,13 @@ case "$1 $2" in
 esac
 `);
     writeFileSync(join(fixture, 'lsof'), '#!/bin/bash\nexit 1\n');
-    for (const file of ['aura', 'lsof']) chmodSync(join(fixture, file), 0o755);
+    // Disk is an independent external prerequisite. Keep this fixture focused
+    // on allocation capacity regardless of the test host's available space.
+    writeFileSync(join(fixture, 'node'), `#!/bin/bash
+if [[ "$1" == */oss-disk-preflight.mjs ]]; then exit 0; fi
+exec '${process.execPath}' "$@"
+`);
+    for (const file of ['aura', 'lsof', 'node']) chmodSync(join(fixture, file), 0o755);
     const result = spawnSync('/bin/bash', [gatePath, '--name', 'capacity-fixture', '--slot', '249'], { encoding: 'utf8',
       env: { ...process.env, TMPDIR: fixture, PATH: `${fixture}:${process.env.PATH}`, AURA_FIXTURE_CALLS: calls,
         AURA_WORKSPACE_ROOT: fixture, AURA_WORKSPACE_STATE_DIR: join(fixture, 'state') } });
