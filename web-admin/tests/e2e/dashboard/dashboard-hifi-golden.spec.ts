@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { DashboardDesignerPage } from '../../pages/DashboardDesignerPage';
+import { ensureSidebarExpanded, navigateToMenuByClick, ensureFilterFormOpen } from '../helpers';
 
 test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json', locale: 'zh-CN' });
 
@@ -16,15 +17,15 @@ let dashboardPid = '';
 test.describe('Dashboard designer high-fidelity', () => {
   test.beforeEach(async ({ page }) => {
     dp = new DashboardDesignerPage(page);
-    // Menu-entry journey remains a separate unverified acceptance requirement.
-    await page.goto('/dashboard-designer');
-    await expect(dp.toolbar).toBeVisible();
-    await expect(dp.palette).toBeVisible();
-    await expect(dp.propertyPanel).toBeVisible();
-    await expect(dp.canvas).toBeVisible({ timeout: 30000 });
+    await page.goto('/');
+    await ensureSidebarExpanded(page);
+    await navigateToMenuByClick(page, ['元数据管理', '仪表盘管理']);
+    await expect(page).toHaveURL(/\/p\/dashboard_management$/);
+    await expect(page.getByTestId('toolbar-btn-create')).toBeVisible();
   });
 
   test('DHIFI-01 bind real aggregates, save, verify rendered numbers and chart bars', async ({ page, request }) => {
+    await createFromManagement(page);
     await nameViaSettings(page, dashTitle);
     // Own twelve records provide an exact expected count independent of other specs.
     for (let i = 0; i < 12; i++) {
@@ -73,15 +74,20 @@ test.describe('Dashboard designer high-fidelity', () => {
     }
   });
 
-  test('DHIFI-02 presentation mode shows the data-bound dashboard', async ({ page, request }) => {
-    await page.goto('/dashboard-designer');
-    await expect(dp.canvas).toBeVisible({ timeout: 30000 });
-    // Open the exact object created in this worker; never select old prefix matches.
+  test('DHIFI-02 presentation mode shows the data-bound dashboard', async ({ page }) => {
+    // Search through the real list and open only this worker's saved object.
     expect(dashboardPid).not.toBe('');
-    const target = await (await request.get(`/api/dashboards/${dashboardPid}`)).json();
-    expect(String(target.code)).toBe('0');
-    expect(target.data.title).toBe(dashTitle);
-    await page.goto(`/dashboard-designer/${dashboardPid}`);
+    await ensureFilterFormOpen(page);
+    await page.getByPlaceholder(/^(搜索仪表盘标题|Search dashboard title)$/).fill(dashTitle);
+    const listResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboards'
+      && r.request().method() === 'GET');
+    await page.getByTestId('filter-search').click();
+    expect((await listResponse).ok()).toBeTruthy();
+    const row = page.getByRole('row').filter({ has: page.getByText(dashTitle, { exact: true }) });
+    await expect(row).toHaveCount(1);
+    await expect(row).toBeVisible();
+    await row.getByText(dashTitle, { exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${dashboardPid}$`));
     await expect(dp.canvas).toBeVisible({ timeout: 30000 });
     await page.getByTestId('toolbar-btn-presentation').click();
     await expect(page.getByTestId('big-screen-exit')).toBeVisible({ timeout: 20000 });
@@ -97,7 +103,8 @@ test.describe('Dashboard designer high-fidelity', () => {
     await expect(page.getByTestId('big-screen-exit')).toHaveCount(0);
   });
 
-  test('DHIFI-03 settings dialog exposes the three scopes', async () => {
+  test('DHIFI-03 settings dialog exposes the three scopes', async ({ page }) => {
+    await createFromManagement(page);
     await dp.settingsButton.click();
     const dialog = dp.page.getByRole('dialog', { name: 'Dashboard Settings' });
     await expect(dialog).toBeVisible();
@@ -113,6 +120,15 @@ test.describe('Dashboard designer high-fidelity', () => {
     await dialog.getByRole('button', { name: /^(取消|Cancel)$/ }).click();
   });
 });
+
+async function createFromManagement(page: import('@playwright/test').Page) {
+  await page.getByTestId('toolbar-btn-create').click();
+  await expect(page).toHaveURL(/\/dashboard-designer$/);
+  await expect(dp.toolbar).toBeVisible();
+  await expect(dp.palette).toBeVisible();
+  await expect(dp.propertyPanel).toBeVisible();
+  await expect(dp.canvas).toBeVisible({ timeout: 30000 });
+}
 
 async function nameViaSettings(page: import('@playwright/test').Page, title: string) {
   await dp.settingsButton.click();
