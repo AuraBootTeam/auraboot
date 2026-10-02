@@ -8,6 +8,8 @@ created: 2026-10-02
 
 `allowed_claim: targeted-tested / partial`。当前候选 browser E2E did_not_run（executed=0），r6 启动被宿主机验证名额上限拒绝。r5 编辑器14项通过属于前一候选，不能替代后续业务依赖、范围名称、成员新增移除、只读按钮和文件下载变更的验证。Goal 保持 active，未完成验收。
 
+最新状态：owner授权额度18并确认局域网ssh dev后，r6启动及双重身份验证成功；编辑器14项实测9通过、5失败、0retry。长预览超屏和成员checkbox双重切换为真实交互缺陷，范围两项为5→8动作分母漂移。已集中修复并通过类型检查；修复后的候选仍待浏览器验收。此前capacity/VPN阻挡已解除，旧描述保留为历史记录。
+
 唯一实施账本是[已确认完整方案](../plans/2026-10/2026-10-02-permission-transparency-plan.md)，稳定契约见[范围与记录诊断 SoT](../system-reference/permission-scope-and-record-diagnostics.md)。本报告不创建另一份任务清单。
 
 ## 执行账本与证据边界
@@ -19,6 +21,7 @@ created: 2026-10-02
 | r5 Enterprise UT | 4 | 4 | 4 | 0 | 0 | 0 | ui/capability-r5-transaction-explainer-it.log + JUnit XML |
 | r5 Enterprise explanation IT | 4 | 4 | 4 | 0 | 0 | 0 | 同上；三种授权码来源正例及未知来源负例；未包含真实 recordId 正例 |
 | r5 editor browser | 14 | 14 | 14 | 0 | 0 | 0 | ui/capability-r5-browser-results.json |
+| r6 editor browser | 14 | 14 | 9 | 5 | 0 | 0 | ui/capability-r6-editor-results-run2.json；修复后需重验，未以重试消除失败 |
 | r5 product fixed golden | 56 | 未完成 | 日志46 | 日志2 | 未得终态 | 未得终态 | ui/capability-r5-product-golden.log；第49项附近SIGKILL，缺最终JSON，不形成门禁通过 |
 | r6 首批前端 UT | 58 | 58 | 58 | 0 | 0 | 0 | ui/capability-r6-unit.log；后续成员组件变更不在该次执行中 |
 | r6 范围代码 typecheck | 不适用 | 1 | 1 | 0 | 0 | 0 | ui/capability-r6-typecheck.log，退出0 |
@@ -65,3 +68,5 @@ allowed_claim: 已实现并提交候选改动，已有定向测试；未完成�
 Workspace证据根：`/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/`。最终必须更新本报告与唯一实施账本，再按已验证确切提交收口。
 
 当前五仓草稿 PR：OSS #2157、Quote #534、Enterprise #1431、Plugins #612、CRM #25。PR open 不代表验收完成；新的三个 PR 聊天附件调用均因 transport closed 失败，GitHub 审查入口已存在。r6 第四次启动仍被 capacity gate 拒绝，没有运行当前浏览器测试。
+
+r6第七次启动获owner授权的18额度后成功；第一次浏览器命令因缺少PG_DB在收集前被环境契约拦截，补明确enterprise_158后执行14项。双重身份、启动、类型检查、失败截图与暂停日志在Workspace ui/capability-r6-*；不得把收集前拒绝写成产品失败。CI批次permission-capability-r6-5d32c1db9-v1：Quote/BOM job 20261002t151751z-e0610564 running（旧候选），queued backend/composition已因候选更新公开取消；新候选尚无CI receipt。

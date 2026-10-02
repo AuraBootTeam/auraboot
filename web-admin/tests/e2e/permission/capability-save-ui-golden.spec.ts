@@ -71,6 +71,9 @@ test('① capability save persists through the browser on a snowflake-id role', 
   );
   await page.getByTestId('capability-save').click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('confirm-ok')).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('confirm-cancel')).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: `${SHOTS}/00-capability-preview.png`, fullPage: true });
   await page.getByTestId('confirm-ok').click();
   expect((await saveResp).status()).toBe(200);

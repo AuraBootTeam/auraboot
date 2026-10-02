@@ -97,17 +97,17 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="rounded-card bg-panel relative mx-4 w-full max-w-md scale-100 transform opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
+        className="rounded-card bg-panel relative mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-md scale-100 transform flex-col opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
       >
-        <div className="p-6">
-          <h3 id={titleId} className="text-text mb-2 text-lg font-semibold dark:text-white">
+        <div className="flex min-h-0 flex-col p-6">
+          <h3 id={titleId} className="text-text mb-2 shrink-0 text-lg font-semibold dark:text-white">
             {title}
           </h3>
-          <p id={descId} className="text-text-2 text-sm whitespace-pre-wrap dark:text-gray-300">
+          <p id={descId} className="text-text-2 min-h-0 overflow-y-auto overscroll-contain text-sm whitespace-pre-wrap dark:text-gray-300">
             {content}
           </p>
         </div>
-        <div className="flex justify-end gap-3 px-6 pb-6">
+        <div className="flex shrink-0 justify-end gap-3 px-6 pb-6">
           <button
             data-testid="confirm-cancel"
             onClick={onCancel}

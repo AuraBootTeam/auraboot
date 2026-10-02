@@ -78,8 +78,15 @@ for (const scope of ['dept', 'team']) {
     const scopeSelect = page.getByTestId('capability-scope-model.qo_quote_common.read');
     await expect(scopeSelect).toHaveValue(scope);
     const dialog = page.getByTestId('capability-scope-dialog');
-    await expect(dialog.getByRole('combobox')).toHaveCount(5);
-    for (const select of await dialog.getByRole('combobox').all()) await expect(select).toHaveValue(scope);
+    const scopedActions = [
+      'qo.quote.read', 'qo.quote.material.read', 'sys.file.read',
+      'model.qo_quote_common.read', 'model.qo_quote_line_common.read',
+      'model.crm_customer_request_common.read', 'model.crm_customer_request_pcba_rfq.read',
+      'model.qo_supplier_request_line_common.read',
+    ];
+    await expect(dialog.getByRole('combobox')).toHaveCount(scopedActions.length);
+    for (const action of scopedActions)
+      await expect(dialog.getByTestId(`capability-scope-${action}`)).toHaveValue(scope);
     await expect(dialog).not.toContainText('范围配置无效');
     await expect(dialog).not.toContainText('Qo_supplier_request_line_common');
     const matrixResponse = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);

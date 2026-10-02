@@ -356,6 +356,7 @@ export default function AddMemberDialog({
                                 type="checkbox"
                                 checked={isExisting || isSelected}
                                 disabled={isExisting}
+                                onClick={(event) => event.stopPropagation()}
                                 onChange={() =>
                                   !isExisting && toggleListSelect(c.memberPid)
                                 }
