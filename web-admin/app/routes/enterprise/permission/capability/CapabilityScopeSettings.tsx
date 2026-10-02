@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
+import { modelService } from '~/shared/services/modelService';
 import { permissionService } from '~/shared/services/permissionService';
 import { SCOPE_OPTIONS, scopeOption, isValidScope } from '../scopeConfig';
 import type { PermissionMatrixDTO } from '../types';
@@ -28,6 +29,9 @@ export default function CapabilityScopeSettings({
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [pending, setPending] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [modelNames, setModelNames] = useState<Record<string, string>>({});
+  const [namesLoading, setNamesLoading] = useState(true);
+  const [namesError, setNamesError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -79,11 +83,42 @@ export default function CapabilityScopeSettings({
       ),
     [matrix, capability],
   );
+  useEffect(() => {
+    let current = true;
+    setNamesLoading(true);
+    setNamesError(false);
+    const codes = [...new Set(rows.filter((row) => row.code.startsWith('model.'))
+      .map((row) => row.resourceCode))];
+    void Promise.all(codes.map(async (code) => {
+      const model = await modelService.findByCode(code);
+      if (!model.displayName || model.displayName === code)
+        throw new Error('Model has no business display name');
+      return [code, model.displayName] as const;
+    })).then((names) => {
+      if (current) setModelNames(Object.fromEntries(names));
+    }).catch(() => {
+      if (current) setNamesError(true);
+    }).finally(() => {
+      if (current) setNamesLoading(false);
+    });
+    return () => { current = false; };
+  }, [rows]);
+  const actionNames: Record<string, string> = {
+    read: t('common.view', undefined, 'View'),
+    create: t('action.create', undefined, 'Create'),
+    update: t('action.update', undefined, 'Update'),
+    delete: t('action.delete', undefined, 'Delete'),
+    import: t('action.import', undefined, 'Import'),
+    export: t('action.export', undefined, 'Export'),
+  };
+  const rowLabel = (row: typeof rows[number]) => row.code.startsWith('model.')
+    ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
+    : row.label;
   const apply = async () => {
     const changes = rows.filter(
       (row) => pending[row.code] != null && pending[row.code] !== row.scopeType,
     );
-    if (!changes.length || saving || changes.some((row) => !isValidScope(pending[row.code])))
+    if (!changes.length || saving || namesLoading || namesError || changes.some((row) => !isValidScope(pending[row.code])))
       return;
     setSaving(true);
     onBusy(true);
@@ -146,15 +181,17 @@ export default function CapabilityScopeSettings({
             'Adjust existing grants for this capability. Shared actions also affect other capabilities; granting and revoking remain in the capability checklist.',
           )}
         </p>
+        {namesLoading && <p role="status">{t('common.loading', undefined, 'Loading…')}</p>}
+        {namesError && <p role="alert">{t('admin.permission.capability.scopeNamesErrorV2', undefined, 'Could not load business names. Close and reopen to try again.')}</p>}
         <div className="flex flex-col gap-3">
-          {rows.map((row) => {
+          {!namesLoading && !namesError && rows.map((row) => {
             const value = pending[row.code] ?? row.scopeType ?? '';
-            const option = scopeOption(value);
+            const option = scopeOption(pending[row.code] ?? row.scopeType);
             return (
               <label key={row.code} className="flex items-center justify-between gap-3 text-sm">
-                <span>{row.label}</span>
+                <span>{rowLabel(row)}</span>
                 <select
-                  aria-label={row.label}
+                  aria-label={rowLabel(row)}
                   data-testid={`capability-scope-${row.code}`}
                   disabled={saving}
                   value={value}
@@ -200,7 +237,7 @@ export default function CapabilityScopeSettings({
             type="button"
             data-testid="capability-scope-apply"
             disabled={
-              saving ||
+              saving || namesLoading || namesError ||
               !rows.some((row) => pending[row.code] && pending[row.code] !== row.scopeType)
             }
             onClick={() => void apply()}

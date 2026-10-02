@@ -23,6 +23,12 @@ test('composition gate rejects cross-root duplicates, unknown fields and invalid
     assert.match(run().stderr, /unknown property/);
     write(1, [{code: 'business.view', includes: ['record.read', 'record.read']}]);
     assert.match(run().stderr, /duplicate dependencies/);
+    writeFileSync(join(roots[0], 'plugin/config/models.json'), JSON.stringify([{code: 'tenant_member'}]));
+    writeFileSync(join(roots[0], 'plugin/config/commands.json'), JSON.stringify([{code: 'admin:approve_member', modelCode: 'tenant_member', type: 'state_transition'}]));
+    write(1, [{code: 'business.view', includes: ['model.tenant_member.approve']}]);
+    assert.equal(run().status, 0, 'state transitions derive the model verb');
+    write(1, [{code: 'business.view', includes: ['model.tenant_member.approve_member']}]);
+    assert.match(run().stderr, /ghost permission/);
     write(1, [{code: 'business.view', includes: ['record.missing']}]);
     assert.match(run().stderr, /ghost permission/);
   } finally { rmSync(root, {recursive: true, force: true}); }

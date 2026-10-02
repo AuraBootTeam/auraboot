@@ -9,7 +9,20 @@
     "includes": [
       "org.hr.read",
       "org.hr.manage",
-      "org_management"
+      "org_management",
+      "model.org_department.read",
+      "model.org_position.read",
+      "model.org_employee.read",
+      "meta.command.execute",
+      "model.org_department.create",
+      "model.org_department.update",
+      "model.org_department.delete",
+      "model.org_position.create",
+      "model.org_position.update",
+      "model.org_position.delete",
+      "model.org_employee.create",
+      "model.org_employee.update",
+      "model.org_employee.delete"
     ],
     "tier": "editor",
     "order": 10
@@ -23,7 +36,10 @@
     "description": "只读查看组织架构、职位、人员",
     "includes": [
       "org.hr.read",
-      "org_management"
+      "org_management",
+      "model.org_department.read",
+      "model.org_position.read",
+      "model.org_employee.read"
     ],
     "tier": "viewer",
     "order": 11
@@ -39,7 +55,12 @@
       "org.team.read",
       "org.team.manage",
       "org_management",
-      "org_teams"
+      "org_teams",
+      "meta.command.execute",
+      "model.ab_team.read",
+      "model.ab_team.create",
+      "model.ab_team.update",
+      "model.ab_team.delete"
     ],
     "tier": "editor",
     "order": 20
@@ -60,7 +81,8 @@
       "model.tenant_member.reset_member_password",
       "model.tenant_member.provision_member_from_employee",
       "org_management",
-      "member_management"
+      "member_management",
+      "meta.command.execute"
     ],
     "tier": "editor",
     "order": 30

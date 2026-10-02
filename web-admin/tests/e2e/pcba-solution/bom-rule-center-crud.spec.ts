@@ -17,6 +17,24 @@ import {
   dynamicCreate,
 } from './quote-e2e-helpers';
 
+/** Creates an independent, recallable fixture through the production material writer. */
+async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
+  const result = await executeCommand(page, 'bom:create_material', {
+    bom_mm_material_code: code,
+    bom_mm_material_name: category === 'resistor' ? '贴片电阻' : '贴片电容',
+    bom_mm_spec_model: spec, bom_mm_category: category, bom_mm_package: packageCode,
+    bom_mm_unit: 'PCS', bom_mm_brand: brand, bom_mm_enabled: true,
+  });
+  expect(result.success).toBe(true);
+  const rows = await queryDynamicRecords(page, 'bom_material_master', [
+    { fieldName: 'bom_mm_material_code', operator: 'EQ', value: code },
+  ]);
+  expect(rows).toHaveLength(1);
+  expect(String(rows[0].bom_mm_norm_text ?? '')).not.toBe('');
+  expect(JSON.parse(String(rows[0].bom_mm_attributes_json))).toEqual(expect.objectContaining({ package: packageCode }));
+  return rows[0];
+}
+
 type Choice = { field: string; label: string; value: string };
 type RuleCase = {
   model: string;
@@ -349,7 +367,8 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   const file = info.outputPath('rule-effect.xlsx');
   fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  // Setup creates only customer/project; all rule changes and conversion starts use UI.
+  // Setup creates isolated material/customer/project; rule changes and conversion starts use UI.
+  await createRecallableMaterial(page, `${marker}-R`, 'resistor', '10kΩ ±1% 0603', '0603', brand);
   const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   expect(customerId).toBeTruthy();
@@ -649,7 +668,8 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   const file = info.outputPath('rule-effect.xlsx');
   fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  // Setup creates only customer/project; all rule changes and conversion starts use UI.
+  // Setup creates isolated material/customer/project; rule changes and conversion starts use UI.
+  await createRecallableMaterial(page, `${marker}-R`, 'resistor', '10kΩ ±1% 0603', '0603');
   const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   expect(customerId).toBeTruthy();
@@ -1036,16 +1056,9 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   test.setTimeout(600_000);
   const marker = `B18-${Date.now()}`;
   const customerPn = `CUSTPNB18${Date.now()}`;
-  // V2 召回查冻结算力投影:映射目标必须是库内已存在的标准料号(生产语义:
-  // 客户料号 → 内部标准料号),新建料号不在冻结投影中不可召回
-  const libraryMaterial = (
-    await queryDynamicRecords(page, 'bom_material_master', [
-      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
-    ])
-  ).find((row) => String(row.bom_mm_material_code ?? '').startsWith('10'))
-    ?? (await queryDynamicRecords(page, 'bom_material_master', [
-      { fieldName: 'bom_mm_enabled', operator: 'EQ', value: true },
-    ]))[0];
+  // The production writer creates the target and refreshes its frozen recall projection.
+  // A fresh runtime must not depend on a material left by a previous suite.
+  const libraryMaterial = await createRecallableMaterial(page, `${marker}-C`, 'capacitor', '100nF 50V 0402', '0402');
   const mappedMaterial = String(libraryMaterial.bom_mm_material_code);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
@@ -1108,8 +1121,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
     { fieldName: 'bom_cpm_customer_pn_norm', operator: 'EQ', value: customerPn },
   ]);
   expect(mappings, 'mapping persisted').toHaveLength(1);
-  // 映射目标已在冻结物料库中,无需建料(物料库投影按快照绑定)
-  // V2 召回查物料投影而非主档:建料后刷新投影,新料才进入 K1 召回视野
+  // Refresh after mapping so K1 sees the new customer-part relation.
   await executeCommand(page, 'bom:refresh_material_snapshot', {});
 
   const after = await convert();

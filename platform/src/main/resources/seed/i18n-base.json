@@ -4239,5 +4239,10 @@
     "key": "admin.permission.capability.undoRevokeV2",
     "zh-CN": "待撤销 · 取消撤销",
     "en-US": "Pending revocation · undo"
+  },
+  {
+    "key": "admin.permission.capability.scopeNamesErrorV2",
+    "zh-CN": "无法加载业务名称，请关闭后重新打开。",
+    "en-US": "Could not load business names. Close and reopen to try again."
   }
 ]

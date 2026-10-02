@@ -1793,3 +1793,4 @@ aurabot:
 
 "admin.permission.capability.revokePartialV2": "Revoke existing grants"
 "admin.permission.capability.undoRevokeV2": "Pending revocation · undo"
+"admin.permission.capability.scopeNamesErrorV2": "Could not load business names. Close and reopen to try again."

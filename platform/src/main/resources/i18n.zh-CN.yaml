@@ -2099,3 +2099,4 @@ aurabot:
 
 "admin.permission.capability.revokePartialV2": "撤销已有授权"
 "admin.permission.capability.undoRevokeV2": "待撤销 · 取消撤销"
+"admin.permission.capability.scopeNamesErrorV2": "无法加载业务名称，请关闭后重新打开。"

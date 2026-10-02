@@ -42,15 +42,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
       // Quote collaboration grants every quote tab for this exact shared root only.
       expect(response.status()).toBe(allowed ? 200 : 403);
     }
-    // 文件腿(Q15-05):文件授权跟随关联记录的 read 授权(记录共享行面延伸到文件)。
-    // 授权成员:200;未授权:拒绝(403;若 PermissionInterceptor 缺权限映射为 500,
-    // 亦视为拒绝态,映射缺陷单独立产品发现)。
+    // File access follows the related record's read authorization and returns an exact 403 on denial.
     const sharedFileProbe = await client.request.get(`/api/file/${sharedQuoteFileId}`);
     const sharedFileStatus = sharedFileProbe.status();
     if (allowed) {
       expect(sharedFileStatus, `authorized file access must pass, got ${sharedFileStatus}`).toBe(200);
     } else {
-      expect([403, 500], `unauthorized file access must be rejected, got ${sharedFileStatus}`).toContain(sharedFileStatus);
+      expect(sharedFileStatus, `unauthorized file access must be rejected, got ${sharedFileStatus}`).toBe(403);
     }
     const capability = await client.request.get(`/api/record-share/manage-capability?${shareParams}`);
     expect(capability.status()).toBe(allowed ? 200 : 403);

@@ -50,3 +50,18 @@ test('member state capabilities use the runtime-derived verb, not the command su
     assert.ok(!includes.includes(`model.tenant_member.${action}_member`));
   }
 });
+
+test('organization authoring retains record reads and command endpoint dependencies', () => {
+  const org = JSON.parse(source('../../org-management/config/capabilities.json'));
+  for (const code of ['org.cap.hr', 'org.cap.team', 'org.cap.member'])
+    assert.ok(org.find(cap => cap.code === code).includes.includes('meta.command.execute'), code);
+  for (const model of ['org_department', 'org_position', 'org_employee']) {
+    assert.ok(org.find(cap => cap.code === 'org.cap.hr_view').includes.includes(`model.${model}.read`));
+    for (const action of ['read', 'create', 'update', 'delete'])
+      assert.ok(org.find(cap => cap.code === 'org.cap.hr').includes.includes(`model.${model}.${action}`));
+  }
+  for (const name of ['org_create_department', 'org_update_department', 'org_delete_department', 'org_create_employee', 'org_update_employee', 'org_delete_employee', 'org_create_position', 'org_update_position', 'org_delete_position']) {
+    const command = JSON.parse(source(`../../org-management/config/commands/${name}.json`));
+    assert.deepEqual(command.permissions, ['org.hr.manage']);
+  }
+});

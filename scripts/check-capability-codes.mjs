@@ -19,24 +19,43 @@ import path from 'node:path';
 // The seven CRUD-ish actions the platform always generates for a model.
 const CRUD_ACTIONS = /^model\.[a-z0-9_]+\.(read|create|update|delete|manage|export|import)$/i;
 
-// A model permission is `model.<modelCode>.<action>` where <action> comes from a
-// declared command — see TestSeedController: "model." + modelCode + "." + action. The
-// action set is therefore whatever the commands declare, not a fixed seven. Allowing
-// only the seven flagged six legitimate codes (model.tenant_member.approve, .suspend,
-// …) whose commands exist as admin:approve_member and friends.
+// Mirror CommandActionDeriver's manifest-time action contract; a command suffix is
+// not necessarily its permission verb (admin:approve_member -> tenant_member.approve).
 function declaredModelActions(roots) {
   const out = new Set();
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
     for (const dir of fs.readdirSync(root)) {
-      const f = path.join(root, dir, 'config', 'commands.json');
-      if (!fs.existsSync(f)) continue;
-      let j; try { j = readJson(f); } catch { continue; }
-      for (const c of Array.isArray(j) ? j : (j.commands || [])) {
-        const model = c.modelCode;
-        const code = c.code || c.commandCode || '';
-        const action = code.includes(':') ? code.split(':').pop() : code;
-        if (model && action) out.add(`${model}.${action}`);
+      const config = path.join(root, dir, 'config');
+      const combined = path.join(config, 'commands.json');
+      const folder = path.join(config, 'commands');
+      const files = [
+        ...(fs.existsSync(combined) ? [combined] : []),
+        ...(fs.existsSync(folder) ? fs.readdirSync(folder).filter(f => f.endsWith('.json')).map(f => path.join(folder, f)) : []),
+      ];
+      for (const file of files) {
+        const value = readJson(file);
+        for (const c of Array.isArray(value) ? value : (value.commands || [value])) {
+          const model = c.modelCode;
+          const type = c.type?.toLowerCase();
+          if (!model || !type || type === 'query') continue;
+          if (['create', 'update', 'delete'].includes(type)) {
+            out.add(`${model}.${type}`);
+            continue;
+          }
+          const code = c.code || c.commandCode || '';
+          const suffix = code.includes(':') ? code.slice(code.indexOf(':') + 1) : code;
+          let verb = suffix;
+          const parts = model.split('_');
+          for (let i = 0; i < parts.length; i++) {
+            const modelSuffix = `_${parts.slice(i).join('_')}`;
+            if (suffix.endsWith(modelSuffix) && suffix.length > modelSuffix.length) {
+              verb = suffix.slice(0, -modelSuffix.length);
+              break;
+            }
+          }
+          if (verb && !['create', 'update', 'delete', 'query'].includes(verb)) out.add(`${model}.${verb}`);
+        }
       }
     }
   }

@@ -77,6 +77,11 @@ for (const scope of ['dept', 'team']) {
     await expect(page.getByTestId('capability-scope-dialog')).toBeVisible();
     const scopeSelect = page.getByTestId('capability-scope-model.qo_quote_common.read');
     await expect(scopeSelect).toHaveValue(scope);
+    const dialog = page.getByTestId('capability-scope-dialog');
+    await expect(dialog.getByRole('combobox')).toHaveCount(5);
+    for (const select of await dialog.getByRole('combobox').all()) await expect(select).toHaveValue(scope);
+    await expect(dialog).not.toContainText('范围配置无效');
+    await expect(dialog).not.toContainText('Qo_supplier_request_line_common');
     const matrixResponse = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);
     expect(matrixResponse.ok()).toBeTruthy();
     const actions = (await matrixResponse.json()).data.modules
