@@ -8,6 +8,7 @@ import React, { useState, useLayoutEffect, useEffect, useId, useRef } from 'reac
 import { createPortal } from 'react-dom';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import { partitionRowActions } from './actionColumnWidth';
+import { useI18n } from '~/contexts/I18nContext';
 
 const DROPDOWN_MIN_WIDTH = 120;
 const DROPDOWN_ESTIMATED_HEIGHT = 40; // single-item baseline; refined per item
@@ -120,6 +121,7 @@ export function RowActionButtons({
   handleAction: (button: ButtonConfig, record?: any) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
@@ -198,7 +200,7 @@ export function RowActionButtons({
               setOpen(!open);
             }}
             className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1 transition-colors"
-            aria-label="More actions"
+            aria-label={t('table_actions.more')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

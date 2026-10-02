@@ -2025,3 +2025,6 @@ designer_settings:
   appearance_description: "Theme, colors and panel layout"
   export_label: "Export settings"
   export_description: "Export format and content options"
+
+table_actions:
+  more: "More actions"

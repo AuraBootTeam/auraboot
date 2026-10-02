@@ -2329,3 +2329,6 @@ designer_settings:
   appearance_description: "主题、颜色和界面布局"
   export_label: "导出设置"
   export_description: "导出格式和内容选项"
+
+table_actions:
+  more: "更多操作"
