@@ -2191,3 +2191,17 @@ designer_viewport:
     tablet: "平板"
     mobile: "手机"
     mobile-small: "小屏手机"
+
+designer_search:
+  scope:
+    all: "全部"
+    fields: "字段"
+    components: "组件"
+    bindings: "绑定"
+    actions: "动作"
+  placeholder: "搜索字段、组件、绑定..."
+  history: "搜索历史"
+  clear_history: "清除历史"
+  clear_query: "清空搜索"
+  no_results: "没有找到匹配 \"{query}\" 的结果"
+  searching: "搜索中"

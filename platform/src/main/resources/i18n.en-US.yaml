@@ -1887,3 +1887,17 @@ designer_viewport:
     tablet: "Tablet"
     mobile: "Mobile"
     mobile-small: "Small mobile"
+
+designer_search:
+  scope:
+    all: "All"
+    fields: "Fields"
+    components: "Components"
+    bindings: "Bindings"
+    actions: "Actions"
+  placeholder: "Search fields, components, bindings..."
+  history: "Search history"
+  clear_history: "Clear history"
+  clear_query: "Clear search"
+  no_results: "No results matching \"{query}\""
+  searching: "Searching"
