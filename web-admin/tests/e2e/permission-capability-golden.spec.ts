@@ -36,12 +36,12 @@ test.describe('Permission v2 capability editor', () => {
     const first = checkboxes.first();
     const before = await first.isChecked();
     await first.click();
-    expect(await first.isChecked()).toBe(!before);
+    await expect(first).toBeChecked({ checked: !before });
     await expect(save).toBeEnabled();
 
     // Toggle back to the baseline -> Save disabled again. (No Save click => non-destructive.)
     await first.click();
-    expect(await first.isChecked()).toBe(before);
+    await expect(first).toBeChecked({ checked: before });
     await expect(save).toBeDisabled();
 
     await page.screenshot({ path: 'test-results/permission-capability-golden.png', fullPage: true });

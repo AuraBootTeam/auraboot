@@ -38,7 +38,7 @@ for (const scope of ['dept', 'team']) {
     await page.getByTestId('role-search-input').fill(role.code);
     await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
     await page.getByTestId(`role-item-${role.code}`).click();
-    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid, { timeout: 15_000 });
 
     // ② set the role default scope to "dept" (仅本部门) via the drawer
     await page.getByTestId('data-scope-modify-btn').click();
@@ -69,8 +69,12 @@ for (const scope of ['dept', 'team']) {
       (r) => r.url().includes('/api/permissions/matrix/') && r.url().includes('/batch'),
       { timeout: 10_000 },
     );
-    await firstCheckbox.check();
-    await grantResp;
+    // The editor commits the checked state only after persistence and readback.
+    await firstCheckbox.click();
+    const response = await grantResp;
+    expect(response.status()).toBe(200);
+    expect(String((await response.json()).code)).toBe('0');
+    await expect(firstCheckbox).toBeChecked();
 
     // the newly-granted code's scope select must read "dept" — INHERITED from the role default
     const scopeSelect = page.getByTestId(`atomic-scope-${code}`);

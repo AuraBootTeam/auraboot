@@ -54,7 +54,7 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await page.getByTestId('role-search-input').fill(role.code);
   await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid, { timeout: 15_000 });
 
   const checkbox = page.getByTestId(`capability-checkbox-${cap!.code}`);
   await checkbox.scrollIntoViewIfNeeded();
@@ -97,8 +97,11 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await expect(page.getByTestId('permission-page')).toBeVisible();
   await page.getByTestId('role-search-input').fill(role.code);
   await page.getByTestId(`role-item-${role.code}`).click();
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
   const checkbox = page.getByTestId(`capability-checkbox-${cap.code}`);
   await checkbox.check();
+  await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('capability-draft')).toBeVisible();
   await expect(page.getByTestId('data-scope-modify-btn')).toBeDisabled();
   await page.getByTestId('permission-right-tab-members').click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();

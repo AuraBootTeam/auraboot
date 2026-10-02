@@ -146,7 +146,7 @@ export default function AdvancedAtomicActions({
           </span>
           <span className="text-[11px] text-gray-400">
             {t(
-              'admin.permission.advanced.summary',
+              'admin.permission.advanced.coverageSummary',
               { total: totalCodes, exceptions: exceptionCount },
               `${totalCodes} actions · ${exceptionCount} granted actions without declared capability coverage`,
             )}
@@ -164,7 +164,7 @@ export default function AdvancedAtomicActions({
           {/* purpose banner */}
           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
             {t(
-              'admin.permission.advanced.banner',
+              'admin.permission.advanced.coverageBanner',
               undefined,
               'Use business capabilities for everyday changes. This table shows individual actions and which declared capabilities include them. Coverage does not identify how an action was granted.',
             )}
@@ -196,7 +196,7 @@ export default function AdvancedAtomicActions({
                 onChange={(e) => setOnlyUncovered(e.target.checked)}
               />
               {t(
-                'admin.permission.advanced.onlyUncovered',
+                'admin.permission.advanced.coverageOnlyUncovered',
                 undefined,
                 'Not covered by business capabilities',
               )}
@@ -210,7 +210,7 @@ export default function AdvancedAtomicActions({
                 <div />
                 <div>{t('admin.permission.advanced.colCode', undefined, 'Code / name')}</div>
                 <div>{t('admin.permission.scope.label', undefined, 'Data scope')}</div>
-                <div>{t('admin.permission.advanced.colSource', undefined, 'Source')}</div>
+                <div>{t('admin.permission.advanced.colCoverage', undefined, 'Capability coverage')}</div>
               </div>
 
               {grouped.length === 0 ? (
@@ -336,7 +336,7 @@ export default function AdvancedAtomicActions({
                             {src.covered ? (
                               <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] text-green-700 dark:border-green-900/40 dark:bg-green-900/10 dark:text-green-400">
                                 {t(
-                                  'admin.permission.advanced.sourceCapability',
+                                  'admin.permission.advanced.coverageCapability',
                                   { name: src.capabilityLabel ?? '' },
                                   `Included in "${src.capabilityLabel ?? ''}"`,
                                 )}
@@ -344,7 +344,7 @@ export default function AdvancedAtomicActions({
                             ) : (
                               <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
                                 {t(
-                                  'admin.permission.advanced.sourceException',
+                                  'admin.permission.advanced.coverageAbsent',
                                   undefined,
                                   'No declared capability coverage',
                                 )}
@@ -361,7 +361,7 @@ export default function AdvancedAtomicActions({
           </div>
           <p className="mt-2 text-[11px] text-gray-400">
             {t(
-              'admin.permission.advanced.legend',
+              'admin.permission.advanced.coverageLegend',
               undefined,
               'Capability coverage means the action is included in a declared capability. Uncovered actions have no such declaration; neither label proves the source of the grant.',
             )}

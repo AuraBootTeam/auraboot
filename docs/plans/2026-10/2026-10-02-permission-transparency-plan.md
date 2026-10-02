@@ -42,7 +42,7 @@ RBAC 一次“允许”不足以证明页签或字段可见。记录解释、页
 
 后端复用 `integration/security/rbac` 的独立权限矩阵及 existing controller IT。浏览器复用 `permission/role-default-scope-golden.spec.ts`、`permission/capability-save-ui-golden.spec.ts`、`rbac/rbac-platform-baseline.golden.spec.ts` 和报价 `quote-surface-permission-release`、`quote-data-scope-isolation`、`x03-team-scope-golden`、`quote-bom-badfile-permissions`。先核对固定 catalog 的实际收集与执行分母，不新增另一份“全量”清单代替既有 gate。
 
-当前 browser E2E executed=0；前一轮管理员页面浏览只是观察，不是本分支修复验收。独立 development runtime 为 `permission-transparency` / slot 151 / DB `auraboot_151`，尚未启动 Web/BFF/backend 常驻栈。
+后端验收使用 slot151；UI 续作用独立产品 runtime `permission-transparency-ui-r2` / slot154 / DB `enterprise_154`。所有浏览器证据只对应其冻结源码，不借用共享 canonical 的运行栈。
 
 ## 当前执行账本
 
@@ -52,7 +52,8 @@ RBAC 一次“允许”不足以证明页签或字段可见。记录解释、页
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | service/controller UT | aura gradle permission-transparency :test，6 个指定类 | 90 | 90 | 90 | 0 | 0 | 0 | `.workspace/evidence/permission-transparency/backend-final/` 的 JUnit XML |
 | HTTP + DB IT | 同次运行 PermissionMatrixPolicyControllerIT | 6 | 6 | 6 | 0 | 0 | 0 | 同目录对应 JUnit XML；DB auraboot_151 |
-| browser E2E | 尚未启动本分支产品栈 | 0 | 0 | 0 | 0 | 0 | 1 | 无本分支浏览器 runner 证据 |
+| UI targeted browser（首轮） | 5 个既有权限文件 | 12 | 12 | 8 | 4 | 0 | 0 | Workspace `ui/browser-results.json`；快速交互状态时序待修正 |
+| roles-full（首轮 quoteops 分组） | 产品公开 gate | 20 | 20 | 19 | 1 | 0 | 0 | Workspace `ui/roles-full.log`；formal expiry 在最后请求耗尽 15 秒全用例预算，chromium 分组尚未执行 |
 
 受控 mutation 将实际记录改传 null，`evaluatesActualRecordWithTargetIdentityAndRestoresCaller` 执行 1 / 失败 1；恢复后上述 96 项定向检查通过。初次 IT 的 1 项失败来自断言使用不存在的 `success` 响应字段，按实际 `code` 契约修正，保留初次 XML。报告与执行/源码身份索引保留在 Workspace `.workspace/evidence/permission-transparency/`，未将其升级为全量验收。
 
@@ -62,6 +63,12 @@ RBAC 一次“允许”不足以证明页签或字段可见。记录解释、页
 
 ## 合并后续作（2026-10-02）
 
-PR #2154 已核实进入 origin/main，执行 closeout 后删除旧分支，目录保留用于 UI 续作。独立产品 runtime 改为 `permission-transparency-ui` / slot 152 / DB `enterprise_152`；五个源仓来自已冻结 worktree，未使用 canonical 未提交代码。金蝶 L4 默认连接为空，使用公开 launcher 配置 `QUOTE_BOM_USE_JIEJIA_L4_DEFAULTS=0` 继续权限回归；不作为金蝶实链通过证据。
+PR #2154 已核实进入 origin/main，执行 closeout 后删除旧分支，目录保留用于 UI 续作。首套 UI runtime slot152 已关闭，当前独立产品 runtime 为 `permission-transparency-ui-r2` / slot154 / DB `enterprise_154`；五个源仓来自已冻结 worktree，未使用 canonical 未提交代码。金蝶 L4 默认连接为空，使用公开 launcher 配置 `QUOTE_BOM_USE_JIEJIA_L4_DEFAULTS=0` 继续权限回归；不作为金蝶实链通过证据。
 
 前端已实施：新声明能力自动进入主选择区、team 选项、默认与实际范围分离、非法/缺失/读取失败显式状态、保存变更预览、失败保留草稿、切换角色/页签/路由的草稿保护、高级统计改称“未被业务能力覆盖”。执行中的 UI 状态矩阵保存在 `.workspace/evidence/permission-transparency/ui/acceptance-matrix.md`，浏览器尚未验收，不宣称全量通过。
+
+## 当前重验边界
+
+前端 48 项 UT 和 typecheck 已通过。定向浏览器第一轮 8/12；取消草稿的同一用例手动及带 trace 通过，快速路径待通过目标 role PID 和草稿回显同步确认。原子动作编辑按持久化/read-back 展示，测试不能要求乐观更新。角色门禁第一轮 19/20，销售上传及多价格通道、采购导入、四类角色菜单、审批通过/拒绝已执行；expiry 重验沿用同文件正式审批的 120 秒旅程预算。失败证据保留，不能以重验结果抹除。
+
+新增权限编辑文案同时进入构件 YAML 和 bootstrap seed，既有 DB 无新 seed 时也能加载；覆盖说明使用新的语义 key，避免旧 DB 的“破例/来源”文案覆写。DB 租户覆盖仍优先。完整角色门禁、share 撤销/过期、上传后附件预览、企业旧 explain 与 PCBA 错误 role name 声明均保持在未关闭分母。最终结果以 Workspace 对应源码的执行账本为准。

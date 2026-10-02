@@ -917,13 +917,13 @@
   },
   {
     "key": "admin.permission.advanced.summary",
-    "zh-CN": "共 {total} 个动作 · {exceptions} 项已授权动作未被业务能力覆盖",
-    "en-US": "{total} actions · {exceptions} granted actions without business capability coverage"
+    "zh-CN": "{total} 项原子码 · {exceptions} 项破例",
+    "en-US": "{total} codes · {exceptions} exceptions"
   },
   {
     "key": "admin.permission.advanced.banner",
-    "zh-CN": "日常授权请使用上方业务能力。此表用于查看单个动作及包含它的能力；覆盖关系不能证明授权来源。",
-    "en-US": "Use business capabilities for everyday changes. This table shows individual actions and which capabilities include them. Coverage does not prove the source of a grant."
+    "zh-CN": "这是底层原子权限码 — 日常请用上方“业务能力”,它会自动管理这些。仅用于:① 审计核对某能力包含哪些原子码;② 破例授予尚未被任何能力覆盖的权限。",
+    "en-US": "These are low-level permission codes — for everyday work use the capability checklist above, which manages them automatically. Use this only to audit which codes a capability includes, or to grant an exception not yet covered by any capability."
   },
   {
     "key": "admin.permission.advanced.search",
@@ -937,8 +937,8 @@
   },
   {
     "key": "admin.permission.advanced.onlyUncovered",
-    "zh-CN": "仅看未被业务能力覆盖的动作",
-    "en-US": "Actions without business capability coverage"
+    "zh-CN": "只看未覆盖/破例",
+    "en-US": "Uncovered / exception only"
   },
   {
     "key": "admin.permission.advanced.colCode",
@@ -957,18 +957,18 @@
   },
   {
     "key": "admin.permission.advanced.sourceCapability",
-    "zh-CN": "能力「{name}」包含",
-    "en-US": "Included in “{name}”"
+    "zh-CN": "能力「{name}」",
+    "en-US": "Capability “{name}”"
   },
   {
     "key": "admin.permission.advanced.sourceException",
-    "zh-CN": "无业务能力覆盖",
-    "en-US": "No business capability coverage"
+    "zh-CN": "未覆盖 · 破例",
+    "en-US": "Uncovered · exception"
   },
   {
     "key": "admin.permission.advanced.legend",
-    "zh-CN": "“能力包含”表示该动作被某个已声明能力收录；“无覆盖”表示没有对应声明。二者都不代表实际授权来源。",
-    "en-US": "Coverage means a declared capability includes the action. Uncovered means no such declaration exists. Neither label proves the source of a grant."
+    "zh-CN": "绿色“能力 X”= 由上方某能力授予,改它请去能力清单;黄色“破例”= 无对应业务能力,在此直接授予(计入破例,留审计)。",
+    "en-US": "Green “Capability X” = granted by a capability above; edit it there. Amber “exception” = no matching business capability; grant directly here (counted as an exception for audit)."
   },
   {
     "key": "admin.permission.advanced.configurePolicy",
@@ -977,8 +977,8 @@
   },
   {
     "key": "admin.permission.effective.summary",
-    "zh-CN": "已授权动作 {total} 项 · {exceptions} 项未被业务能力覆盖",
-    "en-US": "{total} granted actions · {exceptions} not covered by business capabilities"
+    "zh-CN": "有效权限 {total} 项 · {exceptions} 项破例",
+    "en-US": "{total} effective permissions · {exceptions} exceptions"
   },
   {
     "key": "admin.permission.members.orgPickerUnavailable",
@@ -4064,5 +4064,45 @@
     "key": "admin.permission.editor.roleHint",
     "zh-CN": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。",
     "en-US": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
+  },
+  {
+    "key": "admin.permission.advanced.coverageSummary",
+    "zh-CN": "共 {total} 个动作 · {exceptions} 项已授权动作未被业务能力覆盖",
+    "en-US": "{total} actions · {exceptions} granted actions without business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageBanner",
+    "zh-CN": "日常授权请使用上方业务能力。此表用于查看单个动作及包含它的能力；覆盖关系不能证明授权来源。",
+    "en-US": "Use business capabilities for everyday changes. This table shows individual actions and which capabilities include them. Coverage does not prove the source of a grant."
+  },
+  {
+    "key": "admin.permission.advanced.coverageOnlyUncovered",
+    "zh-CN": "仅看未被业务能力覆盖的动作",
+    "en-US": "Actions without business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageCapability",
+    "zh-CN": "能力「{name}」包含",
+    "en-US": "Included in “{name}”"
+  },
+  {
+    "key": "admin.permission.advanced.coverageAbsent",
+    "zh-CN": "无业务能力覆盖",
+    "en-US": "No business capability coverage"
+  },
+  {
+    "key": "admin.permission.advanced.coverageLegend",
+    "zh-CN": "“能力包含”表示该动作被某个已声明能力收录；“无覆盖”表示没有对应声明。二者都不代表实际授权来源。",
+    "en-US": "Coverage means a declared capability includes the action. Uncovered means no such declaration exists. Neither label proves the source of a grant."
+  },
+  {
+    "key": "admin.permission.effective.coverageSummary",
+    "zh-CN": "已授权动作 {total} 项 · {exceptions} 项未被业务能力覆盖",
+    "en-US": "{total} granted actions · {exceptions} not covered by business capabilities"
+  },
+  {
+    "key": "admin.permission.advanced.colCoverage",
+    "zh-CN": "能力覆盖",
+    "en-US": "Capability coverage"
   }
 ]

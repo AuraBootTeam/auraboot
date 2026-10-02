@@ -337,7 +337,7 @@ export default function CapabilityRoleEditor({
         <div className="flex items-center justify-between">
           <span data-testid="effective-summary" className="text-xs text-gray-500">
             {t(
-              'admin.permission.effective.summary',
+              'admin.permission.effective.coverageSummary',
               { total: effective.total, exceptions: effective.exceptions },
               `${effective.total} granted actions · ${effective.exceptions} not covered by declared capabilities`,
             )}
