@@ -102,6 +102,29 @@ class SchemaManagementServiceMethodsTest {
         when(tableMetadataService.isColumnNullable("tb_test", "row_version")).thenReturn(false);
     }
 
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"skip", "view", "namedQuery", "endpoint", "sqlView", "inline"})
+    void metadataOnlyModelsNeverExecuteCreateOrSyncDdl(String kind) {
+        if ("skip".equals(kind)) {
+            testModel.setExtension(java.util.Map.of("skipTableCreation", true));
+        } else if ("view".equals(kind)) {
+            testModel.setModelType("view");
+        } else {
+            testModel.setSourceType(kind);
+        }
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        SchemaOperationResult created = schemaManagementService.createTableByModel("test_model");
+        assertTrue(created.getSuccess(), "metadata-only creation must not request DDL");
+        SchemaOperationResult synced = schemaManagementService.updateTableByModel("test_model");
+        assertTrue(synced.getSuccess(), "metadata-only field reimport must not request DDL");
+        assertEquals(SchemaOperationResult.SchemaOperationType.CREATE_TABLE, created.getOperationType());
+        assertEquals(SchemaOperationResult.SchemaOperationType.SYNC_SCHEMA, synced.getOperationType());
+        verifyNoInteractions(dynamicDataMapper);
+        verify(tableMetadataService, never()).tableExists(anyString());
+    }
+
     @Test
     @DisplayName("createTableByModel - skips DDL for externally managed platform tables")
     void testCreateTableByModel_ExternallyManagedTableSkipsDdl() {
