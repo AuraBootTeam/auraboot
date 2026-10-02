@@ -953,7 +953,13 @@ test.describe('Open Platform golden journey', () => {
     expect(overflow).toBeLessThanOrEqual(1);
     await capture(page, 'OP-OPS-16-top', false);
     await expect(operations).toContainText('open-platform-golden-whoami');
-    await operations.scrollIntoViewIfNeeded();
+    const mobileAudit = operations.getByTestId('open-platform-call-audit');
+    await mobileAudit.scrollIntoViewIfNeeded();
+    await expect(mobileAudit.locator('code').first()).toBeInViewport();
+    // Settle the resized scroll container before capturing its painted content.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await capture(page, 'OP-OPS-16', false);
     await eventCatalog.scrollIntoViewIfNeeded();
     await captureLocator(eventCatalog, 'OP-PROTO-10');
