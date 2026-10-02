@@ -59,3 +59,9 @@ services:
 volumes:
   skills_c2_postgres_data:
   oss_ci_redis_data:
+
+# Created by the runner using the explicit CI subnet pool, never the implicit pool.
+networks:
+  default:
+    external: true
+    name: "${AURA_OSS_CI_NETWORK:?backend CI runner must allocate its own network}"

@@ -12,6 +12,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACTS="${AURA_REGRESSION_ARTIFACTS:-$PROJECT_ROOT/.workspace/oss-backend-unit-ci}"
 RUNTIME_TOKEN="$(printf '%s' "${AURA_REGRESSION_SLOT:-local}-$$" | tr -cd '[:alnum:]-')"
 COMPOSE_PROJECT="aura-ci-oss-backend-$RUNTIME_TOKEN"
+export AURA_OSS_CI_NETWORK="${COMPOSE_PROJECT}_default"
+NETWORK_CREATED=false
 
 free_port() {
   local candidate="$1" limit="$2"
@@ -54,6 +56,26 @@ environment_invalid() {
   exit 2
 }
 
+create_isolated_network() {
+  local subnet_index
+  # Use the existing release-image CI pool; Docker arbitrates overlap atomically.
+  # Retained environments must not consume Docker's finite implicit pools.
+  for subnet_index in $(seq 0 255); do
+    if docker network create --subnet "10.247.${subnet_index}.0/24" \
+        --label "aura.ci.compose-project=$COMPOSE_PROJECT" "$AURA_OSS_CI_NETWORK" \
+        > "$ARTIFACTS/network-create.log" 2>&1; then
+      NETWORK_CREATED=true
+      printf '[oss-backend-unit-ci] isolated network created: name=%s subnet=10.247.%s.0/24\n' \
+        "$AURA_OSS_CI_NETWORK" "$subnet_index"
+      return 0
+    fi
+    if ! grep -q 'Pool overlaps' "$ARTIFACTS/network-create.log"; then
+      environment_invalid 'isolated network creation failed; inspect network-create.log'
+    fi
+  done
+  environment_invalid 'no free isolated CI network in 10.247.0.0/16'
+}
+
 cleanup() {
   status=$?
   docker compose "${COMPOSE_ARGS[@]}" ps --all > "$ARTIFACTS/compose-ps.txt" 2>&1 || true
@@ -62,11 +84,13 @@ cleanup() {
   # Retain containers and volumes for evidence, but release the finite Docker
   # address-pool allocation. Stopped containers can be reattached by Compose if
   # an owner later restarts this exact retained project.
-  while IFS= read -r container_id; do
-    [[ -n "$container_id" ]] || continue
-    docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
-  done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
-  docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
+  if [[ "$NETWORK_CREATED" == true ]]; then
+    while IFS= read -r container_id; do
+      [[ -n "$container_id" ]] || continue
+      docker network disconnect -f "${COMPOSE_PROJECT}_default" "$container_id" >/dev/null 2>&1 || true
+    done < <(docker compose "${COMPOSE_ARGS[@]}" ps -aq 2>/dev/null || true)
+    docker network rm "${COMPOSE_PROJECT}_default" >/dev/null 2>&1 || true
+  fi
   printf '[oss-backend-unit-ci] runtime retained and stopped; network released: compose_project=%s artifacts=%s\n' \
     "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
@@ -119,6 +143,8 @@ if ! PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 \
     > "$ARTIFACTS/playwright-install.log" 2>&1; then
   environment_invalid 'cannot install lockfile-pinned Playwright Chromium within 10 minutes'
 fi
+
+create_isolated_network
 
 if ! docker compose "${COMPOSE_ARGS[@]}" up -d --wait postgres redis kafka; then
   environment_invalid 'CI PostgreSQL/Redis/Kafka stack did not become healthy'

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
@@ -142,4 +144,58 @@ test('backend CI override provisions a required native Kafka broker', () => {
   assert.match(override, /INTERNAL:\/\/kafka:9092/);
   assert.match(override, /KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL/);
   assert.match(override, /kafka-topics --bootstrap-server localhost:9092 --list/);
+});
+
+function allocateWithDocker(t, mode) {
+  const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-network-contract-'));
+  t.after(() => rmSync(artifacts, { recursive: true, force: true }));
+  const allocator = source.match(/create_isolated_network\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(allocator, 'runner must allocate an explicit subnet before Compose');
+  return spawnSync('bash', ['-c', `
+    COMPOSE_PROJECT=own-contract
+    AURA_OSS_CI_NETWORK=own-contract_default
+    NETWORK_CREATED=false
+    calls=0
+    environment_invalid() { printf '%s\\n' "$*" >&2; printf 'calls=%s\\n' "$calls"; exit 2; }
+    docker() {
+      calls=$((calls + 1))
+      printf '%s\\n' "$*" >> "$ARTIFACTS/commands.txt"
+      if [[ "$MODE" == unexpected ]]; then printf 'permission denied\\n' >&2; return 1; fi
+      if [[ "$MODE" == exhausted || "$calls" == 1 ]]; then
+        printf 'Error response from daemon: Pool overlaps with other one on this address space\\n' >&2
+        return 1
+      fi
+      printf 'created-network-id\\n'
+    }
+    ${allocator}
+    create_isolated_network
+    printf 'created=%s calls=%s\\n' "$NETWORK_CREATED" "$calls"
+    cat "$ARTIFACTS/commands.txt"
+  `], { encoding: 'utf8', env: { ...process.env, ARTIFACTS: artifacts, MODE: mode } });
+}
+
+test('CI network allocation advances only after overlap and Compose uses the owned external network', t => {
+  const result = allocateWithDocker(t, 'overlap');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /created=true calls=2/);
+  assert.match(result.stdout, /network create --subnet 10\.247\.1\.0\/24 --label aura\.ci\.compose-project=own-contract own-contract_default/);
+  const compose = readFileSync(composeOverride, 'utf8');
+  assert.match(compose, /networks:\s+default:\s+external: true\s+name: "\$\{AURA_OSS_CI_NETWORK:\?/);
+  assert.ok(source.indexOf('\ncreate_isolated_network\n') < source.indexOf('up -d --wait postgres redis kafka'));
+  assert.match(source, /if \[\[ "\$NETWORK_CREATED" == true \]\]; then/);
+});
+
+test('an exhausted explicit network pool fails environment-invalid without claiming creation', t => {
+  const result = allocateWithDocker(t, 'exhausted');
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /calls=256/);
+  assert.match(result.stderr, /no free isolated CI network/);
+  assert.doesNotMatch(result.stdout, /created=true/);
+});
+
+test('unexpected Docker errors fail immediately instead of being retried as subnet collisions', t => {
+  const result = allocateWithDocker(t, 'unexpected');
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /calls=1/);
+  assert.match(result.stderr, /isolated network creation failed/);
 });
