@@ -881,7 +881,7 @@ test.describe('Open Platform golden journey', () => {
     await expect(apiReference).toHaveURL(
       /swagger-ui\/index\.html\?urls\.primaryName=open-platform/,
     );
-    await apiReference.goto(`${BACKEND_URL}/swagger-ui/index.html?urls.primaryName=open-platform`);
+    expect(new URL(apiReference.url()).origin).toBe(new URL(WEB_BASE_URL).origin);
     await expect(apiReference.locator('.opblock').first()).toBeVisible({ timeout: 30_000 });
     await expect(apiReference.locator('body')).not.toContainText(
       /Whitelabel Error Page|404 Not Found|Loading page configuration/,
