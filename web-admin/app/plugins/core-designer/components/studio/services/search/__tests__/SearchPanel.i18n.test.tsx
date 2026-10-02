@@ -81,6 +81,41 @@ describe.each(['en-US', 'zh-CN'])('designer search in %s', locale => {
     expect(searchService.getState().history).toEqual([]);
     expect(screen.queryByText(labels.history)).not.toBeInTheDocument();
   });
+  it.each([new Error('Fixture index unavailable'), 'non-error failure'])(
+    'fails closed for a throwing indexer (%s) and recovers without a stale error', async failure => {
+      const labels = dictionary(locale).designer_search;
+      localized(locale);
+      const input = screen.getByPlaceholderText(labels.placeholder);
+      fireEvent.change(input, { target: { value: 'amount' } });
+      await waitFor(() => expect(searchService.getState().results).toHaveLength(4));
+      const failingIndexer = () => { throw failure; };
+      searchService.registerIndexer('fields', failingIndexer);
+      try {
+        fireEvent.change(input, { target: { value: 'unavailable' } });
+        const alert = await screen.findByRole('alert');
+        expect(alert).toHaveTextContent(failure instanceof Error ? failure.message : labels.failed);
+        expect(searchService.getState().results).toEqual([]);
+        expect(screen.queryByRole('button', { name: 'amount fields' })).not.toBeInTheDocument();
+        expect(screen.queryByText(labels.no_results.replace('{query}', 'unavailable'))).not.toBeInTheDocument();
+      } finally {
+        searchService.unregisterIndexer('fields', failingIndexer);
+      }
+      fireEvent.change(input, { target: { value: 'amount' } });
+      await waitFor(() => expect(searchService.getState().results).toHaveLength(4));
+      expect(searchService.getState().error).toBeNull();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    },
+  );
+  it('localizes the loading status without showing an empty-result message', () => {
+    const labels = dictionary(locale).designer_search;
+    const initial = { ...searchService.getState(), loading: true };
+    vi.spyOn(searchService, 'getState').mockReturnValue(initial);
+    vi.spyOn(searchService, 'subscribe').mockImplementation(listener => { listener(initial); return () => {}; });
+    localized(locale);
+    fireEvent.change(screen.getByPlaceholderText(labels.placeholder), { target: { value: 'amount' } });
+    expect(screen.getByRole('status', { name: labels.searching })).toBeInTheDocument();
+    expect(screen.queryByText(labels.no_results.replace('{query}', 'amount'))).not.toBeInTheDocument();
+  });
   it('keeps keyboard selection and caller-provided placeholder semantics', async () => {
     const onSelect = vi.fn(); localized(locale, { onSelect, placeholder: 'Custom query' });
     const input = screen.getByPlaceholderText('Custom query');
@@ -93,4 +128,24 @@ describe.each(['en-US', 'zh-CN'])('designer search in %s', locale => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(input).toHaveValue(''); expect(searchService.getState().selectedId).toBeNull();
   });
+});
+
+it('clears stale errors on cached and empty query recovery', async () => {
+  let fail = false;
+  const indexer = () => { if (fail) throw new Error('Transient index failure'); return []; };
+  searchService.registerIndexer('fields', indexer);
+  try {
+    await searchService.search({ query: 'amount' });
+    fail = true;
+    await searchService.search({ query: 'uncached-failure' });
+    expect(searchService.getState().error).toBe('Transient index failure');
+    await searchService.search({ query: 'amount' });
+    expect(searchService.getState().results).toHaveLength(4);
+    expect(searchService.getState().error).toBeNull();
+    await searchService.search({ query: 'another-uncached-failure' });
+    expect(searchService.getState().error).toBe('Transient index failure');
+    await searchService.search({ query: '   ' });
+    expect(searchService.getState().error).toBeNull();
+    expect(searchService.getState().results).toEqual([]);
+  } finally { searchService.unregisterIndexer('fields', indexer); }
 });

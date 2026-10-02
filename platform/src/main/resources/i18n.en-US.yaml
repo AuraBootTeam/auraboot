@@ -1889,6 +1889,7 @@ designer_viewport:
     mobile-small: "Small mobile"
 
 designer_search:
+  failed: "Search failed"
   scope:
     all: "All"
     fields: "Fields"

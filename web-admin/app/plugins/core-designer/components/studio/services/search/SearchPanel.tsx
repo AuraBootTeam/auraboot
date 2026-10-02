@@ -324,11 +324,13 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
 
       {/* Error */}
       {state.error && (
-        <div className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">{state.error}</div>
+        <div role="alert" className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">
+          {state.errorKey ? t(state.errorKey) : state.error}
+        </div>
       )}
 
       {/* Results */}
-      {!state.loading && query && state.results.length > 0 && (
+      {!state.loading && !state.error && query && state.results.length > 0 && (
         <div
           ref={resultsRef}
           className="mt-2 max-h-80 overflow-auto rounded-md border border-gray-200"
@@ -384,7 +386,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
       )}
 
       {/* No results */}
-      {!state.loading && query && state.results.length === 0 && (
+      {!state.loading && !state.error && query && state.results.length === 0 && (
         <div className="mt-2 py-4 text-center text-sm text-gray-500">
           {t('designer_search.no_results', { query })}
         </div>

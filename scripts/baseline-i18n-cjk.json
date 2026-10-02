@@ -1,5 +1,5 @@
 {
   "rule": "CJK codepoints in web-admin/app may only decrease (ratchet)",
-  "cjkCodepoints": 135274,
-  "filesWithCjk": 1084
+  "cjkCodepoints": 135270,
+  "filesWithCjk": 1083
 }

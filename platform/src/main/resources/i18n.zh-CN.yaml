@@ -2193,6 +2193,7 @@ designer_viewport:
     mobile-small: "小屏手机"
 
 designer_search:
+  failed: "搜索失败"
   scope:
     all: "全部"
     fields: "字段"
