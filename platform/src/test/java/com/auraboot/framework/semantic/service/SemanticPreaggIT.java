@@ -6,6 +6,7 @@ import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.entity.AbSemanticMetric;
 import com.auraboot.framework.semantic.entity.AbSemanticPreagg;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
+import com.auraboot.framework.semantic.mapper.AbSemanticPreaggMapper;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -91,6 +95,8 @@ class SemanticPreaggIT {
     private SemanticQueryService queryService;
     @Autowired
     private AbSemanticMetricMapper metricMapper;
+    @Autowired
+    private AbSemanticPreaggMapper preaggMapper;
     @Autowired
     private JdbcTemplate jdbc;
 
@@ -204,5 +210,36 @@ class SemanticPreaggIT {
                 "SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
                 Integer.class, mvName.replace("\"", ""));
         assertThat(mvLeft).isZero();
+    }
+
+    @Test
+    @DisplayName("Due sweep refreshes the governed metric without caller context")
+    void dueSweepWithoutCallerContext() {
+        String run = UUID.randomUUID().toString().replace("-", "");
+        insertAliasRow("golden-sweep-" + run + "-one");
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-sweep-" + run, modelPid, "alias_count_metric", List.of(), 1);
+        try {
+            String metricColumn = "preagg_golden_alias." + preagg.getMetricCode();
+            long before = mvMetricValue(preagg.getMvName(), metricColumn);
+            insertAliasRow("golden-sweep-" + run + "-two");
+            long expected = liveValue();
+            assertThat(expected).isGreaterThan(before);
+            OffsetDateTime stale = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(2);
+            preagg.setLastRefreshedAt(stale);
+            preaggMapper.updateById(preagg);
+
+            MetaContext.clear();
+            preaggService.refreshAllDue();
+            // Check the scheduler boundary before any helper rebinds the tenant.
+            assertThat(MetaContext.exists()).isFalse();
+            assertThat(mvMetricValue(preagg.getMvName(), metricColumn)).isEqualTo(expected);
+            MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+            assertThat(preaggMapper.findByPid(TENANT_ID, preagg.getPid()).getLastRefreshedAt())
+                    .isAfter(stale);
+        } finally {
+            MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
+            preaggService.delete(preagg.getPid());
+        }
     }
 }
