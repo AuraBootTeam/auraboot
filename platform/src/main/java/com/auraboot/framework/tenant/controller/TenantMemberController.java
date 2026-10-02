@@ -104,7 +104,6 @@ public class TenantMemberController {
     }
 
     @GetMapping("/{memberPid}/offboarding-impact")
-    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     public ApiResponse<TenantMemberOffboardingImpactResponse> inspectOffboardingImpact(
             @PathVariable String memberPid,
             @RequestParam(required = false) String targetMemberPid,
@@ -115,11 +114,11 @@ public class TenantMemberController {
     }
 
     @GetMapping("/{memberPid}/offboarding-candidates")
-    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     public ApiResponse<List<TenantMemberOffboardingCandidate>> listOffboardingCandidates(
             @PathVariable String memberPid,
+            @RequestParam(defaultValue = "remove") String action,
             @CurrentUserId Long userId) {
-        return ApiResponse.success(memberApplicationService.listOffboardingCandidates(memberPid, userId));
+        return ApiResponse.success(memberApplicationService.listOffboardingCandidates(memberPid, action, userId));
     }
 
     @GetMapping("/{memberPid}/teams")

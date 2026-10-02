@@ -7,6 +7,10 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
@@ -39,6 +43,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -78,6 +83,15 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
 
     @Autowired
     private TenantMemberMapper tenantMemberMapper;
+
+    @Autowired
+    private UserPermissionService userPermissionService;
+
+    @Autowired
+    private PermissionFacade permissionFacade;
+
+    @Autowired
+    private DynamicDataService dynamicDataService;
     
     @Override
     public PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId) {
@@ -333,17 +347,14 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         if (!member.getTenantId().equals(currentTenantId)) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
         }
-        TenantMemberOffboardingAction parsedAction;
-        try {
-            parsedAction = TenantMemberOffboardingAction.valueOf(action.trim().toUpperCase());
-        } catch (RuntimeException ex) {
-            throw new BusinessException(ResponseCode.BadParam, "Invalid offboarding action: " + action);
-        }
+        TenantMemberOffboardingAction parsedAction = parseOffboardingAction(action);
+        authorizeOffboardingPreflight(memberPid, parsedAction, userId);
         return offboardingCoordinator.inspect(member, targetMemberPid, userId, parsedAction);
     }
 
     @Override
-    public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, Long userId) {
+    public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(
+            String memberPid, String action, Long userId) {
         TenantMember member = tenantMemberService.findByPid(memberPid);
         if (member == null) {
             throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
@@ -355,12 +366,64 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         if (!member.getTenantId().equals(currentTenantId)) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
         }
+        Long subjectMemberId = authorizeOffboardingPreflight(
+                memberPid, parseOffboardingAction(action), userId);
         return tenantMemberMapper.findActiveOffboardingCandidates(currentTenantId, memberPid).stream()
+                .filter(row -> subjectMemberId == null || canReadOffboardingRecord(
+                        String.valueOf(row.get("memberPid")), subjectMemberId))
                 .map(row -> new TenantMemberOffboardingCandidate(
                         String.valueOf(row.get("memberPid")),
                         String.valueOf(row.get("displayName")),
                         row.get("email") == null ? null : String.valueOf(row.get("email"))))
                 .toList();
+    }
+
+    private TenantMemberOffboardingAction parseOffboardingAction(String action) {
+        if (action == null) {
+            throw new BusinessException(ResponseCode.BadParam, "Offboarding action is required");
+        }
+        try {
+            return TenantMemberOffboardingAction.valueOf(action.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid offboarding action: " + action);
+        }
+    }
+
+    /** Null denotes the existing tenant-wide legacy member administrator path. */
+    private Long authorizeOffboardingPreflight(
+            String memberPid, TenantMemberOffboardingAction action, Long userId) {
+        if (userId == null) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Authenticated member is required");
+        }
+        if (userPermissionService.hasPermission(userId, MetaPermission.TENANT_MEMBER_MANAGE)) {
+            return null;
+        }
+        String verb = switch (action) {
+            case SUSPEND -> "suspend";
+            case DEACTIVATE -> "leave";
+            case REMOVE -> "delete";
+        };
+        if (!userPermissionService.hasPermission(userId, "model.tenant_member." + verb)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member action is not permitted");
+        }
+        Long subjectMemberId = MetaContext.getCurrentMemberId();
+        if (subjectMemberId == null) {
+            TenantMember subject = tenantMemberService.findByTenantIdAndUserId(
+                    MetaContext.getCurrentTenantId(), userId);
+            subjectMemberId = subject == null ? null : subject.getId();
+        }
+        if (subjectMemberId == null || !canReadOffboardingRecord(memberPid, subjectMemberId)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Member record is not accessible");
+        }
+        return subjectMemberId;
+    }
+
+    private boolean canReadOffboardingRecord(String memberPid, Long subjectMemberId) {
+        // Load the actual model map before evaluating, as the command target-scope phase does.
+        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
+                () -> dynamicDataService.getById("tenant_member", memberPid));
+        return record != null && permissionFacade.canOperate(
+                subjectMemberId, "tenant_member", "read", record).granted();
     }
 
     @Override

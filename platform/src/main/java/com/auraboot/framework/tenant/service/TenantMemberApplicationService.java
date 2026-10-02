@@ -67,7 +67,7 @@ public interface TenantMemberApplicationService {
     TenantMemberOffboardingImpactResponse inspectOffboardingImpact(
             String memberPid, String targetMemberPid, String action, Long userId);
 
-    List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, Long userId);
+    List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, String action, Long userId);
     
     /**
      * 批量移除成员
