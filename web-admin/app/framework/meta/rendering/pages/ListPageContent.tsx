@@ -1030,6 +1030,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // State management - P2-1 fix: merged into single state
   const [data, setData] = useState<DynamicEntity[]>([]);
+  const [dataReady, setDataReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // T9 — cross-page selection model. `selectionState` is the single source of
@@ -2186,6 +2187,7 @@ function ListPageContentInner(props: PageContentProps) {
             const start = requestedPageZeroBased * requestedPageSize;
             const sliced = responseData.slice(start, start + requestedPageSize);
             setData(sliced as DynamicEntity[]);
+            setDataReady(true);
             setPageState((prev) => ({
               ...prev,
               pagination: {
@@ -2199,6 +2201,7 @@ function ListPageContentInner(props: PageContentProps) {
             const currentPage = Number(responseData.page ?? requestedPageNum) || requestedPageNum;
             const total = Number(responseData.total ?? 0);
             setData(records);
+            setDataReady(true);
             setPageState((prev) => ({
               ...prev,
               pagination: {
@@ -2476,6 +2479,7 @@ function ListPageContentInner(props: PageContentProps) {
               // API returned flat array — client-side pagination
               const sliced = (responseData as any[]).slice(0, pagination.pageSize);
               setData(sliced as DynamicEntity[]);
+              setDataReady(true);
               setPageState((prev) => ({
                 ...prev,
                 pagination: {
@@ -2489,6 +2493,7 @@ function ListPageContentInner(props: PageContentProps) {
               const currentPage = Number(responseData.page ?? 1) || 1;
               const total = Number(responseData.total ?? 0);
               setData(records);
+              setDataReady(true);
               setPageState((prev) => ({
                 ...prev,
                 pagination: {
@@ -4680,6 +4685,9 @@ function ListPageContentInner(props: PageContentProps) {
       <div
         className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
         data-testid="dynamic-list"
+        data-model-code={modelCode}
+        data-ready={dataReady && !loading}
+        aria-busy={!dataReady || loading}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
         <div className="rounded-card border-border bg-panel relative overflow-hidden border shadow-sm">

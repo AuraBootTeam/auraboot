@@ -253,3 +253,13 @@ describe('dashboardService.normalizeDashboard', () => {
     ]);
   });
 });
+
+describe('authored line-chart presentation survives dashboard loading', () => {
+  it('preserves translated legend labels and line/area presentation through normalization', () => {
+    const config = { dataSource: { type: 'namedQuery', queryCode: 'inv_movement_monthly_trend' },
+      metricLabels: { inbound_count: { 'zh-CN': '入库单数', en: 'Inbound documents' }, outbound_count: { 'zh-CN': '出库单数' } },
+      smooth: true, areaStyle: true, showSymbol: false };
+    const dashboard = normalizeDashboard(baseDashboard([{ id: 'trend', type: 'smart-line-chart', config }]));
+    expect(dashboard.widgets[0].config).toMatchObject(config);
+  });
+});
