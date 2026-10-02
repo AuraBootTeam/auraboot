@@ -32,6 +32,7 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
           blocks: [
             { id: 'probe_stat', blockType: 'stat-card', title: 'Orders today', layout: { span: 12 } },
             { id: 'probe_desc', blockType: 'description', title: 'Notes', layout: { span: 12 } },
+            { id: 'probe_strip', blockType: 'metric-strip', title: 'KPI', layout: { span: 12 } },
           ],
         },
       ],
@@ -99,22 +100,43 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
   await page.waitForTimeout(2500);
   await dump('after-reload-desc');
 
-  // B2 probe: which desc field persists? Fill candidates in priority order.
-  const descCandidates = [
-    'inspector-field-props.content',
-    'inspector-field-props.markdown',
-    'inspector-field-props.text',
-    'inspector-field-content',
+  // A1 probe: metric-strip field set after reload.
+  await page.getByTestId('outline-item-probe_strip').click();
+  await page.waitForTimeout(1500);
+  await dump('strip-reload');
+  // Persist-path candidates for variant/metrics.
+  const stripCandidates = [
+    'inspector-field-props.variant',
+    'inspector-field-variant',
+    'inspector-field-props.metrics',
+    'inspector-field-metrics',
   ];
-  let descFilled = '';
-  for (const tid of descCandidates) {
+  let stripFilled = '';
+  for (const tid of stripCandidates) {
     const f = page.getByTestId(tid);
-    if (await f.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await f.fill('Read before submitting');
-      descFilled = tid;
+    if (await f.isVisible({ timeout: 800 }).catch(() => false)) {
+      const tag = await f.evaluate((el) => el.tagName);
+      if (tag === 'SELECT') {
+        await (f as any).selectOption('cards').catch(() => {});
+      } else {
+        await f.fill('[{"key":"k","label":"K"}]');
+      }
+      stripFilled = `${tid}(${tag})`;
       break;
     }
   }
+  const save4 = page.getByTestId('designer-save');
+  if (await save4.isVisible().catch(() => false)) {
+    await save4.click();
+  } else {
+    await page.getByRole('button', { name: /保存|Save/ }).first().click();
+  }
+  await page.waitForTimeout(2500);
+  const persisted3 = await page.request.get(`/api/pages/${pid}`);
+  const ptext3 = await persisted3.text();
+  const fs4 = await import('fs');
+  fs4.appendFileSync('/tmp/pd-probe-fields.log', `STRIP_FILLED=${stripFilled}\nSTRIP_PERSISTED=${ptext3.slice(0, 1500)}\n`);
+  await dump('strip-after-edit');
   // B2's real flow guarantees the designer registered the edit (dirty state)
   // before saving — replicate that guarantee here.
   await page
