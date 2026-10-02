@@ -11,6 +11,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { DslFieldOverride, BlockType } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useDslRegistry } from '~/contexts/DslRegistryContext';
+import { evaluateScopedExpression } from '~/framework/meta/runtime/expression/scopedEval';
 import fieldPropertyConfig from '../configs/field-property-panel.json';
 import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 import {
@@ -168,13 +169,14 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
       if (!expr) return true;
 
       try {
-        // Simple expression evaluation
-        const code = expr
-          .replace(/blockType/g, `'${blockType}'`)
-          .replace(/dataType/g, `'${dataType}'`);
-        // eslint-disable-next-line no-new-func
-        return new Function(`return ${code}`)();
-      } catch {
+        // Sandbox interpreter; blockType/dataType provided as context variables
+        // (was: token substitution into a new Function string).
+        const result = evaluateScopedExpression(expr, { blockType, dataType });
+        return !!result;
+      } catch (error) {
+        // Designer tool surface: a broken expression keeps the field visible
+        // but is logged (observable), never silent.
+        console.error('[expression] field visibility eval failed:', expr, error);
         return true;
       }
     },
