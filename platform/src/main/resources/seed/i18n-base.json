@@ -3939,5 +3939,61 @@
     "en-US": "Invalid source evidence. The form was not changed. Please retry.",
     "ja-JP": "原文の根拠が無効です。フォームは変更されていません。再試行してください。",
     "ko-KR": "원문 근거가 유효하지 않습니다. 양식은 변경되지 않았습니다. 다시 시도해 주세요."
+  },
+  {
+    "key": "search.settings",
+    "zh-CN": "搜索设置",
+    "en-US": "Search settings",
+    "ja-JP": "検索設定",
+    "ko-KR": "검색 설정"
+  },
+  {
+    "key": "search.settingsHint",
+    "zh-CN": "选择并排列参与记录搜索的模型。",
+    "en-US": "Choose and order the record models searched.",
+    "ja-JP": "レコード検索に使用するモデルを選択して並べ替えます。",
+    "ko-KR": "레코드 검색에 사용할 모델을 선택하고 정렬하세요."
+  },
+  {
+    "key": "search.noReadableModels",
+    "zh-CN": "暂无可搜索的模型",
+    "en-US": "No readable search models",
+    "ja-JP": "検索可能なモデルがありません",
+    "ko-KR": "검색 가능한 모델이 없습니다"
+  },
+  {
+    "key": "search.loadModelsFailed",
+    "zh-CN": "无法加载搜索模型",
+    "en-US": "Unable to load search models",
+    "ja-JP": "検索モデルを読み込めません",
+    "ko-KR": "검색 모델을 불러올 수 없습니다"
+  },
+  {
+    "key": "search.saveSettingsFailed",
+    "zh-CN": "无法保存搜索设置",
+    "en-US": "Unable to save search settings",
+    "ja-JP": "検索設定を保存できません",
+    "ko-KR": "검색 설정을 저장할 수 없습니다"
+  },
+  {
+    "key": "search.settingsSaved",
+    "zh-CN": "搜索设置已保存",
+    "en-US": "Search settings saved",
+    "ja-JP": "検索設定を保存しました",
+    "ko-KR": "검색 설정이 저장되었습니다"
+  },
+  {
+    "key": "common.moveUp",
+    "zh-CN": "上移",
+    "en-US": "Move up",
+    "ja-JP": "上へ移動",
+    "ko-KR": "위로 이동"
+  },
+  {
+    "key": "common.moveDown",
+    "zh-CN": "下移",
+    "en-US": "Move down",
+    "ja-JP": "下へ移動",
+    "ko-KR": "아래로 이동"
   }
 ]
