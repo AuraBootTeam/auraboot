@@ -87,3 +87,24 @@ export async function loginViaUI(page: Page, email: string, password: string): P
     timeout: 15_000,
   });
 }
+
+
+/**
+ * A fresh UI login can land the session in the System space (platform_admin
+ * only), which lacks page-management permissions like page.page.manage —
+ * page-seeding then 403s. Explicitly select the account's business space via
+ * the BFF switch-space route so the session cookie is re-minted with the
+ * business-scoped token (a direct backend tenant-selection call rotates the
+ * credentials out from under the browser session).
+ */
+export async function ensureBusinessSpace(page: Page): Promise<void> {
+  const spaces = await page.request.get('/api/tenant-selection/my-spaces');
+  const body = (await spaces.json().catch(() => ({}))) as {
+    data?: Array<Record<string, unknown>>;
+  };
+  const business = (body?.data ?? []).find((sp) => sp.spaceType === 'business');
+  if (!business || typeof business.tenantId !== 'string') return;
+  await page.request.post('/api/switch-space', {
+    form: { tenantId: business.tenantId, redirectTo: '/' },
+  });
+}

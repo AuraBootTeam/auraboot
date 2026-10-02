@@ -217,7 +217,7 @@ test.describe('Unified Designer canvas multi-select + batch delete golden', () =
     // extension.designerRootId instead of as a stored block.
     expect(persisted.blocks, 'all three sections removed from persisted schema').toEqual([]);
     expect(
-        (persisted.extension as Record<string, unknown> | undefined)?.designerRootId,
+        ((persisted as unknown as { extension?: Record<string, unknown> }).extension as Record<string, unknown> | undefined)?.designerRootId,
         'root identity preserved in extension').toBe(ROOT_BLOCK);
 
     // Undo restores all three in a single step (one history entry).
@@ -285,7 +285,7 @@ test.describe('Unified Designer canvas multi-select + batch delete golden', () =
     // v4 flat storage: the undeletable kind root is implied, not stored — its
     // identity survives in extension.designerRootId.
     expect(
-        (persisted.extension as Record<string, unknown> | undefined)?.designerRootId,
+        ((persisted as unknown as { extension?: Record<string, unknown> }).extension as Record<string, unknown> | undefined)?.designerRootId,
         'root kept').toBe(ROOT_BLOCK);
     expect(findBlockById(persisted.blocks, SECTION_B), 'B kept (not selected)').not.toBeNull();
   });
