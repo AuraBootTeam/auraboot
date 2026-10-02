@@ -874,6 +874,10 @@ test.describe('Open Platform golden journey', () => {
     await dismissToasts(page);
     await capture(page, 'OP-UI-02');
 
+    // APIRequestContext needs the project's synthetic same-origin Referer for writes.
+    // Chromium rejects that forced header on the real noreferrer popup; browser
+    // navigation must use its native referrer policy, as an ordinary user does.
+    await context.setExtraHTTPHeaders({});
     const popupPromise = context.waitForEvent('page');
     await page.getByRole('button', { name: /API 参考/ }).click();
     const apiReference = await popupPromise;
