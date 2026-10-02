@@ -4183,5 +4183,15 @@
     "key": "dashboard.exportFailed",
     "zh-CN": "Excel 导出失败",
     "en-US": "Excel export failed"
+  },
+  {
+    "key": "dashboard.designer.settings",
+    "zh-CN": "设置",
+    "en-US": "Settings"
+  },
+  {
+    "key": "dashboard.designer.defaultTitle",
+    "zh-CN": "未命名仪表盘",
+    "en-US": "Untitled Dashboard"
   }
 ]
