@@ -5,6 +5,10 @@ import com.auraboot.framework.meta.dto.DataTypeMapping;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
+import com.auraboot.framework.meta.dto.MetaFieldDTO;
+import com.auraboot.framework.meta.dto.DictDTO;
+import com.auraboot.framework.meta.entity.payload.DataSourceItemBean;
+import com.auraboot.framework.common.util.JsonUtil;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.ApplicationNavigationPolicy;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
@@ -41,6 +45,56 @@ public final class ApplicationRuntimeDefinitionCatalog {
         this.definitions = definitions;
         this.resolver = resolver;
         this.mapper = mapper;
+    }
+
+    public Optional<DictDTO> findDict(long tenantId, String applicationCode, String code) {
+        var release = activeRelease(tenantId, applicationCode);
+        if (release == null) return Optional.empty();
+        var matches = release.components().stream().flatMap(component -> list(component.manifest().getDicts()).stream())
+                .filter(dict -> code.equals(dict.getCode())).toList();
+        if (matches.size() > 1) throw unavailable("Dictionary key is ambiguous in the active Application Release: " + code);
+        if (matches.isEmpty()) return Optional.empty();
+        var source = matches.getFirst();
+        Set<String> values = new LinkedHashSet<>();
+        List<DataSourceItemBean> items = list(source.getItems()).stream().map(item -> {
+            if (item.getValue() == null || !values.add(item.getValue())) {
+                throw unavailable("Release dictionary values must be present and unique: " + code);
+            }
+            DataSourceItemBean result = new DataSourceItemBean();
+            result.setValue(item.getValue());
+            result.setLabel(item.getEffectiveLabel());
+            result.setOrder(item.getSortNo());
+            result.setDisabled(!"enabled".equals(item.getStatus()));
+            Map<String, Object> extra = new LinkedHashMap<>(item.getExtra() == null ? Map.of() : item.getExtra());
+            extra.put("labels", item.getAllLocalizedLabels());
+            if (item.getParentValue() != null) extra.put("parentValue", item.getParentValue());
+            result.setExtra(extra);
+            return result;
+        }).sorted(Comparator.comparing(item -> item.getOrder() == null ? 0 : item.getOrder())).toList();
+        Map<String, Object> extension = new LinkedHashMap<>(source.getExtension() == null ? Map.of() : source.getExtension());
+        extension.put("releaseId", release.release().releaseId());
+        return Optional.of(DictDTO.builder().code(code).name(source.getEffectiveName()).dictType(source.getDictType())
+                .description(source.getDescription()).items(items).enabled(true).status("published")
+                .extendedProps(mapper.valueToTree(extension)).build());
+    }
+
+    /** Rendering metadata uses the same bound definitions as dynamic reads. */
+    public Optional<List<MetaFieldDTO>> findFieldMetadata(long tenantId, String applicationCode, String modelCode) {
+        return findModel(tenantId, applicationCode, modelCode).map(model -> model.getFields().stream()
+                .map(field -> {
+                    Map<String, Object> extension = new LinkedHashMap<>(
+                            field.getExtraProps() == null ? Map.of() : field.getExtraProps());
+                    if (field.getDisplayName() != null) extension.put("displayName", field.getDisplayName());
+                    if (field.getDefaultValue() != null) extension.put("defaultValue", field.getDefaultValue());
+                    return MetaFieldDTO.builder().code(field.getCode()).dataType(field.getDataType())
+                            .extension(extension).fieldOrder(field.getSortOrder()).required(field.getRequired())
+                            .feature(Map.of("required", Boolean.TRUE.equals(field.getRequired()),
+                                    "unique", Boolean.TRUE.equals(field.getUnique())))
+                            .dictCode(extension.get("dictCode") instanceof String code ? code : null)
+                            .refTarget(field.getRefTarget() == null ? null : JsonUtil.toMap(field.getRefTarget()))
+                            .uiSchema(extension.get("uiSchema") == null ? null : JsonUtil.toMap(extension.get("uiSchema")))
+                            .build();
+                }).toList());
     }
 
     /** Empty means that this tenant has no active binding and must retain its existing read path. */

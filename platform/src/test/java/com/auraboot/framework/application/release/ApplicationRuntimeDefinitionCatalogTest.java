@@ -53,6 +53,38 @@ class ApplicationRuntimeDefinitionCatalogTest {
     }
 
     @Test
+    void suppliesRenderingMetadataWithoutTenantLocalModelOrFieldIds() {
+        var fields = catalog.findFieldMetadata(42L, "aura-edu", "xy_student").orElseThrow();
+        var name = fields.stream().filter(field -> "xy_stu_name".equals(field.getCode())).findFirst().orElseThrow();
+        assertThat(name.getId()).isNull();
+        assertThat(name.getPid()).isNull();
+        assertThat(name.getDisplayName()).isEqualTo("学生姓名");
+        assertThat(name.getRequired()).isTrue();
+        assertThat(name.getFieldOrder()).isEqualTo(1);
+        assertThat(name.getDataType()).isEqualTo("string");
+        assertThat(catalog.findFieldMetadata(42L, "aura-edu", "platform_user")).isEmpty();
+    }
+
+    @Test
+    void materializesReleaseDictionaryWithoutTenantLocalIds() {
+        var source = release("active");
+        source.components().getFirst().manifest().setDicts(List.of(
+                com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO.builder().code("xy_subject")
+                        .nameZhCN("学科").items(List.of(
+                                com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO.DictItemDTO.builder()
+                                        .value("math").labelZhCN("数学").labelEn("Mathematics").sortNo(1).build())).build()));
+        when(resolver.boundRelease(42L, "aura-edu")).thenReturn(source);
+        var dict = catalog.findDict(42L, "aura-edu", "xy_subject").orElseThrow();
+        assertThat(dict.getId()).isNull();
+        assertThat(dict.getPid()).isNull();
+        assertThat(dict.getItems()).hasSize(1);
+        assertThat(dict.getItems().getFirst().getLabel()).isEqualTo("数学");
+        assertThat(dict.getItems().getFirst().getExtra()).containsKey("labels");
+        assertThat(dict.getExtendedProps().get("releaseId").asText()).isEqualTo(bound.releaseId);
+        assertThat(catalog.findDict(42L, "aura-edu", "platform_status")).isEmpty();
+    }
+
+    @Test
     void keepsShadowAndUnboundTenantsOnTheirExistingReadPath() {
         bound.status = "shadow";
         assertThat(catalog.findModel(42L, "aura-edu", "xy_student")).isEmpty();
