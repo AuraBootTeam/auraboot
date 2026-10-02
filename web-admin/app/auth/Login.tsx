@@ -1,3 +1,5 @@
+import AuthAppearanceShell from './AuthAppearanceShell';
+import { resolveAuthContent } from '~/config/auth-appearance';
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -644,26 +646,19 @@ export default function LoginPage() {
   );
   const iconSocialOptions = socialOptions.filter((option) => option !== oidcOption);
 
+  const appearance = branding.authAppearance;
+  const loginTitle = resolveAuthContent(appearance?.content?.loginTitle, locale, appearance?.defaultLocale ?? 'zh-CN', t('auth.welcome') || '欢迎回来');
+  const defaultLoginLead = branding.mode === 'commercial'
+    ? t('auth.commercialBranding.welcomeSub', { productName: branding.productName }, locale.startsWith('zh') ? `登录以继续使用 ${branding.productName} 工作台` : `Sign in to continue to the ${branding.productName} workspace`)
+    : compliance.enabled ? t('auth.compliance.welcomeSub', undefined, `登录以继续使用 ${branding.productName}`) : t('auth.welcomeSub', undefined, `登录以继续使用 ${branding.productName} 工作台`);
+  const loginLead = resolveAuthContent(appearance?.content?.loginLead, locale, appearance?.defaultLocale ?? 'zh-CN', defaultLoginLead);
+
   const card = (
     <div className="w-full max-w-[404px]">
-      <div className="mb-8">
-        <h1 className="text-[28px] font-extrabold tracking-tight text-[#213d32] lg:text-[30px] dark:text-white">
-          {t('auth.welcome') || '欢迎回来'}
-        </h1>
-        <p className="mt-2 text-[15px] text-[#819184] dark:text-gray-400">
-          {branding.mode === 'commercial'
-            ? t(
-                'auth.commercialBranding.welcomeSub',
-                { productName: branding.productName },
-                locale.startsWith('zh')
-                  ? `登录以继续使用 ${branding.productName} 工作台`
-                  : `Sign in to continue to the ${branding.productName} workspace`,
-              )
-            : compliance.enabled
-              ? t('auth.compliance.welcomeSub', undefined, `登录以继续使用 ${branding.productName}`)
-              : t('auth.welcomeSub', undefined, `登录以继续使用 ${branding.productName} 工作台`)}
-        </p>
-      </div>
+      {(loginTitle || loginLead) && <div className="mb-8">
+        {loginTitle && <h1 className="text-[28px] font-extrabold tracking-tight text-[#213d32] lg:text-[30px] dark:text-white">{loginTitle}</h1>}
+        {loginLead && <p className="mt-2 text-[15px] text-[#819184] dark:text-gray-400">{loginLead}</p>}
+      </div>}
 
       {wechatOnly ? (
         <div>
@@ -838,6 +833,13 @@ export default function LoginPage() {
       )}
     </div>
   );
+
+  if (appearance) {
+    return <div data-testid="login-page-root" data-hydrated={hydrated ? 'true' : 'false'}>
+      <AuthAppearanceShell branding={branding} appearance={appearance} displayName={displayName}>{card}</AuthAppearanceShell>
+      <IcpComplianceFooter />
+    </div>;
+  }
 
   return (
     <div

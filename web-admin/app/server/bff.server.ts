@@ -18,6 +18,7 @@ import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage, commitUserSession, maybeRenewSession } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { resolveDeploymentBranding } from '~/config/branding.server';
+import { resolveAuthAppearance } from '~/config/auth-appearance';
 import { enforceCsrfProtection, hasSameOrigin } from './middlewares/CsrfProtection';
 import { handleLegacySessionMigration } from './auth/legacy-session-migration';
 import { handleSocialSessionExchange } from './auth/social-session-exchange';
@@ -341,6 +342,15 @@ app.get('/metrics', async (_req, res) => {
 app.get('/api/runtime/branding', async (_req, res, next) => {
   try {
     const branding = await resolveDeploymentBranding(process.env);
+    if (branding.mode === 'commercial') {
+      const response = await axios.get(`${SPRING_BOOT_URL}/api/auth/appearance`);
+      if (String(response.data?.code) !== '0' || !response.data?.data) {
+        throw new Error('Unable to resolve published authentication appearance');
+      }
+      if (response.data.data.appearance !== null) {
+        branding.authAppearance = resolveAuthAppearance(response.data.data.appearance);
+      }
+    }
     res.set('Cache-Control', 'no-store');
     res.json({ branding });
   } catch (error) {

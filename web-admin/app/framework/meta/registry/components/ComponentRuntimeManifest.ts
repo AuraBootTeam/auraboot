@@ -24,6 +24,7 @@ function runtime(
 }
 
 export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> = {
+  authappearanceeditor: runtime('admin', 'AuthAppearanceEditor', { aliases: ['auth-appearance-editor'] }),
   input: runtime('form', 'Input', { aliases: ['SmartInput', 'Input', 'input'] }),
   textarea: runtime('form', 'Textarea', {
     aliases: ['SmartTextarea', 'Textarea', 'textarea'],

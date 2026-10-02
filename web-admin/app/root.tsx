@@ -157,7 +157,9 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cached = ssrLoaderCache.get(cacheKey) as any;
     if (cached) {
-      return cached as RootLoaderData;
+      // Published appearance must take effect immediately, even while the
+      // locale/bootstrap bundle remains in the public-route cache.
+      return { ...cached, branding } as RootLoaderData;
     }
 
     const i18nData = await getI18nData(locale, request);

@@ -4197,6 +4197,34 @@ COMMENT ON COLUMN public.ab_aurabot_skill_run.risk_level IS 'RiskLevel.code() sn
 
 
 --
+-- Name: ab_auth_appearance_revision; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_auth_appearance_revision (
+    version bigint NOT NULL,
+    action character varying(32) NOT NULL,
+    snapshot jsonb NOT NULL,
+    actor_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_auth_appearance_revision_action_check CHECK (((action)::text = ANY ((ARRAY['save'::character varying, 'publish'::character varying, 'rollback'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_auth_appearance_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_auth_appearance_state (
+    id bigint NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    published_version bigint DEFAULT 0 NOT NULL,
+    draft jsonb,
+    published jsonb,
+    CONSTRAINT ab_auth_appearance_state_id_check CHECK ((id = 1))
+);
+
+
+--
 -- Name: ab_auth_identity; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15865,6 +15893,30 @@ CREATE TABLE public.ab_semantic_metric (
 
 
 --
+-- Name: ab_semantic_metric_alert; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_semantic_metric_alert (
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    name character varying(200) NOT NULL,
+    metric_pid character varying(26) NOT NULL,
+    comparator character varying(10) NOT NULL,
+    threshold numeric NOT NULL,
+    silence_minutes integer DEFAULT 60 NOT NULL,
+    alert_status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    last_triggered_at timestamp with time zone,
+    last_evaluated_at timestamp with time zone,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    CONSTRAINT chk_semantic_metric_alert_comparator CHECK (((comparator)::text = ANY ((ARRAY['gt'::character varying, 'gte'::character varying, 'lt'::character varying, 'lte'::character varying])::text[]))),
+    CONSTRAINT chk_semantic_metric_alert_status CHECK (((alert_status)::text = ANY ((ARRAY['active'::character varying, 'paused'::character varying])::text[])))
+);
+
+
+--
 -- Name: ab_semantic_model; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15891,6 +15943,28 @@ CREATE TABLE public.ab_semantic_model (
 
 
 --
+-- Name: ab_semantic_preagg; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_semantic_preagg (
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    name character varying(200) NOT NULL,
+    semantic_model_pid character varying(26) NOT NULL,
+    metric_code character varying(100) NOT NULL,
+    dimension_codes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    refresh_minutes integer DEFAULT 60 NOT NULL,
+    mv_name character varying(100) NOT NULL,
+    last_refreshed_at timestamp with time zone,
+    last_refresh_rows bigint,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_flag boolean DEFAULT false NOT NULL
+);
+
+
+--
 -- Name: ab_semantic_query_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15907,7 +15981,8 @@ CREATE TABLE public.ab_semantic_query_log (
     cache_hit boolean DEFAULT false NOT NULL,
     preagg_pid character varying(32),
     sql_fingerprint character varying(64),
-    executed_at timestamp with time zone DEFAULT now() NOT NULL
+    executed_at timestamp with time zone DEFAULT now() NOT NULL,
+    pid character varying(26)
 );
 
 
@@ -17412,7 +17487,7 @@ CREATE TABLE public.mt_org_department (
     id bigint NOT NULL,
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
-    org_dept_name character varying(200),
+    org_dept_name character varying(200) NOT NULL,
     org_dept_code character varying(100),
     org_dept_parent_id character varying(26),
     org_dept_manager_id character varying(26),
@@ -17454,12 +17529,12 @@ CREATE TABLE public.mt_org_employee (
     id bigint NOT NULL,
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
-    org_emp_name character varying(200),
+    org_emp_name character varying(200) NOT NULL,
     org_emp_email character varying(255),
     org_emp_phone character varying(50),
     org_emp_gender character varying(50),
-    org_emp_dept_id character varying(26),
-    org_emp_position_id character varying(26),
+    org_emp_dept_id character varying(26) NOT NULL,
+    org_emp_position_id character varying(26) NOT NULL,
     org_emp_status character varying(50),
     org_emp_type character varying(50),
     org_emp_member_id character varying(26),
@@ -19463,6 +19538,22 @@ ALTER TABLE ONLY public.ab_audit_trail
 
 ALTER TABLE ONLY public.ab_aurabot_skill_run
     ADD CONSTRAINT ab_aurabot_skill_run_pkey PRIMARY KEY (pid);
+
+
+--
+-- Name: ab_auth_appearance_revision ab_auth_appearance_revision_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_auth_appearance_revision
+    ADD CONSTRAINT ab_auth_appearance_revision_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: ab_auth_appearance_state ab_auth_appearance_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_auth_appearance_state
+    ADD CONSTRAINT ab_auth_appearance_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -22610,6 +22701,14 @@ ALTER TABLE ONLY public.ab_semantic_lineage_edge
 
 
 --
+-- Name: ab_semantic_metric_alert ab_semantic_metric_alert_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_metric_alert
+    ADD CONSTRAINT ab_semantic_metric_alert_pkey PRIMARY KEY (pid);
+
+
+--
 -- Name: ab_semantic_metric ab_semantic_metric_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22623,6 +22722,22 @@ ALTER TABLE ONLY public.ab_semantic_metric
 
 ALTER TABLE ONLY public.ab_semantic_model
     ADD CONSTRAINT ab_semantic_model_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_semantic_preagg ab_semantic_preagg_mv_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_preagg
+    ADD CONSTRAINT ab_semantic_preagg_mv_name_key UNIQUE (mv_name);
+
+
+--
+-- Name: ab_semantic_preagg ab_semantic_preagg_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_semantic_preagg
+    ADD CONSTRAINT ab_semantic_preagg_pkey PRIMARY KEY (pid);
 
 
 --
@@ -28690,6 +28805,13 @@ CREATE INDEX idx_semantic_dimension_model ON public.ab_semantic_dimension USING 
 
 
 --
+-- Name: idx_semantic_metric_alert_tenant_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_semantic_metric_alert_tenant_status ON public.ab_semantic_metric_alert USING btree (tenant_id, alert_status) WHERE (deleted_flag = false);
+
+
+--
 -- Name: idx_semantic_metric_model; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28701,6 +28823,13 @@ CREATE INDEX idx_semantic_metric_model ON public.ab_semantic_metric USING btree 
 --
 
 CREATE INDEX idx_semantic_model_tenant ON public.ab_semantic_model USING btree (tenant_id, status) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_semantic_preagg_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_semantic_preagg_tenant ON public.ab_semantic_preagg USING btree (tenant_id) WHERE (deleted_flag = false);
 
 
 --

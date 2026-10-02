@@ -50,7 +50,8 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "loginHeroUrl",
             "loginFeatures",
             "loginWechatOnly",
-            "tenantOnboarding");
+            "tenantOnboarding",
+            "authAppearance");
     private static final Set<String> TENANT_ONBOARDING_FIELDS = Set.of(
             "entityLabel",
             "selectionTitle",
@@ -67,9 +68,17 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             "joinSteps");
 
     private final BrandingIdentity identity;
+    private final boolean commercialBrandingEnabled;
 
     public DeploymentBrandingProvider(Environment environment, ObjectMapper objectMapper) {
         this.identity = resolve(environment, objectMapper);
+        this.commercialBrandingEnabled = COMMERCIAL_EDITIONS.contains(
+                normalized(environment.getProperty("EDITION")))
+                && StringUtils.hasText(environment.getProperty("AURABOOT_BRANDING_CONFIG_PATH"));
+    }
+
+    public boolean isCommercialBrandingEnabled() {
+        return commercialBrandingEnabled;
     }
 
     @Override
@@ -130,6 +139,10 @@ public class DeploymentBrandingProvider implements BrandingProvider {
         if (!unknownFields.isEmpty()) {
             throw new IllegalStateException(
                     "Deployment branding contains unsupported fields: " + unknownFields);
+        }
+
+        if (document.has("authAppearance")) {
+            AuthAppearanceValidator.validate(document.get("authAppearance"));
         }
 
         String orderReference = requiredText(document, "orderReference", 120);

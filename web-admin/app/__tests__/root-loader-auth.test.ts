@@ -236,7 +236,7 @@ describe('root loader authentication guard', () => {
       productName: 'Northstar',
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://bff.internal:4000/api/runtime/branding',
+      'http://127.0.0.1:3500/api/runtime/branding',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
@@ -248,6 +248,24 @@ describe('root loader authentication guard', () => {
     await expect(
       resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
     ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
+  });
+
+  it('refreshes published branding on a public-route cache hit without mutating the cached locale bundle', async () => {
+    vi.stubEnv('EDITION', 'standard');
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+    const cached = { locale: 'en-US', branding: { productName: 'Stale release' }, i18n: { retained: true } };
+    mocks.ssrCacheGet.mockReturnValue(cached);
+    const appearance = { version: 1, template: 'split', defaultLocale: 'zh-CN', content: { headline: { mode: 'hidden' } } };
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
+      String(url).endsWith('/api/runtime/branding')
+        ? { branding: { mode: 'commercial', productName: 'Northstar', authAppearance: appearance } }
+        : { code: '0', data: {} },
+    ), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const { loader } = await import('~/root');
+    const result = await loader({ request: new Request('http://localhost/login', { headers: { Cookie: 'locale=en-US' } }) } as any);
+    expect(result).toMatchObject({ i18n: { retained: true }, branding: { productName: 'Northstar', authAppearance: appearance } });
+    expect(cached.branding.productName).toBe('Stale release');
+    expect(mocks.getI18nData).not.toHaveBeenCalled();
   });
 
   it('always emits a stable product title when ICP mode is disabled', async () => {

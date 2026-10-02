@@ -67,3 +67,42 @@ test('rejects a dependency view whose lightningcss native load fails', () => {
     fs.rmSync(value.root, { recursive: true, force: true });
   }
 });
+
+function capsuleFixture() {
+  const value = fixture();
+  const capsule = path.join(fs.realpathSync(value.root), 'f'.repeat(64));
+  const store = path.join(capsule, '.pnpm');
+  const packages = path.join(store, 'packages', 'node_modules');
+  fs.mkdirSync(path.dirname(packages), { recursive: true });
+  fs.renameSync(value.modules, packages);
+  const view = path.join(capsule, 'node_modules');
+  fs.mkdirSync(view);
+  for (const entry of fs.readdirSync(packages)) {
+    fs.symlinkSync(path.join(packages, entry), path.join(view, entry));
+  }
+  fs.symlinkSync(view, value.modules);
+  const receipt = {
+    schemaVersion: 1, dependencyKey: `sha256:${path.basename(capsule)}`,
+    dependenciesDir: view, virtualStoreDir: store,
+    platform: process.platform, arch: process.arch, nodeAbi: process.versions.modules,
+  };
+  const marker = path.join(capsule, '.aura-dependency-capsule.json');
+  fs.writeFileSync(marker, JSON.stringify(receipt));
+  return { ...value, marker, receipt };
+}
+
+test('reuses a published capsule with owner-verified virtual-store links', () => {
+  const value = capsuleFixture();
+  try { assert.equal(usable(value.modules).status, 0); }
+  finally { fs.rmSync(value.root, { recursive: true, force: true }); }
+});
+
+test('rejects a capsule receipt pointing at a different dependency view or store', () => {
+  const value = capsuleFixture();
+  try {
+    fs.writeFileSync(value.marker, JSON.stringify({ ...value.receipt, dependenciesDir: '/another/view' }));
+    assert.notEqual(usable(value.modules).status, 0);
+    fs.writeFileSync(value.marker, JSON.stringify({ ...value.receipt, virtualStoreDir: '/another/store' }));
+    assert.notEqual(usable(value.modules).status, 0);
+  } finally { fs.rmSync(value.root, { recursive: true, force: true }); }
+});

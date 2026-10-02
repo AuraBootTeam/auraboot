@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "d2c01f1d2",
+    "commit": "1bd6b0586",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -3428,6 +3428,19 @@
           "note": "kind=list model=api_connector"
         },
         {
+          "id": "page:auth_appearance",
+          "action": "auth_appearance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/branding/auth-appearance.golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list"
+        },
+        {
           "id": "page:dashboard_management_list",
           "action": "dashboard_management_list",
           "surface": "ui",
@@ -6647,7 +6660,7 @@
   "stats": {
     "commands": 257,
     "untested": 181,
-    "pages": 168,
+    "pages": 169,
     "pagesUntested": 103,
     "platformPages": 95,
     "platformPagesUntested": 41

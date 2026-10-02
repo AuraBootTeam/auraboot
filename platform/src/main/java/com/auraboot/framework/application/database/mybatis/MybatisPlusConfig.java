@@ -53,7 +53,7 @@ public class MybatisPlusConfig {
      * forbidden.
      */
     public static final Set<String> VERIFIED_GLOBAL_TABLES = Set.of(
-        // schema-verified: no tenant_id column (15)
+        // schema-verified: no tenant_id column (17)
         "ab_user",                          // global identity
         "ab_tenant",                        // the tenant registry itself
         "ab_system_config",                 // platform config
@@ -68,7 +68,9 @@ public class MybatisPlusConfig {
         "ab_verification_code",             // pre-auth OTP
         "ab_auth_identity",                 // WeChat identity lookup before tenant context
         "ab_login_application",             // pre-auth global application registry
-        "ab_login_channel_auth_method"      // parent channel is explicit
+        "ab_login_channel_auth_method",     // parent channel is explicit
+        "ab_auth_appearance_state",         // deployment-level singleton; schema has no tenant_id
+        "ab_auth_appearance_revision"       // deployment-level release audit; schema has no tenant_id
     );
 
     /**
