@@ -4059,5 +4059,10 @@
     "key": "admin.permission.policy.loadError",
     "zh-CN": "权限策略加载失败，请重试",
     "en-US": "Could not load permission policy. Retry to continue."
+  },
+  {
+    "key": "admin.permission.editor.roleHint",
+    "zh-CN": "选择业务能力，核对变更后保存；数据范围决定能访问哪些记录。",
+    "en-US": "Select business capabilities, then review and save. Data scope controls which records can be accessed."
   }
 ]

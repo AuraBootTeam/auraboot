@@ -27,59 +27,66 @@ async function createRole(page: Page) {
   return (await resp.json()).data as { pid: string; code: string };
 }
 
-test('a role default data scope is inherited by newly-granted permissions', async ({ page }) => {
-  const role = await createRole(page);
+for (const scope of ['dept', 'team']) {
+  test(`a role default ${scope} data scope is inherited by newly-granted permissions`, async ({
+    page,
+  }) => {
+    const role = await createRole(page);
 
-  await page.goto('/enterprise/permissions');
-  await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId('role-search-input').fill(role.code);
-  await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
+    await page.goto('/enterprise/permissions');
+    await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('role-search-input').fill(role.code);
+    await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId(`role-item-${role.code}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
 
-  // ② set the role default scope to "dept" (仅本部门) via the drawer
-  await page.getByTestId('data-scope-modify-btn').click();
-  await expect(page.getByTestId('data-scope-drawer')).toBeVisible();
-  await page.getByTestId('data-scope-option-dept').click();
-  await page.getByTestId('data-scope-apply').click();
-  await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByTestId('data-scope-default')).toContainText(/仅本部门|Dept Only|本部门/, {
-    timeout: 10_000,
+    // ② set the role default scope to "dept" (仅本部门) via the drawer
+    await page.getByTestId('data-scope-modify-btn').click();
+    await expect(page.getByTestId('data-scope-drawer')).toBeVisible();
+    await page.getByTestId(`data-scope-option-${scope}`).click();
+    await page.getByTestId('data-scope-apply').click();
+    await expect(page.getByTestId('data-scope-drawer')).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByTestId('data-scope-default')).toContainText(
+      scope === 'team' ? /团队|My teams/ : /仅本部门|Dept Only|本部门/,
+      {
+        timeout: 10_000,
+      },
+    );
+
+    // ③ expand advanced; grant a NEW atomic permission via its checkbox (precision-safe rolePid path)
+    await page.getByTestId('advanced-atomic-toggle').click();
+    await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
+    const firstCheckbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
+    await expect(firstCheckbox).toBeVisible({ timeout: 10_000 });
+    const tid = await firstCheckbox.getAttribute('data-testid');
+    const code = tid!.replace('atomic-checkbox-', '');
+
+    // a newly-granted code has no scope <select> until granted
+    await expect(page.getByTestId(`atomic-scope-${code}`)).toHaveCount(0);
+
+    // grant it — the hook materializes the role default onto this new grant; the editor refetches
+    const grantResp = page.waitForResponse(
+      (r) => r.url().includes('/api/permissions/matrix/') && r.url().includes('/batch'),
+      { timeout: 10_000 },
+    );
+    await firstCheckbox.check();
+    await grantResp;
+
+    // the newly-granted code's scope select must read "dept" — INHERITED from the role default
+    const scopeSelect = page.getByTestId(`atomic-scope-${code}`);
+    await expect(scopeSelect).toBeVisible({ timeout: 10_000 });
+    await expect(scopeSelect).toHaveValue(scope);
+
+    await page.screenshot({ path: `${SHOTS}/01-inherited-${scope}-scope.png`, fullPage: true });
+
+    // backend cross-check: the role's stored default is persisted
+    const defResp = await page.request.get(
+      `${BASE}/api/permissions/matrix/${role.pid}/default-scope`,
+    );
+    expect(defResp.ok()).toBeTruthy();
+    expect((await defResp.json()).data).toBe(scope);
   });
-
-  // ③ expand advanced; grant a NEW atomic permission via its checkbox (precision-safe rolePid path)
-  await page.getByTestId('advanced-atomic-toggle').click();
-  await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
-  const firstCheckbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
-  await expect(firstCheckbox).toBeVisible({ timeout: 10_000 });
-  const tid = await firstCheckbox.getAttribute('data-testid');
-  const code = tid!.replace('atomic-checkbox-', '');
-
-  // a newly-granted code has no scope <select> until granted
-  await expect(page.getByTestId(`atomic-scope-${code}`)).toHaveCount(0);
-
-  // grant it — the hook materializes the role default onto this new grant; the editor refetches
-  const grantResp = page.waitForResponse(
-    (r) => r.url().includes('/api/permissions/matrix/') && r.url().includes('/batch'),
-    { timeout: 10_000 },
-  );
-  await firstCheckbox.check();
-  await grantResp;
-
-  // the newly-granted code's scope select must read "dept" — INHERITED from the role default
-  const scopeSelect = page.getByTestId(`atomic-scope-${code}`);
-  await expect(scopeSelect).toBeVisible({ timeout: 10_000 });
-  await expect(scopeSelect).toHaveValue('dept');
-
-  await page.screenshot({ path: `${SHOTS}/01-inherited-scope.png`, fullPage: true });
-
-  // backend cross-check: the role's stored default is persisted
-  const defResp = await page.request.get(
-    `${BASE}/api/permissions/matrix/${role.pid}/default-scope`,
-  );
-  expect(defResp.ok()).toBeTruthy();
-  expect((await defResp.json()).data).toBe('dept');
-});
+}
 
 test('capability save grants via the precision-safe rolePid endpoint (snowflake-id role)', async ({
   page,

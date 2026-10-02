@@ -137,4 +137,42 @@ describe('DataScopeBar', () => {
     expect(applied).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeTruthy();
   });
+  it('shows mixed actual scopes even with an all default', async () => {
+    vi.mocked(permissionService.getRoleDefaultScope).mockResolvedValue('all');
+    render(
+      <DataScopeBar
+        rolePid="r1"
+        matrix={matrix([
+          { r: 'a', a: 'read', granted: true, scope: 'self' },
+          { r: 'b', a: 'read', granted: true, scope: 'team' },
+        ])}
+        onScopeApplied={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+        'admin.permission.scope.all',
+      ),
+    );
+    expect(screen.getByTestId('data-scope-current')).toHaveTextContent(
+      'admin.permission.scope.mixed',
+    );
+  });
+  it('shows a failed default read and supports retry without widening scope', async () => {
+    vi.mocked(permissionService.getRoleDefaultScope)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue('team');
+    render(<DataScopeBar rolePid="r1" matrix={matrix([])} onScopeApplied={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('data-scope-modify-btn')).toBeDisabled());
+    const retry = await screen.findByText('common.retry');
+    expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+      'admin.permission.scope.loadError',
+    );
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getByTestId('data-scope-default')).toHaveTextContent(
+        'admin.permission.scope.team',
+      ),
+    );
+  });
 });

@@ -83,3 +83,49 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await checkbox.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${SHOTS}/01-capability-saved.png`, fullPage: true });
 });
+
+test('capability draft survives failed save and canceled navigation', async ({ page }) => {
+  const role = await createRole(page);
+  const capUrl = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(role.pid)}`;
+  const before = (await (await page.request.get(capUrl)).json()).data;
+  const cap = before
+    .flatMap((g: any) => g.capabilities)
+    .find((c: any) => !c.conventionDerived && c.includes?.length);
+  expect(cap).toBeTruthy();
+  await page.goto('/home');
+  await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
+  await expect(page.getByTestId('permission-page')).toBeVisible();
+  await page.getByTestId('role-search-input').fill(role.code);
+  await page.getByTestId(`role-item-${role.code}`).click();
+  const checkbox = page.getByTestId(`capability-checkbox-${cap.code}`);
+  await checkbox.check();
+  await expect(page.getByTestId('data-scope-modify-btn')).toBeDisabled();
+  await page.getByTestId('permission-right-tab-members').click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-cancel').click();
+  await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('capability-draft')).toBeVisible();
+  await page.route('**/api/permission/capabilities?**', async (route) => {
+    if (route.request().method() === 'PUT')
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 503, message: 'Injected unavailable' }),
+      });
+    else await route.continue();
+  });
+  await page.getByTestId('capability-save').click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByTestId('capability-save')).toBeEnabled();
+  await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('capability-draft')).toBeVisible();
+  const after = (await (await page.request.get(capUrl)).json()).data;
+  expect(
+    after.flatMap((g: any) => g.capabilities).find((c: any) => c.code === cap.code).granted,
+  ).toBe(false);
+  await page.screenshot({ path: `${SHOTS}/02-draft-save-error.png`, fullPage: true });
+  await page.unroute('**/api/permission/capabilities?**');
+  await page.getByTestId('permission-right-tab-members').click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByTestId('role-member-tab')).toBeVisible();
+});

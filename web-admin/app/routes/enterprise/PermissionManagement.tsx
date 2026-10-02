@@ -294,9 +294,9 @@ export default function PermissionManagement() {
             <table data-testid="role-table" className="w-full table-fixed">
               <thead className="sr-only">
                 <tr>
-                  <th>Role</th>
-                  <th>Type</th>
-                  <th>Actions</th>
+                  <th>{t('admin.permission.role.name', undefined, 'Role')}</th>
+                  <th>{t('admin.permission.role.type', undefined, 'Type')}</th>
+                  <th>{t('common.actions', undefined, 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,11 +340,6 @@ export default function PermissionManagement() {
                             </span>
                           )}
                         </div>
-                        {role.description && (
-                          <div className="mt-0.5 truncate text-xs text-gray-500">
-                            {role.description}
-                          </div>
-                        )}
                       </td>
                       <td className="w-20 px-2 py-2 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-0.5">
@@ -369,7 +364,7 @@ export default function PermissionManagement() {
                                   handleToggleRole(role);
                                 }}
                                 className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20"
-                                title={isDisabled ? 'Enable' : 'Disable'}
+                                title={t(isDisabled ? 'common.enable' : 'common.disable')}
                               >
                                 <PowerIcon className="h-3.5 w-3.5" />
                               </button>
@@ -455,9 +450,13 @@ export default function PermissionManagement() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {selectedRole.name}
               </h2>
-              {selectedRole.description && (
-                <p className="mt-0.5 text-sm text-gray-500">{selectedRole.description}</p>
-              )}
+              <p className="mt-1 text-xs text-gray-500">
+                {t(
+                  'admin.permission.editor.roleHint',
+                  undefined,
+                  'Select business capabilities, then review and save the changes.',
+                )}
+              </p>
             </div>
           )}
 
