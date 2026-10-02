@@ -20,6 +20,8 @@ test.describe('Report Designer', () => {
     // Wait for navigation and the interactive designer to render
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(page.getByTestId('report-canvas')).toBeVisible();
+    // New-report initialization runs in a client effect; SSR visibility is insufficient.
+    await expect(page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
   });
 
   test('should load designer with 3-panel layout', async ({ page }) => {
