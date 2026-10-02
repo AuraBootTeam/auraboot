@@ -31,6 +31,7 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
           layout: { span: 12 },
           blocks: [
             { id: 'probe_stat', blockType: 'stat-card', title: 'Orders today', layout: { span: 12 } },
+            { id: 'probe_desc', blockType: 'description', title: 'Notes', layout: { span: 12 } },
           ],
         },
       ],
@@ -93,27 +94,45 @@ test('probe: inspector field testids for display blocks', async ({ page, baseURL
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByTestId('unified-designer-workbench').waitFor({ state: 'visible', timeout: 30_000 });
-  await page.getByTestId('outline-item-probe_stat').click();
+  await page.getByTestId('outline-item-probe_desc').click();
   await page.getByTestId('inspector-selected-id').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
   await page.waitForTimeout(2500);
-  await dump('after-reload');
+  await dump('after-reload-desc');
 
-  // Widget-family edit: set model via -manual input + props.value, save again.
-  await page.getByTestId('inspector-field-dataSource.model-manual').fill(`mdl_${uid}`).catch(() => {});
-  const pv = page.getByTestId('inspector-field-props.value');
-  if (await pv.isVisible().catch(() => false)) {
-    await pv.fill('42');
+  // B2 probe: which desc field persists? Fill candidates in priority order.
+  const descCandidates = [
+    'inspector-field-props.content',
+    'inspector-field-props.markdown',
+    'inspector-field-props.text',
+    'inspector-field-content',
+  ];
+  let descFilled = '';
+  for (const tid of descCandidates) {
+    const f = page.getByTestId(tid);
+    if (await f.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await f.fill('Read before submitting');
+      descFilled = tid;
+      break;
+    }
   }
-  const save2 = page.getByTestId('designer-save');
-  if (await save2.isVisible().catch(() => false)) {
-    await save2.click();
+  // B2's real flow guarantees the designer registered the edit (dirty state)
+  // before saving — replicate that guarantee here.
+  await page
+    .getByTestId('designer-dirty-state')
+    .filter({ hasText: '未保存' })
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .catch(() => {});
+  const save3 = page.getByTestId('designer-save');
+  if (await save3.isVisible().catch(() => false)) {
+    await save3.click();
   } else {
     await page.getByRole('button', { name: /保存|Save/ }).first().click();
   }
-  await page.waitForTimeout(2000);
-  const persisted = await page.request.get(`/api/pages/${pid}`);
-  const ptext = await persisted.text();
-  const fs2 = await import('fs');
-  fs2.appendFileSync('/tmp/pd-probe-fields.log', `PERSISTED=${ptext.slice(0, 1200)}\n`);
-  await dump('after-widget-edit');
+  await page.waitForTimeout(2500);
+  const persisted2 = await page.request.get(`/api/pages/${pid}`);
+  const ptext2 = await persisted2.text();
+  const fs3 = await import('fs');
+  fs3.appendFileSync('/tmp/pd-probe-fields.log', `DESC_FILLED=${descFilled}\nDESC_PERSISTED=${ptext2.slice(0, 1500)}\n`);
+
+
 });
