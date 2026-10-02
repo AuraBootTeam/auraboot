@@ -1,0 +1,225 @@
+// Real-stack browser workflow acceptance. No API or response mocks.
+// An executed result and original screenshot review are required for acceptance.
+import { test, expect, type Page, type APIResponse } from '@playwright/test';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
+import { ensureSidebarExpanded } from '../helpers';
+
+type Resource = { pid: string; i18nKey: string; value: string; status: string; rejectReason: string | null; reviewedAt: string | null };
+async function accepted<T>(response: APIResponse): Promise<T> {
+  expect(response.ok(), `HTTP ${response.status()} from ${response.url()}`).toBe(true);
+  const envelope = await response.json();
+  expect(envelope.code, JSON.stringify(envelope)).toBe('0');
+  return envelope.data as T;
+}
+async function read(page: Page, pid: string) {
+  return accepted<Resource | null>(await page.request.get(`/api/admin/i18n/resources/${pid}`));
+}
+async function openResources(page: Page) {
+  await ensureSidebarExpanded(page);
+  // Reachability is part of the acceptance: do not bypass the sidebar by goto.
+  const entry = page.locator('nav a[href="/i18n-resources"]');
+  await expect(entry).toHaveCount(1);
+  // SidebarSubmenu mounts children even when their parent is collapsed.
+  // Open the actual ancestor buttons, outermost first, without forcing a click.
+  const parents = entry.locator('xpath=ancestor::div[./button]/button');
+  for (let i = 0; i < await parents.count(); i++) {
+    const parent = parents.nth(i);
+    if ((await parent.locator('xpath=../div').getAttribute('class'))?.includes('max-h-0')) {
+      await expect(parent).toBeVisible();
+      await parent.click();
+    }
+  }
+  await expect(entry).toBeVisible();
+  await entry.click();
+  await expect(page).toHaveURL(/\/i18n-resources(?:\?|$)/);
+  await expect(page.getByTestId('i18n-resources-page')).toBeVisible();
+}
+async function filter(page: Page, prefix: string) {
+  await page.getByLabel('lang', { exact: true }).selectOption('zh-CN');
+  await page.getByPlaceholder(/^(key 前缀，如 menu\.|key prefix, e\.g\. menu\.)$/).fill(prefix);
+  await page.getByRole('button', { name: /^(查询|Search)$/ }).click();
+}
+function row(page: Page, key: string) {
+  return page.getByTestId('i18n-resources-table').getByRole('row').filter({ has: page.getByRole('cell', { name: key, exact: true }) });
+}
+const statusLabel = { draft: /^(草稿|Draft)$/, review: /^(待审核|Pending Review)$/, approved: /^(已批准|Approved)$/ };
+async function persisted(page: Page, pid: string, status: keyof typeof statusLabel) {
+  // Poll read-only persistence; there are no mutation retries.
+  await expect.poll(async () => (await read(page, pid))?.status).toBe(status);
+  const resource = await read(page, pid);
+  expect(resource).not.toBeNull();
+  await expect(row(page, resource!.i18nKey).getByText(statusLabel[status])).toBeVisible();
+  return resource!;
+}
+
+test.describe('i18n admin real workflow', () => {
+  test.describe.configure({ timeout: 120_000, retries: 0 });
+
+  test('prefix and keyword filters preserve all 21 records across both pages', async ({ browser }, info) => {
+    const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const prefix = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.pages.`;
+    const resources: Resource[] = [];
+    try {
+      for (let i = 0; i < 21; i++) {
+        resources.push(await accepted<Resource>(await page.request.post('/api/admin/i18n/resources', {
+          data: { key: `${prefix}${String(i).padStart(2, '0')}`, lang: 'zh-CN', value: i === 20 ? 'Unique last-page wording' : `Page wording ${i}` },
+        })));
+      }
+      await openResources(page);
+      await filter(page, prefix);
+      const rows = page.getByTestId('i18n-resources-table').locator('tbody tr');
+      await expect(rows).toHaveCount(20);
+      await expect(page.getByText('1 / 2', { exact: true })).toBeVisible();
+      const observed = new Set(await rows.locator('td:first-child').allTextContents());
+      await page.getByRole('button', { name: /^(下一页|Next)$/ }).click();
+      await expect(page.getByText('2 / 2', { exact: true })).toBeVisible();
+      await expect(rows).toHaveCount(1);
+      for (const key of await rows.locator('td:first-child').allTextContents()) {
+        expect(observed.has(key), 'pagination must not duplicate a first-page key').toBe(false);
+        observed.add(key);
+      }
+      expect([...observed].sort()).toEqual(resources.map(r => r.i18nKey).sort());
+      await page.getByPlaceholder(/^(关键字|keyword)$/).fill('Unique last-page wording');
+      await page.getByRole('button', { name: /^(查询|Search)$/ }).click();
+      await expect(page.getByText('1 / 1', { exact: true })).toBeVisible();
+      await expect(rows).toHaveCount(1);
+      await expect(row(page, `${prefix}20`)).toBeVisible();
+      await expect(page.getByRole('button', { name: /^(下一页|Next)$/ })).toBeDisabled();
+      await info.attach('filtered-pagination-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    } finally { await context.close(); }
+  });
+
+  test('authenticated baseline member is denied every admin CRUD and review endpoint', async ({ browser }, info) => {
+    const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const suffix = `${Date.now()}-${info.workerIndex}`;
+    const user = makeRoleUser(`ios-i18n-member-${suffix}`, ['tenant_member']);
+    let member: Awaited<ReturnType<typeof openAsRole>> | undefined;
+    try {
+      await ensureRoleUser(admin.page, user);
+      const resource = await accepted<Resource>(await admin.page.request.post('/api/admin/i18n/resources', { data: {
+        key: `e2e.ios-handover.${suffix}.permission`, lang: 'zh-CN', value: 'Permission fixture',
+      } }));
+      member = await openAsRole(browser, user.email, user.password);
+      const snapshot = await fetchRoleSnapshot(member.page);
+      expect(snapshot.roleCodes).toEqual(['tenant_member']);
+      expect(snapshot.permissionCodes).not.toContain('system_management');
+      const requests = [
+        { method: 'GET', path: '/api/admin/i18n/resources' },
+        { method: 'GET', path: `/api/admin/i18n/resources/${resource.pid}` },
+        { method: 'POST', path: '/api/admin/i18n/resources', data: { key: `${resource.i18nKey}.forbidden`, lang: 'zh-CN', value: 'Forbidden create' } },
+        { method: 'PUT', path: `/api/admin/i18n/resources/${resource.pid}`, data: { value: 'Forbidden update' } },
+        { method: 'DELETE', path: `/api/admin/i18n/resources/${resource.pid}` },
+        { method: 'POST', path: `/api/admin/i18n/resources/${resource.pid}/submit-review` },
+        { method: 'POST', path: `/api/admin/i18n/resources/${resource.pid}/approve` },
+        { method: 'POST', path: `/api/admin/i18n/resources/${resource.pid}/reject`, data: { reason: 'Forbidden reject' } },
+        { method: 'PUT', path: `/api/admin/i18n/resources/${resource.pid}/status`, data: { status: 'draft' } },
+        { method: 'POST', path: '/api/admin/i18n/ai-translate', data: { targetLocale: 'en-US', sourceLocale: 'zh-CN', maxKeys: 1 } },
+      ];
+      const denied = [];
+      for (const request of requests) {
+        const response = await member.page.request.fetch(request.path, { method: request.method, data: request.data });
+        expect(response.status(), `${request.method} ${request.path}`).toBe(403);
+        const envelope = await response.json();
+        expect(envelope.code).not.toBe('0');
+        denied.push({ method: request.method, path: request.path, httpStatus: response.status(), code: envelope.code });
+      }
+      expect(await read(admin.page, resource.pid)).toMatchObject({ value: 'Permission fixture', status: 'approved' });
+      await info.attach('authenticated-member-denials', { body: Buffer.from(JSON.stringify(denied, null, 2)), contentType: 'application/json' });
+    } finally { await member?.context.close(); await admin.context.close(); }
+  });
+
+  test('create, edit, submit, reject with reason, approve and delete through the admin UI', async ({ browser }, info) => {
+    const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const key = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.journey`;
+    try {
+      await openResources(page);
+      await filter(page, key);
+      await expect(row(page, key)).toHaveCount(0);
+      await page.getByPlaceholder('key', { exact: true }).fill(key);
+      await page.getByLabel('new lang', { exact: true }).selectOption('zh-CN');
+      await page.getByPlaceholder(/^(文案|value)$/).fill('Original handover translation');
+      const creation = page.waitForResponse(r => r.url().endsWith('/api/admin/i18n/resources') && r.request().method() === 'POST');
+      await page.getByRole('button', { name: /^(新增|Create)$/ }).click();
+      const created = await accepted<Resource>(await creation);
+      expect(created.i18nKey).toBe(key);
+      expect(created.value).toBe('Original handover translation');
+      // Current product contract: a privileged manual create is approved.
+      await persisted(page, created.pid, 'approved');
+      await expect(page.getByPlaceholder('key', { exact: true })).toHaveValue('');
+
+      // Supported admin fixture operation establishes the draft under review.
+      await accepted(await page.request.put(`/api/admin/i18n/resources/${created.pid}/status`, { data: { status: 'draft' } }));
+      await filter(page, key);
+      await persisted(page, created.pid, 'draft');
+      await row(page, key).getByLabel(`edit-${key}`, { exact: true }).click();
+      await row(page, key).getByRole('textbox').fill('Revised handover translation');
+      await row(page, key).getByRole('button', { name: /^(保存|Save)$/ }).click();
+      expect((await persisted(page, created.pid, 'draft')).value).toBe('Revised handover translation');
+      await expect(row(page, key).getByLabel(`approve-${key}`, { exact: true })).toHaveCount(0);
+      await row(page, key).getByLabel(`submit-review-${key}`, { exact: true }).click();
+      await persisted(page, created.pid, 'review');
+      await row(page, key).getByLabel(`reject-${key}`, { exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      const reason = dialog.getByLabel(/^(驳回原因（必填）|Rejection reason \(required\))$/);
+      const reject = dialog.getByRole('button', { name: /^(驳回|Reject)$/ });
+      await expect(reject).toBeDisabled();
+      await reason.fill('   ');
+      await expect(reject).toBeDisabled();
+      expect((await read(page, created.pid))?.status).toBe('review');
+      await reason.fill('Please clarify this wording');
+      await reject.click();
+      await expect(dialog).toHaveCount(0);
+      const rejected = await persisted(page, created.pid, 'draft');
+      expect(rejected.rejectReason).toBe('Please clarify this wording');
+      expect(Number.isFinite(Date.parse(rejected.reviewedAt!))).toBe(true);
+      await info.attach('rejected-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
+      await row(page, key).getByLabel(`submit-review-${key}`, { exact: true }).click();
+      await persisted(page, created.pid, 'review');
+      await row(page, key).getByLabel(`approve-${key}`, { exact: true }).click();
+      const approved = await persisted(page, created.pid, 'approved');
+      expect(approved.rejectReason).toBeNull();
+      expect(Number.isFinite(Date.parse(approved.reviewedAt!))).toBe(true);
+      await info.attach('approved-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
+      await row(page, key).getByLabel(`delete-${key}`, { exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: /^(取消|Cancel)$/ }).click();
+      expect((await read(page, created.pid))?.pid).toBe(created.pid);
+      await row(page, key).getByLabel(`delete-${key}`, { exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: /^(确认|Confirm)$/ }).click();
+      await expect.poll(() => read(page, created.pid)).toBeNull();
+      await expect(row(page, key)).toHaveCount(0);
+    } finally { await context.close(); }
+  });
+
+  test('real stale-review rejection preserves reason and dialog on a business failure', async ({ browser }, info) => {
+    const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const key = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.stale`;
+    try {
+      const resource = await accepted<Resource>(await page.request.post('/api/admin/i18n/resources', { data: { key, lang: 'zh-CN', value: 'Concurrent review fixture' } }));
+      await accepted(await page.request.put(`/api/admin/i18n/resources/${resource.pid}/status`, { data: { status: 'draft' } }));
+      await accepted(await page.request.post(`/api/admin/i18n/resources/${resource.pid}/submit-review`));
+      await openResources(page);
+      await filter(page, key);
+      await persisted(page, resource.pid, 'review');
+      await row(page, key).getByLabel(`reject-${key}`, { exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      const reason = dialog.getByLabel(/^(驳回原因（必填）|Rejection reason \(required\))$/);
+      await reason.fill('Preserve this reason after the concurrent approval');
+      // Actual concurrent state transition. No route interception or fake envelope.
+      await accepted(await page.request.post(`/api/admin/i18n/resources/${resource.pid}/approve`));
+      const failure = page.waitForResponse(r => r.url().endsWith(`/resources/${resource.pid}/reject`) && r.request().method() === 'POST');
+      await dialog.getByRole('button', { name: /^(驳回|Reject)$/ }).click();
+      const response = await failure;
+      const body = await response.json();
+      expect(body.code, JSON.stringify(body)).not.toBe('0');
+      await expect(dialog).toBeVisible();
+      await expect(reason).toHaveValue('Preserve this reason after the concurrent approval');
+      await expect(dialog.getByRole('alert')).toContainText(/Cannot reject/);
+      expect((await read(page, resource.pid))?.status).toBe('approved');
+      await info.attach('business-failure-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      // Retain the uniquely named fixture and artifacts for failure/owner review.
+    } finally { await context.close(); }
+  });
+});
