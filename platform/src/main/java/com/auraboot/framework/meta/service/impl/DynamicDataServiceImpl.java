@@ -1963,7 +1963,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("delete", modelCode, recordId);
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
@@ -2463,7 +2463,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchDelete", modelCode, recordIds.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "batch deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(

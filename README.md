@@ -69,6 +69,8 @@ Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com
 ### DSL Engine
 Define models, fields, commands, pages, and formulas in declarative JSON. A single model definition creates the database table, REST endpoints, form validation, and list/detail pages with no code generation step.
 
+Use [model mutation policies](docs/system-reference/model-mutation-policy.md) to protect immutable history and require command authorization for creation or deletion.
+
 ### 20+ Stage Command Pipeline
 Every data operation flows through a unified pipeline: schema validation → permission check → state machine → field mapping → handler → side effects → webhooks → audit. Fully configurable per command through DSL.
 
