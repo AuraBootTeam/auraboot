@@ -7,6 +7,8 @@ import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.enums.DataScopeType;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -125,6 +127,14 @@ public class DataScopeServiceImpl implements DataScopeService {
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
+        try {
+            DataScopeType.fromCode(scopeType);
+        } catch (IllegalArgumentException e) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope type", e);
+        }
+        if (mergeStrategy != null && !"MAX".equals(mergeStrategy) && !"MIN".equals(mergeStrategy)) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope merge strategy");
+        }
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)

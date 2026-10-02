@@ -40,6 +40,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -71,6 +73,38 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
         grantToTestRole(MetaPermission.PERMISSION_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
         userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
+    }
+
+    @Test
+    void invalidDefaultScopeReturnsBadRequestWithoutPersisting() throws Exception {
+        String previous = getTestRole().getDefaultDataScopeType();
+        mvc().perform(put("/api/permissions/matrix/" + getTestRole().getPid() + "/default-scope")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scopeType\":\"tem\"}"))
+                .andExpect(status().isBadRequest());
+        applyTestMetaContext();
+        assertThat(roleMapper.selectById(getTestRole().getId()).getDefaultDataScopeType()).isEqualTo(previous);
+    }
+
+    @Test
+    void teamDefaultScopeIsAcceptedAndPersisted() throws Exception {
+        mvc().perform(put("/api/permissions/matrix/" + getTestRole().getPid() + "/default-scope")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scopeType\":\"team\"}"))
+                .andExpect(status().isOk());
+        applyTestMetaContext();
+        assertThat(roleMapper.selectById(getTestRole().getId()).getDefaultDataScopeType()).isEqualTo("team");
+    }
+
+    @Test
+    void explainUnknownMemberReturnsBadRequestRatherThanAnUnscopedVerdict() throws Exception {
+        mvc().perform(get("/api/permissions/matrix/explain")
+                        .param("memberId", String.valueOf(IdWorker.getId()))
+                        .param("resource", "crm_account_common")
+                        .param("action", "read")
+                        .param("recordPid", "missing-record"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(com.auraboot.framework.common.constant.ResponseCode.BadParam.getCode()));
     }
 
     @Test

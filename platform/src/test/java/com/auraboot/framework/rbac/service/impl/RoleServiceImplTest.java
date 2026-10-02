@@ -3,6 +3,8 @@ package com.auraboot.framework.rbac.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
@@ -40,6 +42,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RoleServiceImpl")
 class RoleServiceImplTest {
+
+    @Test
+    void invalidDefaultScopeIsRejectedBeforeUpdatingRole() {
+        for (String invalid : new String[] {"", "own", "share", "tem", "ALL"}) {
+            RootUnCheckedException exception = assertThrows(RootUnCheckedException.class,
+                    () -> service.setDefaultDataScopeType(7L, invalid));
+            assertEquals(ResponseCode.BadParam, exception.getResponseCode());
+        }
+        org.mockito.Mockito.verifyNoInteractions(roleMapper);
+    }
 
     @Mock private RoleMapper roleMapper;
     @Mock private RolePermissionService rolePermissionService;

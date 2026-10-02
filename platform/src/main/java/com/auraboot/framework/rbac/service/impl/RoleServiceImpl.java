@@ -2,6 +2,9 @@ package com.auraboot.framework.rbac.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.permission.enums.DataScopeType;
 import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -102,6 +105,13 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public void setDefaultDataScopeType(Long roleId, String scopeType) {
+        if (scopeType != null) {
+            try {
+                DataScopeType.fromCode(scopeType);
+            } catch (IllegalArgumentException e) {
+                throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid default data scope type", e);
+            }
+        }
         // Plain VARCHAR column — a scoped LambdaUpdate set is safe (no typeHandler concern) and
         // updates only this column (null clears the default, reverting to deny-by-default).
         lambdaUpdate()
