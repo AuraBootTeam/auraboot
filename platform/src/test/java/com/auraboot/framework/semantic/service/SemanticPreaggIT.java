@@ -126,6 +126,8 @@ class SemanticPreaggIT {
 
     @BeforeEach
     void publishModelOnce() {
+        // Reused development DBs can retain this fixture after a failed older teardown.
+        if (modelPid == null) cleanup();
         MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
         if (modelPid != null) return;
         jdbc.update("DELETE FROM ab_meta_model WHERE id = 991950010 OR pid = ?", META_MODEL_PID);
