@@ -62,7 +62,7 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
     testImplementation 'org.mockito:mockito-core:5.23.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.23.0'
-    testImplementation 'org.assertj:assertj-core:3.27.3'
+    testImplementation 'org.assertj:assertj-core:3.27.7'
     // ConditionalOnProperty / ConditionalOnMissingBean must be on the test
     // RUNTIME classpath: an absent annotation type is silently ignored by the
     // JVM, which would make every @Bean in the configuration unconditional.
