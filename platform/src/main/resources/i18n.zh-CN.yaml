@@ -2105,3 +2105,5 @@ aurabot:
 "admin.permission.members.expiryDate": "到期日期"
 "admin.permission.members.colValidity": "有效期"
 "admin.permission.members.permanent": "长期有效"
+
+permission.org.role.update: "修改角色"

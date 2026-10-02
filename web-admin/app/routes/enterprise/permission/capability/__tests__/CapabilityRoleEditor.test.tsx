@@ -5,7 +5,10 @@ import type { CapabilityGroup } from '../types';
 import type { PermissionMatrixDTO } from '../../types';
 
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (_key: string, _vars?: unknown, fallback?: string) => fallback }),
+  useI18n: () => ({
+    t: (key: string, _vars?: unknown, fallback?: string) =>
+      key === 'permission.qo.quote.read' ? '查看报价单' : fallback,
+  }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }),
@@ -293,6 +296,26 @@ describe('CapabilityRoleEditor', () => {
     expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
     expect(screen.queryByTestId('atomic-checkbox-qo.quote.read')).toBeNull();
     expect(screen.queryByTestId('atomic-scope-qo.quote.read')).toBeNull();
+    const diagnostics = screen.getByTestId('permission-diagnostics') as HTMLDetailsElement;
+    diagnostics.open = true;
+    fireEvent(diagnostics, new Event('toggle'));
+    expect(await screen.findByText('查看报价单')).toBeTruthy();
+    expect(screen.queryByText('Read quote')).toBeNull();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search permission diagnostics' }), {
+      target: { value: '查看报价单' },
+    });
+    expect(screen.getByTestId('diagnostic-action-qo.quote.read')).toBeTruthy();
+    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
+      grantedCodes: [],
+      revokedCodes: ['qo.quote.read'],
+      preservedCodes: [],
+      resultingCapabilities: [],
+      relatedMenus: [],
+    });
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    expect(await screen.findByText(/Revoke: 查看报价单/)).toBeTruthy();
+    expect(screen.queryByText(/Revoke: Read quote/)).toBeNull();
     expect(permissionService.batchUpdateRolePermissions).not.toHaveBeenCalled();
   });
 

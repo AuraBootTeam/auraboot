@@ -1799,3 +1799,5 @@ aurabot:
 "admin.permission.members.expiryDate": "Expiry date"
 "admin.permission.members.colValidity": "Validity"
 "admin.permission.members.permanent": "Permanent"
+
+permission.org.role.update: "Update roles"

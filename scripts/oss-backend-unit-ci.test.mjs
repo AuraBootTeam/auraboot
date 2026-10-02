@@ -13,7 +13,10 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('backend CI runner is executable and owns its complete infrastructure lifecycle', () => {
   assert.ok(statSync(runner).mode & 0o100);
-  assert.match(source, /docker-compose\.skills-c2\.override\.yml/);
+  const composeFiles = [...source.matchAll(/-f "\$PROJECT_ROOT\/([^"\n]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(composeFiles, ['docker-compose.yml', 'docker-compose.oss-backend-ci.override.yml']);
+  for (const file of composeFiles) assert.ok(statSync(path.join(here, '..', file)).isFile(), file);
+  assert.match(source, /--profile oss-backend-ci/);
   assert.match(source, /up -d --wait postgres redis kafka/);
   assert.match(source, /runtime retained and stopped; network released: compose_project=/);
   assert.match(source, /COMPOSE_PROJECT="aura-ci-oss-backend-\$RUNTIME_TOKEN"/);
@@ -87,7 +90,8 @@ test('backend CI runner pre-pulls every fixed and Testcontainers image', () => {
 });
 
 test('backend CI runner preserves Gradle product-test exit status', () => {
-  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*$/);
+  assert.match(source, /platform\/gradlew -p platform --continue cleanTest test bootstrapBillingAccountTest\s*\n(?:#[^\n]*\n|\s*\n)*gradle_status=\$\?/);
+  assert.match(source, /exit "\$gradle_status"\s*$/);
   assert.doesNotMatch(source, /platform\/gradlew[^\n]*\|\| environment_invalid/);
 });
 

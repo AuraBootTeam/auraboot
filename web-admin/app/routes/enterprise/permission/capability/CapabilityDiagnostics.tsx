@@ -24,10 +24,14 @@ export default function CapabilityDiagnostics({
         module.resources.flatMap((resource) =>
           resource.actions
             .filter((action) => action.supported)
-            .map((action) => ({ ...action, resourceName: resource.resourceName })),
+            .map((action) => ({
+              ...action,
+              label: t(`permission.${action.code}`, undefined, action.label),
+              resourceName: resource.resourceName,
+            })),
         ),
       ),
-    [matrix],
+    [matrix, t],
   );
   const filtered = rows.filter((row) =>
     `${row.label} ${row.code} ${row.resourceName}`.toLowerCase().includes(query.toLowerCase()),

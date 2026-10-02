@@ -272,6 +272,8 @@ test('partial revocation retains selected shared actions and completion persists
   expect(plan.revokedCodes).toEqual(['org.role.update']);
   expect(plan.grantedCodes).toEqual([]);
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await expect(page.getByTestId('confirm-dialog')).toContainText('修改角色');
+  await expect(page.getByTestId('confirm-dialog')).not.toContainText('Organization role update');
   await page.screenshot({
     path: info.outputPath('partial-revocation-preview.png'),
     fullPage: true,
@@ -295,7 +297,8 @@ test('partial revocation retains selected shared actions and completion persists
   await page.getByTestId('capability-save').click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   const completion = page.waitForResponse(
-    (response) => response.url().includes('/api/permission/capabilities?') &&
+    (response) =>
+      response.url().includes('/api/permission/capabilities?') &&
       response.request().method() === 'PUT',
   );
   await page.getByTestId('confirm-ok').click();
@@ -312,6 +315,7 @@ test('partial revocation retains selected shared actions and completion persists
   await page.getByTestId('role-search-input').fill(role.code);
   await page.getByTestId(`role-item-${role.code}`).click();
   await expect(checkbox).toBeChecked();
+  await expect(page.getByTestId('data-scope-bar')).not.toContainText(/加载中|Loading/i);
   await page.screenshot({
     path: info.outputPath('partial-completed-persisted.png'),
     fullPage: true,

@@ -245,7 +245,9 @@ for (const c of cases) {
       await expect(denied.page.locator('main')).toContainText(
         /Page Unavailable|Access forbidden|Access denied|无权限|未授权|权限不足/i,
       );
-      await expect(denied.page.getByTestId('dynamic-page-form')).toHaveCount(0);
+      // The shared page shell remains; denied authoring must expose no editable controls.
+      await expect(denied.page.locator('main input, main textarea, main select, main [contenteditable="true"]')).toHaveCount(0);
+      await expect(denied.page.locator('main [data-testid^="form-btn-"]')).toHaveCount(0);
       await denied.page.screenshot({ path: info.outputPath('denied.png') });
       for (const operation of c.allowDelete === false ? ['create', 'update'] : ['create', 'update', 'delete']) {
         await expectCommandDenied(

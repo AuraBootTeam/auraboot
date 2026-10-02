@@ -4269,5 +4269,10 @@
     "key": "admin.permission.members.permanent",
     "zh-CN": "长期有效",
     "en-US": "Permanent"
+  },
+  {
+    "key": "permission.org.role.update",
+    "zh-CN": "修改角色",
+    "en-US": "Update roles"
   }
 ]

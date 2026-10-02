@@ -252,7 +252,10 @@ export default function CapabilityRoleEditor({
   const actionLabels = new Map(
     (matrix?.modules ?? []).flatMap((module) =>
       module.resources.flatMap((resource) =>
-        resource.actions.map((action) => [action.code, action.label] as const),
+        resource.actions.map(
+          (action) =>
+            [action.code, t(`permission.${action.code}`, undefined, action.label)] as const,
+        ),
       ),
     ),
   );
