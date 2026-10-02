@@ -1,5 +1,10 @@
 package com.auraboot.framework.semantic.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
@@ -20,14 +25,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
-import org.springframework.scheduling.support.ScheduledMethodRunnable;
+import org.springframework.scheduling.config.TaskExecutionOutcome;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -253,13 +263,17 @@ class SemanticPreaggIT {
     @Test
     @Timeout(180)
     @DisplayName("Real scheduled sweep refreshes due data during a two-minute observation")
-    void scheduledSweepDuringTwoMinuteObservation() throws InterruptedException {
-        assertThat(scheduler.getScheduledTasks()).anySatisfy(task -> {
-            assertThat(task.getTask().getRunnable()).isInstanceOf(ScheduledMethodRunnable.class);
-            ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getTask().getRunnable();
-            assertThat(runnable.getMethod().getName()).isEqualTo("refreshAllDue");
-            assertThat(runnable.getTarget()).isSameAs(preaggService);
-        });
+    void scheduledSweepDuringTwoMinuteObservation() throws Exception {
+        // Spring 6.2 wraps the registered runnable to track its execution outcome.
+        var registered = scheduler.getScheduledTasks().stream()
+                .filter(task -> task.toString().equals(SemanticPreaggService.class.getName() + ".refreshAllDue"))
+                .toList();
+        assertThat(registered).hasSize(1);
+        var scheduledTask = registered.get(0).getTask();
+        Logger serviceLogger = (Logger) LoggerFactory.getLogger(SemanticPreaggService.class);
+        ListAppender<ILoggingEvent> observationLog = new ListAppender<>();
+        observationLog.start();
+        serviceLogger.addAppender(observationLog);
         String run = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         insertAliasRow("golden-" + run + "-1");
         AbSemanticPreagg preagg = preaggService.create(
@@ -283,6 +297,36 @@ class SemanticPreaggIT {
             MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
             OffsetDateTime refreshedAt = preaggMapper.findByPid(TENANT_ID, preagg.getPid())
                     .getLastRefreshedAt();
+            long outcomeDeadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+            while (scheduledTask.getLastExecutionOutcome().status() == TaskExecutionOutcome.Status.STARTED
+                    && System.nanoTime() < outcomeDeadline) {
+                Thread.sleep(100);
+            }
+            var outcome = scheduledTask.getLastExecutionOutcome();
+            var warnings = observationLog.list.stream()
+                    .filter(event -> event.getLevel().isGreaterOrEqual(Level.WARN))
+                    .map(ILoggingEvent::getFormattedMessage).toList();
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
+            Map<String, Object> evidence = new LinkedHashMap<>();
+            evidence.put("runtime", System.getenv("AURA_RUNTIME_NAME"));
+            evidence.put("sourceSha", System.getenv("AURA_RUNTIME_SOURCE_OSS_COMMIT"));
+            evidence.put("tenantId", TENANT_ID);
+            evidence.put("preaggPid", preagg.getPid());
+            evidence.put("mvName", preagg.getMvName());
+            evidence.put("startedAt", startedAt.toString());
+            evidence.put("elapsedMs", elapsedMs);
+            evidence.put("before", before);
+            evidence.put("expected", expected);
+            evidence.put("actual", actual);
+            evidence.put("refreshedAt", refreshedAt.toString());
+            evidence.put("scheduledExecutionAt", outcome.executionTime() == null ? null : outcome.executionTime().toString());
+            evidence.put("scheduledStatus", outcome.status().name());
+            evidence.put("warnings", warnings);
+            String ownedEvidence = System.getenv("AURA_EVIDENCE_ROOT");
+            Path evidenceDir = ownedEvidence == null ? Path.of("build/reports/preagg") : Path.of(ownedEvidence);
+            Files.createDirectories(evidenceDir);
+            Files.writeString(evidenceDir.resolve("preagg-scheduled-" + run + ".json"),
+                    new ObjectMapper().writeValueAsString(evidence));
             log.info("Preagg scheduled observation runtime={} pid={} start={} elapsedMs={} "
                             + "before={} expected={} actual={} refreshedAt={}",
                     System.getenv("AURA_RUNTIME_NAME"), preagg.getPid(), startedAt,
@@ -290,7 +334,12 @@ class SemanticPreaggIT {
                     before, expected, actual, refreshedAt);
             assertThat(actual).isEqualTo(expected);
             assertThat(refreshedAt).isAfter(startedAt);
+            assertThat(outcome.status()).isEqualTo(TaskExecutionOutcome.Status.SUCCESS);
+            assertThat(outcome.executionTime()).isAfter(startedAt.toInstant());
+            assertThat(warnings).isEmpty();
         } finally {
+            serviceLogger.detachAppender(observationLog);
+            observationLog.stop();
             MetaContext.setContext(TENANT_ID, USER_ID, "preagg-golden-pid", "preagg-golden-user");
             preaggService.delete(preagg.getPid());
         }
