@@ -1563,7 +1563,7 @@
     {
       "code": "tenant_admin",
       "name": "租户管理员",
-      "description": "租户管理员角色，拥有该租户的所有权限(P0 2026-09-20: 管理员角色不得为默认角色——空 roleCodes 建户会静默授予默认角色)",
+      "description": "管理本租户的业务配置、成员与权限。",
       "type": "tenant",
       "scopeType": "tenant",
       "priority": 1,
@@ -1573,7 +1573,7 @@
     {
       "code": "tenant_member",
       "name": "租户成员基线",
-      "description": "系统托管基线角色：每个租户成员在权限解析时隐式获得其渲染支持读（无需显式分配 ab_user_role 行）。见 07 §4.6 / DDR-2026-06-30。仅放对所有成员无害的读。",
+      "description": "租户成员共有的基础查看能力，由系统统一维护。",
       "type": "tenant",
       "scopeType": "tenant",
       "priority": 15,

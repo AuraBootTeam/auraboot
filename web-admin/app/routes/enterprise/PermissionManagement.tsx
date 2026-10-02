@@ -246,11 +246,14 @@ export default function PermissionManagement() {
 
         <div className="flex-1 overflow-y-auto">
           {recommendedRoleCount > 0 && !searchQuery && (
-            <div className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <div
+              className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+              data-i18n-ui-copy="role-guidance"
+            >
               {t(
                 'admin.permission.role.recommendedHint',
                 undefined,
-                '建议岗位: 管理员 tenant_admin；销售/采购 bom_operator + qo_quoter；工程 bom_operator',
+                '按业务职责分配角色；管理员角色仅授予需要管理权限的人员。',
               )}
             </div>
           )}
@@ -315,8 +318,19 @@ export default function PermissionManagement() {
                           )}
                         </div>
                         {role.description && (
-                          <div className="mt-0.5 truncate text-xs text-gray-500">
-                            {role.description}
+                          <div
+                            className="mt-0.5 truncate text-xs text-gray-500"
+                            data-i18n-ui-copy={
+                              t(
+                                `role.${role.code}._meta.description`,
+                                undefined,
+                                role.description,
+                              ) !== role.description
+                                ? 'role-description'
+                                : undefined
+                            }
+                          >
+                            {t(`role.${role.code}._meta.description`, undefined, role.description)}
                           </div>
                         )}
                       </td>
@@ -430,7 +444,24 @@ export default function PermissionManagement() {
                 {selectedRole.name}
               </h2>
               {selectedRole.description && (
-                <p className="mt-0.5 text-sm text-gray-500">{selectedRole.description}</p>
+                <p
+                  className="mt-0.5 text-sm text-gray-500"
+                  data-i18n-ui-copy={
+                    t(
+                      `role.${selectedRole.code}._meta.description`,
+                      undefined,
+                      selectedRole.description,
+                    ) !== selectedRole.description
+                      ? 'role-description'
+                      : undefined
+                  }
+                >
+                  {t(
+                    `role.${selectedRole.code}._meta.description`,
+                    undefined,
+                    selectedRole.description,
+                  )}
+                </p>
               )}
             </div>
           )}

@@ -4193,5 +4193,47 @@
     "key": "dashboard.designer.defaultTitle",
     "zh-CN": "未命名仪表盘",
     "en-US": "Untitled Dashboard"
+  },
+  {
+    "key": "admin.permission.role.recommendedHint",
+    "zh-CN": "按业务职责分配角色；管理员角色仅授予需要管理权限的人员。",
+    "en-US": "Assign roles by business responsibility; grant administrator roles only to staff who need management access.",
+    "ja-JP": "業務上の責任に応じてロールを割り当て、管理権限が必要な担当者にのみ管理者ロールを付与します。",
+    "ko-KR": "업무 책임에 따라 역할을 배정하고 관리 권한이 필요한 직원에게만 관리자 역할을 부여하세요."
+  },
+  {
+    "key": "role.tenant_admin._meta.description",
+    "zh-CN": "管理本租户的业务配置、成员与权限。",
+    "en-US": "Manage business configuration, members and permissions for this tenant.",
+    "ja-JP": "このテナントの業務設定、メンバー、権限を管理します。",
+    "ko-KR": "이 테넌트의 업무 설정, 구성원 및 권한을 관리합니다."
+  },
+  {
+    "key": "role.tenant_member._meta.description",
+    "zh-CN": "租户成员共有的基础查看能力，由系统统一维护。",
+    "en-US": "Shared basic viewing capabilities for tenant members, maintained by the system.",
+    "ja-JP": "システムが維持する、テナントメンバー共通の基本的な閲覧権限です。",
+    "ko-KR": "시스템이 관리하는 테넌트 구성원의 공통 기본 조회 권한입니다."
+  },
+  {
+    "key": "workbench.exported",
+    "zh-CN": "已导出 {count} 个工作表",
+    "en-US": "Exported {count} sheets",
+    "ja-JP": "{count} 個のシートをエクスポートしました",
+    "ko-KR": "시트 {count}개를 내보냈습니다"
+  },
+  {
+    "key": "workbench.exportNoData",
+    "zh-CN": "暂无可导出的数据",
+    "en-US": "No data to export",
+    "ja-JP": "エクスポートするデータがありません",
+    "ko-KR": "내보낼 데이터가 없습니다"
+  },
+  {
+    "key": "workbench.exportFailed",
+    "zh-CN": "Excel 导出失败，请稍后重试",
+    "en-US": "Excel export failed. Please try again.",
+    "ja-JP": "Excel のエクスポートに失敗しました。もう一度お試しください。",
+    "ko-KR": "Excel 내보내기에 실패했습니다. 다시 시도해 주세요."
   }
 ]
