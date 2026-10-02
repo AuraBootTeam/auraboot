@@ -96,8 +96,10 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 }
 
 function detailDoc(pageKey: string, sectionId: string, sectionTitle: string) {
+  // v4 flat dialect: top-level blocks, kind root implied (designerRootId in
+  // extension keeps the editor outline ids stable across save/reload).
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     kind: 'detail',
     id: pageKey,
     pageKey,
@@ -105,20 +107,11 @@ function detailDoc(pageKey: string, sectionId: string, sectionTitle: string) {
     title: `Version golden ${pageKey}`,
     blocks: [
       {
-        id: ROOT_BLOCK,
-        blockType: 'detail',
-        title: 'Version golden root',
-        dataSource: { model: MODEL_CODE },
-        layout: { span: 12 },
-        blocks: [
-          {
-            id: sectionId,
-            blockType: 'detail-section',
-            title: sectionTitle,
-            layout: { columns: 12 },
-            blocks: [],
-          },
-        ],
+        id: sectionId,
+        blockType: 'detail-section',
+        title: sectionTitle,
+        columns: 12,
+        fields: [],
       },
     ],
   };
@@ -135,9 +128,13 @@ async function seedDraftPage(page: Page, uid: string): Promise<{ pid: string; pa
       modelCode: MODEL_CODE,
       // The unified designer loads/saves a V3 document; its client validator
       // requires schemaVersion 3. A v4 seed loads but fails save validation.
-      schemaVersion: 3,
+      schemaVersion: 4,
       blocks: detailDoc(pageKey, SECTION_BLOCK, 'Original section').blocks,
-      extension: { e2e: true, scenario: 'version-history-golden' },
+      extension: {
+        e2e: true,
+        scenario: 'version-history-golden',
+        designerRootId: ROOT_BLOCK,
+      },
     },
   });
   expect(resp.ok(), `seed page failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
