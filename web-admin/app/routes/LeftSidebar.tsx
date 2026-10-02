@@ -103,7 +103,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
         <button
           onClick={toggleCollapsed}
           className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
         >
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>

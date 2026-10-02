@@ -3995,5 +3995,68 @@
     "en-US": "Move down",
     "ja-JP": "下へ移動",
     "ko-KR": "아래로 이동"
+  },
+  {
+    "key": "sidebar.expand",
+    "zh-CN": "展开侧栏",
+    "en-US": "Expand sidebar",
+    "ja-JP": "サイドバーを展開",
+    "ko-KR": "사이드바 펼치기"
+  },
+  {
+    "key": "sidebar.collapse",
+    "zh-CN": "收起侧栏",
+    "en-US": "Collapse sidebar",
+    "ja-JP": "サイドバーを折りたたむ",
+    "ko-KR": "사이드바 접기"
+  },
+  {
+    "key": "language.switch",
+    "zh-CN": "切换语言",
+    "en-US": "Switch language",
+    "ja-JP": "言語を切り替え",
+    "ko-KR": "언어 변경"
+  },
+  {
+    "key": "theme.switch",
+    "zh-CN": "切换主题",
+    "en-US": "Switch theme",
+    "ja-JP": "テーマを切り替え",
+    "ko-KR": "테마 변경"
+  },
+  {
+    "key": "table.reorderColumn",
+    "zh-CN": "拖动调整列顺序",
+    "en-US": "Drag to reorder column",
+    "ja-JP": "ドラッグして列を並べ替え",
+    "ko-KR": "드래그하여 열 순서 변경"
+  },
+  {
+    "key": "table.rowHeight",
+    "zh-CN": "行高",
+    "en-US": "Row height",
+    "ja-JP": "行の高さ",
+    "ko-KR": "행 높이"
+  },
+  {
+    "key": "table.statusTabs",
+    "zh-CN": "状态筛选",
+    "en-US": "Status filters",
+    "ja-JP": "状態フィルター",
+    "ko-KR": "상태 필터"
+  },
+  {
+    "key": "inbox.title",
+    "zh-CN": "收件箱",
+    "en-US": "Inbox",
+    "ja-JP": "受信トレイ",
+    "ko-KR": "받은 편지함"
+  },
+  {
+    "key": "inbox.unreadCount",
+    "zh-CN": "{count} 条未读",
+    "en-US": "{count} unread items",
+    "ja-JP": "未読 {count} 件",
+    "ko-KR": "읽지 않은 항목 {count}개"
   }
 ]
