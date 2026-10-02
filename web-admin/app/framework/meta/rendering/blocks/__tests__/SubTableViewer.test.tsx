@@ -884,7 +884,9 @@ describe('SubTableViewer string constraints', () => {
       endpoint.endsWith('/field-meta')
         ? {
             code: '0',
-            data: [{ code: 'lot_code', dataType: 'string', constraints: { maxLength: 100 } }],
+            data: [
+              { code: 'lot_code', dataType: 'string', feature: { validation: { maxLength: 100 } } },
+            ],
           }
         : { code: '0', data: { records: [] } },
     );

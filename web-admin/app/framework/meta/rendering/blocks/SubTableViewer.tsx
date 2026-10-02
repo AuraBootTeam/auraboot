@@ -72,7 +72,8 @@ interface ChildFieldMeta {
   dictCode?: string;
   referenceModelCode?: string;
   refTarget?: Record<string, any>;
-  constraints?: { required?: boolean; maxLength?: number };
+  required?: boolean;
+  feature?: { validation?: { maxLength?: number } };
   extension?: Record<string, any>;
 }
 
@@ -257,10 +258,15 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           refTarget.targetModel ||
           refTarget.modelCode;
       }
-      if (enriched.maxLength === undefined && meta.constraints?.maxLength !== undefined) {
-        enriched.maxLength = meta.constraints.maxLength;
+      const maximumLength = Number(
+        meta.feature?.validation?.maxLength ??
+          metaExtension.constraints?.maxLength ??
+          metaExtension.extension?.constraints?.maxLength,
+      );
+      if (enriched.maxLength === undefined && Number.isFinite(maximumLength) && maximumLength > 0) {
+        enriched.maxLength = maximumLength;
       }
-      if (!enriched.required && meta.constraints?.required) {
+      if (!enriched.required && meta.required) {
         enriched.required = true;
       }
 
