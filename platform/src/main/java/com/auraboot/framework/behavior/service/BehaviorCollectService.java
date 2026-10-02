@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Server-side ingestion for /api/collect (M1; SoT §5.5/§2.5) and /api/collect/keyed (SP2).
@@ -24,6 +25,10 @@ import java.util.List;
 @Slf4j
 @Service
 public class BehaviorCollectService {
+
+    private static final Set<String> CLIENT_SCHEMA_VERSIONS = Set.of("1", "2");
+    private static final Set<String> CLIENT_IDENTITY_QUALITIES =
+            Set.of("stable", "heuristic", "declared", "anonymous");
 
     private final BehaviorIngestPublisher publisher;
     private final BehaviorIngestMetrics metrics;
@@ -54,6 +59,7 @@ public class BehaviorCollectService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "tenant_required");
         }
         rejectReservedEvents(events);
+        validateClientEnvelopes(events);
         int enqueued = publisher.publish(tenantId, MetaContext.getCurrentUserId(), events);
         metrics.recordAccepted("authenticated", enqueued);
         return enqueued;
@@ -69,6 +75,7 @@ public class BehaviorCollectService {
             return 0;
         }
         rejectReservedEvents(events);
+        validateClientEnvelopes(events);
         int enqueued = publisher.publish(tenantId, null, events);
         metrics.recordAccepted("keyed", enqueued);
         return enqueued;
@@ -86,6 +93,29 @@ public class BehaviorCollectService {
 
     private static String normalized(String value) {
         return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void validateClientEnvelopes(List<BehaviorEventInput> events) {
+        for (BehaviorEventInput event : events) {
+            if (event == null || event.getSchemaVersion() == null
+                    || !CLIENT_SCHEMA_VERSIONS.contains(event.getSchemaVersion())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported_client_schema_version");
+            }
+            if (event.getIdentityQuality() != null
+                    && !CLIENT_IDENTITY_QUALITIES.contains(event.getIdentityQuality())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_client_identity_quality");
+            }
+            if (event.getProps() == null) continue;
+            // The browser SDK emits only an optional route template; UI attribution
+            // has dedicated envelope fields. Never enqueue arbitrary business content.
+            for (var entry : event.getProps().entrySet()) {
+                if (!"routeTemplate".equals(entry.getKey())
+                        || !(entry.getValue() instanceof String route)
+                        || !route.matches("/[A-Za-z0-9_./:-]{0,511}")) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_client_event_properties");
+                }
+            }
+        }
     }
 
 }
