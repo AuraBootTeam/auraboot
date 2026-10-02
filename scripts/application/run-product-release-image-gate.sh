@@ -172,6 +172,7 @@ NETWORK="$PROJECT-net"
 PG_CONTAINER="$PROJECT-pg"
 BUILD_PG_CONTAINER="$PROJECT-build-pg"
 APP_CONTAINER="$PROJECT-app"
+PUBLISH_CONTAINER="$PROJECT-publisher"
 PAYLOAD_CONTAINER="$PROJECT-payload"
 IMAGE_REF=''
 IMAGE_ID=''
@@ -190,11 +191,14 @@ cleanup() {
   if docker inspect "$APP_CONTAINER" >/dev/null 2>&1; then
     docker logs "$APP_CONTAINER" >"$ARTIFACTS/logs/application-final.log" 2>&1 || true
   fi
+  if docker inspect "$PUBLISH_CONTAINER" >/dev/null 2>&1; then
+    docker logs "$PUBLISH_CONTAINER" >"$ARTIFACTS/logs/publication-final.log" 2>&1 || true
+  fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
     AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
       "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
   fi
-  docker rm -f "$APP_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$APP_CONTAINER" "$PUBLISH_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_IMAGE" ]] || docker image rm "$REGISTRY_IMAGE" >/dev/null 2>&1 || true
   [[ -z "$REGISTRY_DIGEST_REF" ]] || docker image rm "$REGISTRY_DIGEST_REF" >/dev/null 2>&1 || true
@@ -318,14 +322,17 @@ docker run --rm --network "$NETWORK" \
 
 RUNTIME_DB_ROLE=aura_runtime_ci
 REGISTRATION_DB_ROLE=aura_registry_ci
+PUBLISH_DB_ROLE=aura_publisher_ci
+PUBLISH_DB_PASSWORD="$(openssl rand -hex 24)"
 RUNTIME_DB_PASSWORD="$(openssl rand -hex 24)"
 REGISTRATION_DB_PASSWORD="$(openssl rand -hex 24)"
 DATABASE_ROLE_SQL="$WORK_ROOT/database-roles.sql"
 umask 077
 cat >"$DATABASE_ROLE_SQL" <<SQL
 CREATE ROLE $RUNTIME_DB_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '$RUNTIME_DB_PASSWORD';
+CREATE ROLE $PUBLISH_DB_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '$PUBLISH_DB_PASSWORD';
 CREATE ROLE $REGISTRATION_DB_ROLE LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD '$REGISTRATION_DB_PASSWORD';
-GRANT CONNECT ON DATABASE aura_product_ci TO $RUNTIME_DB_ROLE, $REGISTRATION_DB_ROLE;
+GRANT CONNECT ON DATABASE aura_product_ci TO $RUNTIME_DB_ROLE, $REGISTRATION_DB_ROLE, $PUBLISH_DB_ROLE;
 GRANT USAGE ON SCHEMA public TO $RUNTIME_DB_ROLE;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO $RUNTIME_DB_ROLE;
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO $RUNTIME_DB_ROLE;
@@ -340,6 +347,11 @@ node "$CORE_ROOT/scripts/application/registry-role-policy.mjs" \
   | docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U auraboot -d aura_product_ci \
     >>"$ARTIFACTS/logs/database-roles.log" 2>&1 \
   || fail 'least-privilege registry database policy could not be applied'
+node "$CORE_ROOT/scripts/application/dynamic-publication-role-policy.mjs" \
+  public "$RUNTIME_DB_ROLE" "$PUBLISH_DB_ROLE" "$REGISTRATION_DB_ROLE" "$OWNER_DB_ROLE" \
+  | docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U auraboot -d aura_product_ci \
+    >>"$ARTIFACTS/logs/database-roles.log" 2>&1 \
+  || fail 'controlled dynamic publication database policy could not be applied'
 rm -f "$DATABASE_ROLE_SQL"
 
 LOCK_IDENTITY="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).identity)" "$PRODUCT_RELEASE/application.lock")"
@@ -350,33 +362,39 @@ OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
 WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
 printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
-docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
-  -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
-  -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
-  -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
-  -e SPRING_DATASOURCE_USERNAME="$RUNTIME_DB_ROLE" -e SPRING_DATASOURCE_PASSWORD="$RUNTIME_DB_PASSWORD" \
-  -e AURA_APPLICATION_MODE=application -e AURABOOT_BOOTSTRAP_ENABLED=false -e AURABOOT_DEMO_SEED=false \
-  -e JWT_SECRET="$JWT_SECRET" -e JAVA_TOOL_OPTIONS=-Daura.plugins.dir=/opt/auraboot/plugins \
-  -e AURA_APPLICATION_ID="$AURA_PRODUCT_ID" -e AURA_APPLICATION_VERSION="$APP_VERSION" \
-  -e AURA_APPLICATION_LOCK_IDENTITY="$LOCK_IDENTITY" -e AURA_APPLICATION_SOURCE_COMMIT="$PRODUCT_SHA" \
-  -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" \
-  -e AURA_REGISTRY_REGISTRATION_JDBC_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
-  -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
-  -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
-  "${SIGNATURE_ENV[@]}" \
-  "${CORPUS_CONTAINER_ARGS[@]}" \
-  "$IMAGE_REF" \
-  --cors.allowed-origins="http://127.0.0.1:$WEB_PORT" \
-  --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
-  "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
-APP_PORT="$(docker port "$APP_CONTAINER" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"
-for attempt in $(seq 1 90); do
-  curl -fsS "http://127.0.0.1:$APP_PORT/actuator/health" | grep -q '"status":"UP"' && break
-  [[ "$attempt" -lt 90 ]] || { docker logs "$APP_CONTAINER" >"$ARTIFACTS/logs/application.log" 2>&1; fail 'application image never became healthy'; }
-  sleep 2
-done
+# Only the explicit publication phase receives dynamic-schema credentials.
+# The acceptance runtime uses the distinct account without schema CREATE or table ownership.
+start_application_phase() {
+  local container="$1" db_role="$2" db_password="$3" phase="$4"
+  docker run -d --name "$container" --network "$NETWORK" -p 127.0.0.1::6443 \
+    -v "$REGISTRATION_PASSWORD_FILE":/run/secrets/aura-registry-password:ro \
+    -e SERVER_PORT=6443 -e SPRING_PROFILES_ACTIVE=community \
+    -e SPRING_DATASOURCE_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
+    -e SPRING_DATASOURCE_USERNAME="$db_role" -e SPRING_DATASOURCE_PASSWORD="$db_password" \
+    -e AURA_APPLICATION_MODE=application -e AURABOOT_BOOTSTRAP_ENABLED=false -e AURABOOT_DEMO_SEED=false \
+    -e JWT_SECRET="$JWT_SECRET" -e JAVA_TOOL_OPTIONS=-Daura.plugins.dir=/opt/auraboot/plugins \
+    -e AURA_APPLICATION_ID="$AURA_PRODUCT_ID" -e AURA_APPLICATION_VERSION="$APP_VERSION" \
+    -e AURA_APPLICATION_LOCK_IDENTITY="$LOCK_IDENTITY" -e AURA_APPLICATION_SOURCE_COMMIT="$PRODUCT_SHA" \
+    -e AURA_APPLICATION_IMAGE_DIGEST="$LAYOUT_DIGEST" \
+    -e AURA_REGISTRY_REGISTRATION_JDBC_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
+    -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
+    -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
+    "${SIGNATURE_ENV[@]}" \
+    "${CORPUS_CONTAINER_ARGS[@]}" \
+    "$IMAGE_REF" \
+    --cors.allowed-origins="http://127.0.0.1:$WEB_PORT" \
+    --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
+    "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
+  APP_PORT="$(docker port "$container" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"
+  for attempt in $(seq 1 90); do
+    curl -fsS "http://127.0.0.1:$APP_PORT/actuator/health" | grep -q '"status":"UP"' && break
+    [[ "$attempt" -lt 90 ]] || { docker logs "$container" >"$ARTIFACTS/logs/$phase-startup.log" 2>&1; fail 'application image never became healthy'; }
+    sleep 2
+  done
 
-COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER="$RUNTIME_DB_ROLE" PGPASSWORD="$RUNTIME_DB_PASSWORD" ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
+  COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER="$db_role" PGPASSWORD="$db_password" ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
+}
+start_application_phase "$PUBLISH_CONTAINER" "$PUBLISH_DB_ROLE" "$PUBLISH_DB_PASSWORD" publication
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
 RELEASE_ID=''
@@ -393,9 +411,9 @@ if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
 fi
 if [[ -n "$FIXTURE_REL" ]]; then
   info "injecting exact-commit acceptance fixture $FIXTURE_REL ($FIXTURE_DIGEST)"
-  docker exec "$APP_CONTAINER" mkdir -p /tmp/aura-release-fixtures
+  docker exec "$PUBLISH_CONTAINER" mkdir -p /tmp/aura-release-fixtures
   git -C "$PRODUCT_ROOT" archive "$PRODUCT_SHA" "$FIXTURE_REL" \
-    | docker cp - "$APP_CONTAINER:/tmp/aura-release-fixtures" \
+    | docker cp - "$PUBLISH_CONTAINER:/tmp/aura-release-fixtures" \
     || fail 'release acceptance fixture injection failed'
   env "${COMMON_ENV[@]}" AURA_RELEASE_FIXTURE_ROOT="$FIXTURE_CONTAINER_ROOT" \
     AURA_RELEASE_FIXTURE_SOURCE_ROOT="$PRODUCT_ROOT/$FIXTURE_REL" \
@@ -403,6 +421,13 @@ if [[ -n "$FIXTURE_REL" ]]; then
     >"$ARTIFACTS/logs/publish-fixture.log" 2>&1 \
     || fail 'explicit release acceptance fixture publish failed'
 fi
+docker logs "$PUBLISH_CONTAINER" >"$ARTIFACTS/logs/publication.log" 2>&1
+docker stop "$PUBLISH_CONTAINER" >/dev/null || fail 'publication container failed to stop'
+start_application_phase "$APP_CONTAINER" "$RUNTIME_DB_ROLE" "$RUNTIME_DB_PASSWORD" runtime
+ROLE_SEPARATION="$(docker exec "$PG_CONTAINER" psql -U auraboot -d aura_product_ci -tAX -F '|' -c \
+  "SELECT has_schema_privilege('$RUNTIME_DB_ROLE','public','CREATE'), has_schema_privilege('$REGISTRATION_DB_ROLE','public','CREATE'), has_schema_privilege('$PUBLISH_DB_ROLE','public','CREATE'), has_table_privilege('$PUBLISH_DB_ROLE','ab_application','INSERT'), (SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner='$RUNTIME_DB_ROLE')")"
+printf '%s\n' "$ROLE_SEPARATION" >"$ARTIFACTS/logs/publication-role-separation.log"
+[[ "$ROLE_SEPARATION" == 'f|f|t|f|0' ]] || fail 'publication/runtime database authority separation failed'
 mkdir -p "$STATE_ROOT"; docker logs "$APP_CONTAINER" >"$STATE_ROOT/runtime.log" 2>&1
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" start-web >"$ARTIFACTS/logs/web.log" 2>&1 || fail 'release Web BFF failed to start'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" verify >"$ARTIFACTS/logs/verify.log" 2>&1 || fail 'artifact identity verification failed'
