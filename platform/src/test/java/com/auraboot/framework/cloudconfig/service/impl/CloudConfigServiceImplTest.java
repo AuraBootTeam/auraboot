@@ -296,6 +296,22 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
+    void saveConfigEncryptionFailureDoesNotPersistPlaintext() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setServiceType("llm");
+        request.setProviderCode("fixture");
+        request.setConfigLevel("tenant");
+        request.setConfig("{\"apiKey\":\"test-secret\"}");
+        request.setEnabled(false);
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        when(fieldEncryptionService.encrypt("test-secret")).thenThrow(new IllegalStateException("Encryption unavailable"));
+
+        assertThatThrownBy(() -> cloudConfigService.saveConfig(request))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Encryption unavailable");
+        verifyNoInteractions(cloudConfigMapper);
+    }
+
+    @Test
     void listConfigs_normalizesLevelSoTheDocumentedUppercaseValueWorks() {
         // The public contract is documented as `?level=PLATFORM|TENANT`, writes store it
         // lower-cased, and listByLevel matches lowercase literals in its WHERE clause and

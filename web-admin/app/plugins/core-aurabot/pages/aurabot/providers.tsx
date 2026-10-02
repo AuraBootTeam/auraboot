@@ -185,8 +185,9 @@ export function meta() {
 
 export default function LlmProvidersPage() {
   const { t } = useI18n();
-  const { hasPermission } = useAuth();
-  const canManageProviders = hasPermission('ai_center') || hasPermission('system_management');
+  const { hasPermission, hasRole } = useAuth();
+  const canManagePlatform = hasRole('platform_admin');
+  const canManageProviders = hasPermission('ai_center');
   const {
     configs,
     loading,
@@ -196,7 +197,7 @@ export default function LlmProvidersPage() {
     handleDelete,
     handleToggleEnabled,
     handleSave,
-  } = useCloudConfigs();
+  } = useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: canManagePlatform ? 'platform' : 'tenant' });
 
   const { showSuccessToast, showErrorToast } = useToastContext();
 
@@ -275,14 +276,15 @@ export default function LlmProvidersPage() {
       PROVIDER_FIELDS[data.providerCode] = fields;
       setCustomProviderFields((prev) => ({ ...prev, [data.providerCode]: fields }));
     }
-    await handleSave(data);
-    setSidePanel(null);
+    if (await handleSave({ ...data, pid: sidePanel?.config?.pid })) {
+      setSidePanel(null);
+    }
   };
 
   const handleTestInline = async (config: CloudConfig) => {
     setLocalTestingPid(config.pid);
     try {
-      const result = await post('/api/admin/cloud-config/{pid}/test', { pid: config.pid });
+      const result = await post('/api/llm-config/{pid}/test', { pid: config.pid });
       if (ResultHelper.isSuccess(result)) {
         // Auto-enable provider after successful test
         if (!config.enabled) {
@@ -357,7 +359,7 @@ export default function LlmProvidersPage() {
         {/* Level toggle + count */}
         <div className="mb-5 flex items-center justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700">
-            {(['platform', 'tenant'] as const).map((lv) => (
+            {(canManagePlatform ? ['platform', 'tenant'] as const : ['tenant'] as const).map((lv) => (
               <button
                 key={lv}
                 onClick={() => setLevel(lv)}
@@ -428,6 +430,7 @@ export default function LlmProvidersPage() {
           isNew={sidePanel.isNew}
           customMode={sidePanel.customMode}
           currentLevel={level}
+          canManagePlatform={canManagePlatform}
           onClose={handleSideClose}
           onSave={handleSideSave}
           onTest={handleTestInline}
@@ -733,6 +736,7 @@ function EditSidePanel({
   isNew,
   customMode,
   currentLevel,
+  canManagePlatform,
   onClose,
   onSave,
   onTest,
@@ -743,6 +747,7 @@ function EditSidePanel({
   isNew: boolean;
   customMode?: boolean;
   currentLevel: ConfigLevel;
+  canManagePlatform: boolean;
   onClose: () => void;
   onSave: (data: {
     configLevel: ConfigLevel;
@@ -933,7 +938,7 @@ function EditSidePanel({
                 {t('ai.providers.field.configLevel', undefined, 'Config Level')}
               </label>
               <div className="flex gap-3">
-                {(['platform', 'tenant'] as ConfigLevel[]).map((lv) => (
+                {((canManagePlatform ? ['platform', 'tenant'] : ['tenant']) as ConfigLevel[]).map((lv) => (
                   <label key={lv} className="flex cursor-pointer items-center gap-2">
                     <input
                       type="radio"

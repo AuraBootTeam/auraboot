@@ -302,3 +302,127 @@ test('a standalone BOM rules capability grants UI authoring and revokes to read-
     } finally { await reader.context.close(); }
   } finally { await writer.context.close(); }
 });
+
+
+test('a standalone model-service capability manages tenant LLM settings without cloud or console access', async ({ page, browser }, info) => {
+  test.setTimeout(180_000);
+  const code = `e2e_model_only_${Date.now()}`;
+  const provider = `e2ellm${Date.now()}`;
+  const created = await page.request.post('/api/roles', { data: { code, name: code, type: 'custom' } });
+  expect(created.status()).toBe(200);
+  const role = (await created.json()).data;
+  const user = makeQuoteRoleUser('model-only', code, [code]);
+  await ensureQuoteRoleUser(page, user);
+
+  async function selectModelCapability(selected: boolean) {
+    await page.goto('/home');
+    await ensureSidebarExpanded(page);
+    await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
+    await page.getByTestId('role-search-input').fill(code);
+    await page.getByTestId(`role-item-${code}`).click();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+    await page.getByTestId('capability-checkbox-sys.cap.model_service').setChecked(selected);
+    await expect(page.getByTestId('capability-checkbox-sys.cap.console')).not.toBeChecked();
+    await expect(page.getByTestId('capability-checkbox-sys.cap.cloud_config')).not.toBeChecked();
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    const saved = page.waitForResponse(response => response.url().includes('/api/permission/capabilities?') && response.request().method() === 'PUT');
+    await page.getByTestId('confirm-ok').click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect(String((await response.json()).code)).toBe('0');
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+  }
+
+  await selectModelCapability(true);
+  const member = await openQuoteRolePage(browser, user);
+  try {
+    const snapshot = await fetchRoleSnapshot(member.page);
+    expect(snapshot.permissionCodes).toContain('ai_center');
+    expect(snapshot.permissionCodes).not.toContain('sys.cloud_config.update');
+    expect(snapshot.permissionCodes).not.toContain('system_management');
+    await ensureSidebarExpanded(member.page);
+    const sidebar = member.page.getByTestId('sidebar');
+    const entry = sidebar.locator('a[href="/aurabot/providers"]');
+    if (!(await entry.isVisible())) await sidebar.getByRole('button', { name: '系统管理', exact: true }).click();
+    const listed = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'GET');
+    await entry.click();
+    const initial = await listed;
+    expect(initial.status()).toBe(200);
+    expect(String((await initial.json()).code)).toBe('0');
+    await expect(member.page.getByTestId('level-toggle-platform')).toHaveCount(0);
+    await expect(sidebar.locator('a[href="/p/c/account_security_policy_detail"]')).toHaveCount(0);
+    await expect(sidebar.locator('a[href="/p/c/system_preferences_form"]')).toHaveCount(0);
+    await member.page.getByTestId('add-provider-btn').click();
+    await member.page.getByTestId('picker-preset-custom').click();
+    await member.page.getByTestId('custom-display-name').fill(provider);
+    await member.page.getByTestId('field-apiKey').fill('e2e-local-fixture-key');
+    await member.page.getByTestId('field-defaultModel').fill('e2e-fixture-model');
+    const saving = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
+    await member.page.getByTestId('panel-save-btn').click();
+    const saved = await saving;
+    expect(new URL(saved.url()).origin).toBe(new URL(member.page.url()).origin);
+    expect(saved.status()).toBe(200);
+    expect(String((await saved.json()).code)).toBe('0');
+    expect(saved.request().postDataJSON()).toMatchObject({ serviceType: 'llm', configLevel: 'tenant', providerCode: provider });
+    const card = member.page.getByTestId(`provider-card-${provider}`);
+    await expect(card).toBeVisible();
+    await member.page.reload();
+    await expect(card).toBeVisible();
+    const list = await member.page.request.get('/api/llm-config');
+    expect(list.status()).toBe(200);
+    const rows = (await list.json()).data.filter((row: { providerCode: string }) => row.providerCode === provider);
+    expect(rows).toHaveLength(1);
+    const pid = rows[0].pid;
+    await member.page.getByTestId(`provider-edit-${provider}`).click();
+    await member.page.getByTestId('field-priority').fill('7');
+    const editing = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
+    await member.page.getByTestId('panel-save-btn').click();
+    const edited = await editing;
+    expect(edited.status()).toBe(200);
+    expect(String((await edited.json()).code)).toBe('0');
+    expect(edited.request().postDataJSON()).toMatchObject({ pid, priority: 7, serviceType: 'llm' });
+    const afterEdit = await member.page.request.get('/api/llm-config');
+    expect(afterEdit.status()).toBe(200);
+    const updated = (await afterEdit.json()).data.filter((row: { providerCode: string }) => row.providerCode === provider);
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toMatchObject({ pid, priority: 7 });
+    const toggling = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
+    await member.page.getByTestId(`provider-toggle-${provider}`).click();
+    const toggled = await toggling;
+    expect(toggled.status()).toBe(200);
+    expect(String((await toggled.json()).code)).toBe('0');
+    expect(toggled.request().postDataJSON()).toMatchObject({ pid, serviceType: 'llm', enabled: true });
+    await expect(member.page.getByTestId(`provider-toggle-${provider}`)).toHaveAttribute('aria-checked', 'true');
+    await member.page.reload();
+    await expect(member.page.getByTestId(`provider-toggle-${provider}`)).toHaveAttribute('aria-checked', 'true');
+    await member.page.screenshot({ path: info.outputPath('standalone-model-service-saved.png'), fullPage: true });
+    const nonLlm = await member.page.request.post('/api/llm-config', { data: { serviceType: 'sms', configLevel: 'tenant', providerCode: `${provider}bad`, config: '{}', enabled: false } });
+    expect(nonLlm.status()).toBe(403);
+    const deleting = member.page.waitForResponse(response => new URL(response.url()).pathname === `/api/llm-config/${pid}` && response.request().method() === 'DELETE');
+    member.page.once('dialog', async dialog => {
+      expect(dialog.type()).toBe('confirm');
+      expect(dialog.message()).toContain(provider);
+      await dialog.accept();
+    });
+    await member.page.getByTestId(`provider-delete-${provider}`).click();
+    const deleted = await deleting;
+    expect(deleted.status()).toBe(200);
+    expect(String((await deleted.json()).code)).toBe('0');
+    await expect(card).toHaveCount(0);
+    await member.page.reload();
+    await expect(card).toHaveCount(0);
+    const afterDelete = await member.page.request.get('/api/llm-config');
+    expect(afterDelete.status()).toBe(200);
+    expect((await afterDelete.json()).data.filter((row: { providerCode: string }) => row.providerCode === provider)).toHaveLength(0);
+  } finally { await member.context.close(); }
+  await selectModelCapability(false);
+  const revoked = await openQuoteRolePage(browser, user);
+  try {
+    expect((await fetchRoleSnapshot(revoked.page)).permissionCodes).not.toContain('ai_center');
+    await ensureSidebarExpanded(revoked.page);
+    await expect(revoked.page.getByTestId('sidebar').locator('a[href="/aurabot/providers"]')).toHaveCount(0);
+    expect((await revoked.page.request.get('/api/llm-config')).status()).toBe(403);
+    await revoked.page.screenshot({ path: info.outputPath('standalone-model-service-revoked.png'), fullPage: true });
+  } finally { await revoked.context.close(); }
+});

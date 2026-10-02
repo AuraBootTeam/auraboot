@@ -449,14 +449,16 @@ export interface UseCloudConfigsReturn {
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
-  }) => Promise<void>;
+    pid?: string;
+  }) => Promise<boolean>;
 }
 
-export function useCloudConfigs(): UseCloudConfigsReturn {
+export function useCloudConfigs(options: { apiBase?: string; initialLevel?: ConfigLevel } = {}): UseCloudConfigsReturn {
+  const apiBase = options.apiBase ?? '/api/admin/cloud-config';
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [configs, setConfigs] = useState<CloudConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [level, setLevel] = useState<ConfigLevel>('platform');
+  const [level, setLevel] = useState<ConfigLevel>(options.initialLevel ?? 'platform');
   const [showEditor, setShowEditor] = useState(false);
   const [editingConfig, setEditingConfig] = useState<CloudConfig | null>(null);
   const [testingPid, setTestingPid] = useState<string | null>(null);
@@ -464,7 +466,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
   const loadConfigs = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await get<CloudConfig[]>('/api/admin/cloud-config', { level });
+      const result = await get<CloudConfig[]>(apiBase, { level });
       if (ResultHelper.isSuccess(result) && result.data) {
         setConfigs(
           result.data.map((item) => ({
@@ -481,7 +483,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     } finally {
       setLoading(false);
     }
-  }, [level, showErrorToast]);
+  }, [apiBase, level, showErrorToast]);
 
   useEffect(() => {
     loadConfigs();
@@ -501,7 +503,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     const providerLabel = PROVIDER_LABELS[config.providerCode] || config.providerCode;
     if (!window.confirm(`确定要删除「${providerLabel}」的配置吗?`)) return;
     try {
-      const result = await del('/api/admin/cloud-config/{pid}', { pid: config.pid });
+      const result = await del(`${apiBase}/{pid}`, { pid: config.pid });
       if (ResultHelper.isSuccess(result)) {
         showSuccessToast('配置已删除');
         loadConfigs();
@@ -516,7 +518,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
   const handleTest = async (config: CloudConfig) => {
     setTestingPid(config.pid);
     try {
-      const result = await post('/api/admin/cloud-config/{pid}/test', { pid: config.pid });
+      const result = await post(`${apiBase}/{pid}/test`, { pid: config.pid });
       if (ResultHelper.isSuccess(result)) {
         showSuccessToast('连接测试成功');
       } else {
@@ -532,7 +534,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
   const handleToggleEnabled = async (config: CloudConfig) => {
     try {
       const parsed = safeParseJSON(config.config);
-      const result = await post('/api/admin/cloud-config', {
+      const result = await post(apiBase, {
         ...config,
         configLevel: config.configLevel,
         serviceType: config.serviceType,
@@ -557,6 +559,7 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
+    pid?: string;
   }) => {
     try {
       const body: any = {
@@ -567,20 +570,22 @@ export function useCloudConfigs(): UseCloudConfigsReturn {
         enabled: data.enabled,
         priority: data.priority,
       };
-      if (editingConfig) {
-        body.pid = editingConfig.pid;
+      if (data.pid || editingConfig) {
+        body.pid = data.pid ?? editingConfig?.pid;
       }
-      const result = await post('/api/admin/cloud-config', body);
+      const result = await post(apiBase, body);
       if (ResultHelper.isSuccess(result)) {
-        showSuccessToast(editingConfig ? '配置已更新' : '配置已创建');
+        showSuccessToast(body.pid ? '配置已更新' : '配置已创建');
         setShowEditor(false);
-        loadConfigs();
+        await loadConfigs();
+        return true;
       } else {
         showErrorToast(result.desc || '保存失败');
       }
     } catch (e: any) {
       showErrorToast(e.message || '保存失败');
     }
+    return false;
   };
 
   return {

@@ -7,9 +7,11 @@ import com.auraboot.framework.cloudconfig.entity.CloudConfig;
 import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
@@ -81,7 +83,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             existing.setConfigLevel(configLevel);
             existing.setServiceType(serviceType);
             existing.setProviderCode(request.getProviderCode());
-            existing.setConfig(encryptedConfig);
+            existing.setConfig(preserveMaskedSecrets(request.getConfig(), encryptedConfig, existing.getConfig()));
             existing.setEnabled(request.getEnabled());
             existing.setPriority(request.getPriority() != null ? request.getPriority() : 0);
             existing.setUpdatedAt(Instant.now());
@@ -171,6 +173,31 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     // ==================== Private helpers ====================
 
+    /** Retain stored ciphertext when an editor sends back its unchanged masked value. */
+    private String preserveMaskedSecrets(String submitted, String encrypted, String stored) {
+        if (submitted == null || submitted.isBlank() || stored == null || stored.isBlank()) {
+            return encrypted;
+        }
+        try {
+            JsonNode input = objectMapper.readTree(submitted);
+            JsonNode previous = objectMapper.readTree(stored);
+            JsonNode result = objectMapper.readTree(encrypted);
+            if (!input.isObject() || !previous.isObject() || !result.isObject()) {
+                return encrypted;
+            }
+            ObjectNode updated = (ObjectNode) result;
+            for (String field : SENSITIVE_FIELDS) {
+                if (input.path(field).isTextual() && previous.path(field).isTextual()
+                        && input.path(field).asText().equals(fieldEncryptionService.mask(previous.path(field).asText()))) {
+                    updated.set(field, previous.get(field));
+                }
+            }
+            return objectMapper.writeValueAsString(updated);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ResponseCode.BadParam, "Cloud configuration must be valid JSON", exception);
+        }
+    }
+
     /**
      * Encrypt sensitive fields in the config JSON string.
      * Iterates all top-level fields; if the field name is in SENSITIVE_FIELDS,
@@ -198,9 +225,8 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             }
 
             return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            log.warn("Failed to encrypt config JSON fields, storing as-is: {}", e.getMessage());
-            return configJson;
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ResponseCode.BadParam, "Cloud configuration must be valid JSON", exception);
         }
     }
 

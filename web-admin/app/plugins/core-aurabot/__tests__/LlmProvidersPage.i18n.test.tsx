@@ -1,9 +1,16 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import { I18nProvider } from '~/contexts/I18nContext';
 import LlmProvidersPage from '../pages/aurabot/providers';
+
+const state = vi.hoisted(() => ({
+  platformAdmin: true,
+  configs: [] as any[],
+  useCloudConfigs: vi.fn(),
+  save: vi.fn().mockResolvedValue(true),
+}));
 
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({
@@ -26,7 +33,7 @@ vi.mock('~/contexts/AuthContext', async (importOriginal) => {
       token: null,
       isAuthenticated: true,
       hasPermission: () => true,
-      hasRole: () => true,
+      hasRole: () => state.platformAdmin,
       hasAnyPermission: () => true,
       hasAllPermissions: () => true,
     }),
@@ -37,21 +44,28 @@ vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/admin/cloud-config-core')>();
   return {
     ...actual,
-    useCloudConfigs: () => ({
-      configs: [],
+    useCloudConfigs: (options: unknown) => {
+      state.useCloudConfigs(options);
+      return {
+      configs: state.configs,
       loading: false,
-      level: 'platform',
+      level: state.platformAdmin ? 'platform' : 'tenant',
       setLevel: vi.fn(),
       testingPid: null,
       handleDelete: vi.fn(),
       handleToggleEnabled: vi.fn(),
-      handleSave: vi.fn(),
-    }),
+      handleSave: state.save,
+    };
+    },
   };
 });
 
 afterEach(() => {
   document.body.innerHTML = '';
+  state.platformAdmin = true;
+  state.configs = [];
+  state.save.mockReset().mockResolvedValue(true);
+  state.useCloudConfigs.mockClear();
 });
 
 describe('LlmProvidersPage i18n', () => {
@@ -87,5 +101,36 @@ describe('LlmProvidersPage i18n', () => {
     expect(screen.getByText('已配置 0 个提供商')).toBeInTheDocument();
     expect(screen.getByText('暂无已配置的模型提供商')).toBeInTheDocument();
     expect(screen.getByText('添加第一个提供商')).toBeInTheDocument();
+  });
+});
+
+
+describe('LlmProvidersPage scoped configuration', () => {
+  it('uses the LLM-only API and hides global levels for a model-service member', () => {
+    state.platformAdmin = false;
+    render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);
+    expect(state.useCloudConfigs).toHaveBeenCalledWith({ apiBase: '/api/llm-config', initialLevel: 'tenant' });
+    expect(screen.queryByTestId('level-toggle-platform')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('add-provider-btn'));
+    fireEvent.click(screen.getByTestId('picker-preset-openai'));
+    expect(screen.queryByRole('radio', { name: 'Platform' })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Tenant' })).toBeChecked();
+  });
+
+  it('saves the edited PID and retains the draft panel on failure', async () => {
+    state.platformAdmin = false;
+    state.configs = [{ pid: 'existing-llm', configLevel: 'tenant', serviceType: 'llm', providerCode: 'openai',
+      config: '{"apiKey":"test-key","defaultModel":"fixture-model"}', enabled: false, priority: 1 }];
+    state.save.mockResolvedValue(false);
+    render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);
+    fireEvent.click(screen.getByTestId('provider-edit-openai'));
+    fireEvent.change(screen.getByTestId('field-priority'), { target: { value: '7' } });
+    fireEvent.click(screen.getByTestId('panel-save-btn'));
+    await waitFor(() => expect(state.save).toHaveBeenCalledWith(expect.objectContaining({ pid: 'existing-llm', priority: 7, serviceType: 'llm', configLevel: 'tenant' })));
+    expect(screen.getByTestId('provider-edit-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('field-priority')).toHaveValue(7);
+    state.save.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId('panel-save-btn'));
+    await waitFor(() => expect(screen.queryByTestId('provider-edit-panel')).not.toBeInTheDocument());
   });
 });

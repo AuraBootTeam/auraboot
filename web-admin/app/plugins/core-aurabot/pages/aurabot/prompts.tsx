@@ -330,7 +330,7 @@ function TemplateEditor({
     config: Record<string, string>;
     enabled: boolean;
     priority: number;
-  }) => Promise<void>;
+  }) => Promise<boolean | void>;
   onReload: () => Promise<void>;
 }) {
   const parsed = safeParseJSON(config.config);
