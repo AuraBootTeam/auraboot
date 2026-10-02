@@ -82,6 +82,19 @@ def main():
         raise ValueError("package inventory shrank below the approved nine-package baseline")
     if json.loads((packages[-1] / "package.json").read_text()).get("private") is not True:
         raise ValueError("AuraQR SDK must remain private")
+    for name, absent_section, patent_section, no_section_ten in (
+        ("LICENSE-FAQ-en.md", "### Q11.", "### Q19.", "There is no §10"),
+        ("LICENSE-FAQ.md", "### Q11.", "### Q19.", "协议没有 §10"),
+    ):
+        faq = (core / name).read_text()
+        if not all(package in faq for package in required):
+            raise ValueError(f"{name}: package license inventory is incomplete")
+        q11 = faq.split(absent_section, 1)[1].split("### Q12.", 1)[0]
+        if "ambiguous" in q11 or "边界开始模糊" in q11:
+            raise ValueError(f"{name}: retired SaaS restriction remains")
+        q19 = faq.split(patent_section, 1)[1].split("### Q20.", 1)[0]
+        if "§3" not in q19 or no_section_ten not in q19:
+            raise ValueError(f"{name}: patent license citation correction missing")
     args.out.mkdir(parents=True, exist_ok=False)
     results = []
     for package in packages:
