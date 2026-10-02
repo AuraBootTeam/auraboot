@@ -13,6 +13,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -32,6 +34,9 @@ class SemanticPreaggContextTest {
     private SemanticPreaggService service;
     private AbSemanticPreagg preagg;
     private MetaContext.Snapshot caller;
+    private PlatformTransactionManager transactions;
+    private TransactionStatus transaction;
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void setup() {
@@ -39,8 +44,11 @@ class SemanticPreaggContextTest {
         AbSemanticModelMapper models = mock(AbSemanticModelMapper.class);
         queries = mock(SemanticQueryService.class);
         UserAttributeService attributes = mock(UserAttributeService.class);
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        service = new SemanticPreaggService(mapper, models, queries, attributes, jdbc, new ObjectMapper());
+        jdbc = mock(JdbcTemplate.class);
+        transactions = mock(PlatformTransactionManager.class);
+        transaction = mock(TransactionStatus.class);
+        when(transactions.getTransaction(any())).thenReturn(transaction);
+        service = new SemanticPreaggService(mapper, models, queries, attributes, jdbc, new ObjectMapper(), transactions);
         AbSemanticModel model = new AbSemanticModel();
         model.setCode("orders");
         when(models.findByPid(1L, "model")).thenReturn(model);
@@ -67,6 +75,51 @@ class SemanticPreaggContextTest {
         MetaContext.setEnvironmentId(4L);
         MetaContext.setOtelTraceId("caller-trace");
         caller = MetaContext.snapshot();
+    }
+
+    @Test
+    void createRollsBackWhenMetadataInsertFailsAfterViewCreation() {
+        doThrow(new IllegalStateException("insert failure")).when(mapper).insert(any(AbSemanticPreagg.class));
+        assertThatThrownBy(() -> service.create("Orders", "model", "count", List.of(), 60))
+                .hasMessage("insert failure");
+        verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW "));
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void refreshRollsBackWhenMetadataUpdateFailsAfterViewRebuild() {
+        doThrow(new IllegalStateException("update failure")).when(mapper).updateById(any(AbSemanticPreagg.class));
+        assertThatThrownBy(() -> service.refreshNow("preagg")).hasMessage("update failure");
+        verify(jdbc).execute("DROP MATERIALIZED VIEW IF EXISTS mv_preagg");
+        verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW mv_preagg "));
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+        assertThat(MetaContext.snapshot()).isEqualTo(caller);
+    }
+
+    @Test
+    void deleteRollsBackMetadataWhenViewDropFails() {
+        doThrow(new IllegalStateException("drop failure")).when(jdbc)
+                .execute("DROP MATERIALIZED VIEW IF EXISTS mv_preagg");
+        assertThatThrownBy(() -> service.delete("preagg")).hasMessage("drop failure");
+        verify(mapper).updateById(preagg);
+        verify(transactions).rollback(transaction);
+        verify(transactions, never()).commit(any());
+    }
+
+    @Test
+    void createCommitsViewAndMetadataInOneTransaction() {
+        service.create("Orders", "model", "count", List.of(), 60);
+        var order = inOrder(transactions, jdbc, mapper);
+        order.verify(transactions).getTransaction(any());
+        order.verify(jdbc).execute(startsWith("DROP MATERIALIZED VIEW IF EXISTS "));
+        order.verify(jdbc).execute(startsWith("CREATE MATERIALIZED VIEW "));
+        order.verify(mapper).insert(any(AbSemanticPreagg.class));
+        order.verify(transactions).commit(transaction);
+        verify(transactions, times(1)).getTransaction(any());
+        verify(transactions, never()).rollback(any());
     }
 
     @AfterEach

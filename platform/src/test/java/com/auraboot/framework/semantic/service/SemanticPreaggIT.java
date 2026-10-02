@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Golden IT for the pre-aggregation engine (R3): the materialized view is
@@ -169,6 +170,57 @@ class SemanticPreaggIT {
                 "SELECT count(*) FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'",
                 Long.class, TENANT_ID);
         return count;
+    }
+
+    @Test
+    @DisplayName("A failed metadata update restores the prior MV snapshot and refresh timestamp")
+    void failedRefreshRollsBackViewAndMetadataTogether() {
+        jdbc.update("DELETE FROM ab_object_alias WHERE tenant_id = ? AND pid LIKE 'pg-golden-%'", TENANT_ID);
+        insertAliasRow("golden-rollback-one");
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-refresh-rollback", modelPid, "alias_count_metric", List.of(), 60);
+        String column = "preagg_golden_alias.alias_count_metric";
+        long before = mvMetricValue(preagg.getMvName(), column);
+        var timestamp = jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
+                java.time.OffsetDateTime.class, preagg.getPid());
+        insertAliasRow("golden-rollback-two");
+        assertThat(liveValue()).isGreaterThan(before);
+        String constraint = "preagg_it_" + preagg.getPid().toLowerCase();
+        // NOT VALID allows the existing row, but fails its next metadata UPDATE,
+        // after DROP/CREATE has already rebuilt the materialized view.
+        jdbc.execute("ALTER TABLE ab_semantic_preagg ADD CONSTRAINT " + constraint
+                + " CHECK (pid <> '" + preagg.getPid() + "') NOT VALID");
+        try {
+            assertThatThrownBy(() -> preaggService.refreshNow(preagg.getPid()))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThat(mvMetricValue(preagg.getMvName(), column)).isEqualTo(before);
+            assertThat(jdbc.queryForObject("SELECT last_refreshed_at FROM ab_semantic_preagg WHERE pid = ?",
+                    java.time.OffsetDateTime.class, preagg.getPid())).isEqualTo(timestamp);
+        } finally {
+            jdbc.execute("ALTER TABLE ab_semantic_preagg DROP CONSTRAINT " + constraint);
+            preaggService.delete(preagg.getPid());
+        }
+    }
+
+    @Test
+    @DisplayName("A dependent view prevents deletion without hiding the active definition")
+    void failedDeleteKeepsDefinitionAndMaterializedView() {
+        AbSemanticPreagg preagg = preaggService.create(
+                "preagg-delete-rollback", modelPid, "alias_count_metric", List.of(), 60);
+        String dependent = "preagg_dep_" + preagg.getPid().toLowerCase();
+        jdbc.execute("CREATE VIEW " + dependent + " AS SELECT * FROM " + preagg.getMvName());
+        try {
+            assertThatThrownBy(() -> preaggService.delete(preagg.getPid()))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThat(preaggService.list()).extracting(AbSemanticPreagg::getPid).contains(preagg.getPid());
+            assertThat(jdbc.queryForObject("SELECT deleted_flag FROM ab_semantic_preagg WHERE pid = ?",
+                    Boolean.class, preagg.getPid())).isFalse();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_matviews WHERE matviewname = ?",
+                    Integer.class, preagg.getMvName())).isEqualTo(1);
+        } finally {
+            jdbc.execute("DROP VIEW " + dependent);
+            preaggService.delete(preagg.getPid());
+        }
     }
 
     @Test

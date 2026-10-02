@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -47,11 +49,18 @@ public class SemanticPreaggService {
     private final UserAttributeService userAttributeService;
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
     // ==================== CRUD ====================
 
     public AbSemanticPreagg create(String name, String semanticModelPid, String metricCode,
                                    List<String> dimensionCodes, int refreshMinutes) {
+        return new TransactionTemplate(transactionManager).execute(status ->
+                createInTransaction(name, semanticModelPid, metricCode, dimensionCodes, refreshMinutes));
+    }
+
+    private AbSemanticPreagg createInTransaction(String name, String semanticModelPid, String metricCode,
+                                                List<String> dimensionCodes, int refreshMinutes) {
         Long tenantId = MetaContext.get().getTenantId();
         Long userId = MetaContext.get().getUserId();
         if (refreshMinutes < 1) {
@@ -79,7 +88,7 @@ public class SemanticPreaggService {
 
         // Compile + create the materialized view; a preagg without a working
         // MV is not persisted.
-        refresh(preagg);
+        refreshInTransaction(preagg);
         preaggMapper.insert(preagg);
         return preagg;
     }
@@ -90,6 +99,10 @@ public class SemanticPreaggService {
     }
 
     public void delete(String pid) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> deleteInTransaction(pid));
+    }
+
+    private void deleteInTransaction(String pid) {
         Long tenantId = MetaContext.get().getTenantId();
         AbSemanticPreagg preagg = requirePreagg(tenantId, pid);
         preagg.setDeletedFlag(true);
@@ -131,6 +144,12 @@ public class SemanticPreaggService {
 
     /** Compile the governed query, inline its params, and rebuild the MV. */
     private long refresh(AbSemanticPreagg preagg) {
+        // Programmatic boundary covers scheduler/self-invocation as well as API calls.
+        // PostgreSQL DDL and the MyBatis metadata writes must commit or roll back together.
+        return new TransactionTemplate(transactionManager).execute(status -> refreshInTransaction(preagg));
+    }
+
+    private long refreshInTransaction(AbSemanticPreagg preagg) {
         AbSemanticModel model = modelMapper.findByPid(preagg.getTenantId(), preagg.getSemanticModelPid());
         if (model == null) {
             throw new SemanticValidationException("SEMANTIC_PREAGG_MODEL_MISSING",
