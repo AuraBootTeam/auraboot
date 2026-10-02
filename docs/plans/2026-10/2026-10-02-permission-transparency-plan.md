@@ -53,7 +53,7 @@ RBAC 一次“允许”不足以证明页签或字段可见。记录解释、页
 | service/controller UT | aura gradle permission-transparency :test，6 个指定类 | 90 | 90 | 90 | 0 | 0 | 0 | `.workspace/evidence/permission-transparency/backend-final/` 的 JUnit XML |
 | HTTP + DB IT | 同次运行 PermissionMatrixPolicyControllerIT | 6 | 6 | 6 | 0 | 0 | 0 | 同目录对应 JUnit XML；DB auraboot_151 |
 | UI targeted browser（首轮） | 5 个既有权限文件 | 12 | 12 | 8 | 4 | 0 | 0 | Workspace `ui/browser-results.json`；快速交互状态时序待修正 |
-| roles-full（首轮 quoteops 分组） | 产品公开 gate | 20 | 20 | 19 | 1 | 0 | 0 | Workspace `ui/roles-full.log`；formal expiry 在最后请求耗尽 15 秒全用例预算，chromium 分组尚未执行 |
+| roles-full（首轮 quoteops 分组） | 产品公开 gate | 20 | 20 | 19 | 1 | 0 | 0 | Workspace `ui/roles-full.log`；formal expiry 在最后请求耗尽 15 秒全用例预算，另有 chromium 隔离用例 1 项通过，但总体门仍为失败 |
 
 受控 mutation 将实际记录改传 null，`evaluatesActualRecordWithTargetIdentityAndRestoresCaller` 执行 1 / 失败 1；恢复后上述 96 项定向检查通过。初次 IT 的 1 项失败来自断言使用不存在的 `success` 响应字段，按实际 `code` 契约修正，保留初次 XML。报告与执行/源码身份索引保留在 Workspace `.workspace/evidence/permission-transparency/`，未将其升级为全量验收。
 
@@ -71,4 +71,6 @@ PR #2154 已核实进入 origin/main，执行 closeout 后删除旧分支，目�
 
 前端 48 项 UT 和 typecheck 已通过。定向浏览器第一轮 8/12；取消草稿的同一用例手动及带 trace 通过，快速路径待通过目标 role PID 和草稿回显同步确认。原子动作编辑按持久化/read-back 展示，测试不能要求乐观更新。角色门禁第一轮 19/20，销售上传及多价格通道、采购导入、四类角色菜单、审批通过/拒绝已执行；expiry 重验沿用同文件正式审批的 120 秒旅程预算。失败证据保留，不能以重验结果抹除。
 
-新增权限编辑文案同时进入构件 YAML 和 bootstrap seed，既有 DB 无新 seed 时也能加载；覆盖说明使用新的语义 key，避免旧 DB 的“破例/来源”文案覆写。DB 租户覆盖仍优先。完整角色门禁、share 撤销/过期、上传后附件预览、企业旧 explain 与 PCBA 错误 role name 声明均保持在未关闭分母。最终结果以 Workspace 对应源码的执行账本为准。
+新增权限编辑文案同时进入构件 YAML 和 bootstrap seed，既有 DB 无新 seed 时也能加载；覆盖说明使用新的语义 key，避免旧 DB 的“破例/来源”文案覆写。DB 租户覆盖仍优先。完整角色门禁（含覆盖登记裁决）、share 撤销/过期、上传后附件预览、企业旧 explain 与 PCBA 错误 role name 声明均保持在未关闭分母。最终结果以 Workspace 对应源码的执行账本为准。
+
+重验补充：UI 11/12；同一旧勾选用例在无 trace 时失败、带 trace 5 次通过，尚不证明稳定。本轮进一步使用 hydration marker、固定 capability test ID 及显式 setChecked 驱动，保留选择改变/保存 dirty 的原断言，待重验。角色 20 quoteops + 1 chromium 均通过，产品总门因为 14 条覆盖注册差异仍失败。已核实公开 launcher 错用共享 plugins 根目录；正确冻结根目录后只剩 7 个文件摘要更新，所有断言锚点都存在。续作修复从 runtime manifest 传递 plugins/CRM 根目录，缺失即拒绝，并补 3 项路由单测；旧实现 mutation 会红。登记按已核验断言更新，未将登记结果替代执行。
