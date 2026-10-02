@@ -515,6 +515,7 @@ export default function PageDesignerEditorImpl() {
         onSave={() => toolbarActions.save()}
         onPublish={() => toolbarActions.publish()}
         onSettings={toolbarActions.toggleSettings}
+        onPageCreated={(pid) => navigate(`/page-designer/${pid}`)}
         onShortcutHelp={toolbarActions.toggleShortcuts}
         aiPanelOpen={aiPanelOpen}
         onToggleAiPanel={() => setAiPanelOpen((prev) => !prev)}

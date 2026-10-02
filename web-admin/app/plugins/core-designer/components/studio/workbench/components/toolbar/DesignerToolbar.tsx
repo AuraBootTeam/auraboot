@@ -14,6 +14,7 @@
 import React, { useCallback, useState } from 'react';
 import { PAGE_STATUS_INFO, type PageMeta } from '../../../services/page-manager';
 import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/components/SaveAsTemplateDialog';
+import { CreateFromTemplateDialog } from '~/plugins/core-designer/components/studio/components/CreateFromTemplateDialog';
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
@@ -48,6 +49,7 @@ export interface DesignerToolbarProps {
   onSave?: () => void;
   onPublish?: () => void;
   onSettings?: () => void;
+  onPageCreated?: (pid: string) => void;
   onShortcutHelp?: () => void;
   onAiGenerated?: (dsl: {
     kind: PageSchema['kind'];
@@ -150,6 +152,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   onSave,
   onPublish,
   onSettings,
+  onPageCreated,
   onShortcutHelp,
   onAiGenerated,
   aiPanelOpen = false,
@@ -158,6 +161,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+  const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
   const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const { hasPermission } = usePermissions();
@@ -166,7 +170,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const canPublish = canManage;
   const canImport = canManage;
   const canExport = canManage;
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const l = useCallback(
     (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
     [locale],
@@ -343,7 +347,18 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                 label={l('模板', 'Template')}
                 title={l('另存为模板', 'Save as template')}
                 onClick={() => setShowSaveAsTemplate(true)}
+                disabled={!canManage}
                 data-testid="toolbar-save-as-template"
+              />
+            )}
+            {onPageCreated && (
+              <ToolbarButton
+                icon={<span aria-hidden="true">+</span>}
+                label={t('designer_template.select')}
+                title={t('designer_template.select')}
+                disabled={!canManage}
+                onClick={() => setShowCreateFromTemplate(true)}
+                data-testid="toolbar-create-from-template"
               />
             )}
             <ToolbarButton
@@ -709,7 +724,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         </div>
       </div>
 
-      {pageMeta && (
+      {pageMeta && canManage && (
         <SaveAsTemplateDialog
           open={showSaveAsTemplate}
           onClose={() => setShowSaveAsTemplate(false)}
@@ -717,6 +732,17 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           currentName={pageMeta.title}
           onSuccess={() => {
             setShowSaveAsTemplate(false);
+          }}
+        />
+      )}
+
+      {onPageCreated && canManage && showCreateFromTemplate && (
+        <CreateFromTemplateDialog
+          open={showCreateFromTemplate}
+          onClose={() => setShowCreateFromTemplate(false)}
+          onSuccess={(pid) => {
+            setShowCreateFromTemplate(false);
+            onPageCreated(pid);
           }}
         />
       )}
