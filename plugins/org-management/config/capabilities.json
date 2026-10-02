@@ -8,7 +8,8 @@
     "description": "查看与维护组织架构、职位、人员",
     "includes": [
       "org.hr.read",
-      "org.hr.manage"
+      "org.hr.manage",
+      "org_management"
     ],
     "tier": "editor",
     "order": 10
@@ -21,7 +22,8 @@
     "name:en": "View Organization",
     "description": "只读查看组织架构、职位、人员",
     "includes": [
-      "org.hr.read"
+      "org.hr.read",
+      "org_management"
     ],
     "tier": "viewer",
     "order": 11
@@ -35,7 +37,9 @@
     "description": "查看与维护团队",
     "includes": [
       "org.team.read",
-      "org.team.manage"
+      "org.team.manage",
+      "org_management",
+      "org_teams"
     ],
     "tier": "editor",
     "order": 20
@@ -54,7 +58,9 @@
       "model.tenant_member.suspend_member",
       "model.tenant_member.restore_member",
       "model.tenant_member.reset_member_password",
-      "model.tenant_member.provision_member_from_employee"
+      "model.tenant_member.provision_member_from_employee",
+      "org_management",
+      "member_management"
     ],
     "tier": "editor",
     "order": 30
@@ -67,7 +73,9 @@
     "name:en": "View Members",
     "description": "只读查看租户成员账号",
     "includes": [
-      "model.tenant_member.read"
+      "model.tenant_member.read",
+      "org_management",
+      "member_management"
     ],
     "tier": "viewer",
     "order": 31
@@ -83,7 +91,9 @@
       "org.role.read",
       "org.role.update",
       "org.user_role.read",
-      "org.user_role.update"
+      "org.user_role.update",
+      "org_management",
+      "permission_management"
     ],
     "tier": "editor",
     "order": 40
@@ -97,7 +107,9 @@
     "description": "只读查看角色与授权关系",
     "includes": [
       "org.role.read",
-      "org.user_role.read"
+      "org.user_role.read",
+      "org_management",
+      "permission_management"
     ],
     "tier": "viewer",
     "order": 41
@@ -114,7 +126,9 @@
       "meta.permission.update",
       "meta.permission.manage",
       "meta.menu.read",
-      "meta.menu.update"
+      "meta.menu.update",
+      "org_management",
+      "permission_management"
     ],
     "tier": "editor",
     "order": 50
@@ -129,7 +143,8 @@
     "includes": [
       "org.tenant.read",
       "org.tenant.update",
-      "org.tenant.invite.manage"
+      "org.tenant.invite.manage",
+      "org_management"
     ],
     "tier": "editor",
     "order": 60

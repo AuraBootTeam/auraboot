@@ -11,7 +11,7 @@ vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }),
 }));
 vi.mock('../capabilityService', () => ({
-  capabilityService: { getForRole: vi.fn(), applySelection: vi.fn() },
+  capabilityService: { getForRole: vi.fn(), applySelection: vi.fn(), previewSelection: vi.fn() },
 }));
 vi.mock('~/shared/services/permissionService', () => ({
   permissionService: {
@@ -56,7 +56,16 @@ function mockData(g: CapabilityGroup[] = groups, m: PermissionMatrixDTO = emptyM
 }
 
 describe('CapabilityRoleEditor', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
+      grantedCodes: [],
+      revokedCodes: [],
+      preservedCodes: [],
+      resultingCapabilities: [],
+      relatedMenus: [],
+    });
+  });
 
   it('loads capability + matrix views, seeds selection from granted, disables Save until dirty', async () => {
     mockData();
@@ -67,7 +76,7 @@ describe('CapabilityRoleEditor', () => {
     expect(permissionService.getMatrixForRole).toHaveBeenCalledWith('role-pid-5');
     // ② data-scope bar and ③ advanced section both present
     expect(screen.getByTestId('data-scope-bar')).toBeTruthy();
-    expect(screen.getByTestId('advanced-atomic-section')).toBeTruthy();
+    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
     expect(
       (screen.getByTestId('capability-checkbox-qo.cap.quote_view') as HTMLInputElement).checked,
     ).toBe(true);
@@ -88,7 +97,7 @@ describe('CapabilityRoleEditor', () => {
 
     fireEvent.click(screen.getByTestId('capability-save'));
     expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('confirm-ok'));
+    fireEvent.click(await screen.findByTestId('confirm-ok'));
     await waitFor(() =>
       expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', [
         'qo.cap.quote_view',
@@ -189,16 +198,15 @@ describe('CapabilityRoleEditor', () => {
 
     expect(screen.getByTestId('capability-checkbox-qo.cap.quote_view')).toBeTruthy();
     expect(screen.queryByTestId('capability-checkbox-model.qo_quote_common')).toBeNull();
-    expect(screen.getByTestId('advanced-capability-summary')).toHaveTextContent('1/1');
+    expect(screen.queryByTestId('advanced-capability-summary')).toBeNull();
 
     fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
     fireEvent.click(screen.getByTestId('capability-save'));
     expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId('confirm-ok'));
+    fireEvent.click(await screen.findByTestId('confirm-ok'));
     await waitFor(() =>
       expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', [
         'qo.cap.quote_view',
-        'model.qo_quote_common',
         'qo.cap.quote_edit',
       ]),
     );
@@ -226,7 +234,7 @@ describe('CapabilityRoleEditor', () => {
     await screen.findByTestId('capability-role-editor');
     fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
     fireEvent.click(screen.getByTestId('capability-save'));
-    fireEvent.click(screen.getByTestId('confirm-ok'));
+    fireEvent.click(await screen.findByTestId('confirm-ok'));
     await waitFor(() => expect(screen.getByTestId('capability-save')).not.toBeDisabled());
     expect(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')).toBeChecked();
     expect(screen.getByTestId('capability-draft')).toBeTruthy();
@@ -253,7 +261,7 @@ describe('CapabilityRoleEditor', () => {
     expect(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')).toBeChecked();
     expect(screen.getByTestId('capability-draft')).toBeTruthy();
   });
-  it('hides a stale snapshot after an atomic write succeeds but matrix readback fails', async () => {
+  it('shows read-only diagnostics without atomic write controls', async () => {
     const matrix: PermissionMatrixDTO = {
       modules: [
         {
@@ -266,11 +274,11 @@ describe('CapabilityRoleEditor', () => {
               actions: [
                 {
                   permissionId: 1,
-                  permissionPid: 'permission-1',
+                  permissionPid: 'p1',
                   code: 'qo.quote.read',
                   action: 'read',
                   label: 'Read quote',
-                  granted: false,
+                  granted: true,
                   supported: true,
                 },
               ],
@@ -280,36 +288,110 @@ describe('CapabilityRoleEditor', () => {
       ],
     };
     mockData(groups, matrix);
-    vi.mocked(permissionService.batchUpdateRolePermissions).mockResolvedValue(undefined);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-role-editor');
+    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
+    expect(screen.queryByTestId('atomic-checkbox-qo.quote.read')).toBeNull();
+    expect(screen.queryByTestId('atomic-scope-qo.quote.read')).toBeNull();
+    expect(permissionService.batchUpdateRolePermissions).not.toHaveBeenCalled();
+  });
+
+  it('hides stale state when capability write succeeds but readback fails', async () => {
+    mockData();
+    vi.mocked(capabilityService.applySelection).mockResolvedValue(groups);
     vi.mocked(permissionService.getMatrixForRole)
-      .mockResolvedValueOnce(matrix)
+      .mockResolvedValueOnce(emptyMatrix)
       .mockRejectedValueOnce(new Error('readback unavailable'));
     render(<CapabilityRoleEditor rolePid="role-pid-5" />);
     await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
-    fireEvent.click(screen.getByTestId('atomic-checkbox-qo.quote.read'));
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    fireEvent.click(await screen.findByTestId('confirm-ok'));
     await screen.findByTestId('capability-editor-error');
-    expect(permissionService.batchUpdateRolePermissions).toHaveBeenCalledWith('role-pid-5', [
-      { permissionId: 1, granted: true },
-    ]);
     expect(screen.queryByTestId('capability-role-editor')).toBeNull();
-    vi.mocked(permissionService.getMatrixForRole).mockResolvedValue({
-      ...matrix,
-      modules: [
-        {
-          ...matrix.modules[0],
-          resources: [
-            {
-              ...matrix.modules[0].resources[0],
-              actions: [{ ...matrix.modules[0].resources[0].actions[0], granted: true }],
-            },
-          ],
-        },
-      ],
-    });
+    vi.mocked(permissionService.getMatrixForRole).mockResolvedValue(emptyMatrix);
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
-    expect(screen.getByTestId('atomic-checkbox-qo.quote.read')).toBeChecked();
+  });
+
+  it('does not submit when authoritative preview fails and preserves the draft', async () => {
+    mockData();
+    vi.mocked(capabilityService.previewSelection).mockRejectedValue(
+      new Error('preview unavailable'),
+    );
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-role-editor');
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await waitFor(() => expect(screen.getByTestId('capability-save')).not.toBeDisabled());
+    expect(screen.queryByTestId('confirm-dialog')).toBeNull();
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
+    expect(screen.getByTestId('capability-draft')).toBeTruthy();
+  });
+  it('shows a partial grant as mixed and allows explicit completion through preview', async () => {
+    mockData([
+      {
+        group: 'Business',
+        capabilities: [
+          {
+            ...cap('partial.cap', 'Partial capability', false),
+            authorizationState: 'partial',
+            includes: ['read', 'write'],
+            missingCodes: ['write'],
+          },
+        ],
+      },
+    ]);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-role-editor');
+    const checkbox = screen.getByTestId('capability-checkbox-partial.cap') as HTMLInputElement;
+    expect(checkbox.indeterminate).toBe(true);
+    expect(checkbox).toHaveAttribute('aria-checked', 'mixed');
+    expect(screen.getByTestId('capability-partial-partial.cap')).toBeTruthy();
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await screen.findByTestId('confirm-dialog');
+    expect(capabilityService.previewSelection).toHaveBeenCalledWith('role-pid-5', ['partial.cap']);
+  });
+  it('requires explicit partial revocation and supports undo and discard before preview', async () => {
+    mockData([
+      {
+        group: '报价单',
+        capabilities: [
+          {
+            ...cap('partial.cap', 'Partial capability', false),
+            authorizationState: 'partial',
+            includes: ['record.read', 'record.edit'],
+            missingCodes: ['record.edit'],
+          },
+        ],
+      },
+    ]);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await screen.findByTestId('capability-revoke-partial-partial.cap');
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
+    expect(screen.getByTestId('capability-checkbox-partial.cap')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
+    fireEvent.click(screen.getByTestId('capability-discard'));
+    expect(screen.getByTestId('capability-checkbox-partial.cap')).toHaveAttribute(
+      'aria-checked',
+      'mixed',
+    );
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await screen.findByTestId('confirm-ok');
+    expect(capabilityService.previewSelection).toHaveBeenCalledWith(
+      'role-pid-5',
+      [],
+      ['partial.cap'],
+    );
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
   });
 });

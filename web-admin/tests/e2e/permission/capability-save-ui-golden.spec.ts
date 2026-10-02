@@ -140,15 +140,13 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await expect(page.getByTestId('role-member-tab')).toBeVisible();
 });
 
-test('atomic grant readback failure blocks stale editing and retry reads the persisted grant', async ({
+test('capability grant readback failure blocks stale editing and retry reads the persisted grant', async ({
   page,
 }) => {
-  test
-    .info()
-    .annotations.push({
-      type: 'fault-injection',
-      description: 'Browser GET matrix returns 503 after a real persisted atomic grant.',
-    });
+  test.info().annotations.push({
+    type: 'fault-injection',
+    description: 'Browser GET matrix returns 503 after a real persisted capability grant.',
+  });
   const role = await createRole(page);
   await page.goto('/home');
   await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true');
@@ -159,9 +157,9 @@ test('atomic grant readback failure blocks stale editing and retry reads the per
     'data-role-pid',
     role.pid,
   );
-  await page.getByTestId('advanced-atomic-toggle').click();
-  const checkbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
-  const code = (await checkbox.getAttribute('data-testid'))!.replace('atomic-checkbox-', '');
+  const capabilityCode = 'qo.cap.quote_view';
+  const checkbox = page.getByTestId(`capability-checkbox-${capabilityCode}`);
+  const code = 'qo.quote.read';
   await expect(checkbox).not.toBeChecked();
   const matrixPath = `/api/permissions/matrix/${role.pid}`;
   await page.route(`**${matrixPath}`, async (route) => {
@@ -175,10 +173,13 @@ test('atomic grant readback failure blocks stale editing and retry reads the per
   });
   const grant = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === `${matrixPath}/batch` &&
+      new URL(response.url()).pathname === '/api/permission/capabilities' &&
       response.request().method() === 'PUT',
   );
   await checkbox.click();
+  await page.getByTestId('capability-save').click();
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  await page.getByTestId('confirm-ok').click();
   const response = await grant;
   expect(response.status()).toBe(200);
   expect(String((await response.json()).code)).toBe('0');
@@ -190,7 +191,7 @@ test('atomic grant readback failure blocks stale editing and retry reads the per
     .flatMap((module: any) => module.resources)
     .flatMap((resource: any) => resource.actions);
   expect(actions.find((action: any) => action.code === code).granted).toBe(true);
-  await page.screenshot({ path: `${SHOTS}/03-atomic-readback-error.png`, fullPage: true });
+  await page.screenshot({ path: `${SHOTS}/03-capability-readback-error.png`, fullPage: true });
   await page.unroute(`**${matrixPath}`);
   await page
     .getByTestId('capability-editor-error')
@@ -200,6 +201,6 @@ test('atomic grant readback failure blocks stale editing and retry reads the per
     'data-role-pid',
     role.pid,
   );
-  await page.getByTestId('advanced-atomic-toggle').click();
-  await expect(page.getByTestId(`atomic-checkbox-${code}`)).toBeChecked();
+  await expect(page.getByTestId(`capability-checkbox-${capabilityCode}`)).toBeChecked();
+  await expect(page.locator('[data-testid^="atomic-checkbox-"]')).toHaveCount(0);
 });

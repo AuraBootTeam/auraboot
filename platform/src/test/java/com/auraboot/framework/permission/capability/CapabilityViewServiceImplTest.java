@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -81,7 +82,9 @@ class CapabilityViewServiceImplTest {
         Capability cap = group.getCapabilities().get(0);
         assertThat(cap.getCode()).isEqualTo("crm.cap.account");
         assertThat(cap.getLabel()).isEqualTo("维护客户资料");
-        assertThat(cap.isGranted()).isFalse(); // crm.account.manage not granted
+        assertThat(cap.isGranted()).isFalse();
+        assertThat(cap.getAuthorizationState()).isEqualTo("partial");
+        assertThat(cap.getMissingCodes()).containsExactly("crm.account.manage");
     }
 
     @Test
@@ -176,22 +179,6 @@ class CapabilityViewServiceImplTest {
     }
 
     @Test
-    void conventionDerivedCapabilityIsSavable() {
-        // no declaration covers billing.license.* -> it surfaces as convention-derived "billing.license";
-        // selecting it must grant its codes (capability is the sole grant surface).
-        when(registry.listDeclarations(any())).thenReturn(List.of());
-        when(permissionService.findAllActive()).thenReturn(List.of(
-                perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of()); // fresh role
-
-        MetaContext.setContext(1L, 1L, "p", "u");
-        service.applyCapabilitySelection(5L, Set.of("billing.license"));
-
-        verify(rolePermissionService).assignPermissionsToRole(eq(5L),
-                argThat(ids -> ids.size() == 2 && ids.contains(1L) && ids.contains(2L)));
-    }
-
-    @Test
     void readOnlyCapabilityGrantsReadCodesButNeverManage() {
         // R3: a viewer-tier capability (crm.cap.account_view = read + model-read, NO manage)
         // coexists with the editor-tier crm.cap.account (read + manage + model-read). Selecting
@@ -231,4 +218,99 @@ class CapabilityViewServiceImplTest {
 
         verifyNoInteractions(rolePermissionService);
     }
+    @Test
+    void businessSavePreservesFullyGrantedUndeclaredActions() {
+        when(registry.listDeclarations(any())).thenReturn(List.of());
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+                perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
+        MetaContext.setContext(1L, 1L, "p", "u");
+
+        service.applyCapabilitySelection(5L, Set.of());
+
+        verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test
+    void rejectsUndeclaredCapabilitiesWithoutWriting() {
+        when(registry.listDeclarations(any())).thenReturn(List.of());
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "p1", "billing.license.read")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        MetaContext.setContext(1L, 1L, "p", "u");
+
+        assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("billing.license")))
+                .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
+        verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test
+    void previewAndApplyPreserveSharedActionsAndReportResultingPartialCapability() {
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("cap.edit", "Business", "crm.account.read", "crm.account.manage"),
+                decl("cap.view", "Business", "crm.account.read")));
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
+                perm(3L, "p3", "legacy_flag")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+                perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
+                perm(3L, "p3", "legacy_flag")));
+        when(menuMapper.findAllActiveMenus()).thenReturn(List.of(menu("Customers", "crm.account.read")));
+        MetaContext.setContext(1L, 1L, "p", "u");
+
+        CapabilitySelectionPreview preview = service.previewCapabilitySelection(5L, Set.of("cap.view"));
+        assertThat(preview.grantedCodes()).isEmpty();
+        assertThat(preview.revokedCodes()).containsExactly("crm.account.manage");
+        assertThat(preview.preservedCodes()).containsExactly("legacy_flag");
+        assertThat(preview.resultingCapabilities()).singleElement().satisfies(cap -> {
+            assertThat(cap.getCode()).isEqualTo("cap.edit");
+            assertThat(cap.getAuthorizationState()).isEqualTo("partial");
+        });
+        assertThat(preview.relatedMenus()).containsExactly("Customers");
+        verifyNoInteractions(rolePermissionService);
+        service.applyCapabilitySelection(5L, Set.of("cap.view"));
+        verify(rolePermissionService).removePermissionsFromRoleByPids(5L, List.of("p2"));
+    }
+
+    @Test
+    void unavailableDependencyRejectsWholeSelectionBeforeWriting() {
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("cap.invalid", "Business", "crm.account.read", "missing.code.read")));
+        when(permissionService.findAllActive()).thenReturn(List.of(perm(1L, "p1", "crm.account.read")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        MetaContext.setContext(1L, 1L, "p", "u");
+        assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("cap.invalid")))
+                .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
+        verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test
+    void partialRevocationRequiresExplicitIntentAndPreservesSelectedSharedActions() {
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("cap.edit", "Business", "crm.account.read", "crm.account.manage", "crm.account.export"),
+                decl("cap.view", "Business", "crm.account.read")));
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
+                perm(3L, "p3", "crm.account.export")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+                perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage")));
+        MetaContext.setContext(1L, 1L, "p", "u");
+        assertThat(service.previewCapabilitySelection(5L, Set.of("cap.view")).revokedCodes()).isEmpty();
+        CapabilitySelectionPreview plan = service.previewCapabilitySelection(5L, Set.of("cap.view"), Set.of("cap.edit"));
+        assertThat(plan.revokedCodes()).containsExactly("crm.account.manage");
+        service.applyCapabilitySelection(5L, Set.of("cap.view"), Set.of("cap.edit"));
+        verify(rolePermissionService).removePermissionsFromRoleByPids(5L, List.of("p2"));
+    }
+
+    @Test
+    void rejectsConflictingGrantAndPartialRevokeIntentWithoutWrites() {
+        MetaContext.setContext(1L, 1L, "p", "u");
+        when(registry.listDeclarations(any())).thenReturn(List.of(decl("cap.view", "Business", "crm.account.read")));
+        when(permissionService.findAllActive()).thenReturn(List.of(perm(1L, "p1", "crm.account.read")));
+        assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("cap.view"), Set.of("cap.view")))
+                .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
+        verifyNoInteractions(rolePermissionService);
+    }
+
 }

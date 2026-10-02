@@ -2734,12 +2734,17 @@ public class PluginImportServiceImpl implements PluginImportService {
     private void importCapabilities(PluginManifestExtended manifest) {
         if (manifest.getCapabilities() == null || manifest.getCapabilities().isEmpty()) return;
         int created = 0;
+        Set<String> capabilityCodes = new java.util.HashSet<>();
         for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
-            if (!dto.isValid()) {
-                log.warn("Skipping invalid capability (missing code/includes): index={}",
-                        manifest.getCapabilities().indexOf(dto));
-                continue;
+            if (!capabilityCodes.add(dto.getCode())) {
+                throw new IllegalArgumentException("Duplicate capability declaration: " + dto.getCode());
             }
+            if (!dto.isValid()) {
+                throw new IllegalArgumentException("Invalid capability declaration: " + dto.getCode());
+            }
+        }
+        // Validate the whole declaration set before the first registry mutation.
+        for (CapabilityDefinitionDTO dto : manifest.getCapabilities()) {
             capabilityRegistryService.saveDefinition(dto);
             created++;
         }

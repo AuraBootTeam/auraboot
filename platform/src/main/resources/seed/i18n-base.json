@@ -4104,5 +4104,140 @@
     "key": "admin.permission.advanced.colCoverage",
     "zh-CN": "能力覆盖",
     "en-US": "Capability coverage"
+  },
+  {
+    "key": "admin.permission.capability.partialV2",
+    "zh-CN": "部分授权，勾选可补齐",
+    "en-US": "Partially granted; select to complete"
+  },
+  {
+    "key": "admin.permission.capability.noneV2",
+    "zh-CN": "未授权",
+    "en-US": "Not granted"
+  },
+  {
+    "key": "admin.permission.capability.fullV2",
+    "zh-CN": "完整授权",
+    "en-US": "Fully granted"
+  },
+  {
+    "key": "admin.permission.capability.relatedMenusV2",
+    "zh-CN": "相关菜单",
+    "en-US": "Related menus"
+  },
+  {
+    "key": "admin.permission.diagnostics.titleV2",
+    "zh-CN": "权限诊断 · 只读",
+    "en-US": "Permission diagnostics · read only"
+  },
+  {
+    "key": "admin.permission.diagnostics.noteV2",
+    "zh-CN": "共 {total} 个动作；{uncovered} 项已授权动作未关联声明能力。此处展示声明覆盖关系，不代表授权来源或用户最终访问结果。",
+    "en-US": "{total} actions; {uncovered} granted actions without declared capability coverage. Coverage does not identify grant origin or effective user access."
+  },
+  {
+    "key": "admin.permission.diagnostics.searchV2",
+    "zh-CN": "搜索权限名称或标识",
+    "en-US": "Search permission diagnostics"
+  },
+  {
+    "key": "admin.permission.diagnostics.actionV2",
+    "zh-CN": "动作",
+    "en-US": "Action"
+  },
+  {
+    "key": "admin.permission.diagnostics.stateV2",
+    "zh-CN": "本角色授权",
+    "en-US": "Role grant"
+  },
+  {
+    "key": "admin.permission.diagnostics.scopeV2",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "admin.permission.diagnostics.capabilitiesV2",
+    "zh-CN": "关联能力",
+    "en-US": "Related capabilities"
+  },
+  {
+    "key": "admin.permission.diagnostics.codeV2",
+    "zh-CN": "技术标识",
+    "en-US": "Technical identifier"
+  },
+  {
+    "key": "admin.permission.diagnostics.grantedV2",
+    "zh-CN": "已授权",
+    "en-US": "Granted"
+  },
+  {
+    "key": "admin.permission.diagnostics.noneV2",
+    "zh-CN": "未授权",
+    "en-US": "Not granted"
+  },
+  {
+    "key": "admin.permission.diagnostics.unmappedV2",
+    "zh-CN": "未关联声明能力",
+    "en-US": "No declared capability"
+  },
+  {
+    "key": "admin.permission.diagnostics.emptyV2",
+    "zh-CN": "没有匹配动作",
+    "en-US": "No matching actions"
+  },
+  {
+    "key": "admin.permission.editor.readbackErrorV2",
+    "zh-CN": "权限已保存，但读取结果失败。请重新加载后继续。",
+    "en-US": "Permissions were saved, but the result could not be loaded. Reload before continuing."
+  },
+  {
+    "key": "admin.permission.editor.previewErrorV2",
+    "zh-CN": "无法计算变更影响，草稿已保留。",
+    "en-US": "Could not calculate permission changes. Your draft is preserved."
+  },
+  {
+    "key": "admin.permission.editor.atomicDiffV2",
+    "zh-CN": "新增 {added} 个动作，移除 {removed} 个动作；另有 {preserved} 个现有动作保持不变。",
+    "en-US": "Add {added} actions, remove {removed}; {preserved} existing actions remain unchanged."
+  },
+  {
+    "key": "admin.permission.editor.roleLocalV2",
+    "zh-CN": "变更仅作用于当前角色。用户访问仍受其他角色、记录范围和共享关系共同影响。",
+    "en-US": "This changes this role only. Other roles, record scopes and sharing still determine user access."
+  },
+  {
+    "key": "admin.permission.editor.draftV2",
+    "zh-CN": "有 {count} 项待保存变更。请保存或放弃后再修改数据范围。",
+    "en-US": "{count} pending changes. Save or discard before editing data scope."
+  },
+  {
+    "key": "admin.permission.capability.scopeV2",
+    "zh-CN": "调整记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "admin.permission.capability.scopeNoteV2",
+    "zh-CN": "仅调整此能力已有授权的记录动作。同一个动作被多个能力包含时，范围调整会共同生效；新增和撤销授权请使用上方能力选择。",
+    "en-US": "Adjust existing record grants for this capability. Shared actions also affect other capabilities; use the checklist to grant or revoke access."
+  },
+  {
+    "key": "admin.permission.capability.noScopesV2",
+    "zh-CN": "没有已授权的记录动作可配置。",
+    "en-US": "No granted record actions to configure."
+  },
+  {
+    "key": "admin.permission.capability.scopeFailureV2",
+    "zh-CN": "无法确认范围变更结果，部分变更可能已保存。请重新加载后继续。",
+    "en-US": "Scope changes could not be verified. Some changes may have been saved; reload before continuing."
+  },
+  {
+    "key": "admin.permission.capability.revokePartialV2",
+    "zh-CN": "撤销已有授权",
+    "en-US": "Revoke existing grants"
+  },
+  {
+    "key": "admin.permission.capability.undoRevokeV2",
+    "zh-CN": "待撤销 · 取消撤销",
+    "en-US": "Pending revocation · undo"
   }
 ]

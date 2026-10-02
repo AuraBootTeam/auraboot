@@ -6,8 +6,7 @@ import { BASE_URL } from '../../helpers/environments';
  *
  * Proves the owner-requested behavior end-to-end on a real browser + real backend: setting a role's
  * default data scope (② drawer) makes newly-granted permissions INHERIT that scope (materialized at
- * grant time), not just apply to current grants. Grants via the ③ advanced atomic checkbox (the
- * precision-safe rolePid grant path) and asserts the new code's scope select reads the default.
+ * grant time), not just apply to current grants. Grants via the primary capability editor and verifies the inherited scope in the capability settings.
  */
 
 const SHOTS = 'test-results/rbac-default-scope';
@@ -38,7 +37,11 @@ for (const scope of ['dept', 'team']) {
     await page.getByTestId('role-search-input').fill(role.code);
     await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
     await page.getByTestId(`role-item-${role.code}`).click();
-    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid, { timeout: 15_000 });
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+      'data-role-pid',
+      role.pid,
+      { timeout: 15_000 },
+    );
 
     // ② set the role default scope to "dept" (仅本部门) via the drawer
     await page.getByTestId('data-scope-modify-btn').click();
@@ -53,33 +56,35 @@ for (const scope of ['dept', 'team']) {
       },
     );
 
-    // ③ expand advanced; grant a NEW atomic permission via its checkbox (precision-safe rolePid path)
-    await page.getByTestId('advanced-atomic-toggle').click();
-    await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
-    const firstCheckbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
-    await expect(firstCheckbox).toBeVisible({ timeout: 10_000 });
-    const tid = await firstCheckbox.getAttribute('data-testid');
-    const code = tid!.replace('atomic-checkbox-', '');
-
-    // a newly-granted code has no scope <select> until granted
-    await expect(page.getByTestId(`atomic-scope-${code}`)).toHaveCount(0);
-
-    // grant it — the hook materializes the role default onto this new grant; the editor refetches
+    // Grant a complete declared business capability through the primary editor.
+    const capabilityCode = 'qo.cap.quote_view';
+    const checkbox = page.getByTestId(`capability-checkbox-${capabilityCode}`);
+    await expect(checkbox).not.toBeChecked();
+    await checkbox.click();
+    await page.getByTestId('capability-save').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     const grantResp = page.waitForResponse(
-      (r) => r.url().includes('/api/permissions/matrix/') && r.url().includes('/batch'),
-      { timeout: 10_000 },
+      (response) =>
+        response.url().includes('/api/permission/capabilities?') &&
+        response.request().method() === 'PUT',
     );
-    // The editor commits the checked state only after persistence and readback.
-    await firstCheckbox.click();
+    await page.getByTestId('confirm-ok').click();
     const response = await grantResp;
     expect(response.status()).toBe(200);
     expect(String((await response.json()).code)).toBe('0');
-    await expect(firstCheckbox).toBeChecked();
-
-    // the newly-granted code's scope select must read "dept" — INHERITED from the role default
-    const scopeSelect = page.getByTestId(`atomic-scope-${code}`);
-    await expect(scopeSelect).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('capability-save')).toBeDisabled();
+    await page.getByTestId(`capability-scope-configure-${capabilityCode}`).click();
+    await expect(page.getByTestId('capability-scope-dialog')).toBeVisible();
+    const scopeSelect = page.getByTestId('capability-scope-model.qo_quote_common.read');
     await expect(scopeSelect).toHaveValue(scope);
+    const matrixResponse = await page.request.get(`${BASE}/api/permissions/matrix/${role.pid}`);
+    expect(matrixResponse.ok()).toBeTruthy();
+    const actions = (await matrixResponse.json()).data.modules
+      .flatMap((module: any) => module.resources)
+      .flatMap((resource: any) => resource.actions);
+    expect(
+      actions.find((action: any) => action.code === 'model.qo_quote_common.read').scopeType,
+    ).toBe(scope);
 
     await page.screenshot({ path: `${SHOTS}/01-inherited-${scope}-scope.png`, fullPage: true });
 

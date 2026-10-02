@@ -11,6 +11,8 @@ import com.auraboot.framework.rbac.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import com.auraboot.framework.permission.capability.CapabilitySelectionPreview;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,10 +54,24 @@ public class CapabilityController {
     @RequirePermission(MetaPermission.ROLE_MANAGE)
     public ApiResponse<List<CapabilityGroup>> applySelection(
             @RequestParam String rolePid,
-            @RequestBody Set<String> selectedCapabilityCodes) {
+            @RequestBody Set<String> selectedCapabilityCodes,
+            @RequestParam(required = false) Set<String> revokePartial) {
         Long roleId = resolveRoleId(rolePid);
-        capabilityViewService.applyCapabilitySelection(roleId, selectedCapabilityCodes);
+        if (revokePartial == null || revokePartial.isEmpty()) {
+            capabilityViewService.applyCapabilitySelection(roleId, selectedCapabilityCodes);
+        } else {
+            capabilityViewService.applyCapabilitySelection(roleId, selectedCapabilityCodes, revokePartial);
+        }
         return ApiResponse.success(capabilityViewService.resolveForRole(roleId));
+    }
+
+    @PostMapping("/preview")
+    @RequirePermission(MetaPermission.ROLE_READ)
+    public ApiResponse<CapabilitySelectionPreview> previewSelection(
+            @RequestParam String rolePid, @RequestBody Set<String> selectedCapabilityCodes,
+            @RequestParam(required = false) Set<String> revokePartial) {
+        return ApiResponse.success(capabilityViewService.previewCapabilitySelection(resolveRoleId(rolePid), selectedCapabilityCodes,
+                revokePartial == null ? Set.of() : revokePartial));
     }
 
     private Long resolveRoleId(String rolePid) {

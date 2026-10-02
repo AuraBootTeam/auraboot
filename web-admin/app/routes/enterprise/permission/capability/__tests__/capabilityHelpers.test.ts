@@ -326,4 +326,17 @@ describe('capabilityHelpers', () => {
     expect(split.primaryGroups.map((g) => g.group)).toEqual(['线索与商机']);
     expect(split.advancedGroups).toEqual([]);
   });
+  it('does not implicitly select sensitive or approval capabilities through tier presets', () => {
+    const groups: CapabilityGroup[] = [
+      {
+        group: 'Business',
+        capabilities: [
+          { ...cap('normal', false), tier: 'viewer' },
+          { ...cap('cost', false, true), tier: 'editor' },
+          { ...cap('approval', false, true), tier: 'approver' },
+        ],
+      },
+    ];
+    expect(capabilityCodesForTier(groups, 'admin')).toEqual(['normal']);
+  });
 });

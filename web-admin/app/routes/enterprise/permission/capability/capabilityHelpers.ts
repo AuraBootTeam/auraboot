@@ -172,7 +172,14 @@ export function capabilityCodesForTier(groups: CapabilityGroup[], tier: string):
   const max = TIER_ORDER[tier];
   if (max === undefined) return [];
   return allCapabilities(groups)
-    .filter((c) => c.tier != null && TIER_ORDER[c.tier] !== undefined && TIER_ORDER[c.tier] <= max)
+    .filter(
+      (c) =>
+        !c.sensitive &&
+        !c.conventionDerived &&
+        c.tier != null &&
+        TIER_ORDER[c.tier] !== undefined &&
+        TIER_ORDER[c.tier] <= max,
+    )
     .map((c) => c.code);
 }
 

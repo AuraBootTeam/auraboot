@@ -1,5 +1,5 @@
 import { useI18n } from '~/contexts/I18nContext';
-import type { CapabilityGroup } from './types';
+import type { CapabilityGroup, Capability } from './types';
 
 interface CapabilityChecklistProps {
   groups: CapabilityGroup[];
@@ -8,6 +8,10 @@ interface CapabilityChecklistProps {
   /** Called with a capability code when its checkbox is toggled. */
   onToggle: (code: string) => void;
   disabled?: boolean;
+  revokedPartial?: string[];
+  onRevokePartial?: (code: string) => void;
+  onConfigureScope?: (capability: Capability) => void;
+  scopeConfigurableCodes?: Set<string>;
 }
 
 /**
@@ -21,6 +25,10 @@ export default function CapabilityChecklist({
   selected,
   onToggle,
   disabled = false,
+  revokedPartial = [],
+  onRevokePartial,
+  onConfigureScope,
+  scopeConfigurableCodes,
 }: CapabilityChecklistProps) {
   const { t } = useI18n();
   const selectedSet = new Set(selected);
@@ -50,23 +58,54 @@ export default function CapabilityChecklist({
             </legend>
             <div className="flex flex-col gap-1.5">
               {group.capabilities.map((cap) => (
-                <label
+                <div
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
                   className="flex cursor-pointer items-start gap-2 text-sm text-gray-700"
                 >
                   <input
                     type="checkbox"
+                    id={`capability-input-${cap.code}`}
                     className="mt-1"
                     data-testid={`capability-checkbox-${cap.code}`}
                     checked={selectedSet.has(cap.code)}
+                    ref={(input) => {
+                      if (input)
+                        input.indeterminate =
+                          cap.authorizationState === 'partial' &&
+                          !selectedSet.has(cap.code) &&
+                          !revokedPartial.includes(cap.code);
+                    }}
+                    aria-checked={
+                      cap.authorizationState === 'partial' &&
+                      !selectedSet.has(cap.code) &&
+                      !revokedPartial.includes(cap.code)
+                        ? 'mixed'
+                        : selectedSet.has(cap.code)
+                    }
                     disabled={disabled}
                     aria-label={cap.label}
                     onChange={() => onToggle(cap.code)}
                   />
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="flex items-center gap-2">
-                      <span>{cap.label}</span>
+                      <label htmlFor={`capability-input-${cap.code}`} className="cursor-pointer">
+                        {cap.label}
+                      </label>
+                      {cap.authorizationState === 'partial' &&
+                        !selectedSet.has(cap.code) &&
+                        !revokedPartial.includes(cap.code) && (
+                          <span
+                            data-testid={`capability-partial-${cap.code}`}
+                            className="text-xs text-amber-700"
+                          >
+                            {t(
+                              'admin.permission.capability.partialV2',
+                              { count: cap.missingCodes?.length ?? 0 },
+                              'Partially granted; select to complete',
+                            )}
+                          </span>
+                        )}
                       {cap.sensitive && (
                         <span
                           data-testid={`capability-sensitive-${cap.code}`}
@@ -77,13 +116,52 @@ export default function CapabilityChecklist({
                         </span>
                       )}
                     </span>
+                    {cap.authorizationState === 'partial' &&
+                      onRevokePartial &&
+                      !selectedSet.has(cap.code) && (
+                        <button
+                          type="button"
+                          data-testid={`capability-revoke-partial-${cap.code}`}
+                          disabled={disabled}
+                          onClick={() => onRevokePartial(cap.code)}
+                          className="text-left text-xs text-red-700 hover:underline"
+                        >
+                          {revokedPartial.includes(cap.code)
+                            ? t(
+                                'admin.permission.capability.undoRevokeV2',
+                                undefined,
+                                'Pending revocation · undo',
+                              )
+                            : t(
+                                'admin.permission.capability.revokePartialV2',
+                                undefined,
+                                'Revoke existing grants',
+                              )}
+                        </button>
+                      )}
+                    {onConfigureScope && scopeConfigurableCodes?.has(cap.code) && (
+                      <button
+                        type="button"
+                        data-testid={`capability-scope-configure-${cap.code}`}
+                        disabled={disabled}
+                        onClick={() => onConfigureScope(cap)}
+                        className="text-accent text-left text-xs hover:underline"
+                      >
+                        {t('admin.permission.capability.scopeV2', undefined, 'Record scope')}
+                      </button>
+                    )}
                     {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
                       <span
                         data-testid={`capability-menus-${cap.code}`}
                         className="flex flex-wrap items-center gap-1 text-xs text-gray-400"
                       >
                         <span>
-                          {t('permission.capability.unlocksMenus', undefined, '解锁菜单')}:
+                          {t(
+                            'admin.permission.capability.relatedMenusV2',
+                            undefined,
+                            'Related menus',
+                          )}
+                          :
                         </span>
                         {cap.unlockedMenus.map((m) => (
                           <span key={m} className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">
@@ -93,7 +171,7 @@ export default function CapabilityChecklist({
                       </span>
                     )}
                   </span>
-                </label>
+                </div>
               ))}
             </div>
           </fieldset>
