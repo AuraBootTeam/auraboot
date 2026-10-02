@@ -31,6 +31,7 @@ WORKSPACE="${AURA_WORKSPACE_ROOT:-${AURA_CI_WORKSPACE_ROOT:-$REPO_ROOT}}"
 while [[ "$WORKSPACE" != / && ! -x "$WORKSPACE/aura" ]]; do WORKSPACE="$(dirname "$WORKSPACE")"; done
 [[ -x "$WORKSPACE/aura" ]] || die_env 'workspace aura CLI not found'
 [[ -x "$GS" && -f "$PROFILE" && -f "$AUDIT" ]] || die_env 'missing gate dependency'
+command -v pdftotext >/dev/null 2>&1 || die_env 'pdftotext (Poppler) is required to inspect exported PDF contents'
 # A supplied name never grants ownership of an existing runtime or its database.
 [[ ! -e "$WORKSPACE/.workspace/env/$NAME.env" && ! -e "$WORKSPACE/.workspace/golden/$NAME" ]] \
   || die_env "runtime name '$NAME' already exists; choose a fresh name"

@@ -19,6 +19,7 @@ function fixture(t, mode = '') {
   }
   const executable = (file, source) => fs.writeFileSync(file, source, { mode: 0o755 });
   executable(path.join(root, 'bin/lsof'), '#!/usr/bin/env bash\nexit 1\n');
+  executable(path.join(root, 'bin/pdftotext'), '#!/usr/bin/env bash\nexit 0\n');
   executable(path.join(root, 'aura'), `#!/usr/bin/env bash
 printf 'aura %s\\n' "$*" >> "$CALLS"
 if [[ "$*" == 'runtime list' ]]; then printf 'NAME MODE SLOT\\n'; fi
