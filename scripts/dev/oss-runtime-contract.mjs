@@ -1,12 +1,21 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
-const run = (command, args) => execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+export function runCommand(command, args) {
+  try { return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
+  catch (error) {
+    // execFileSync messages include argv and stderr, which may contain process tokens.
+    const failure = new Error(`${basename(command)} failed (exit ${error.status ?? 'unknown'})`);
+    failure.status = error.status;
+    throw failure;
+  }
+}
+const run = runCommand;
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 function atomicJson(file, value) {
   mkdirSync(dirname(file), { recursive: true });

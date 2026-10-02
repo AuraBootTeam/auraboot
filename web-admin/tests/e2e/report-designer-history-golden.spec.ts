@@ -18,25 +18,19 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
-const TABLE_PLACEHOLDER = 'Configure columns in the property panel';
+const TABLE_PLACEHOLDER = /^(请在属性面板中配置列|Configure columns in the property panel)$/;
 const RICHTEXT_PLACEHOLDER = 'Click to add text content';
 
 function canvas(page: Page) {
   return page.getByTestId('report-canvas');
 }
 
-// Click a palette button and confirm the block landed on the canvas. The very
-// first interaction right after navigation can race React hydration (the SSR'd
-// button isn't wired yet, so the click is a no-op); retry the click until the
-// block actually appears. This exercises the real add behavior — it just does
-// not flake on a pre-hydration click.
-async function addPaletteBlock(page: Page, buttonName: RegExp, placeholder: string) {
-  const button = page.getByRole('button', { name: buttonName });
+// Initialization is asserted before actions; each block is added exactly once.
+async function addPaletteBlock(page: Page, buttonName: RegExp, placeholder: string | RegExp) {
+  const button = page.getByTestId('block-palette').getByRole('button', { name: buttonName });
   await expect(button).toBeEnabled();
-  await expect(async () => {
-    await button.click();
-    await expect(canvas(page).getByText(placeholder)).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 15000 });
+  await button.click();
+  await expect(canvas(page).getByText(placeholder)).toBeVisible();
 }
 
 async function addDataTable(page: Page) {
@@ -49,9 +43,10 @@ async function addRichText(page: Page) {
 
 test.describe('Report Designer — history & topology golden', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/report-designer', { waitUntil: 'domcontentloaded' });
+    await page.goto('/report-designer', { waitUntil: 'load' });
     await expect(page.getByTestId('block-palette')).toBeVisible();
     await expect(canvas(page)).toBeVisible();
+    await expect(page.getByTestId('report-designer-toolbar').getByText(/^(未保存|Unsaved)$/)).toBeVisible();
   });
 
   test('undo removes an added block; redo restores it', async ({ page }) => {

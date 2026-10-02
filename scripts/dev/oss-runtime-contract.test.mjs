@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assertLiveContract, assertOwnedStop, descendants } from './oss-runtime-contract.mjs';
+import { assertLiveContract, assertOwnedStop, descendants, runCommand } from './oss-runtime-contract.mjs';
 import { auditResults } from './oss-gate-results.mjs';
+
+test('failed subprocess diagnostics preserve exit status without argv or stderr credentials', () => {
+  assert.throws(() => runCommand(process.execPath, ['-e', 'console.error("private-fixture-token");process.exit(7)', '--', '--token', 'private-fixture-token']), error => {
+    assert.equal(error.status, 7);
+    assert.match(error.message, /failed \(exit 7\)/);
+    assert.doesNotMatch(error.message, /private-fixture-token|--token/);
+    return true;
+  });
+});
 
 test('owned stop covers supervisor descendants and reparented registered listeners', () => {
   const table = [{ pid: 11, ppid: 10 }, { pid: 12, ppid: 11 }, { pid: 21, ppid: 1 }];
