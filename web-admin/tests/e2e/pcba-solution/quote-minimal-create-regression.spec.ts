@@ -473,6 +473,8 @@ test.describe('PCBA quote minimal create regression', () => {
       const fileLink = materialRow.getByRole('link', { name: '下载文件', exact: true });
       const fileHref = await fileLink.getAttribute('href');
       expect(fileHref).toMatch(/^\/api\/file\/download\/[^/]+$/);
+      const detailUrlBeforeDownload = page.url();
+      const openPagesBeforeDownload = page.context().pages().length;
       const downloadEvent = page.waitForEvent('download');
       await fileLink.click();
       const downloaded = await downloadEvent;
@@ -481,6 +483,8 @@ test.describe('PCBA quote minimal create regression', () => {
       const downloadedPath = testInfo.outputPath('uploaded-cpl-readback.csv');
       await downloaded.saveAs(downloadedPath);
       expect(fs.readFileSync(downloadedPath)).toEqual(fs.readFileSync(cplFixture));
+      expect(page.url()).toBe(detailUrlBeforeDownload);
+      expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
 
       // Materials upload is create-only now: the detail toolbar keeps only the

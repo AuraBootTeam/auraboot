@@ -370,3 +370,7 @@ CI旧候选实际暴露只读角色直接打开规则新增表单的缺陷：菜
 13个变更表单的UX审计before/after均120错误、0警告（全文件73页328错误），为既有字段引导/分组等债务，本轮未新增；不宣称黄金验收通过。当前CI旧候选134项仍运行，已出现更多失败，需取终态及逐项根因，不以日志进度作为门禁通过。
 
 旧候选共享文件负例实际GET /api/file/{pid}返回500。已沿CI backend trace定位到 authorizeRecordId 的 recordLoader catch(Exception)把 getById 抛出的 AccessDeniedException 包成MetaServiceException。仅补明确拒绝异常原样抛出，不改授权裁决、record lookup或数据库故障语义；补原异常身份保留与普通故障仍包装两项UT。严格403浏览器断言保持，当前修复须重新真栈验证。
+
+### 附件下载入口整改（2026-10-03）
+
+旧CI CPL下载失败的原图显示空白新标签页，附件链接DSL显式target=_blank。页面Blueprint补充：资料上传tab里的“下载文件”是secondary下载动作，下载后应留在原报价上下文，不新增空白页面；授权、文件名、文件内容及错误裁决沿用原机制。仅将这一列的既有link render.target改为_self，不改变PDF预览或其他外链。既有真实下载用例保留URL、文件名与逐字节断言，再检查页面URL和页面数量保持不变。新候选需重新冻结并验证；尚不据配置修改宣称下载已恢复。

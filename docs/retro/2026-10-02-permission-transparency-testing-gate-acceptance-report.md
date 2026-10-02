@@ -16,6 +16,10 @@ created: 2026-10-02
 
 13个BOM表单24个主要动作补齐命令已要求的bom.rule.manage；通用form在当前primary动作全部显式拒绝时呈现无权限页。关联文件GET拒绝异常保留403语义，不改授权裁决。两项修复仍须真栈浏览器复验。13表单UX before/after均120错误、0警告，本轮未新增但未达到黄金标准。r7共享aura-bpm缺配置阻挡仍在，没有删除其他任务登记或改共享dirty配置。
 
+2026-10-03补充：查看CPL下载失败原图，链接打开空白新标签页。将附件下载列target改为_self，既有用例继续核对原始字节、文件名并新增原页面URL及页面数量不变断言。报价详情DSL UX审计1页0错误0警告，角色配置5项通过；Playwright只做collection，目标quoteops用例1项（连同auth依赖总22项），executed=0。r7三个queued任务因候选变化经公开CLI全部取消；下一候选重新冻结。当前没有新的完整回归通过证据。
+
+已有冻结r6环境拒绝源码漂移复用；本轮尝试之后已重新suspend，数据库/缓存/原图保留。未修改冻结校验或其他任务环境。CI模块网络错误已读取原client-error记录：ListPageContent/DetailPageContent动态模块加载失败，事后两模块均HTTP200；仅据此不能宣布环境恢复或权限页签用例通过。
+
 唯一实施账本是[已确认完整方案](../plans/2026-10/2026-10-02-permission-transparency-plan.md)，稳定契约见[范围与记录诊断 SoT](../system-reference/permission-scope-and-record-diagnostics.md)。本报告不创建另一份任务清单。
 
 ## 执行账本与证据边界
