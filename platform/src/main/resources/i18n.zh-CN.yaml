@@ -2122,3 +2122,18 @@ designer_json_editor:
   enum: "值必须是以下之一: {values}"
   format: "格式化"
   minify: "压缩"
+
+designer_device_selector:
+  type:
+    desktop: "桌面"
+    laptop: "笔记本"
+    tablet: "平板"
+    mobile: "手机"
+    custom: "自定义"
+  custom_dimensions: "自定义尺寸"
+  width: "宽度"
+  height: "高度"
+  cancel: "取消"
+  apply: "应用"
+  landscape: "切换为横屏"
+  portrait: "切换为竖屏"

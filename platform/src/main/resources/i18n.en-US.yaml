@@ -1818,3 +1818,18 @@ designer_json_editor:
   enum: "Value must be one of: {values}"
   format: "Format"
   minify: "Minify"
+
+designer_device_selector:
+  type:
+    desktop: "Desktop"
+    laptop: "Laptop"
+    tablet: "Tablet"
+    mobile: "Mobile"
+    custom: "Custom"
+  custom_dimensions: "Custom dimensions"
+  width: "Width"
+  height: "Height"
+  cancel: "Cancel"
+  apply: "Apply"
+  landscape: "Switch to landscape"
+  portrait: "Switch to portrait"
