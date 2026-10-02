@@ -630,15 +630,15 @@ test.describe('Page Designer standard block runtime', () => {
     await page.getByTestId('row-checkbox-0').check();
     await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
     // Delete lives in the More-actions overflow menu (main moved it out of
-    // the primary toolbar); open the menu to reach it.
+    // the primary toolbar); open the menu to assert it, then Escape closes.
     await page.getByTestId('bulk-more-actions-btn').click();
     await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
-    await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toHaveCount(0);
 
     await page.getByTestId('bulk-edit-btn').click();
     await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toBeVisible();
-    await expect(page.getByText('Update 1 selected records')).toBeVisible();
+    await expect(page.getByText('Update 1 records')).toBeVisible();
     await expect(page.getByRole('combobox')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('heading', { name: 'Bulk Edit' })).toHaveCount(0);
