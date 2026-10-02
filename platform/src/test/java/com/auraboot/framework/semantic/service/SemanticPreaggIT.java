@@ -215,14 +215,15 @@ class SemanticPreaggIT {
     @Test
     @DisplayName("Due sweep refreshes the governed metric without caller context")
     void dueSweepWithoutCallerContext() {
-        String run = UUID.randomUUID().toString().replace("-", "");
-        insertAliasRow("golden-sweep-" + run + "-one");
+        // ab_object_alias.pid is varchar(26); the helper also adds a "pg-" prefix.
+        String run = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        insertAliasRow("golden-" + run + "-1");
         AbSemanticPreagg preagg = preaggService.create(
                 "preagg-sweep-" + run, modelPid, "alias_count_metric", List.of(), 1);
         try {
             String metricColumn = "preagg_golden_alias." + preagg.getMetricCode();
             long before = mvMetricValue(preagg.getMvName(), metricColumn);
-            insertAliasRow("golden-sweep-" + run + "-two");
+            insertAliasRow("golden-" + run + "-2");
             long expected = liveValue();
             assertThat(expected).isGreaterThan(before);
             OffsetDateTime stale = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(2);
