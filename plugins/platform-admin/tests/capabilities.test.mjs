@@ -51,6 +51,31 @@ test('member state capabilities use the runtime-derived verb, not the command su
   }
 });
 
+test('member commands enforce their action permissions at the command boundary', () => {
+  const commands = JSON.parse(source('../config/commands.json'));
+  const org = JSON.parse(source('../../org-management/config/capabilities.json'));
+  const includes = org.find(cap => cap.code === 'org.cap.member').includes;
+  const actions = {
+    approve_member: 'approve',
+    reject_member: 'reject',
+    suspend_member: 'suspend',
+    restore_member: 'restore',
+    leave_member: 'leave',
+    delete_member: 'delete',
+    reset_member_password: 'reset_member_password',
+    provision_member_from_employee: 'provision_member_from_employee',
+  };
+  for (const [suffix, action] of Object.entries(actions)) {
+    const command = commands.find(item => item.code === `admin:${suffix}`);
+    assert.ok(command, `${suffix} must exist`);
+    assert.equal(command.modelCode, 'tenant_member');
+    assert.deepEqual(command.permissions, [`model.tenant_member.${action}`],
+      `${command.code} must not rely on endpoint permission or button visibility`);
+    assert.equal(includes.includes(command.permissions[0]), !['leave', 'delete'].includes(action),
+      'member capability must retain its existing action scope');
+  }
+});
+
 test('organization authoring retains record reads and command endpoint dependencies', () => {
   const org = JSON.parse(source('../../org-management/config/capabilities.json'));
   for (const code of ['org.cap.hr', 'org.cap.team', 'org.cap.member'])

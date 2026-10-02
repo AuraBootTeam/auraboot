@@ -167,6 +167,9 @@
     "displayName:en": "Approve",
     "type": "state_transition",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.approve"
+    ],
     "stateField": "status",
     "fromStates": [
       "pending"
@@ -183,6 +186,9 @@
     "displayName:en": "Reject",
     "type": "state_transition",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.reject"
+    ],
     "stateField": "status",
     "fromStates": [
       "pending"
@@ -199,6 +205,9 @@
     "displayName:en": "Suspend",
     "type": "state_transition",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.suspend"
+    ],
     "stateField": "status",
     "fromStates": [
       "active"
@@ -215,6 +224,9 @@
     "displayName:en": "Restore",
     "type": "state_transition",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.restore"
+    ],
     "stateField": "status",
     "fromStates": [
       "suspended",
@@ -232,6 +244,9 @@
     "displayName:en": "Leave",
     "type": "state_transition",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.leave"
+    ],
     "stateField": "status",
     "fromStates": [
       "active"
@@ -248,6 +263,9 @@
     "displayName:en": "Remove Member",
     "type": "delete",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.delete"
+    ],
     "extension": {
       "confirmMessage:zh-CN": "确认移除该成员？此操作不可恢复。",
       "confirmMessage:en": "Remove this member? This action cannot be undone."
@@ -259,6 +277,9 @@
     "displayName:en": "Reset Password",
     "type": "custom",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.reset_member_password"
+    ],
     "extension": {
       "confirmMessage:zh-CN": "确认为该成员生成新的临时密码？临时密码只会显示一次。",
       "confirmMessage:en": "Generate a new temporary password for this member? It will be shown only once."
@@ -270,6 +291,9 @@
     "displayName:en": "Provision Member from Employee",
     "type": "custom",
     "modelCode": "tenant_member",
+    "permissions": [
+      "model.tenant_member.provision_member_from_employee"
+    ],
     "extension": {
       "confirmMessage:zh-CN": "确认从所选人员开通登录账号？如需新建用户，将生成一次性临时密码。",
       "confirmMessage:en": "Provision an account from the selected employee? A one-time temporary password will be generated when a user is created."
