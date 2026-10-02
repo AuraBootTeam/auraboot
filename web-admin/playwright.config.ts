@@ -77,6 +77,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-process-fee-review',
   'quote-record-sharing-golden',
   'quote-gerber-runtime',
+  'team-data-scope-runtime',
   'quote-excel-download',
   'quote-bulk-import-price-cache-golden',
   // Per-role suites (DDR-2026-06-29 §8). These were listed on the gate script's
@@ -454,7 +455,7 @@ export default defineConfig({
           {
             name: 'rbac-chromium',
             testDir: './tests/e2e/permission',
-            testMatch: /(dynamic|team)-data-scope-runtime\.spec\.ts$/,
+            testMatch: /dynamic-data-scope-runtime\.spec\.ts$/,
             dependencies: ['rbac-auth'],
             use: {
               ...devices['Desktop Chrome'],
