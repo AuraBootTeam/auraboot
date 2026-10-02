@@ -160,9 +160,21 @@ class MetaContextTenantFilterScopeTest {
         void pendingLedgerCountsDownTowardZero() {
             // The ledger IS the campaign dashboard: every wave that removes an
             // exemption updates its expected count here. 34 = post-W2a peak.
-            assertEquals(3, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
-                    "W3e removed ab_outbox; W3d-followup removed ab_automation/ab_notification_digest (scan rows were already scoped in W3d — entries were missed then); update this ledger per wave");
+            // W5 TERMINAL: the migration ledger is closed at zero.
+            assertEquals(0, MybatisPlusConfig.MIGRATION_PENDING_TABLES.size(),
+                    "MIGRATION_PENDING must stay empty; new exemptions need an approved census (A4-class) and a new tier");
             assertEquals(15, MybatisPlusConfig.VERIFIED_GLOBAL_TABLES.size());
+            assertEquals(3, MybatisPlusConfig.AUTH_PLANE_TABLES.size(),
+                    "auth-plane tier: tenant_member/user_role/role (owner-approved W5 2026-10-01)");
+        }
+
+        @Test
+        void authPlaneTablesRemainExemptByDesign() {
+            var handler = tenantInterceptor().getTenantLineHandler();
+            for (String table : new String[]{"ab_tenant_member", "ab_user_role", "ab_role"}) {
+                assertTrue(handler.ignoreTable(table),
+                        "auth-plane tier: parameters are the scope; the owner-approved exemption stands");
+            }
         }
 
         @Test

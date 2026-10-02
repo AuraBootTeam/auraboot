@@ -34,13 +34,23 @@ public class MybatisPlusConfig {
     private static volatile Set<String> envScopedTables;
 
     /**
-     * Tenant-exemption registry (cleanup campaign, schema-verified 2026-09-27 against
-     * db/snapshots/schema-current.sql). The ignoreTable verdict may only come from these
-     * two sets: VERIFIED_GLOBAL shrinks never, MIGRATION_PENDING must shrink to empty —
-     * each removal lands with its call-site migration to
-     * {@link MetaContext#runWithoutTenantFilter} (see W2a: SessionManagementServiceImpl).
-     * Adding a name back without a schema-verified "no tenant_id column" evidence row is
-     * forbidden; the campaign plan lives in the team docs (2026-09-27-tenant-exemption-cleanup-plan).
+     * Tenant-table registry (schema-verified 2026-09-27 against
+     * db/snapshots/schema-current.sql; campaign plan: team docs
+     * 2026-09-27-tenant-exemption-cleanup-plan). The ignoreTable verdict may only
+     * come from these three sets:
+     * <ul>
+     *   <li>{@link #VERIFIED_GLOBAL_TABLES} — no tenant_id column; never shrinks.</li>
+     *   <li>{@link #AUTH_PLANE_TABLES} — HAS a tenant_id column, but membership/role
+     *       binding is queried across tenants by design (login, admission, bootstrap,
+     *       cross-tenant authorization); the query parameters ARE the scope. Every
+     *       pre-context seam is wrapped in {@link MetaContext#runWithoutTenantFilter};
+     *       new queries on these tables must keep explicit identifiers. Reviewed as
+     *       part of the W5 gate.</li>
+     *   <li>{@link #MIGRATION_PENDING_TABLES} — must shrink to empty; each removal
+     *       lands with its call-site migration (see W2a/W3e).</li>
+     * </ul>
+     * Adding a name back without schema evidence or an approved A4-class census is
+     * forbidden.
      */
     public static final Set<String> VERIFIED_GLOBAL_TABLES = Set.of(
         // schema-verified: no tenant_id column (15)
@@ -62,25 +72,29 @@ public class MybatisPlusConfig {
     );
 
     /**
-     * Tables that HAVE a tenant_id column (schema-verified) but are still exempted for
-     * behavioral reasons. Every entry here is a scheduled migration: wrap the context-less
-     * call sites in {@link MetaContext#runWithoutTenantFilter} and delete the entry.
-     * Cluster notes: login/auth-seam (W2b/c/d), admin & entitlement (W4),
-     * permission-audit @Async (W4), remaining scheduler/worker seams (W3:
-     * outbox, scheduled-task pair), mobile config (W4 — schema shows tenant_id
-     * despite the old "no tenant_id" comment). Done: W4a exchange-rate, W3a
-     * idempotency/i18n/cloud seeders, W3b behavior trio + export/async
-     * (@Async executors propagate MetaContext via TenantAwareTaskDecorator —
-     * the old "@Async threads lack MetaContext" comments were wrong).
+     * Auth-plane tables (A4 census 2026-10-01, owner-approved tier): rows carry a
+     * tenant_id but the binding itself is cross-tenant by design — "which tenants
+     * does this user belong to", "which roles in which tenants", "is this user a
+     * platform admin anywhere". The query parameters are the scope; automatic
+     * injection of the caller's tenant cannot express that (and the decisive seams
+     * run before any caller context exists). All pre-context seams are wrapped in
+     * {@link MetaContext#runWithoutTenantFilter}. Owner-approved as a permanent
+     * registry tier (W5, 2026-10-01).
      */
-    public static final Set<String> MIGRATION_PENDING_TABLES = Set.of(
-        "ab_tenant_member",                 // "which tenants does user belong to"; SINGLE-mode filter lookup
-        // W2b pending — RBAC pair (highest fan-out: explicit-param style spreads context-less
-        // callers across initializers/listeners/caches; needs a dedicated census)
-        "ab_user_role",                     // login + auth-filter role load pass tenantId explicitly
-        "ab_role"                           // login + initializers pass tenantId explicitly
-        // W3 pending — scheduler/worker/async executors without MetaContext
+    public static final Set<String> AUTH_PLANE_TABLES = Set.of(
+        "ab_tenant_member",                 // user↔tenant membership (login, admission, bootstrap)
+        "ab_user_role",                     // member↔role binding (auth-filter role load, explicit tenantId)
+        "ab_role"                           // role definitions (login + initializers pass tenantId explicitly)
     );
+
+    /**
+     * The migration ledger — kept as the W5 terminal gate. It closed at EMPTY on
+     * 2026-10-01 (W2a–W3e): every table that has a tenant_id column but needs an
+     * exemption is either in {@link #AUTH_PLANE_TABLES} (owner-approved tier) or
+     * was removed outright. Do not add entries here; new exemptions require an
+     * approved A4-class census and a new registry tier.
+     */
+    public static final Set<String> MIGRATION_PENDING_TABLES = Set.of();
 
     /**
      * Whitelist of tables backing {@code @EnvScoped} entities, discovered via classpath scan
@@ -158,8 +172,9 @@ public class MybatisPlusConfig {
                 if (MetaContext.isTenantFilterBypassed()) {
                     return true;
                 }
-                // ── Tenant-exemption registry (schema-verified; see set javadoc) ──
-                if (VERIFIED_GLOBAL_TABLES.contains(tableName) || MIGRATION_PENDING_TABLES.contains(tableName)) {
+                // ── Tenant-table registry (schema-verified; see set javadoc) ──
+                if (VERIFIED_GLOBAL_TABLES.contains(tableName) || MIGRATION_PENDING_TABLES.contains(tableName)
+                        || AUTH_PLANE_TABLES.contains(tableName)) {
                     return true;
                 }
 
