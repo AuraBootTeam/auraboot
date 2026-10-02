@@ -1187,7 +1187,7 @@
         "bulkActions": [
           {
             "code": "bulk_restore_members",
-            "permissionCode": "org.role.update",
+            "permissionCode": "model.tenant_member.restore",
             "variant": "default",
             "label": {
               "zh-CN": "批量启用",
@@ -1204,7 +1204,7 @@
           },
           {
             "code": "bulk_suspend_members",
-            "permissionCode": "org.role.update",
+            "permissionCode": "model.tenant_member.suspend",
             "variant": "danger",
             "label": {
               "zh-CN": "批量停用",
