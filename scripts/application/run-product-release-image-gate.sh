@@ -96,6 +96,25 @@ CORE_SHA="$(git -C "$CORE_ROOT" rev-parse HEAD)"
 PRODUCT_SHA="$(git -C "$PRODUCT_ROOT" rev-parse HEAD)"
 [[ "$CORE_SHA" =~ ^[0-9a-f]{40}$ && "$PRODUCT_SHA" =~ ^[0-9a-f]{40}$ ]] || fatal 'checkout HEAD is not immutable'
 
+CORPUS_CONFIG="${AURA_PRODUCT_CORPUS_CONFIG:-}"
+CORPUS_VERIFIER="${AURA_PRODUCT_CORPUS_VERIFIER:-}"
+if [[ -n "$CORPUS_CONFIG" || -n "$CORPUS_VERIFIER" ]]; then
+  for corpus_input in "$CORPUS_CONFIG" "$CORPUS_VERIFIER"; do
+    [[ -n "$corpus_input" && "$corpus_input" != /* && "$corpus_input" =~ ^[A-Za-z0-9._/-]+$ ]] \
+      || fatal 'corpus inputs must be repository-relative tracked files'
+    [[ "/$corpus_input/" != *'/../'* && "/$corpus_input/" != *'/./'* ]] \
+      || fatal 'corpus input contains an unsafe path component'
+    [[ "$(git -C "$PRODUCT_ROOT" cat-file -t "$PRODUCT_SHA:$corpus_input" 2>/dev/null || true)" == blob ]] \
+      || fatal 'corpus inputs must be tracked at the exact product commit'
+  done
+fi
+SIGNATURE_ENV=()
+case "${AURA_PRODUCT_SIGNATURE_KEY_REQUIRED:-0}" in
+  0) ;;
+  1) SIGNATURE_ENV=(-e "BPM_SIGNATURE_SECRET_KEY=$(openssl rand -hex 32)") ;;
+  *) fatal 'AURA_PRODUCT_SIGNATURE_KEY_REQUIRED must be 0 or 1' ;;
+esac
+
 RUNTIME_ARGS=()
 RUNTIME_ARGS_REL="${AURA_PRODUCT_RUNTIME_ARGS_FILE:-}"
 if [[ -n "$RUNTIME_ARGS_REL" ]]; then
@@ -319,6 +338,7 @@ APP_VERSION="$(node -e "const fs=require('node:fs');process.stdout.write(JSON.pa
 LAYOUT_DIGEST="$(node -e "const r=require(process.argv[1]);process.stdout.write((r.image&&r.image.digest)||'')" "$PRODUCT_RELEASE/release-receipt.json")"
 JWT_SECRET="$(openssl rand -hex 32)"; SESSION_SECRET="$(openssl rand -hex 32)"; ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
 OPEN_PLATFORM_SIGNING_KEY="$(openssl rand -hex 32)"
+WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 REGISTRATION_PASSWORD_FILE="$WORK_ROOT/registry-registration-password"
 printf '%s\n' "$REGISTRATION_DB_PASSWORD" >"$REGISTRATION_PASSWORD_FILE"
 docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
@@ -334,8 +354,10 @@ docker run -d --name "$APP_CONTAINER" --network "$NETWORK" -p 127.0.0.1::6443 \
   -e AURA_REGISTRY_REGISTRATION_JDBC_URL="jdbc:postgresql://$PG_CONTAINER:5432/aura_product_ci" \
   -e AURA_REGISTRY_REGISTRATION_USERNAME="$REGISTRATION_DB_ROLE" \
   -e AURA_REGISTRY_REGISTRATION_PASSWORD_FILE=/run/secrets/aura-registry-password \
+  "${SIGNATURE_ENV[@]}" \
   "$IMAGE_REF" \
   --aura.persistence.tenant-bypass-table-prefixes=se_ \
+  --cors.allowed-origins="http://127.0.0.1:$WEB_PORT" \
   --open-platform.protocol-signing-key="$OPEN_PLATFORM_SIGNING_KEY" \
   "${RUNTIME_ARGS[@]}" >/dev/null || fail 'application image failed to start'
 APP_PORT="$(docker port "$APP_CONTAINER" 6443/tcp | tail -1)"; APP_PORT="${APP_PORT##*:}"
@@ -345,7 +367,6 @@ for attempt in $(seq 1 90); do
   sleep 2
 done
 
-WEB_PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 COMMON_ENV=(AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_SERVER_ARTIFACT_ROOT=/opt/auraboot AURA_STATE_ROOT="$STATE_ROOT" AURA_BACKEND_PORT="$APP_PORT" AURA_WEB_PORT="$WEB_PORT" PGHOST=127.0.0.1 PGPORT="$PG_PORT" PGDATABASE=aura_product_ci PGUSER="$RUNTIME_DB_ROLE" PGPASSWORD="$RUNTIME_DB_PASSWORD" ADMIN_EMAIL=admin@auraboot.local ADMIN_PASSWORD="$ADMIN_PASSWORD" SESSION_SECRET="$SESSION_SECRET" JWT_SECRET="$JWT_SECRET" OPEN_PLATFORM_SIGNING_KEY="$OPEN_PLATFORM_SIGNING_KEY" PUBLIC_URL="http://127.0.0.1:$WEB_PORT")
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" init-core >"$ARTIFACTS/logs/init-core.log" 2>&1 || fail 'explicit core initialization failed'
 env "${COMMON_ENV[@]}" "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" publish >"$ARTIFACTS/logs/publish.log" 2>&1 || fail 'explicit product publish failed'
@@ -391,6 +412,27 @@ node "$CORE_ROOT/scripts/application/create-release-screenshot-manifest.mjs" \
   >"$ARTIFACTS/logs/screenshot-manifest.log" 2>&1 \
   || fail 'required release screenshots are incomplete or invalid'
 
+if [[ -n "$CORPUS_CONFIG" ]]; then
+  mkdir -p "$ARTIFACTS/corpus"
+  CORPUS_ENV=("${COMMON_ENV[@]}" PLAYWRIGHT_BASE_URL="http://127.0.0.1:$WEB_PORT"
+    BACKEND_URL="http://127.0.0.1:$APP_PORT" BFF_URL="http://127.0.0.1:$WEB_PORT"
+    BE_PORT="$APP_PORT" BFF_PORT="$WEB_PORT" VITE_PORT="$WEB_PORT" PW_SKIP_WEBSERVER=1
+    PW_CORPUS_STORAGE_STATE="$STATE_ROOT/corpus-admin.json")
+  env "${CORPUS_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" exec playwright test \
+    --config "$CORPUS_CONFIG" --list --reporter=json \
+    >"$ARTIFACTS/corpus/collection.json" 2>"$ARTIFACTS/logs/corpus-collection.log" \
+    || fail 'business corpus collection failed'
+  corpus_status=0
+  env "${CORPUS_ENV[@]}" PLAYWRIGHT_JSON_OUTPUT_FILE="$ARTIFACTS/corpus/results.json" \
+    pnpm --dir "$PRODUCT_ROOT" exec playwright test --config "$CORPUS_CONFIG" \
+    --reporter=line,json --output "$ARTIFACTS/corpus/artifacts" \
+    >"$ARTIFACTS/logs/corpus.log" 2>&1 || corpus_status=$?
+  node "$PRODUCT_ROOT/$CORPUS_VERIFIER" "$ARTIFACTS/corpus/collection.json" \
+    "$ARTIFACTS/corpus/results.json" "$ARTIFACTS/corpus/reconciliation.json" \
+    || fail 'business corpus contains failures, skips, retries or missing cases'
+  [[ "$corpus_status" -eq 0 ]] || fail 'business corpus runner failed'
+fi
+
 PULLED_IMAGE_ID=''
 if [[ "$PUBLISH_REGISTRY" == 1 ]]; then
   REGISTRY_HOST="${AURA_RELEASE_REGISTRY%%/*}"
@@ -431,7 +473,7 @@ if [[ "$EXPECT_RELEASE_REGISTRATION" == 1 ]]; then
   cp "$STATE_ROOT/release-control-receipt.json" "$ARTIFACTS/release-control-receipt.json"
 fi
 python3 - "$ARTIFACTS/release-image-receipt.json" "$AURA_PRODUCT_ID" "$CORE_SHA" "$PRODUCT_SHA" "$LOCK_IDENTITY" "$LAYOUT_DIGEST" "$IMAGE_ID" "$REGISTRY_DIGEST_REF" "$PULLED_IMAGE_ID" "$AURA_CI_BUILDER_ID" "$AURA_CI_JOB_ID" "$FIXTURE_REL" "$FIXTURE_DIGEST" "$ARTIFACTS" "$APP_CONTAINER" "$PG_CONTAINER" "$WEB_PORT" "$PUBLISH_REGISTRY" "$EXPECT_RELEASE_REGISTRATION" "$RELEASE_ID" "$RELEASE_BINDING_COUNT" <<'PY'
-import datetime, json, sys
+import datetime, json, os, sys
 from hashlib import sha256
 path, product, core, source, lock, layout, image_id, registry_image, pulled_id, builder, job, fixture_path, fixture_digest, evidence_root, app_container, pg_container, web_port, publish_registry, expect_release, release_id, binding_count = sys.argv[1:]
 def digest(relative_path):
@@ -463,6 +505,13 @@ receipt = {"schemaVersion": 1, "status": "PASS", "product": product,
            "logsRoot": "logs",
            "finishedAt": datetime.datetime.now(datetime.timezone.utc).isoformat()}
 receipt["applicationRelease"] = {"required": expect_release == "1"}
+corpus_receipt = os.path.join(evidence_root, "corpus/reconciliation.json")
+if os.path.isfile(corpus_receipt):
+    corpus = json.load(open(corpus_receipt))
+    receipt["businessCorpus"] = {"status": corpus["status"], "declared": corpus["declared"],
+                                "passed": corpus["passed"], "unresolved": corpus["unresolved"],
+                                "reconciliation": "corpus/reconciliation.json",
+                                "results": "corpus/results.json"}
 if expect_release == "1":
     receipt["applicationRelease"].update({
         "releaseId": release_id,
