@@ -7,6 +7,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ModelDefinitionDTOTest {
 
+    @Test
+    void commandDeletionPolicySurvivesTheExistingExtensionContract() throws Exception {
+        ModelDefinitionDTO model = objectMapper.readValue(
+                "{\"code\":\"oi_disclosure_package\",\"extension\":{\"commandOnlyDelete\":true}}",
+                ModelDefinitionDTO.class);
+        assertThat(model.getExtension()).containsEntry("commandOnlyDelete", true);
+        assertThat(model.getUnknownFields()).isNull();
+    }
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test

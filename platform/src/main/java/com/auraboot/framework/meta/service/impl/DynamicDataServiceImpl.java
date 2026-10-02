@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.config.TenantAwareTaskDecorator;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.security.CsvSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -181,9 +182,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * non-transactional callers retain immediate dispatch.
      */
     private void triggerAutomationAfterCommit(String description, Runnable trigger) {
+        // Capture before the request scope ends; AFTER_COMMIT can run after identity cleanup.
+        Runnable scopedTrigger = new TenantAwareTaskDecorator().decorate(trigger);
         Runnable safeTrigger = () -> {
             try {
-                trigger.run();
+                scopedTrigger.run();
             } catch (Exception e) {
                 log.error("Failed to trigger {}: {}", description, logSafe(e.getMessage()), e);
             }
@@ -1960,7 +1963,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("delete", modelCode, recordId);
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
@@ -2460,7 +2463,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchDelete", modelCode, recordIds.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
-        ModelMutationGuard.assertMutable(model, "batch deleted");
+        ModelMutationGuard.assertDeleteAllowed(model);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(

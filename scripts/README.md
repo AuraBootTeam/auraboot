@@ -23,6 +23,7 @@
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `check-batch4-gates.mjs` | 0 | 2026-10-02 | Large-file and i18n CJK structural ratchets. |
 | `check-agent-eval-boundary.mjs` | 2 | 2026-06-21 | OSS agent/RAG boundary gate. |
 | `check-batch4-gates.mjs` | 0 | 2026-10-02 | Existing batch-four gate collection. |
 | `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Existing OSS scope-consistency gate. |
@@ -55,6 +56,7 @@
 | `check-license-boundary.sh` | 2 | 2026-09-27 | Fail when known copyleft dependency coordinates re-enter default distribution build files. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |
 | `check-no-secret-echo.sh` | 0 | 2026-07-14 | Wrapper so this gate shows up in `ls scripts/check-*.sh` — the repo's local-gate inventory. |
+| `check-oss-scope-consistency.mjs` | 0 | 2026-10-02 | Verify OSS scope declarations against code anchors and plugin directories. |
 | `check-oss-boundary.sh` | 3 | 2026-06-18 | OSS / Enterprise boundary check. |
 | `check-oss-no-internal-docs.sh` | 1 | 2026-07-02 | Fail if internal-process docs are tracked in the public OSS repo. |
 | `check-public-record-id-contracts.sh` | 1 | 2026-06-24 |  |
