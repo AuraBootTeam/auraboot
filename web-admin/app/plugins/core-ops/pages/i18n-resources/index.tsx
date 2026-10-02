@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
+import { requireI18nAdminResult } from '~/shared/services/i18n-admin-response';
+import { confirmDialog } from '~/utils/confirmDialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '~/ui/ui/dialog';
 import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
@@ -9,6 +12,11 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
+
+async function adminRequest<T>(path: string, options: Parameters<typeof fetchResult>[1]) {
+  return requireI18nAdminResult(await fetchResult<T>(path, options));
+}
+
 
 /**
  * I18n Resources admin page — CRUD over /api/admin/i18n/resources.
@@ -60,12 +68,15 @@ export default function I18nResourcesPage() {
   const [newLang, setNewLang] = useState('zh-CN');
   const [newValue, setNewValue] = useState('');
   const [batchTranslating, setBatchTranslating] = useState(false);
+  const [mutationLoading, setMutationLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<I18nResourceRow | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await fetchResult<I18nPage>('/api/admin/i18n/resources', {
+      const page = await adminRequest<I18nPage>('/api/admin/i18n/resources', {
         method: 'get',
         params: {
           pageNum,
@@ -75,7 +86,6 @@ export default function I18nResourcesPage() {
           keyword: keyword || undefined,
         },
       });
-      const page = (result as { data?: I18nPage }).data;
       if (page && Array.isArray(page.records)) {
         setRows(page.records);
         setTotal(page.total ?? page.records.length);
@@ -86,6 +96,7 @@ export default function I18nResourcesPage() {
     } catch {
       setError(l('加载失败', 'Failed to load resources'));
       setRows([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -95,71 +106,66 @@ export default function I18nResourcesPage() {
     load();
   }, [load]);
 
-  const saveEdit = useCallback(
-    async (pid: string) => {
-      await fetchResult(`/api/admin/i18n/resources/${pid}`, {
-        method: 'put',
-        params: { value: editValue, status: 'approved' },
-      });
-      setEditingPid(null);
-      load();
-    },
-    [editValue, load],
-  );
+  const mutate = useCallback(async (operation: () => Promise<unknown>) => {
+    if (mutationLoading) return false;
+    setMutationLoading(true);
+    setError('');
+    try {
+      await operation();
+      await load();
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : l('操作失败', 'Operation failed'));
+      return false;
+    } finally {
+      setMutationLoading(false);
+    }
+  }, [load, l, mutationLoading]);
 
-  const review = useCallback(
-    async (pid: string, status: 'approved' | 'rejected') => {
-      let rejectReason: string | undefined
-      if (status === 'rejected') {
-        rejectReason = window.prompt(l('驳回原因', 'Rejection reason')) || undefined
-        if (!rejectReason) return
-      }
-      await fetchResult(`/api/admin/i18n/resources/${pid}`, {
-        method: 'put',
-        params: { status, rejectReason },
-      })
-      load()
-    },
-    [l, load],
-  )
+  const saveEdit = async (pid: string) => {
+    if (await mutate(() => adminRequest(`/api/admin/i18n/resources/${pid}`, {
+      method: 'put', params: { value: editValue },
+    }))) setEditingPid(null);
+  };
 
-  const remove = useCallback(
-    async (pid: string) => {
-      if (!window.confirm(l('确认删除该条目？', 'Delete this resource?'))) return;
-      await fetchResult(`/api/admin/i18n/resources/${pid}`, { method: 'delete' });
-      load();
-    },
-    [l, load],
-  );
+  const submitReview = (pid: string) => mutate(() => adminRequest(
+    `/api/admin/i18n/resources/${pid}/submit-review`, { method: 'post' },
+  ));
 
-  const create = useCallback(async () => {
-    if (!newKey || !newValue) return;
-    await fetchResult('/api/admin/i18n/resources', {
-      method: 'post',
-      params: { key: newKey, lang: newLang, value: newValue },
-    });
-    setNewKey('');
-    setNewValue('');
-    load();
-  }, [newKey, newLang, newValue, load]);
+  const approve = (pid: string) => mutate(() => adminRequest(
+    `/api/admin/i18n/resources/${pid}/approve`, { method: 'post' },
+  ));
 
-  // Batch: the backend finds keys missing in targetLocale (up to maxKeys)
-  // and fills them from the source locale — one call per prefix space.
-  const aiTranslateBatch = useCallback(
-    async (targetLocale: string) => {
-      setBatchTranslating(true);
-      try {
-        await fetchResult('/api/admin/i18n/ai-translate', {
-          method: 'post',
-          params: { targetLocale, sourceLocale: 'zh-CN', maxKeys: 200 },
-        });
-        load();
-      } finally {
-        setBatchTranslating(false);
-      }
-    },
-    [load],
-  );
+  const reject = async () => {
+    if (!rejectTarget || !rejectReason.trim()) return;
+    if (await mutate(() => adminRequest(`/api/admin/i18n/resources/${rejectTarget.pid}/reject`, {
+      method: 'post', params: { reason: rejectReason.trim() },
+    }))) setRejectTarget(null);
+  };
+
+  const remove = async (pid: string) => {
+    if (!await confirmDialog({
+      title: l('删除翻译', 'Delete translation'),
+      content: l('确认删除该条目？', 'Delete this resource?'), variant: 'danger',
+    })) return;
+    await mutate(() => adminRequest(`/api/admin/i18n/resources/${pid}`, { method: 'delete' }));
+  };
+
+  const create = async () => {
+    if (!newKey.trim() || !newValue.trim()) return;
+    if (await mutate(() => adminRequest('/api/admin/i18n/resources', {
+      method: 'post', params: { key: newKey.trim(), lang: newLang, value: newValue },
+    }))) { setNewKey(''); setNewValue(''); }
+  };
+
+  const aiTranslateBatch = async (targetLocale: string) => {
+    setBatchTranslating(true);
+    try {
+      await mutate(() => adminRequest('/api/admin/i18n/ai-translate', {
+        method: 'post', params: { targetLocale, sourceLocale: 'zh-CN', maxKeys: 200 },
+      }));
+    } finally { setBatchTranslating(false); }
+  };
 
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
@@ -202,7 +208,7 @@ export default function I18nResourcesPage() {
         </button>
         <button
           onClick={() => aiTranslateBatch('en-US')}
-          disabled={batchTranslating}
+          disabled={batchTranslating || mutationLoading}
           className="border rounded px-2 py-1 text-sm flex items-center gap-1 disabled:opacity-50"
           title={l('为 en-US 补齐缺失翻译(≤200 条)', 'Fill missing en-US translations (≤200)')}
         >
@@ -217,7 +223,7 @@ export default function I18nResourcesPage() {
           {LOCALES.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
         <input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={l('文案', 'value')} className="border rounded px-2 py-1 text-sm flex-1 min-w-40" />
-        <button onClick={create} disabled={!newKey || !newValue} className="border rounded px-3 py-1 text-sm disabled:opacity-50">
+        <button onClick={create} disabled={mutationLoading || !newKey.trim() || !newValue.trim()} className="border rounded px-3 py-1 text-sm disabled:opacity-50">
           {l('新增', 'Create')}
         </button>
       </div>
@@ -255,17 +261,17 @@ export default function I18nResourcesPage() {
                     className={
                       r.status === 'approved'
                         ? 'text-green-700 bg-green-100 rounded px-1.5 py-0.5'
-                        : r.status === 'rejected'
+                        : r.status === 'deprecated'
                           ? 'text-red-700 bg-red-100 rounded px-1.5 py-0.5'
                           : 'text-amber-700 bg-amber-100 rounded px-1.5 py-0.5'
                     }
                   >
-                    {r.status}
+                    {({ draft: l('草稿', 'Draft'), review: l('待审核', 'Pending Review'), approved: l('已批准', 'Approved'), deprecated: l('已停用', 'Deprecated') } as Record<string, string>)[r.status] ?? l('未知状态', 'Unknown status')}
                   </span>
                 </td>
                 <td className="p-2 whitespace-nowrap">
                   {editingPid === r.pid ? (
-                    <button onClick={() => saveEdit(r.pid)} className="text-blue-600 px-1">
+                    <button disabled={mutationLoading} onClick={() => saveEdit(r.pid)} className="text-blue-600 px-1">
                       {l('保存', 'Save')}
                     </button>
                   ) : (
@@ -277,17 +283,22 @@ export default function I18nResourcesPage() {
                       <PencilSquareIcon className="h-4 w-4 inline" />
                     </button>
                   )}
-                  {r.status !== 'approved' && (
-                    <button onClick={() => review(r.pid, 'approved')} className="text-green-700 px-1" aria-label={`approve-${r.i18nKey}`} title={l('批准', 'Approve')}>
+                  {r.status === 'draft' && (
+                    <button disabled={mutationLoading} onClick={() => submitReview(r.pid)} className="text-blue-600 px-1" aria-label={`submit-review-${r.i18nKey}`}>
+                      {l('提交审核', 'Submit for review')}
+                    </button>
+                  )}
+                  {r.status === 'review' && (
+                    <button disabled={mutationLoading} onClick={() => approve(r.pid)} className="text-green-700 px-1" aria-label={`approve-${r.i18nKey}`} title={l('批准', 'Approve')}>
                       ✓
                     </button>
                   )}
-                  {r.status !== 'rejected' && (
-                    <button onClick={() => review(r.pid, 'rejected')} className="text-red-600 px-1" aria-label={`reject-${r.i18nKey}`} title={l('驳回', 'Reject')}>
+                  {r.status === 'review' && (
+                    <button disabled={mutationLoading} onClick={() => { setRejectReason(''); setRejectTarget(r); }} className="text-red-600 px-1" aria-label={`reject-${r.i18nKey}`} title={l('驳回', 'Reject')}>
                       ✕
                     </button>
                   )}
-                  <button onClick={() => remove(r.pid)} className="text-red-600 px-1" aria-label={`delete-${r.i18nKey}`}>
+                  <button disabled={mutationLoading} onClick={() => remove(r.pid)} className="text-red-600 px-1" aria-label={`delete-${r.i18nKey}`}>
                     <TrashIcon className="h-4 w-4 inline" />
                   </button>
                 </td>
@@ -309,6 +320,22 @@ export default function I18nResourcesPage() {
           {l('下一页', 'Next')}
         </button>
       </div>
+      <Dialog open={rejectTarget !== null} onOpenChange={(open) => {
+        if (!open && !mutationLoading) setRejectTarget(null);
+      }}>
+        <DialogContent>
+          <DialogTitle>{l('驳回翻译', 'Reject translation')}</DialogTitle>
+          <DialogDescription>{rejectTarget?.i18nKey}</DialogDescription>
+          <label htmlFor="i18n-reject-reason">{l('驳回原因（必填）', 'Rejection reason (required)')}</label>
+          <textarea id="i18n-reject-reason" value={rejectReason} disabled={mutationLoading}
+            onChange={(event) => setRejectReason(event.target.value)} className="border rounded p-2" />
+          <div className="flex justify-end gap-2">
+            <button disabled={mutationLoading} onClick={() => setRejectTarget(null)}>{l('取消', 'Cancel')}</button>
+            <button disabled={mutationLoading || !rejectReason.trim()} onClick={reject}>{l('驳回', 'Reject')}</button>
+          </div>
+          {error && <p role="alert" className="text-red-600">{error}</p>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
