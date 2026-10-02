@@ -15,63 +15,63 @@ import type { PaletteItem } from '~/shared/designer';
 const BLOCK_DEFINITIONS: BlockDefinition[] = [
   {
     type: 'table',
-    label: '数据表格 Data Table',
+    label: { zh: '数据表格', en: 'Data Table' },
     icon: 'table',
-    description: 'Tabular data from a model or query',
+    description: { zh: '显示模型或查询中的表格数据', en: 'Tabular data from a model or query' },
   },
   {
     type: 'grouped-table',
-    label: '分组表格 Grouped Table',
+    label: { zh: '分组表格', en: 'Grouped Table' },
     icon: 'grouped',
-    description: 'Group rows by field with subtotals',
+    description: { zh: '按字段分组并显示小计', en: 'Group rows by field with subtotals' },
   },
   {
     type: 'stat-card',
-    label: '指标卡片 Stat Card',
+    label: { zh: '指标卡片', en: 'Stat Card' },
     icon: 'stat',
-    description: 'KPI metric with aggregation',
+    description: { zh: '显示聚合指标', en: 'KPI metric with aggregation' },
   },
   {
     type: 'rich-text',
-    label: '富文本 Rich Text',
+    label: { zh: '富文本', en: 'Rich Text' },
     icon: 'text',
-    description: 'Static text content or notes',
+    description: { zh: '添加文本内容或说明', en: 'Static text content or notes' },
   },
   {
     type: 'cross-tab',
-    label: '交叉表 Cross Tab',
+    label: { zh: '交叉表', en: 'Cross Tab' },
     icon: 'crosstab',
-    description: 'Pivot table with row/column grouping',
+    description: { zh: '按行和列分组的透视表', en: 'Pivot table with row/column grouping' },
   },
   {
     type: 'chart',
-    label: '图表 Chart',
+    label: { zh: '图表', en: 'Chart' },
     icon: 'chart',
-    description: 'Bar, horizontal bar, or pie chart',
+    description: { zh: '显示柱状图、条形图或饼图', en: 'Bar, horizontal bar, or pie chart' },
   },
   {
     type: 'barcode',
-    label: '条码 Barcode',
+    label: { zh: '条码', en: 'Barcode' },
     icon: 'barcode',
-    description: 'Barcode from static value or data field',
+    description: { zh: '使用固定值或数据字段生成条码', en: 'Barcode from static value or data field' },
   },
   {
     type: 'watermark',
-    label: '水印 Watermark',
+    label: { zh: '水印', en: 'Watermark' },
     icon: 'watermark',
-    description: 'Text watermark overlay on the page',
+    description: { zh: '在页面上显示文本水印', en: 'Text watermark overlay on the page' },
   },
   {
     type: 'page-header',
-    label: '页眉 Page Header',
+    label: { zh: '页眉', en: 'Page Header' },
     icon: 'header',
-    description: 'Repeated on every page top',
+    description: { zh: '在每页顶部重复显示', en: 'Repeated on every page top' },
   },
   {
     type: 'page-footer',
-    label: '页脚 Page Footer',
+    label: { zh: '页脚', en: 'Page Footer' },
     icon: 'footer',
-    description: 'Repeated on every page bottom',
+    description: { zh: '在每页底部重复显示', en: 'Repeated on every page bottom' },
   },
 ];
 
@@ -316,7 +316,7 @@ export const BlockPalette: React.FC = () => {
 
       return {
         type: def.type,
-        label: def.label,
+        label: text(def.label),
         icon: (
           <div
             className={`flex h-10 w-10 items-center justify-center rounded ${isAdded ? 'text-gray-400' : 'text-gray-500'}`}
@@ -324,13 +324,13 @@ export const BlockPalette: React.FC = () => {
             <BlockIcon type={def.icon} />
           </div>
         ),
-        description: def.description,
+        description: text(def.description),
         disabled: isAdded,
-        disabledText: isAdded ? 'Added' : undefined,
+        disabledText: isAdded ? text({ zh: '已添加', en: 'Added' }) : undefined,
         data: def,
       };
     });
-  }, [report?.header, report?.footer]);
+  }, [report?.header, report?.footer, text]);
 
   return (
     <DesignerPalette
