@@ -340,3 +340,11 @@ SOT Updates：本轮仅形成待确认提案，未更改已上线契约；确认
 - CI 私网 ping和SSH不可达，wg interfaces为空；现有受限配置存在，但 sudo -n wg-quick up 需要密码，未改变网络设置。已请 owner 在本机启用既有隧道。
 
 本轮 Goal 仍 active，完整产品门、角色门及当前UI验收仍为未执行，不关闭AUTH条目，不标 shipped。
+
+### 五仓候选提交及客户删除入口修复
+
+五仓均已创建草稿审查入口：OSS #2157、Quote #534、Enterprise #1431、Plugins #612、CRM #25。未合并；新增三个 PR 的聊天挂载被附件工具 transport closed 阻挡，GitHub PR 创建成功。
+
+CRM 客户列表原通用批量删除入口以 crm.account.manage 显示，但调用要求 model.crm_account_common.delete 的通用 API。关闭通用入口，保留已有 crm:delete_account 业务批量命令及关联业务拒绝逻辑，不扩大角色底层删除授权。新增配置负例及既有三个角色真实UI删除旅程断言；CRM配置3项通过，浏览器尚未执行。
+
+r6 第四次完整启动仍被验证容量拒绝；没有启动服务、导入配置或执行当前浏览器测试。当前PR保持draft，完整验收与CI阻挡不因提交而关闭。

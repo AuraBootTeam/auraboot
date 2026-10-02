@@ -165,6 +165,33 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
         const custOk = await createClosedLoop(page, MENU.customer, 'crm_acc_name', custMarker, 'crm:create_account');
         expect(custOk, `${r.roleCode} customer created and visible in list`).toBe(true);
 
+        // Delete a separate, unreferenced account through the visible business bulk action.
+        const deleteMarker = `ZKHDELCUST${uid}${r.key}`.slice(0, 28);
+        expect(await createClosedLoop(page, MENU.customer, 'crm_acc_name', deleteMarker, 'crm:create_account')).toBe(true);
+        const deletionRows = await queryDynamicRecords(page, 'crm_account_common', [
+          { fieldName: 'crm_acc_name', operator: 'EQ', value: deleteMarker },
+        ]);
+        expect(deletionRows).toHaveLength(1);
+        await page.locator('table tbody tr').filter({ hasText: deleteMarker }).getByRole('checkbox').check();
+        await page.getByTestId('bulk-more-actions-btn').click();
+        await expect(page.getByTestId('bulk-delete-btn')).toHaveCount(0);
+        await page.getByTestId('bulk-action-bulk_delete_accounts').click();
+        const deletionResponse = page.waitForResponse(response =>
+          new URL(response.url()).origin === new URL(page.url()).origin &&
+          decodeURIComponent(response.url()).endsWith('/api/meta/commands/execute/crm:delete_account') &&
+          response.request().method() === 'POST');
+        await page.getByTestId('confirm-dialog').getByTestId('confirm-ok').click();
+        const deleted = await deletionResponse;
+        expect(deleted.status()).toBe(200);
+        expect(String((await deleted.json()).code)).toBe('0');
+        expect(deleted.request().postDataJSON().targetRecordPid).toBe(deletionRows[0].pid);
+        await expect(page.locator('table tbody tr').filter({ hasText: deleteMarker })).toHaveCount(0);
+        await page.reload();
+        await waitForListReady(page);
+        expect(await queryDynamicRecords(page, 'crm_account_common', [
+          { fieldName: 'crm_acc_name', operator: 'EQ', value: deleteMarker },
+        ])).toHaveLength(0);
+
         // 3. 新建项目真机闭环 (references the just-created customer + quality level)
         const projMarker = `ZKHPROJ${uid}${r.key}`.slice(0, 28);
         const projOk = await createClosedLoop(page, MENU.project, 'bom_project_name', projMarker, 'bom:create_project', async (p) => {

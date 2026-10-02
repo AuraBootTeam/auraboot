@@ -23,7 +23,7 @@ created: 2026-10-02
 | r6 首批前端 UT | 58 | 58 | 58 | 0 | 0 | 0 | ui/capability-r6-unit.log；后续成员组件变更不在该次执行中 |
 | r6 范围代码 typecheck | 不适用 | 1 | 1 | 0 | 0 | 0 | ui/capability-r6-typecheck.log，退出0 |
 | 当前 OSS 静态能力测试 | 5 | 5 | 5 | 0 | 0 | 0 | platform-admin 4、composition gate 1；未等同浏览器 |
-| 当前 Quote / BOM / CRM 配置测试 | 12 | 12 | 12 | 0 | 0 | 0 | Quote6、BOM4、CRM2，运行命令记录；当前模型读取闭包静态有效 |
+| 当前 Quote / BOM / CRM 配置测试 | 13 | 13 | 13 | 0 | 0 | 0 | Quote6、BOM4、CRM3，运行命令记录；当前模型读取闭包静态有效 |
 | 当前 browser / product / roles | 未完成 | 0 | 0 | 0 | 0 | 全部 | r6 两次启动被 capacity gate 拒绝，不把 collection 当执行 |
 | Linux CI | 未执行 | 0 | 0 | 0 | 0 | 全部 | 私网 ping/SSH 不通；隧道未启用，sudo -n 需要密码 |
 
@@ -35,6 +35,7 @@ created: 2026-10-02
 - 新建报价旅程从真实上传到资料页签下载刚上传的 CPL，验证同一运行目标、原文件名与逐字节内容；尚未执行。共享文件负例要求精确403，500不再算权限拒绝。
 - BOM两项失败已定位到鲜活环境没有物料库前提。测试改用正式建料命令生成规范化属性和冻结投影，保留业务匹配断言；尚未执行，不能宣称问题已解决。
 - 当前配置增加依赖不等于现有角色自动获得动作；部分授权仍在分母。隐藏菜单、未来模型和未启用功能保持未启用；成员基线与业务页面支持读是不同能力。
+- 客户列表原通用批量删除按钮使用业务维护权限显示，却调用要求模型删除权限的通用 API。配置已关闭该重复入口，保留校验关联业务的 crm:delete_account 命令，不补授 raw model delete。配置检查通过；既有三个业务角色旅程增补独立客户创建、真实选择删除、命令目标 PID、刷新与持久化结果断言，尚未执行。
 - 不使用 retry、skip、阈值降级消除失败。已有受控 recordPid mutation 曾使 UT 变红并恢复；本轮新增按钮/文件内容断言尚未完成 mutation，必须留作未执行证据。
 
 ## Final Evidence Pack
@@ -62,3 +63,5 @@ allowed_claim: 已实现并提交候选改动，已有定向测试；未完成�
 ```
 
 Workspace证据根：`/Users/ghj/work/auraboot/.workspace/evidence/permission-transparency/`。最终必须更新本报告与唯一实施账本，再按已验证确切提交收口。
+
+当前五仓草稿 PR：OSS #2157、Quote #534、Enterprise #1431、Plugins #612、CRM #25。PR open 不代表验收完成；新的三个 PR 聊天附件调用均因 transport closed 失败，GitHub 审查入口已存在。r6 第四次启动仍被 capacity gate 拒绝，没有运行当前浏览器测试。
