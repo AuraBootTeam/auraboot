@@ -16,15 +16,32 @@ const sessionStorage = createCookieSessionStorage({
 });
 
 async function authenticate(page: import('@playwright/test').Page) {
-  const seedResponse = await page.request.post(
-    `${BACKEND_URL}/api/test/seed?testRunId=open-platform-ui-20260914`,
-    { timeout: 30_000 },
-  );
-  expect(seedResponse.ok()).toBeTruthy();
-  const seed = await seedResponse.json();
-  expect(seed.jwt).toEqual(expect.any(String));
+  // Exercise the production authentication contract. TestSeedController lives in
+  // src/test and is intentionally absent from the real bootJar.
+  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
+    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+  });
+  expect(loginResponse.ok(), `login status ${loginResponse.status()}`).toBeTruthy();
+  const login = (await loginResponse.json()).data;
+  let jwt = login.jwt as string;
+  if (!login.tenantId) {
+    const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    expect(spacesResponse.ok()).toBeTruthy();
+    const spaces = (await spacesResponse.json()).data as Array<{ tenantId: string; spaceType: string }>;
+    const businessTenant = spaces.find((space) => space.spaceType === 'business');
+    expect(businessTenant).toBeTruthy();
+    const selection = await page.request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+      data: { action: 'select', tenantId: businessTenant!.tenantId },
+    });
+    expect(selection.ok()).toBeTruthy();
+    jwt = (await selection.json()).data.jwt;
+  }
+  expect(jwt).toEqual(expect.any(String));
   const session = await sessionStorage.getSession();
-  session.set('jwtToken', seed.jwt);
+  session.set('jwtToken', jwt);
   const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
   const value = setCookie.match(/__session=([^;]+)/)?.[1];
   expect(value).toBeTruthy();
@@ -33,6 +50,29 @@ async function authenticate(page: import('@playwright/test').Page) {
     { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
   ]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+
+  const existingResponse = await page.request.get(`${BACKEND_URL}/api/open-platform/applications`, {
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  expect(existingResponse.ok()).toBeTruthy();
+  const existing = (await existingResponse.json()).data as Array<{ pid: string; name: string }>;
+  for (const app of existing) {
+    expect(
+      app.name === '开放平台协作验收应用' ||
+        app.name.startsWith('开放平台多账号权限验收应用 ') ||
+        app.name === '金蝶 ERP 连接器',
+      `refusing to remove non-fixture application ${app.name}`,
+    ).toBe(true);
+    const remove = await page.request.delete(`${BACKEND_URL}/api/open-platform/applications/${app.pid}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    expect(remove.ok(), `fixture cleanup status ${remove.status()}`).toBeTruthy();
+  }
+  const emptyResponse = await page.request.get(`${BACKEND_URL}/api/open-platform/applications`, {
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  expect(emptyResponse.ok()).toBeTruthy();
+  expect((await emptyResponse.json()).data).toEqual([]);
 }
 
 async function capture(page: import('@playwright/test').Page, id: string, fullPage = true) {
