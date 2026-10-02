@@ -90,3 +90,28 @@ test('organization authoring retains record reads and command endpoint dependenc
     assert.deepEqual(command.permissions, ['org.hr.manage']);
   }
 });
+
+test('member offboarding actions have separate capabilities without widening member management', () => {
+  const org = JSON.parse(source('../../org-management/config/capabilities.json'));
+  const pages = JSON.parse(source('../config/pages.json'));
+  const page = pages.find(item => item.pageKey === 'tenant_member_list');
+  const commands = JSON.parse(source('../config/commands.json'));
+  const management = org.find(cap => cap.code === 'org.cap.member');
+  for (const [code, suffix, action] of [
+    ['org.cap.member_offboarding', 'leave_member', 'leave'],
+    ['org.cap.member_remove', 'delete_member', 'delete'],
+  ]) {
+    const cap = org.find(item => item.code === code);
+    assert.ok(cap, `${suffix} must be configurable through an upper capability`);
+    const command = commands.find(item => item.code === `admin:${suffix}`);
+    assert.ok(page.blocks.some(block => block.rowActions?.some(row => row.action?.command === command.code)),
+      `${suffix} must be a real member-page action`);
+    assert.deepEqual(command.permissions, [`model.tenant_member.${action}`]);
+    for (const permission of ['model.tenant_member.read', 'org_management', 'member_management', 'meta.command.execute', ...command.permissions])
+      assert.ok(cap.includes.includes(permission), `${code} must include ${permission}`);
+    assert.ok(!management.includes.includes(command.permissions[0]), 'existing member management must not expand');
+    for (const other of ['leave', 'delete'].filter(value => value !== action))
+      assert.ok(!cap.includes.includes(`model.tenant_member.${other}`), 'offboarding decisions stay independent');
+    assert.ok(!cap.includes.includes('admin_tenant_member'), 'do not introduce the legacy broad bypass');
+  }
+});

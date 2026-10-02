@@ -88,6 +88,40 @@
     "order": 30
   },
   {
+    "code": "org.cap.member_offboarding",
+    "group": "组织与权限管理",
+    "displayGroupOrder": 90,
+    "name:zh-CN": "办理成员离职",
+    "name:en": "Offboard Members",
+    "description": "查看成员、检查交接影响并办理离职；不包含移除成员",
+    "includes": [
+      "model.tenant_member.read",
+      "model.tenant_member.leave",
+      "org_management",
+      "member_management",
+      "meta.command.execute"
+    ],
+    "tier": "editor",
+    "order": 32
+  },
+  {
+    "code": "org.cap.member_remove",
+    "group": "组织与权限管理",
+    "displayGroupOrder": 90,
+    "name:zh-CN": "移除账号成员",
+    "name:en": "Remove Members",
+    "description": "查看成员、检查交接影响并移除成员的租户关系；不包含办理离职",
+    "includes": [
+      "model.tenant_member.read",
+      "model.tenant_member.delete",
+      "org_management",
+      "member_management",
+      "meta.command.execute"
+    ],
+    "tier": "editor",
+    "order": 33
+  },
+  {
     "code": "org.cap.member_view",
     "group": "组织与权限管理",
     "displayGroupOrder": 90,
