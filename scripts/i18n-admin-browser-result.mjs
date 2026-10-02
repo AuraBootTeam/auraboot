@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 export const expectedTitles = [
+  'same-role tenant administrators cannot read or mutate each other translation resources',
   'prefix and keyword filters preserve all 21 records across both pages',
   'authenticated baseline member is denied every admin CRUD and review endpoint',
   'create, edit, submit, reject with reason, approve and delete through the admin UI',
@@ -48,6 +49,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.met
   fs.writeFileSync(path.join(path.dirname(reportPath), 'i18n-browser-receipt.json'), JSON.stringify({
     schemaVersion: 1, runtime, repo, commit, ...result, passed: result.executed, failed: 0, skipped: 0,
     report: path.resolve(reportPath), reportSha256: createHash('sha256').update(bytes).digest('hex'),
-    verdict: 'pass', scope: 'Four i18n admin browser cases; tenant isolation, AI and visual review remain separate',
+    verdict: 'pass', scope: 'Four i18n admin browser cases including warm-pack invalidation and one real tenant-isolation API case; AI and visual review remain separate',
   }, null, 2) + '\n', { flag: 'wx' });
 }

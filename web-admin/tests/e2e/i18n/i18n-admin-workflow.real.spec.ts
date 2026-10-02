@@ -1,6 +1,6 @@
 // Real-stack browser workflow acceptance. No API or response mocks.
 // An executed result and original screenshot review are required for acceptance.
-import { test, expect, type Page, type APIResponse } from '@playwright/test';
+import { test, expect, request as requestFactory, type Page, type APIResponse, type APIRequestContext } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { openAsRole, makeRoleUser, ensureRoleUser, fetchRoleSnapshot } from '../rbac/rbac-helpers';
 import { ensureSidebarExpanded } from '../helpers';
@@ -14,6 +14,10 @@ async function accepted<T>(response: APIResponse): Promise<T> {
 }
 async function read(page: Page, pid: string) {
   return accepted<Resource | null>(await page.request.get(`/api/admin/i18n/resources/${pid}`));
+}
+async function packValue(page: Page, key: string) {
+  const pack = await accepted<Record<string, string>>(await page.request.get('/api/i18n/zh-CN'));
+  return pack[key];
 }
 async function openResources(page: Page) {
   await ensureSidebarExpanded(page);
@@ -55,6 +59,77 @@ async function persisted(page: Page, pid: string, status: keyof typeof statusLab
 
 test.describe('i18n admin real workflow', () => {
   test.describe.configure({ timeout: 120_000, retries: 0 });
+
+  test('same-role tenant administrators cannot read or mutate each other translation resources', async ({ browser }, info) => {
+    const backend = process.env.BACKEND_URL;
+    expect(backend, 'an explicit real backend URL is required').toBeTruthy();
+    const admin = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+    const clients: APIRequestContext[] = [];
+    const prefix = `e2e.ios-handover.${Date.now()}.${info.workerIndex}.tenant.`;
+    const identities: Array<{ tenantId: string; userId: string; roleCodes: string[] }> = [];
+    const fixtures: Resource[] = [];
+    const outcomes: Array<{ tenantId: string; foreignPid: string; method: string; code: string }> = [];
+    try {
+      for (const label of ['a', 'b']) {
+        const tenant = await accepted<{ tenantId: string; jwt: string }>(await admin.page.request.post('/api/tenant-selection/process', {
+          data: { action: 'create', tenantName: `${prefix}${label}`.replaceAll('.', '-'), displayName: `Translation isolation ${label}` },
+          timeout: 60_000,
+        }));
+        expect(tenant.jwt).toBeTruthy();
+        const client = await requestFactory.newContext({ baseURL: backend, extraHTTPHeaders: { Authorization: `Bearer ${tenant.jwt}` } });
+        clients.push(client);
+        const identity = await accepted<{ user: { id: string; tenantId: string }; permissions: { roles: Array<{ code: string }>; permissionCodes: string[] } }>(await client.get('/api/auth/me'));
+        const roleCodes = identity.permissions.roles.map(role => role.code).sort();
+        expect(roleCodes).toContain('tenant_admin');
+        expect(roleCodes).not.toContain('platform_admin');
+        expect(identity.permissions.permissionCodes).toContain('system_management');
+        expect(String(identity.user.tenantId)).toBe(String(tenant.tenantId));
+        identities.push({ tenantId: String(tenant.tenantId), userId: String(identity.user.id), roleCodes });
+        const resource = await accepted<Resource>(await client.post('/api/admin/i18n/resources', { data: {
+          key: `${prefix}shared`, lang: 'zh-CN', value: `Tenant ${label} private wording`,
+        } }));
+        await accepted(await client.put(`/api/admin/i18n/resources/${resource.pid}/status`, { data: { status: 'draft' } }));
+        fixtures.push(await accepted<Resource>(await client.post(`/api/admin/i18n/resources/${resource.pid}/submit-review`)));
+      }
+      expect(identities[0].tenantId).not.toBe(identities[1].tenantId);
+      expect(identities[0].userId).toBe(identities[1].userId);
+      expect(identities[0].roleCodes).toEqual(identities[1].roleCodes);
+      expect(fixtures[0].pid).not.toBe(fixtures[1].pid);
+      for (let i = 0; i < clients.length; i++) {
+        const client = clients[i];
+        const foreign = fixtures[1 - i];
+        const owner = clients[1 - i];
+        const before = await accepted<Resource>(await owner.get(`/api/admin/i18n/resources/${foreign.pid}`));
+        expect(await accepted(await client.get(`/api/admin/i18n/resources/${foreign.pid}`))).toBeNull();
+        const listed = await accepted<{ records: Resource[]; total: number }>(await client.get('/api/admin/i18n/resources', {
+          params: { lang: 'zh-CN', keyPrefix: prefix, pageNum: 1, pageSize: 20 },
+        }));
+        expect(Number(listed.total)).toBe(1);
+        expect(listed.records.map(resource => resource.pid)).toEqual([fixtures[i].pid]);
+        const mutations = [
+          { method: 'PUT', suffix: '', data: { value: 'Cross-tenant overwrite' } },
+          { method: 'PUT', suffix: '/status', data: { status: 'draft' } },
+          { method: 'POST', suffix: '/submit-review' },
+          { method: 'POST', suffix: '/approve' },
+          { method: 'POST', suffix: '/reject', data: { reason: 'Cross-tenant rejection' } },
+        ];
+        for (const mutation of mutations) {
+          const response = await client.fetch(`/api/admin/i18n/resources/${foreign.pid}${mutation.suffix}`, { method: mutation.method, data: mutation.data });
+          const envelope = await response.json();
+          expect(envelope.code, `${mutation.method} foreign resource${mutation.suffix}`).not.toBe('0');
+          expect(await accepted(await owner.get(`/api/admin/i18n/resources/${foreign.pid}`))).toEqual(before);
+          outcomes.push({ tenantId: identities[i].tenantId, foreignPid: foreign.pid, method: `${mutation.method}${mutation.suffix}`, code: envelope.code });
+        }
+        // Missing-PID DELETE is intentionally idempotent; it must not delete the foreign row.
+        await accepted(await client.delete(`/api/admin/i18n/resources/${foreign.pid}`));
+        expect(await accepted(await owner.get(`/api/admin/i18n/resources/${foreign.pid}`))).toEqual(before);
+      }
+      await info.attach('same-role-cross-tenant-isolation', { body: Buffer.from(JSON.stringify({ identities, fixtures: fixtures.map(resource => ({ pid: resource.pid, key: resource.i18nKey })), outcomes }, null, 2)), contentType: 'application/json' });
+    } finally {
+      for (const client of clients) await client.dispose();
+      await admin.context.close();
+    }
+  });
 
   test('prefix and keyword filters preserve all 21 records across both pages', async ({ browser }, info) => {
     const { context, page } = await openAsRole(browser, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
@@ -136,6 +211,9 @@ test.describe('i18n admin real workflow', () => {
       await openResources(page);
       await filter(page, key);
       await expect(row(page, key)).toHaveCount(0);
+      // Warm the actual pack cache before mutation; a fresh uncached read alone
+      // would not prove that the mutation invalidates a previously loaded pack.
+      expect(await packValue(page, key)).toBeUndefined();
       await page.getByPlaceholder('key', { exact: true }).fill(key);
       await page.getByLabel('new lang', { exact: true }).selectOption('zh-CN');
       await page.getByPlaceholder(/^(文案|value)$/).fill('Original handover translation');
@@ -146,19 +224,23 @@ test.describe('i18n admin real workflow', () => {
       expect(created.value).toBe('Original handover translation');
       // Current product contract: a privileged manual create is approved.
       await persisted(page, created.pid, 'approved');
+      expect(await packValue(page, key)).toBe('Original handover translation');
       await expect(page.getByPlaceholder('key', { exact: true })).toHaveValue('');
 
       // Supported admin fixture operation establishes the draft under review.
       await accepted(await page.request.put(`/api/admin/i18n/resources/${created.pid}/status`, { data: { status: 'draft' } }));
       await filter(page, key);
       await persisted(page, created.pid, 'draft');
+      expect(await packValue(page, key)).toBeUndefined();
       await row(page, key).getByLabel(`edit-${key}`, { exact: true }).click();
       await row(page, key).getByRole('textbox').fill('Revised handover translation');
       await row(page, key).getByRole('button', { name: /^(保存|Save)$/ }).click();
       expect((await persisted(page, created.pid, 'draft')).value).toBe('Revised handover translation');
+      expect(await packValue(page, key)).toBeUndefined();
       await expect(row(page, key).getByLabel(`approve-${key}`, { exact: true })).toHaveCount(0);
       await row(page, key).getByLabel(`submit-review-${key}`, { exact: true }).click();
       await persisted(page, created.pid, 'review');
+      expect(await packValue(page, key)).toBeUndefined();
       await row(page, key).getByLabel(`reject-${key}`, { exact: true }).click();
       const dialog = page.getByRole('dialog');
       const reason = dialog.getByLabel(/^(驳回原因（必填）|Rejection reason \(required\))$/);
@@ -181,6 +263,7 @@ test.describe('i18n admin real workflow', () => {
       const approved = await persisted(page, created.pid, 'approved');
       expect(approved.rejectReason).toBeNull();
       expect(Number.isFinite(Date.parse(approved.reviewedAt!))).toBe(true);
+      expect(await packValue(page, key)).toBe('Revised handover translation');
       await info.attach('approved-original', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
       await row(page, key).getByLabel(`delete-${key}`, { exact: true }).click();
@@ -190,6 +273,7 @@ test.describe('i18n admin real workflow', () => {
       await page.getByRole('dialog').getByRole('button', { name: /^(确认|Confirm)$/ }).click();
       await expect.poll(() => read(page, created.pid)).toBeNull();
       await expect(row(page, key)).toHaveCount(0);
+      expect(await packValue(page, key)).toBeUndefined();
     } finally { await context.close(); }
   });
 
