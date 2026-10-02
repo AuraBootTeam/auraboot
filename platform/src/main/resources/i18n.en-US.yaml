@@ -1794,3 +1794,8 @@ aurabot:
 "admin.permission.capability.revokePartialV2": "Revoke existing grants"
 "admin.permission.capability.undoRevokeV2": "Pending revocation · undo"
 "admin.permission.capability.scopeNamesErrorV2": "Could not load business names. Close and reopen to try again."
+"admin.permission.members.temporary": "Time-bounded access"
+"admin.permission.members.effectiveDate": "Effective date"
+"admin.permission.members.expiryDate": "Expiry date"
+"admin.permission.members.colValidity": "Validity"
+"admin.permission.members.permanent": "Permanent"

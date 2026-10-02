@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useContributionRegistry } from '~/framework/extensions/use-contribution';
 import {
   MagnifyingGlassIcon,
   BuildingOffice2Icon,
@@ -51,7 +52,9 @@ export default function AddMemberDialog({
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('org');
+  const registry = useContributionRegistry();
+  const hasOrgPicker = Boolean(registry.getRenderer('org-tree-picker'));
+  const [activeTab, setActiveTab] = useState<TabKey>(hasOrgPicker ? 'org' : 'list');
   const [submitting, setSubmitting] = useState(false);
 
   // Org tree mode
@@ -72,7 +75,7 @@ export default function AddMemberDialog({
 
   useEffect(() => {
     if (open) {
-      setActiveTab('org');
+      setActiveTab(hasOrgPicker ? 'org' : 'list');
       setOrgSelectedPids([]);
       setListSelectedPids(new Set());
       setListKeyword('');
@@ -81,7 +84,7 @@ export default function AddMemberDialog({
       setEffectiveDate(new Date().toISOString().slice(0, 10));
       setExpiryDate('');
     }
-  }, [open]);
+  }, [open, hasOrgPicker]);
 
   // ---------------------------------------------------------------------------
   // Load candidates for list mode
@@ -196,7 +199,7 @@ export default function AddMemberDialog({
         {/* Tab switch */}
         <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="-mb-px flex space-x-4">
-            <button
+            {hasOrgPicker && <button
               data-testid="add-member-tab-org"
               onClick={() => setActiveTab('org')}
               className={`flex items-center border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
@@ -207,7 +210,7 @@ export default function AddMemberDialog({
             >
               <BuildingOffice2Icon className="mr-1.5 h-4 w-4" />
               {t('admin.permission.members.tabOrg', undefined, 'Organization')}
-            </button>
+            </button>}
             <button
               data-testid="add-member-tab-list"
               onClick={() => setActiveTab('list')}

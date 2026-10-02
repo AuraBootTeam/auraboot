@@ -4244,5 +4244,30 @@
     "key": "admin.permission.capability.scopeNamesErrorV2",
     "zh-CN": "无法加载业务名称，请关闭后重新打开。",
     "en-US": "Could not load business names. Close and reopen to try again."
+  },
+  {
+    "key": "admin.permission.members.temporary",
+    "zh-CN": "限时授权",
+    "en-US": "Time-bounded access"
+  },
+  {
+    "key": "admin.permission.members.effectiveDate",
+    "zh-CN": "生效日期",
+    "en-US": "Effective date"
+  },
+  {
+    "key": "admin.permission.members.expiryDate",
+    "zh-CN": "到期日期",
+    "en-US": "Expiry date"
+  },
+  {
+    "key": "admin.permission.members.colValidity",
+    "zh-CN": "有效期",
+    "en-US": "Validity"
+  },
+  {
+    "key": "admin.permission.members.permanent",
+    "zh-CN": "长期有效",
+    "en-US": "Permanent"
   }
 ]

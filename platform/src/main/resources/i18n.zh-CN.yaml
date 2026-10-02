@@ -2100,3 +2100,8 @@ aurabot:
 "admin.permission.capability.revokePartialV2": "撤销已有授权"
 "admin.permission.capability.undoRevokeV2": "待撤销 · 取消撤销"
 "admin.permission.capability.scopeNamesErrorV2": "无法加载业务名称，请关闭后重新打开。"
+"admin.permission.members.temporary": "限时授权"
+"admin.permission.members.effectiveDate": "生效日期"
+"admin.permission.members.expiryDate": "到期日期"
+"admin.permission.members.colValidity": "有效期"
+"admin.permission.members.permanent": "长期有效"
