@@ -354,8 +354,9 @@ S5. Commercial edition. The Licensor offers a commercial/enterprise
     respect to the commercial edition; they never revoke or restrict the
     Part 1 grant on the AuraBoot Software.
 
-S6. Termination and survival are governed exclusively by Part 1 §9 and §10.
-    There is no additional breach-based termination of the Part 1 grant.
+S6. Patent-license termination is governed by Part 1 §3. This
+    supplementary part adds no breach-based termination provision and
+    does not alter the rights or obligations in Part 1.
 
 S7. Precedence. If a supplementary term in Part 2 is held to restrict a
     right granted by Part 1, that term is severed and Part 1 controls.
